@@ -1,7 +1,7 @@
 """
 Epic v0 compiler — M1: minimal pipeline
 Input:  .ep source
-Output: .exe via nasm + lld-link
+Output: .exe via nasm + link.py
 
 Usage: python epicc.py <file.ep>
 """
@@ -16,6 +16,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TOOLS_DIR = os.path.join(SCRIPT_DIR, "tools")
 NASM = os.path.join(TOOLS_DIR, "nasm.exe")
 LLD_LINK = os.path.join(TOOLS_DIR, "lld-link.exe")
+LINK_PY = os.path.join(SCRIPT_DIR, "link.py")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 
 
@@ -1090,18 +1091,11 @@ def compile_file(input_path):
 
     print(f"[4/4] Linking → {exe_path}")
     result = subprocess.run(
-        [
-            LLD_LINK,
-            "/subsystem:console",
-            "/entry:_start",
-            obj_path,
-            os.path.join(SDK_LIB, "kernel32.lib"),
-            f"/out:{exe_path}",
-        ],
+        [sys.executable, LINK_PY, obj_path, "-o", exe_path],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
-        print("LLD error:\n" + result.stderr)
+        print("Link error:\n" + result.stderr)
         sys.exit(1)
 
     size = os.path.getsize(exe_path)

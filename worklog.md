@@ -63,6 +63,12 @@
 - `fopen(path, mode)`, `fread(fd, buf, len)`, `fwrite(fd, buf, len)`, `fclose(fd)`
 - 数组名作表达式返回 `.data` 地址
 
+### PE linker `link.py` (2026-06-25)
+- 自写 PE linker：COFF 解析 → PE 生成，替代 lld-link (68MB → 8KB)
+- 支持 REL32 relocation（import + section-relative），thunk + IAT
+- 基础功能通（8/13 测试），扩展 import（lstrlenA 等）待修
+- 产出的 .exe 约 2KB（vs lld-link 的 2.5KB）
+
 ### Bug 修复记录
 - `default rel` 缺失：NASM 默认用绝对寻址导致 ACCESS_VIOLATION
 - `_buf+r8-1` 超出 32-bit 位移：改成 `lea rax, [_buf-1]; mov [rax+r8], 10`
