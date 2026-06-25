@@ -1,3 +1,10 @@
+# EXIT 0
+# STDOUT 3
+# STDOUT 1
+# STDOUT 70
+# STDOUT 9
+# STDOUT -5
+# STDOUT 5
 fn main() -> i64 {
     puti(10 / 3);
     puti(10 % 3);

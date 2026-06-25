@@ -1,3 +1,6 @@
+# EXIT 0
+# STDOUT HI
+# STDOUT 90
 fn to_upper(c: i8) -> i64 {
     if (c >= 'a') {
         if (c <= 'z') {

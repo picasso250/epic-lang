@@ -61,7 +61,7 @@ TOKEN_SPEC = [
     ("COLON",     r':'),
     ("CHAR",      r"'[^']'"),
     ("STRING",    r'"[^"]*"'),
-    ("COMMENT",   r'//[^\n]*'),
+    ("COMMENT",   r'#[^\n]*'),
     ("WHITESPACE", r'[ \t\n\r]+'),
 ]
 
@@ -423,7 +423,7 @@ class Emitter:
         self.emit("global _start")
         self.emit("extern ExitProcess")
         self.emit("extern GetStdHandle")
-        self.emit("extern WriteConsoleA")
+        self.emit("extern WriteFile")
         self.emit("default rel")
         self.emit("")
 
@@ -678,9 +678,10 @@ class Emitter:
                 self.emit("    lea rdx, [_buf]")
                 self.emit("    mov r8, 1")
                 self.emit("    lea r9, [_written]")
-                self.emit("    sub rsp, 32")
-                self.emit("    call WriteConsoleA")
-                self.emit("    add rsp, 32")
+                self.emit("    sub rsp, 40")
+                self.emit("    mov qword [rsp+32], 0")
+                self.emit("    call WriteFile")
+                self.emit("    add rsp, 40")
             return
 
         # User-defined function call
@@ -696,7 +697,7 @@ class Emitter:
         self.emit(f"    add rsp, 32")
 
     def emit_string(self, s):
-        """Emit a single WriteConsoleA call for the whole string."""
+        """Emit a single WriteFile call for the whole string."""
         n = len(s)
         if n == 0:
             self.emit("    mov rax, 0")
@@ -711,9 +712,10 @@ class Emitter:
         self.emit("    lea rdx, [_buf]")
         self.emit(f"    mov r8, {n + 1}")
         self.emit("    lea r9, [_written]")
-        self.emit("    sub rsp, 32")
-        self.emit("    call WriteConsoleA")
-        self.emit("    add rsp, 32")
+        self.emit("    sub rsp, 40")
+        self.emit("    mov qword [rsp+32], 0")
+        self.emit("    call WriteFile")
+        self.emit("    add rsp, 40")
 
     def emit_binary(self, expr):
         op = expr["op"]
@@ -898,13 +900,14 @@ _itoa_write:
     mov ecx, -11          ; STD_OUTPUT_HANDLE
     call GetStdHandle
 
-    mov rcx, rax          ; hConsole
+    mov rcx, rax          ; hFile
     lea rdx, [_buf]       ; lpBuffer
     mov r8, [rbp-8]       ; restore length
     lea r9, [_written]
-    sub rsp, 32
-    call WriteConsoleA
-    add rsp, 32
+    sub rsp, 40
+    mov qword [rsp+32], 0
+    call WriteFile
+    add rsp, 40
 
     mov rsp, rbp
     pop rbp
