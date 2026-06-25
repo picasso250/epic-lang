@@ -1,0 +1,16 @@
+fn main() -> i64 {
+    let buf: i8[10];
+    buf[0] = 'E';
+    buf[1] = 'p';
+    buf[2] = 'i';
+    buf[3] = 'c';
+    buf[4] = 10;
+
+    let i: i64 = 0;
+    while (i < 5) {
+        putc(buf[i]);
+        i = i + 1;
+    }
+    puti(buf[0]);
+    exit(0);
+}

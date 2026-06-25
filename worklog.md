@@ -45,6 +45,12 @@
 - 栈上仍占 8 字节（对齐简化），自动 `movsx` 提升到 i64 运算
 - 存储用 `al` / `cl` 等低字节，加载用 `movsx`
 
+### M9: 静态数组 (2026-06-25)
+- `let buf: i8[N]` 声明 → `.data` 段 `resb N`
+- `buf[i]` 读：`lea + movsx`；写：`lea + mov [rcx], al`
+- 仅支持全局数组（不传参），预扫描到 `.data` 段
+- 无边界检查
+
 ### Bug 修复记录
 - `default rel` 缺失：NASM 默认用绝对寻址导致 ACCESS_VIOLATION
 - `_buf+r8-1` 超出 32-bit 位移：改成 `lea rax, [_buf-1]; mov [rax+r8], 10`

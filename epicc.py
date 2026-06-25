@@ -50,6 +50,8 @@ TOKEN_SPEC = [
     ("PERCENT",   r'%'),
     ("BANG",      r'!'),
     ("ASSIGN",    r'='),
+    ("LBRACKET",  r'\['),
+    ("RBRACKET",  r'\]'),
     ("LPAREN",    r'\('),
     ("RPAREN",    r'\)'),
     ("LBRACE",    r'\{'),
@@ -223,9 +225,11 @@ class Parser:
         if t[0] == "WHILE":
             return self.parse_while_stmt()
         if t[0] == "ID":
-            # Look ahead: if next is ASSIGN, it's an assignment; otherwise expr
-            if self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "ASSIGN":
-                return self.parse_assign_stmt()
+            # Look ahead: [ → array access/assign; = → scalar assign; otherwise expr
+            if self.pos + 1 < len(self.tokens):
+                nxt = self.tokens[self.pos + 1][0]
+                if nxt in ("ASSIGN", "LBRACKET"):
+                    return self.parse_assign_stmt()
         if t[0] in self.EXPR_FIRST:
             return self.parse_expr_stmt()
         raise ParseError(f"Unexpected token {t[0]} in statement", t[2])
@@ -242,6 +246,12 @@ class Parser:
         name = self.expect("ID")
         self.expect("COLON")
         typ = self.parse_type()
+        # Check for array: let buf: i8[4096];
+        if self.check("LBRACKET"):
+            size_tok = self.expect("NUMBER")
+            self.expect("RBRACKET")
+            self.expect("SEMICOLON")
+            return {"type": "array_decl", "name": name[1], "elem_type": typ, "size": size_tok[1]}
         self.expect("ASSIGN")
         value = self.parse_expr()
         self.expect("SEMICOLON")
@@ -249,6 +259,15 @@ class Parser:
 
     def parse_assign_stmt(self):
         name = self.expect("ID")
+        # Check for array assign: buf[i] = expr;
+        if self.check("LBRACKET"):
+            index = self.parse_expr()
+            self.expect("RBRACKET")
+            self.expect("ASSIGN")
+            value = self.parse_expr()
+            self.expect("SEMICOLON")
+            return {"type": "array_set", "name": name[1], "index": index, "value": value}
+        # Scalar assign: x = expr;
         self.expect("ASSIGN")
         value = self.parse_expr()
         self.expect("SEMICOLON")
@@ -353,6 +372,10 @@ class Parser:
                 args = self.parse_args()
                 self.expect("RPAREN")
                 return {"type": "call", "name": name, "args": args}
+            if self.check("LBRACKET"):
+                index = self.parse_expr()
+                self.expect("RBRACKET")
+                return {"type": "array_get", "name": name, "index": index}
             return {"type": "var", "name": name}
         if self.check("LPAREN"):
             expr = self.parse_expr()
@@ -403,10 +426,24 @@ class Emitter:
         self.emit("extern WriteConsoleA")
         self.emit("default rel")
         self.emit("")
+
+        # Collect array declarations from all functions
+        self.arrays = {}  # name → {elem_type, size}
+        for func in ast.get("funcs", []):
+            for stmt in func.get("body", {}).get("stmts", []):
+                if stmt["type"] == "array_decl":
+                    self.arrays[stmt["name"]] = {
+                        "elem_type": stmt["elem_type"],
+                        "size": stmt["size"]
+                    }
+
         self.emit("section .data")
         self.emit("    _buf times 32 db 0")
         self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
+        for name, info in self.arrays.items():
+            size = info["size"]
+            self.emit(f"    {name} resb {size}")
         self.emit("")
         self.emit("section .text")
         self.emit("")
@@ -485,6 +522,10 @@ class Emitter:
             self.emit_expr(stmt["expr"])
         elif t == "let":
             self.emit_let(stmt)
+        elif t == "array_decl":
+            pass  # already emitted in .data section
+        elif t == "array_set":
+            self.emit_array_set(stmt)
         elif t == "if":
             self.emit_if(stmt)
         elif t == "while":
@@ -543,6 +584,38 @@ class Emitter:
         self.emit(f"    jmp {start_label}")
         self.emit(f"{end_label}:")
 
+    def emit_array_get(self, expr):
+        """result = buf[i]"""
+        name = expr["name"]
+        info = self.arrays.get(name)
+        if info is None:
+            raise RuntimeError(f"Undefined array: {name}")
+        elem_type = info["elem_type"]
+        self.emit_expr(expr["index"])
+        self.emit(f"    lea rcx, [{name}]")
+        if elem_type == "i8":
+            self.emit("    movsx rax, byte [rcx + rax]")
+        else:
+            self.emit("    mov rax, [rcx + rax*8]")
+
+    def emit_array_set(self, stmt):
+        """buf[i] = expr;"""
+        name = stmt["name"]
+        info = self.arrays.get(name)
+        if info is None:
+            raise RuntimeError(f"Undefined array: {name}")
+        elem_type = info["elem_type"]
+        self.emit_expr(stmt["value"])
+        self.emit("    push rax")  # save value
+        self.emit_expr(stmt["index"])
+        self.emit(f"    lea rcx, [{name}]")
+        self.emit("    add rcx, rax")
+        self.emit("    pop rax")  # restore value
+        if elem_type == "i8":
+            self.emit("    mov [rcx], al")
+        else:
+            self.emit("    mov [rcx], rax")
+
     def emit_assign(self, stmt):
         name = stmt["name"]
         self.emit_expr(stmt["value"])
@@ -575,6 +648,8 @@ class Emitter:
                 self.emit(f"    mov rax, [rbp{slot:+d}]")
         elif t == "call":
             self.emit_call(expr)
+        elif t == "array_get":
+            self.emit_array_get(expr)
         elif t == "binary":
             self.emit_binary(expr)
         elif t == "unary":
