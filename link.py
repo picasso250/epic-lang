@@ -55,8 +55,12 @@ def link(obj_path, exe_path):
     strtab = data[strtab_start:strtab_start + strtab_sz]
 
     # ── Find imports ──
-    imports = [sym_name(s, strtab) for s in syms
-               if s['section'] == 0 and s['aux'] == 0 and s['name_off'] is not None]
+    imports = []
+    for s in syms:
+        if s['section'] == 0 and s['aux'] == 0:
+            n = sym_name(s, strtab)
+            if n and n not in imports:
+                imports.append(n)
 
     # ── Find all REL32 relocations ──
     relocs = []
@@ -80,6 +84,15 @@ def link(obj_path, exe_path):
         if 'text' in s['name']: sec_rva[j] = text_rva
         elif 'data' in s['name']: sec_rva[j] = data_rva
 
+    # ── Find entry point from symbol table ──
+    entry_rva = text_rva
+    for s in syms:
+        if s['section'] > 0:
+            n = sym_name(s, strtab)
+            if n == '_start':
+                entry_rva = sec_rva.get(s['section'] - 1, 0) + s['value']
+                break
+
     # ── Build .idata ──
     idata, iat_map = build_idata(imports, idata_rva)
 
@@ -97,7 +110,7 @@ def link(obj_path, exe_path):
     for (si, rva, sym_i) in relocs:
         s = syms[sym_i]
         target = 0
-        if s['section'] == 0 and s['aux'] == 0 and s['name_off'] is not None:
+        if s['section'] == 0 and s['aux'] == 0:
             func = sym_name(s, strtab)
             target = thunk_rva.get(func, 0)
         elif s['section'] > 0:
@@ -109,7 +122,7 @@ def link(obj_path, exe_path):
             struct.pack_into('<i', text_sec['data'], rva, disp)
 
     # ── Write PE ──
-    return write_pe(exe_path, text_sec, data_sec, idata, idata_rva, imports)
+    return write_pe(exe_path, text_sec, data_sec, idata, idata_rva, imports, entry_rva)
 
 
 def build_idata(imports, idata_rva):
@@ -139,7 +152,7 @@ def build_idata(imports, idata_rva):
     return bytes(idt + ilt + hint_blob) + b'kernel32.dll\x00', iat_map
 
 
-def write_pe(path, text_sec, data_sec, idata, idata_rva, imports):
+def write_pe(path, text_sec, data_sec, idata, idata_rva, imports, entry_rva):
     TEXT_RVA, DATA_RVA = 0x1000, 0x2000
     all_sec = [
         ('.text', TEXT_RVA, bytes(text_sec['data']), 0x60000020),
@@ -166,7 +179,7 @@ def write_pe(path, text_sec, data_sec, idata, idata_rva, imports):
                        0, 0, 0, OPT_HDR, 0x0022)
     buf += struct.pack('<HBB', 0x020B, 0, 0)
     buf += struct.pack('<III', text_raw, data_raw + idata_raw, 0)
-    buf += struct.pack('<II', TEXT_RVA, TEXT_RVA)
+    buf += struct.pack('<II', entry_rva, TEXT_RVA)
     buf += struct.pack('<Q', IMAGE_BASE)
     buf += struct.pack('<II', SECTION_ALIGN, FILE_ALIGN)
     buf += struct.pack('<HHHH', 6, 0, 0, 0)
