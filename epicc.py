@@ -400,12 +400,16 @@ class Parser:
 class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
-        self.builtins = {"exit", "puti", "putc"}
+        self.builtins = {"exit", "puti", "putc", "putstr",
+                         "fopen", "fread", "fwrite", "fclose",
+                         "strcmp", "strcpy"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.label_counter = 0
         self.current_fn = ""
         self.alloc_size = 0     # bytes allocated after push rbp / mov rbp, rsp
+        self.strings = {}       # literal text → label name
+        self.string_counter = 0
 
     def emit(self, s):
         self.out.write(s + "\n")
@@ -424,32 +428,77 @@ class Emitter:
         self.emit("extern ExitProcess")
         self.emit("extern GetStdHandle")
         self.emit("extern WriteFile")
+        self.emit("extern CreateFileA")
+        self.emit("extern ReadFile")
+        self.emit("extern CloseHandle")
+        self.emit("extern lstrcmpA")
+        self.emit("extern lstrcpyA")
+        self.emit("extern lstrlenA")
         self.emit("default rel")
         self.emit("")
 
-        # Collect array declarations from all functions
-        self.arrays = {}  # name → {elem_type, size}
+        # Collect arrays and strings from AST
+        self.arrays = {}
+        self.strings = {}
+        self.string_counter = 0
         for func in ast.get("funcs", []):
-            for stmt in func.get("body", {}).get("stmts", []):
-                if stmt["type"] == "array_decl":
-                    self.arrays[stmt["name"]] = {
-                        "elem_type": stmt["elem_type"],
-                        "size": stmt["size"]
-                    }
+            self._collect_from_block(func.get("body", {}))
 
         self.emit("section .data")
         self.emit("    _buf times 32 db 0")
         self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
         for name, info in self.arrays.items():
-            size = info["size"]
-            self.emit(f"    {name} resb {size}")
+            self.emit(f"{name}: resb {info['size']}")
+        # Emit string literals (null-terminated)
+        for label, text in sorted(self.strings.items(), key=lambda x: x[0]):
+            escaped = text.replace("\\", "\\\\").replace('"', '"')
+            self.emit(f'{label}: db "{escaped}", 0')
         self.emit("")
         self.emit("section .text")
         self.emit("")
 
         for func in ast.get("funcs", []):
             self.emit_fn_def(func)
+
+    def _collect_from_block(self, block):
+        """Recursively collect arrays and strings from AST."""
+        for stmt in block.get("stmts", []):
+            if stmt["type"] == "array_decl":
+                self.arrays[stmt["name"]] = {
+                    "elem_type": stmt["elem_type"],
+                    "size": stmt["size"]
+                }
+            elif stmt["type"] == "if":
+                self._collect_from_block(stmt["then_block"])
+                if stmt.get("else_block"):
+                    self._collect_from_block(stmt["else_block"])
+            elif stmt["type"] == "while":
+                self._collect_from_block(stmt["body"])
+            # Collect strings from expressions
+            self._collect_strings(stmt)
+
+    def _collect_strings(self, node):
+        """Recursively find string literals and register them."""
+        if isinstance(node, dict):
+            if node.get("type") == "string":
+                self.get_string_label(node["value"])
+            for v in node.values():
+                self._collect_strings(v)
+        elif isinstance(node, list):
+            for item in node:
+                self._collect_strings(item)
+
+    def get_string_label(self, text):
+        # Check if text already has a label
+        for lbl, txt in self.strings.items():
+            if txt == text:
+                return lbl
+        # New string
+        self.string_counter += 1
+        label = f"_str_{self.string_counter}"
+        self.strings[label] = text
+        return label
 
     FRAME_LOCALS = 32  # generous fixed allocation (32 i64 slots)
 
@@ -519,7 +568,10 @@ class Emitter:
         if t == "return":
             self.emit_return(stmt)
         elif t == "expr_stmt":
-            self.emit_expr(stmt["expr"])
+            if stmt["expr"]["type"] == "string":
+                self.emit_string_print(stmt["expr"]["value"])
+            else:
+                self.emit_expr(stmt["expr"])
         elif t == "let":
             self.emit_let(stmt)
         elif t == "array_decl":
@@ -635,17 +687,22 @@ class Emitter:
         if t == "literal":
             self.emit(f"    mov rax, {expr['value']}")
         elif t == "string":
-            self.emit_string(expr["value"])
+            label = self.get_string_label(expr["value"])
+            self.emit(f"    lea rax, [{label}]")
         elif t == "var":
             name = expr["name"]
-            slot = self.local_offset.get(name)
-            if slot is None:
-                raise RuntimeError(f"Undefined variable: {name}")
-            var_type = self.local_types.get(name, "i64")
-            if var_type == "i8":
-                self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
+            # Check if it's an array name
+            if name in self.arrays:
+                self.emit(f"    lea rax, [{name}]")
             else:
-                self.emit(f"    mov rax, [rbp{slot:+d}]")
+                slot = self.local_offset.get(name)
+                if slot is None:
+                    raise RuntimeError(f"Undefined variable: {name}")
+                var_type = self.local_types.get(name, "i64")
+                if var_type == "i8":
+                    self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
+                else:
+                    self.emit(f"    mov rax, [rbp{slot:+d}]")
         elif t == "call":
             self.emit_call(expr)
         elif t == "array_get":
@@ -682,6 +739,113 @@ class Emitter:
                 self.emit("    mov qword [rsp+32], 0")
                 self.emit("    call WriteFile")
                 self.emit("    add rsp, 40")
+            elif name == "putstr":
+                # putstr(ptr): write null-terminated string to stdout
+                # Save params to stack before GetStdHandle clobbers volatile regs
+                self.emit_expr(args[0])  # rax = ptr
+                self.emit("    mov rcx, rax")
+                self.emit("    call lstrlenA")  # rax = length
+                self.emit("    push rax")       # save length on stack
+                self.emit_expr(args[0])  # rax = ptr
+                self.emit("    push rax")       # save ptr on stack
+                self.emit("    mov ecx, -11")
+                self.emit("    call GetStdHandle")  # rax = handle
+                self.emit("    mov rcx, rax")
+                self.emit("    pop rdx")        # restore ptr → rdx
+                self.emit("    pop r8")         # restore length → r8
+                self.emit("    lea r9, [_written]")
+                self.emit("    sub rsp, 48")
+                self.emit("    mov qword [rsp+32], 0")
+                self.emit("    call WriteFile")
+                self.emit("    add rsp, 48")
+            elif name == "strcmp":
+                # strcmp(ptr, "literal") → lstrcmpA(ptr, literal_addr)
+                self.emit_expr(args[1])
+                self.emit("    mov rdx, rax")
+                self.emit_expr(args[0])
+                self.emit("    mov rcx, rax")
+                self.emit("    sub rsp, 40")
+                self.emit("    call lstrcmpA")
+                self.emit("    add rsp, 40")
+            elif name == "strcpy":
+                # strcpy(dst_ptr, "literal") → lstrcpyA(dst_ptr, literal_addr)
+                self.emit_expr(args[1])
+                self.emit("    mov rdx, rax")
+                self.emit_expr(args[0])
+                self.emit("    mov rcx, rax")
+                self.emit("    sub rsp, 40")
+                self.emit("    call lstrcpyA")
+                self.emit("    add rsp, 40")
+            elif name == "fopen":
+                # fopen(path_ptr, mode) → CreateFileA
+                rl = self.fresh_label()  # read label
+                wl = self.fresh_label()  # write skip label (after write path)
+                dl = self.fresh_label()  # done label
+                self.emit_expr(args[1])  # rax = mode
+                self.emit("    test rax, rax")
+                self.emit(f"    jz {rl}")
+                # Write mode
+                self.emit_expr(args[0])  # rax = path
+                self.emit("    mov rcx, rax")
+                self.emit("    mov edx, 0x40000000")  # GENERIC_WRITE
+                self.emit("    xor r8d, r8d")
+                self.emit("    xor r9d, r9d")
+                self.emit("    sub rsp, 56")
+                self.emit("    mov dword [rsp+32], 2")       # CREATE_ALWAYS
+                self.emit("    mov dword [rsp+40], 0x80")
+                self.emit("    mov qword [rsp+48], 0")
+                self.emit("    call CreateFileA")
+                self.emit("    add rsp, 56")
+                self.emit(f"    jmp {dl}")
+                self.emit(f"{rl}:")
+                self.emit_expr(args[0])  # rax = path
+                self.emit("    mov rcx, rax")
+                self.emit("    mov edx, 0x80000000")  # GENERIC_READ
+                self.emit("    mov r8d, 1")
+                self.emit("    xor r9d, r9d")
+                self.emit("    sub rsp, 56")
+                self.emit("    mov dword [rsp+32], 3")       # OPEN_EXISTING
+                self.emit("    mov dword [rsp+40], 0x80")
+                self.emit("    mov qword [rsp+48], 0")
+                self.emit("    call CreateFileA")
+                self.emit("    add rsp, 56")
+                self.emit(f"{dl}:")
+            elif name == "fread":
+                # fread(fd, buf_ptr, len) → ReadFile
+                self.emit_expr(args[2])  # len
+                self.emit("    mov r8, rax")
+                self.emit_expr(args[1])  # buf
+                self.emit("    mov rdx, rax")
+                self.emit_expr(args[0])  # fd
+                self.emit("    mov rcx, rax")
+                self.emit("    lea r9, [_written]")
+                self.emit("    sub rsp, 40")
+                self.emit("    mov qword [rsp+32], 0")  # lpOverlapped = NULL
+                self.emit("    call ReadFile")
+                self.emit("    add rsp, 40")
+                # Return bytes read (from _written)
+                self.emit("    mov eax, [_written]")
+            elif name == "fwrite":
+                # fwrite(fd, buf_ptr, len) → WriteFile
+                self.emit_expr(args[2])  # len
+                self.emit("    mov r8, rax")
+                self.emit_expr(args[1])  # buf
+                self.emit("    mov rdx, rax")
+                self.emit_expr(args[0])  # fd
+                self.emit("    mov rcx, rax")
+                self.emit("    lea r9, [_written]")
+                self.emit("    sub rsp, 40")
+                self.emit("    mov qword [rsp+32], 0")
+                self.emit("    call WriteFile")
+                self.emit("    add rsp, 40")
+                self.emit("    mov eax, [_written]")
+            elif name == "fclose":
+                # fclose(fd) → CloseHandle
+                self.emit_expr(args[0])
+                self.emit("    mov rcx, rax")
+                self.emit("    sub rsp, 32")
+                self.emit("    call CloseHandle")
+                self.emit("    add rsp, 32")
             return
 
         # User-defined function call
@@ -696,13 +860,11 @@ class Emitter:
         self.emit(f"    call {name}")
         self.emit(f"    add rsp, 32")
 
-    def emit_string(self, s):
-        """Emit a single WriteFile call for the whole string."""
+    def emit_string_print(self, s):
+        """Print a string literal as a statement (e.g. "hello";)."""
         n = len(s)
         if n == 0:
-            self.emit("    mov rax, 0")
             return
-        # Write string to _buf with a newline
         for i, ch in enumerate(s):
             self.emit(f"    mov byte [_buf+{i}], {ord(ch)}")
         self.emit(f"    mov byte [_buf+{n}], 10")
@@ -821,28 +983,28 @@ _itoa_write:
 
     ; handle negative
     test rax, rax
-    jns .itoa_positive
+    jns itoa_positive
     mov byte [_buf], '-'
     neg rax
     mov r10, 1
-    jmp .itoa_convert
+    jmp itoa_convert
 
-.itoa_positive:
+itoa_positive:
     ; handle zero
     test rax, rax
-    jnz .itoa_nonzero
+    jnz itoa_nonzero
     mov byte [_buf], '0'
     mov byte [_buf+1], 10
     mov r8, 2
-    jmp .itoa_print
+    jmp itoa_print
 
-.itoa_nonzero:
+itoa_nonzero:
     mov r10, 0  ; offset for sign
 
-.itoa_convert:
+itoa_convert:
     ; write digits backwards from _buf_end
     lea r11, [_buf_end]
-.itoa_loop:
+itoa_loop:
     dec r11
     xor rdx, rdx
     mov rcx, 10
@@ -850,7 +1012,7 @@ _itoa_write:
     add dl, '0'
     mov [r11], dl
     test rax, rax
-    jnz .itoa_loop
+    jnz itoa_loop
 
     ; compute length: _buf_end - r11 + r10 + 1 (for newline)
     lea r8, [_buf_end]
@@ -860,42 +1022,42 @@ _itoa_write:
 
     ; if negative, shift digits right by 1
     test r10, r10
-    jz .itoa_copy
+    jz itoa_copy
 
     ; copy from r11 to _buf+1
     mov rcx, r11
     lea rdx, [_buf+1]
     mov rax, r8
     sub rax, 2  ; length without sign and newline
-.itoa_shift:
+itoa_shift:
     mov bl, [rcx]
     mov [rdx], bl
     inc rcx
     inc rdx
     dec rax
-    jnz .itoa_shift
-    jmp .itoa_newline
+    jnz itoa_shift
+    jmp itoa_newline
 
-.itoa_copy:
+itoa_copy:
     ; copy from r11 to _buf
     mov rcx, r11
     lea rdx, [_buf]
     mov rax, r8
     sub rax, 1  ; length without newline
-.itoa_copy_loop:
+itoa_copy_loop:
     mov bl, [rcx]
     mov [rdx], bl
     inc rcx
     inc rdx
     dec rax
-    jnz .itoa_copy_loop
+    jnz itoa_copy_loop
 
-.itoa_newline:
+itoa_newline:
     ; write newline at end (use lea to avoid 32-bit displacement overflow)
     lea rax, [_buf-1]
     mov byte [rax+r8], 10
 
-.itoa_print:
+itoa_print:
     mov [rbp-8], r8       ; save length (GetStdHandle clobbers r8)
     mov ecx, -11          ; STD_OUTPUT_HANDLE
     call GetStdHandle

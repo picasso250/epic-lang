@@ -1,0 +1,25 @@
+# EXIT 0
+# STDOUT 42
+# STDOUT 2
+fn main() -> i64 {
+    # Write a file
+    let out: i8[100];
+    let fd: i64 = fopen("test_out.txt", 1);
+    strcpy(out, "42");
+    fwrite(fd, out, 2);
+    fclose(fd);
+
+    # Read it back
+    let inp: i8[100];
+    fd = fopen("test_out.txt", 0);
+    let n: i64 = fread(fd, inp, 100);
+    fclose(fd);
+
+    # Print what we read
+    # inp[0] = '4', inp[1] = '2'
+    putc(inp[0]);
+    putc(inp[1]);
+    putc(10);
+    puti(n);
+    exit(0);
+}

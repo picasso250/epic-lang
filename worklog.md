@@ -51,6 +51,18 @@
 - 仅支持全局数组（不传参），预扫描到 `.data` 段
 - 无边界检查
 
+### 工具
+- `runtests.py`: 自动测试框架，扫描 `# EXIT` / `# STDOUT` 标注，13/13 通过 (2026-06-25)
+- 注释语法改为 `#`，输出改为 `WriteFile` (可重定向捕获)
+
+### M10: 字符串表达式 + builtin (2026-06-25)
+- `"..."` 在表达式位置返回 `.data` 段地址（null-terminated）
+- `putstr(ptr)`, `strcmp(a, b)`, `strcpy(dst, src)` builtin
+
+### M11: 文件 I/O (2026-06-25)
+- `fopen(path, mode)`, `fread(fd, buf, len)`, `fwrite(fd, buf, len)`, `fclose(fd)`
+- 数组名作表达式返回 `.data` 地址
+
 ### Bug 修复记录
 - `default rel` 缺失：NASM 默认用绝对寻址导致 ACCESS_VIOLATION
 - `_buf+r8-1` 超出 32-bit 位移：改成 `lea rax, [_buf-1]; mov [rax+r8], 10`
