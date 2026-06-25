@@ -30,6 +30,7 @@ TOKEN_SPEC = [
     ("ELSE",      r'\belse\b'),
     ("WHILE",     r'\bwhile\b'),
     ("LET",       r'\blet\b'),
+    ("TYPE_I8",   r'\bi8\b'),
     ("TYPE_I64",  r'\bi64\b'),
     ("ID",        r'[a-zA-Z_][a-zA-Z0-9_]*'),
     ("NUMBER",    r'[0-9]+'),
@@ -56,6 +57,7 @@ TOKEN_SPEC = [
     ("SEMICOLON", r';'),
     ("COMMA",     r','),
     ("COLON",     r':'),
+    ("CHAR",      r"'[^']'"),
     ("STRING",    r'"[^"]*"'),
     ("COMMENT",   r'//[^\n]*'),
     ("WHITESPACE", r'[ \t\n\r]+'),
@@ -99,6 +101,8 @@ def lex(source_text):
             value = int(value)
         if kind == "STRING":
             value = value[1:-1]  # strip quotes
+        if kind == "CHAR":
+            value = ord(value[1])  # 'X' → ASCII code
         tokens.append((kind, value, line))
     return tokens
 
@@ -188,8 +192,8 @@ class Parser:
 
     def parse_type(self):
         t = self.advance()
-        if t[0] == "TYPE_I64":
-            return "i64"
+        if t[0] in ("TYPE_I64", "TYPE_I8"):
+            return t[1]  # "i64" or "i8"
         raise ParseError(f"Expected type, got {t[0]}({t[1]})", t[2])
 
     # ── block ─────────────────────────────────────────────────────────
@@ -336,6 +340,9 @@ class Parser:
         if self.peek_kind("NUMBER"):
             t = self.advance()
             return {"type": "literal", "value": t[1]}
+        if self.peek_kind("CHAR"):
+            t = self.advance()
+            return {"type": "literal", "value": t[1]}
         if self.peek_kind("STRING"):
             t = self.advance()
             return {"type": "string", "value": t[1]}
@@ -413,6 +420,7 @@ class Emitter:
 
     def emit_fn_def(self, fn):
         self.local_offset = {}
+        self.local_types = {}
         self.local_count = 0
         name = fn["name"]
         self.current_fn = name
@@ -431,16 +439,24 @@ class Emitter:
 
         # Map params from registers to local slots
         param_regs = ["rcx", "rdx", "r8", "r9"]
+        param_low = ["cl", "dl", "r8b", "r9b"]  # low-byte names
         for i, p in enumerate(params):
             slot = self.get_var_slot(p["name"])
-            self.emit(f"    mov [rbp{slot:+d}], {param_regs[i]}")
+            ptype = p.get("type", "i64")
+            self.local_types[p["name"]] = ptype
+            if ptype == "i8":
+                self.emit(f"    mov [rbp{slot:+d}], {param_low[i]}")
+            else:
+                self.emit(f"    mov [rbp{slot:+d}], {param_regs[i]}")
 
         # Body
         self.emit_block(body)
 
         # Epilogue (only for non-main; main never returns via ret)
         if name != "main":
-            self.emit(f".{name}_ep:")
+            ep_label = f"{name}_ep"
+            self.current_ep_label = ep_label
+            self.emit(f"{ep_label}:")
             self.emit("    mov rsp, rbp")
             self.emit("    pop rbp")
             self.emit("    ret")
@@ -486,14 +502,19 @@ class Emitter:
             self.emit("    call ExitProcess")
         else:
             self.emit_expr(expr)
-            self.emit(f"    jmp .{self.current_fn}_ep")
+            ep_label = getattr(self, "current_ep_label", f"{self.current_fn}_ep")
+            self.emit(f"    jmp {ep_label}")
 
     def emit_let(self, stmt):
-        # let x: i64 = expr;
         name = stmt["name"]
         slot = self.get_var_slot(name)
+        var_type = stmt.get("var_type", "i64")
+        self.local_types[name] = var_type
         self.emit_expr(stmt["value"])
-        self.emit(f"    mov [rbp{slot:+d}], rax")
+        if var_type == "i8":
+            self.emit(f"    mov [rbp{slot:+d}], al")
+        else:
+            self.emit(f"    mov [rbp{slot:+d}], rax")
 
     def emit_if(self, stmt):
         else_label = self.fresh_label()
@@ -526,10 +547,13 @@ class Emitter:
         name = stmt["name"]
         self.emit_expr(stmt["value"])
         slot = self.local_offset.get(name)
-        if slot is not None:
-            self.emit(f"    mov [rbp{slot:+d}], rax")
-        else:
+        if slot is None:
             raise RuntimeError(f"Undefined variable: {name}")
+        var_type = self.local_types.get(name, "i64")
+        if var_type == "i8":
+            self.emit(f"    mov [rbp{slot:+d}], al")
+        else:
+            self.emit(f"    mov [rbp{slot:+d}], rax")
 
     # ── expressions ────────────────────────────────────────────────────
 
@@ -540,11 +564,15 @@ class Emitter:
         elif t == "string":
             self.emit_string(expr["value"])
         elif t == "var":
-            slot = self.local_offset.get(expr["name"])
-            if slot is not None:
-                self.emit(f"    mov rax, [rbp{slot:+d}]")
+            name = expr["name"]
+            slot = self.local_offset.get(name)
+            if slot is None:
+                raise RuntimeError(f"Undefined variable: {name}")
+            var_type = self.local_types.get(name, "i64")
+            if var_type == "i8":
+                self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
             else:
-                raise RuntimeError(f"Undefined variable: {expr['name']}")
+                self.emit(f"    mov rax, [rbp{slot:+d}]")
         elif t == "call":
             self.emit_call(expr)
         elif t == "binary":
