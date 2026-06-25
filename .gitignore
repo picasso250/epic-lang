@@ -1,0 +1,14 @@
+# Build artifacts
+*.asm
+*.obj
+*.exe
+
+# Python
+__pycache__/
+*.pyc
+
+# Binary tools (see README for setup)
+tools/
+
+# Temporary debug files
+test_*.*

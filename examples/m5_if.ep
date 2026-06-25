@@ -1,0 +1,12 @@
+fn main() -> i64 {
+    let x: i64 = 10;
+    if (x > 5) {
+        puti(1);
+    }
+    if (x < 5) {
+        puti(999);
+    } else {
+        puti(2);
+    }
+    exit(0);
+}

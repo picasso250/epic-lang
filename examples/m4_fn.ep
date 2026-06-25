@@ -1,0 +1,11 @@
+fn add(a: i64, b: i64) -> i64 {
+    return a + b;
+}
+
+fn main() -> i64 {
+    let x: i64 = add(40, 2);
+    puti(x);
+    let y: i64 = add(x, 1);
+    puti(y);
+    exit(0);
+}
