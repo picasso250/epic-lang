@@ -1,0 +1,13 @@
+# EXIT 50
+
+struct Point {
+    x: i64;
+    y: i64;
+}
+
+fn main() -> i64 {
+    let p: Point;
+    p.x = 30;
+    p.y = 20;
+    return p.x + p.y;
+}

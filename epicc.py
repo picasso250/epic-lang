@@ -30,6 +30,7 @@ TOKEN_SPEC = [
     ("IF",        r'\bif\b'),
     ("ELSE",      r'\belse\b'),
     ("WHILE",     r'\bwhile\b'),
+    ("STRUCT",    r'\bstruct\b'),
     ("LET",       r'\blet\b'),
     ("TYPE_I8",   r'\bi8\b'),
     ("TYPE_I64",  r'\bi64\b'),
@@ -49,6 +50,7 @@ TOKEN_SPEC = [
     ("STAR",      r'\*'),
     ("SLASH",     r'/'),
     ("PERCENT",   r'%'),
+    ("DOT",       r'\.'),
     ("BANG",      r'!'),
     ("ASSIGN",    r'='),
     ("LBRACKET",  r'\['),
@@ -153,14 +155,32 @@ class Parser:
 
     def parse_program(self):
         funcs = []
-        while self.peek_kind("FN"):
-            funcs.append(self.parse_fn_def())
+        structs = []
+        while self.peek()[0] in ("FN", "STRUCT"):
+            if self.peek_kind("FN"):
+                funcs.append(self.parse_fn_def())
+            else:
+                structs.append(self.parse_struct_def())
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return {"type": "program", "funcs": funcs}
+        return {"type": "program", "funcs": funcs, "structs": structs}
 
     # ── fn definition ─────────────────────────────────────────────────
+
+    def parse_struct_def(self):
+        self.expect("STRUCT")
+        name = self.expect("ID")
+        self.expect("LBRACE")
+        fields = []
+        while not self.peek_kind("RBRACE"):
+            fname = self.expect("ID")
+            self.expect("COLON")
+            ftype = self.parse_type()
+            self.expect("SEMICOLON")
+            fields.append({"name": fname[1], "type": ftype})
+        self.expect("RBRACE")
+        return {"type": "struct_def", "name": name[1], "fields": fields}
 
     def parse_fn_def(self):
         self.expect("FN")
@@ -197,6 +217,8 @@ class Parser:
         t = self.advance()
         if t[0] in ("TYPE_I64", "TYPE_I8"):
             return t[1]  # "i64" or "i8"
+        if t[0] == "ID":
+            return t[1]  # struct name
         raise ParseError(f"Expected type, got {t[0]}({t[1]})", t[2])
 
     # ── block ─────────────────────────────────────────────────────────
@@ -215,6 +237,17 @@ class Parser:
 
     EXPR_FIRST = {"NUMBER", "STRING", "ID", "LPAREN", "MINUS", "BANG"}
 
+    def _is_assignment(self):
+        """Look ahead past ID(.ID)* to see if = or [ follows."""
+        i = self.pos + 1
+        while i < len(self.tokens):
+            kind = self.tokens[i][0]
+            if kind == "DOT":
+                i += 2
+                continue
+            return kind in ("ASSIGN", "LBRACKET")
+        return False
+
     def parse_stmt(self):
         t = self.peek()
         if t[0] == "RETURN":
@@ -226,11 +259,8 @@ class Parser:
         if t[0] == "WHILE":
             return self.parse_while_stmt()
         if t[0] == "ID":
-            # Look ahead: [ → array access/assign; = → scalar assign; otherwise expr
-            if self.pos + 1 < len(self.tokens):
-                nxt = self.tokens[self.pos + 1][0]
-                if nxt in ("ASSIGN", "LBRACKET"):
-                    return self.parse_assign_stmt()
+            if self._is_assignment():
+                return self.parse_assign_stmt()
         if t[0] in self.EXPR_FIRST:
             return self.parse_expr_stmt()
         raise ParseError(f"Unexpected token {t[0]} in statement", t[2])
@@ -253,8 +283,9 @@ class Parser:
             self.expect("RBRACKET")
             self.expect("SEMICOLON")
             return {"type": "array_decl", "name": name[1], "elem_type": typ, "size": size_tok[1]}
-        self.expect("ASSIGN")
-        value = self.parse_expr()
+        value = None
+        if self.check("ASSIGN"):
+            value = self.parse_expr()
         self.expect("SEMICOLON")
         return {"type": "let", "name": name[1], "var_type": typ, "value": value}
 
@@ -268,6 +299,15 @@ class Parser:
             value = self.parse_expr()
             self.expect("SEMICOLON")
             return {"type": "array_set", "name": name[1], "index": index, "value": value}
+        # Check for field assign: obj.field = expr;
+        if self.check("DOT"):
+            field = self.expect("ID")
+            self.expect("ASSIGN")
+            value = self.parse_expr()
+            self.expect("SEMICOLON")
+            return {"type": "field_set",
+                    "object": {"type": "var", "name": name[1]},
+                    "field": field[1], "value": value}
         # Scalar assign: x = expr;
         self.expect("ASSIGN")
         value = self.parse_expr()
@@ -372,12 +412,18 @@ class Parser:
             if self.check("LPAREN"):
                 args = self.parse_args()
                 self.expect("RPAREN")
-                return {"type": "call", "name": name, "args": args}
-            if self.check("LBRACKET"):
+                node = {"type": "call", "name": name, "args": args}
+            elif self.check("LBRACKET"):
                 index = self.parse_expr()
                 self.expect("RBRACKET")
-                return {"type": "array_get", "name": name, "index": index}
-            return {"type": "var", "name": name}
+                node = {"type": "array_get", "name": name, "index": index}
+            else:
+                node = {"type": "var", "name": name}
+            # Field access chain: a.b.c
+            while self.check("DOT"):
+                field = self.expect("ID")
+                node = {"type": "field_access", "object": node, "field": field[1]}
+            return node
         if self.check("LPAREN"):
             expr = self.parse_expr()
             self.expect("RPAREN")
@@ -406,11 +452,14 @@ class Emitter:
                          "strcmp", "strcpy"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
+        self.local_types = {}
         self.label_counter = 0
         self.current_fn = ""
         self.alloc_size = 0     # bytes allocated after push rbp / mov rbp, rsp
         self.strings = {}       # literal text → label name
         self.string_counter = 0
+        self.local_bytes = 0    # track variable allocation in pre-scan
+        self.structs = {}       # name → {fields: [{name, type, offset}], size}
 
     def emit(self, s):
         self.out.write(s + "\n")
@@ -437,6 +486,9 @@ class Emitter:
         self.emit("extern lstrlenA")
         self.emit("default rel")
         self.emit("")
+
+        # Compute struct layouts first
+        self._compute_struct_layouts(ast)
 
         # Collect arrays and strings from AST
         self.arrays = {}
@@ -501,25 +553,26 @@ class Emitter:
         self.strings[label] = text
         return label
 
-    FRAME_LOCALS = 32  # generous fixed allocation (32 i64 slots)
-
     # ── function definition ────────────────────────────────────────────
 
     def emit_fn_def(self, fn):
         self.local_offset = {}
         self.local_types = {}
-        self.local_count = 0
+        self.local_bytes = 0
         name = fn["name"]
         self.current_fn = name
         params = fn["params"]
         body = fn["body"]
 
+        # Pre-scan: allocate stack slots for let declarations
+        self._pre_scan_block(body)
+
         # Entry label: main → _start
         label = "_start" if name == "main" else name
         self.emit(f"{label}:")
 
-        # Prologue: fixed frame = MAX_LOCALS*8 + 32 shadow, 16-aligned
-        self.alloc_size = self.FRAME_LOCALS * 8 + 32  # 288, already 16-aligned
+        # Prologue: dynamic frame, 16-byte aligned (include 32-byte shadow)
+        self.alloc_size = ((self.local_bytes + 32 + 15) // 16) * 16
         self.emit("    push rbp")
         self.emit("    mov rbp, rsp")
         self.emit(f"    sub rsp, {self.alloc_size}")
@@ -552,11 +605,54 @@ class Emitter:
 
     # ── frame helpers ──────────────────────────────────────────────────
 
-    def get_var_slot(self, name):
+    def get_var_slot(self, name, typ=None):
         if name not in self.local_offset:
-            self.local_count += 1
-            self.local_offset[name] = -self.local_count * 8
+            size = self._type_size(typ) if typ else 8
+            # 8-byte align
+            if self.local_bytes % 8 != 0:
+                self.local_bytes += 8 - (self.local_bytes % 8)
+            self.local_bytes += size
+            self.local_offset[name] = -self.local_bytes
         return self.local_offset[name]
+
+    def _type_size(self, typ):
+        if typ == "i64":
+            return 8
+        if typ == "i8":
+            return 1
+        if typ in self.structs:
+            return self.structs[typ]["size"]
+        return 8  # unknown, assume i64
+
+    def _compute_struct_layouts(self, ast):
+        self.structs = {}
+        for s in ast.get("structs", []):
+            fields = []
+            offset = 0
+            max_align = 1
+            for f in s["fields"]:
+                fsize = self._type_size(f["type"])
+                falign = 8 if f["type"] in self.structs else fsize
+                if offset % falign != 0:
+                    offset += falign - (offset % falign)
+                fields.append({"name": f["name"], "type": f["type"], "offset": offset})
+                offset += fsize
+                max_align = max(max_align, falign)
+            if offset % max_align != 0:
+                offset += max_align - (offset % max_align)
+            self.structs[s["name"]] = {"fields": fields, "size": offset}
+
+    def _pre_scan_block(self, block):
+        """Allocate stack slots for all let declarations."""
+        for stmt in block.get("stmts", []):
+            if stmt["type"] == "let":
+                self.get_var_slot(stmt["name"], stmt.get("var_type"))
+            elif stmt["type"] == "if":
+                self._pre_scan_block(stmt["then_block"])
+                if stmt.get("else_block"):
+                    self._pre_scan_block(stmt["else_block"])
+            elif stmt["type"] == "while":
+                self._pre_scan_block(stmt["body"])
 
     # ── statements ─────────────────────────────────────────────────────
 
@@ -582,6 +678,8 @@ class Emitter:
             self.emit_while(stmt)
         elif t == "assign":
             self.emit_assign(stmt)
+        elif t == "field_set":
+            self.emit_field_set(stmt)
         else:
             raise RuntimeError(f"Unknown stmt type: {t}")
 
@@ -598,10 +696,13 @@ class Emitter:
 
     def emit_let(self, stmt):
         name = stmt["name"]
-        slot = self.get_var_slot(name)
         var_type = stmt.get("var_type", "i64")
+        slot = self.get_var_slot(name, var_type)
         self.local_types[name] = var_type
-        self.emit_expr(stmt["value"])
+        value = stmt.get("value")
+        if value is None:
+            return  # declaration without initializer
+        self.emit_expr(value)
         if var_type == "i8":
             self.emit(f"    mov [rbp{slot:+d}], al")
         else:
@@ -709,6 +810,8 @@ class Emitter:
             self.emit_binary(expr)
         elif t == "unary":
             self.emit_unary(expr)
+        elif t == "field_access":
+            self.emit_field_access(expr)
         else:
             raise RuntimeError(f"Unknown expr type: {t}")
 
@@ -946,6 +1049,50 @@ class Emitter:
             self.emit("    test rax, rax")
             self.emit("    setz al")
             self.emit("    movzx eax, al")
+
+    # ── struct operations ─────────────────────────────────────────────
+
+    def _resolve_field(self, var_name, field_name):
+        """Return (slot_offset, field_offset, field_type) for var.field."""
+        slot = self.local_offset.get(var_name)
+        if slot is None:
+            raise RuntimeError(f"Undefined variable: {var_name}")
+        var_type = self.local_types.get(var_name, "i64")
+        if var_type not in self.structs:
+            raise RuntimeError(f"Field access on non-struct type '{var_type}'")
+        info = self.structs[var_type]
+        for f in info["fields"]:
+            if f["name"] == field_name:
+                return slot, f["offset"], f["type"]
+        raise RuntimeError(f"Struct '{var_type}' has no field '{field_name}'")
+
+    def emit_field_access(self, expr):
+        """Read expr.object.field into rax."""
+        obj = expr["object"]
+        field_name = expr["field"]
+        if obj["type"] != "var":
+            raise RuntimeError(f"Field access on non-variable: {obj['type']}")
+        slot, off, ftype = self._resolve_field(obj["name"], field_name)
+        self.emit(f"    lea rax, [rbp{slot:+d}]")
+        if ftype == "i8":
+            self.emit(f"    movsx rax, byte [rax+{off}]")
+        else:
+            self.emit(f"    mov rax, [rax+{off}]")
+
+    def emit_field_set(self, stmt):
+        """stmt.object.field = stmt.value"""
+        obj = stmt["object"]
+        field_name = stmt["field"]
+        # Evaluate value first (may use same struct)
+        self.emit_expr(stmt["value"])
+        self.emit("    push rax")
+        slot, off, ftype = self._resolve_field(obj["name"], field_name)
+        self.emit(f"    lea rcx, [rbp{slot:+d}]")
+        self.emit("    pop rax")
+        if ftype == "i8":
+            self.emit(f"    mov [rcx+{off}], al")
+        else:
+            self.emit(f"    mov [rcx+{off}], rax")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

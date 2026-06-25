@@ -74,3 +74,19 @@
 - `_buf+r8-1` 超出 32-bit 位移：改成 `lea rax, [_buf-1]; mov [rax+r8], 10`
 - `call GetStdHandle` 踩掉 r8：在 `_itoa_write` 里保存到 `[rbp-8]`
 - 重复 `emit_fn_def`：删掉第一个残缺版本
+
+### linker bug 修复 (2026-06-26)
+- **EntryPoint 偷懒**：`AddressOfEntryPoint` 写死 `.text` 开头。M4/M8 的函数排在 `_start` 前面时炸。
+  修复：从 COFF symbol table 找 `_start` section/value，计算 `entry_rva`。
+- **短名 import 漏掉**：COFF ≤8 字符名字不进 string table，直接塞 symbol record name 字段。
+  旧代码用 `name_off is not None` 过滤 import，漏掉 `lstrlenA/lstrcmpA/lstrcpyA/ReadFile`。
+  修复：`section==0 && aux==0` 即视为 import。
+- 两刀下去 → 8/13 → 13/13 全绿
+
+### M12: struct 类型 (2026-06-26)
+- `struct Name { field: type; ... }` 顶层定义
+- `let p: Point;` 无初始值声明（`=` 变可选）
+- `p.x` 字段读 / `p.x = expr` 字段写
+- C 自然对齐布局，预扫描动态计算帧大小
+- 暂不支持：struct 传参/返回、struct 字面量、嵌套 struct、struct 赋值
+- 测试 15/15 通过
