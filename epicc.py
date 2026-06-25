@@ -568,10 +568,7 @@ class Emitter:
         if t == "return":
             self.emit_return(stmt)
         elif t == "expr_stmt":
-            if stmt["expr"]["type"] == "string":
-                self.emit_string_print(stmt["expr"]["value"])
-            else:
-                self.emit_expr(stmt["expr"])
+            self.emit_expr(stmt["expr"])
         elif t == "let":
             self.emit_let(stmt)
         elif t == "array_decl":
@@ -859,25 +856,6 @@ class Emitter:
         self.emit(f"    sub rsp, 32")
         self.emit(f"    call {name}")
         self.emit(f"    add rsp, 32")
-
-    def emit_string_print(self, s):
-        """Print a string literal as a statement (e.g. "hello";)."""
-        n = len(s)
-        if n == 0:
-            return
-        for i, ch in enumerate(s):
-            self.emit(f"    mov byte [_buf+{i}], {ord(ch)}")
-        self.emit(f"    mov byte [_buf+{n}], 10")
-        self.emit("    mov ecx, -11")
-        self.emit("    call GetStdHandle")
-        self.emit("    mov rcx, rax")
-        self.emit("    lea rdx, [_buf]")
-        self.emit(f"    mov r8, {n + 1}")
-        self.emit("    lea r9, [_written]")
-        self.emit("    sub rsp, 40")
-        self.emit("    mov qword [rsp+32], 0")
-        self.emit("    call WriteFile")
-        self.emit("    add rsp, 40")
 
     def emit_binary(self, expr):
         op = expr["op"]
