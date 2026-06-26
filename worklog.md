@@ -151,3 +151,11 @@
 - `strlen(s) → i64`：字符串长度（lstrlenA 包装）
 - `system(cmd) → i64`：CreateProcessA + WaitForSingleObject + GetExitCodeProcess
 - 测试 24/24 通过
+
+### 编译器拆分 (2026-06-26)
+- epicc.py 拆为 4 文件：lexer.py (97行) + parser.py (350行) + codegen.py (~1400行 Emitter+Helpers+Driver) + picc.py (薄壳入口)
+- AST 从 dict 转为 dataclass 节点 (st_nodes.py，22 类)，isinstance 分发替代 kind 字符串
+- st_nodes.py 命名避免 st.py 与 stdlib 命名冲突
+- 目录平铺，路径常量归 codegen.py，异常类各回各家
+- grill-me 16 问逐一定策
+- 32/32 测试全绿
