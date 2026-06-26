@@ -2,7 +2,8 @@
 Epic v0 compiler CLI.
 
 Usage:
-    python epicc.py <file.ep>
+    python epicc.py <file.ep>              # use default lld-link
+    python epicc.py <file.ep> --linker py  # use link.py
 """
 
 import argparse
@@ -28,7 +29,7 @@ SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 #  Driver
 # ═══════════════════════════════════════════════════════════════════════════
 
-def compile_file(input_path):
+def compile_file(input_path, linker="lld-link"):
     base = os.path.splitext(os.path.basename(input_path))[0]
     asm_path = base + ".asm"
     obj_path = base + ".obj"
@@ -59,11 +60,19 @@ def compile_file(input_path):
     if result.returncode != 0:
         raise RuntimeError("NASM error:\n" + result.stderr[:500])
 
-    print(f"[4/4] Linking → {exe_path}")
-    result = subprocess.run(
-        [sys.executable, LINK_PY, obj_path, "-o", exe_path],
-        capture_output=True, text=True,
-    )
+    print(f"[4/4] Linking (via {linker}) → {exe_path}")
+    if linker == "py":
+        result = subprocess.run(
+            [sys.executable, LINK_PY, obj_path, "-o", exe_path],
+            capture_output=True, text=True,
+        )
+    else:
+        result = subprocess.run(
+            [LLD_LINK, "/subsystem:console", f"/entry:_start",
+             f"/out:{exe_path}", obj_path,
+             os.path.join(SDK_LIB, "kernel32.lib")],
+            capture_output=True, text=True,
+        )
     if result.returncode != 0:
         raise RuntimeError("Link error:\n" + result.stderr[:500])
 
@@ -81,6 +90,8 @@ def parse_args(argv):
         description="Epic v0 compiler",
     )
     parser.add_argument("input", help="input .ep source file")
+    parser.add_argument("--linker", choices=["lld-link", "py"], default="lld-link",
+                        help="linker to use (default: lld-link)")
     return parser.parse_args(argv)
 
 
@@ -92,7 +103,7 @@ def main(argv=None):
         return 1
 
     try:
-        compile_file(args.input)
+        compile_file(args.input, linker=args.linker)
     except (LexError, ParseError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
