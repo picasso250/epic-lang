@@ -1,0 +1,11 @@
+# EXIT 0
+# STDOUT 99
+
+fun main() -> i64 {
+    let xs = new i64[3];
+    xs.data[0] = 99;
+    xs.data[1] = 42;
+    xs.data[2] = 7;
+    puti(xs.data[0]);
+    exit(0);
+}

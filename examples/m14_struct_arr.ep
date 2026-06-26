@@ -1,0 +1,14 @@
+# EXIT 150
+
+struct Token {
+    kind: i64;
+    value: i64;
+}
+
+fun main() -> i64 {
+    let tokens = new Token[3];
+    tokens.data[0].kind = 1;
+    tokens.data[1].kind = 50;
+    tokens.data[2].kind = 100;
+    return tokens.data[0].kind + tokens.data[1].kind + tokens.data[2].kind;
+}

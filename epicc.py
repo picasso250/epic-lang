@@ -243,14 +243,23 @@ class Parser:
     EXPR_FIRST = {"NUMBER", "STRING", "ID", "LPAREN", "MINUS", "BANG"}
 
     def _is_assignment(self):
-        """Look ahead past ID(.ID)* to see if = or [ follows."""
+        """Look ahead past ID (.ID | [expr])* to see if = follows."""
         i = self.pos + 1
         while i < len(self.tokens):
             kind = self.tokens[i][0]
             if kind == "DOT":
                 i += 2
-                continue
-            return kind in ("ASSIGN", "LBRACKET")
+            elif kind == "LBRACKET":
+                depth = 1
+                i += 1
+                while i < len(self.tokens) and depth > 0:
+                    if self.tokens[i][0] == "LBRACKET":
+                        depth += 1
+                    elif self.tokens[i][0] == "RBRACKET":
+                        depth -= 1
+                    i += 1
+            else:
+                return kind == "ASSIGN"
         return False
 
     def parse_stmt(self):
@@ -280,14 +289,9 @@ class Parser:
     def parse_let_stmt(self):
         self.expect("LET")
         name = self.expect("ID")
-        self.expect("COLON")
-        typ = self.parse_type()
-        # Check for array: let buf: i8[4096];
-        if self.check("LBRACKET"):
-            size_tok = self.expect("NUMBER")
-            self.expect("RBRACKET")
-            self.expect("SEMICOLON")
-            return {"type": "array_decl", "name": name[1], "elem_type": typ, "size": size_tok[1]}
+        typ = None
+        if self.check("COLON"):
+            typ = self.parse_type()
         value = None
         if self.check("ASSIGN"):
             value = self.parse_expr()
@@ -296,28 +300,28 @@ class Parser:
 
     def parse_assign_stmt(self):
         name = self.expect("ID")
-        # Check for array assign: buf[i] = expr;
-        if self.check("LBRACKET"):
-            index = self.parse_expr()
-            self.expect("RBRACKET")
-            self.expect("ASSIGN")
-            value = self.parse_expr()
-            self.expect("SEMICOLON")
-            return {"type": "array_set", "name": name[1], "index": index, "value": value}
-        # Check for field assign: obj.field = expr;
-        if self.check("DOT"):
-            field = self.expect("ID")
-            self.expect("ASSIGN")
-            value = self.parse_expr()
-            self.expect("SEMICOLON")
-            return {"type": "field_set",
-                    "object": {"type": "var", "name": name[1]},
-                    "field": field[1], "value": value}
-        # Scalar assign: x = expr;
+        # Build LHS chain: .field | [index]
+        lhs = {"type": "var", "name": name[1]}
+        while True:
+            if self.check("DOT"):
+                field = self.expect("ID")
+                lhs = {"type": "field_access", "object": lhs, "field": field[1]}
+            elif self.check("LBRACKET"):
+                index = self.parse_expr()
+                self.expect("RBRACKET")
+                lhs = {"type": "subscript", "base": lhs, "index": index}
+            else:
+                break
         self.expect("ASSIGN")
         value = self.parse_expr()
         self.expect("SEMICOLON")
-        return {"type": "assign", "name": name[1], "value": value}
+        if lhs["type"] == "var":
+            return {"type": "assign", "name": lhs["name"], "value": value}
+        elif lhs["type"] == "field_access":
+            return {"type": "field_set", "object": lhs["object"], "field": lhs["field"], "value": value}
+        elif lhs["type"] == "subscript":
+            return {"type": "subscript_assign", "base": lhs["base"], "index": lhs["index"], "value": value}
+        raise ParseError(f"Invalid assignment target: {lhs['type']}")
 
     def parse_if_stmt(self):
         self.expect("IF")
@@ -404,8 +408,15 @@ class Parser:
     def parse_primary(self):
         if self.peek_kind("NEW"):
             self.expect("NEW")
-            name = self.expect("ID")
-            return {"type": "new", "struct_name": name[1]}
+            t = self.advance()
+            if t[0] not in ("ID", "TYPE_I64", "TYPE_I8"):
+                raise ParseError(f"Expected type after new, got {t[0]}", t[2])
+            elem = t[1]
+            if self.check("LBRACKET"):
+                count = self.parse_expr()
+                self.expect("RBRACKET")
+                return {"type": "new_array", "elem_type": elem, "count": count}
+            return {"type": "new", "struct_name": elem}
         if self.peek_kind("NUMBER"):
             t = self.advance()
             return {"type": "literal", "value": t[1]}
@@ -422,16 +433,19 @@ class Parser:
                 args = self.parse_args()
                 self.expect("RPAREN")
                 node = {"type": "call", "name": name, "args": args}
-            elif self.check("LBRACKET"):
-                index = self.parse_expr()
-                self.expect("RBRACKET")
-                node = {"type": "array_get", "name": name, "index": index}
             else:
                 node = {"type": "var", "name": name}
-            # Field access chain: a.b.c
-            while self.check("DOT"):
-                field = self.expect("ID")
-                node = {"type": "field_access", "object": node, "field": field[1]}
+            # Postfix: .field and [index]
+            while True:
+                if self.check("DOT"):
+                    field = self.expect("ID")
+                    node = {"type": "field_access", "object": node, "field": field[1]}
+                elif self.check("LBRACKET"):
+                    index = self.parse_expr()
+                    self.expect("RBRACKET")
+                    node = {"type": "subscript", "base": node, "index": index}
+                else:
+                    break
             return node
         if self.check("LPAREN"):
             expr = self.parse_expr()
@@ -501,20 +515,17 @@ class Emitter:
         # Compute struct layouts first
         self._compute_struct_layouts(ast)
 
-        # Collect arrays and strings from AST
-        self.arrays = {}
+        # Collect strings from AST
         self.strings = {}
         self.string_counter = 0
         for func in ast.get("funcs", []):
-            self._collect_from_block(func.get("body", {}))
+            self._collect_strings_from_block(func.get("body", {}))
 
         self.emit("section .data")
         self.emit("    _buf times 32 db 0")
         self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
         self.emit("    _heap dq 0")
-        for name, info in self.arrays.items():
-            self.emit(f"{name}: resb {info['size']}")
         # Emit string literals (null-terminated)
         for label, text in sorted(self.strings.items(), key=lambda x: x[0]):
             escaped = text.replace("\\", "\\\\").replace('"', '"')
@@ -526,21 +537,15 @@ class Emitter:
         for func in ast.get("funcs", []):
             self.emit_fn_def(func)
 
-    def _collect_from_block(self, block):
-        """Recursively collect arrays and strings from AST."""
+    def _collect_strings_from_block(self, block):
+        """Recursively collect strings from AST."""
         for stmt in block.get("stmts", []):
-            if stmt["type"] == "array_decl":
-                self.arrays[stmt["name"]] = {
-                    "elem_type": stmt["elem_type"],
-                    "size": stmt["size"]
-                }
-            elif stmt["type"] == "if":
-                self._collect_from_block(stmt["then_block"])
+            if stmt["type"] == "if":
+                self._collect_strings_from_block(stmt["then_block"])
                 if stmt.get("else_block"):
-                    self._collect_from_block(stmt["else_block"])
+                    self._collect_strings_from_block(stmt["else_block"])
             elif stmt["type"] == "while":
-                self._collect_from_block(stmt["body"])
-            # Collect strings from expressions
+                self._collect_strings_from_block(stmt["body"])
             self._collect_strings(stmt)
 
     def _collect_strings(self, node):
@@ -687,10 +692,6 @@ class Emitter:
             self.emit_expr(stmt["expr"])
         elif t == "let":
             self.emit_let(stmt)
-        elif t == "array_decl":
-            pass  # already emitted in .data section
-        elif t == "array_set":
-            self.emit_array_set(stmt)
         elif t == "if":
             self.emit_if(stmt)
         elif t == "while":
@@ -699,6 +700,8 @@ class Emitter:
             self.emit_assign(stmt)
         elif t == "field_set":
             self.emit_field_set(stmt)
+        elif t == "subscript_assign":
+            self.emit_subscript_assign(stmt)
         else:
             raise RuntimeError(f"Unknown stmt type: {t}")
 
@@ -715,10 +718,22 @@ class Emitter:
 
     def emit_let(self, stmt):
         name = stmt["name"]
-        var_type = stmt.get("var_type", "i64")
+        var_type = stmt.get("var_type")
+        value = stmt.get("value")
+        # Type inference from initializer
+        if var_type is None and value is not None:
+            if value["type"] == "new":
+                var_type = f"&{value['struct_name']}"
+            elif value["type"] == "new_array":
+                var_type = f"&_arr_{value['elem_type']}"
+            elif value["type"] == "string":
+                var_type = "i64"
+            else:
+                var_type = "i64"
+        if var_type is None:
+            var_type = "i64"
         slot = self.get_var_slot(name, var_type)
         self.local_types[name] = var_type
-        value = stmt.get("value")
         if value is None:
             return  # declaration without initializer
         self.emit_expr(value)
@@ -754,38 +769,6 @@ class Emitter:
         self.emit(f"    jmp {start_label}")
         self.emit(f"{end_label}:")
 
-    def emit_array_get(self, expr):
-        """result = buf[i]"""
-        name = expr["name"]
-        info = self.arrays.get(name)
-        if info is None:
-            raise RuntimeError(f"Undefined array: {name}")
-        elem_type = info["elem_type"]
-        self.emit_expr(expr["index"])
-        self.emit(f"    lea rcx, [{name}]")
-        if elem_type == "i8":
-            self.emit("    movsx rax, byte [rcx + rax]")
-        else:
-            self.emit("    mov rax, [rcx + rax*8]")
-
-    def emit_array_set(self, stmt):
-        """buf[i] = expr;"""
-        name = stmt["name"]
-        info = self.arrays.get(name)
-        if info is None:
-            raise RuntimeError(f"Undefined array: {name}")
-        elem_type = info["elem_type"]
-        self.emit_expr(stmt["value"])
-        self.emit("    push rax")  # save value
-        self.emit_expr(stmt["index"])
-        self.emit(f"    lea rcx, [{name}]")
-        self.emit("    add rcx, rax")
-        self.emit("    pop rax")  # restore value
-        if elem_type == "i8":
-            self.emit("    mov [rcx], al")
-        else:
-            self.emit("    mov [rcx], rax")
-
     def emit_assign(self, stmt):
         name = stmt["name"]
         self.emit_expr(stmt["value"])
@@ -809,22 +792,18 @@ class Emitter:
             self.emit(f"    lea rax, [{label}]")
         elif t == "var":
             name = expr["name"]
-            # Check if it's an array name
-            if name in self.arrays:
-                self.emit(f"    lea rax, [{name}]")
+            slot = self.local_offset.get(name)
+            if slot is None:
+                raise RuntimeError(f"Undefined variable: {name}")
+            var_type = self.local_types.get(name, "i64")
+            if var_type == "i8":
+                self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
             else:
-                slot = self.local_offset.get(name)
-                if slot is None:
-                    raise RuntimeError(f"Undefined variable: {name}")
-                var_type = self.local_types.get(name, "i64")
-                if var_type == "i8":
-                    self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
-                else:
-                    self.emit(f"    mov rax, [rbp{slot:+d}]")
+                self.emit(f"    mov rax, [rbp{slot:+d}]")
         elif t == "call":
             self.emit_call(expr)
-        elif t == "array_get":
-            self.emit_array_get(expr)
+        elif t == "subscript":
+            self.emit_subscript(expr)
         elif t == "binary":
             self.emit_binary(expr)
         elif t == "unary":
@@ -833,10 +812,8 @@ class Emitter:
             self.emit_field_access(expr)
         elif t == "new":
             self.emit_new(expr)
-        elif t == "unary" and expr["op"] == "&":
-            self.emit_addrof(expr)
-        elif t == "unary" and expr["op"] == "*":
-            self.emit_deref(expr)
+        elif t == "new_array":
+            self.emit_new_array(expr)
         else:
             raise RuntimeError(f"Unknown expr type: {t}")
 
@@ -1067,13 +1044,20 @@ class Emitter:
         self.emit(f"{end_label}:")
 
     def emit_unary(self, expr):
-        self.emit_expr(expr["expr"])
         if expr["op"] == "-":
+            self.emit_expr(expr["expr"])
             self.emit("    neg rax")
         elif expr["op"] == "!":
+            self.emit_expr(expr["expr"])
             self.emit("    test rax, rax")
             self.emit("    setz al")
             self.emit("    movzx eax, al")
+        elif expr["op"] == "&":
+            self.emit_addrof(expr)
+        elif expr["op"] == "*":
+            self.emit_deref(expr)
+        else:
+            raise RuntimeError(f"Unknown unary op: {expr['op']}")
 
     # ── struct operations ─────────────────────────────────────────────
 
@@ -1111,29 +1095,92 @@ class Emitter:
         """Read expr.object.field into rax."""
         obj = expr["object"]
         field_name = expr["field"]
-        if obj["type"] != "var":
-            raise RuntimeError(f"Field access on non-variable: {obj['type']}")
-        slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
-        self._emit_struct_base(slot, is_ptr)
-        if ftype == "i8":
-            self.emit(f"    movsx rax, byte [rax+{off}]")
+        if obj["type"] == "var":
+            slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+            self._emit_struct_base(slot, is_ptr)
+            if ftype == "i8":
+                self.emit(f"    movsx rax, byte [rax+{off}]")
+            else:
+                self.emit(f"    mov rax, [rax+{off}]")
+        elif obj["type"] == "subscript":
+            # Subscript returned a pointer; access its field
+            self.emit_subscript(obj)
+            elem, is_struct = self._subscript_type(obj["base"])
+            if not is_struct:
+                raise RuntimeError(f"Field access on value type '{elem}'")
+            info = self.structs[elem]
+            for f in info["fields"]:
+                if f["name"] == field_name:
+                    if f["type"] == "i8":
+                        self.emit(f"    movsx rax, byte [rax+{f['offset']}]")
+                    else:
+                        self.emit(f"    mov rax, [rax+{f['offset']}]")
+                    return
+            raise RuntimeError(f"Struct '{elem}' has no field '{field_name}'")
         else:
-            self.emit(f"    mov rax, [rax+{off}]")
+            raise RuntimeError(f"Field access on non-variable: {obj['type']}")
 
     def emit_field_set(self, stmt):
         """stmt.object.field = stmt.value"""
         obj = stmt["object"]
         field_name = stmt["field"]
-        # Evaluate value first (may use same struct)
-        self.emit_expr(stmt["value"])
-        self.emit("    push rax")
-        slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
-        self._emit_struct_base_rcx(slot, is_ptr)
-        self.emit("    pop rax")
-        if ftype == "i8":
-            self.emit(f"    mov [rcx+{off}], al")
+        if obj["type"] == "var":
+            # Evaluate value first (may use same struct)
+            self.emit_expr(stmt["value"])
+            self.emit("    push rax")
+            slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+            self._emit_struct_base_rcx(slot, is_ptr)
+            self.emit("    pop rax")
+            if ftype == "i8":
+                self.emit(f"    mov [rcx+{off}], al")
+            else:
+                self.emit(f"    mov [rcx+{off}], rax")
+        elif obj["type"] == "subscript":
+            # Subscript result is a pointer; set field on it
+            self.emit_expr(stmt["value"])
+            self.emit("    push rax")
+            self.emit_subscript(obj)
+            self.emit("    pop rcx")
+            # rax = pointer to struct, rcx = value
+            # Look up field offset
+            elem, is_struct = self._subscript_type(obj["base"])
+            if not is_struct:
+                raise RuntimeError(f"Field set on value type")
+            info = self.structs[elem]
+            for f in info["fields"]:
+                if f["name"] == field_name:
+                    if f["type"] == "i8":
+                        self.emit(f"    mov [rax+{f['offset']}], cl")
+                    else:
+                        self.emit(f"    mov [rax+{f['offset']}], rcx")
+                    return
+            raise RuntimeError(f"Struct '{elem}' has no field '{field_name}'")
         else:
-            self.emit(f"    mov [rcx+{off}], rax")
+            raise RuntimeError(f"Field set on non-var: {obj['type']}")
+
+    def emit_subscript_assign(self, stmt):
+        """base[index] = value"""
+        base = stmt["base"]
+        index = stmt["index"]
+        value = stmt["value"]
+        elem, is_struct = self._subscript_type(base)
+        # Evaluate value first
+        self.emit_expr(value)
+        self.emit("    push rax")
+        # Compute address: base + index * size
+        self.emit_expr(base)        # rax = base pointer
+        self.emit("    push rax")
+        self.emit_expr(index)       # rax = index
+        self.emit("    pop rcx")    # rcx = base pointer
+        if elem == "i8":
+            self.emit(f"    lea rcx, [rcx + rax]")
+        else:
+            self.emit(f"    lea rcx, [rcx + rax*8]")
+        self.emit("    pop rax")
+        if elem == "i8":
+            self.emit(f"    mov [rcx], al")
+        else:
+            self.emit(f"    mov [rcx], rax")
 
     def emit_new(self, expr):
         """new StructName → HeapAlloc, returns &StructName in rax."""
@@ -1149,16 +1196,140 @@ class Emitter:
         self.emit(f"    add rsp, 48")
         # rax = pointer, zero-initialized
 
+    def emit_new_array(self, expr):
+        """new T[n] → array struct { len: i64, data: &T|&&T }"""
+        elem = expr["elem_type"]
+        count = expr["count"]
+        arr_type = f"_arr_{elem}"
+        if elem in ("i64", "i8"):
+            data_type = f"&{elem}"
+        else:
+            data_type = f"&&{elem}"
+        if arr_type not in self.structs:
+            self.structs[arr_type] = {
+                "fields": [
+                    {"name": "len", "type": "i64", "offset": 0},
+                    {"name": "data", "type": data_type, "offset": 8},
+                ],
+                "size": 16,
+            }
+        # 1. Allocate header (16 bytes)
+        self.emit(f"    mov rcx, [_heap]")
+        self.emit(f"    mov edx, 8")
+        self.emit(f"    mov r8d, 16")
+        self.emit(f"    sub rsp, 48")
+        self.emit(f"    call HeapAlloc")
+        self.emit(f"    add rsp, 48")
+        self.emit(f"    push rax")  # save header ptr on shadow
+        # 2. Store len
+        self.emit_expr(count)       # rax = count
+        self.emit(f"    pop rcx")   # rcx = header ptr
+        self.emit(f"    push rcx")  # re-save
+        self.emit(f"    mov [rcx], rax")  # header.len = count
+        # 3. Compute data size and allocate
+        if elem in ("i64", "i8"):
+            el_size = 8 if elem == "i64" else 1
+            s_op = "imul" if el_size > 1 else ""  # no multiplication needed for size 1
+            self.emit(f"    mov r8, rax")  # r8 = count
+            if el_size == 8:
+                self.emit(f"    imul r8, {el_size}")
+            self.emit(f"    mov rcx, [_heap]")
+            self.emit(f"    mov edx, 8")
+            self.emit(f"    sub rsp, 48")
+            self.emit(f"    call HeapAlloc")
+            self.emit(f"    add rsp, 48")
+            # rax = data pointer
+            self.emit(f"    pop rcx")   # rcx = header ptr
+            self.emit(f"    push rcx")
+            self.emit(f"    mov [rcx+8], rax")  # header.data = data ptr
+            self.emit(f"    pop rax")   # return header ptr
+        else:
+            # struct array: allocate pointer array (count * 8), then new each element
+            # Save count and header ptr in frame slots to avoid stack shadow issues
+            self.emit(f"    mov [rbp-16], rcx")  # save header ptr
+            self.emit(f"    mov [rbp-24], rax")  # save count
+            # Allocate pointer array: count * 8
+            self.emit(f"    mov r8, rax")
+            self.emit(f"    imul r8, 8")
+            self.emit(f"    mov rcx, [_heap]")
+            self.emit(f"    mov edx, 8")
+            self.emit(f"    sub rsp, 48")
+            self.emit(f"    call HeapAlloc")
+            self.emit(f"    add rsp, 48")
+            # rax = pointer array base
+            self.emit(f"    mov [rbp-32], rax")  # save pointer array
+            # Loop: for i in range(count): data[i] = new StructName
+            self.emit(f"    mov r10, [rbp-24]")  # r10 = count (loop counter, counts down)
+            loop_lbl = self.fresh_label()
+            done_lbl = self.fresh_label()
+            self.emit(f"{loop_lbl}:")
+            self.emit(f"    test r10, r10")
+            self.emit(f"    jz {done_lbl}")
+            self.emit(f"    dec r10")
+            # new elem
+            el_size = self.structs[elem]["size"]
+            self.emit(f"    mov rcx, [_heap]")
+            self.emit(f"    mov edx, 8")
+            self.emit(f"    mov r8d, {el_size}")
+            self.emit(f"    sub rsp, 48")
+            self.emit(f"    call HeapAlloc")
+            self.emit(f"    add rsp, 48")
+            # store in pointer array
+            self.emit(f"    mov rcx, [rbp-32]")  # pointer array base
+            self.emit(f"    mov [rcx + r10*8], rax")
+            self.emit(f"    jmp {loop_lbl}")
+            self.emit(f"{done_lbl}:")
+            # store pointer array in header
+            self.emit(f"    mov rcx, [rbp-16]")  # header ptr
+            self.emit(f"    mov rax, [rbp-32]")  # pointer array
+            self.emit(f"    mov [rcx+8], rax")   # header.data = pointer array
+            self.emit(f"    mov rax, rcx")       # return header ptr
+            self.emit(f"    pop rcx")            # balance push from step 2
+
+    def emit_subscript(self, expr):
+        """base[index] → load value from array"""
+        base = expr["base"]
+        index = expr["index"]
+        # Determine element type from base expression
+        elem, is_struct = self._subscript_type(base)
+        # Evaluate base (pointer), then add index * size
+        self.emit_expr(base)        # rax = base pointer
+        self.emit("    push rax")
+        self.emit_expr(index)       # rax = index
+        self.emit("    pop rcx")    # rcx = base pointer
+        if elem == "i8":
+            self.emit(f"    movsx rax, byte [rcx + rax]")
+        elif elem == "i64":
+            self.emit(f"    mov rax, [rcx + rax*8]")
+        else:
+            # Struct pointer array
+            self.emit(f"    mov rax, [rcx + rax*8]")
+
+    def _subscript_type(self, base_expr):
+        """Return (elem_type, is_struct) for subscript base expression."""
+        if base_expr["type"] == "field_access":
+            obj = base_expr["object"]
+            fn = base_expr["field"]
+            if obj["type"] == "var":
+                vtype = self.local_types.get(obj["name"], "i64")
+                if vtype.startswith("&"):
+                    vtype = vtype[1:]  # strip &
+                if vtype.startswith("_arr_"):
+                    vtype = vtype[5:]  # strip _arr_
+                if vtype in ("i64", "i8"):
+                    return vtype, False
+                else:
+                    return vtype, True
+        # Default: pointer to i64
+        return "i64", False
+
     def emit_addrof(self, expr):
         """&inner → lea rax, [address]"""
         inner = expr["expr"]
         if inner["type"] == "var":
             name = inner["name"]
-            if name in self.arrays:
-                self.emit(f"    lea rax, [{name}]")
-            else:
-                slot = self.local_offset[name]
-                self.emit(f"    lea rax, [rbp{slot:+d}]")
+            slot = self.local_offset[name]
+            self.emit(f"    lea rax, [rbp{slot:+d}]")
         elif inner["type"] == "field_access":
             obj = inner["object"]
             field_name = inner["field"]

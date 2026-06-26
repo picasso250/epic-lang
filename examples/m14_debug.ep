@@ -1,0 +1,13 @@
+# EXIT 0
+# STDOUT 3
+
+struct Token {
+    kind: i64;
+    value: i64;
+}
+
+fun main() -> i64 {
+    let tokens = new Token[3];
+    puti(tokens.len);
+    exit(0);
+}
