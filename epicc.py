@@ -633,7 +633,20 @@ class Emitter:
 
         self.emit("")
 
-    # ── frame helpers ──────────────────────────────────────────────────
+    # ── ABI helpers ───────────────────────────────────────────────────
+
+    def _call_prep(self, stack_args=0):
+        """Emit sub rsp for a call, ensuring 16-byte alignment.
+        stack_args: number of extra 8-byte slots beyond the 4 register params."""
+        total = 32 + stack_args * 8
+        frame = ((total + 15) // 16) * 16 + 8
+        self.emit(f"    sub rsp, {frame}")
+        return frame
+
+    def _call_cleanup(self, stack_args=0):
+        total = 32 + stack_args * 8
+        frame = ((total + 15) // 16) * 16 + 8
+        self.emit(f"    add rsp, {frame}")
 
     def get_var_slot(self, name, typ=None):
         if name not in self.local_offset:
@@ -871,10 +884,10 @@ class Emitter:
                 self.emit("    pop rdx")        # restore ptr → rdx
                 self.emit("    pop r8")         # restore length → r8
                 self.emit("    lea r9, [_written]")
-                self.emit("    sub rsp, 48")
+                self.emit("    sub rsp, 40")
                 self.emit("    mov qword [rsp+32], 0")
                 self.emit("    call WriteFile")
-                self.emit("    add rsp, 48")
+                self.emit("    add rsp, 40")
             elif name == "strcmp":
                 # strcmp(ptr, "literal") → lstrcmpA(ptr, literal_addr)
                 self.emit_expr(args[1])
@@ -920,12 +933,12 @@ class Emitter:
                 self.emit("    mov edx, 0x80000000")  # GENERIC_READ
                 self.emit("    mov r8d, 1")
                 self.emit("    xor r9d, r9d")
-                self.emit("    sub rsp, 56")
+                self._call_prep(3)
                 self.emit("    mov dword [rsp+32], 3")       # OPEN_EXISTING
                 self.emit("    mov dword [rsp+40], 0x80")
                 self.emit("    mov qword [rsp+48], 0")
                 self.emit("    call CreateFileA")
-                self.emit("    add rsp, 56")
+                self._call_cleanup(3)
                 self.emit(f"{dl}:")
             elif name == "fread":
                 # fread(fd, buf_ptr, len) → ReadFile
@@ -1232,9 +1245,9 @@ class Emitter:
         self.emit(f"    mov rcx, [_heap]")
         self.emit(f"    mov edx, 8")   # HEAP_ZERO_MEMORY
         self.emit(f"    mov r8d, {size}")
-        self.emit(f"    sub rsp, 48")
+        self.emit(f"    sub rsp, 40")
         self.emit(f"    call HeapAlloc")
-        self.emit(f"    add rsp, 48")
+        self.emit(f"    add rsp, 40")
         # rax = pointer, zero-initialized
 
     def emit_new_array(self, expr):
@@ -1258,9 +1271,9 @@ class Emitter:
         self.emit(f"    mov rcx, [_heap]")
         self.emit(f"    mov edx, 8")
         self.emit(f"    mov r8d, 16")
-        self.emit(f"    sub rsp, 48")
+        self.emit(f"    sub rsp, 40")
         self.emit(f"    call HeapAlloc")
-        self.emit(f"    add rsp, 48")
+        self.emit(f"    add rsp, 40")
         self.emit(f"    push rax")  # save header ptr on shadow
         # 2. Store len
         self.emit_expr(count)       # rax = count
@@ -1276,9 +1289,9 @@ class Emitter:
                 self.emit(f"    imul r8, {el_size}")
             self.emit(f"    mov rcx, [_heap]")
             self.emit(f"    mov edx, 8")
-            self.emit(f"    sub rsp, 48")
+            self.emit(f"    sub rsp, 40")
             self.emit(f"    call HeapAlloc")
-            self.emit(f"    add rsp, 48")
+            self.emit(f"    add rsp, 40")
             # rax = data pointer
             self.emit(f"    pop rcx")   # rcx = header ptr
             self.emit(f"    push rcx")
@@ -1297,9 +1310,9 @@ class Emitter:
             self.emit(f"    imul r8, 8")
             self.emit(f"    mov rcx, [_heap]")
             self.emit(f"    mov edx, 8")
-            self.emit(f"    sub rsp, 48")
+            self.emit(f"    sub rsp, 40")
             self.emit(f"    call HeapAlloc")
-            self.emit(f"    add rsp, 48")
+            self.emit(f"    add rsp, 40")
             # rax = pointer array base
             self.emit(f"    mov [rbp{tmp_data:+d}], rax")   # save pointer array
             # Loop: for i in range(count): data[i] = new StructName
@@ -1315,9 +1328,9 @@ class Emitter:
             self.emit(f"    mov rcx, [_heap]")
             self.emit(f"    mov edx, 8")
             self.emit(f"    mov r8d, {el_size}")
-            self.emit(f"    sub rsp, 48")
+            self.emit(f"    sub rsp, 40")
             self.emit(f"    call HeapAlloc")
-            self.emit(f"    add rsp, 48")
+            self.emit(f"    add rsp, 40")
             # store in pointer array
             self.emit(f"    mov rcx, [rbp{tmp_data:+d}]")  # pointer array base
             self.emit(f"    mov [rcx + r12*8], rax")
@@ -1411,7 +1424,7 @@ ITOA_HELPER = r"""
 _itoa_write:
     push rbp
     mov rbp, rsp
-    sub rsp, 48
+    sub rsp, 40
 
     ; handle negative
     test rax, rax
