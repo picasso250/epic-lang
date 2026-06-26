@@ -83,7 +83,7 @@ fun is_digit(c: i64) -> i64 {
 # ── Lexer ───────────────────────────────────────────────────────────────
 
 fun lex(src: &str) -> &Vec {
-    let tokens: &Vec = vec_new(4096);
+    let tokens = vec_new(4096);
     let n = src.len;
     let pos = 0;
     let line = 1;
@@ -305,7 +305,7 @@ fun main() -> i64 {
     let n = fread(fd, buf.data, 65535);
     fclose(fd);
     let src: &str = str_new(buf.data, n);
-    let tokens: &Vec = lex(src);
+    let tokens = lex(src);
     dump_tokens(tokens);
     return 0;
 }

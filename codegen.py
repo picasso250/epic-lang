@@ -1009,8 +1009,9 @@ class Emitter:
                 return "i64"
             if name in ("exit", "putc", "putstr"):
                 return "void"
-            # User-defined function: find its return type
-            # For now, assume i64 (we don't track user function signatures here)
+            # User-defined function
+            if name in self.funcs:
+                return self.funcs[name]["ret_type"]
             return "i64"
         if isinstance(expr, FieldAccessNode):
             obj_type = self._expr_type(expr.object)
