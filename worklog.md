@@ -106,3 +106,17 @@
 - struct 禁止按值传参/返回（通过指针传递）
 - 暂不支持：多级指针、free、struct 字面量
 - 测试 18/18 通过
+
+### M14: 动态数组 (2026-06-26)
+- `new i64[n]` / `new i8[n]` / `new Token[n]`
+- `xs.len` + `xs.data[i]` 下标访问，struct 数组自动取指针
+- struct 数组 eager 分配：逐个 `new Token`（r12 非 volatile 保环）
+- 删除静态数组 `let buf: i8[4096]`，`m9_array.ep` / `m11_file.ep` 重写
+- 类型推断：`let xs = new i64[3]`
+- 测试 21/21 通过
+
+### M15: 自举准备 builtins (2026-06-26)
+- `itoa(buf, n) → i64`：整数→十进制字符串，返回长度
+- `strlen(s) → i64`：字符串长度（lstrlenA 包装）
+- `system(cmd) → i64`：CreateProcessA + WaitForSingleObject + GetExitCodeProcess
+- 测试 24/24 通过

@@ -472,7 +472,7 @@ class Emitter:
         self.out = open(out_path, "w")
         self.builtins = {"exit", "puti", "putc", "putstr",
                          "fopen", "fread", "fwrite", "fclose",
-                         "strcmp", "strcpy"}
+                         "strcmp", "strcpy", "strlen", "itoa", "system"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -507,6 +507,9 @@ class Emitter:
         self.emit("extern lstrcmpA")
         self.emit("extern lstrcpyA")
         self.emit("extern lstrlenA")
+        self.emit("extern CreateProcessA")
+        self.emit("extern WaitForSingleObject")
+        self.emit("extern GetExitCodeProcess")
         self.emit("extern HeapAlloc")
         self.emit("extern GetProcessHeap")
         self.emit("default rel")
@@ -949,6 +952,30 @@ class Emitter:
                 self.emit("    sub rsp, 32")
                 self.emit("    call CloseHandle")
                 self.emit("    add rsp, 32")
+            elif name == "strlen":
+                # strlen(ptr) → lstrlenA(ptr)
+                self.emit_expr(args[0])
+                self.emit("    mov rcx, rax")
+                self.emit("    sub rsp, 32")
+                self.emit("    call lstrlenA")
+                self.emit("    add rsp, 32")
+            elif name == "itoa":
+                # itoa(buf, n) → call _itoa, returns length
+                self.emit_expr(args[1])     # n (right arg first for push-order)
+                self.emit("    push rax")
+                self.emit_expr(args[0])     # buf
+                self.emit("    pop rdx")    # rdx = n
+                self.emit("    mov rcx, rax")  # rcx = buf
+                self.emit("    sub rsp, 32")
+                self.emit("    call _itoa")
+                self.emit("    add rsp, 32")
+            elif name == "system":
+                # system(cmd) → call _system, returns exit code
+                self.emit_expr(args[0])
+                self.emit("    mov rcx, rax")
+                self.emit("    sub rsp, 40")
+                self.emit("    call _system")
+                self.emit("    add rsp, 40")
             return
 
         # User-defined function call
@@ -1464,6 +1491,140 @@ itoa_print:
     ret
 """
 
+ITOA_HELPER2 = r"""
+; ── _itoa: convert integer to decimal string at buffer ──
+; rcx = buffer ptr, rdx = number
+; returns: rax = length written (no null terminator)
+; clobbers: rax, rcx, rdx, r8, r9, r10, r11
+_itoa:
+    push rbp
+    mov rbp, rsp
+    push r12
+    mov r12, rcx        ; save buffer ptr
+    mov rax, rdx        ; number to convert
+    mov r10, 0          ; sign flag
+    ; handle negative
+    test rax, rax
+    jns _itoa_pos
+    neg rax
+    mov r10, 1
+_itoa_pos:
+    ; handle zero
+    test rax, rax
+    jnz _itoa_nz
+    mov byte [r12], '0'
+    mov rax, 1
+    pop r12
+    mov rsp, rbp
+    pop rbp
+    ret
+_itoa_nz:
+    ; convert digits to temp area on stack
+    lea r11, [rbp-32]   ; temp buffer (32 bytes, enough for 64-bit int)
+    add r11, 31
+    mov byte [r11], 0
+_itoa_loop:
+    dec r11
+    xor rdx, rdx
+    mov rcx, 10
+    div rcx
+    add dl, '0'
+    mov [r11], dl
+    test rax, rax
+    jnz _itoa_loop
+    ; now r11 points to first digit
+    ; compute length
+    lea rax, [rbp-32]
+    add rax, 31
+    sub rax, r11         ; rax = length
+    ; copy to buffer
+    mov rcx, rax         ; save length
+    mov r8, rax           ; save length for return
+    ; if negative, write sign first
+    test r10, r10
+    jz _itoa_copy
+    mov byte [r12], '-'
+    inc r12
+    inc r8               ; include sign in length
+_itoa_copy:
+    mov al, [r11]
+    mov [r12], al
+    inc r11
+    inc r12
+    dec rcx
+    jnz _itoa_copy
+    mov rax, r8           ; return length
+    pop r12
+    mov rsp, rbp
+    pop rbp
+    ret
+"""
+
+SYSTEM_HELPER = r"""
+; ── _system: execute command via CreateProcessA ──
+; rcx = command line string
+; returns: rax = exit code, or -1 on failure
+_system:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 248         ; 128(SI+PI) + 80(call frame: 32 shadow + 48 params) + 40 pad
+    push rcx             ; save cmd
+    ; Zero STARTUPINFOA + PROCESS_INFORMATION (128 bytes)
+    lea rdi, [rsp+96]    ; SI+PI at rsp+96 (above call frame)
+    mov ecx, 32          ; 128/4 = 32 dwords
+    xor eax, eax
+    rep stosd
+    ; si.cb = sizeof(STARTUPINFOA) = 104
+    mov dword [rsp+96], 104
+    ; CreateProcessA(NULL, cmd, NULL, NULL, 0, 0, NULL, NULL, &si, &pi)
+    xor ecx, ecx              ; lpApplicationName = NULL
+    pop rdx                   ; lpCommandLine
+    xor r8, r8                ; lpProcessAttributes = NULL
+    xor r9, r9                ; lpThreadAttributes = NULL
+    mov qword [rsp+32], 0     ; bInheritHandles = FALSE
+    mov qword [rsp+40], 0     ; dwCreationFlags = 0
+    mov qword [rsp+48], 0     ; lpEnvironment = NULL
+    mov qword [rsp+56], 0     ; lpCurrentDirectory = NULL
+    lea rax, [rsp+96]
+    mov [rsp+64], rax         ; lpStartupInfo
+    lea rax, [rsp+200]
+    mov [rsp+72], rax         ; lpProcessInformation
+    call CreateProcessA
+    ; Check result
+    test eax, eax
+    jnz _system_ok
+    mov rax, -1               ; failure → -1
+    jmp _system_done
+_system_ok:
+    ; WaitForSingleObject(pi.hProcess, INFINITE)
+    mov rcx, [rsp+200]       ; pi.hProcess
+    mov edx, -1               ; INFINITE
+    sub rsp, 40
+    call WaitForSingleObject
+    add rsp, 40
+    ; GetExitCodeProcess
+    mov rcx, [rsp+200]       ; pi.hProcess
+    lea rdx, [rbp-8]          ; exit code out
+    sub rsp, 40
+    call GetExitCodeProcess
+    add rsp, 40
+    ; CloseHandle(pi.hProcess)
+    mov rcx, [rsp+200]
+    sub rsp, 32
+    call CloseHandle
+    add rsp, 32
+    ; CloseHandle(pi.hThread)
+    mov rcx, [rsp+208]
+    sub rsp, 32
+    call CloseHandle
+    add rsp, 32
+    mov rax, [rbp-8]          ; return exit code
+_system_done:
+    mov rsp, rbp
+    pop rbp
+    ret
+"""
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Driver
@@ -1487,6 +1648,8 @@ def compile_file(input_path):
     emitter = Emitter(asm_path)
     emitter.emit_program(ast)
     emitter.emit(ITOA_HELPER)
+    emitter.emit(ITOA_HELPER2)
+    emitter.emit(SYSTEM_HELPER)
     emitter.close()
 
     print(f"[3/4] Assembling → {obj_path}")
