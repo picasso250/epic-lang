@@ -3,8 +3,10 @@
 # STDOUT 43
 fun main() -> i64 {
     let x: i64 = 42;
-    puti(x);
+    putstr(itoa(x));
+    putc(10);
     x = x + 1;
-    puti(x);
+    putstr(itoa(x));
+    putc(10);
     exit(0);
 }

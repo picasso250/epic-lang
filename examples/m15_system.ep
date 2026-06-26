@@ -3,7 +3,7 @@
 
 fun main() -> i64 {
     let e: i64 = system("cmd /c exit 7");
-    puti(e);
+    putstr(itoa(e));
     putc(10);
     exit(0);
 }

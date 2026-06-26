@@ -1,12 +1,11 @@
 # EXIT 0
 # STDOUT hellobye
 fun main() -> i64 {
-    # string literal as expression: returns pointer
-    let s: i64 = "hello";
+    let s = "hello";
     putstr(s);
 
     # strcmp
-    let t: i64 = "hello";
+    let t = "hello";
     if strcmp(s, t) == 0 {
         putstr("bye");
     } else {

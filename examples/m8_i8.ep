@@ -15,6 +15,7 @@ fun main() -> i64 {
     putc(e);
     putc('c');
     putc(10);
-    puti(a);
+    putstr(itoa(a));
+    putc(10);
     exit(0);
 }

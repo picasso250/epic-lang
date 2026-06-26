@@ -12,6 +12,7 @@ fun main() -> i64 {
     putc(to_upper('h'));
     putc(to_upper('i'));
     putc(10);
-    puti(to_upper('z'));
+    putstr(itoa(to_upper('z')));
+    putc(10);
     exit(0);
 }

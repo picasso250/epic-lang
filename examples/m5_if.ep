@@ -4,12 +4,15 @@
 fun main() -> i64 {
     let x: i64 = 10;
     if x > 5 {
-        puti(1);
+        putstr(itoa(1));
+        putc(10);
     }
     if x < 5 {
-        puti(999);
+        putstr(itoa(999));
+        putc(10);
     } else {
-        puti(2);
+        putstr(itoa(2));
+        putc(10);
     }
     exit(0);
 }

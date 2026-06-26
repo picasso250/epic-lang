@@ -6,6 +6,7 @@ fun main() -> i64 {
     xs.data[0] = 99;
     xs.data[1] = 42;
     xs.data[2] = 7;
-    puti(xs.data[0]);
+    putstr(itoa(xs.data[0]));
+    putc(10);
     exit(0);
 }

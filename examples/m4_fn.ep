@@ -7,8 +7,10 @@ fun add(a: i64, b: i64) -> i64 {
 
 fun main() -> i64 {
     let x: i64 = add(40, 2);
-    puti(x);
+    putstr(itoa(x));
+    putc(10);
     let y: i64 = add(x, 1);
-    puti(y);
+    putstr(itoa(y));
+    putc(10);
     exit(0);
 }

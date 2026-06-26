@@ -2,12 +2,12 @@
 fun main() -> i64 {
     let files = listdir("examples/*.ep", 30);
     putstr("found: ");
-    puti(files.len);
+    putstr(itoa(files.len));
     putc(10);
 
     let i = 0;
     while i < files.len {
-        putstr(files.data[i].data);
+        putstr(files.data[i]);
         putc(10);
         i = i + 1;
     }

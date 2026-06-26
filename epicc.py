@@ -33,6 +33,7 @@ TOKEN_SPEC = [
     ("STRUCT",    r'\bstruct\b'),
     ("NEW",       r'\bnew\b'),
     ("LET",       r'\blet\b'),
+    ("TYPE_STR",  r'\bstr\b'),
     ("TYPE_I8",   r'\bi8\b'),
     ("TYPE_I64",  r'\bi64\b'),
     ("ID",        r'[a-zA-Z_][a-zA-Z0-9_]*'),
@@ -223,8 +224,8 @@ class Parser:
         if t[0] == "AMPERSAND":
             inner = self.parse_type()
             return f"&{inner}"  # e.g. "&Token" or "&i64"
-        if t[0] in ("TYPE_I64", "TYPE_I8"):
-            return t[1]  # "i64" or "i8"
+        if t[0] in ("TYPE_I64", "TYPE_I8", "TYPE_STR"):
+            return t[1]  # "i64" or "i8" or "str"
         if t[0] == "ID":
             return t[1]  # struct name
         raise ParseError(f"Expected type, got {t[0]}({t[1]})", t[2])
@@ -473,10 +474,10 @@ class Parser:
 class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
-        self.builtins = {"exit", "puti", "putc", "putstr",
+        self.builtins = {"exit", "putc", "putstr",
                          "fopen", "fread", "fwrite", "fclose",
-                         "strcmp", "strcpy", "strlen", "itoa", "system",
-                         "listdir"}
+                         "strcmp", "strlen", "itoa", "system",
+                         "listdir", "str"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -640,16 +641,17 @@ class Emitter:
     # ── ABI helpers ───────────────────────────────────────────────────
 
     def _call_prep(self, stack_args=0):
-        """Emit sub rsp for a call, ensuring 16-byte alignment.
-        stack_args: number of extra 8-byte slots beyond the 4 register params."""
+        """Emit sub rsp for a Win32 call, ensuring 16-byte alignment.
+        Assumes rsp \u2261 8 (mod 16) after function prologue (push rbp + sub rsp).
+        stack_args: number of extra 8-byte params beyond the 4 register params."""
         total = 32 + stack_args * 8
-        frame = ((total + 15) // 16) * 16 + 8
+        frame = ((total + 15) // 16) * 16
         self.emit(f"    sub rsp, {frame}")
         return frame
 
     def _call_cleanup(self, stack_args=0):
         total = 32 + stack_args * 8
-        frame = ((total + 15) // 16) * 16 + 8
+        frame = ((total + 15) // 16) * 16
         self.emit(f"    add rsp, {frame}")
 
     def get_var_slot(self, name, typ=None):
@@ -679,24 +681,23 @@ class Emitter:
             return 8  # pointers are always 8 bytes
         return 8  # unknown, assume i64
 
+    def _register_len_data_type(self, name, elem_ptr_type):
+        """Register a {data, len} layout type. data at offset 0, len at offset 8."""
+        if name not in self.structs:
+            self.structs[name] = {
+                "fields": [
+                    {"name": "data", "type": elem_ptr_type, "offset": 0},
+                    {"name": "len", "type": "i64", "offset": 8},
+                ],
+                "size": 16,
+            }
+
     def _compute_struct_layouts(self, ast):
         self.structs = {}
-        # Built-in str type: { len: i64, data: &i8 }
-        self.structs["str"] = {
-            "fields": [
-                {"name": "len", "type": "i64", "offset": 0},
-                {"name": "data", "type": "&i8", "offset": 8},
-            ],
-            "size": 16,
-        }
+        # Built-in str type: { data: &i8, len: i64 }
+        self._register_len_data_type("str", "&i8")
         # Array-of-str type used by listdir()
-        self.structs["_arr_str"] = {
-            "fields": [
-                {"name": "len", "type": "i64", "offset": 0},
-                {"name": "data", "type": "&&str", "offset": 8},
-            ],
-            "size": 16,
-        }
+        self._register_len_data_type("_arr_str", "&&str")
         for s in ast.get("structs", []):
             fields = []
             offset = 0
@@ -776,9 +777,11 @@ class Emitter:
             elif value["type"] == "call" and value["name"] == "listdir":
                 var_type = "&_arr_str"
             elif value["type"] == "call" and value["name"] == "itoa":
-                var_type = "i64"
+                var_type = "&str"
+            elif value["type"] == "call" and value["name"] == "str":
+                var_type = "&str"
             elif value["type"] == "string":
-                var_type = "i64"
+                var_type = "&str"
             else:
                 var_type = "i64"
         if var_type is None:
@@ -840,7 +843,12 @@ class Emitter:
             self.emit(f"    mov rax, {expr['value']}")
         elif t == "string":
             label = self.get_string_label(expr["value"])
-            self.emit(f"    lea rax, [{label}]")
+            strlen = len(expr["value"])
+            self.emit(f"    lea rcx, [{label}]")
+            self.emit(f"    mov rdx, {strlen}")
+            self._call_prep(0)
+            self.emit(f"    call _str_alloc")
+            self._call_cleanup(0)
         elif t == "var":
             name = expr["name"]
             slot = self.local_offset.get(name)
@@ -877,83 +885,71 @@ class Emitter:
                 self.emit_expr(args[0])
                 self.emit("    mov ecx, eax")
                 self.emit("    call ExitProcess")
-            elif name == "puti":
-                self.emit_expr(args[0])
-                self.emit("    call _itoa_write")
             elif name == "putc":
                 self.emit_expr(args[0])
                 self.emit("    mov [_buf], al")
                 self.emit("    mov ecx, -11")
+                self._call_prep(0)
                 self.emit("    call GetStdHandle")
+                self._call_cleanup(0)
                 self.emit("    mov rcx, rax")
                 self.emit("    lea rdx, [_buf]")
                 self.emit("    mov r8, 1")
                 self.emit("    lea r9, [_written]")
-                self.emit("    sub rsp, 40")
+                self._call_prep(1)
                 self.emit("    mov qword [rsp+32], 0")
                 self.emit("    call WriteFile")
-                self.emit("    add rsp, 40")
+                self._call_cleanup(1)
             elif name == "putstr":
-                # putstr(ptr): write null-terminated string to stdout
-                # Save params to stack before GetStdHandle clobbers volatile regs
-                self.emit_expr(args[0])  # rax = ptr
-                self.emit("    mov rcx, rax")
-                self.emit("    call lstrlenA")  # rax = length
-                self.emit("    push rax")       # save length on stack
-                self.emit_expr(args[0])  # rax = ptr
-                self.emit("    push rax")       # save ptr on stack
-                self.emit("    mov ecx, -11")
-                self.emit("    call GetStdHandle")  # rax = handle
-                self.emit("    mov rcx, rax")
-                self.emit("    pop rdx")        # restore ptr → rdx
-                self.emit("    pop r8")         # restore length → r8
+                # putstr(s: &str): save &str in temp slot, GetStdHandle, then WriteFile
+                self.emit_expr(args[0])       # rax = &str
+                tmp = self._alloc_temp()
+                self.emit(f"    mov [rbp{tmp:+d}], rax")  # save &str
+                self.emit("    mov ecx, -11")  # STD_OUTPUT_HANDLE
+                self._call_prep(0)
+                self.emit("    call GetStdHandle")
+                self._call_cleanup(0)
+                self.emit("    mov rcx, rax")   # rcx = stdout handle
+                self.emit(f"    mov rax, [rbp{tmp:+d}]")  # rax = &str
+                self.emit("    mov rdx, [rax]")      # rdx = str.data (offset 0)
+                self.emit("    mov r8, [rax+8]")    # r8 = str.len (offset 8)
                 self.emit("    lea r9, [_written]")
-                self.emit("    sub rsp, 40")
+                self._call_prep(1)             # 1 stack arg (lpOverlapped)
                 self.emit("    mov qword [rsp+32], 0")
                 self.emit("    call WriteFile")
-                self.emit("    add rsp, 40")
+                self._call_cleanup(1)
             elif name == "strcmp":
-                # strcmp(ptr, "literal") → lstrcmpA(ptr, literal_addr)
-                self.emit_expr(args[1])
-                self.emit("    mov rdx, rax")
-                self.emit_expr(args[0])
-                self.emit("    mov rcx, rax")
-                self.emit("    sub rsp, 40")
+                # strcmp(a: &str, b: &str) → extract .data from each, call lstrcmpA
+                self.emit_expr(args[1])       # rax = &str (b)
+                self.emit("    mov rdx, [rax]")    # rdx = b.data (offset 0)
+                self.emit_expr(args[0])       # rax = &str (a)
+                self.emit("    mov rcx, [rax]")    # rcx = a.data (offset 0)
+                self._call_prep(0)
                 self.emit("    call lstrcmpA")
-                self.emit("    add rsp, 40")
-            elif name == "strcpy":
-                # strcpy(dst_ptr, "literal") → lstrcpyA(dst_ptr, literal_addr)
-                self.emit_expr(args[1])
-                self.emit("    mov rdx, rax")
-                self.emit_expr(args[0])
-                self.emit("    mov rcx, rax")
-                self.emit("    sub rsp, 40")
-                self.emit("    call lstrcpyA")
-                self.emit("    add rsp, 40")
+                self._call_cleanup(0)
             elif name == "fopen":
-                # fopen(path_ptr, mode) → CreateFileA
-                rl = self.fresh_label()  # read label
-                wl = self.fresh_label()  # write skip label (after write path)
-                dl = self.fresh_label()  # done label
+                # fopen(path: &str, mode) → extract path.data, call CreateFileA
+                rl = self.fresh_label()
+                dl = self.fresh_label()
                 self.emit_expr(args[1])  # rax = mode
                 self.emit("    test rax, rax")
                 self.emit(f"    jz {rl}")
                 # Write mode
-                self.emit_expr(args[0])  # rax = path
-                self.emit("    mov rcx, rax")
+                self.emit_expr(args[0])       # rax = &str
+                self.emit("    mov rcx, [rax]")    # rcx = path.data (offset 0)
                 self.emit("    mov edx, 0x40000000")  # GENERIC_WRITE
                 self.emit("    xor r8d, r8d")
                 self.emit("    xor r9d, r9d")
-                self.emit("    sub rsp, 56")
+                self._call_prep(3)
                 self.emit("    mov dword [rsp+32], 2")       # CREATE_ALWAYS
                 self.emit("    mov dword [rsp+40], 0x80")
                 self.emit("    mov qword [rsp+48], 0")
                 self.emit("    call CreateFileA")
-                self.emit("    add rsp, 56")
+                self._call_cleanup(3)
                 self.emit(f"    jmp {dl}")
                 self.emit(f"{rl}:")
-                self.emit_expr(args[0])  # rax = path
-                self.emit("    mov rcx, rax")
+                self.emit_expr(args[0])       # rax = &str
+                self.emit("    mov rcx, [rax]")    # rcx = path.data (offset 0)
                 self.emit("    mov edx, 0x80000000")  # GENERIC_READ
                 self.emit("    mov r8d, 1")
                 self.emit("    xor r9d, r9d")
@@ -973,11 +969,10 @@ class Emitter:
                 self.emit_expr(args[0])  # fd
                 self.emit("    mov rcx, rax")
                 self.emit("    lea r9, [_written]")
-                self.emit("    sub rsp, 40")
+                self._call_prep(1)
                 self.emit("    mov qword [rsp+32], 0")  # lpOverlapped = NULL
                 self.emit("    call ReadFile")
-                self.emit("    add rsp, 40")
-                # Return bytes read (from _written)
+                self._call_cleanup(1)
                 self.emit("    mov eax, [_written]")
             elif name == "fwrite":
                 # fwrite(fd, buf_ptr, len) → WriteFile
@@ -988,50 +983,53 @@ class Emitter:
                 self.emit_expr(args[0])  # fd
                 self.emit("    mov rcx, rax")
                 self.emit("    lea r9, [_written]")
-                self.emit("    sub rsp, 40")
+                self._call_prep(1)
                 self.emit("    mov qword [rsp+32], 0")
                 self.emit("    call WriteFile")
-                self.emit("    add rsp, 40")
+                self._call_cleanup(1)
                 self.emit("    mov eax, [_written]")
             elif name == "fclose":
                 # fclose(fd) → CloseHandle
                 self.emit_expr(args[0])
                 self.emit("    mov rcx, rax")
-                self.emit("    sub rsp, 32")
+                self._call_prep(0)
                 self.emit("    call CloseHandle")
-                self.emit("    add rsp, 32")
+                self._call_cleanup(0)
             elif name == "strlen":
-                # strlen(ptr) → lstrlenA(ptr)
+                # strlen(s: &str) → s.len (direct field read, no call)
                 self.emit_expr(args[0])
-                self.emit("    mov rcx, rax")
-                self.emit("    sub rsp, 32")
-                self.emit("    call lstrlenA")
-                self.emit("    add rsp, 32")
+                self.emit("    mov rax, [rax+8]")  # str.len at offset 8
             elif name == "itoa":
-                # itoa(buf, n) → call _itoa, returns length
-                self.emit_expr(args[1])     # n (right arg first for push-order)
-                self.emit("    push rax")
-                self.emit_expr(args[0])     # buf
-                self.emit("    pop rdx")    # rdx = n
-                self.emit("    mov rcx, rax")  # rcx = buf
-                self.emit("    sub rsp, 32")
+                # itoa(n) → &str (heap-allocated)
+                self.emit_expr(args[0])     # rax = n
+                self.emit("    mov rcx, rax")  # rcx = n
+                self._call_prep(0)
                 self.emit("    call _itoa")
-                self.emit("    add rsp, 32")
+                self._call_cleanup(0)
             elif name == "system":
-                # system(cmd) → call _system, returns exit code
-                self.emit_expr(args[0])
-                self.emit("    mov rcx, rax")
+                # system(cmd: &str) → extract cmd.data, call _system
+                self.emit_expr(args[0])       # rax = &str
+                self.emit("    mov rcx, [rax]")    # rcx = cmd.data (offset 0)
                 self._call_prep(0)
                 self.emit("    call _system")
                 self._call_cleanup(0)
             elif name == "listdir":
-                # listdir(pattern, max) → call _listdir, returns &_arr_str
+                # listdir(pattern: &str, max) → extract pattern.data, call _listdir
                 self.emit_expr(args[1])     # max
                 self.emit("    mov rdx, rax")
                 self.emit_expr(args[0])     # pattern
-                self.emit("    mov rcx, rax")
+                self.emit("    mov rcx, [rax]")  # rcx = pattern.data (offset 0)
                 self._call_prep(0)
                 self.emit("    call _listdir")
+                self._call_cleanup(0)
+            elif name == "str":
+                # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
+                self.emit_expr(args[1])     # rax = len
+                self.emit("    mov rdx, rax")
+                self.emit_expr(args[0])     # rax = bytes
+                self.emit("    mov rcx, rax")
+                self._call_prep(0)
+                self.emit("    call _str_alloc")
                 self._call_cleanup(0)
             return
 
@@ -1292,14 +1290,7 @@ class Emitter:
             data_type = f"&{elem}"
         else:
             data_type = f"&&{elem}"
-        if arr_type not in self.structs:
-            self.structs[arr_type] = {
-                "fields": [
-                    {"name": "len", "type": "i64", "offset": 0},
-                    {"name": "data", "type": data_type, "offset": 8},
-                ],
-                "size": 16,
-            }
+        self._register_len_data_type(arr_type, data_type)
         # 1. Allocate header (16 bytes)
         self.emit(f"    mov rcx, [_heap]")
         self.emit(f"    mov edx, 8")
@@ -1308,11 +1299,11 @@ class Emitter:
         self.emit(f"    call HeapAlloc")
         self.emit(f"    add rsp, 40")
         self.emit(f"    push rax")  # save header ptr on shadow
-        # 2. Store len
+        # 2. Store len at offset 8
         self.emit_expr(count)       # rax = count
         self.emit(f"    pop rcx")   # rcx = header ptr
         self.emit(f"    push rcx")  # re-save
-        self.emit(f"    mov [rcx], rax")  # header.len = count
+        self.emit(f"    mov [rcx+8], rax")  # header.len = count (offset 8)
         # 3. Compute data size and allocate
         if elem in ("i64", "i8"):
             el_size = 8 if elem == "i64" else 1
@@ -1328,7 +1319,7 @@ class Emitter:
             # rax = data pointer
             self.emit(f"    pop rcx")   # rcx = header ptr
             self.emit(f"    push rcx")
-            self.emit(f"    mov [rcx+8], rax")  # header.data = data ptr
+            self.emit(f"    mov [rcx], rax")  # header.data = data ptr (offset 0)
             self.emit(f"    pop rax")   # return header ptr
         else:
             # struct array: allocate pointer array (count * 8), then new each element
@@ -1372,9 +1363,9 @@ class Emitter:
             # store pointer array in header
             self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")  # header ptr
             self.emit(f"    mov rax, [rbp{tmp_data:+d}]")   # pointer array
-            self.emit(f"    mov [rcx+8], rax")   # header.data = pointer array
-            self.emit(f"    mov rax, rcx")       # return header ptr
-            self.emit(f"    pop rcx")            # balance push from step 2
+            self.emit(f"    mov [rcx], rax")   # header.data = pointer array (offset 0)
+            self.emit(f"    mov rax, rcx")     # return header ptr
+            self.emit(f"    pop rcx")           # balance push from step 2
 
     def emit_subscript(self, expr):
         """base[index] → load value from array"""
@@ -1451,179 +1442,150 @@ class Emitter:
 #  Helpers (itoa, string output) — emitted once at end of .asm
 # ═══════════════════════════════════════════════════════════════════════════
 
-ITOA_HELPER = r"""
-; ── _itoa_write: convert rax to decimal string and write to console ──
+STR_ALLOC_HELPER = r"""
+; ── _str_alloc: deep-copy bytes into heap-allocated str ──
+; rcx = src pointer, rdx = len
+; returns: rax = &str { data: &i8, len: i64 }
 ; clobbers: rax, rcx, rdx, r8, r9, r10, r11
-_itoa_write:
+_str_alloc:
     push rbp
     mov rbp, rsp
+    sub rsp, 40           ; 3 save slots (24) + alignment
+    mov [rbp-8], rcx      ; save src
+    mov [rbp-16], rdx     ; save len
+    ; Allocate header (16 bytes)
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 16
     sub rsp, 40
-
-    ; handle negative
-    test rax, rax
-    jns itoa_positive
-    mov byte [_buf], '-'
-    neg rax
-    mov r10, 1
-    jmp itoa_convert
-
-itoa_positive:
-    ; handle zero
-    test rax, rax
-    jnz itoa_nonzero
-    mov byte [_buf], '0'
-    mov byte [_buf+1], 10
-    mov r8, 2
-    jmp itoa_print
-
-itoa_nonzero:
-    mov r10, 0  ; offset for sign
-
-itoa_convert:
-    ; write digits backwards from _buf_end
-    lea r11, [_buf_end]
-itoa_loop:
-    dec r11
-    xor rdx, rdx
-    mov rcx, 10
-    div rcx
-    add dl, '0'
-    mov [r11], dl
-    test rax, rax
-    jnz itoa_loop
-
-    ; compute length: _buf_end - r11 + r10 + 1 (for newline)
-    lea r8, [_buf_end]
-    sub r8, r11
-    add r8, r10
-    inc r8  ; newline
-
-    ; if negative, shift digits right by 1
-    test r10, r10
-    jz itoa_copy
-
-    ; copy from r11 to _buf+1
-    mov rcx, r11
-    lea rdx, [_buf+1]
-    mov rax, r8
-    sub rax, 2  ; length without sign and newline
-itoa_shift:
-    mov bl, [rcx]
-    mov [rdx], bl
-    inc rcx
-    inc rdx
-    dec rax
-    jnz itoa_shift
-    jmp itoa_newline
-
-itoa_copy:
-    ; copy from r11 to _buf
-    mov rcx, r11
-    lea rdx, [_buf]
-    mov rax, r8
-    sub rax, 1  ; length without newline
-itoa_copy_loop:
-    mov bl, [rcx]
-    mov [rdx], bl
-    inc rcx
-    inc rdx
-    dec rax
-    jnz itoa_copy_loop
-
-itoa_newline:
-    ; write newline at end (use lea to avoid 32-bit displacement overflow)
-    lea rax, [_buf-1]
-    mov byte [rax+r8], 10
-
-itoa_print:
-    mov [rbp-8], r8       ; save length (GetStdHandle clobbers r8)
-    mov ecx, -11          ; STD_OUTPUT_HANDLE
-    call GetStdHandle
-
-    mov rcx, rax          ; hFile
-    lea rdx, [_buf]       ; lpBuffer
-    mov r8, [rbp-8]       ; restore length
-    lea r9, [_written]
-    sub rsp, 40
-    mov qword [rsp+32], 0
-    call WriteFile
+    call HeapAlloc
     add rsp, 40
-
+    mov [rbp-24], rax     ; save header ptr
+    ; Allocate data (len + 1 for null terminator)
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8, [rbp-16]      ; len
+    inc r8                ; +1 for null
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+                          ; rax = data ptr
+    ; Store data ptr and len in header
+    mov rcx, [rbp-24]     ; rcx = header
+    mov [rcx], rax        ; header.data = data (offset 0)
+    mov rdx, [rbp-16]     ; rdx = len
+    mov [rcx+8], rdx      ; header.len = len (offset 8)
+    ; Copy bytes
+    test rdx, rdx
+    jz _str_alloc_null
+    mov r8, [rbp-8]       ; r8 = src
+    mov r9, rax           ; r9 = dst
+_str_alloc_copy:
+    mov r10b, [r8]
+    mov [r9], r10b
+    inc r8
+    inc r9
+    dec rdx
+    jnz _str_alloc_copy
+_str_alloc_null:
+    mov byte [r9], 0      ; null terminator
+    mov rax, [rbp-24]     ; return header ptr
     mov rsp, rbp
     pop rbp
     ret
 """
 
-ITOA_HELPER2 = r"""
-; ── _itoa: convert integer to decimal string at buffer ──
-; rcx = buffer ptr, rdx = number
-; returns: rax = length written (no null terminator)
-; clobbers: rax, rcx, rdx, r8, r9, r10, r11
+ITOA_HELPER = r"""
+; ── _itoa: convert integer to heap-allocated str ──
+; rcx = number
+; returns: rax = &str (heap-allocated { data: &i8, len: i64 })
 _itoa:
     push rbp
     mov rbp, rsp
-    push r12
-    sub rsp, 40         ; temp buffer space + alignment
-    mov r12, rcx        ; save buffer ptr
-    mov rax, rdx        ; number to convert
-    mov r10, 0          ; sign flag
-    ; handle negative
+    sub rsp, 88           ; 48 (saves) + 32 (temp) + 8 (align)
+    mov r8, 0             ; sign flag
+    mov rax, rcx
     test rax, rax
-    jns _itoa_pos
+    jns .positive
     neg rax
-    mov r10, 1
-_itoa_pos:
-    ; handle zero
+    mov r8, 1             ; has sign
+.positive:
     test rax, rax
-    jnz _itoa_nz
-    mov byte [r12], '0'
-    mov rax, 1
-    add rsp, 40
-    pop r12
-    mov rsp, rbp
-    pop rbp
-    ret
-_itoa_nz:
-    ; convert digits to temp area on stack
-    lea r11, [rbp-32]   ; temp buffer (32 bytes, enough for 64-bit int)
-    add r11, 31
-    mov byte [r11], 0
-_itoa_loop:
-    dec r11
+    jnz .convert
+    lea r10, [zero_str_data]
+    mov r11, 1
+    mov r8, 0
+    jmp .save_state
+.convert:
+    lea r10, [rbp-80]
+    add r10, 31
+    sub r10, r8           ; leave room for sign
+    mov r11, 0
+.digit_loop:
     xor rdx, rdx
     mov rcx, 10
     div rcx
     add dl, '0'
-    mov [r11], dl
-    test rax, rax
-    jnz _itoa_loop
-    ; now r11 points to first digit
-    ; compute length
-    lea rax, [rbp-32]
-    add rax, 31
-    sub rax, r11         ; rax = length
-    ; copy to buffer
-    mov rcx, rax         ; save length
-    mov r8, rax           ; save length for return
-    ; if negative, write sign first
-    test r10, r10
-    jz _itoa_copy
-    mov byte [r12], '-'
-    inc r12
-    inc r8               ; include sign in length
-_itoa_copy:
-    mov al, [r11]
-    mov [r12], al
+    dec r10
+    mov [r10], dl
     inc r11
-    inc r12
-    dec rcx
-    jnz _itoa_copy
-    mov rax, r8           ; return length
+    test rax, rax
+    jnz .digit_loop
+.save_state:
+    mov [rbp-16], r10     ; save first digit ptr (volatile)
+    mov [rbp-24], r11     ; save digit count (volatile)
+    mov [rbp-32], r8      ; save sign flag
+    ; Allocate header (16 bytes)
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 16
+    sub rsp, 40
+    call HeapAlloc
     add rsp, 40
-    pop r12
+    mov [rbp-8], rax      ; save header
+    ; Compute total len
+    mov r8, [rbp-24]       ; digit count
+    add r8, [rbp-32]       ; + sign flag
+    ; Allocate data (total len + 1)
+    mov rcx, [_heap]
+    mov edx, 8
+    push r8               ; save total len
+    inc r8                ; +1 for null
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    pop rdx               ; rdx = total len
+    mov rcx, [rbp-8]
+    mov [rcx], rax        ; header.data = data
+    mov [rcx+8], rdx      ; header.len = total len
+    ; Restore volatile state
+    mov r10, [rbp-16]     ; first digit ptr
+    mov r11, [rbp-24]     ; digit count
+    mov r8, [rbp-32]      ; sign flag
+    ; Write sign if negative
+    mov r9, rax           ; dst cursor
+    test r8, r8
+    jz .copy_digits
+    mov byte [r9], '-'
+    inc r9
+.copy_digits:
+    mov rcx, r11
+    test rcx, rcx
+    jz .nullterm
+.copy:
+    mov al, [r10]
+    mov [r9], al
+    inc r10
+    inc r9
+    dec rcx
+    jnz .copy
+.nullterm:
+    mov byte [r9], 0
+    mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
+zero_str_data: db '0', 0
 """
 
 SYSTEM_HELPER = r"""
@@ -1693,8 +1655,8 @@ _system_done:
 
 LISTDIR_HELPER = r"""
 ; ── _listdir: list files matching pattern ──
-; rcx = pattern, rdx = max
-; returns: rax = pointer to { len: i64, data: &&str }
+; rcx = pattern (C string), rdx = max
+; returns: rax = pointer to { data: &&str, len: i64 }
 _listdir:
     push rbp
     mov rbp, rsp
@@ -1713,7 +1675,7 @@ _listdir:
     call HeapAlloc
     add rsp, 40
     mov r14, rax         ; r14 = header ptr
-    mov qword [r14], 0   ; header.len = 0
+    mov qword [r14+8], 0 ; header.len = 0 (offset 8)
     ; Allocate pointer array: max * 8
     mov rcx, [_heap]
     mov edx, 8
@@ -1722,7 +1684,7 @@ _listdir:
     sub rsp, 40
     call HeapAlloc
     add rsp, 40
-    mov [r14+8], rax     ; header.data = pointer array
+    mov [r14], rax       ; header.data = pointer array (offset 0)
     ; FindFirstFileA
     lea rdx, [rbp-592]
     mov rcx, [rbp-728]   ; pattern
@@ -1733,7 +1695,7 @@ _listdir:
     je _listdir_done2
     mov r15, rax          ; r15 = find handle
 _listdir_loop2:
-    mov rcx, [r14]        ; current count
+    mov rcx, [r14+8]      ; current count (offset 8)
     cmp rcx, [rbp-736]    ; max
     jge _listdir_close2
     ; Get filename length
@@ -1750,7 +1712,7 @@ _listdir_loop2:
     call HeapAlloc
     add rsp, 40
     mov r13, rax          ; r13 = str ptr
-    mov [r13], r12        ; str.len = filename length
+    mov [r13+8], r12      ; str.len = filename length (offset 8)
     ; Allocate filename buffer (len + 1)
     mov r8, r12
     inc r8
@@ -1759,7 +1721,7 @@ _listdir_loop2:
     sub rsp, 40
     call HeapAlloc
     add rsp, 40
-    mov [r13+8], rax      ; str.data = filename buffer
+    mov [r13], rax        ; str.data = filename buffer (offset 0)
     ; Copy filename
     mov rcx, rax          ; dst = filename buffer
     lea rdx, [rbp-592+44] ; src = cFileName
@@ -1767,10 +1729,10 @@ _listdir_loop2:
     call lstrcpyA
     add rsp, 40
     ; Store str ptr in pointer array
-    mov rcx, [r14+8]      ; pointer array base
-    mov rax, [r14]        ; current index
+    mov rcx, [r14]        ; pointer array base (offset 0)
+    mov rax, [r14+8]      ; current index (offset 8)
     mov [rcx + rax*8], r13
-    inc qword [r14]       ; header.len++
+    inc qword [r14+8]     ; header.len++ (offset 8)
     ; FindNextFileA
     mov rcx, r15
     lea rdx, [rbp-592]
@@ -1819,8 +1781,8 @@ def compile_file(input_path):
 
     emitter = Emitter(asm_path)
     emitter.emit_program(ast)
+    emitter.emit(STR_ALLOC_HELPER)
     emitter.emit(ITOA_HELPER)
-    emitter.emit(ITOA_HELPER2)
     emitter.emit(SYSTEM_HELPER)
     emitter.emit(LISTDIR_HELPER)
     emitter.close()

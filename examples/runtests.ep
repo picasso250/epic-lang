@@ -1,14 +1,9 @@
-# Minimal Epic self-test runner
-# Compiles m1_exit.ep and checks exit code
-
+# EXIT 0
 fun main() -> i64 {
-    let cmd = new i8[256];
-
-    # Compile
-    strcpy(cmd.data, "python epicc.py examples/m1_exit.ep");
-    let e = system(cmd.data);
+    let cmd = "python epicc.py examples/m1_exit.ep";
+    let e = system(cmd);
     putstr("compile exit: ");
-    puti(e);
+    putstr(itoa(e));
     putc(10);
 
     if e != 0 {
@@ -17,9 +12,10 @@ fun main() -> i64 {
     }
 
     # Run and capture exit
-    e = system("m1_exit.exe");
+    let cmd2 = "m1_exit.exe";
+    e = system(cmd2);
     putstr("run exit: ");
-    puti(e);
+    putstr(itoa(e));
     putc(10);
 
     if e != 42 {

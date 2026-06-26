@@ -2,8 +2,8 @@
 # STDOUT 5
 
 fun main() -> i64 {
-    let s: i64 = "hello";
-    puti(strlen(s));
+    let s = "hello";
+    putstr(itoa(strlen(s)));
     putc(10);
     exit(0);
 }

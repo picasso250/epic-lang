@@ -1,10 +1,8 @@
 # EXIT 0
 # STDOUT 42
-
 fun main() -> i64 {
-    let s = new i8[32];
-    let n: i64 = itoa(s.data, 42);
-    fwrite(-11, s.data, n);
+    let s = itoa(42);
+    putstr(s);
     putc(10);
     exit(0);
 }

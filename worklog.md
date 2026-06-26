@@ -2,6 +2,25 @@
 
 ## 2026-06-25 项目启动 & 设计决议
 
+### str 类型重构 (2026-06-26)
+- `{len, data}` → `{data, len}`（data offset 0, len offset 8，从 Rust/Go）
+- `str` 加入词法 (`STR` token) 和语法 (`parse_type`)
+- 字符串字面量每次深拷贝（`_str_alloc`），返回 `&str`
+- 类型推断：`let s = "..."` → `&str`
+- 删 `puti`（替代：`putstr(itoa(n))`）
+- 删 `strcpy`（替代：`str(bytes, len)` 深拷贝）
+- 新增 `str(bytes, len)` builtin
+- `itoa(n)` 改签名为 `itoa(n: i64) → &str`（堆分配）
+- `system(cmd)`/`fopen(path)`/`listdir(pattern)` 改签名接收 `&str`
+- `{len,data}` 统一入口：`_register_len_data_type()`
+- `_call_prep` 修复：去 +8（适配 push rbp + sub rsp 后的真实对齐态）
+- 所有 builtin Win32 调用改用 `_call_prep`/`_call_cleanup`
+- `_itoa` 重写：本地标签 + 栈帧保存 volatile 状态，支持负数
+- Bug 修：`push r14/r15` 后写 `[rbp-8]` 覆盖 saved `r14`
+- Bug 修：`HeapAlloc` 踩 volatile `r10`/`r11` → ACCESS_VIOLATION
+- 33/37 测试通过。剩余 4 crash：m10_str(strcmp)/m15_system/m16_listdir/runtests
+  共同点：通过 `&str` 参数调 builtin，内部 syscall 路径待查
+
 ### 工具链
 - NASM 3.01 (1.9 MB) → lld-link 22.1.8 (135.8 MB, 含 LLVM-C.dll) → .exe
 - 工具存放于 `tools/` 目录
