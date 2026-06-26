@@ -83,7 +83,7 @@ class LexError(Exception):
 
 
 def lex(source_text):
-    """Tokenize source text, yield (name, value, line) tuples."""
+    """Tokenize source text. Detects and rejects invalid characters."""
     tokens = []
     lines = source_text.split("\n")
     line_numbers = []
@@ -94,23 +94,26 @@ def lex(source_text):
                 line_numbers.append(i)
             pos += 1
 
-    for m in TOKEN_RE.finditer(source_text):
+    pos = 0
+    while pos < len(source_text):
+        m = TOKEN_RE.match(source_text, pos)
+        if not m:
+            line = line_numbers[pos] if pos < len(line_numbers) else 1
+            raise LexError(f"Unexpected character {source_text[pos]!r}", line)
         kind = m.lastgroup
         value = m.group()
-        line = 1
-        if m.start() < len(line_numbers):
-            line = line_numbers[m.start()]
-        if kind == "WHITESPACE":
+        if kind == "WHITESPACE" or kind == "COMMENT":
+            pos = m.end()
             continue
-        if kind == "COMMENT":
-            continue
+        line = line_numbers[m.start()] if m.start() < len(line_numbers) else 1
         if kind == "NUMBER":
             value = int(value)
-        if kind == "STRING":
+        elif kind == "STRING":
             value = value[1:-1]  # strip quotes
-        if kind == "CHAR":
+        elif kind == "CHAR":
             value = ord(value[1])  # 'X' → ASCII code
         tokens.append((kind, value, line))
+        pos = m.end()
     return tokens
 
 
@@ -591,8 +594,10 @@ class Emitter:
         label = "_start" if name == "main" else name
         self.emit(f"{label}:")
 
-        # Prologue: dynamic frame, 16-byte aligned (include 32-byte shadow)
-        self.alloc_size = ((self.local_bytes + 32 + 15) // 16) * 16
+        # Prologue: dynamic frame, 16-byte aligned (include 32-byte shadow + 3 compiler temps)
+        self._temp_count = 0
+        self._temp_base = self.local_bytes  # temps start below user vars
+        self.alloc_size = ((self.local_bytes + 3*8 + 32 + 15) // 16) * 16
         self.emit("    push rbp")
         self.emit("    mov rbp, rsp")
         self.emit(f"    sub rsp, {self.alloc_size}")
@@ -639,6 +644,12 @@ class Emitter:
             self.local_bytes += size
             self.local_offset[name] = -self.local_bytes
         return self.local_offset[name]
+
+    def _alloc_temp(self):
+        """Allocate a compiler temporary frame slot, return rbp-relative offset."""
+        nr = self._temp_count
+        self._temp_count += 1
+        return -(self._temp_base + (nr + 1) * 8)
 
     def _type_size(self, typ):
         if typ == "i64":
@@ -978,14 +989,17 @@ class Emitter:
                 self.emit("    add rsp, 40")
             return
 
-        # User-defined function call
+        # User-defined function call: spill all args first, then load registers
         if len(args) > 4:
             raise RuntimeError(f"Function {name} has >4 arguments (not supported)")
         param_regs = ["rcx", "rdx", "r8", "r9"]
-        for i, arg in enumerate(reversed(args)):
-            idx = len(args) - 1 - i
+        # Evaluate args right-to-left, push each
+        for arg in reversed(args):
             self.emit_expr(arg)
-            self.emit(f"    mov {param_regs[idx]}, rax")
+            self.emit("    push rax")
+        # Pop into registers (rcx gets first arg, rdx second, etc.)
+        for i in range(len(args)):
+            self.emit(f"    pop {param_regs[i]}")
         self.emit(f"    sub rsp, 32")
         self.emit(f"    call {name}")
         self.emit(f"    add rsp, 32")
@@ -1272,9 +1286,12 @@ class Emitter:
             self.emit(f"    pop rax")   # return header ptr
         else:
             # struct array: allocate pointer array (count * 8), then new each element
-            # Save count and header ptr in frame slots to avoid stack shadow issues
-            self.emit(f"    mov [rbp-16], rcx")  # save header ptr
-            self.emit(f"    mov [rbp-24], rax")  # save count
+            # Save count and header ptr in compiler temps (not hardcoded slots)
+            tmp_header = self._alloc_temp()
+            tmp_count = self._alloc_temp()
+            tmp_data = self._alloc_temp()
+            self.emit(f"    mov [rbp{tmp_header:+d}], rcx")  # save header ptr
+            self.emit(f"    mov [rbp{tmp_count:+d}], rax")   # save count
             # Allocate pointer array: count * 8
             self.emit(f"    mov r8, rax")
             self.emit(f"    imul r8, 8")
@@ -1284,9 +1301,9 @@ class Emitter:
             self.emit(f"    call HeapAlloc")
             self.emit(f"    add rsp, 48")
             # rax = pointer array base
-            self.emit(f"    mov [rbp-32], rax")  # save pointer array
+            self.emit(f"    mov [rbp{tmp_data:+d}], rax")   # save pointer array
             # Loop: for i in range(count): data[i] = new StructName
-            self.emit(f"    mov r12, [rbp-24]")  # r12 = count (non-volatile, loop counter)
+            self.emit(f"    mov r12, [rbp{tmp_count:+d}]")  # r12 = count (non-volatile)
             loop_lbl = self.fresh_label()
             done_lbl = self.fresh_label()
             self.emit(f"{loop_lbl}:")
@@ -1302,13 +1319,13 @@ class Emitter:
             self.emit(f"    call HeapAlloc")
             self.emit(f"    add rsp, 48")
             # store in pointer array
-            self.emit(f"    mov rcx, [rbp-32]")  # pointer array base
+            self.emit(f"    mov rcx, [rbp{tmp_data:+d}]")  # pointer array base
             self.emit(f"    mov [rcx + r12*8], rax")
             self.emit(f"    jmp {loop_lbl}")
             self.emit(f"{done_lbl}:")
             # store pointer array in header
-            self.emit(f"    mov rcx, [rbp-16]")  # header ptr
-            self.emit(f"    mov rax, [rbp-32]")  # pointer array
+            self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")  # header ptr
+            self.emit(f"    mov rax, [rbp{tmp_data:+d}]")   # pointer array
             self.emit(f"    mov [rcx+8], rax")   # header.data = pointer array
             self.emit(f"    mov rax, rcx")       # return header ptr
             self.emit(f"    pop rcx")            # balance push from step 2
@@ -1500,6 +1517,7 @@ _itoa:
     push rbp
     mov rbp, rsp
     push r12
+    sub rsp, 40         ; temp buffer space + alignment
     mov r12, rcx        ; save buffer ptr
     mov rax, rdx        ; number to convert
     mov r10, 0          ; sign flag
@@ -1514,6 +1532,7 @@ _itoa_pos:
     jnz _itoa_nz
     mov byte [r12], '0'
     mov rax, 1
+    add rsp, 40
     pop r12
     mov rsp, rbp
     pop rbp
@@ -1554,6 +1573,7 @@ _itoa_copy:
     dec rcx
     jnz _itoa_copy
     mov rax, r8           ; return length
+    add rsp, 40
     pop r12
     mov rsp, rbp
     pop rbp
