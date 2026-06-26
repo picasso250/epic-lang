@@ -1,7 +1,7 @@
 # EXIT 0
 # STDOUT 42
 # STDOUT 2
-fn main() -> i64 {
+fun main() -> i64 {
     # Write a file
     let out: i8[100];
     let fd: i64 = fopen("test_out.txt", 1);

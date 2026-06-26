@@ -25,7 +25,7 @@ SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 # ═══════════════════════════════════════════════════════════════════════════
 
 TOKEN_SPEC = [
-    ("FN",        r'\bfn\b'),
+    ("FUN",       r'\bfun\b'),
     ("RETURN",    r'\breturn\b'),
     ("IF",        r'\bif\b'),
     ("ELSE",      r'\belse\b'),
@@ -156,8 +156,8 @@ class Parser:
     def parse_program(self):
         funcs = []
         structs = []
-        while self.peek()[0] in ("FN", "STRUCT"):
-            if self.peek_kind("FN"):
+        while self.peek()[0] in ("FUN", "STRUCT"):
+            if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
             else:
                 structs.append(self.parse_struct_def())
@@ -166,7 +166,7 @@ class Parser:
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
         return {"type": "program", "funcs": funcs, "structs": structs}
 
-    # ── fn definition ─────────────────────────────────────────────────
+    # ── fun definition ─────────────────────────────────────────────────
 
     def parse_struct_def(self):
         self.expect("STRUCT")
@@ -183,7 +183,7 @@ class Parser:
         return {"type": "struct_def", "name": name[1], "fields": fields}
 
     def parse_fn_def(self):
-        self.expect("FN")
+        self.expect("FUN")
         name = self.expect("ID")
         self.expect("LPAREN")
         params = self.parse_params()

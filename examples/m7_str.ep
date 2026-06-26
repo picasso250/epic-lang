@@ -1,7 +1,7 @@
 # EXIT 0
 # STDOUT Hello, Epic!
 # STDOUT 42
-fn main() -> i64 {
+fun main() -> i64 {
     putstr("Hello, Epic!");
     putc(10);
     puti(42);

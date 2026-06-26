@@ -1,7 +1,7 @@
 # EXIT 0
 # STDOUT 1
 # STDOUT 2
-fn main() -> i64 {
+fun main() -> i64 {
     let x: i64 = 10;
     if (x > 5) {
         puti(1);

@@ -4,7 +4,7 @@
 # STDOUT 2
 # STDOUT 3
 # STDOUT 4
-fn main() -> i64 {
+fun main() -> i64 {
     let i: i64 = 0;
     while (i < 5) {
         puti(i);

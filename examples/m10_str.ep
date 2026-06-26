@@ -1,6 +1,6 @@
 # EXIT 0
 # STDOUT hellobye
-fn main() -> i64 {
+fun main() -> i64 {
     # string literal as expression: returns pointer
     let s: i64 = "hello";
     putstr(s);

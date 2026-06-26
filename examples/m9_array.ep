@@ -1,7 +1,7 @@
 # EXIT 0
 # STDOUT Epic
 # STDOUT 69
-fn main() -> i64 {
+fun main() -> i64 {
     let buf: i8[10];
     buf[0] = 'E';
     buf[1] = 'p';

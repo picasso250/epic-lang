@@ -1,7 +1,7 @@
 # EXIT 0
 # STDOUT HI
 # STDOUT 90
-fn to_upper(c: i8) -> i64 {
+fun to_upper(c: i8) -> i64 {
     if (c >= 'a') {
         if (c <= 'z') {
             return c - 32;
@@ -10,7 +10,7 @@ fn to_upper(c: i8) -> i64 {
     return c;
 }
 
-fn main() -> i64 {
+fun main() -> i64 {
     putc(to_upper('h'));
     putc(to_upper('i'));
     putc(10);
