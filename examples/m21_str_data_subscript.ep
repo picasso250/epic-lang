@@ -1,0 +1,5 @@
+# EXIT 66
+fun main() -> i64 {
+    let s = "ABC";
+    return s.data[1];
+}

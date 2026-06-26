@@ -1216,10 +1216,14 @@ class Emitter:
         elif obj["type"] == "subscript":
             # Subscript returned a pointer; access its field
             self.emit_subscript(obj)
-            elem, is_struct = self._subscript_type(obj["base"])
-            if not is_struct:
-                raise RuntimeError(f"Field access on value type '{elem}'")
-            info = self.structs[elem]
+            # rax = pointer to element. Resolve element type from subscript.
+            elem_type = self._expr_type(obj)
+            if not elem_type.startswith("&"):
+                raise RuntimeError(f"Field access on value type '{elem_type}'")
+            struct_name = elem_type[1:]
+            if struct_name not in self.structs:
+                raise RuntimeError(f"Field access on unknown type '{struct_name}'")
+            info = self.structs[struct_name]
             for f in info["fields"]:
                 if f["name"] == field_name:
                     if f["type"] == "i8":
@@ -1227,7 +1231,7 @@ class Emitter:
                     else:
                         self.emit(f"    mov rax, [rax+{f['offset']}]")
                     return
-            raise RuntimeError(f"Struct '{elem}' has no field '{field_name}'")
+            raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
         else:
             raise RuntimeError(f"Field access on non-variable: {obj['type']}")
 
@@ -1253,11 +1257,15 @@ class Emitter:
             self.emit_subscript(obj)
             self.emit("    pop rcx")
             # rax = pointer to struct, rcx = value
-            # Look up field offset
-            elem, is_struct = self._subscript_type(obj["base"])
-            if not is_struct:
+            # Resolve element type from subscript base
+            elem_type = self._expr_type(obj)
+            # Strip leading & to get struct name
+            if not elem_type.startswith("&"):
                 raise RuntimeError(f"Field set on value type")
-            info = self.structs[elem]
+            struct_name = elem_type[1:]
+            if struct_name not in self.structs:
+                raise RuntimeError(f"Field set on unknown type: {struct_name}")
+            info = self.structs[struct_name]
             for f in info["fields"]:
                 if f["name"] == field_name:
                     if f["type"] == "i8":
@@ -1265,7 +1273,7 @@ class Emitter:
                     else:
                         self.emit(f"    mov [rax+{f['offset']}], rcx")
                     return
-            raise RuntimeError(f"Struct '{elem}' has no field '{field_name}'")
+            raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
         else:
             raise RuntimeError(f"Field set on non-var: {obj['type']}")
 
@@ -1274,7 +1282,9 @@ class Emitter:
         base = stmt["base"]
         index = stmt["index"]
         value = stmt["value"]
-        elem, is_struct = self._subscript_type(base)
+        # Compute element type from a synthetic subscript expression
+        elem_type = self._expr_type({"type": "subscript", "base": base, "index": index})
+        is_i8 = (elem_type == "i8")
         # Evaluate value first
         self.emit_expr(value)
         self.emit("    push rax")
@@ -1283,12 +1293,12 @@ class Emitter:
         self.emit("    push rax")
         self.emit_expr(index)       # rax = index
         self.emit("    pop rcx")    # rcx = base pointer
-        if elem == "i8":
+        if is_i8:
             self.emit(f"    lea rcx, [rcx + rax]")
         else:
             self.emit(f"    lea rcx, [rcx + rax*8]")
         self.emit("    pop rax")
-        if elem == "i8":
+        if is_i8:
             self.emit(f"    mov [rcx], al")
         else:
             self.emit(f"    mov [rcx], rax")
@@ -1397,54 +1407,81 @@ class Emitter:
         """base[index] → load value from array"""
         base = expr["base"]
         index = expr["index"]
-        # Determine element type from base expression
-        elem, is_struct = self._subscript_type(base)
+        elem_type = self._expr_type(expr)  # type of the element being accessed
         # Evaluate base (pointer), then add index * size
         self.emit_expr(base)        # rax = base pointer
         self.emit("    push rax")
         self.emit_expr(index)       # rax = index
         self.emit("    pop rcx")    # rcx = base pointer
-        if elem == "i8":
+        if elem_type == "i8":
             self.emit(f"    movsx rax, byte [rcx + rax]")
-        elif elem == "i64":
-            self.emit(f"    mov rax, [rcx + rax*8]")
         else:
-            # Struct pointer array
+            # i64, struct pointer, or anything else: 8-byte stride
             self.emit(f"    mov rax, [rcx + rax*8]")
 
-    def _subscript_type(self, base_expr):
-        """Return (elem_type, is_struct) for subscript base expression."""
-        if base_expr["type"] == "var":
-            vtype = self.local_types.get(base_expr["name"], "i64")
-            if vtype == "&i8":
-                return "i8", False
-            if vtype == "&i64":
-                return "i64", False
-            if vtype.startswith("&"):
-                inner = vtype[1:]
-                if inner in ("i64", "i8"):
-                    return inner, False
+    def _expr_type(self, expr):
+        """Return the type string of an expression. Minimal but principled."""
+        t = expr["type"]
+        if t == "literal":
+            return "i64"
+        if t == "string":
+            return "&str"
+        if t == "var":
+            return self.local_types.get(expr["name"], "i64")
+        if t == "call":
+            name = expr["name"]
+            # Builtins with known return types
+            if name in ("itoa", "str_new"):
+                return "&str"
+            if name == "listdir":
+                return "&_arr_str"
+            if name in ("strlen", "strcmp", "fread", "fwrite", "fopen", "fclose", "system"):
+                return "i64"
+            if name in ("exit", "putc", "putstr"):
+                return "void"
+            # User-defined function: find its return type
+            # For now, assume i64 (we don't track user function signatures here)
+            return "i64"
+        if t == "field_access":
+            obj_type = self._expr_type(expr["object"])
+            field_name = expr["field"]
+            # Strip & to get the struct name
+            struct_name = obj_type[1:] if obj_type.startswith("&") else obj_type
+            if struct_name in self.structs:
+                for f in self.structs[struct_name]["fields"]:
+                    if f["name"] == field_name:
+                        return f["type"]
+            return "i64"  # fallback
+        if t == "subscript":
+            base_type = self._expr_type(expr["base"])
+            # base_type is like &T where T may be _arr_X, i8, i64, or &Struct
+            if base_type.startswith("&"):
+                inner = base_type[1:]  # strip one layer of pointer
                 if inner.startswith("_arr_"):
-                    inner = inner[5:]
-                    if inner in ("i64", "i8"):
-                        return inner, False
-                    return inner, True
-                return inner, True
-        if base_expr["type"] == "field_access":
-            obj = base_expr["object"]
-            fn = base_expr["field"]
-            if obj["type"] == "var":
-                vtype = self.local_types.get(obj["name"], "i64")
-                if vtype.startswith("&"):
-                    vtype = vtype[1:]  # strip &
-                if vtype.startswith("_arr_"):
-                    vtype = vtype[5:]  # strip _arr_
-                if vtype in ("i64", "i8"):
-                    return vtype, False
-                else:
-                    return vtype, True
-        # Default: pointer to i64
-        return "i64", False
+                    elem = inner[5:]  # element type name
+                    if elem in ("i64", "i8"):
+                        return elem
+                    return "&" + elem  # struct arrays return &Struct
+                # Direct pointer: subscript returns the pointee type
+                return inner
+            return "i64"  # fallback
+        if t == "unary":
+            op = expr["op"]
+            if op == "&":
+                return "&" + self._expr_type(expr["expr"])
+            if op == "*":
+                inner = self._expr_type(expr["expr"])
+                if inner.startswith("&"):
+                    return inner[1:]
+                return "i64"
+            return "i64"  # - and ! always return i64
+        if t == "binary":
+            return "i64"  # all binary ops produce i64
+        if t == "new":
+            return "&" + expr["struct_name"]
+        if t == "new_array":
+            return "&_arr_" + expr["elem_type"]
+        return "i64"
 
     def emit_addrof(self, expr):
         """&inner → lea rax, [address]"""
