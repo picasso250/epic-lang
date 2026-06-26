@@ -1259,13 +1259,13 @@ class Emitter:
             # rax = pointer array base
             self.emit(f"    mov [rbp-32], rax")  # save pointer array
             # Loop: for i in range(count): data[i] = new StructName
-            self.emit(f"    mov r10, [rbp-24]")  # r10 = count (loop counter, counts down)
+            self.emit(f"    mov r12, [rbp-24]")  # r12 = count (non-volatile, loop counter)
             loop_lbl = self.fresh_label()
             done_lbl = self.fresh_label()
             self.emit(f"{loop_lbl}:")
-            self.emit(f"    test r10, r10")
+            self.emit(f"    test r12, r12")
             self.emit(f"    jz {done_lbl}")
-            self.emit(f"    dec r10")
+            self.emit(f"    dec r12")
             # new elem
             el_size = self.structs[elem]["size"]
             self.emit(f"    mov rcx, [_heap]")
@@ -1276,7 +1276,7 @@ class Emitter:
             self.emit(f"    add rsp, 48")
             # store in pointer array
             self.emit(f"    mov rcx, [rbp-32]")  # pointer array base
-            self.emit(f"    mov [rcx + r10*8], rax")
+            self.emit(f"    mov [rcx + r12*8], rax")
             self.emit(f"    jmp {loop_lbl}")
             self.emit(f"{done_lbl}:")
             # store pointer array in header
