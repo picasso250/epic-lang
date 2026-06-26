@@ -592,17 +592,25 @@ class Emitter:
         params = fn["params"]
         body = fn["body"]
 
+        # Pre-scan parameters FIRST so local_bytes includes them
+        for p in params:
+            self.get_var_slot(p["name"], p.get("type", "i64"))
+
         # Pre-scan: allocate stack slots for let declarations
         self._pre_scan_block(body)
+
+        # Pre-scan: count max temp slots needed
+        max_temps = self._pre_scan_temps(body)
+        temp_bytes = max(max_temps + 1, 3) * 8  # at least 3 temps (24 bytes)
 
         # Entry label: main → _start
         label = "_start" if name == "main" else name
         self.emit(f"{label}:")
 
-        # Prologue: dynamic frame, 16-byte aligned (include 32-byte shadow + 3 compiler temps)
+        # Prologue: dynamic frame, 16-byte aligned (include 32-byte shadow + compiler temps)
         self._temp_count = 0
         self._temp_base = self.local_bytes  # temps start below user vars
-        self.alloc_size = ((self.local_bytes + 3*8 + 32 + 15) // 16) * 16
+        self.alloc_size = ((self.local_bytes + temp_bytes + 32 + 15) // 16) * 16
         self.emit("    push rbp")
         self.emit("    mov rbp, rsp")
         self.emit(f"    sub rsp, {self.alloc_size}")
@@ -641,17 +649,21 @@ class Emitter:
     # ── ABI helpers ───────────────────────────────────────────────────
 
     def _call_prep(self, stack_args=0):
-        """Emit sub rsp for a Win32 call, ensuring 16-byte alignment.
-        Assumes rsp \u2261 8 (mod 16) after function prologue (push rbp + sub rsp).
-        stack_args: number of extra 8-byte params beyond the 4 register params."""
-        total = 32 + stack_args * 8
-        frame = ((total + 15) // 16) * 16
+        """Emit sub rsp for extra stack params beyond the 4 register params.
+        The frame already has 32 bytes shadow space; extra bytes are for
+        params 5+ at [rsp+32], [rsp+40], etc.  Alignment: rsp \u2261 8 mod 16."""
+        extra_bytes = stack_args * 8
+        if extra_bytes == 0:
+            return 0
+        frame = ((extra_bytes + 15) // 16) * 16
         self.emit(f"    sub rsp, {frame}")
         return frame
 
     def _call_cleanup(self, stack_args=0):
-        total = 32 + stack_args * 8
-        frame = ((total + 15) // 16) * 16
+        extra_bytes = stack_args * 8
+        if extra_bytes == 0:
+            return
+        frame = ((extra_bytes + 15) // 16) * 16
         self.emit(f"    add rsp, {frame}")
 
     def get_var_slot(self, name, typ=None):
@@ -725,6 +737,25 @@ class Emitter:
                     self._pre_scan_block(stmt["else_block"])
             elif stmt["type"] == "while":
                 self._pre_scan_block(stmt["body"])
+
+    def _pre_scan_temps(self, node):
+        """Count maximum temp slots needed. Each binary op uses 1 temp."""
+        if isinstance(node, dict):
+            count = 0
+            if node.get("type") == "binary":
+                count = 1  # this binary op saves right operand in a temp
+            # Recurse into children, take max across siblings (temps are reused)
+            for v in node.values():
+                count += self._pre_scan_temps(v)
+            return count
+        elif isinstance(node, list):
+            # For lists of statements, each statement's path is independent
+            # But temps are cumulative across sequential statements (not reused across statements)
+            total = 0
+            for item in node:
+                total += self._pre_scan_temps(item)
+            return total
+        return 0
 
     # ── statements ─────────────────────────────────────────────────────
 
@@ -846,9 +877,7 @@ class Emitter:
             strlen = len(expr["value"])
             self.emit(f"    lea rcx, [{label}]")
             self.emit(f"    mov rdx, {strlen}")
-            self._call_prep(0)
             self.emit(f"    call _str_alloc")
-            self._call_cleanup(0)
         elif t == "var":
             name = expr["name"]
             slot = self.local_offset.get(name)
@@ -889,9 +918,7 @@ class Emitter:
                 self.emit_expr(args[0])
                 self.emit("    mov [_buf], al")
                 self.emit("    mov ecx, -11")
-                self._call_prep(0)
                 self.emit("    call GetStdHandle")
-                self._call_cleanup(0)
                 self.emit("    mov rcx, rax")
                 self.emit("    lea rdx, [_buf]")
                 self.emit("    mov r8, 1")
@@ -906,9 +933,7 @@ class Emitter:
                 tmp = self._alloc_temp()
                 self.emit(f"    mov [rbp{tmp:+d}], rax")  # save &str
                 self.emit("    mov ecx, -11")  # STD_OUTPUT_HANDLE
-                self._call_prep(0)
                 self.emit("    call GetStdHandle")
-                self._call_cleanup(0)
                 self.emit("    mov rcx, rax")   # rcx = stdout handle
                 self.emit(f"    mov rax, [rbp{tmp:+d}]")  # rax = &str
                 self.emit("    mov rdx, [rax]")      # rdx = str.data (offset 0)
@@ -924,9 +949,7 @@ class Emitter:
                 self.emit("    mov rdx, [rax]")    # rdx = b.data (offset 0)
                 self.emit_expr(args[0])       # rax = &str (a)
                 self.emit("    mov rcx, [rax]")    # rcx = a.data (offset 0)
-                self._call_prep(0)
                 self.emit("    call lstrcmpA")
-                self._call_cleanup(0)
             elif name == "fopen":
                 # fopen(path: &str, mode) → extract path.data, call CreateFileA
                 rl = self.fresh_label()
@@ -992,9 +1015,7 @@ class Emitter:
                 # fclose(fd) → CloseHandle
                 self.emit_expr(args[0])
                 self.emit("    mov rcx, rax")
-                self._call_prep(0)
                 self.emit("    call CloseHandle")
-                self._call_cleanup(0)
             elif name == "strlen":
                 # strlen(s: &str) → s.len (direct field read, no call)
                 self.emit_expr(args[0])
@@ -1003,34 +1024,30 @@ class Emitter:
                 # itoa(n) → &str (heap-allocated)
                 self.emit_expr(args[0])     # rax = n
                 self.emit("    mov rcx, rax")  # rcx = n
-                self._call_prep(0)
                 self.emit("    call _itoa")
-                self._call_cleanup(0)
             elif name == "system":
                 # system(cmd: &str) → extract cmd.data, call _system
                 self.emit_expr(args[0])       # rax = &str
                 self.emit("    mov rcx, [rax]")    # rcx = cmd.data (offset 0)
-                self._call_prep(0)
+                self.emit("    sub rsp, 8")       # align for _system entry
                 self.emit("    call _system")
-                self._call_cleanup(0)
+                self.emit("    add rsp, 8")
             elif name == "listdir":
                 # listdir(pattern: &str, max) → extract pattern.data, call _listdir
                 self.emit_expr(args[1])     # max
                 self.emit("    mov rdx, rax")
                 self.emit_expr(args[0])     # pattern
                 self.emit("    mov rcx, [rax]")  # rcx = pattern.data (offset 0)
-                self._call_prep(0)
+                self.emit("    sub rsp, 8")       # align for _listdir entry
                 self.emit("    call _listdir")
-                self._call_cleanup(0)
+                self.emit("    add rsp, 8")
             elif name == "str":
                 # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
                 self.emit_expr(args[1])     # rax = len
                 self.emit("    mov rdx, rax")
                 self.emit_expr(args[0])     # rax = bytes
                 self.emit("    mov rcx, rax")
-                self._call_prep(0)
                 self.emit("    call _str_alloc")
-                self._call_cleanup(0)
             return
 
         # User-defined function call: spill all args first, then load registers
@@ -1057,11 +1074,14 @@ class Emitter:
             self.emit_short_circuit(expr)
             return
 
-        # Evaluate right → save to stack, evaluate left → rax, pop right → rcx
+        # Evaluate right to temp slot, evaluate left → rax, load right → rcx
+        # Using temp slot (not push/pop) so left expr can contain calls without
+        # clobbering stack alignment or shadow space.
         self.emit_expr(right)
-        self.emit("    push rax")
+        tmp = self._alloc_temp()
+        self.emit(f"    mov [rbp{tmp:+d}], rax")
         self.emit_expr(left)
-        self.emit("    pop rcx")
+        self.emit(f"    mov rcx, [rbp{tmp:+d}]")
 
         op_map = {
             "+": "add rax, rcx",

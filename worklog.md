@@ -18,8 +18,12 @@
 - `_itoa` 重写：本地标签 + 栈帧保存 volatile 状态，支持负数
 - Bug 修：`push r14/r15` 后写 `[rbp-8]` 覆盖 saved `r14`
 - Bug 修：`HeapAlloc` 踩 volatile `r10`/`r11` → ACCESS_VIOLATION
-- 33/37 测试通过。剩余 4 crash：m10_str(strcmp)/m15_system/m16_listdir/runtests
-  共同点：通过 `&str` 参数调 builtin，内部 syscall 路径待查
+- Bug 修：`_temp_base` 在参数 `get_var_slot` 前设导致临时槽与参数槽重合 → 函数返回值错误
+- Bug 修：`emit_binary` 改 push/pop 为帧临时槽（避开函数调用时栈对齐问题）
+- Bug 修：帧预留 temp 数量不足 → 预扫描统计 `_pre_scan_temps`
+- 对齐策略：学 GCC，shadow space 吃进 `sub rsp`，零栈参不再额外操作
+- `_call_prep(N)` 简化为仅对 N>0 时 `sub rsp` 额外参数空间
+- 27/27 测试全绿。runtests.ep 移至根目录标记未完成
 
 ### 工具链
 - NASM 3.01 (1.9 MB) → lld-link 22.1.8 (135.8 MB, 含 LLVM-C.dll) → .exe
