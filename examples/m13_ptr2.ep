@@ -1,0 +1,19 @@
+# EXIT 0
+# STDOUT 200
+
+struct Point {
+    x: i64;
+    y: i64;
+}
+
+fun sum(p: &Point) -> i64 {
+    return p.x + p.y;
+}
+
+fun main() -> i64 {
+    let p: &Point = new Point;
+    p.x = 100;
+    p.y = 100;
+    puti(sum(p));
+    exit(0);
+}

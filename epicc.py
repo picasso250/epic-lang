@@ -31,6 +31,7 @@ TOKEN_SPEC = [
     ("ELSE",      r'\belse\b'),
     ("WHILE",     r'\bwhile\b'),
     ("STRUCT",    r'\bstruct\b'),
+    ("NEW",       r'\bnew\b'),
     ("LET",       r'\blet\b'),
     ("TYPE_I8",   r'\bi8\b'),
     ("TYPE_I64",  r'\bi64\b'),
@@ -42,6 +43,7 @@ TOKEN_SPEC = [
     ("LTE",       r'<='),
     ("GTE",       r'>='),
     ("AND",       r'&&'),
+    ("AMPERSAND", r'&'),
     ("OR",        r'\|\|'),
     ("LT",        r'<'),
     ("GT",        r'>'),
@@ -215,6 +217,9 @@ class Parser:
 
     def parse_type(self):
         t = self.advance()
+        if t[0] == "AMPERSAND":
+            inner = self.parse_type()
+            return f"&{inner}"  # e.g. "&Token" or "&i64"
         if t[0] in ("TYPE_I64", "TYPE_I8"):
             return t[1]  # "i64" or "i8"
         if t[0] == "ID":
@@ -390,9 +395,17 @@ class Parser:
             return {"type": "unary", "op": "-", "expr": self.parse_unary()}
         if self.check("BANG"):
             return {"type": "unary", "op": "!", "expr": self.parse_unary()}
+        if self.check("AMPERSAND"):
+            return {"type": "unary", "op": "&", "expr": self.parse_unary()}
+        if self.check("STAR"):
+            return {"type": "unary", "op": "*", "expr": self.parse_unary()}
         return self.parse_primary()
 
     def parse_primary(self):
+        if self.peek_kind("NEW"):
+            self.expect("NEW")
+            name = self.expect("ID")
+            return {"type": "new", "struct_name": name[1]}
         if self.peek_kind("NUMBER"):
             t = self.advance()
             return {"type": "literal", "value": t[1]}
@@ -480,6 +493,8 @@ class Emitter:
         self.emit("extern lstrcmpA")
         self.emit("extern lstrcpyA")
         self.emit("extern lstrlenA")
+        self.emit("extern HeapAlloc")
+        self.emit("extern GetProcessHeap")
         self.emit("default rel")
         self.emit("")
 
@@ -497,6 +512,7 @@ class Emitter:
         self.emit("    _buf times 32 db 0")
         self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
+        self.emit("    _heap dq 0")
         for name, info in self.arrays.items():
             self.emit(f"{name}: resb {info['size']}")
         # Emit string literals (null-terminated)
@@ -573,6 +589,11 @@ class Emitter:
         self.emit("    mov rbp, rsp")
         self.emit(f"    sub rsp, {self.alloc_size}")
 
+        # Heap init for main
+        if name == "main":
+            self.emit("    call GetProcessHeap")
+            self.emit("    mov [_heap], rax")
+
         # Map params from registers to local slots
         param_regs = ["rcx", "rdx", "r8", "r9"]
         param_low = ["cl", "dl", "r8b", "r9b"]  # low-byte names
@@ -618,6 +639,8 @@ class Emitter:
             return 1
         if typ in self.structs:
             return self.structs[typ]["size"]
+        if typ.startswith("&"):
+            return 8  # pointers are always 8 bytes
         return 8  # unknown, assume i64
 
     def _compute_struct_layouts(self, ast):
@@ -808,6 +831,12 @@ class Emitter:
             self.emit_unary(expr)
         elif t == "field_access":
             self.emit_field_access(expr)
+        elif t == "new":
+            self.emit_new(expr)
+        elif t == "unary" and expr["op"] == "&":
+            self.emit_addrof(expr)
+        elif t == "unary" and expr["op"] == "*":
+            self.emit_deref(expr)
         else:
             raise RuntimeError(f"Unknown expr type: {t}")
 
@@ -1049,18 +1078,34 @@ class Emitter:
     # ── struct operations ─────────────────────────────────────────────
 
     def _resolve_field(self, var_name, field_name):
-        """Return (slot_offset, field_offset, field_type) for var.field."""
+        """Return (slot_offset, field_offset, field_type, is_ptr) for var.field."""
         slot = self.local_offset.get(var_name)
         if slot is None:
             raise RuntimeError(f"Undefined variable: {var_name}")
         var_type = self.local_types.get(var_name, "i64")
-        if var_type not in self.structs:
+        is_ptr = var_type.startswith("&")
+        struct_name = var_type[1:] if is_ptr else var_type
+        if struct_name not in self.structs:
             raise RuntimeError(f"Field access on non-struct type '{var_type}'")
-        info = self.structs[var_type]
+        info = self.structs[struct_name]
         for f in info["fields"]:
             if f["name"] == field_name:
-                return slot, f["offset"], f["type"]
-        raise RuntimeError(f"Struct '{var_type}' has no field '{field_name}'")
+                return slot, f["offset"], f["type"], is_ptr
+        raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+
+    def _emit_struct_base(self, slot, is_ptr):
+        """Emit instruction to load base address into rax."""
+        if is_ptr:
+            self.emit(f"    mov rax, [rbp{slot:+d}]")
+        else:
+            self.emit(f"    lea rax, [rbp{slot:+d}]")
+
+    def _emit_struct_base_rcx(self, slot, is_ptr):
+        """Emit instruction to load base address into rcx."""
+        if is_ptr:
+            self.emit(f"    mov rcx, [rbp{slot:+d}]")
+        else:
+            self.emit(f"    lea rcx, [rbp{slot:+d}]")
 
     def emit_field_access(self, expr):
         """Read expr.object.field into rax."""
@@ -1068,8 +1113,8 @@ class Emitter:
         field_name = expr["field"]
         if obj["type"] != "var":
             raise RuntimeError(f"Field access on non-variable: {obj['type']}")
-        slot, off, ftype = self._resolve_field(obj["name"], field_name)
-        self.emit(f"    lea rax, [rbp{slot:+d}]")
+        slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+        self._emit_struct_base(slot, is_ptr)
         if ftype == "i8":
             self.emit(f"    movsx rax, byte [rax+{off}]")
         else:
@@ -1082,13 +1127,63 @@ class Emitter:
         # Evaluate value first (may use same struct)
         self.emit_expr(stmt["value"])
         self.emit("    push rax")
-        slot, off, ftype = self._resolve_field(obj["name"], field_name)
-        self.emit(f"    lea rcx, [rbp{slot:+d}]")
+        slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+        self._emit_struct_base_rcx(slot, is_ptr)
         self.emit("    pop rax")
         if ftype == "i8":
             self.emit(f"    mov [rcx+{off}], al")
         else:
             self.emit(f"    mov [rcx+{off}], rax")
+
+    def emit_new(self, expr):
+        """new StructName → HeapAlloc, returns &StructName in rax."""
+        struct_name = expr["struct_name"]
+        if struct_name not in self.structs:
+            raise RuntimeError(f"Unknown struct in new: {struct_name}")
+        size = self.structs[struct_name]["size"]
+        self.emit(f"    mov rcx, [_heap]")
+        self.emit(f"    mov edx, 8")   # HEAP_ZERO_MEMORY
+        self.emit(f"    mov r8d, {size}")
+        self.emit(f"    sub rsp, 48")
+        self.emit(f"    call HeapAlloc")
+        self.emit(f"    add rsp, 48")
+        # rax = pointer, zero-initialized
+
+    def emit_addrof(self, expr):
+        """&inner → lea rax, [address]"""
+        inner = expr["expr"]
+        if inner["type"] == "var":
+            name = inner["name"]
+            if name in self.arrays:
+                self.emit(f"    lea rax, [{name}]")
+            else:
+                slot = self.local_offset[name]
+                self.emit(f"    lea rax, [rbp{slot:+d}]")
+        elif inner["type"] == "field_access":
+            obj = inner["object"]
+            field_name = inner["field"]
+            if obj["type"] != "var":
+                raise RuntimeError(f"Cannot take address of: {obj['type']}")
+            slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+            self._emit_struct_base(slot, is_ptr)
+            self.emit(f"    add rax, {off}")
+        else:
+            raise RuntimeError(f"Cannot take address of: {inner['type']}")
+
+    def emit_deref(self, expr):
+        """*inner → load value from pointer"""
+        inner = expr["expr"]
+        # Determine pointee type from the inner expression
+        pointee = "i64"
+        if inner["type"] == "var":
+            vtype = self.local_types.get(inner["name"], "i64")
+            if vtype.startswith("&"):
+                pointee = vtype[1:]
+        self.emit_expr(inner)
+        if pointee == "i8":
+            self.emit("    movsx rax, byte [rax]")
+        else:
+            self.emit("    mov rax, [rax]")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

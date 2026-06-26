@@ -1,0 +1,13 @@
+# EXIT 42
+
+struct Node {
+    kind: i64;
+    value: i64;
+}
+
+fun main() -> i64 {
+    let n: &Node = new Node;
+    n.kind = 42;
+    n.value = 10;
+    return n.kind;
+}

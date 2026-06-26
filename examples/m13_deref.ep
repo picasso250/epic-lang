@@ -1,0 +1,7 @@
+# EXIT 99
+
+fun main() -> i64 {
+    let x: i64 = 99;
+    let p: &i64 = &x;
+    return *p;
+}

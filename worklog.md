@@ -90,3 +90,19 @@
 - C 自然对齐布局，预扫描动态计算帧大小
 - 暂不支持：struct 传参/返回、struct 字面量、嵌套 struct、struct 赋值
 - 测试 15/15 通过
+
+### 语法清理 (2026-06-26)
+- `fn` → `fun`
+- `if/while (cond)` → `if/while cond`（去括号）
+- `m8_i8_fn.ep` 用 `&&` 替代嵌套 `if`
+
+### M13: 指针 + 堆分配 (2026-06-26)
+- 指针类型 `&T`（`&i64`, `&Node`）
+- 堆分配 `new Node` → `HeapAlloc`（HEAP_ZERO_MEMORY）
+- 取地址 `&expr` → `lea rax, [addr]`
+- 解引用 `*expr` → `mov rax, [rax]`（纯读值，非左值）
+- 自动解引用：对 `&T` 变量做 `.field` 访问自动 `mov rax, [rbp+slot]` 加载指针
+- 指针传参：`fun f(p: &Point) -> i64`，指针用 1 个寄存器
+- struct 禁止按值传参/返回（通过指针传递）
+- 暂不支持：多级指针、free、struct 字面量
+- 测试 18/18 通过
