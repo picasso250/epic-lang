@@ -316,9 +316,7 @@ class Parser:
 
     def parse_if_stmt(self):
         self.expect("IF")
-        self.expect("LPAREN")
         cond = self.parse_expr()
-        self.expect("RPAREN")
         then_block = self.parse_block()
         else_block = None
         if self.check("ELSE"):
@@ -327,9 +325,7 @@ class Parser:
 
     def parse_while_stmt(self):
         self.expect("WHILE")
-        self.expect("LPAREN")
         cond = self.parse_expr()
-        self.expect("RPAREN")
         body = self.parse_block()
         return {"type": "while", "cond": cond, "body": body}
 

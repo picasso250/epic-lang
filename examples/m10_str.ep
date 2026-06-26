@@ -7,7 +7,7 @@ fun main() -> i64 {
 
     # strcmp
     let t: i64 = "hello";
-    if (strcmp(s, t) == 0) {
+    if strcmp(s, t) == 0 {
         putstr("bye");
     } else {
         putstr("no");

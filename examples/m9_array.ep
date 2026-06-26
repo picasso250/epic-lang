@@ -10,7 +10,7 @@ fun main() -> i64 {
     buf[4] = 10;
 
     let i: i64 = 0;
-    while (i < 5) {
+    while i < 5 {
         putc(buf[i]);
         i = i + 1;
     }

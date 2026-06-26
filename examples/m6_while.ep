@@ -6,7 +6,7 @@
 # STDOUT 4
 fun main() -> i64 {
     let i: i64 = 0;
-    while (i < 5) {
+    while i < 5 {
         puti(i);
         i = i + 1;
     }

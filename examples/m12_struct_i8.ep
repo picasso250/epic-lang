@@ -9,7 +9,7 @@ fun main() -> i64 {
     let d: Data;
     d.flag = 1;
     d.value = 65;
-    if (d.flag) {
+    if d.flag {
         return d.value;
     }
     return 0;
