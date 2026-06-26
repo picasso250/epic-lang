@@ -155,7 +155,6 @@ while i < 100 {
 | Builtin | 签名 | 说明 |
 |---------|------|------|
 | `putstr` | `putstr(s: &str) → void` | 输出到 stdout，读 `s.len` + `s.data` 调 WriteFile |
-| `strlen` | `strlen(s: &str) → i64` | 返回 `s.len`（一条 mov 指令） |
 | `strcmp` | `strcmp(a: &str, b: &str) → i64` | 提取 `a.data`/`b.data` 调 lstrcmpA |
 | `str_new` | `str_new(bytes: &i8, len: i64) → &str` | 深拷贝构造 str |
 | `itoa` | `itoa(n: i64) → &str` | 整数→十进制字符串（堆分配） |

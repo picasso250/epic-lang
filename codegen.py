@@ -16,7 +16,7 @@ class Emitter:
         self.out = open(out_path, "w")
         self.builtins = {"exit", "putc", "putstr",
                          "fopen", "fread", "fwrite", "fclose",
-                         "strcmp", "strlen", "itoa", "system",
+                         "strcmp", "itoa", "system",
                          "listdir", "str_new"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
@@ -557,10 +557,6 @@ class Emitter:
                 self.emit_expr(args[0])
                 self.emit("    mov rcx, rax")
                 self.emit("    call CloseHandle")
-            elif name == "strlen":
-                # strlen(s: &str) → s.len (direct field read, no call)
-                self.emit_expr(args[0])
-                self.emit("    mov rax, [rax+8]")  # str.len at offset 8
             elif name == "itoa":
                 # itoa(n) → &str (heap-allocated)
                 self.emit_expr(args[0])     # rax = n
@@ -987,7 +983,7 @@ class Emitter:
                 return "&str"
             if name == "listdir":
                 return "&_arr_str"
-            if name in ("strlen", "strcmp", "fread", "fwrite", "fopen", "fclose", "system"):
+            if name in ("strcmp", "fread", "fwrite", "fopen", "fclose", "system"):
                 return "i64"
             if name in ("exit", "putc", "putstr"):
                 return "void"
