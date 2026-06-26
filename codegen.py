@@ -1423,8 +1423,7 @@ def compile_file(input_path):
         capture_output=True, text=True,
     )
     if result.returncode != 0:
-        print("NASM error:\n" + result.stderr)
-        sys.exit(1)
+        raise RuntimeError("NASM error:\n" + result.stderr[:500])
 
     print(f"[4/4] Linking → {exe_path}")
     result = subprocess.run(
@@ -1432,25 +1431,7 @@ def compile_file(input_path):
         capture_output=True, text=True,
     )
     if result.returncode != 0:
-        print("Link error:\n" + result.stderr)
-        sys.exit(1)
+        raise RuntimeError("Link error:\n" + result.stderr[:500])
 
     size = os.path.getsize(exe_path)
     print(f"  OK: {exe_path} ({size} bytes)")
-
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python epicc.py <file.ep>")
-        sys.exit(1)
-
-    input_path = sys.argv[1]
-    if not os.path.exists(input_path):
-        print(f"Error: file not found: {input_path}")
-        sys.exit(1)
-
-    compile_file(input_path)
-
-
-if __name__ == "__main__":
-    main()
