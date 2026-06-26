@@ -475,7 +475,8 @@ class Emitter:
         self.out = open(out_path, "w")
         self.builtins = {"exit", "puti", "putc", "putstr",
                          "fopen", "fread", "fwrite", "fclose",
-                         "strcmp", "strcpy", "strlen", "itoa", "system"}
+                         "strcmp", "strcpy", "strlen", "itoa", "system",
+                         "listdir"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -515,6 +516,9 @@ class Emitter:
         self.emit("extern GetExitCodeProcess")
         self.emit("extern HeapAlloc")
         self.emit("extern GetProcessHeap")
+        self.emit("extern FindFirstFileA")
+        self.emit("extern FindNextFileA")
+        self.emit("extern FindClose")
         self.emit("default rel")
         self.emit("")
 
@@ -532,10 +536,10 @@ class Emitter:
         self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
         self.emit("    _heap dq 0")
-        # Emit string literals (null-terminated)
+        # Emit string literals as comma-separated bytes (avoids NASM escaping)
         for label, text in sorted(self.strings.items(), key=lambda x: x[0]):
-            escaped = text.replace("\\", "\\\\").replace('"', '"')
-            self.emit(f'{label}: db "{escaped}", 0')
+            bytes_str = ", ".join(str(b) for b in text.encode('ascii', errors='replace'))
+            self.emit(f"{label}: db {bytes_str}, 0")
         self.emit("")
         self.emit("section .text")
         self.emit("")
@@ -677,6 +681,22 @@ class Emitter:
 
     def _compute_struct_layouts(self, ast):
         self.structs = {}
+        # Built-in str type: { len: i64, data: &i8 }
+        self.structs["str"] = {
+            "fields": [
+                {"name": "len", "type": "i64", "offset": 0},
+                {"name": "data", "type": "&i8", "offset": 8},
+            ],
+            "size": 16,
+        }
+        # Array-of-str type used by listdir()
+        self.structs["_arr_str"] = {
+            "fields": [
+                {"name": "len", "type": "i64", "offset": 0},
+                {"name": "data", "type": "&&str", "offset": 8},
+            ],
+            "size": 16,
+        }
         for s in ast.get("structs", []):
             fields = []
             offset = 0
@@ -753,6 +773,10 @@ class Emitter:
                 var_type = f"&{value['struct_name']}"
             elif value["type"] == "new_array":
                 var_type = f"&_arr_{value['elem_type']}"
+            elif value["type"] == "call" and value["name"] == "listdir":
+                var_type = "&_arr_str"
+            elif value["type"] == "call" and value["name"] == "itoa":
+                var_type = "i64"
             elif value["type"] == "string":
                 var_type = "i64"
             else:
@@ -997,9 +1021,18 @@ class Emitter:
                 # system(cmd) → call _system, returns exit code
                 self.emit_expr(args[0])
                 self.emit("    mov rcx, rax")
-                self.emit("    sub rsp, 40")
+                self._call_prep(0)
                 self.emit("    call _system")
-                self.emit("    add rsp, 40")
+                self._call_cleanup(0)
+            elif name == "listdir":
+                # listdir(pattern, max) → call _listdir, returns &_arr_str
+                self.emit_expr(args[1])     # max
+                self.emit("    mov rdx, rax")
+                self.emit_expr(args[0])     # pattern
+                self.emit("    mov rcx, rax")
+                self._call_prep(0)
+                self.emit("    call _listdir")
+                self._call_cleanup(0)
             return
 
         # User-defined function call: spill all args first, then load registers
@@ -1658,6 +1691,112 @@ _system_done:
     ret
 """
 
+LISTDIR_HELPER = r"""
+; ── _listdir: list files matching pattern ──
+; rcx = pattern, rdx = max
+; returns: rax = pointer to { len: i64, data: &&str }
+_listdir:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 688         ; WIN32_FIND_DATAA(592) + 96
+    push r12             ; rbp-696
+    push r13             ; rbp-704
+    push r14             ; rbp-712
+    push r15             ; rbp-720
+    push rcx             ; rbp-728 save pattern
+    push rdx             ; rbp-736 save max
+    ; Allocate header (16 bytes)
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 16
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov r14, rax         ; r14 = header ptr
+    mov qword [r14], 0   ; header.len = 0
+    ; Allocate pointer array: max * 8
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8, [rbp-736]    ; max
+    imul r8, 8
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov [r14+8], rax     ; header.data = pointer array
+    ; FindFirstFileA
+    lea rdx, [rbp-592]
+    mov rcx, [rbp-728]   ; pattern
+    sub rsp, 40
+    call FindFirstFileA
+    add rsp, 40
+    cmp rax, -1
+    je _listdir_done2
+    mov r15, rax          ; r15 = find handle
+_listdir_loop2:
+    mov rcx, [r14]        ; current count
+    cmp rcx, [rbp-736]    ; max
+    jge _listdir_close2
+    ; Get filename length
+    lea rcx, [rbp-592+44]
+    sub rsp, 40
+    call lstrlenA
+    add rsp, 40
+    mov r12, rax          ; r12 = filename length
+    ; Allocate str struct (16 bytes)
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 16
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov r13, rax          ; r13 = str ptr
+    mov [r13], r12        ; str.len = filename length
+    ; Allocate filename buffer (len + 1)
+    mov r8, r12
+    inc r8
+    mov rcx, [_heap]
+    mov edx, 8
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov [r13+8], rax      ; str.data = filename buffer
+    ; Copy filename
+    mov rcx, rax          ; dst = filename buffer
+    lea rdx, [rbp-592+44] ; src = cFileName
+    sub rsp, 40
+    call lstrcpyA
+    add rsp, 40
+    ; Store str ptr in pointer array
+    mov rcx, [r14+8]      ; pointer array base
+    mov rax, [r14]        ; current index
+    mov [rcx + rax*8], r13
+    inc qword [r14]       ; header.len++
+    ; FindNextFileA
+    mov rcx, r15
+    lea rdx, [rbp-592]
+    sub rsp, 40
+    call FindNextFileA
+    add rsp, 40
+    test eax, eax
+    jnz _listdir_loop2
+_listdir_close2:
+    mov rcx, r15
+    sub rsp, 40
+    call FindClose
+    add rsp, 40
+_listdir_done2:
+    mov rax, r14          ; return header ptr
+    pop rdx               ; discard saved max
+    pop rcx               ; discard saved pattern
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    mov rsp, rbp
+    pop rbp
+    ret
+"""
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Driver
@@ -1683,6 +1822,7 @@ def compile_file(input_path):
     emitter.emit(ITOA_HELPER)
     emitter.emit(ITOA_HELPER2)
     emitter.emit(SYSTEM_HELPER)
+    emitter.emit(LISTDIR_HELPER)
     emitter.close()
 
     print(f"[3/4] Assembling → {obj_path}")
