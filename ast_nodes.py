@@ -134,12 +134,6 @@ class BinaryNode(ASTNode):
 
 
 @dataclass
-class UnaryNode(ASTNode):
-    op: str
-    expr: ASTNode
-
-
-@dataclass
 class FieldAccessNode(ASTNode):
     object: ASTNode
     field: str

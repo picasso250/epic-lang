@@ -437,8 +437,6 @@ class Emitter:
             self.emit_subscript(expr)
         elif isinstance(expr, BinaryNode):
             self.emit_binary(expr)
-        elif isinstance(expr, UnaryNode):
-            self.emit_unary(expr)
         elif isinstance(expr, FieldAccessNode):
             self.emit_field_access(expr)
         elif isinstance(expr, NewNode):
@@ -690,22 +688,6 @@ class Emitter:
         self.emit("    setne al")
         self.emit("    movzx eax, al")
         self.emit(f"{end_label}:")
-
-    def emit_unary(self, expr):
-        if expr.op == "-":
-            self.emit_expr(expr.expr)
-            self.emit("    neg rax")
-        elif expr.op == "!":
-            self.emit_expr(expr.expr)
-            self.emit("    test rax, rax")
-            self.emit("    setz al")
-            self.emit("    movzx eax, al")
-        elif expr.op == "&":
-            self.emit_addrof(expr)
-        elif expr.op == "*":
-            self.emit_deref(expr)
-        else:
-            raise RuntimeError(f"Unknown unary op: {expr.op}")
 
     # ── struct operations ─────────────────────────────────────────────
 
@@ -1036,16 +1018,6 @@ class Emitter:
                 # Direct pointer: subscript returns the pointee type
                 return inner
             return "i64"  # fallback
-        if isinstance(expr, UnaryNode):
-            op = expr.op
-            if op == "&":
-                return "&" + self._expr_type(expr.expr)
-            if op == "*":
-                inner = self._expr_type(expr.expr)
-                if inner.startswith("&"):
-                    return inner[1:]
-                return "i64"
-            return "i64"  # - and ! always return i64
         if isinstance(expr, BinaryNode):
             return "i64"  # all binary ops produce i64
         if isinstance(expr, NewNode):
@@ -1053,36 +1025,3 @@ class Emitter:
         if isinstance(expr, NewArrayNode):
             return "&_arr_" + expr.elem_type
         return "i64"
-
-    def emit_addrof(self, expr):
-        """&inner → lea rax, [address]"""
-        inner = expr.expr
-        if isinstance(inner, VarNode):
-            name = inner.name
-            slot = self.local_offset[name]
-            self.emit(f"    lea rax, [rbp{slot:+d}]")
-        elif isinstance(inner, FieldAccessNode):
-            obj = inner.object
-            field_name = inner.field
-            if not isinstance(obj, VarNode):
-                raise RuntimeError(f"Cannot take address of: {type(obj).__name__}")
-            slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
-            self._emit_struct_base(slot, is_ptr)
-            self.emit(f"    add rax, {off}")
-        else:
-            raise RuntimeError(f"Cannot take address of: {type(inner).__name__}")
-
-    def emit_deref(self, expr):
-        """*inner → load value from pointer"""
-        inner = expr.expr
-        # Determine pointee type from the inner expression
-        pointee = "i64"
-        if isinstance(inner, VarNode):
-            vtype = self.local_types.get(inner.name, "i64")
-            if vtype.startswith("&"):
-                pointee = vtype[1:]
-        self.emit_expr(inner)
-        if pointee == "i8":
-            self.emit("    movsx rax, byte [rax]")
-        else:
-            self.emit("    mov rax, [rax]")
