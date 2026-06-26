@@ -1,0 +1,6 @@
+# EXIT 66
+fun main() -> i64 {
+    let s = "ABC";
+    let bytes: &i8 = s.data;
+    return bytes[1];
+}

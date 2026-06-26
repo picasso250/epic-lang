@@ -1,0 +1,5 @@
+# EXIT 0
+fun main() -> i64 {
+    putstr("");
+    return 0;
+}

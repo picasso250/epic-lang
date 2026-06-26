@@ -113,7 +113,7 @@ while i < 100 {
 | `putstr` | `putstr(s: &str) → void` | 输出到 stdout，读 `s.len` + `s.data` 调 WriteFile |
 | `strlen` | `strlen(s: &str) → i64` | 返回 `s.len`（一条 mov 指令） |
 | `strcmp` | `strcmp(a: &str, b: &str) → i64` | 提取 `a.data`/`b.data` 调 lstrcmpA |
-| `str` | `str(bytes: &i8, len: i64) → &str` | 深拷贝构造 str |
+| `str_new` | `str_new(bytes: &i8, len: i64) → &str` | 深拷贝构造 str |
 | `itoa` | `itoa(n: i64) → &str` | 整数→十进制字符串（堆分配） |
 
 ### I/O builtin
@@ -175,7 +175,7 @@ let buf = new i8[4096];
 let fd = fopen("data.txt", 0);
 let n = fread(fd, buf.data, 4096);
 fclose(fd);
-let content = str(buf.data, n);
+let content = str_new(buf.data, n);
 putstr(content);
 
 // 整数转字符串

@@ -477,7 +477,7 @@ class Emitter:
         self.builtins = {"exit", "putc", "putstr",
                          "fopen", "fread", "fwrite", "fclose",
                          "strcmp", "strlen", "itoa", "system",
-                         "listdir", "str"}
+                         "listdir", "str_new"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -540,7 +540,10 @@ class Emitter:
         # Emit string literals as comma-separated bytes (avoids NASM escaping)
         for label, text in sorted(self.strings.items(), key=lambda x: x[0]):
             bytes_str = ", ".join(str(b) for b in text.encode('ascii', errors='replace'))
-            self.emit(f"{label}: db {bytes_str}, 0")
+            if bytes_str:
+                self.emit(f"{label}: db {bytes_str}, 0")
+            else:
+                self.emit(f"{label}: db 0")
         self.emit("")
         self.emit("section .text")
         self.emit("")
@@ -739,18 +742,21 @@ class Emitter:
                 self._pre_scan_block(stmt["body"])
 
     def _pre_scan_temps(self, node):
-        """Count maximum temp slots needed. Each binary op uses 1 temp."""
+        """Count temp slots needed. Covers: binary ops (1), putstr (1), struct new_array (3)."""
         if isinstance(node, dict):
             count = 0
-            if node.get("type") == "binary":
-                count = 1  # this binary op saves right operand in a temp
-            # Recurse into children, take max across siblings (temps are reused)
+            t = node.get("type", "")
+            if t == "binary":
+                count = 1
+            elif t == "call" and node.get("name") == "putstr":
+                count = 1  # putstr calls _alloc_temp to save &str
+            elif t == "new_array" and node.get("elem_type") not in ("i64", "i8"):
+                count = 3  # struct array saves header/count/data in temps
             for v in node.values():
-                count += self._pre_scan_temps(v)
+                if isinstance(v, (dict, list)):
+                    count += self._pre_scan_temps(v)
             return count
         elif isinstance(node, list):
-            # For lists of statements, each statement's path is independent
-            # But temps are cumulative across sequential statements (not reused across statements)
             total = 0
             for item in node:
                 total += self._pre_scan_temps(item)
@@ -809,7 +815,7 @@ class Emitter:
                 var_type = "&_arr_str"
             elif value["type"] == "call" and value["name"] == "itoa":
                 var_type = "&str"
-            elif value["type"] == "call" and value["name"] == "str":
+            elif value["type"] == "call" and value["name"] == "str_new":
                 var_type = "&str"
             elif value["type"] == "string":
                 var_type = "&str"
@@ -1041,7 +1047,7 @@ class Emitter:
                 self.emit("    sub rsp, 8")       # align for _listdir entry
                 self.emit("    call _listdir")
                 self.emit("    add rsp, 8")
-            elif name == "str":
+            elif name == "str_new":
                 # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
                 self.emit_expr(args[1])     # rax = len
                 self.emit("    mov rdx, rax")
@@ -1408,6 +1414,22 @@ class Emitter:
 
     def _subscript_type(self, base_expr):
         """Return (elem_type, is_struct) for subscript base expression."""
+        if base_expr["type"] == "var":
+            vtype = self.local_types.get(base_expr["name"], "i64")
+            if vtype == "&i8":
+                return "i8", False
+            if vtype == "&i64":
+                return "i64", False
+            if vtype.startswith("&"):
+                inner = vtype[1:]
+                if inner in ("i64", "i8"):
+                    return inner, False
+                if inner.startswith("_arr_"):
+                    inner = inner[5:]
+                    if inner in ("i64", "i8"):
+                        return inner, False
+                    return inner, True
+                return inner, True
         if base_expr["type"] == "field_access":
             obj = base_expr["object"]
             fn = base_expr["field"]
@@ -1497,9 +1519,9 @@ _str_alloc:
     mov [rcx+8], rdx      ; header.len = len (offset 8)
     ; Copy bytes
     test rdx, rdx
+    mov r9, rax           ; r9 = dst cursor (set before branch for len=0 case)
     jz _str_alloc_null
     mov r8, [rbp-8]       ; r8 = src
-    mov r9, rax           ; r9 = dst
 _str_alloc_copy:
     mov r10b, [r8]
     mov [r9], r10b

@@ -25,6 +25,14 @@
 - `_call_prep(N)` 简化为仅对 N>0 时 `sub rsp` 额外参数空间
 - 27/27 测试全绿。runtests.ep 移至根目录标记未完成
 
+### Code Review 修复 (2026-06-26)
+- P0: `_pre_scan_temps` 补统计 `putstr` (1 temp) 和 `new_array` struct (3 temps) → 修复多 putstr 越界崩溃
+- P1: `_subscript_type` 增加 `var` 分支，`&i8` 下标不再按 `i64*8` 读 → 修复 `bytes[1]` 静默算错
+- P2: 空字符串 `.data` 段生成 `db , 0` 改 `db 0`；`_str_alloc` 空长度时 `r9` 前移至分支前
+- P3: `str(...)` builtin 改名为 `str_new(...)`（避免与 `TYPE_STR` 词法冲突）
+- 新增回归测试 m17-m20
+- `//` 注释不引入，保持 `#`
+
 ### 工具链
 - NASM 3.01 (1.9 MB) → lld-link 22.1.8 (135.8 MB, 含 LLVM-C.dll) → .exe
 - 工具存放于 `tools/` 目录
