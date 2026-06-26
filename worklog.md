@@ -159,3 +159,17 @@
 - 目录平铺，路径常量归 codegen.py，异常类各回各家
 - grill-me 16 问逐一定策
 - 32/32 测试全绿
+
+### 词法清理 & 链式字段访问 (2026-06-26)
+- TYPE_STR/TYPE_I8/TYPE_I64 从 lexer 删除，降级为 ID + parser 上下文区分
+- 修 emit_field_access/emit_field_set 支持链式 FieldAccessNode（a.next.val）
+- 加 _emit_field_read_from_rax / _emit_field_write_to_rax 辅助方法
+- struct 自引用 (&Node) 测试通过 (m22_self_ref.ep)
+- 33/33 测试全绿
+
+### Regex reference 实现 (2026-06-26)
+- ref_regex.py: 极简 NFA regex（字面量 | * ()）Thompson 构造 + VM 匹配 + epoch 去重
+- 修复：_make_star patch 覆盖 out1 → 改用 (node, which_out) patch 列表
+- 修复：epoch dedup 阻止 nlist→clist → 同步骤改用 extend
+- 修复：空串匹配检查缺失 → epsilon 闭包后先扫描 match 态
+- 29/29 测试全绿

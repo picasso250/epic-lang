@@ -753,24 +753,50 @@ class Emitter:
         elif isinstance(obj, SubscriptNode):
             # Subscript returned a pointer; access its field
             self.emit_subscript(obj)
-            # rax = pointer to element. Resolve element type from subscript.
-            elem_type = self._expr_type(obj)
-            if not elem_type.startswith("&"):
-                raise RuntimeError(f"Field access on value type '{elem_type}'")
-            struct_name = elem_type[1:]
-            if struct_name not in self.structs:
-                raise RuntimeError(f"Field access on unknown type '{struct_name}'")
-            info = self.structs[struct_name]
-            for f in info["fields"]:
-                if f["name"] == field_name:
-                    if f["type"] == "i8":
-                        self.emit(f"    movsx rax, byte [rax+{f['offset']}]")
-                    else:
-                        self.emit(f"    mov rax, [rax+{f['offset']}]")
-                    return
-            raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+            # rax = pointer to element.
+            self._emit_field_read_from_rax(obj, field_name)
+        elif isinstance(obj, FieldAccessNode):
+            # Chain: obj.field2.field1 — evaluate inner, then read field from rax
+            self.emit_field_access(obj)
+            self._emit_field_read_from_rax(obj, field_name)
         else:
             raise RuntimeError(f"Field access on non-variable: {type(obj).__name__}")
+
+    def _emit_field_read_from_rax(self, source_expr, field_name):
+        """Read field_name from a struct pointer already in rax."""
+        elem_type = self._expr_type(source_expr)
+        if not elem_type.startswith("&"):
+            raise RuntimeError(f"Field access on value type '{elem_type}'")
+        struct_name = elem_type[1:]
+        if struct_name not in self.structs:
+            raise RuntimeError(f"Field access on unknown type '{struct_name}'")
+        info = self.structs[struct_name]
+        for f in info["fields"]:
+            if f["name"] == field_name:
+                if f["type"] == "i8":
+                    self.emit(f"    movsx rax, byte [rax+{f['offset']}]")
+                else:
+                    self.emit(f"    mov rax, [rax+{f['offset']}]")
+                return
+        raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+
+    def _emit_field_write_to_rax(self, source_expr, field_name):
+        """Write rcx to field_name of struct pointer in rax."""
+        elem_type = self._expr_type(source_expr)
+        if not elem_type.startswith("&"):
+            raise RuntimeError(f"Field write on value type")
+        struct_name = elem_type[1:]
+        if struct_name not in self.structs:
+            raise RuntimeError(f"Field write on unknown type: {struct_name}")
+        info = self.structs[struct_name]
+        for f in info["fields"]:
+            if f["name"] == field_name:
+                if f["type"] == "i8":
+                    self.emit(f"    mov [rax+{f['offset']}], cl")
+                else:
+                    self.emit(f"    mov [rax+{f['offset']}], rcx")
+                return
+        raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
 
     def emit_field_set(self, stmt):
         """stmt.object.field = stmt.value"""
@@ -811,6 +837,13 @@ class Emitter:
                         self.emit(f"    mov [rax+{f['offset']}], rcx")
                     return
             raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+        elif isinstance(obj, FieldAccessNode):
+            # Chain: obj.field2.field1 = value
+            self.emit_expr(stmt.value)
+            self.emit("    push rax")
+            self.emit_field_access(obj)
+            self.emit("    pop rcx")
+            self._emit_field_write_to_rax(obj, field_name)
         else:
             raise RuntimeError(f"Field set on non-var: {type(obj).__name__}")
 

@@ -107,8 +107,6 @@ class Parser:
         if t[0] == "AMPERSAND":
             inner = self.parse_type()
             return f"&{inner}"  # e.g. "&Token" or "&i64"
-        if t[0] in ("TYPE_I64", "TYPE_I8", "TYPE_STR"):
-            return t[1]  # "i64" or "i8" or "str"
         if t[0] == "ID":
             return t[1]  # struct name
         raise ParseError(f"Expected type, got {t[0]}({t[1]})", t[2])
@@ -296,7 +294,7 @@ class Parser:
         if self.peek_kind("NEW"):
             self.expect("NEW")
             t = self.advance()
-            if t[0] not in ("ID", "TYPE_I64", "TYPE_I8"):
+            if t[0] != "ID":
                 raise ParseError(f"Expected type after new, got {t[0]}", t[2])
             elem = t[1]
             if self.check("LBRACKET"):

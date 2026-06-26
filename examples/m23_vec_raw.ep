@@ -1,0 +1,37 @@
+# Test: use i64 array as opaque pointer storage (Vec proof-of-concept)
+struct Vec {
+    data: &i64;
+    len: i64;
+    cap: i64;
+}
+
+struct Point {
+    x: i64;
+    y: i64;
+}
+
+fun main() -> i64 {
+    # Create vec backed by i64 array
+    let v = new Vec;
+    v.len = 0;
+    v.cap = 4;
+
+    let arr = new i64[4];
+    v.data = arr.data;
+
+    # Create a Point and store its pointer as i64 in the vec
+    let p = new Point;
+    p.x = 42;
+    p.y = 99;
+
+    # Store pointer as i64 in the vec (v.data[i] expects i64, p is &Point)
+    v.data[0] = p;
+    v.len = 1;
+
+    # Read back from vec: v.data[0] returns i64, but the bits are a pointer.
+    # Store in a variable typed as &Point and use it.
+    let p2: &Point = v.data[0];
+    let result = p2.x + p2.y;
+    return result;
+}
+# EXIT 141
