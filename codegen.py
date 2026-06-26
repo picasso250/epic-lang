@@ -1,14 +1,16 @@
 """
 Epic v0 — code generator (Emitter + helpers + driver)
-Takes AST dicts from parser, emits NASM x64 assembly, assembles and links.
+Takes AST dataclass nodes from parser, emits NASM x64 assembly, assembles and links.
 """
 
 import sys
 import os
 import subprocess
+import dataclasses
 
 from lexer import lex, LexError
 from parser import Parser, ParseError
+from ast_nodes import *
 
 # ── paths ────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -81,8 +83,8 @@ class Emitter:
         # Collect strings from AST
         self.strings = {}
         self.string_counter = 0
-        for func in ast.get("funcs", []):
-            self._collect_strings_from_block(func.get("body", {}))
+        for func in ast.funcs:
+            self._collect_strings_from_block(func.body)
 
         self.emit("section .data")
         self.emit("    _buf times 32 db 0")
@@ -100,27 +102,27 @@ class Emitter:
         self.emit("section .text")
         self.emit("")
 
-        for func in ast.get("funcs", []):
+        for func in ast.funcs:
             self.emit_fn_def(func)
 
     def _collect_strings_from_block(self, block):
         """Recursively collect strings from AST."""
-        for stmt in block.get("stmts", []):
-            if stmt["type"] == "if":
-                self._collect_strings_from_block(stmt["then_block"])
-                if stmt.get("else_block"):
-                    self._collect_strings_from_block(stmt["else_block"])
-            elif stmt["type"] == "while":
-                self._collect_strings_from_block(stmt["body"])
+        for stmt in block.stmts:
+            if isinstance(stmt, IfNode):
+                self._collect_strings_from_block(stmt.then_block)
+                if stmt.else_block:
+                    self._collect_strings_from_block(stmt.else_block)
+            elif isinstance(stmt, WhileNode):
+                self._collect_strings_from_block(stmt.body)
             self._collect_strings(stmt)
 
     def _collect_strings(self, node):
         """Recursively find string literals and register them."""
-        if isinstance(node, dict):
-            if node.get("type") == "string":
-                self.get_string_label(node["value"])
-            for v in node.values():
-                self._collect_strings(v)
+        if isinstance(node, StringNode):
+            self.get_string_label(node.value)
+        if isinstance(node, ASTNode):
+            for f in dataclasses.fields(node):
+                self._collect_strings(getattr(node, f.name))
         elif isinstance(node, list):
             for item in node:
                 self._collect_strings(item)
@@ -142,14 +144,14 @@ class Emitter:
         self.local_offset = {}
         self.local_types = {}
         self.local_bytes = 0
-        name = fn["name"]
+        name = fn.name
         self.current_fn = name
-        params = fn["params"]
-        body = fn["body"]
+        params = fn.params
+        body = fn.body
 
         # Pre-scan parameters FIRST so local_bytes includes them
         for p in params:
-            self.get_var_slot(p["name"], p.get("type", "i64"))
+            self.get_var_slot(p.name, p.type)
 
         # Pre-scan: allocate stack slots for let declarations
         self._pre_scan_block(body)
@@ -179,9 +181,9 @@ class Emitter:
         param_regs = ["rcx", "rdx", "r8", "r9"]
         param_low = ["cl", "dl", "r8b", "r9b"]  # low-byte names
         for i, p in enumerate(params):
-            slot = self.get_var_slot(p["name"])
-            ptype = p.get("type", "i64")
-            self.local_types[p["name"]] = ptype
+            slot = self.get_var_slot(p.name)
+            ptype = p.type
+            self.local_types[p.name] = ptype
             if ptype == "i8":
                 self.emit(f"    mov [rbp{slot:+d}], {param_low[i]}")
             else:
@@ -265,47 +267,47 @@ class Emitter:
         self._register_len_data_type("str", "&i8")
         # Array-of-str type used by listdir()
         self._register_len_data_type("_arr_str", "&&str")
-        for s in ast.get("structs", []):
+        for s in ast.structs:
             fields = []
             offset = 0
             max_align = 1
-            for f in s["fields"]:
-                fsize = self._type_size(f["type"])
-                falign = 8 if f["type"] in self.structs else fsize
+            for f in s.fields:
+                fsize = self._type_size(f.type)
+                falign = 8 if f.type in self.structs else fsize
                 if offset % falign != 0:
                     offset += falign - (offset % falign)
-                fields.append({"name": f["name"], "type": f["type"], "offset": offset})
+                fields.append({"name": f.name, "type": f.type, "offset": offset})
                 offset += fsize
                 max_align = max(max_align, falign)
             if offset % max_align != 0:
                 offset += max_align - (offset % max_align)
-            self.structs[s["name"]] = {"fields": fields, "size": offset}
+            self.structs[s.name] = {"fields": fields, "size": offset}
 
     def _pre_scan_block(self, block):
         """Allocate stack slots for all let declarations."""
-        for stmt in block.get("stmts", []):
-            if stmt["type"] == "let":
-                self.get_var_slot(stmt["name"], stmt.get("var_type"))
-            elif stmt["type"] == "if":
-                self._pre_scan_block(stmt["then_block"])
-                if stmt.get("else_block"):
-                    self._pre_scan_block(stmt["else_block"])
-            elif stmt["type"] == "while":
-                self._pre_scan_block(stmt["body"])
+        for stmt in block.stmts:
+            if isinstance(stmt, LetNode):
+                self.get_var_slot(stmt.name, stmt.var_type)
+            elif isinstance(stmt, IfNode):
+                self._pre_scan_block(stmt.then_block)
+                if stmt.else_block:
+                    self._pre_scan_block(stmt.else_block)
+            elif isinstance(stmt, WhileNode):
+                self._pre_scan_block(stmt.body)
 
     def _pre_scan_temps(self, node):
         """Count temp slots needed. Covers: binary ops (1), putstr (1), struct new_array (3)."""
-        if isinstance(node, dict):
+        if isinstance(node, ASTNode):
             count = 0
-            t = node.get("type", "")
-            if t == "binary":
+            if isinstance(node, BinaryNode):
                 count = 1
-            elif t == "call" and node.get("name") == "putstr":
+            elif isinstance(node, CallNode) and node.name == "putstr":
                 count = 1  # putstr calls _alloc_temp to save &str
-            elif t == "new_array" and node.get("elem_type") not in ("i64", "i8"):
+            elif isinstance(node, NewArrayNode) and node.elem_type not in ("i64", "i8"):
                 count = 3  # struct array saves header/count/data in temps
-            for v in node.values():
-                if isinstance(v, (dict, list)):
+            for f in dataclasses.fields(node):
+                v = getattr(node, f.name)
+                if isinstance(v, (ASTNode, list)):
                     count += self._pre_scan_temps(v)
             return count
         elif isinstance(node, list):
@@ -318,58 +320,56 @@ class Emitter:
     # ── statements ─────────────────────────────────────────────────────
 
     def emit_block(self, block):
-        for stmt in block.get("stmts", []):
+        for stmt in block.stmts:
             self.emit_stmt(stmt)
 
     def emit_stmt(self, stmt):
-        t = stmt["type"]
-        if t == "return":
+        if isinstance(stmt, ReturnNode):
             self.emit_return(stmt)
-        elif t == "expr_stmt":
-            self.emit_expr(stmt["expr"])
-        elif t == "let":
+        elif isinstance(stmt, ExprStmtNode):
+            self.emit_expr(stmt.expr)
+        elif isinstance(stmt, LetNode):
             self.emit_let(stmt)
-        elif t == "if":
+        elif isinstance(stmt, IfNode):
             self.emit_if(stmt)
-        elif t == "while":
+        elif isinstance(stmt, WhileNode):
             self.emit_while(stmt)
-        elif t == "assign":
+        elif isinstance(stmt, AssignNode):
             self.emit_assign(stmt)
-        elif t == "field_set":
+        elif isinstance(stmt, FieldSetNode):
             self.emit_field_set(stmt)
-        elif t == "subscript_assign":
+        elif isinstance(stmt, SubscriptAssignNode):
             self.emit_subscript_assign(stmt)
         else:
-            raise RuntimeError(f"Unknown stmt type: {t}")
+            raise RuntimeError(f"Unknown stmt type: {type(stmt).__name__}")
 
     def emit_return(self, stmt):
-        expr = stmt["expr"]
         if self.current_fn == "main":
-            self.emit_expr(expr)
+            self.emit_expr(stmt.expr)
             self.emit("    mov ecx, eax")
             self.emit("    call ExitProcess")
         else:
-            self.emit_expr(expr)
+            self.emit_expr(stmt.expr)
             ep_label = getattr(self, "current_ep_label", f"{self.current_fn}_ep")
             self.emit(f"    jmp {ep_label}")
 
     def emit_let(self, stmt):
-        name = stmt["name"]
-        var_type = stmt.get("var_type")
-        value = stmt.get("value")
+        name = stmt.name
+        var_type = stmt.var_type
+        value = stmt.value
         # Type inference from initializer
         if var_type is None and value is not None:
-            if value["type"] == "new":
-                var_type = f"&{value['struct_name']}"
-            elif value["type"] == "new_array":
-                var_type = f"&_arr_{value['elem_type']}"
-            elif value["type"] == "call" and value["name"] == "listdir":
+            if isinstance(value, NewNode):
+                var_type = f"&{value.struct_name}"
+            elif isinstance(value, NewArrayNode):
+                var_type = f"&_arr_{value.elem_type}"
+            elif isinstance(value, CallNode) and value.name == "listdir":
                 var_type = "&_arr_str"
-            elif value["type"] == "call" and value["name"] == "itoa":
+            elif isinstance(value, CallNode) and value.name == "itoa":
                 var_type = "&str"
-            elif value["type"] == "call" and value["name"] == "str_new":
+            elif isinstance(value, CallNode) and value.name == "str_new":
                 var_type = "&str"
-            elif value["type"] == "string":
+            elif isinstance(value, StringNode):
                 var_type = "&str"
             else:
                 var_type = "i64"
@@ -388,33 +388,33 @@ class Emitter:
     def emit_if(self, stmt):
         else_label = self.fresh_label()
         end_label = self.fresh_label()
-        self.emit_expr(stmt["cond"])
+        self.emit_expr(stmt.cond)
         self.emit("    test rax, rax")
-        if stmt.get("else_block"):
+        if stmt.else_block:
             self.emit(f"    jz {else_label}")
         else:
             self.emit(f"    jz {end_label}")
-        self.emit_block(stmt["then_block"])
-        if stmt.get("else_block"):
+        self.emit_block(stmt.then_block)
+        if stmt.else_block:
             self.emit(f"    jmp {end_label}")
             self.emit(f"{else_label}:")
-            self.emit_block(stmt["else_block"])
+            self.emit_block(stmt.else_block)
         self.emit(f"{end_label}:")
 
     def emit_while(self, stmt):
         start_label = self.fresh_label()
         end_label = self.fresh_label()
         self.emit(f"{start_label}:")
-        self.emit_expr(stmt["cond"])
+        self.emit_expr(stmt.cond)
         self.emit("    test rax, rax")
         self.emit(f"    jz {end_label}")
-        self.emit_block(stmt["body"])
+        self.emit_block(stmt.body)
         self.emit(f"    jmp {start_label}")
         self.emit(f"{end_label}:")
 
     def emit_assign(self, stmt):
-        name = stmt["name"]
-        self.emit_expr(stmt["value"])
+        name = stmt.name
+        self.emit_expr(stmt.value)
         slot = self.local_offset.get(name)
         if slot is None:
             raise RuntimeError(f"Undefined variable: {name}")
@@ -427,17 +427,16 @@ class Emitter:
     # ── expressions ────────────────────────────────────────────────────
 
     def emit_expr(self, expr):
-        t = expr["type"]
-        if t == "literal":
-            self.emit(f"    mov rax, {expr['value']}")
-        elif t == "string":
-            label = self.get_string_label(expr["value"])
-            strlen = len(expr["value"])
+        if isinstance(expr, LiteralNode):
+            self.emit(f"    mov rax, {expr.value}")
+        elif isinstance(expr, StringNode):
+            label = self.get_string_label(expr.value)
+            strlen = len(expr.value)
             self.emit(f"    lea rcx, [{label}]")
             self.emit(f"    mov rdx, {strlen}")
             self.emit(f"    call _str_alloc")
-        elif t == "var":
-            name = expr["name"]
+        elif isinstance(expr, VarNode):
+            name = expr.name
             slot = self.local_offset.get(name)
             if slot is None:
                 raise RuntimeError(f"Undefined variable: {name}")
@@ -446,26 +445,26 @@ class Emitter:
                 self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
             else:
                 self.emit(f"    mov rax, [rbp{slot:+d}]")
-        elif t == "call":
+        elif isinstance(expr, CallNode):
             self.emit_call(expr)
-        elif t == "subscript":
+        elif isinstance(expr, SubscriptNode):
             self.emit_subscript(expr)
-        elif t == "binary":
+        elif isinstance(expr, BinaryNode):
             self.emit_binary(expr)
-        elif t == "unary":
+        elif isinstance(expr, UnaryNode):
             self.emit_unary(expr)
-        elif t == "field_access":
+        elif isinstance(expr, FieldAccessNode):
             self.emit_field_access(expr)
-        elif t == "new":
+        elif isinstance(expr, NewNode):
             self.emit_new(expr)
-        elif t == "new_array":
+        elif isinstance(expr, NewArrayNode):
             self.emit_new_array(expr)
         else:
-            raise RuntimeError(f"Unknown expr type: {t}")
+            raise RuntimeError(f"Unknown expr type: {type(expr).__name__}")
 
     def emit_call(self, expr):
-        name = expr["name"]
-        args = expr["args"]
+        name = expr.name
+        args = expr.args
 
         if name in self.builtins:
             if name == "exit":
@@ -624,9 +623,9 @@ class Emitter:
         self.emit(f"    add rsp, 32")
 
     def emit_binary(self, expr):
-        op = expr["op"]
-        left = expr["left"]
-        right = expr["right"]
+        op = expr.op
+        left = expr.left
+        right = expr.right
 
         if op in ("&&", "||"):
             self.emit_short_circuit(expr)
@@ -684,11 +683,11 @@ class Emitter:
             raise RuntimeError(f"Unknown binary op: {op}")
 
     def emit_short_circuit(self, expr):
-        op = expr["op"]
+        op = expr.op
         end_label = self.fresh_label()
         true_label = self.fresh_label()
 
-        self.emit_expr(expr["left"])
+        self.emit_expr(expr.left)
         if op == "&&":
             self.emit("    test rax, rax")
             self.emit(f"    jz {end_label}")
@@ -696,7 +695,7 @@ class Emitter:
             self.emit("    test rax, rax")
             self.emit(f"    jnz {true_label}")
 
-        self.emit_expr(expr["right"])
+        self.emit_expr(expr.right)
 
         if op == "||":
             self.emit(f"{true_label}:")
@@ -707,20 +706,20 @@ class Emitter:
         self.emit(f"{end_label}:")
 
     def emit_unary(self, expr):
-        if expr["op"] == "-":
-            self.emit_expr(expr["expr"])
+        if expr.op == "-":
+            self.emit_expr(expr.expr)
             self.emit("    neg rax")
-        elif expr["op"] == "!":
-            self.emit_expr(expr["expr"])
+        elif expr.op == "!":
+            self.emit_expr(expr.expr)
             self.emit("    test rax, rax")
             self.emit("    setz al")
             self.emit("    movzx eax, al")
-        elif expr["op"] == "&":
+        elif expr.op == "&":
             self.emit_addrof(expr)
-        elif expr["op"] == "*":
+        elif expr.op == "*":
             self.emit_deref(expr)
         else:
-            raise RuntimeError(f"Unknown unary op: {expr['op']}")
+            raise RuntimeError(f"Unknown unary op: {expr.op}")
 
     # ── struct operations ─────────────────────────────────────────────
 
@@ -756,16 +755,16 @@ class Emitter:
 
     def emit_field_access(self, expr):
         """Read expr.object.field into rax."""
-        obj = expr["object"]
-        field_name = expr["field"]
-        if obj["type"] == "var":
-            slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+        obj = expr.object
+        field_name = expr.field
+        if isinstance(obj, VarNode):
+            slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
             self._emit_struct_base(slot, is_ptr)
             if ftype == "i8":
                 self.emit(f"    movsx rax, byte [rax+{off}]")
             else:
                 self.emit(f"    mov rax, [rax+{off}]")
-        elif obj["type"] == "subscript":
+        elif isinstance(obj, SubscriptNode):
             # Subscript returned a pointer; access its field
             self.emit_subscript(obj)
             # rax = pointer to element. Resolve element type from subscript.
@@ -785,26 +784,26 @@ class Emitter:
                     return
             raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
         else:
-            raise RuntimeError(f"Field access on non-variable: {obj['type']}")
+            raise RuntimeError(f"Field access on non-variable: {type(obj).__name__}")
 
     def emit_field_set(self, stmt):
         """stmt.object.field = stmt.value"""
-        obj = stmt["object"]
-        field_name = stmt["field"]
-        if obj["type"] == "var":
+        obj = stmt.object
+        field_name = stmt.field
+        if isinstance(obj, VarNode):
             # Evaluate value first (may use same struct)
-            self.emit_expr(stmt["value"])
+            self.emit_expr(stmt.value)
             self.emit("    push rax")
-            slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+            slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
             self._emit_struct_base_rcx(slot, is_ptr)
             self.emit("    pop rax")
             if ftype == "i8":
                 self.emit(f"    mov [rcx+{off}], al")
             else:
                 self.emit(f"    mov [rcx+{off}], rax")
-        elif obj["type"] == "subscript":
+        elif isinstance(obj, SubscriptNode):
             # Subscript result is a pointer; set field on it
-            self.emit_expr(stmt["value"])
+            self.emit_expr(stmt.value)
             self.emit("    push rax")
             self.emit_subscript(obj)
             self.emit("    pop rcx")
@@ -827,15 +826,16 @@ class Emitter:
                     return
             raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
         else:
-            raise RuntimeError(f"Field set on non-var: {obj['type']}")
+            raise RuntimeError(f"Field set on non-var: {type(obj).__name__}")
 
     def emit_subscript_assign(self, stmt):
         """base[index] = value"""
-        base = stmt["base"]
-        index = stmt["index"]
-        value = stmt["value"]
+        base = stmt.base
+        index = stmt.index
+        value = stmt.value
         # Compute element type from a synthetic subscript expression
-        elem_type = self._expr_type({"type": "subscript", "base": base, "index": index})
+        synth = SubscriptNode(base=base, index=index)
+        elem_type = self._expr_type(synth)
         is_i8 = (elem_type == "i8")
         # Evaluate value first
         self.emit_expr(value)
@@ -857,7 +857,7 @@ class Emitter:
 
     def emit_new(self, expr):
         """new StructName → HeapAlloc, returns &StructName in rax."""
-        struct_name = expr["struct_name"]
+        struct_name = expr.struct_name
         if struct_name not in self.structs:
             raise RuntimeError(f"Unknown struct in new: {struct_name}")
         size = self.structs[struct_name]["size"]
@@ -871,8 +871,8 @@ class Emitter:
 
     def emit_new_array(self, expr):
         """new T[n] → array struct { len: i64, data: &T|&&T }"""
-        elem = expr["elem_type"]
-        count = expr["count"]
+        elem = expr.elem_type
+        count = expr.count
         arr_type = f"_arr_{elem}"
         if elem in ("i64", "i8"):
             data_type = f"&{elem}"
@@ -957,8 +957,8 @@ class Emitter:
 
     def emit_subscript(self, expr):
         """base[index] → load value from array"""
-        base = expr["base"]
-        index = expr["index"]
+        base = expr.base
+        index = expr.index
         elem_type = self._expr_type(expr)  # type of the element being accessed
         # Evaluate base (pointer), then add index * size
         self.emit_expr(base)        # rax = base pointer
@@ -973,15 +973,14 @@ class Emitter:
 
     def _expr_type(self, expr):
         """Return the type string of an expression. Minimal but principled."""
-        t = expr["type"]
-        if t == "literal":
+        if isinstance(expr, LiteralNode):
             return "i64"
-        if t == "string":
+        if isinstance(expr, StringNode):
             return "&str"
-        if t == "var":
-            return self.local_types.get(expr["name"], "i64")
-        if t == "call":
-            name = expr["name"]
+        if isinstance(expr, VarNode):
+            return self.local_types.get(expr.name, "i64")
+        if isinstance(expr, CallNode):
+            name = expr.name
             # Builtins with known return types
             if name in ("itoa", "str_new"):
                 return "&str"
@@ -994,9 +993,9 @@ class Emitter:
             # User-defined function: find its return type
             # For now, assume i64 (we don't track user function signatures here)
             return "i64"
-        if t == "field_access":
-            obj_type = self._expr_type(expr["object"])
-            field_name = expr["field"]
+        if isinstance(expr, FieldAccessNode):
+            obj_type = self._expr_type(expr.object)
+            field_name = expr.field
             # Strip & to get the struct name
             struct_name = obj_type[1:] if obj_type.startswith("&") else obj_type
             if struct_name in self.structs:
@@ -1004,8 +1003,8 @@ class Emitter:
                     if f["name"] == field_name:
                         return f["type"]
             return "i64"  # fallback
-        if t == "subscript":
-            base_type = self._expr_type(expr["base"])
+        if isinstance(expr, SubscriptNode):
+            base_type = self._expr_type(expr.base)
             # base_type is like &T where T may be _arr_X, i8, i64, or &Struct
             if base_type.startswith("&"):
                 inner = base_type[1:]  # strip one layer of pointer
@@ -1017,49 +1016,49 @@ class Emitter:
                 # Direct pointer: subscript returns the pointee type
                 return inner
             return "i64"  # fallback
-        if t == "unary":
-            op = expr["op"]
+        if isinstance(expr, UnaryNode):
+            op = expr.op
             if op == "&":
-                return "&" + self._expr_type(expr["expr"])
+                return "&" + self._expr_type(expr.expr)
             if op == "*":
-                inner = self._expr_type(expr["expr"])
+                inner = self._expr_type(expr.expr)
                 if inner.startswith("&"):
                     return inner[1:]
                 return "i64"
             return "i64"  # - and ! always return i64
-        if t == "binary":
+        if isinstance(expr, BinaryNode):
             return "i64"  # all binary ops produce i64
-        if t == "new":
-            return "&" + expr["struct_name"]
-        if t == "new_array":
-            return "&_arr_" + expr["elem_type"]
+        if isinstance(expr, NewNode):
+            return "&" + expr.struct_name
+        if isinstance(expr, NewArrayNode):
+            return "&_arr_" + expr.elem_type
         return "i64"
 
     def emit_addrof(self, expr):
         """&inner → lea rax, [address]"""
-        inner = expr["expr"]
-        if inner["type"] == "var":
-            name = inner["name"]
+        inner = expr.expr
+        if isinstance(inner, VarNode):
+            name = inner.name
             slot = self.local_offset[name]
             self.emit(f"    lea rax, [rbp{slot:+d}]")
-        elif inner["type"] == "field_access":
-            obj = inner["object"]
-            field_name = inner["field"]
-            if obj["type"] != "var":
-                raise RuntimeError(f"Cannot take address of: {obj['type']}")
-            slot, off, ftype, is_ptr = self._resolve_field(obj["name"], field_name)
+        elif isinstance(inner, FieldAccessNode):
+            obj = inner.object
+            field_name = inner.field
+            if not isinstance(obj, VarNode):
+                raise RuntimeError(f"Cannot take address of: {type(obj).__name__}")
+            slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
             self._emit_struct_base(slot, is_ptr)
             self.emit(f"    add rax, {off}")
         else:
-            raise RuntimeError(f"Cannot take address of: {inner['type']}")
+            raise RuntimeError(f"Cannot take address of: {type(inner).__name__}")
 
     def emit_deref(self, expr):
         """*inner → load value from pointer"""
-        inner = expr["expr"]
+        inner = expr.expr
         # Determine pointee type from the inner expression
         pointee = "i64"
-        if inner["type"] == "var":
-            vtype = self.local_types.get(inner["name"], "i64")
+        if isinstance(inner, VarNode):
+            vtype = self.local_types.get(inner.name, "i64")
             if vtype.startswith("&"):
                 pointee = vtype[1:]
         self.emit_expr(inner)
