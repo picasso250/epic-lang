@@ -2,6 +2,7 @@
 *.asm
 *.obj
 *.exe
+build/
 
 # Python
 __pycache__/

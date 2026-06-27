@@ -5,9 +5,9 @@ struct Token {
 }
 
 fun main() -> i64 {
-    let a: i64 = 5;
-    let b: i64 = 6;
-    let c: i64 = 7;
+    let a = 5;
+    let b = 6;
+    let c = 7;
     let arr = new Token[1];
     return a + b + c;
 }

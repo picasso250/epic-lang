@@ -5,7 +5,7 @@ Scans examples/*.ep, reads # EXIT and # STDOUT annotations,
 compiles, runs, and reports pass/fail.
 """
 
-import os, sys, subprocess, re, io
+import os, sys, subprocess, re
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
@@ -28,8 +28,6 @@ def parse_annotations(source):
 
 def run_test(ep_file):
     """Compile and run a single .ep file, return (pass, detail)."""
-    base = os.path.splitext(os.path.basename(ep_file))[0]
-    
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
     exit_expected, stdout_expected = parse_annotations(source)
@@ -45,7 +43,8 @@ def run_test(ep_file):
     if result.returncode != 0:
         return False, f"compile failed:\n{result.stderr[:500]}"
     
-    exe_path = os.path.join(SCRIPT_DIR, base + ".exe")
+    rel = os.path.relpath(ep_file, SCRIPT_DIR)
+    exe_path = os.path.join(SCRIPT_DIR, "build", os.path.splitext(rel)[0] + ".exe")
     if not os.path.exists(exe_path):
         return False, f"no exe produced: {exe_path}"
 
@@ -53,14 +52,6 @@ def run_test(ep_file):
         [exe_path],
         capture_output=True, cwd=SCRIPT_DIR,
     )
-    
-    # Clean up build artifacts
-    for ext in [".asm", ".obj", ".exe"]:
-        try:
-            os.remove(os.path.join(SCRIPT_DIR, base + ext))
-        except OSError:
-            pass
-    
     # Check exit code
     failures = []
     if exit_expected is not None:

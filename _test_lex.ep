@@ -261,7 +261,7 @@ fun dump_tokens(tokens: Token[]) -> i64 {
 
 fun main() -> i64 {
     let buf = new i8[65536];
-    let fd = fopen("examples/m1_exit.ep", 0);
+    let fd = fopen("C:\Users\MECHREV\projects\epic-lang\examples\m9_array.ep", 0);
     if fd < 0 {
         putstr("open failed\n");
         return 1;

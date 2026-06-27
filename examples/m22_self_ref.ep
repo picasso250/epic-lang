@@ -1,7 +1,7 @@
 # Test self-referencing struct
 struct Node {
     val: i64;
-    next: &Node;
+    next: Node;
 }
 
 fun main() -> i64 {

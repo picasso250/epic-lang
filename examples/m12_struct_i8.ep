@@ -6,7 +6,7 @@ struct Data {
 }
 
 fun main() -> i64 {
-    let d: Data;
+    let d = new Data;
     d.flag = 1;
     d.value = 65;
     if d.flag {

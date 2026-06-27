@@ -153,4 +153,4 @@ class NewNode(ASTNode):
 @dataclass
 class NewArrayNode(ASTNode):
     elem_type: str
-    count: ASTNode
+    count: Optional[ASTNode] = None

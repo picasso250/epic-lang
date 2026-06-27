@@ -98,17 +98,20 @@ class Parser:
             self.expect("COLON")
             ptype = self.parse_type()
             params.append(Param(name=pname[1], type=ptype))
+            if len(params) > 4:
+                raise ParseError("functions may have at most 4 parameters in v0", pname[2])
             if not self.check("COMMA"):
                 break
         return params
 
     def parse_type(self):
         t = self.advance()
-        if t[0] == "AMPERSAND":
-            inner = self.parse_type()
-            return f"&{inner}"  # e.g. "&Token" or "&i64"
         if t[0] == "ID":
-            return t[1]  # struct name
+            typ = t[1]
+            while self.check("LBRACKET"):
+                self.expect("RBRACKET")
+                typ = f"{typ}[]"
+            return typ
         raise ParseError(f"Expected type, got {t[0]}({t[1]})", t[2])
 
     # ── block ─────────────────────────────────────────────────────────
@@ -175,8 +178,8 @@ class Parser:
         self.expect("LET")
         name = self.expect("ID")
         typ = None
-        if self.check("COLON"):
-            typ = self.parse_type()
+        if self.peek_kind("COLON"):
+            raise ParseError("let type annotations are not supported in v0", self.peek()[2])
         value = None
         if self.check("ASSIGN"):
             value = self.parse_expr()
@@ -290,7 +293,9 @@ class Parser:
                 raise ParseError(f"Expected type after new, got {t[0]}", t[2])
             elem = t[1]
             if self.check("LBRACKET"):
-                count = self.parse_expr()
+                count = None
+                if not self.peek_kind("RBRACKET"):
+                    count = self.parse_expr()
                 self.expect("RBRACKET")
                 return NewArrayNode(elem_type=elem, count=count)
             return NewNode(struct_name=elem)
@@ -309,6 +314,8 @@ class Parser:
             if self.check("LPAREN"):
                 args = self.parse_args()
                 self.expect("RPAREN")
+                if len(args) > 4:
+                    raise ParseError("function calls may have at most 4 arguments in v0", t[2])
                 node = CallNode(name=name, args=args)
             else:
                 node = VarNode(name=name)

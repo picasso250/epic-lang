@@ -43,8 +43,8 @@ TOKEN_SPEC = [
     ("SEMICOLON", r';'),
     ("COMMA",     r','),
     ("COLON",     r':'),
-    ("CHAR",      r"'[^']'"),
-    ("STRING",    r'"[^"]*"'),
+    ("CHAR",      r"'(?:\\[nrt\\\\\"'0]|[^\\'\n\r])'"),
+    ("STRING",    r'"(?:\\[nrt\\\\\"\'0]|[^\\\"\n\r])*"'),
     ("COMMENT",   r'#[^\n]*'),
     ("WHITESPACE", r'[ \t\n\r]+'),
 ]
@@ -59,6 +59,34 @@ class LexError(Exception):
     def __init__(self, msg, line):
         super().__init__(f"Lex error line {line}: {msg}")
         self.line = line
+
+
+ESCAPES = {
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+    "\\": "\\",
+    '"': '"',
+    "'": "'",
+    "0": "\0",
+}
+
+
+def decode_escaped(raw, line):
+    out = []
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "\\":
+            i += 1
+            if i >= len(raw) or raw[i] not in ESCAPES:
+                raise LexError("Invalid escape sequence", line)
+            ch = ESCAPES[raw[i]]
+        if ord(ch) > 127:
+            raise LexError("Non-ASCII string and character literals are not supported", line)
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def lex(source_text):
@@ -88,9 +116,12 @@ def lex(source_text):
         if kind == "NUMBER":
             value = int(value)
         elif kind == "STRING":
-            value = value[1:-1]  # strip quotes
+            value = decode_escaped(value[1:-1], line)
         elif kind == "CHAR":
-            value = ord(value[1])  # 'X' → ASCII code
+            decoded = decode_escaped(value[1:-1], line)
+            if len(decoded) != 1:
+                raise LexError("Character literal must contain exactly one byte", line)
+            value = ord(decoded)
         tokens.append((kind, value, line))
         pos = m.end()
     return tokens

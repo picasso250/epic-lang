@@ -17,7 +17,7 @@ class Emitter:
         self.builtins = {"exit", "putc", "putstr",
                          "fopen", "fread", "fwrite", "fclose",
                          "strcmp", "itoa", "system",
-                         "listdir", "str_new"}
+                         "listdir", "str_new", "read_file", "push"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -28,6 +28,7 @@ class Emitter:
         self.string_counter = 0
         self.local_bytes = 0    # track variable allocation in pre-scan
         self.structs = {}       # name → {fields: [{name, type, offset}], size}
+        self.funcs = {}         # name → {ret_type, params}
 
     def emit(self, s):
         self.out.write(s + "\n")
@@ -49,6 +50,7 @@ class Emitter:
         self.emit("extern CreateFileA")
         self.emit("extern ReadFile")
         self.emit("extern CloseHandle")
+        self.emit("extern GetFileSize")
         self.emit("extern lstrcmpA")
         self.emit("extern lstrcpyA")
         self.emit("extern lstrlenA")
@@ -65,6 +67,10 @@ class Emitter:
 
         # Compute struct layouts first
         self._compute_struct_layouts(ast)
+        self.funcs = {
+            fn.name: {"ret_type": self._internal_type(fn.ret_type), "params": fn.params}
+            for fn in ast.funcs
+        }
 
         # Collect strings from AST
         self.strings = {}
@@ -79,7 +85,7 @@ class Emitter:
         self.emit("    _heap dq 0")
         # Emit string literals as comma-separated bytes (avoids NASM escaping)
         for label, text in sorted(self.strings.items(), key=lambda x: x[0]):
-            bytes_str = ", ".join(str(b) for b in text.encode('ascii', errors='replace'))
+            bytes_str = ", ".join(str(b) for b in text.encode("ascii"))
             if bytes_str:
                 self.emit(f"{label}: db {bytes_str}, 0")
             else:
@@ -132,12 +138,15 @@ class Emitter:
         self.local_bytes = 0
         name = fn.name
         self.current_fn = name
+        self.current_ep_label = f"{name}_ep"
         params = fn.params
         body = fn.body
+        if len(params) > 4:
+            raise RuntimeError(f"Function {name} has >4 parameters (not supported)")
 
         # Pre-scan parameters FIRST so local_bytes includes them
         for p in params:
-            self.get_var_slot(p.name, p.type)
+            self.get_var_slot(p.name, self._internal_type(p.type))
 
         # Pre-scan: allocate stack slots for let declarations
         self._pre_scan_block(body)
@@ -168,7 +177,7 @@ class Emitter:
         param_low = ["cl", "dl", "r8b", "r9b"]  # low-byte names
         for i, p in enumerate(params):
             slot = self.get_var_slot(p.name)
-            ptype = p.type
+            ptype = self._internal_type(p.type)
             self.local_types[p.name] = ptype
             if ptype == "i8":
                 self.emit(f"    mov [rbp{slot:+d}], {param_low[i]}")
@@ -180,9 +189,7 @@ class Emitter:
 
         # Epilogue (only for non-main; main never returns via ret)
         if name != "main":
-            ep_label = f"{name}_ep"
-            self.current_ep_label = ep_label
-            self.emit(f"{ep_label}:")
+            self.emit(f"{self.current_ep_label}:")
             self.emit("    mov rsp, rbp")
             self.emit("    pop rbp")
             self.emit("    ret")
@@ -209,6 +216,25 @@ class Emitter:
         frame = ((extra_bytes + 15) // 16) * 16
         self.emit(f"    add rsp, {frame}")
 
+    def _spill_args(self, args):
+        slots = []
+        for arg in args:
+            self.emit_expr(arg)
+            slot = self._alloc_temp()
+            self.emit(f"    mov [rbp{slot:+d}], rax")
+            slots.append(slot)
+        return slots
+
+    def _load_spilled_args(self, slots):
+        param_regs = ["rcx", "rdx", "r8", "r9"]
+        for i, slot in enumerate(slots):
+            self.emit(f"    mov {param_regs[i]}, [rbp{slot:+d}]")
+
+    def _call_with_shadow(self, target):
+        self.emit("    sub rsp, 32")
+        self.emit(f"    call {target}")
+        self.emit("    add rsp, 32")
+
     def get_var_slot(self, name, typ=None):
         if name not in self.local_offset:
             size = self._type_size(typ) if typ else 8
@@ -226,6 +252,7 @@ class Emitter:
         return -(self._temp_base + (nr + 1) * 8)
 
     def _type_size(self, typ):
+        typ = self._internal_type(typ) if typ else typ
         if typ == "i64":
             return 8
         if typ == "i8":
@@ -236,33 +263,63 @@ class Emitter:
             return 8  # pointers are always 8 bytes
         return 8  # unknown, assume i64
 
-    def _register_len_data_type(self, name, elem_ptr_type):
-        """Register a {data, len} layout type. data at offset 0, len at offset 8."""
+    def _internal_type(self, typ):
+        """Lower user-facing types to the internal pointer-heavy representation."""
+        if typ is None:
+            return None
+        if typ.startswith("&"):
+            return typ
+        if typ.endswith("[]"):
+            elem = self._internal_type(typ[:-2])
+            if elem.startswith("&"):
+                elem = elem[1:]
+            self._ensure_array_type(elem)
+            return f"&_arr_{elem}"
+        if typ in ("i64", "i8", "void"):
+            return typ
+        return f"&{typ}"
+
+    def _array_data_type(self, elem):
+        return f"&{elem}" if elem in ("i64", "i8") else f"&&{elem}"
+
+    def _register_len_data_type(self, name, elem_ptr_type, has_cap=False):
+        """Register a {data, len[, cap]} layout type. data is always offset 0."""
         if name not in self.structs:
+            fields = [
+                {"name": "data", "type": elem_ptr_type, "offset": 0},
+                {"name": "len", "type": "i64", "offset": 8},
+            ]
+            size = 16
+            if has_cap:
+                fields.append({"name": "cap", "type": "i64", "offset": 16})
+                size = 24
             self.structs[name] = {
-                "fields": [
-                    {"name": "data", "type": elem_ptr_type, "offset": 0},
-                    {"name": "len", "type": "i64", "offset": 8},
-                ],
-                "size": 16,
+                "fields": fields,
+                "size": size,
             }
+
+    def _ensure_array_type(self, elem):
+        arr_type = f"_arr_{elem}"
+        self._register_len_data_type(arr_type, self._array_data_type(elem), has_cap=True)
+        return arr_type
 
     def _compute_struct_layouts(self, ast):
         self.structs = {}
         # Built-in str type: { data: &i8, len: i64 }
         self._register_len_data_type("str", "&i8")
         # Array-of-str type used by listdir()
-        self._register_len_data_type("_arr_str", "&&str")
+        self._register_len_data_type("_arr_str", "&&str", has_cap=True)
         for s in ast.structs:
             fields = []
             offset = 0
             max_align = 1
             for f in s.fields:
-                fsize = self._type_size(f.type)
-                falign = 8 if f.type in self.structs else fsize
+                ftype = self._internal_type(f.type)
+                fsize = self._type_size(ftype)
+                falign = 8 if ftype in self.structs else fsize
                 if offset % falign != 0:
                     offset += falign - (offset % falign)
-                fields.append({"name": f.name, "type": f.type, "offset": offset})
+                fields.append({"name": f.name, "type": ftype, "offset": offset})
                 offset += fsize
                 max_align = max(max_align, falign)
             if offset % max_align != 0:
@@ -287,10 +344,14 @@ class Emitter:
             count = 0
             if isinstance(node, BinaryNode):
                 count = 1
-            elif isinstance(node, CallNode) and node.name == "putstr":
-                count = 1  # putstr calls _alloc_temp to save &str
-            elif isinstance(node, NewArrayNode) and node.elem_type not in ("i64", "i8"):
-                count = 3  # struct array saves header/count/data in temps
+            elif isinstance(node, CallNode):
+                count = len(node.args)
+                if node.name == "putstr":
+                    count += 1  # putstr saves &str across GetStdHandle
+                elif node.name == "push":
+                    count += 3
+            elif isinstance(node, NewArrayNode):
+                count = 2
             for f in dataclasses.fields(node):
                 v = getattr(node, f.name)
                 if isinstance(v, (ASTNode, list)):
@@ -358,9 +419,10 @@ class Emitter:
             elif isinstance(value, StringNode):
                 var_type = "&str"
             else:
-                var_type = "i64"
+                var_type = self._expr_type(value)
         if var_type is None:
             var_type = "i64"
+        var_type = self._internal_type(var_type)
         slot = self.get_var_slot(name, var_type)
         self.local_types[name] = var_type
         if value is None:
@@ -485,21 +547,22 @@ class Emitter:
                 self.emit("    call WriteFile")
                 self._call_cleanup(1)
             elif name == "strcmp":
-                # strcmp(a: &str, b: &str) → extract .data from each, call lstrcmpA
-                self.emit_expr(args[1])       # rax = &str (b)
+                slots = self._spill_args(args)
+                self.emit(f"    mov rax, [rbp{slots[1]:+d}]")
                 self.emit("    mov rdx, [rax]")    # rdx = b.data (offset 0)
-                self.emit_expr(args[0])       # rax = &str (a)
+                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
                 self.emit("    mov rcx, [rax]")    # rcx = a.data (offset 0)
                 self.emit("    call lstrcmpA")
             elif name == "fopen":
                 # fopen(path: &str, mode) → extract path.data, call CreateFileA
+                slots = self._spill_args(args)
                 rl = self.fresh_label()
                 dl = self.fresh_label()
-                self.emit_expr(args[1])  # rax = mode
+                self.emit(f"    mov rax, [rbp{slots[1]:+d}]")
                 self.emit("    test rax, rax")
                 self.emit(f"    jz {rl}")
                 # Write mode
-                self.emit_expr(args[0])       # rax = &str
+                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
                 self.emit("    mov rcx, [rax]")    # rcx = path.data (offset 0)
                 self.emit("    mov edx, 0x40000000")  # GENERIC_WRITE
                 self.emit("    xor r8d, r8d")
@@ -512,7 +575,7 @@ class Emitter:
                 self._call_cleanup(3)
                 self.emit(f"    jmp {dl}")
                 self.emit(f"{rl}:")
-                self.emit_expr(args[0])       # rax = &str
+                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
                 self.emit("    mov rcx, [rax]")    # rcx = path.data (offset 0)
                 self.emit("    mov edx, 0x80000000")  # GENERIC_READ
                 self.emit("    mov r8d, 1")
@@ -526,12 +589,8 @@ class Emitter:
                 self.emit(f"{dl}:")
             elif name == "fread":
                 # fread(fd, buf_ptr, len) → ReadFile
-                self.emit_expr(args[2])  # len
-                self.emit("    mov r8, rax")
-                self.emit_expr(args[1])  # buf
-                self.emit("    mov rdx, rax")
-                self.emit_expr(args[0])  # fd
-                self.emit("    mov rcx, rax")
+                slots = self._spill_args(args)
+                self._load_spilled_args(slots)
                 self.emit("    lea r9, [_written]")
                 self._call_prep(1)
                 self.emit("    mov qword [rsp+32], 0")  # lpOverlapped = NULL
@@ -540,12 +599,8 @@ class Emitter:
                 self.emit("    mov eax, [_written]")
             elif name == "fwrite":
                 # fwrite(fd, buf_ptr, len) → WriteFile
-                self.emit_expr(args[2])  # len
-                self.emit("    mov r8, rax")
-                self.emit_expr(args[1])  # buf
-                self.emit("    mov rdx, rax")
-                self.emit_expr(args[0])  # fd
-                self.emit("    mov rcx, rax")
+                slots = self._spill_args(args)
+                self._load_spilled_args(slots)
                 self.emit("    lea r9, [_written]")
                 self._call_prep(1)
                 self.emit("    mov qword [rsp+32], 0")
@@ -571,36 +626,34 @@ class Emitter:
                 self.emit("    add rsp, 8")
             elif name == "listdir":
                 # listdir(pattern: &str, max) → extract pattern.data, call _listdir
-                self.emit_expr(args[1])     # max
-                self.emit("    mov rdx, rax")
-                self.emit_expr(args[0])     # pattern
+                slots = self._spill_args(args)
+                self.emit(f"    mov rdx, [rbp{slots[1]:+d}]")
+                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
                 self.emit("    mov rcx, [rax]")  # rcx = pattern.data (offset 0)
                 self.emit("    sub rsp, 8")       # align for _listdir entry
                 self.emit("    call _listdir")
                 self.emit("    add rsp, 8")
+            elif name == "read_file":
+                self.emit_expr(args[0])
+                self.emit("    mov rcx, [rax]")
+                self.emit("    sub rsp, 8")
+                self.emit("    call _read_file")
+                self.emit("    add rsp, 8")
             elif name == "str_new":
                 # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
-                self.emit_expr(args[1])     # rax = len
-                self.emit("    mov rdx, rax")
-                self.emit_expr(args[0])     # rax = bytes
-                self.emit("    mov rcx, rax")
+                slots = self._spill_args(args)
+                self.emit(f"    mov rcx, [rbp{slots[0]:+d}]")
+                self.emit(f"    mov rdx, [rbp{slots[1]:+d}]")
                 self.emit("    call _str_alloc")
+            elif name == "push":
+                self.emit_push(args)
             return
 
-        # User-defined function call: spill all args first, then load registers
         if len(args) > 4:
             raise RuntimeError(f"Function {name} has >4 arguments (not supported)")
-        param_regs = ["rcx", "rdx", "r8", "r9"]
-        # Evaluate args right-to-left, push each
-        for arg in reversed(args):
-            self.emit_expr(arg)
-            self.emit("    push rax")
-        # Pop into registers (rcx gets first arg, rdx second, etc.)
-        for i in range(len(args)):
-            self.emit(f"    pop {param_regs[i]}")
-        self.emit(f"    sub rsp, 32")
-        self.emit(f"    call {name}")
-        self.emit(f"    add rsp, 32")
+        slots = self._spill_args(args)
+        self._load_spilled_args(slots)
+        self._call_with_shadow(name)
 
     def emit_binary(self, expr):
         op = expr.op
@@ -838,7 +891,10 @@ class Emitter:
         self.emit_expr(value)
         self.emit("    push rax")
         # Compute address: base + index * size
-        self.emit_expr(base)        # rax = base pointer
+        base_type = self._expr_type(base)
+        self.emit_expr(base)        # rax = base pointer or array header
+        if base_type.startswith("&_arr_"):
+            self.emit("    mov rax, [rax]")
         self.emit("    push rax")
         self.emit_expr(index)       # rax = index
         self.emit("    pop rcx")    # rcx = base pointer
@@ -867,90 +923,124 @@ class Emitter:
         # rax = pointer, zero-initialized
 
     def emit_new_array(self, expr):
-        """new T[n] → array struct { len: i64, data: &T|&&T }"""
+        """new T[] / new T[n] → dynamic array { data, len, cap }."""
         elem = expr.elem_type
-        count = expr.count
-        arr_type = f"_arr_{elem}"
-        if elem in ("i64", "i8"):
-            data_type = f"&{elem}"
-        else:
-            data_type = f"&&{elem}"
-        self._register_len_data_type(arr_type, data_type)
-        # 1. Allocate header (16 bytes)
+        self._ensure_array_type(elem)
+        cap_expr = expr.count
+        tmp_header = self._alloc_temp()
+        tmp_cap = self._alloc_temp()
+
+        # Allocate header (24 bytes): data, len, cap.
         self.emit(f"    mov rcx, [_heap]")
         self.emit(f"    mov edx, 8")
-        self.emit(f"    mov r8d, 16")
+        self.emit(f"    mov r8d, 24")
         self.emit(f"    sub rsp, 40")
         self.emit(f"    call HeapAlloc")
         self.emit(f"    add rsp, 40")
-        self.emit(f"    push rax")  # save header ptr on shadow
-        # 2. Store len at offset 8
-        self.emit_expr(count)       # rax = count
-        self.emit(f"    pop rcx")   # rcx = header ptr
-        self.emit(f"    push rcx")  # re-save
-        self.emit(f"    mov [rcx+8], rax")  # header.len = count (offset 8)
-        # 3. Compute data size and allocate
-        if elem in ("i64", "i8"):
-            el_size = 8 if elem == "i64" else 1
-            s_op = "imul" if el_size > 1 else ""  # no multiplication needed for size 1
-            self.emit(f"    mov r8, rax")  # r8 = count
-            if el_size == 8:
-                self.emit(f"    imul r8, {el_size}")
-            self.emit(f"    mov rcx, [_heap]")
-            self.emit(f"    mov edx, 8")
-            self.emit(f"    sub rsp, 40")
-            self.emit(f"    call HeapAlloc")
-            self.emit(f"    add rsp, 40")
-            # rax = data pointer
-            self.emit(f"    pop rcx")   # rcx = header ptr
-            self.emit(f"    push rcx")
-            self.emit(f"    mov [rcx], rax")  # header.data = data ptr (offset 0)
-            self.emit(f"    pop rax")   # return header ptr
+        self.emit(f"    mov [rbp{tmp_header:+d}], rax")
+        if cap_expr is None:
+            self.emit("    mov rax, 4")
         else:
-            # struct array: allocate pointer array (count * 8), then new each element
-            # Save count and header ptr in compiler temps (not hardcoded slots)
-            tmp_header = self._alloc_temp()
-            tmp_count = self._alloc_temp()
-            tmp_data = self._alloc_temp()
-            self.emit(f"    mov [rbp{tmp_header:+d}], rcx")  # save header ptr
-            self.emit(f"    mov [rbp{tmp_count:+d}], rax")   # save count
-            # Allocate pointer array: count * 8
-            self.emit(f"    mov r8, rax")
-            self.emit(f"    imul r8, 8")
-            self.emit(f"    mov rcx, [_heap]")
-            self.emit(f"    mov edx, 8")
-            self.emit(f"    sub rsp, 40")
-            self.emit(f"    call HeapAlloc")
-            self.emit(f"    add rsp, 40")
-            # rax = pointer array base
-            self.emit(f"    mov [rbp{tmp_data:+d}], rax")   # save pointer array
-            # Loop: for i in range(count): data[i] = new StructName
-            self.emit(f"    mov r12, [rbp{tmp_count:+d}]")  # r12 = count (non-volatile)
-            loop_lbl = self.fresh_label()
-            done_lbl = self.fresh_label()
-            self.emit(f"{loop_lbl}:")
-            self.emit(f"    test r12, r12")
-            self.emit(f"    jz {done_lbl}")
-            self.emit(f"    dec r12")
-            # new elem
-            el_size = self.structs[elem]["size"]
-            self.emit(f"    mov rcx, [_heap]")
-            self.emit(f"    mov edx, 8")
-            self.emit(f"    mov r8d, {el_size}")
-            self.emit(f"    sub rsp, 40")
-            self.emit(f"    call HeapAlloc")
-            self.emit(f"    add rsp, 40")
-            # store in pointer array
-            self.emit(f"    mov rcx, [rbp{tmp_data:+d}]")  # pointer array base
-            self.emit(f"    mov [rcx + r12*8], rax")
-            self.emit(f"    jmp {loop_lbl}")
-            self.emit(f"{done_lbl}:")
-            # store pointer array in header
-            self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")  # header ptr
-            self.emit(f"    mov rax, [rbp{tmp_data:+d}]")   # pointer array
-            self.emit(f"    mov [rcx], rax")   # header.data = pointer array (offset 0)
-            self.emit(f"    mov rax, rcx")     # return header ptr
-            self.emit(f"    pop rcx")           # balance push from step 2
+            self.emit_expr(cap_expr)
+        self.emit(f"    cmp rax, 1")
+        self.emit(f"    jge {self.fresh_label()}_cap_ok")
+        cap_ok = f"L{self.label_counter}_cap_ok"
+        self.emit("    mov rax, 1")
+        self.emit(f"{cap_ok}:")
+        self.emit(f"    mov [rbp{tmp_cap:+d}], rax")
+        self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")
+        self.emit(f"    mov qword [rcx+8], 0")
+        self.emit(f"    mov [rcx+16], rax")
+        el_size = 1 if elem == "i8" else 8
+        self.emit("    mov r8, rax")
+        if el_size != 1:
+            self.emit(f"    imul r8, {el_size}")
+        self.emit(f"    mov rcx, [_heap]")
+        self.emit(f"    mov edx, 8")
+        self.emit(f"    sub rsp, 40")
+        self.emit(f"    call HeapAlloc")
+        self.emit(f"    add rsp, 40")
+        self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")
+        self.emit(f"    mov [rcx], rax")
+        self.emit(f"    mov rax, rcx")
+
+    def emit_push(self, args):
+        if len(args) != 2:
+            raise RuntimeError("push expects 2 arguments")
+        arr_type = self._expr_type(args[0])
+        if not (arr_type.startswith("&_arr_")):
+            raise RuntimeError(f"push on non-array type '{arr_type}'")
+        elem = arr_type[6:]
+        el_size = 1 if elem == "i8" else 8
+        tmp_arr = self._alloc_temp()
+        tmp_val = self._alloc_temp()
+        tmp_new_data = self._alloc_temp()
+        self.emit_expr(args[0])
+        self.emit(f"    mov [rbp{tmp_arr:+d}], rax")
+        self.emit_expr(args[1])
+        self.emit(f"    mov [rbp{tmp_val:+d}], rax")
+        grow = self.fresh_label()
+        store = self.fresh_label()
+        done = self.fresh_label()
+        copy_loop = self.fresh_label()
+        copy_done = self.fresh_label()
+        cap_nonzero = self.fresh_label()
+        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit("    mov rcx, [rax+8]")   # len
+        self.emit("    cmp rcx, [rax+16]")  # cap
+        self.emit(f"    jge {grow}")
+        self.emit(f"    jmp {store}")
+        self.emit(f"{grow}:")
+        self.emit("    mov rdx, [rax+16]")
+        self.emit("    test rdx, rdx")
+        self.emit(f"    jnz {cap_nonzero}")
+        self.emit("    mov rdx, 2")
+        self.emit(f"{cap_nonzero}:")
+        self.emit("    add rdx, rdx")
+        self.emit("    mov [rax+16], rdx")
+        self.emit("    mov r8, rdx")
+        if el_size != 1:
+            self.emit(f"    imul r8, {el_size}")
+        self.emit("    mov rcx, [_heap]")
+        self.emit("    mov edx, 8")
+        self.emit("    sub rsp, 40")
+        self.emit("    call HeapAlloc")
+        self.emit("    add rsp, 40")
+        self.emit(f"    mov [rbp{tmp_new_data:+d}], rax")
+        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit("    mov r8, [rax]")      # old data
+        self.emit("    mov r9, [rax+8]")    # len
+        self.emit("    xor r10, r10")
+        self.emit(f"{copy_loop}:")
+        self.emit("    cmp r10, r9")
+        self.emit(f"    jge {copy_done}")
+        if el_size == 1:
+            self.emit("    mov r11b, [r8+r10]")
+            self.emit(f"    mov rax, [rbp{tmp_new_data:+d}]")
+            self.emit("    mov [rax+r10], r11b")
+        else:
+            self.emit("    mov r11, [r8+r10*8]")
+            self.emit(f"    mov rax, [rbp{tmp_new_data:+d}]")
+            self.emit("    mov [rax+r10*8], r11")
+        self.emit("    inc r10")
+        self.emit(f"    jmp {copy_loop}")
+        self.emit(f"{copy_done}:")
+        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit(f"    mov rcx, [rbp{tmp_new_data:+d}]")
+        self.emit("    mov [rax], rcx")
+        self.emit(f"{store}:")
+        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit("    mov rcx, [rax]")     # data
+        self.emit("    mov rdx, [rax+8]")   # len
+        if el_size == 1:
+            self.emit(f"    mov r8, [rbp{tmp_val:+d}]")
+            self.emit("    mov [rcx+rdx], r8b")
+        else:
+            self.emit(f"    mov r8, [rbp{tmp_val:+d}]")
+            self.emit("    mov [rcx+rdx*8], r8")
+        self.emit("    inc qword [rax+8]")
+        self.emit("    xor eax, eax")
+        self.emit(f"{done}:")
 
     def emit_subscript(self, expr):
         """base[index] → load value from array"""
@@ -958,7 +1048,10 @@ class Emitter:
         index = expr.index
         elem_type = self._expr_type(expr)  # type of the element being accessed
         # Evaluate base (pointer), then add index * size
-        self.emit_expr(base)        # rax = base pointer
+        base_type = self._expr_type(base)
+        self.emit_expr(base)        # rax = base pointer or array header
+        if base_type.startswith("&_arr_"):
+            self.emit("    mov rax, [rax]")
         self.emit("    push rax")
         self.emit_expr(index)       # rax = index
         self.emit("    pop rcx")    # rcx = base pointer
@@ -979,7 +1072,7 @@ class Emitter:
         if isinstance(expr, CallNode):
             name = expr.name
             # Builtins with known return types
-            if name in ("itoa", "str_new"):
+            if name in ("itoa", "str_new", "read_file"):
                 return "&str"
             if name == "listdir":
                 return "&_arr_str"

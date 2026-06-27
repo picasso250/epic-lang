@@ -6,10 +6,10 @@ fun add(a: i64, b: i64) -> i64 {
 }
 
 fun main() -> i64 {
-    let x: i64 = add(40, 2);
+    let x = add(40, 2);
     putstr(itoa(x));
     putc(10);
-    let y: i64 = add(x, 1);
+    let y = add(x, 1);
     putstr(itoa(y));
     putc(10);
     exit(0);

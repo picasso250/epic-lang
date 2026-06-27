@@ -7,6 +7,9 @@ struct Token {
 
 fun main() -> i64 {
     let tokens = new Token[3];
+    push(tokens, new Token);
+    push(tokens, new Token);
+    push(tokens, new Token);
     tokens.data[2].kind = 42;
     exit(0);
 }
