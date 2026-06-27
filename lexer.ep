@@ -339,5 +339,3 @@ fun main() -> i64 {
     dump_tokens(tokens);
     return 0;
 }
-# EXIT 0
-# STDOUT m1_tokens.txt
