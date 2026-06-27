@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from codegen import Emitter
-from helpers_asm import STR_ALLOC_HELPER, ITOA_HELPER, SYSTEM_HELPER, LISTDIR_HELPER, READ_FILE_HELPER
+from helpers_asm import STR_ALLOC_HELPER, ITOA_HELPER, ARGV_HELPER, SYSTEM_HELPER, LISTDIR_HELPER, READ_FILE_HELPER, WRITE_FILE_HELPER
 from lexer import LexError, lex
 from parser import ParseError, Parser
 
@@ -60,9 +60,11 @@ def compile_file(input_path, linker="lld-link", out_dir=BUILD_DIR):
     emitter.emit_program(ast)
     emitter.emit(STR_ALLOC_HELPER)
     emitter.emit(ITOA_HELPER)
+    emitter.emit(ARGV_HELPER)
     emitter.emit(SYSTEM_HELPER)
     emitter.emit(LISTDIR_HELPER)
     emitter.emit(READ_FILE_HELPER)
+    emitter.emit(WRITE_FILE_HELPER)
     emitter.close()
 
     print(f"[3/4] Assembling → {obj_path}")

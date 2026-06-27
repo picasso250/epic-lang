@@ -12,6 +12,8 @@
 - v0 uses heap objects and one extra pointer hop for non-primitive values. There is no by-value struct semantics.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
 - Memory is not freed in v0; process exit is the reclamation boundary.
+- v0 self-hosting only needs to compile the compiler's own known source shape. The happy path should be correct and deterministic; error handling only needs to reject bad input, and may abort immediately instead of recovering or producing polished diagnostics.
+- v0 does not preserve forward compatibility. When the implementation and design change, self-hosting code follows the current design directly.
 
 **自举路线**: Python 版原型 → Epic 版编译器逐步替换 → 完全自举。
 
@@ -27,6 +29,12 @@ User-facing types:
 | `Name` | heap-allocated struct reference |
 | `T[]` | heap-allocated dynamic array |
 | `void` | function return type only |
+
+Built-in globals:
+
+| Name | Type | Meaning |
+| --- | --- | --- |
+| `argv` | `str[]` | command-line arguments, including `argv.data[0]` as the executable name |
 
 Internal lowering:
 
@@ -105,14 +113,13 @@ Primitive arrays store primitive values. Struct and `str` arrays store reference
 | `strcmp` | `strcmp(a: str, b: str) -> i64` | Win32 `lstrcmpA` over null-terminated data |
 | `str_new` | `str_new(bytes: i8[], len: i64) -> str` | deep-copies bytes into a string |
 | `itoa` | `itoa(n: i64) -> str` | integer to heap string |
-| `fopen` | `fopen(path: str, mode: i64) -> i64` | mode `0` read, nonzero write |
-| `fread` | `fread(fd: i64, buf: i8[], len: i64) -> i64` | returns bytes read |
-| `fwrite` | `fwrite(fd: i64, buf: i8[], len: i64) -> i64` | returns bytes written |
-| `fclose` | `fclose(fd: i64) -> void` | closes handle |
 | `system` | `system(cmd: str) -> i64` | returns process exit code or `-1` |
 | `listdir` | `listdir(pattern: str, max: i64) -> str[]` | lists matching files |
 | `read_file` | `read_file(path: str) -> str` | reads a whole file or returns empty string on failure |
+| `write_file` | `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
 | `push` | `push(a: T[], x: T) -> void` | appends to dynamic array |
+
+`argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for self-hosting: whitespace separates arguments, and double quotes group an argument.
 
 ## Compiler Outputs
 

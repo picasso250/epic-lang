@@ -1,93 +1,94 @@
 #!/usr/bin/env python3
-"""Compare Epic lexer output against reference Python lexer for all .ep files."""
+"""
+Compare the self-hosted Epic lexer against the Python lexer oracle.
+"""
 
-import os, sys, subprocess, glob
+import os
+import subprocess
+import sys
+
+from lexer import lex
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
 LEXER_EP = os.path.join(SCRIPT_DIR, "lexer.ep")
+LEXER_EXE = os.path.join(SCRIPT_DIR, "build", "lexer.exe")
+EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 
-sys.path.insert(0, SCRIPT_DIR)
-from lexer import lex as py_lex
+
+def oracle_dump(path):
+    with open(path, "r", encoding="utf-8") as f:
+        source = f.read()
+    lines = []
+    for kind, value, line in lex(source):
+        lines.append(f"{kind} {value} {line}")
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
-def build_epic_lexer_for(target_ep):
-    """Patch lexer.ep to read target_ep, compile, return exe path."""
-    with open(LEXER_EP, encoding="utf-8") as f:
-        src = f.read()
-    src = src.replace('"examples/m1_exit.ep"', f'"{target_ep}"')
-    tmp_ep = os.path.join(SCRIPT_DIR, "_test_lex.ep")
-    with open(tmp_ep, "w", encoding="utf-8") as f:
-        f.write(src)
-
+def epic_dump(path):
     result = subprocess.run(
-        [sys.executable, EPICC, tmp_ep],
-        capture_output=True, text=True, cwd=SCRIPT_DIR,
+        [LEXER_EXE, path],
+        cwd=SCRIPT_DIR,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
-        raise RuntimeError(f"Compile failed:\n{result.stderr[:500]}")
-    return os.path.join(SCRIPT_DIR, "_test_lex.exe")
+        raise RuntimeError(f"lexer.exe failed for {path}:\n{result.stdout}\n{result.stderr}")
+    return result.stdout
+
+
+def compile_lexer():
+    result = subprocess.run(
+        [sys.executable, EPICC, LEXER_EP],
+        cwd=SCRIPT_DIR,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stdout + result.stderr)
+
+
+def test_paths():
+    paths = [LEXER_EP]
+    for name in sorted(os.listdir(EXAMPLES_DIR)):
+        if name.endswith(".ep"):
+            paths.append(os.path.join(EXAMPLES_DIR, name))
+    return paths
 
 
 def main():
-    ep_files = sorted(glob.glob(os.path.join(SCRIPT_DIR, "examples", "*.ep")))
-    if not ep_files:
-        print("No .ep files found")
-        return
-
+    compile_lexer()
     passed = 0
     failed = 0
-
-    print(f"Testing Epic lexer against Python lexer on {len(ep_files)} files...\n")
-
-    for ep_file in ep_files:
-        name = os.path.basename(ep_file)
-
-        # Python reference
-        with open(ep_file, encoding="utf-8") as f:
-            py_src = f.read()
-        py_tokens = py_lex(py_src)
-        py_out = "\n".join(f"{k} {v} {l}" for k, v, l in py_tokens)
-
-        # Epic lexer
-        try:
-            exe = build_epic_lexer_for(ep_file)
-        except RuntimeError as e:
-            print(f"  FAIL  {name:30s} COMPILE ERROR: {e}")
-            failed += 1
-            continue
-
-        proc = subprocess.run([exe], capture_output=True, cwd=SCRIPT_DIR)
-        ep_out = proc.stdout.decode("ascii", errors="replace").strip()
-
-        if py_out == ep_out:
-            print(f"  PASS  {name:30s} {len(py_tokens)} tokens")
+    for path in test_paths():
+        rel = os.path.relpath(path, SCRIPT_DIR)
+        expected = oracle_dump(path)
+        actual = epic_dump(path)
+        if actual == expected:
+            print(f"PASS {rel}")
             passed += 1
+            continue
+        print(f"FAIL {rel}")
+        failed += 1
+        exp_lines = expected.splitlines()
+        act_lines = actual.splitlines()
+        limit = min(len(exp_lines), len(act_lines))
+        for i in range(limit):
+            if exp_lines[i] != act_lines[i]:
+                print(f"  line {i + 1}")
+                print(f"  expected: {exp_lines[i]!r}")
+                print(f"  actual:   {act_lines[i]!r}")
+                break
         else:
-            print(f"  FAIL  {name:30s} {len(py_tokens)} tokens — diff:")
-            py_lines = py_out.split("\n")
-            ep_lines = ep_out.split("\n")
-            diff_count = 0
-            for i in range(max(len(py_lines), len(ep_lines))):
-                a = py_lines[i] if i < len(py_lines) else "MISSING"
-                b = ep_lines[i] if i < len(ep_lines) else "MISSING"
-                if a != b:
-                    print(f"         line {i}: {a!r} vs {b!r}")
-                    diff_count += 1
-                    if diff_count >= 3:
-                        print(f"         ... and more")
-                        break
-            failed += 1
-
-        # Cleanup
-        for ext in [".asm", ".obj", ".exe"]:
-            try:
-                os.remove(os.path.join(SCRIPT_DIR, "_test_lex" + ext))
-            except OSError:
-                pass
-
-    print(f"\n{passed} passed, {failed} failed, {len(ep_files)} total")
+            print(f"  expected {len(exp_lines)} lines, got {len(act_lines)}")
+    print(f"\n{passed} passed, {failed} failed")
+    return 0 if failed == 0 else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

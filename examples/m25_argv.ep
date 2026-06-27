@@ -1,0 +1,8 @@
+fun main() -> i64 {
+    if argv.len < 2 {
+        putstr("missing");
+        exit(1);
+    }
+    putstr(argv.data[1]);
+    exit(0);
+}

@@ -15,9 +15,8 @@ class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
         self.builtins = {"exit", "putc", "putstr",
-                         "fopen", "fread", "fwrite", "fclose",
                          "strcmp", "itoa", "system",
-                         "listdir", "str_new", "read_file", "push"}
+                         "listdir", "str_new", "read_file", "write_file", "push"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -29,6 +28,7 @@ class Emitter:
         self.local_bytes = 0    # track variable allocation in pre-scan
         self.structs = {}       # name → {fields: [{name, type, offset}], size}
         self.funcs = {}         # name → {ret_type, params}
+        self.globals = {"argv": {"type": "&_arr_str", "label": "_argv"}}
 
     def emit(self, s):
         self.out.write(s + "\n")
@@ -57,6 +57,7 @@ class Emitter:
         self.emit("extern CreateProcessA")
         self.emit("extern WaitForSingleObject")
         self.emit("extern GetExitCodeProcess")
+        self.emit("extern GetCommandLineA")
         self.emit("extern HeapAlloc")
         self.emit("extern GetProcessHeap")
         self.emit("extern FindFirstFileA")
@@ -83,6 +84,7 @@ class Emitter:
         self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
         self.emit("    _heap dq 0")
+        self.emit("    _argv dq 0")
         # Emit string literals as comma-separated bytes (avoids NASM escaping)
         for label, text in sorted(self.strings.items(), key=lambda x: x[0]):
             bytes_str = ", ".join(str(b) for b in text.encode("ascii"))
@@ -171,6 +173,8 @@ class Emitter:
         if name == "main":
             self.emit("    call GetProcessHeap")
             self.emit("    mov [_heap], rax")
+            self.emit("    call _argv_init")
+            self.emit("    mov [_argv], rax")
 
         # Map params from registers to local slots
         param_regs = ["rcx", "rdx", "r8", "r9"]
@@ -262,6 +266,12 @@ class Emitter:
         if typ.startswith("&"):
             return 8  # pointers are always 8 bytes
         return 8  # unknown, assume i64
+
+    def _global_symbol(self, name):
+        return self.globals.get(name)
+
+    def _emit_global_load(self, sym):
+        self.emit(f"    mov rax, [{sym['label']}]")
 
     def _internal_type(self, typ):
         """Lower user-facing types to the internal pointer-heavy representation."""
@@ -485,6 +495,9 @@ class Emitter:
             self.emit(f"    call _str_alloc")
         elif isinstance(expr, VarNode):
             name = expr.name
+            if sym := self._global_symbol(name):
+                self._emit_global_load(sym)
+                return
             slot = self.local_offset.get(name)
             if slot is None:
                 raise RuntimeError(f"Undefined variable: {name}")
@@ -553,65 +566,6 @@ class Emitter:
                 self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
                 self.emit("    mov rcx, [rax]")    # rcx = a.data (offset 0)
                 self.emit("    call lstrcmpA")
-            elif name == "fopen":
-                # fopen(path: &str, mode) → extract path.data, call CreateFileA
-                slots = self._spill_args(args)
-                rl = self.fresh_label()
-                dl = self.fresh_label()
-                self.emit(f"    mov rax, [rbp{slots[1]:+d}]")
-                self.emit("    test rax, rax")
-                self.emit(f"    jz {rl}")
-                # Write mode
-                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
-                self.emit("    mov rcx, [rax]")    # rcx = path.data (offset 0)
-                self.emit("    mov edx, 0x40000000")  # GENERIC_WRITE
-                self.emit("    xor r8d, r8d")
-                self.emit("    xor r9d, r9d")
-                self._call_prep(3)
-                self.emit("    mov dword [rsp+32], 2")       # CREATE_ALWAYS
-                self.emit("    mov dword [rsp+40], 0x80")
-                self.emit("    mov qword [rsp+48], 0")
-                self.emit("    call CreateFileA")
-                self._call_cleanup(3)
-                self.emit(f"    jmp {dl}")
-                self.emit(f"{rl}:")
-                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
-                self.emit("    mov rcx, [rax]")    # rcx = path.data (offset 0)
-                self.emit("    mov edx, 0x80000000")  # GENERIC_READ
-                self.emit("    mov r8d, 1")
-                self.emit("    xor r9d, r9d")
-                self._call_prep(3)
-                self.emit("    mov dword [rsp+32], 3")       # OPEN_EXISTING
-                self.emit("    mov dword [rsp+40], 0x80")
-                self.emit("    mov qword [rsp+48], 0")
-                self.emit("    call CreateFileA")
-                self._call_cleanup(3)
-                self.emit(f"{dl}:")
-            elif name == "fread":
-                # fread(fd, buf_ptr, len) → ReadFile
-                slots = self._spill_args(args)
-                self._load_spilled_args(slots)
-                self.emit("    lea r9, [_written]")
-                self._call_prep(1)
-                self.emit("    mov qword [rsp+32], 0")  # lpOverlapped = NULL
-                self.emit("    call ReadFile")
-                self._call_cleanup(1)
-                self.emit("    mov eax, [_written]")
-            elif name == "fwrite":
-                # fwrite(fd, buf_ptr, len) → WriteFile
-                slots = self._spill_args(args)
-                self._load_spilled_args(slots)
-                self.emit("    lea r9, [_written]")
-                self._call_prep(1)
-                self.emit("    mov qword [rsp+32], 0")
-                self.emit("    call WriteFile")
-                self._call_cleanup(1)
-                self.emit("    mov eax, [_written]")
-            elif name == "fclose":
-                # fclose(fd) → CloseHandle
-                self.emit_expr(args[0])
-                self.emit("    mov rcx, rax")
-                self.emit("    call CloseHandle")
             elif name == "itoa":
                 # itoa(n) → &str (heap-allocated)
                 self.emit_expr(args[0])     # rax = n
@@ -638,6 +592,16 @@ class Emitter:
                 self.emit("    mov rcx, [rax]")
                 self.emit("    sub rsp, 8")
                 self.emit("    call _read_file")
+                self.emit("    add rsp, 8")
+            elif name == "write_file":
+                slots = self._spill_args(args)
+                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
+                self.emit("    mov rcx, [rax]")      # path.data
+                self.emit(f"    mov rax, [rbp{slots[1]:+d}]")
+                self.emit("    mov rdx, [rax]")      # data.data
+                self.emit("    mov r8, [rax+8]")     # data.len
+                self.emit("    sub rsp, 8")
+                self.emit("    call _write_file")
                 self.emit("    add rsp, 8")
             elif name == "str_new":
                 # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
@@ -775,6 +739,10 @@ class Emitter:
         obj = expr.object
         field_name = expr.field
         if isinstance(obj, VarNode):
+            if sym := self._global_symbol(obj.name):
+                self._emit_global_load(sym)
+                self._emit_field_read_from_rax(obj, field_name)
+                return
             slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
             self._emit_struct_base(slot, is_ptr)
             if ftype == "i8":
@@ -1068,6 +1036,8 @@ class Emitter:
         if isinstance(expr, StringNode):
             return "&str"
         if isinstance(expr, VarNode):
+            if sym := self._global_symbol(expr.name):
+                return sym["type"]
             return self.local_types.get(expr.name, "i64")
         if isinstance(expr, CallNode):
             name = expr.name
@@ -1076,7 +1046,7 @@ class Emitter:
                 return "&str"
             if name == "listdir":
                 return "&_arr_str"
-            if name in ("strcmp", "fread", "fwrite", "fopen", "fclose", "system"):
+            if name in ("strcmp", "system", "write_file"):
                 return "i64"
             if name in ("exit", "putc", "putstr"):
                 return "void"

@@ -2,19 +2,10 @@
 # STDOUT 42
 # STDOUT 2
 fun main() -> i64 {
-    # Write a file
     let s = "42";
-    let fd = fopen("test_out.txt", 1);
-    fwrite(fd, s.data, s.len);
-    fclose(fd);
+    let n = write_file("test_out.txt", s);
+    let inp = read_file("test_out.txt");
 
-    # Read it back
-    let inp = new i8[100];
-    fd = fopen("test_out.txt", 0);
-    let n = fread(fd, inp.data, 100);
-    fclose(fd);
-
-    # Print what we read
     putc(inp.data[0]);
     putc(inp.data[1]);
     putc(10);
