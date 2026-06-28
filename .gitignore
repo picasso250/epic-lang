@@ -11,5 +11,6 @@ __pycache__/
 # Binary tools (see README for setup)
 tools/
 
-# Temporary debug files
-test_*.*
+# Temporary files produced by examples
+test_out.txt
+test_write_file.txt
