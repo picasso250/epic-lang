@@ -1,4 +1,4 @@
-# EXIT 50
+# EXIT: 50
 
 struct Point {
     x: i64;

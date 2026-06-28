@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Epic v0 test runner.
-Scans examples/*.ep, reads # EXIT and # STDOUT annotations,
+Scans examples/*.ep, reads # EXIT: and # STDOUT: annotations,
 compiles, runs, and reports pass/fail.
 """
 
@@ -20,13 +20,13 @@ def parse_annotations(source):
     clean_paths = []
     for line in source.split("\n"):
         line = line.strip()
-        if m := re.match(r'#\s*EXIT\s+(-?\d+)', line):
+        if m := re.match(r'#\s*EXIT:\s*(-?\d+)', line):
             exit_code = int(m.group(1))
-        elif m := re.match(r'#\s*STDOUT\s+(.*)', line):
+        elif m := re.match(r'#\s*STDOUT:\s*(.*)', line):
             stdout_lines.append(m.group(1))
-        elif m := re.match(r'#\s*ARGV(?:\s+(.*))?$', line):
+        elif m := re.match(r'#\s*ARGV:\s*(.*)$', line):
             argv = shlex.split(m.group(1) or "")
-        elif m := re.match(r'#\s*CLEAN\s+(.+)$', line):
+        elif m := re.match(r'#\s*CLEAN:\s*(.+)$', line):
             clean_paths.extend(shlex.split(m.group(1)))
     stdout = "\n".join(stdout_lines) if stdout_lines else None
     return exit_code, stdout, argv, clean_paths

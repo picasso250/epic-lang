@@ -1,5 +1,5 @@
-# EXIT 0
-# STDOUT 42
+# EXIT: 0
+# STDOUT: 42
 fun main() -> i64 {
     let s = itoa(42);
     putstr(s);

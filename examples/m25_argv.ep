@@ -1,6 +1,6 @@
-# ARGV hello
-# EXIT 0
-# STDOUT hello
+# ARGV: hello
+# EXIT: 0
+# STDOUT: hello
 fun main() -> i64 {
     if argv.len < 2 {
         putstr("missing");

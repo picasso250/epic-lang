@@ -17,4 +17,4 @@ fun main() -> i64 {
     let result = p2.x + p2.y;
     return result;
 }
-# EXIT 141
+# EXIT: 141

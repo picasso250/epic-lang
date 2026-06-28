@@ -1,4 +1,4 @@
-# EXIT 42
+# EXIT: 42
 fun main() -> i64 {
     exit(42);
 }

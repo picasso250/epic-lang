@@ -1,6 +1,6 @@
-# EXIT 0
-# STDOUT HI
-# STDOUT 90
+# EXIT: 0
+# STDOUT: HI
+# STDOUT: 90
 fun to_upper(c: i8) -> i64 {
     if c >= 'a' && c <= 'z' {
         return c - 32;

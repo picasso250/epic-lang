@@ -1,9 +1,9 @@
-# EXIT 0
-# STDOUT 0
-# STDOUT 1
-# STDOUT 2
-# STDOUT 3
-# STDOUT 4
+# EXIT: 0
+# STDOUT: 0
+# STDOUT: 1
+# STDOUT: 2
+# STDOUT: 3
+# STDOUT: 4
 fun main() -> i64 {
     let i = 0;
     while i < 5 {

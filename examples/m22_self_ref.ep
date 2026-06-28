@@ -14,4 +14,4 @@ fun main() -> i64 {
     # a.next.val should be 20
     return a.next.val;
 }
-# EXIT 20
+# EXIT: 20

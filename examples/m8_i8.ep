@@ -1,7 +1,7 @@
-# EXIT 0
-# STDOUT A
-# STDOUT Epic
-# STDOUT 65
+# EXIT: 0
+# STDOUT: A
+# STDOUT: Epic
+# STDOUT: 65
 fun main() -> i64 {
     let a = 65;
     putc(a);

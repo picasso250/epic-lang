@@ -1,6 +1,6 @@
-# EXIT 0
-# STDOUT 42
-# STDOUT 43
+# EXIT: 0
+# STDOUT: 42
+# STDOUT: 43
 fun add(a: i64, b: i64) -> i64 {
     return a + b;
 }

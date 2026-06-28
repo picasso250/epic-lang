@@ -1,6 +1,6 @@
-# EXIT 0
-# STDOUT Epic
-# STDOUT 69
+# EXIT: 0
+# STDOUT: Epic
+# STDOUT: 69
 fun main() -> i64 {
     let buf = new i8[10];
     buf.data[0] = 'E';

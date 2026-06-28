@@ -1,6 +1,6 @@
-# EXIT 0
-# STDOUT 1
-# STDOUT 2
+# EXIT: 0
+# STDOUT: 1
+# STDOUT: 2
 fun main() -> i64 {
     let x = 10;
     if x > 5 {

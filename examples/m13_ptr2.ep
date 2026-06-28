@@ -1,5 +1,5 @@
-# EXIT 0
-# STDOUT 200
+# EXIT: 0
+# STDOUT: 200
 
 struct Point {
     x: i64;

@@ -1,5 +1,5 @@
-# EXIT 0
-# STDOUT 1
+# EXIT: 0
+# STDOUT: 1
 
 fun main() -> i64 {
     sys.Sleep(1);

@@ -1,6 +1,6 @@
-# EXIT 0
-# STDOUT Hello, Epic!
-# STDOUT 42
+# EXIT: 0
+# STDOUT: Hello, Epic!
+# STDOUT: 42
 fun main() -> i64 {
     putstr("Hello, Epic!");
     putc(10);

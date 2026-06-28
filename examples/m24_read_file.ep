@@ -1,4 +1,4 @@
-# EXIT 35
+# EXIT: 35
 fun main() -> i64 {
     let src = read_file("examples/m1_exit.ep");
     return src.data[0];

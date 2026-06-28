@@ -1,4 +1,4 @@
-# EXIT 65
+# EXIT: 65
 
 struct Data {
     flag: i8;

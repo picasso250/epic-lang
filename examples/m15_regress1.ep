@@ -1,4 +1,4 @@
-# EXIT 18
+# EXIT: 18
 
 struct Token {
     kind: i64;

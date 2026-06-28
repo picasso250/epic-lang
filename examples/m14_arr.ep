@@ -1,5 +1,5 @@
-# EXIT 0
-# STDOUT 99
+# EXIT: 0
+# STDOUT: 99
 
 fun main() -> i64 {
     let xs = new i64[3];

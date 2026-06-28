@@ -1,4 +1,4 @@
-# EXIT 66
+# EXIT: 66
 fun main() -> i64 {
     let s = "ABC";
     let bytes = s.data;

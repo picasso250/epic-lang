@@ -1,7 +1,7 @@
-# EXIT 0
-# STDOUT 42
-# STDOUT 2
-# CLEAN test_out.txt
+# EXIT: 0
+# STDOUT: 42
+# STDOUT: 2
+# CLEAN: test_out.txt
 fun main() -> i64 {
     let s = "42";
     let n = write_file("test_out.txt", s);
