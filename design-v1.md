@@ -42,6 +42,24 @@ Initial constraints:
 
 This keeps the migration mechanical and keeps parser behavior explicit.
 
+## Else-if chains
+
+v1 supports `else if` as syntax sugar for nested `if` statements in the `else`
+branch:
+
+```epic
+if x == 1 {
+    putstr("one")
+} else if x == 2 {
+    putstr("two")
+} else {
+    putstr("many")
+}
+```
+
+This does not add a new runtime control-flow construct. The parser lowers it
+to the same AST shape as `else { if ... }`, keeping codegen unchanged.
+
 ## String operations
 
 String equality is already supported through `==`, so v1 should not add a

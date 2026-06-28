@@ -434,7 +434,14 @@ fun parse_if_stmt(p: Parser) -> AstNode {
     node.then_block = parse_block(p);
     skip_newlines(p);
     if check(p, "ELSE") == 1 {
-        node.else_block = parse_block(p);
+        skip_newlines(p);
+        if peek_kind(p, "IF") == 1 {
+            let b = ast_node("Block");
+            push(b.stmts, parse_if_stmt(p));
+            node.else_block = b;
+        } else {
+            node.else_block = parse_block(p);
+        }
     }
     return node;
 }
