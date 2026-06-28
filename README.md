@@ -8,7 +8,7 @@ compiler sources, and the resulting compiler can compile Epic programs.
 ## Repository branches
 
 - `v0` is the historical stable bootstrap point.
-- `master` continues toward `v1`.
+- `v1` continues language development after v0.
 
 Do not preserve forward compatibility for its own sake. When the language
 changes, compiler sources should move with the current design.
@@ -48,7 +48,7 @@ After that, switch to the development branch and use the v0 compiler as the
 trusted previous compiler:
 
 ```powershell
-git switch master
+git switch v1
 .\build\v0.exe epic.ep codegen.ep parser.ep lexer.ep
 ```
 
@@ -72,11 +72,11 @@ python test_epic_bootstrap.py
 
 ## v1 direction
 
-Initial v1 feature candidates:
+Initial v1 work:
 
-- map
 - stronger `str` operations
 - remove semicolons
+- split `codegen.ep`
+- revisit `map` after the first pass
 
-The exact v1 scope should be decided by design dependency order: syntax first,
-then type/model changes, then runtime and compiler implementation.
+See `design-v1.md` for the current design notes.
