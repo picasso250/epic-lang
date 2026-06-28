@@ -16,7 +16,8 @@ class Emitter:
         self.out = open(out_path, "w")
         self.builtins = {"exit", "putc", "putstr",
                          "strcmp", "itoa", "system",
-                         "listdir", "str_new", "read_file", "write_file", "push"}
+                         "listdir", "str_new", "read_file", "write_file",
+                         "append_file", "push"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -32,6 +33,33 @@ class Emitter:
 
     def emit(self, s):
         self.out.write(s + "\n")
+
+    def emit_label(self, name):
+        self.emit(f"{name}:")
+
+    def emit_inst(self, op):
+        self.emit(f"    {op}")
+
+    def emit_mov(self, dst, src):
+        self.emit_inst(f"mov {dst}, {src}")
+
+    def emit_lea(self, dst, src):
+        self.emit_inst(f"lea {dst}, {src}")
+
+    def emit_call_inst(self, target):
+        self.emit_inst(f"call {target}")
+
+    def emit_jmp(self, label):
+        self.emit_inst(f"jmp {label}")
+
+    def rbp_slot(self, slot):
+        return f"[rbp{slot:+d}]"
+
+    def emit_stack_store(self, slot, src):
+        self.emit_mov(self.rbp_slot(slot), src)
+
+    def emit_stack_load(self, dst, slot):
+        self.emit_mov(dst, self.rbp_slot(slot))
 
     def fresh_label(self):
         self.label_counter += 1
@@ -49,6 +77,7 @@ class Emitter:
         self.emit("extern WriteFile")
         self.emit("extern CreateFileA")
         self.emit("extern ReadFile")
+        self.emit("extern SetFilePointer")
         self.emit("extern CloseHandle")
         self.emit("extern GetFileSize")
         self.emit("extern lstrcmpA")
@@ -159,22 +188,22 @@ class Emitter:
 
         # Entry label: main → _start
         label = "_start" if name == "main" else name
-        self.emit(f"{label}:")
+        self.emit_label(label)
 
         # Prologue: dynamic frame, 16-byte aligned (include 32-byte shadow + compiler temps)
         self._temp_count = 0
         self._temp_base = self.local_bytes  # temps start below user vars
         self.alloc_size = ((self.local_bytes + temp_bytes + 32 + 15) // 16) * 16
-        self.emit("    push rbp")
-        self.emit("    mov rbp, rsp")
-        self.emit(f"    sub rsp, {self.alloc_size}")
+        self.emit_inst("push rbp")
+        self.emit_mov("rbp", "rsp")
+        self.emit_inst(f"sub rsp, {self.alloc_size}")
 
         # Heap init for main
         if name == "main":
-            self.emit("    call GetProcessHeap")
-            self.emit("    mov [_heap], rax")
-            self.emit("    call _argv_init")
-            self.emit("    mov [_argv], rax")
+            self.emit_call_inst("GetProcessHeap")
+            self.emit_mov("[_heap]", "rax")
+            self.emit_call_inst("_argv_init")
+            self.emit_mov("[_argv]", "rax")
 
         # Map params from registers to local slots
         param_regs = ["rcx", "rdx", "r8", "r9"]
@@ -184,19 +213,19 @@ class Emitter:
             ptype = self._internal_type(p.type)
             self.local_types[p.name] = ptype
             if ptype == "i8":
-                self.emit(f"    mov [rbp{slot:+d}], {param_low[i]}")
+                self.emit_stack_store(slot, param_low[i])
             else:
-                self.emit(f"    mov [rbp{slot:+d}], {param_regs[i]}")
+                self.emit_stack_store(slot, param_regs[i])
 
         # Body
         self.emit_block(body)
 
         # Epilogue (only for non-main; main never returns via ret)
         if name != "main":
-            self.emit(f"{self.current_ep_label}:")
-            self.emit("    mov rsp, rbp")
-            self.emit("    pop rbp")
-            self.emit("    ret")
+            self.emit_label(self.current_ep_label)
+            self.emit_mov("rsp", "rbp")
+            self.emit_inst("pop rbp")
+            self.emit_inst("ret")
 
         self.emit("")
 
@@ -225,18 +254,18 @@ class Emitter:
         for arg in args:
             self.emit_expr(arg)
             slot = self._alloc_temp()
-            self.emit(f"    mov [rbp{slot:+d}], rax")
+            self.emit_stack_store(slot, "rax")
             slots.append(slot)
         return slots
 
     def _load_spilled_args(self, slots):
         param_regs = ["rcx", "rdx", "r8", "r9"]
         for i, slot in enumerate(slots):
-            self.emit(f"    mov {param_regs[i]}, [rbp{slot:+d}]")
+            self.emit_stack_load(param_regs[i], slot)
 
     def _call_with_shadow(self, target):
         self.emit("    sub rsp, 32")
-        self.emit(f"    call {target}")
+        self.emit_call_inst(target)
         self.emit("    add rsp, 32")
 
     def get_var_slot(self, name, typ=None):
@@ -271,7 +300,7 @@ class Emitter:
         return self.globals.get(name)
 
     def _emit_global_load(self, sym):
-        self.emit(f"    mov rax, [{sym['label']}]")
+        self.emit_mov("rax", f"[{sym['label']}]")
 
     def _internal_type(self, typ):
         """Lower user-facing types to the internal pointer-heavy representation."""
@@ -403,12 +432,12 @@ class Emitter:
     def emit_return(self, stmt):
         if self.current_fn == "main":
             self.emit_expr(stmt.expr)
-            self.emit("    mov ecx, eax")
-            self.emit("    call ExitProcess")
+            self.emit_mov("ecx", "eax")
+            self.emit_call_inst("ExitProcess")
         else:
             self.emit_expr(stmt.expr)
             ep_label = getattr(self, "current_ep_label", f"{self.current_fn}_ep")
-            self.emit(f"    jmp {ep_label}")
+            self.emit_jmp(ep_label)
 
     def emit_let(self, stmt):
         name = stmt.name
@@ -439,9 +468,9 @@ class Emitter:
             return  # declaration without initializer
         self.emit_expr(value)
         if var_type == "i8":
-            self.emit(f"    mov [rbp{slot:+d}], al")
+            self.emit_stack_store(slot, "al")
         else:
-            self.emit(f"    mov [rbp{slot:+d}], rax")
+            self.emit_stack_store(slot, "rax")
 
     def emit_if(self, stmt):
         else_label = self.fresh_label()
@@ -454,21 +483,21 @@ class Emitter:
             self.emit(f"    jz {end_label}")
         self.emit_block(stmt.then_block)
         if stmt.else_block:
-            self.emit(f"    jmp {end_label}")
-            self.emit(f"{else_label}:")
+            self.emit_jmp(end_label)
+            self.emit_label(else_label)
             self.emit_block(stmt.else_block)
-        self.emit(f"{end_label}:")
+        self.emit_label(end_label)
 
     def emit_while(self, stmt):
         start_label = self.fresh_label()
         end_label = self.fresh_label()
-        self.emit(f"{start_label}:")
+        self.emit_label(start_label)
         self.emit_expr(stmt.cond)
         self.emit("    test rax, rax")
         self.emit(f"    jz {end_label}")
         self.emit_block(stmt.body)
-        self.emit(f"    jmp {start_label}")
-        self.emit(f"{end_label}:")
+        self.emit_jmp(start_label)
+        self.emit_label(end_label)
 
     def emit_assign(self, stmt):
         name = stmt.name
@@ -478,21 +507,21 @@ class Emitter:
             raise RuntimeError(f"Undefined variable: {name}")
         var_type = self.local_types.get(name, "i64")
         if var_type == "i8":
-            self.emit(f"    mov [rbp{slot:+d}], al")
+            self.emit_stack_store(slot, "al")
         else:
-            self.emit(f"    mov [rbp{slot:+d}], rax")
+            self.emit_stack_store(slot, "rax")
 
     # ── expressions ────────────────────────────────────────────────────
 
     def emit_expr(self, expr):
         if isinstance(expr, LiteralNode):
-            self.emit(f"    mov rax, {expr.value}")
+            self.emit_mov("rax", expr.value)
         elif isinstance(expr, StringNode):
             label = self.get_string_label(expr.value)
             strlen = len(expr.value)
-            self.emit(f"    lea rcx, [{label}]")
-            self.emit(f"    mov rdx, {strlen}")
-            self.emit(f"    call _str_alloc")
+            self.emit_lea("rcx", f"[{label}]")
+            self.emit_mov("rdx", strlen)
+            self.emit_call_inst("_str_alloc")
         elif isinstance(expr, VarNode):
             name = expr.name
             if sym := self._global_symbol(name):
@@ -505,7 +534,7 @@ class Emitter:
             if var_type == "i8":
                 self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
             else:
-                self.emit(f"    mov rax, [rbp{slot:+d}]")
+                self.emit_stack_load("rax", slot)
         elif isinstance(expr, CallNode):
             self.emit_call(expr)
         elif isinstance(expr, SubscriptNode):
@@ -528,87 +557,97 @@ class Emitter:
         if name in self.builtins:
             if name == "exit":
                 self.emit_expr(args[0])
-                self.emit("    mov ecx, eax")
-                self.emit("    call ExitProcess")
+                self.emit_mov("ecx", "eax")
+                self.emit_call_inst("ExitProcess")
             elif name == "putc":
                 self.emit_expr(args[0])
-                self.emit("    mov [_buf], al")
-                self.emit("    mov ecx, -11")
-                self.emit("    call GetStdHandle")
-                self.emit("    mov rcx, rax")
-                self.emit("    lea rdx, [_buf]")
-                self.emit("    mov r8, 1")
-                self.emit("    lea r9, [_written]")
+                self.emit_mov("[_buf]", "al")
+                self.emit_mov("ecx", "-11")
+                self.emit_call_inst("GetStdHandle")
+                self.emit_mov("rcx", "rax")
+                self.emit_lea("rdx", "[_buf]")
+                self.emit_mov("r8", "1")
+                self.emit_lea("r9", "[_written]")
                 self._call_prep(1)
-                self.emit("    mov qword [rsp+32], 0")
-                self.emit("    call WriteFile")
+                self.emit_mov("qword [rsp+32]", "0")
+                self.emit_call_inst("WriteFile")
                 self._call_cleanup(1)
             elif name == "putstr":
                 # putstr(s: &str): save &str in temp slot, GetStdHandle, then WriteFile
                 self.emit_expr(args[0])       # rax = &str
                 tmp = self._alloc_temp()
-                self.emit(f"    mov [rbp{tmp:+d}], rax")  # save &str
-                self.emit("    mov ecx, -11")  # STD_OUTPUT_HANDLE
-                self.emit("    call GetStdHandle")
-                self.emit("    mov rcx, rax")   # rcx = stdout handle
-                self.emit(f"    mov rax, [rbp{tmp:+d}]")  # rax = &str
-                self.emit("    mov rdx, [rax]")      # rdx = str.data (offset 0)
-                self.emit("    mov r8, [rax+8]")    # r8 = str.len (offset 8)
-                self.emit("    lea r9, [_written]")
+                self.emit_stack_store(tmp, "rax")  # save &str
+                self.emit_mov("ecx", "-11")  # STD_OUTPUT_HANDLE
+                self.emit_call_inst("GetStdHandle")
+                self.emit_mov("rcx", "rax")   # rcx = stdout handle
+                self.emit_stack_load("rax", tmp)  # rax = &str
+                self.emit_mov("rdx", "[rax]")      # rdx = str.data (offset 0)
+                self.emit_mov("r8", "[rax+8]")    # r8 = str.len (offset 8)
+                self.emit_lea("r9", "[_written]")
                 self._call_prep(1)             # 1 stack arg (lpOverlapped)
-                self.emit("    mov qword [rsp+32], 0")
-                self.emit("    call WriteFile")
+                self.emit_mov("qword [rsp+32]", "0")
+                self.emit_call_inst("WriteFile")
                 self._call_cleanup(1)
             elif name == "strcmp":
                 slots = self._spill_args(args)
-                self.emit(f"    mov rax, [rbp{slots[1]:+d}]")
-                self.emit("    mov rdx, [rax]")    # rdx = b.data (offset 0)
-                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
-                self.emit("    mov rcx, [rax]")    # rcx = a.data (offset 0)
-                self.emit("    call lstrcmpA")
+                self.emit_stack_load("rax", slots[1])
+                self.emit_mov("rdx", "[rax]")    # rdx = b.data (offset 0)
+                self.emit_stack_load("rax", slots[0])
+                self.emit_mov("rcx", "[rax]")    # rcx = a.data (offset 0)
+                self.emit_call_inst("lstrcmpA")
             elif name == "itoa":
                 # itoa(n) → &str (heap-allocated)
                 self.emit_expr(args[0])     # rax = n
-                self.emit("    mov rcx, rax")  # rcx = n
-                self.emit("    call _itoa")
+                self.emit_mov("rcx", "rax")  # rcx = n
+                self.emit_call_inst("_itoa")
             elif name == "system":
                 # system(cmd: &str) → extract cmd.data, call _system
                 self.emit_expr(args[0])       # rax = &str
-                self.emit("    mov rcx, [rax]")    # rcx = cmd.data (offset 0)
+                self.emit_mov("rcx", "[rax]")    # rcx = cmd.data (offset 0)
                 self.emit("    sub rsp, 8")       # align for _system entry
-                self.emit("    call _system")
+                self.emit_call_inst("_system")
                 self.emit("    add rsp, 8")
             elif name == "listdir":
                 # listdir(pattern: &str, max) → extract pattern.data, call _listdir
                 slots = self._spill_args(args)
-                self.emit(f"    mov rdx, [rbp{slots[1]:+d}]")
-                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
-                self.emit("    mov rcx, [rax]")  # rcx = pattern.data (offset 0)
+                self.emit_stack_load("rdx", slots[1])
+                self.emit_stack_load("rax", slots[0])
+                self.emit_mov("rcx", "[rax]")  # rcx = pattern.data (offset 0)
                 self.emit("    sub rsp, 8")       # align for _listdir entry
-                self.emit("    call _listdir")
+                self.emit_call_inst("_listdir")
                 self.emit("    add rsp, 8")
             elif name == "read_file":
                 self.emit_expr(args[0])
-                self.emit("    mov rcx, [rax]")
+                self.emit_mov("rcx", "[rax]")
                 self.emit("    sub rsp, 8")
-                self.emit("    call _read_file")
+                self.emit_call_inst("_read_file")
                 self.emit("    add rsp, 8")
             elif name == "write_file":
                 slots = self._spill_args(args)
-                self.emit(f"    mov rax, [rbp{slots[0]:+d}]")
-                self.emit("    mov rcx, [rax]")      # path.data
-                self.emit(f"    mov rax, [rbp{slots[1]:+d}]")
-                self.emit("    mov rdx, [rax]")      # data.data
-                self.emit("    mov r8, [rax+8]")     # data.len
+                self.emit_stack_load("rax", slots[0])
+                self.emit_mov("rcx", "[rax]")      # path.data
+                self.emit_stack_load("rax", slots[1])
+                self.emit_mov("rdx", "[rax]")      # data.data
+                self.emit_mov("r8", "[rax+8]")     # data.len
                 self.emit("    sub rsp, 8")
-                self.emit("    call _write_file")
+                self.emit_call_inst("_write_file")
+                self.emit("    add rsp, 8")
+            elif name == "append_file":
+                slots = self._spill_args(args)
+                self.emit_stack_load("rax", slots[0])
+                self.emit_mov("rcx", "[rax]")      # path.data
+                self.emit_stack_load("rax", slots[1])
+                self.emit_mov("rdx", "[rax]")      # data.data
+                self.emit_mov("r8", "[rax+8]")     # data.len
+                self.emit("    sub rsp, 8")
+                self.emit_call_inst("_append_file")
                 self.emit("    add rsp, 8")
             elif name == "str_new":
                 # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
                 slots = self._spill_args(args)
-                self.emit(f"    mov rcx, [rbp{slots[0]:+d}]")
-                self.emit(f"    mov rdx, [rbp{slots[1]:+d}]")
-                self.emit("    call _str_alloc")
+                self.emit_stack_load("rcx", slots[0])
+                self.emit_stack_load("rdx", slots[1])
+                self.emit_call_inst("_str_alloc")
             elif name == "push":
                 self.emit_push(args)
             return
@@ -633,9 +672,9 @@ class Emitter:
         # clobbering stack alignment or shadow space.
         self.emit_expr(right)
         tmp = self._alloc_temp()
-        self.emit(f"    mov [rbp{tmp:+d}], rax")
+        self.emit_stack_store(tmp, "rax")
         self.emit_expr(left)
-        self.emit(f"    mov rcx, [rbp{tmp:+d}]")
+        self.emit_stack_load("rcx", tmp)
 
         op_map = {
             "+": "add rax, rcx",
@@ -651,7 +690,7 @@ class Emitter:
         elif op == "%":
             self.emit("    cqo")
             self.emit("    idiv rcx")
-            self.emit("    mov rax, rdx")
+            self.emit_mov("rax", "rdx")
         elif op == "==":
             self.emit("    cmp rax, rcx")
             self.emit("    sete al")
@@ -695,12 +734,12 @@ class Emitter:
         self.emit_expr(expr.right)
 
         if op == "||":
-            self.emit(f"{true_label}:")
+            self.emit_label(true_label)
 
         self.emit("    test rax, rax")
         self.emit("    setne al")
         self.emit("    movzx eax, al")
-        self.emit(f"{end_label}:")
+        self.emit_label(end_label)
 
     # ── struct operations ─────────────────────────────────────────────
 
@@ -723,16 +762,16 @@ class Emitter:
     def _emit_struct_base(self, slot, is_ptr):
         """Emit instruction to load base address into rax."""
         if is_ptr:
-            self.emit(f"    mov rax, [rbp{slot:+d}]")
+            self.emit_stack_load("rax", slot)
         else:
-            self.emit(f"    lea rax, [rbp{slot:+d}]")
+            self.emit_lea("rax", self.rbp_slot(slot))
 
     def _emit_struct_base_rcx(self, slot, is_ptr):
         """Emit instruction to load base address into rcx."""
         if is_ptr:
-            self.emit(f"    mov rcx, [rbp{slot:+d}]")
+            self.emit_stack_load("rcx", slot)
         else:
-            self.emit(f"    lea rcx, [rbp{slot:+d}]")
+            self.emit_lea("rcx", self.rbp_slot(slot))
 
     def emit_field_access(self, expr):
         """Read expr.object.field into rax."""
@@ -882,11 +921,11 @@ class Emitter:
         if struct_name not in self.structs:
             raise RuntimeError(f"Unknown struct in new: {struct_name}")
         size = self.structs[struct_name]["size"]
-        self.emit(f"    mov rcx, [_heap]")
-        self.emit(f"    mov edx, 8")   # HEAP_ZERO_MEMORY
-        self.emit(f"    mov r8d, {size}")
+        self.emit_mov("rcx", "[_heap]")
+        self.emit_mov("edx", "8")   # HEAP_ZERO_MEMORY
+        self.emit_mov("r8d", size)
         self.emit(f"    sub rsp, 40")
-        self.emit(f"    call HeapAlloc")
+        self.emit_call_inst("HeapAlloc")
         self.emit(f"    add rsp, 40")
         # rax = pointer, zero-initialized
 
@@ -899,13 +938,13 @@ class Emitter:
         tmp_cap = self._alloc_temp()
 
         # Allocate header (24 bytes): data, len, cap.
-        self.emit(f"    mov rcx, [_heap]")
-        self.emit(f"    mov edx, 8")
-        self.emit(f"    mov r8d, 24")
+        self.emit_mov("rcx", "[_heap]")
+        self.emit_mov("edx", "8")
+        self.emit_mov("r8d", "24")
         self.emit(f"    sub rsp, 40")
-        self.emit(f"    call HeapAlloc")
+        self.emit_call_inst("HeapAlloc")
         self.emit(f"    add rsp, 40")
-        self.emit(f"    mov [rbp{tmp_header:+d}], rax")
+        self.emit_stack_store(tmp_header, "rax")
         if cap_expr is None:
             self.emit("    mov rax, 4")
         else:
@@ -914,23 +953,23 @@ class Emitter:
         self.emit(f"    jge {self.fresh_label()}_cap_ok")
         cap_ok = f"L{self.label_counter}_cap_ok"
         self.emit("    mov rax, 1")
-        self.emit(f"{cap_ok}:")
-        self.emit(f"    mov [rbp{tmp_cap:+d}], rax")
-        self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")
-        self.emit(f"    mov qword [rcx+8], 0")
-        self.emit(f"    mov [rcx+16], rax")
+        self.emit_label(cap_ok)
+        self.emit_stack_store(tmp_cap, "rax")
+        self.emit_stack_load("rcx", tmp_header)
+        self.emit_mov("qword [rcx+8]", "0")
+        self.emit_mov("[rcx+16]", "rax")
         el_size = 1 if elem == "i8" else 8
-        self.emit("    mov r8, rax")
+        self.emit_mov("r8", "rax")
         if el_size != 1:
             self.emit(f"    imul r8, {el_size}")
-        self.emit(f"    mov rcx, [_heap]")
-        self.emit(f"    mov edx, 8")
+        self.emit_mov("rcx", "[_heap]")
+        self.emit_mov("edx", "8")
         self.emit(f"    sub rsp, 40")
-        self.emit(f"    call HeapAlloc")
+        self.emit_call_inst("HeapAlloc")
         self.emit(f"    add rsp, 40")
-        self.emit(f"    mov rcx, [rbp{tmp_header:+d}]")
-        self.emit(f"    mov [rcx], rax")
-        self.emit(f"    mov rax, rcx")
+        self.emit_stack_load("rcx", tmp_header)
+        self.emit_mov("[rcx]", "rax")
+        self.emit_mov("rax", "rcx")
 
     def emit_push(self, args):
         if len(args) != 2:
@@ -944,26 +983,26 @@ class Emitter:
         tmp_val = self._alloc_temp()
         tmp_new_data = self._alloc_temp()
         self.emit_expr(args[0])
-        self.emit(f"    mov [rbp{tmp_arr:+d}], rax")
+        self.emit_stack_store(tmp_arr, "rax")
         self.emit_expr(args[1])
-        self.emit(f"    mov [rbp{tmp_val:+d}], rax")
+        self.emit_stack_store(tmp_val, "rax")
         grow = self.fresh_label()
         store = self.fresh_label()
         done = self.fresh_label()
         copy_loop = self.fresh_label()
         copy_done = self.fresh_label()
         cap_nonzero = self.fresh_label()
-        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit_stack_load("rax", tmp_arr)
         self.emit("    mov rcx, [rax+8]")   # len
         self.emit("    cmp rcx, [rax+16]")  # cap
         self.emit(f"    jge {grow}")
-        self.emit(f"    jmp {store}")
-        self.emit(f"{grow}:")
+        self.emit_jmp(store)
+        self.emit_label(grow)
         self.emit("    mov rdx, [rax+16]")
         self.emit("    test rdx, rdx")
         self.emit(f"    jnz {cap_nonzero}")
         self.emit("    mov rdx, 2")
-        self.emit(f"{cap_nonzero}:")
+        self.emit_label(cap_nonzero)
         self.emit("    add rdx, rdx")
         self.emit("    mov [rax+16], rdx")
         self.emit("    mov r8, rdx")
@@ -972,43 +1011,43 @@ class Emitter:
         self.emit("    mov rcx, [_heap]")
         self.emit("    mov edx, 8")
         self.emit("    sub rsp, 40")
-        self.emit("    call HeapAlloc")
+        self.emit_call_inst("HeapAlloc")
         self.emit("    add rsp, 40")
-        self.emit(f"    mov [rbp{tmp_new_data:+d}], rax")
-        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit_stack_store(tmp_new_data, "rax")
+        self.emit_stack_load("rax", tmp_arr)
         self.emit("    mov r8, [rax]")      # old data
         self.emit("    mov r9, [rax+8]")    # len
         self.emit("    xor r10, r10")
-        self.emit(f"{copy_loop}:")
+        self.emit_label(copy_loop)
         self.emit("    cmp r10, r9")
         self.emit(f"    jge {copy_done}")
         if el_size == 1:
             self.emit("    mov r11b, [r8+r10]")
-            self.emit(f"    mov rax, [rbp{tmp_new_data:+d}]")
+            self.emit_stack_load("rax", tmp_new_data)
             self.emit("    mov [rax+r10], r11b")
         else:
             self.emit("    mov r11, [r8+r10*8]")
-            self.emit(f"    mov rax, [rbp{tmp_new_data:+d}]")
+            self.emit_stack_load("rax", tmp_new_data)
             self.emit("    mov [rax+r10*8], r11")
         self.emit("    inc r10")
-        self.emit(f"    jmp {copy_loop}")
-        self.emit(f"{copy_done}:")
-        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
-        self.emit(f"    mov rcx, [rbp{tmp_new_data:+d}]")
+        self.emit_jmp(copy_loop)
+        self.emit_label(copy_done)
+        self.emit_stack_load("rax", tmp_arr)
+        self.emit_stack_load("rcx", tmp_new_data)
         self.emit("    mov [rax], rcx")
-        self.emit(f"{store}:")
-        self.emit(f"    mov rax, [rbp{tmp_arr:+d}]")
+        self.emit_label(store)
+        self.emit_stack_load("rax", tmp_arr)
         self.emit("    mov rcx, [rax]")     # data
         self.emit("    mov rdx, [rax+8]")   # len
         if el_size == 1:
-            self.emit(f"    mov r8, [rbp{tmp_val:+d}]")
+            self.emit_stack_load("r8", tmp_val)
             self.emit("    mov [rcx+rdx], r8b")
         else:
-            self.emit(f"    mov r8, [rbp{tmp_val:+d}]")
+            self.emit_stack_load("r8", tmp_val)
             self.emit("    mov [rcx+rdx*8], r8")
         self.emit("    inc qword [rax+8]")
         self.emit("    xor eax, eax")
-        self.emit(f"{done}:")
+        self.emit_label(done)
 
     def emit_subscript(self, expr):
         """base[index] → load value from array"""
@@ -1046,7 +1085,7 @@ class Emitter:
                 return "&str"
             if name == "listdir":
                 return "&_arr_str"
-            if name in ("strcmp", "system", "write_file"):
+            if name in ("strcmp", "system", "write_file", "append_file"):
                 return "i64"
             if name in ("exit", "putc", "putstr"):
                 return "void"

@@ -1,0 +1,20 @@
+# EXIT 0
+# STDOUT hello world
+fun main() -> i64 {
+    let path = "test_append_file.txt";
+    let n = write_file(path, "hello");
+    if n != 5 {
+        exit(1);
+    }
+    n = append_file(path, " ");
+    if n != 1 {
+        exit(2);
+    }
+    n = append_file(path, "world");
+    if n != 5 {
+        exit(3);
+    }
+    let s = read_file(path);
+    putstr(s);
+    exit(0);
+}

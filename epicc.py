@@ -14,7 +14,7 @@ import sys
 
 from codegen import Emitter
 from ast_nodes import ProgramNode
-from helpers_asm import STR_ALLOC_HELPER, ITOA_HELPER, ARGV_HELPER, SYSTEM_HELPER, LISTDIR_HELPER, READ_FILE_HELPER, WRITE_FILE_HELPER
+from helpers_asm import STR_ALLOC_HELPER, ITOA_HELPER, ARGV_HELPER, SYSTEM_HELPER, LISTDIR_HELPER, READ_FILE_HELPER, WRITE_FILE_HELPER, APPEND_FILE_HELPER
 from lexer import LexError, lex
 from parser import ParseError, Parser
 
@@ -110,6 +110,7 @@ def compile_files(input_paths, main_path=None, linker="lld-link", out_dir=BUILD_
     emitter.emit(LISTDIR_HELPER)
     emitter.emit(READ_FILE_HELPER)
     emitter.emit(WRITE_FILE_HELPER)
+    emitter.emit(APPEND_FILE_HELPER)
     emitter.close()
 
     print(f"[3/4] Assembling → {obj_path}")

@@ -117,6 +117,7 @@ Primitive arrays store primitive values. Struct and `str` arrays store reference
 | `listdir` | `listdir(pattern: str, max: i64) -> str[]` | lists matching files |
 | `read_file` | `read_file(path: str) -> str` | reads a whole file or returns empty string on failure |
 | `write_file` | `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
+| `append_file` | `append_file(path: str, data: str) -> i64` | appends to a file, creating it if needed, and returns bytes written, or `-1` on failure |
 | `push` | `push(a: T[], x: T) -> void` | appends to dynamic array |
 
 `argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for self-hosting: whitespace separates arguments, and double quotes group an argument.
