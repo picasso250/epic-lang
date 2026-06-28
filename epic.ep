@@ -100,19 +100,21 @@ fun output_base(main_path: str) -> str {
 }
 
 fun write_build_script(cmd_path: str, asm_path: str, obj_path: str, exe_path: str) -> i64 {
-    write_file(cmd_path, bytes("@echo off\n"));
-    append_file(cmd_path, bytes("tools\\nasm.exe -f win64 \""));
-    append_file(cmd_path, bytes(asm_path));
-    append_file(cmd_path, bytes("\" -o \""));
-    append_file(cmd_path, bytes(obj_path));
-    append_file(cmd_path, bytes("\"\n"));
-    append_file(cmd_path, bytes("if errorlevel 1 exit /b 1\n"));
-    append_file(cmd_path, bytes("python link.py \""));
-    append_file(cmd_path, bytes(obj_path));
-    append_file(cmd_path, bytes("\" -o \""));
-    append_file(cmd_path, bytes(exe_path));
-    append_file(cmd_path, bytes("\"\n"));
-    append_file(cmd_path, bytes("if errorlevel 1 exit /b 1\n"));
+    let script = new i8[256];
+    extend(script, bytes("@echo off\n"));
+    extend(script, bytes("tools\\nasm.exe -f win64 \""));
+    extend(script, bytes(asm_path));
+    extend(script, bytes("\" -o \""));
+    extend(script, bytes(obj_path));
+    extend(script, bytes("\"\n"));
+    extend(script, bytes("if errorlevel 1 exit /b 1\n"));
+    extend(script, bytes("python link.py \""));
+    extend(script, bytes(obj_path));
+    extend(script, bytes("\" -o \""));
+    extend(script, bytes(exe_path));
+    extend(script, bytes("\"\n"));
+    extend(script, bytes("if errorlevel 1 exit /b 1\n"));
+    write_file(cmd_path, script);
     return 0;
 }
 

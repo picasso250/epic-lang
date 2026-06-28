@@ -240,7 +240,6 @@ The current minimal byte-buffer surface is:
 ```epic
 read_file(path: str) -> i8[]
 write_file(path: str, data: i8[]) -> i64
-append_file(path: str, data: i8[]) -> i64
 str(bytes: i8[]) -> str
 bytes(s: str) -> i8[]
 u16_le(buf: i8[], off: i64) -> i64

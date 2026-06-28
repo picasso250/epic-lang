@@ -270,7 +270,6 @@ fun emit_runtime_helpers(e: EmitterState) -> i64 {
     emit_runtime(e, "runtime/system.asm");
     emit_runtime(e, "runtime/read_file.asm");
     emit_runtime(e, "runtime/write_file.asm");
-    emit_runtime(e, "runtime/append_file.asm");
     return 0;
 }
 
