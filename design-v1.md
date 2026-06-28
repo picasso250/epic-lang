@@ -106,6 +106,42 @@ The initial semantics are deliberately strict:
 
 `str_sub` is not needed when slice syntax exists.
 
+## Arrays and byte buffers
+
+Epic arrays keep the v0 allocation rule:
+
+```epic
+let xs = new i64[1024]
+```
+
+This creates an empty array with capacity for at least `1024` elements. It does
+not create an array whose length is `1024`. The initial `len(xs)` is `0`.
+
+This is intentionally different from Go-like indexed allocation and should stay
+explicit in documentation because it affects byte-buffer code. To create output,
+append elements:
+
+```epic
+let buf = new i8[4096]
+push(buf, 77)
+push(buf, 90)
+```
+
+Because `new T[n]` already covers initial reservation, v1 does not need a
+separate `reserve` builtin.
+
+v1 should add array extension:
+
+```epic
+extend(dst: T[], src: T[]) -> void
+```
+
+`extend` appends all elements of `src` to `dst` in order. It mutates `dst` and
+does not allocate a separate result array for expression-style concatenation.
+v1 should not add generic `T[] + T[]` list addition.
+
+Like `push`, `extend` is a reserved builtin name.
+
 ## Length and capacity
 
 v1 should add builtin functions for length and capacity:
