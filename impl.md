@@ -63,7 +63,6 @@ runtime/argv.asm
 runtime/system.asm
 runtime/read_file.asm
 runtime/write_file.asm
-runtime/append_file.asm
 ```
 
 ## Type lowering
@@ -154,7 +153,6 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `system` | calls `_system` runtime helper |
 | `read_file` | calls `_read_file` runtime helper |
 | `write_file` | calls `_write_file` runtime helper |
-| `append_file` | calls `_append_file` runtime helper |
 | `str_new` | calls `_str_alloc` runtime helper |
 | `push` | emitted by codegen for dynamic arrays |
 
@@ -168,7 +166,7 @@ codegen <input.ep> <output.asm>
 
 It reads one source file, calls the self-hosted lexer and parser directly, and emits a complete NASM file to `output.asm`.
 
-Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen appends those files to the generated program with `read_file` and `append_file`.
+Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen reads those files into the generated program.
 
 ## Status and acceptance
 

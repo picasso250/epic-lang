@@ -17,7 +17,7 @@ class Emitter:
         self.builtins = {"putc", "putstr",
                          "itoa", "system",
                          "str_new", "bytes", "read_file", "write_file",
-                         "append_file", "str_slice",
+                         "str_slice",
                          "str_replace_char", "push", "extend"}
         self.winapi = {
             "Sleep", "GetTickCount64", "GetLastError", "SetLastError",
@@ -660,16 +660,6 @@ class Emitter:
                 self.emit("    sub rsp, 8")
                 self.emit_call_inst("_write_file")
                 self.emit("    add rsp, 8")
-            elif name == "append_file":
-                slots = self._spill_args(args)
-                self.emit_stack_load("rax", slots[0])
-                self.emit_mov("rcx", "[rax]")      # path.data
-                self.emit_stack_load("rax", slots[1])
-                self.emit_mov("rdx", "[rax]")      # data.data
-                self.emit_mov("r8", "[rax+8]")     # data.len
-                self.emit("    sub rsp, 8")
-                self.emit_call_inst("_append_file")
-                self.emit("    add rsp, 8")
             elif name == "str_new":
                 # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
                 slots = self._spill_args(args)
@@ -1156,7 +1146,7 @@ class Emitter:
                 return "&str"
             if name == "bytes":
                 return "&_arr_i8"
-            if name in ("system", "write_file", "append_file"):
+            if name in ("system", "write_file"):
                 return "i64"
             if name in ("putc", "putstr", "extend"):
                 return "void"

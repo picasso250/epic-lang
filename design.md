@@ -155,7 +155,6 @@ Falling off the end of `main` exits with status `0`. Non-zero process status is 
 | `system(cmd: str) -> i64` | runs a command and returns its process exit code, or `-1` on failure |
 | `read_file(path: str) -> str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
-| `append_file(path: str, data: str) -> i64` | appends to a file, creating it if needed, and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T) -> void` | appends to a dynamic array |
 
 `argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for self-hosting: whitespace separates arguments, and double quotes group an argument.

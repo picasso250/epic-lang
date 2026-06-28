@@ -38,7 +38,6 @@ RUNTIME_ASM_FILES = [
     "system.asm",
     "read_file.asm",
     "write_file.asm",
-    "append_file.asm",
 ]
 
 
