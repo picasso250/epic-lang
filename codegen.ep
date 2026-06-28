@@ -670,6 +670,14 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_call_inst(e, "_itoa");
         return 0;
     }
+    if strcmp(name, "system") == 0 {
+        emit_expr(e, expr.args.data[0]);
+        emit_mov(e, "rcx", "[rax]");
+        emit_inst(e, "sub rsp, 8");
+        emit_call_inst(e, "_system");
+        emit_inst(e, "add rsp, 8");
+        return 0;
+    }
     if strcmp(name, "strcmp") == 0 {
         let slots = spill_args(e, expr.args);
         emit_stack_load(e, "rax", slots.data[1]);

@@ -40,6 +40,17 @@ EXAMPLE_SLICE = [
     "m14_arr.ep",
     "m14_debug.ep",
     "m14_struct_arr.ep",
+    "m15_itoa.ep",
+    "m15_regress1.ep",
+    "m15_regress2.ep",
+    "m15_strlen.ep",
+    "m15_system.ep",
+    "m17_temp_slots.ep",
+    "m18_i8_subscript.ep",
+    "m19_empty_str.ep",
+    "m20_c_comment.ep",
+    "m21_str_data_subscript.ep",
+    "m22_self_ref.ep",
 ]
 
 
