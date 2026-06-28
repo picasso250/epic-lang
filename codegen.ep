@@ -444,7 +444,12 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str) -> Field
         }
         i = i + 1;
     }
-    die("unknown field");
+    putstr("Codegen error: unknown field ");
+    putstr(struct_name);
+    putstr(".");
+    putstr(field_name);
+    putc(10);
+    sys.ExitProcess(1);
     return new FieldInfo;
 }
 
@@ -457,14 +462,7 @@ fun ensure_array_layout(e: EmitterState, elem: str) -> i64 {
 }
 
 fun array_layout_name(elem: str) -> str {
-    # v0 only needs these names in m8-m14.
-    if elem == "i8" { return "_arr_i8"; }
-    if elem == "i64" { return "_arr_i64"; }
-    if elem == "str" { return "_arr_str"; }
-    if elem == "Point" { return "_arr_Point"; }
-    if elem == "Token" { return "_arr_Token"; }
-    if elem == "Data" { return "_arr_Data"; }
-    return "_arr_unknown";
+    return "_arr_" + elem;
 }
 
 fun compute_struct_layouts(e: EmitterState, ast: AstNode) -> i64 {

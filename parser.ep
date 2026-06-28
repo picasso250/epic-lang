@@ -152,20 +152,7 @@ fun parse_type(p: Parser) -> str {
     let typ = t.text;
     while check(p, "LBRACKET") == 1 {
         expect(p, "RBRACKET");
-        if same(typ, "i64") == 1 { typ = "i64[]"; }
-        else {
-            if same(typ, "i8") == 1 { typ = "i8[]"; }
-            else {
-                if same(typ, "str") == 1 { typ = "str[]"; }
-                else {
-                    if same(typ, "Token") == 1 { typ = "Token[]"; }
-                    else {
-                        if same(typ, "AstNode") == 1 { typ = "AstNode[]"; }
-                        else { parse_error(t.line, "Unsupported array type in bootstrap parser"); }
-                    }
-                }
-            }
-        }
+        typ = typ + "[]";
     }
     return typ;
 }
