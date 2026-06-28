@@ -5,7 +5,7 @@ Scans examples/*.ep, reads # EXIT and # STDOUT annotations,
 compiles, runs, and reports pass/fail.
 """
 
-import os, sys, subprocess, re
+import os, sys, subprocess, re, shlex
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
@@ -16,21 +16,24 @@ def parse_annotations(source):
     """Extract test annotations from # comments."""
     exit_code = None
     stdout_lines = []
+    argv = []
     for line in source.split("\n"):
         line = line.strip()
         if m := re.match(r'#\s*EXIT\s+(-?\d+)', line):
             exit_code = int(m.group(1))
         elif m := re.match(r'#\s*STDOUT\s+(.*)', line):
             stdout_lines.append(m.group(1))
+        elif m := re.match(r'#\s*ARGV(?:\s+(.*))?$', line):
+            argv = shlex.split(m.group(1) or "")
     stdout = "\n".join(stdout_lines) if stdout_lines else None
-    return exit_code, stdout
+    return exit_code, stdout, argv
 
 
 def run_test(ep_file):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
-    exit_expected, stdout_expected = parse_annotations(source)
+    exit_expected, stdout_expected, argv = parse_annotations(source)
     
     if exit_expected is None and stdout_expected is None:
         return True, "no annotations — skipped"
@@ -49,7 +52,7 @@ def run_test(ep_file):
         return False, f"no exe produced: {exe_path}"
 
     proc = subprocess.run(
-        [exe_path],
+        [exe_path, *argv],
         capture_output=True, cwd=SCRIPT_DIR,
     )
     # Check exit code

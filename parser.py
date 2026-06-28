@@ -128,27 +128,42 @@ class Parser:
 
     # ── statements ────────────────────────────────────────────────────
 
-    EXPR_FIRST = {"NUMBER", "STRING", "ID", "LPAREN", "MINUS", "BANG"}
+    EXPR_FIRST = {"NUMBER", "STRING", "ID", "LPAREN"}
 
-    def _is_assignment(self):
-        """Look ahead past ID (.ID | [expr])* to see if = follows."""
+    def _skip_balanced_brackets(self, i):
+        depth = 1
+        i += 1
+        while i < len(self.tokens) and depth > 0:
+            kind = self.tokens[i][0]
+            if kind == "LBRACKET":
+                depth += 1
+            elif kind == "RBRACKET":
+                depth -= 1
+            i += 1
+        return i
+
+    def _assignment_operator_pos(self):
+        """Return ASSIGN position for ID (.ID | [expr])* =, or None."""
+        if not self.peek_kind("ID"):
+            return None
+
         i = self.pos + 1
         while i < len(self.tokens):
             kind = self.tokens[i][0]
             if kind == "DOT":
+                if i + 1 >= len(self.tokens) or self.tokens[i + 1][0] != "ID":
+                    return None
                 i += 2
             elif kind == "LBRACKET":
-                depth = 1
-                i += 1
-                while i < len(self.tokens) and depth > 0:
-                    if self.tokens[i][0] == "LBRACKET":
-                        depth += 1
-                    elif self.tokens[i][0] == "RBRACKET":
-                        depth -= 1
-                    i += 1
+                i = self._skip_balanced_brackets(i)
+            elif kind == "ASSIGN":
+                return i
             else:
-                return kind == "ASSIGN"
-        return False
+                return None
+        return None
+
+    def _is_assignment(self):
+        return self._assignment_operator_pos() is not None
 
     def parse_stmt(self):
         t = self.peek()
@@ -277,13 +292,10 @@ class Parser:
         return left
 
     def parse_factor(self):
-        left = self.parse_unary()
+        left = self.parse_primary()
         while op := (self.check("STAR") or self.check("SLASH") or self.check("PERCENT")):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_unary())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_primary())
         return left
-
-    def parse_unary(self):
-        return self.parse_primary()
 
     def parse_primary(self):
         if self.peek_kind("NEW"):

@@ -4,6 +4,7 @@ Epic v0 compiler CLI.
 Usage:
     python epicc.py <file.ep>              # use default lld-link
     python epicc.py <file.ep> --linker py  # use link.py
+    python epicc.py --main main.ep main.ep lib.ep
 """
 
 import argparse
@@ -12,6 +13,7 @@ import subprocess
 import sys
 
 from codegen import Emitter
+from ast_nodes import ProgramNode
 from helpers_asm import STR_ALLOC_HELPER, ITOA_HELPER, ARGV_HELPER, SYSTEM_HELPER, LISTDIR_HELPER, READ_FILE_HELPER, WRITE_FILE_HELPER
 from lexer import LexError, lex
 from parser import ParseError, Parser
@@ -44,18 +46,61 @@ def _output_paths(input_path, out_dir):
     return out_base + ".asm", out_base + ".obj", out_base + ".exe"
 
 
-def compile_file(input_path, linker="lld-link", out_dir=BUILD_DIR):
-    asm_path, obj_path, exe_path = _output_paths(input_path, out_dir)
-
-    print(f"[1/4] Reading {input_path}")
+def _parse_file(input_path):
+    print(f"      Reading {input_path}")
     with open(input_path, "r", encoding="utf-8") as f:
         source = f.read()
-
-    print(f"[2/4] Compiling → {asm_path}")
     tokens = lex(source)
     parser = Parser(tokens)
-    ast = parser.parse_program()
+    return parser.parse_program()
 
+
+def _merge_programs(input_paths, main_path):
+    funcs = []
+    structs = []
+    seen_funcs = {}
+    seen_structs = {}
+    found_main = False
+    main_abs = os.path.abspath(main_path)
+
+    for input_path in input_paths:
+        ast = _parse_file(input_path)
+        is_main_file = os.path.abspath(input_path) == main_abs
+
+        for struct in ast.structs:
+            if struct.name in seen_structs:
+                raise RuntimeError(
+                    f"Duplicate struct {struct.name}: {input_path} and {seen_structs[struct.name]}"
+                )
+            seen_structs[struct.name] = input_path
+            structs.append(struct)
+
+        for func in ast.funcs:
+            if func.name == "main" and not is_main_file:
+                continue
+            if func.name == "main":
+                found_main = True
+            if func.name in seen_funcs:
+                raise RuntimeError(
+                    f"Duplicate function {func.name}: {input_path} and {seen_funcs[func.name]}"
+                )
+            seen_funcs[func.name] = input_path
+            funcs.append(func)
+
+    if not found_main:
+        raise RuntimeError(f"Main file has no main function: {main_path}")
+
+    return ProgramNode(funcs=funcs, structs=structs)
+
+
+def compile_files(input_paths, main_path=None, linker="lld-link", out_dir=BUILD_DIR):
+    main_path = main_path or input_paths[0]
+    asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
+
+    print(f"[1/4] Reading {len(input_paths)} file(s)")
+    ast = _merge_programs(input_paths, main_path)
+
+    print(f"[2/4] Compiling → {asm_path}")
     emitter = Emitter(asm_path)
     emitter.emit_program(ast)
     emitter.emit(STR_ALLOC_HELPER)
@@ -96,6 +141,10 @@ def compile_file(input_path, linker="lld-link", out_dir=BUILD_DIR):
     return exe_path
 
 
+def compile_file(input_path, linker="lld-link", out_dir=BUILD_DIR):
+    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  CLI
 # ═══════════════════════════════════════════════════════════════════════════
@@ -105,7 +154,8 @@ def parse_args(argv):
         prog="epicc.py",
         description="Epic v0 compiler",
     )
-    parser.add_argument("input", help="input .ep source file")
+    parser.add_argument("inputs", nargs="+", help="input .ep source files")
+    parser.add_argument("--main", help="file whose main function is the program entry")
     parser.add_argument("--linker", choices=["lld-link", "py"], default="lld-link",
                         help="linker to use (default: lld-link)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
@@ -116,12 +166,25 @@ def parse_args(argv):
 def main(argv=None):
     args = parse_args(sys.argv[1:] if argv is None else argv)
 
-    if not os.path.exists(args.input):
-        print(f"Error: file not found: {args.input}", file=sys.stderr)
+    for input_path in args.inputs:
+        if not os.path.exists(input_path):
+            print(f"Error: file not found: {input_path}", file=sys.stderr)
+            return 1
+    if args.main:
+        if not os.path.exists(args.main):
+            print(f"Error: file not found: {args.main}", file=sys.stderr)
+            return 1
+    elif len(args.inputs) > 1:
+        print("Error: --main is required when compiling multiple files", file=sys.stderr)
         return 1
 
     try:
-        compile_file(args.input, linker=args.linker, out_dir=args.out_dir)
+        compile_files(
+            args.inputs,
+            main_path=args.main or args.inputs[0],
+            linker=args.linker,
+            out_dir=args.out_dir,
+        )
     except (LexError, ParseError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
