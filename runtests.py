@@ -5,11 +5,12 @@ Scans examples/*.ep, reads # EXIT: and # STDOUT: annotations,
 compiles, runs, and reports pass/fail.
 """
 
-import os, sys, subprocess, re, shlex
+import os, sys, subprocess, re, shlex, argparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
+EXEC_TIMEOUT = 1  # seconds, prevent link.py bugs from hanging
 
 
 def parse_annotations(source):
@@ -47,7 +48,7 @@ def clean_test_paths(paths):
             os.remove(path)
 
 
-def run_test(ep_file):
+def run_test(ep_file, linker="lld-link"):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
@@ -63,8 +64,8 @@ def run_test(ep_file):
     
     # Compile
     result = subprocess.run(
-        [sys.executable, EPICC, ep_file],
-        capture_output=True, text=True, cwd=SCRIPT_DIR,
+        [sys.executable, EPICC, ep_file, "--linker", linker],
+        capture_output=True, text=True, cwd=SCRIPT_DIR, timeout=30,
     )
     if result.returncode != 0:
         return False, f"compile failed:\n{result.stderr[:500]}"
@@ -76,7 +77,7 @@ def run_test(ep_file):
 
     proc = subprocess.run(
         [exe_path, *argv],
-        capture_output=True, cwd=SCRIPT_DIR,
+        capture_output=True, cwd=SCRIPT_DIR, timeout=EXEC_TIMEOUT,
     )
     # Check exit code
     failures = []
@@ -105,22 +106,29 @@ def run_test(ep_file):
     return True, "OK"
 
 
-def main():
+def run_all(linker, label):
     examples = sorted(
         f for f in os.listdir(EXAMPLES_DIR) if f.endswith(".ep")
     )
     if not examples:
         print("No .ep files found in examples/")
-        sys.exit(1)
-    
+        return 0, 0, 0
+
     passed = 0
     failed = 0
     skipped = 0
-    
-    print(f"Running {len(examples)} tests...\n")
+
+    print(f"\n{'='*60}")
+    print(f"  Linker: {label}")
+    print(f"{'='*60}")
     for ep_name in examples:
         ep_path = os.path.join(EXAMPLES_DIR, ep_name)
-        ok, detail = run_test(ep_path)
+        try:
+            ok, detail = run_test(ep_path, linker=linker)
+        except subprocess.TimeoutExpired:
+            ok, detail = False, "TIMEOUT (compile >30s)"
+        except Exception as e:
+            ok, detail = False, f"exception: {e}"
         status = "PASS" if ok else "FAIL"
         if "skipped" in detail:
             status = "SKIP"
@@ -130,9 +138,31 @@ def main():
         else:
             failed += 1
         print(f"  {status:5}  {ep_name:20s}  {detail}")
-    
-    print(f"\n{passed} passed, {failed} failed, {skipped} skipped")
-    sys.exit(0 if failed == 0 else 1)
+
+    print(f"\n  {label}: {passed} passed, {failed} failed, {skipped} skipped")
+    return passed, failed, skipped
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Epic test runner")
+    parser.add_argument("--linker", choices=["lld", "py", "both"], default="both",
+                        help="Which linker to use (default: both)")
+    args = parser.parse_args()
+
+    total_failed = 0
+
+    if args.linker in ("lld", "both"):
+        _, failed, _ = run_all("lld-link", "lld-link")
+        total_failed += failed
+
+    if args.linker in ("py", "both"):
+        _, failed, _ = run_all("py", "link.py")
+        total_failed += failed
+
+    print(f"\n{'='*60}")
+    print(f"  Total failed: {total_failed}")
+    print(f"{'='*60}")
+    sys.exit(0 if total_failed == 0 else 1)
 
 
 if __name__ == "__main__":
