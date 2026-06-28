@@ -1,12 +1,15 @@
 # EXIT: 0
 # STDOUT: 1
+# CLEAN: test_sys_create.tmp
 
 fun main() -> i64 {
     sys.Sleep(1);
     let t = sys.GetTickCount64();
     let n = sys.lstrlenA("abc");
     let c = sys.lstrcmpA("same", "same");
-    if t >= 0 && n == 3 && c == 0 {
+    let h = sys.CreateFileA("test_sys_create.tmp", 1073741824, 0, 0, 2, 128, 0);
+    if t >= 0 && n == 3 && c == 0 && h + 1 != 0 {
+        sys.CloseHandle(h);
         putc(49);
         return 0;
     }

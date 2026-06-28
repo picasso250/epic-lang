@@ -23,7 +23,7 @@ class Emitter:
             "GetStdHandle", "CloseHandle", "lstrlenA", "lstrcmpA",
             "MessageBoxA", "Beep", "GetCurrentProcess",
             "GetCurrentProcessId", "GetCurrentThreadId", "ExitProcess",
-            "GetFileAttributesA",
+            "GetFileAttributesA", "CreateFileA", "ReadFile", "WriteFile",
         }
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
@@ -99,7 +99,8 @@ class Emitter:
         for name in sorted(self.winapi):
             if name not in {
                 "ExitProcess", "GetStdHandle", "CloseHandle",
-                "lstrcmpA", "lstrlenA",
+                "lstrcmpA", "lstrlenA", "CreateFileA", "ReadFile",
+                "WriteFile",
             }:
                 self.emit(f"extern {name}")
         self.emit("default rel")
@@ -291,8 +292,6 @@ class Emitter:
         return symbol
 
     def _emit_syscall(self, symbol, args):
-        if len(args) > 4:
-            raise RuntimeError(f"sys.{symbol} has >4 arguments (not supported)")
         param_regs = ["rcx", "rdx", "r8", "r9"]
         slots = []
         for arg in args:
@@ -303,9 +302,18 @@ class Emitter:
             slot = self._alloc_temp()
             self.emit_stack_store(slot, "rax")
             slots.append(slot)
-        for i, slot in enumerate(slots):
+        stack_args = max(0, len(slots) - 4)
+        extra_bytes = stack_args * 8
+        extra_frame = ((extra_bytes + 15) // 16) * 16
+        frame = 32 + extra_frame
+        for i, slot in enumerate(slots[:4]):
             self.emit_stack_load(param_regs[i], slot)
-        self._call_with_shadow(symbol)
+        self.emit(f"    sub rsp, {frame}")
+        for i, slot in enumerate(slots[4:]):
+            self.emit_stack_load("rax", slot)
+            self.emit_mov(f"[rsp+{32 + i * 8}]", "rax")
+        self.emit_call_inst(symbol)
+        self.emit(f"    add rsp, {frame}")
 
     def get_var_slot(self, name, typ=None):
         if name not in self.local_offset:

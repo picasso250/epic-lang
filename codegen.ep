@@ -156,6 +156,9 @@ fun sys_call_symbol(name: str) -> str {
     if strcmp(name, "sys.GetCurrentThreadId") == 0 { return "GetCurrentThreadId"; }
     if strcmp(name, "sys.ExitProcess") == 0 { return "ExitProcess"; }
     if strcmp(name, "sys.GetFileAttributesA") == 0 { return "GetFileAttributesA"; }
+    if strcmp(name, "sys.CreateFileA") == 0 { return "CreateFileA"; }
+    if strcmp(name, "sys.ReadFile") == 0 { return "ReadFile"; }
+    if strcmp(name, "sys.WriteFile") == 0 { return "WriteFile"; }
     return "";
 }
 
@@ -176,6 +179,9 @@ fun sys_member_symbol(ns: str, name: str) -> str {
     if strcmp(name, "GetCurrentThreadId") == 0 { return "GetCurrentThreadId"; }
     if strcmp(name, "ExitProcess") == 0 { return "ExitProcess"; }
     if strcmp(name, "GetFileAttributesA") == 0 { return "GetFileAttributesA"; }
+    if strcmp(name, "CreateFileA") == 0 { return "CreateFileA"; }
+    if strcmp(name, "ReadFile") == 0 { return "ReadFile"; }
+    if strcmp(name, "WriteFile") == 0 { return "WriteFile"; }
     return "";
 }
 
@@ -692,9 +698,25 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
             i = i + 1;
         }
         load_spilled_args(e, slots);
-        emit_inst(e, "sub rsp, 32");
+        let stack_args = slots.len - 4;
+        if stack_args < 0 { stack_args = 0; }
+        let extra_frame = align16(stack_args * 8);
+        let frame = 32 + extra_frame;
+        out_s(e.out_path, "    sub rsp, ");
+        out_i(e.out_path, frame);
+        out_nl(e.out_path);
+        i = 4;
+        while i < slots.len {
+            emit_stack_load(e, "rax", slots.data[i]);
+            out_s(e.out_path, "    mov [rsp+");
+            out_i(e.out_path, 32 + (i - 4) * 8);
+            out_line(e.out_path, "], rax");
+            i = i + 1;
+        }
         emit_call_inst(e, sys_symbol);
-        emit_inst(e, "add rsp, 32");
+        out_s(e.out_path, "    add rsp, ");
+        out_i(e.out_path, frame);
+        out_nl(e.out_path);
         return 0;
     }
     if strcmp(name, "exit") == 0 {

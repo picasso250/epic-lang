@@ -478,9 +478,6 @@ fun parse_postfix(p: Parser, node: AstNode) -> AstNode {
                 }
                 n.args = parse_args(p);
                 expect(p, "RPAREN");
-                if n.args.len > 4 {
-                    parse_error(field.line, "function calls may have at most 4 arguments in v0");
-                }
                 current = n;
             } else {
                 let n = ast_node("FieldAccess");
