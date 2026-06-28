@@ -20,38 +20,8 @@ BOOT_DIR = os.path.join(SCRIPT_DIR, "build", "bootstrap-codegen")
 CODEGEN_EXE = os.path.join(BOOT_DIR, "codegen.exe")
 
 EXAMPLE_SLICE = [
-    "m1_exit.ep",
-    "m2_expr.ep",
-    "m2_expr2.ep",
-    "m3_var.ep",
-    "m4_fn.ep",
-    "m5_if.ep",
-    "m6_while.ep",
-    "m7_str.ep",
-    "m8_i8.ep",
-    "m8_i8_fn.ep",
-    "m9_array.ep",
-    "m10_str.ep",
-    "m11_file.ep",
-    "m12_struct.ep",
-    "m12_struct_i8.ep",
-    "m13_ptr.ep",
-    "m13_ptr2.ep",
-    "m14_arr.ep",
-    "m14_debug.ep",
-    "m14_struct_arr.ep",
-    "m15_itoa.ep",
-    "m15_regress1.ep",
-    "m15_regress2.ep",
-    "m15_strlen.ep",
-    "m15_system.ep",
-    "m17_temp_slots.ep",
-    "m18_i8_subscript.ep",
-    "m19_empty_str.ep",
-    "m20_c_comment.ep",
-    "m21_str_data_subscript.ep",
-    "m22_self_ref.ep",
-    "m28_sys_winapi.ep",
+    name for name in sorted(os.listdir(os.path.join(SCRIPT_DIR, "examples")))
+    if name.endswith(".ep")
 ]
 
 

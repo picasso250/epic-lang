@@ -91,13 +91,13 @@ fun lex(src: str) -> Token[] {
                     let c = p[pos];
                     if c == 10 || c == 13 {
                         putstr("unterminated string\n");
-                        exit(1);
+                        sys.ExitProcess(1);
                     }
                     if c == 92 {
                         pos = pos + 1;
                         if pos >= n {
                             putstr("bad escape\n");
-                            exit(1);
+                            sys.ExitProcess(1);
                         }
                         let e = p[pos];
                         if e == 110 { c = 10; }
@@ -115,7 +115,7 @@ fun lex(src: str) -> Token[] {
                                                 if e == 48 { c = 0; }
                                                 else {
                                                     putstr("bad escape\n");
-                                                    exit(1);
+                                                    sys.ExitProcess(1);
                                                 }
                                             }
                                         }
@@ -131,7 +131,7 @@ fun lex(src: str) -> Token[] {
             }
             if scanning == 1 {
                 putstr("unterminated string\n");
-                exit(1);
+                sys.ExitProcess(1);
             }
             let text = str_new(buf.data, out_len);
             pos = pos + 1;
@@ -162,7 +162,7 @@ fun lex(src: str) -> Token[] {
                                         if e == 48 { ch_val = 0; }
                                         else {
                                             putstr("bad escape\n");
-                                            exit(1);
+                                            sys.ExitProcess(1);
                                         }
                                     }
                                 }
@@ -174,7 +174,7 @@ fun lex(src: str) -> Token[] {
             pos = pos + 1;
             if pos >= n || p[pos] != 39 {
                 putstr("bad char\n");
-                exit(1);
+                sys.ExitProcess(1);
             }
             pos = pos + 1;
             push_token(tokens, "CHAR", itoa(ch_val), start_line);
@@ -202,14 +202,14 @@ fun lex(src: str) -> Token[] {
             }
             let text = str_new(p + start, pos - start);
             let kind = "ID";
-            if strcmp(text, "fun") == 0    { kind = "FUN"; }
-            if strcmp(text, "return") == 0 { kind = "RETURN"; }
-            if strcmp(text, "if") == 0     { kind = "IF"; }
-            if strcmp(text, "else") == 0   { kind = "ELSE"; }
-            if strcmp(text, "while") == 0  { kind = "WHILE"; }
-            if strcmp(text, "struct") == 0 { kind = "STRUCT"; }
-            if strcmp(text, "new") == 0    { kind = "NEW"; }
-            if strcmp(text, "let") == 0    { kind = "LET"; }
+            if text == "fun"    { kind = "FUN"; }
+            if text == "return" { kind = "RETURN"; }
+            if text == "if"     { kind = "IF"; }
+            if text == "else"   { kind = "ELSE"; }
+            if text == "while"  { kind = "WHILE"; }
+            if text == "struct" { kind = "STRUCT"; }
+            if text == "new"    { kind = "NEW"; }
+            if text == "let"    { kind = "LET"; }
             push_token(tokens, kind, text, start_line);
             consumed = 1;
         }
@@ -332,7 +332,7 @@ fun dump_tokens(tokens: Token[]) -> i64 {
 fun main() -> i64 {
     if argv.len < 2 {
         putstr("usage: lexer <file>\n");
-        exit(1);
+        sys.ExitProcess(1);
     }
     let src = read_file(argv.data[1]);
     let tokens = lex(src);

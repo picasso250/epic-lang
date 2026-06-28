@@ -82,7 +82,7 @@ fun make_parser(tokens: Token[]) -> Parser {
 }
 
 fun same(a: str, b: str) -> i64 {
-    if strcmp(a, b) == 0 {
+    if a == b {
         return 1;
     }
     return 0;
@@ -115,7 +115,7 @@ fun parse_error(line: i64, msg: str) -> i64 {
     putstr(": ");
     putstr(msg);
     putc(10);
-    exit(1);
+    sys.ExitProcess(1);
     return 1;
 }
 
@@ -131,7 +131,7 @@ fun expect(p: Parser, kind: str) -> Token {
         putstr("('");
         putstr(t.text);
         putstr("')\n");
-        exit(1);
+        sys.ExitProcess(1);
     }
     return t;
 }
@@ -307,7 +307,9 @@ fun parse_return_stmt(p: Parser) -> AstNode {
     let line = ret.line;
     expect(p, "RETURN");
     let node = ast_node("Return");
-    node.expr = parse_expr(p);
+    if peek_kind(p, "SEMICOLON") == 0 {
+        node.expr = parse_expr(p);
+    }
     node.line = line;
     expect(p, "SEMICOLON");
     return node;
@@ -470,7 +472,7 @@ fun parse_postfix(p: Parser, node: AstNode) -> AstNode {
             let field = expect(p, "ID");
             if check(p, "LPAREN") == 1 {
                 let n = ast_node("Call");
-                if strcmp(current.kind, "Var") == 0 && strcmp(current.name, "sys") == 0 {
+                if current.kind == "Var" && current.name == "sys" {
                     n.name = field.text;
                     n.type_name = "sys";
                 } else {
@@ -691,7 +693,7 @@ fun dump_node(node: AstNode, depth: i64) -> i64 {
 fun main() -> i64 {
     if argv.len < 2 {
         putstr("usage: parser <file>\n");
-        exit(1);
+        sys.ExitProcess(1);
     }
     let src = read_file(argv.data[1]);
     let tokens = lex(src);

@@ -56,7 +56,8 @@ def py_dump(node, depth=0):
             out.extend(py_dump(stmt, depth + 1))
     elif isinstance(node, ReturnNode):
         emit("Return")
-        out.extend(py_dump(node.expr, depth + 1))
+        if node.expr is not None:
+            out.extend(py_dump(node.expr, depth + 1))
     elif isinstance(node, LetNode):
         emit(f"Let {node.name}")
         if node.value is not None:

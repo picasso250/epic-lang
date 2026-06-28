@@ -56,7 +56,7 @@ fun die(msg: str) -> i64 {
     putstr("Codegen error: ");
     putstr(msg);
     putc(10);
-    exit(1);
+    sys.ExitProcess(1);
     return 0;
 }
 
@@ -141,52 +141,52 @@ fun emit_call_inst(e: EmitterState, target: str) -> i64 {
 }
 
 fun sys_call_symbol(name: str) -> str {
-    if strcmp(name, "sys.Sleep") == 0 { return "Sleep"; }
-    if strcmp(name, "sys.GetTickCount64") == 0 { return "GetTickCount64"; }
-    if strcmp(name, "sys.GetLastError") == 0 { return "GetLastError"; }
-    if strcmp(name, "sys.SetLastError") == 0 { return "SetLastError"; }
-    if strcmp(name, "sys.GetStdHandle") == 0 { return "GetStdHandle"; }
-    if strcmp(name, "sys.CloseHandle") == 0 { return "CloseHandle"; }
-    if strcmp(name, "sys.lstrlenA") == 0 { return "lstrlenA"; }
-    if strcmp(name, "sys.lstrcmpA") == 0 { return "lstrcmpA"; }
-    if strcmp(name, "sys.MessageBoxA") == 0 { return "MessageBoxA"; }
-    if strcmp(name, "sys.Beep") == 0 { return "Beep"; }
-    if strcmp(name, "sys.GetCurrentProcess") == 0 { return "GetCurrentProcess"; }
-    if strcmp(name, "sys.GetCurrentProcessId") == 0 { return "GetCurrentProcessId"; }
-    if strcmp(name, "sys.GetCurrentThreadId") == 0 { return "GetCurrentThreadId"; }
-    if strcmp(name, "sys.ExitProcess") == 0 { return "ExitProcess"; }
-    if strcmp(name, "sys.GetFileAttributesA") == 0 { return "GetFileAttributesA"; }
-    if strcmp(name, "sys.CreateFileA") == 0 { return "CreateFileA"; }
-    if strcmp(name, "sys.ReadFile") == 0 { return "ReadFile"; }
-    if strcmp(name, "sys.WriteFile") == 0 { return "WriteFile"; }
+    if name == "sys.Sleep" { return "Sleep"; }
+    if name == "sys.GetTickCount64" { return "GetTickCount64"; }
+    if name == "sys.GetLastError" { return "GetLastError"; }
+    if name == "sys.SetLastError" { return "SetLastError"; }
+    if name == "sys.GetStdHandle" { return "GetStdHandle"; }
+    if name == "sys.CloseHandle" { return "CloseHandle"; }
+    if name == "sys.lstrlenA" { return "lstrlenA"; }
+    if name == "sys.lstrcmpA" { return "lstrcmpA"; }
+    if name == "sys.MessageBoxA" { return "MessageBoxA"; }
+    if name == "sys.Beep" { return "Beep"; }
+    if name == "sys.GetCurrentProcess" { return "GetCurrentProcess"; }
+    if name == "sys.GetCurrentProcessId" { return "GetCurrentProcessId"; }
+    if name == "sys.GetCurrentThreadId" { return "GetCurrentThreadId"; }
+    if name == "sys.ExitProcess" { return "ExitProcess"; }
+    if name == "sys.GetFileAttributesA" { return "GetFileAttributesA"; }
+    if name == "sys.CreateFileA" { return "CreateFileA"; }
+    if name == "sys.ReadFile" { return "ReadFile"; }
+    if name == "sys.WriteFile" { return "WriteFile"; }
     return "";
 }
 
 fun sys_member_symbol(ns: str, name: str) -> str {
-    if strcmp(ns, "sys") != 0 { return ""; }
-    if strcmp(name, "Sleep") == 0 { return "Sleep"; }
-    if strcmp(name, "GetTickCount64") == 0 { return "GetTickCount64"; }
-    if strcmp(name, "GetLastError") == 0 { return "GetLastError"; }
-    if strcmp(name, "SetLastError") == 0 { return "SetLastError"; }
-    if strcmp(name, "GetStdHandle") == 0 { return "GetStdHandle"; }
-    if strcmp(name, "CloseHandle") == 0 { return "CloseHandle"; }
-    if strcmp(name, "lstrlenA") == 0 { return "lstrlenA"; }
-    if strcmp(name, "lstrcmpA") == 0 { return "lstrcmpA"; }
-    if strcmp(name, "MessageBoxA") == 0 { return "MessageBoxA"; }
-    if strcmp(name, "Beep") == 0 { return "Beep"; }
-    if strcmp(name, "GetCurrentProcess") == 0 { return "GetCurrentProcess"; }
-    if strcmp(name, "GetCurrentProcessId") == 0 { return "GetCurrentProcessId"; }
-    if strcmp(name, "GetCurrentThreadId") == 0 { return "GetCurrentThreadId"; }
-    if strcmp(name, "ExitProcess") == 0 { return "ExitProcess"; }
-    if strcmp(name, "GetFileAttributesA") == 0 { return "GetFileAttributesA"; }
-    if strcmp(name, "CreateFileA") == 0 { return "CreateFileA"; }
-    if strcmp(name, "ReadFile") == 0 { return "ReadFile"; }
-    if strcmp(name, "WriteFile") == 0 { return "WriteFile"; }
+    if ns != "sys" { return ""; }
+    if name == "Sleep" { return "Sleep"; }
+    if name == "GetTickCount64" { return "GetTickCount64"; }
+    if name == "GetLastError" { return "GetLastError"; }
+    if name == "SetLastError" { return "SetLastError"; }
+    if name == "GetStdHandle" { return "GetStdHandle"; }
+    if name == "CloseHandle" { return "CloseHandle"; }
+    if name == "lstrlenA" { return "lstrlenA"; }
+    if name == "lstrcmpA" { return "lstrcmpA"; }
+    if name == "MessageBoxA" { return "MessageBoxA"; }
+    if name == "Beep" { return "Beep"; }
+    if name == "GetCurrentProcess" { return "GetCurrentProcess"; }
+    if name == "GetCurrentProcessId" { return "GetCurrentProcessId"; }
+    if name == "GetCurrentThreadId" { return "GetCurrentThreadId"; }
+    if name == "ExitProcess" { return "ExitProcess"; }
+    if name == "GetFileAttributesA" { return "GetFileAttributesA"; }
+    if name == "CreateFileA" { return "CreateFileA"; }
+    if name == "ReadFile" { return "ReadFile"; }
+    if name == "WriteFile" { return "WriteFile"; }
     return "";
 }
 
 fun is_sys_call(name: str) -> i64 {
-    if strcmp(sys_call_symbol(name), "") == 0 { return 0; }
+    if sys_call_symbol(name) == "" { return 0; }
     return 1;
 }
 
@@ -293,7 +293,7 @@ fun type_struct(name: str) -> TypeInfo { return type_info("struct", name); }
 fun type_array(elem: str) -> TypeInfo { return type_info("array", elem); }
 
 fun type_is_i8(t: TypeInfo) -> i64 {
-    if strcmp(t.kind, "i8") == 0 { return 1; }
+    if t.kind == "i8" { return 1; }
     return 0;
 }
 
@@ -302,9 +302,9 @@ fun type_is_value_i8(t: TypeInfo) -> i64 {
 }
 
 fun type_is_complex(t: TypeInfo) -> i64 {
-    if strcmp(t.kind, "str") == 0 { return 1; }
-    if strcmp(t.kind, "struct") == 0 { return 1; }
-    if strcmp(t.kind, "array") == 0 { return 1; }
+    if t.kind == "str" { return 1; }
+    if t.kind == "struct" { return 1; }
+    if t.kind == "array" { return 1; }
     return 0;
 }
 
@@ -325,10 +325,10 @@ fun array_elem_name(name: str) -> str {
 }
 
 fun user_type(name: str) -> TypeInfo {
-    if strcmp(name, "i64") == 0 { return type_i64(); }
-    if strcmp(name, "i8") == 0 { return type_i8(); }
-    if strcmp(name, "void") == 0 { return type_void(); }
-    if strcmp(name, "str") == 0 { return type_str(); }
+    if name == "i64" { return type_i64(); }
+    if name == "i8" { return type_i8(); }
+    if name == "void" { return type_void(); }
+    if name == "str" { return type_str(); }
     if is_array_type_name(name) == 1 { return type_array(array_elem_name(name)); }
     return type_struct(name);
 }
@@ -336,7 +336,7 @@ fun user_type(name: str) -> TypeInfo {
 fun get_string_id(e: EmitterState, text: str) -> i64 {
     let i = 0;
     while i < e.strings.len {
-        if strcmp(e.strings.data[i].text, text) == 0 {
+        if e.strings.data[i].text == text {
             return e.strings.data[i].id;
         }
         i = i + 1;
@@ -350,10 +350,10 @@ fun get_string_id(e: EmitterState, text: str) -> i64 {
 }
 
 fun collect_strings(e: EmitterState, node: AstNode) -> i64 {
-    if strcmp(node.kind, "") == 0 {
+    if node.kind == "" {
         return 0;
     }
-    if strcmp(node.kind, "String") == 0 {
+    if node.kind == "String" {
         get_string_id(e, node.value);
     }
     let i = 0;
@@ -423,7 +423,7 @@ fun add_struct_info(e: EmitterState, name: str, size: i64) -> StructInfo {
 fun find_struct_info(e: EmitterState, name: str) -> StructInfo {
     let i = 0;
     while i < e.structs.len {
-        if strcmp(e.structs.data[i].name, name) == 0 {
+        if e.structs.data[i].name == name {
             return e.structs.data[i];
         }
         i = i + 1;
@@ -436,7 +436,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str) -> Field
     let s = find_struct_info(e, struct_name);
     let i = 0;
     while i < s.fields.len {
-        if strcmp(s.fields.data[i].name, field_name) == 0 {
+        if s.fields.data[i].name == field_name {
             return s.fields.data[i];
         }
         i = i + 1;
@@ -455,12 +455,12 @@ fun ensure_array_layout(e: EmitterState, elem: str) -> i64 {
 
 fun array_layout_name(elem: str) -> str {
     # v0 only needs these names in m8-m14.
-    if strcmp(elem, "i8") == 0 { return "_arr_i8"; }
-    if strcmp(elem, "i64") == 0 { return "_arr_i64"; }
-    if strcmp(elem, "str") == 0 { return "_arr_str"; }
-    if strcmp(elem, "Point") == 0 { return "_arr_Point"; }
-    if strcmp(elem, "Token") == 0 { return "_arr_Token"; }
-    if strcmp(elem, "Data") == 0 { return "_arr_Data"; }
+    if elem == "i8" { return "_arr_i8"; }
+    if elem == "i64" { return "_arr_i64"; }
+    if elem == "str" { return "_arr_str"; }
+    if elem == "Point" { return "_arr_Point"; }
+    if elem == "Token" { return "_arr_Token"; }
+    if elem == "Data" { return "_arr_Data"; }
     return "_arr_unknown";
 }
 
@@ -502,7 +502,7 @@ fun compute_struct_layouts(e: EmitterState, ast: AstNode) -> i64 {
 fun find_func_ret(e: EmitterState, name: str) -> TypeInfo {
     let i = 0;
     while i < e.funcs.len {
-        if strcmp(e.funcs.data[i].name, name) == 0 {
+        if e.funcs.data[i].name == name {
             return e.funcs.data[i].ret_type;
         }
         i = i + 1;
@@ -520,7 +520,7 @@ fun reset_locals(e: EmitterState) -> i64 {
 fun add_local(e: EmitterState, name: str, typ: TypeInfo) -> i64 {
     let i = 0;
     while i < e.locals.len {
-        if strcmp(e.locals.data[i].name, name) == 0 {
+        if e.locals.data[i].name == name {
             return e.locals.data[i].slot;
         }
         i = i + 1;
@@ -535,9 +535,12 @@ fun add_local(e: EmitterState, name: str, typ: TypeInfo) -> i64 {
 }
 
 fun find_local_slot(e: EmitterState, name: str) -> i64 {
+    if name == "argv" {
+        return 0;
+    }
     let i = 0;
     while i < e.locals.len {
-        if strcmp(e.locals.data[i].name, name) == 0 {
+        if e.locals.data[i].name == name {
             return e.locals.data[i].slot;
         }
         i = i + 1;
@@ -547,9 +550,12 @@ fun find_local_slot(e: EmitterState, name: str) -> i64 {
 }
 
 fun find_local_type(e: EmitterState, name: str) -> TypeInfo {
+    if name == "argv" {
+        return type_array("str");
+    }
     let i = 0;
     while i < e.locals.len {
-        if strcmp(e.locals.data[i].name, name) == 0 {
+        if e.locals.data[i].name == name {
             return e.locals.data[i].typ;
         }
         i = i + 1;
@@ -558,39 +564,39 @@ fun find_local_type(e: EmitterState, name: str) -> TypeInfo {
 }
 
 fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
-    if strcmp(expr.kind, "String") == 0 { return type_str(); }
-    if strcmp(expr.kind, "Literal") == 0 { return type_i64(); }
-    if strcmp(expr.kind, "Binary") == 0 { return type_i64(); }
-    if strcmp(expr.kind, "Var") == 0 { return find_local_type(e, expr.name); }
-    if strcmp(expr.kind, "Call") == 0 {
+    if expr.kind == "String" { return type_str(); }
+    if expr.kind == "Literal" { return type_i64(); }
+    if expr.kind == "Binary" { return type_i64(); }
+    if expr.kind == "Var" { return find_local_type(e, expr.name); }
+    if expr.kind == "Call" {
         if is_sys_call(expr.name) == 1 { return type_i64(); }
-        if strcmp(sys_member_symbol(expr.type_name, expr.name), "") != 0 { return type_i64(); }
-        if strcmp(expr.name, "itoa") == 0 { return type_str(); }
-        if strcmp(expr.name, "str_new") == 0 { return type_str(); }
-        if strcmp(expr.name, "read_file") == 0 { return type_str(); }
-        if strcmp(expr.name, "strcmp") == 0 { return type_i64(); }
-        if strcmp(expr.name, "write_file") == 0 { return type_i64(); }
+        if sys_member_symbol(expr.type_name, expr.name) != "" { return type_i64(); }
+        if expr.name == "itoa" { return type_str(); }
+        if expr.name == "str_new" { return type_str(); }
+        if expr.name == "read_file" { return type_str(); }
+        if expr.name == "write_file" { return type_i64(); }
+        if expr.name == "append_file" { return type_i64(); }
         return find_func_ret(e, expr.name);
     }
-    if strcmp(expr.kind, "New") == 0 { return type_struct(expr.name); }
-    if strcmp(expr.kind, "NewArray") == 0 { return type_array(expr.type_name); }
-    if strcmp(expr.kind, "FieldAccess") == 0 {
+    if expr.kind == "New" { return type_struct(expr.name); }
+    if expr.kind == "NewArray" { return type_array(expr.type_name); }
+    if expr.kind == "FieldAccess" {
         let base_type = expr_type(e, expr.object);
         let layout = "";
-        if strcmp(base_type.kind, "str") == 0 { layout = "str"; }
+        if base_type.kind == "str" { layout = "str"; }
         else {
-            if strcmp(base_type.kind, "array") == 0 { layout = array_layout_name(base_type.name); }
+            if base_type.kind == "array" { layout = array_layout_name(base_type.name); }
             else { layout = base_type.name; }
         }
         let f = find_field_info(e, layout, expr.name);
         return f.typ;
     }
-    if strcmp(expr.kind, "Subscript") == 0 {
+    if expr.kind == "Subscript" {
         let bt = expr_type(e, expr.base);
-        if strcmp(bt.kind, "array") == 0 {
+        if bt.kind == "array" {
             return user_type(bt.name);
         }
-        if strcmp(bt.kind, "ptr") == 0 {
+        if bt.kind == "ptr" {
             return user_type(bt.name);
         }
     }
@@ -598,25 +604,25 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
 }
 
 fun infer_let_type(e: EmitterState, value: AstNode) -> TypeInfo {
-    if strcmp(value.kind, "") == 0 { return type_i64(); }
+    if value.kind == "" { return type_i64(); }
     return expr_type(e, value);
 }
 
 fun pre_scan_block(e: EmitterState, block: AstNode) -> i64 {
-    if strcmp(block.kind, "") == 0 {
+    if block.kind == "" {
         return 0;
     }
     let i = 0;
     while i < block.stmts.len {
         let stmt = block.stmts.data[i];
-        if strcmp(stmt.kind, "Let") == 0 {
+        if stmt.kind == "Let" {
             add_local(e, stmt.name, infer_let_type(e, stmt.value_expr));
         } else {
-            if strcmp(stmt.kind, "If") == 0 {
+            if stmt.kind == "If" {
                 pre_scan_block(e, stmt.then_block);
                 pre_scan_block(e, stmt.else_block);
             } else {
-                if strcmp(stmt.kind, "While") == 0 {
+                if stmt.kind == "While" {
                     pre_scan_block(e, stmt.body);
                 }
             }
@@ -680,17 +686,17 @@ fun load_spilled_args(e: EmitterState, slots: i64[]) -> i64 {
 fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
     let name = expr.name;
     let sys_symbol = sys_call_symbol(name);
-    if strcmp(sys_symbol, "") == 0 {
+    if sys_symbol == "" {
         sys_symbol = sys_member_symbol(expr.type_name, expr.name);
     }
-    if strcmp(sys_symbol, "") != 0 {
+    if sys_symbol != "" {
         let slots = new i64[4];
         let i = 0;
         while i < expr.args.len {
             let arg = expr.args.data[i];
             let arg_type = expr_type(e, arg);
             emit_expr(e, arg);
-            if strcmp(arg_type.kind, "str") == 0 {
+            if arg_type.kind == "str" {
                 emit_mov(e, "rax", "[rax]");
             }
             let slot = temp_save_rax(e);
@@ -719,13 +725,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         out_nl(e.out_path);
         return 0;
     }
-    if strcmp(name, "exit") == 0 {
-        emit_expr(e, expr.args.data[0]);
-        emit_mov(e, "ecx", "eax");
-        emit_call_inst(e, "ExitProcess");
-        return 0;
-    }
-    if strcmp(name, "putc") == 0 {
+    if name == "putc" {
         emit_expr(e, expr.args.data[0]);
         emit_mov(e, "[_buf]", "al");
         emit_mov(e, "ecx", "-11");
@@ -740,7 +740,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 16");
         return 0;
     }
-    if strcmp(name, "putstr") == 0 {
+    if name == "putstr" {
         emit_expr(e, expr.args.data[0]);
         let tmp = temp_save_rax(e);
         emit_mov(e, "ecx", "-11");
@@ -756,13 +756,13 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 16");
         return 0;
     }
-    if strcmp(name, "itoa") == 0 {
+    if name == "itoa" {
         emit_expr(e, expr.args.data[0]);
         emit_mov(e, "rcx", "rax");
         emit_call_inst(e, "_itoa");
         return 0;
     }
-    if strcmp(name, "system") == 0 {
+    if name == "system" {
         emit_expr(e, expr.args.data[0]);
         emit_mov(e, "rcx", "[rax]");
         emit_inst(e, "sub rsp, 8");
@@ -770,23 +770,14 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 8");
         return 0;
     }
-    if strcmp(name, "strcmp") == 0 {
-        let slots = spill_args(e, expr.args);
-        emit_stack_load(e, "rax", slots.data[1]);
-        emit_mov(e, "rdx", "[rax]");
-        emit_stack_load(e, "rax", slots.data[0]);
-        emit_mov(e, "rcx", "[rax]");
-        emit_call_inst(e, "lstrcmpA");
-        return 0;
-    }
-    if strcmp(name, "str_new") == 0 {
+    if name == "str_new" {
         let slots = spill_args(e, expr.args);
         emit_stack_load(e, "rcx", slots.data[0]);
         emit_stack_load(e, "rdx", slots.data[1]);
         emit_call_inst(e, "_str_alloc");
         return 0;
     }
-    if strcmp(name, "read_file") == 0 {
+    if name == "read_file" {
         emit_expr(e, expr.args.data[0]);
         emit_mov(e, "rcx", "[rax]");
         emit_inst(e, "sub rsp, 8");
@@ -794,7 +785,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 8");
         return 0;
     }
-    if strcmp(name, "write_file") == 0 {
+    if name == "write_file" {
         let slots = spill_args(e, expr.args);
         emit_stack_load(e, "rax", slots.data[0]);
         emit_mov(e, "rcx", "[rax]");
@@ -806,12 +797,24 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 8");
         return 0;
     }
-    if strcmp(name, "push") == 0 {
+    if name == "append_file" {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rax", slots.data[0]);
+        emit_mov(e, "rcx", "[rax]");
+        emit_stack_load(e, "rax", slots.data[1]);
+        emit_mov(e, "rdx", "[rax]");
+        emit_mov(e, "r8", "[rax+8]");
+        emit_inst(e, "sub rsp, 8");
+        emit_call_inst(e, "_append_file");
+        emit_inst(e, "add rsp, 8");
+        return 0;
+    }
+    if name == "push" {
         # m8-m14 slice: capacity is sufficient; grow path comes later.
         let arr_type = expr_type(e, expr.args.data[0]);
         let elem = arr_type.name;
         let el_size = 8;
-        if strcmp(elem, "i8") == 0 { el_size = 1; }
+        if elem == "i8" { el_size = 1; }
         emit_expr(e, expr.args.data[0]);
         let arr_slot = temp_save_rax(e);
         emit_expr(e, expr.args.data[1]);
@@ -838,11 +841,11 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
 }
 
 fun emit_binary(e: EmitterState, expr: AstNode) -> i64 {
-    if strcmp(expr.op, "&&") == 0 || strcmp(expr.op, "||") == 0 {
+    if expr.op == "&&" || expr.op == "||" {
         let end_id = fresh_label(e);
         let true_id = fresh_label(e);
         emit_expr(e, expr.left);
-        if strcmp(expr.op, "&&") == 0 {
+        if expr.op == "&&" {
             emit_inst(e, "test rax, rax");
             emit_jmp_id(e, "jz", "L", end_id);
         } else {
@@ -850,7 +853,7 @@ fun emit_binary(e: EmitterState, expr: AstNode) -> i64 {
             emit_jmp_id(e, "jnz", "L", true_id);
         }
         emit_expr(e, expr.right);
-        if strcmp(expr.op, "||") == 0 {
+        if expr.op == "||" {
             emit_label_id(e, "L", true_id);
         }
         emit_inst(e, "test rax, rax");
@@ -859,21 +862,39 @@ fun emit_binary(e: EmitterState, expr: AstNode) -> i64 {
         emit_label_id(e, "L", end_id);
         return 0;
     }
+    let left_type = expr_type(e, expr.left);
+    let right_type = expr_type(e, expr.right);
     emit_expr(e, expr.right);
     let tmp = temp_save_rax(e);
     emit_expr(e, expr.left);
+    if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
+        emit_mov(e, "rcx", "[rax]");
+        emit_stack_load(e, "rax", tmp);
+        emit_mov(e, "rdx", "[rax]");
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "lstrcmpA");
+        emit_inst(e, "add rsp, 32");
+        emit_inst(e, "cmp eax, 0");
+        if expr.op == "==" {
+            emit_inst(e, "sete al");
+        } else {
+            emit_inst(e, "setne al");
+        }
+        emit_inst(e, "movzx eax, al");
+        return 0;
+    }
     emit_stack_load(e, "rcx", tmp);
-    if strcmp(expr.op, "+") == 0 { emit_inst(e, "add rax, rcx"); return 0; }
-    if strcmp(expr.op, "-") == 0 { emit_inst(e, "sub rax, rcx"); return 0; }
-    if strcmp(expr.op, "*") == 0 { emit_inst(e, "imul rax, rcx"); return 0; }
-    if strcmp(expr.op, "/") == 0 { emit_inst(e, "cqo"); emit_inst(e, "idiv rcx"); return 0; }
-    if strcmp(expr.op, "%") == 0 { emit_inst(e, "cqo"); emit_inst(e, "idiv rcx"); emit_mov(e, "rax", "rdx"); return 0; }
-    if strcmp(expr.op, "==") == 0 { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "sete al"); emit_inst(e, "movzx eax, al"); return 0; }
-    if strcmp(expr.op, "!=") == 0 { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setne al"); emit_inst(e, "movzx eax, al"); return 0; }
-    if strcmp(expr.op, "<") == 0 { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setl al"); emit_inst(e, "movzx eax, al"); return 0; }
-    if strcmp(expr.op, ">") == 0 { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setg al"); emit_inst(e, "movzx eax, al"); return 0; }
-    if strcmp(expr.op, "<=") == 0 { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setle al"); emit_inst(e, "movzx eax, al"); return 0; }
-    if strcmp(expr.op, ">=") == 0 { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setge al"); emit_inst(e, "movzx eax, al"); return 0; }
+    if expr.op == "+" { emit_inst(e, "add rax, rcx"); return 0; }
+    if expr.op == "-" { emit_inst(e, "sub rax, rcx"); return 0; }
+    if expr.op == "*" { emit_inst(e, "imul rax, rcx"); return 0; }
+    if expr.op == "/" { emit_inst(e, "cqo"); emit_inst(e, "idiv rcx"); return 0; }
+    if expr.op == "%" { emit_inst(e, "cqo"); emit_inst(e, "idiv rcx"); emit_mov(e, "rax", "rdx"); return 0; }
+    if expr.op == "==" { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "sete al"); emit_inst(e, "movzx eax, al"); return 0; }
+    if expr.op == "!=" { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setne al"); emit_inst(e, "movzx eax, al"); return 0; }
+    if expr.op == "<" { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setl al"); emit_inst(e, "movzx eax, al"); return 0; }
+    if expr.op == ">" { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setg al"); emit_inst(e, "movzx eax, al"); return 0; }
+    if expr.op == "<=" { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setle al"); emit_inst(e, "movzx eax, al"); return 0; }
+    if expr.op == ">=" { emit_inst(e, "cmp rax, rcx"); emit_inst(e, "setge al"); emit_inst(e, "movzx eax, al"); return 0; }
     die("unknown binary op");
     return 0;
 }
@@ -892,7 +913,7 @@ fun emit_new(e: EmitterState, expr: AstNode) -> i64 {
 fun emit_new_array(e: EmitterState, expr: AstNode) -> i64 {
     let elem = expr.type_name;
     let el_size = 8;
-    if strcmp(elem, "i8") == 0 { el_size = 1; }
+    if elem == "i8" { el_size = 1; }
     let header_slot = 0;
     let cap_slot = 0;
     emit_mov(e, "rcx", "[_heap]");
@@ -902,7 +923,7 @@ fun emit_new_array(e: EmitterState, expr: AstNode) -> i64 {
     emit_call_inst(e, "HeapAlloc");
     emit_inst(e, "add rsp, 40");
     header_slot = temp_save_rax(e);
-    if strcmp(expr.count.kind, "") == 0 {
+    if expr.count.kind == "" {
         emit_mov(e, "rax", "4");
     } else {
         emit_expr(e, expr.count);
@@ -934,10 +955,10 @@ fun emit_new_array(e: EmitterState, expr: AstNode) -> i64 {
 }
 
 fun field_layout_name(t: TypeInfo) -> str {
-    if strcmp(t.kind, "str") == 0 { return "str"; }
-    if strcmp(t.kind, "array") == 0 { return array_layout_name(t.name); }
-    if strcmp(t.kind, "struct") == 0 { return t.name; }
-    if strcmp(t.kind, "ptr") == 0 { return t.name; }
+    if t.kind == "str" { return "str"; }
+    if t.kind == "array" { return array_layout_name(t.name); }
+    if t.kind == "struct" { return t.name; }
+    if t.kind == "ptr" { return t.name; }
     return "";
 }
 
@@ -972,18 +993,22 @@ fun emit_subscript(e: EmitterState, expr: AstNode) -> i64 {
 }
 
 fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
-    if strcmp(expr.kind, "Literal") == 0 {
+    if expr.kind == "Literal" {
         emit_mov(e, "rax", expr.value);
         return 0;
     }
-    if strcmp(expr.kind, "String") == 0 {
+    if expr.kind == "String" {
         let id = get_string_id(e, expr.value);
         emit_lea_ref_id(e, "rcx", "_str_", id);
         emit_mov_i(e, "rdx", expr.value.len);
         emit_call_inst(e, "_str_alloc");
         return 0;
     }
-    if strcmp(expr.kind, "Var") == 0 {
+    if expr.kind == "Var" {
+        if expr.name == "argv" {
+            emit_mov(e, "rax", "[_argv]");
+            return 0;
+        }
         if type_is_i8(find_local_type(e, expr.name)) == 1 {
             out_s(e.out_path, "    movsx rax, byte ");
             emit_slot_ref(e.out_path, find_local_slot(e, expr.name));
@@ -993,27 +1018,27 @@ fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
         }
         return 0;
     }
-    if strcmp(expr.kind, "Call") == 0 {
+    if expr.kind == "Call" {
         emit_call_expr(e, expr);
         return 0;
     }
-    if strcmp(expr.kind, "Binary") == 0 {
+    if expr.kind == "Binary" {
         emit_binary(e, expr);
         return 0;
     }
-    if strcmp(expr.kind, "New") == 0 {
+    if expr.kind == "New" {
         emit_new(e, expr);
         return 0;
     }
-    if strcmp(expr.kind, "NewArray") == 0 {
+    if expr.kind == "NewArray" {
         emit_new_array(e, expr);
         return 0;
     }
-    if strcmp(expr.kind, "FieldAccess") == 0 {
+    if expr.kind == "FieldAccess" {
         emit_field_access(e, expr);
         return 0;
     }
-    if strcmp(expr.kind, "Subscript") == 0 {
+    if expr.kind == "Subscript" {
         emit_subscript(e, expr);
         return 0;
     }
@@ -1022,18 +1047,25 @@ fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
 }
 
 fun emit_return(e: EmitterState, stmt: AstNode) -> i64 {
-    emit_expr(e, stmt.expr);
-    if strcmp(e.current_fn, "main") == 0 {
-        emit_mov(e, "ecx", "eax");
+    if e.current_fn == "main" {
+        if stmt.expr.kind == "" {
+            emit_mov(e, "ecx", "0");
+        } else {
+            emit_expr(e, stmt.expr);
+            emit_mov(e, "ecx", "eax");
+        }
         emit_call_inst(e, "ExitProcess");
     } else {
+        if stmt.expr.kind != "" {
+            emit_expr(e, stmt.expr);
+        }
         emit_jmp_id(e, "jmp", "L", e.current_ep_id);
     }
     return 0;
 }
 
 fun emit_let(e: EmitterState, stmt: AstNode) -> i64 {
-    if strcmp(stmt.value_expr.kind, "") == 0 {
+    if stmt.value_expr.kind == "" {
         return 0;
     }
     emit_expr(e, stmt.value_expr);
@@ -1104,7 +1136,7 @@ fun emit_if(e: EmitterState, stmt: AstNode) -> i64 {
     let end_id = fresh_label(e);
     emit_expr(e, stmt.expr);
     emit_inst(e, "test rax, rax");
-    if strcmp(stmt.else_block.kind, "") == 0 {
+    if stmt.else_block.kind == "" {
         emit_jmp_id(e, "jz", "L", end_id);
         emit_block(e, stmt.then_block);
     } else {
@@ -1133,20 +1165,20 @@ fun emit_while(e: EmitterState, stmt: AstNode) -> i64 {
 
 fun emit_stmt(e: EmitterState, stmt: AstNode) -> i64 {
     temp_reset(e);
-    if strcmp(stmt.kind, "Return") == 0 { return emit_return(e, stmt); }
-    if strcmp(stmt.kind, "ExprStmt") == 0 { return emit_expr(e, stmt.expr); }
-    if strcmp(stmt.kind, "Let") == 0 { return emit_let(e, stmt); }
-    if strcmp(stmt.kind, "Assign") == 0 { return emit_assign(e, stmt); }
-    if strcmp(stmt.kind, "SubscriptAssign") == 0 { return emit_subscript_assign(e, stmt); }
-    if strcmp(stmt.kind, "FieldSet") == 0 { return emit_field_set(e, stmt); }
-    if strcmp(stmt.kind, "If") == 0 { return emit_if(e, stmt); }
-    if strcmp(stmt.kind, "While") == 0 { return emit_while(e, stmt); }
+    if stmt.kind == "Return" { return emit_return(e, stmt); }
+    if stmt.kind == "ExprStmt" { return emit_expr(e, stmt.expr); }
+    if stmt.kind == "Let" { return emit_let(e, stmt); }
+    if stmt.kind == "Assign" { return emit_assign(e, stmt); }
+    if stmt.kind == "SubscriptAssign" { return emit_subscript_assign(e, stmt); }
+    if stmt.kind == "FieldSet" { return emit_field_set(e, stmt); }
+    if stmt.kind == "If" { return emit_if(e, stmt); }
+    if stmt.kind == "While" { return emit_while(e, stmt); }
     die("unsupported stmt");
     return 0;
 }
 
 fun emit_block(e: EmitterState, block: AstNode) -> i64 {
-    if strcmp(block.kind, "") == 0 {
+    if block.kind == "" {
         return 0;
     }
     let i = 0;
@@ -1169,13 +1201,13 @@ fun emit_fn_def(e: EmitterState, fn: AstNode) -> i64 {
     pre_scan_block(e, fn.body);
     e.temp_base = e.local_bytes;
     e.alloc_size = align16(e.local_bytes + 512 + 32);
-    if strcmp(fn.name, "main") == 0 {
+    if fn.name == "main" {
         emit_label(e, "_start");
     } else {
         emit_label(e, fn.name);
     }
     emit_prologue(e);
-    if strcmp(fn.name, "main") == 0 {
+    if fn.name == "main" {
         emit_call_inst(e, "GetProcessHeap");
         emit_mov(e, "[_heap]", "rax");
         emit_call_inst(e, "_argv_init");
@@ -1198,7 +1230,10 @@ fun emit_fn_def(e: EmitterState, fn: AstNode) -> i64 {
         else { emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9"); }
     }
     emit_block(e, fn.body);
-    if strcmp(fn.name, "main") != 0 {
+    if fn.name == "main" {
+        emit_mov(e, "ecx", "0");
+        emit_call_inst(e, "ExitProcess");
+    } else {
         emit_label_id(e, "L", e.current_ep_id);
         emit_epilogue(e);
     }
@@ -1269,7 +1304,7 @@ fun emit_program(e: EmitterState, ast: AstNode) -> i64 {
 fun main() -> i64 {
     if argv.len < 3 {
         putstr("usage: codegen <input.ep> <output.asm>\n");
-        exit(1);
+        sys.ExitProcess(1);
     }
     let src = read_file(argv.data[1]);
     let tokens = lex(src);
