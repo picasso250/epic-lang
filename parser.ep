@@ -204,6 +204,12 @@ fun parse_struct_def(p: Parser) -> AstNode {
 fun parse_fn_def(p: Parser) -> AstNode {
     expect(p, "FUN");
     let name = expect(p, "ID");
+    if name.text == "len" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "cap" {
+        parse_error(name.line, "reserved builtin function name");
+    }
     expect(p, "LPAREN");
     let params = parse_params(p);
     expect(p, "RPAREN");

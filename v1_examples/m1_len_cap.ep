@@ -1,0 +1,14 @@
+# EXIT: 34
+# STDOUT: 3
+# STDOUT: 2
+fun main() -> void {
+    let s = "abc";
+    let xs = new i64[9];
+    push(xs, 10);
+    push(xs, 20);
+    putstr(itoa(len(s)));
+    putc(10);
+    putstr(itoa(len(xs)));
+    putc(10);
+    sys.ExitProcess(len(s) + len(xs) + cap(xs) + xs.data[1]);
+}
