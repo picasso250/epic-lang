@@ -58,6 +58,14 @@ The driver appends runtime assembly helpers after emitted program assembly:
 
 ```text
 runtime/str_alloc.asm
+runtime/bytes.asm
+runtime/str_cat.asm
+runtime/str_slice.asm
+runtime/str_replace_char.asm
+runtime/str_starts_with.asm
+runtime/str_find.asm
+runtime/str_trim.asm
+runtime/extend_i8.asm
 runtime/itoa.asm
 runtime/argv.asm
 runtime/system.asm
@@ -159,8 +167,13 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `write_file` | calls `_write_file` runtime helper |
 | `append_file` | calls `_append_file` runtime helper |
 | `str_new` | calls `_str_alloc` runtime helper |
+| `bytes` | calls `_bytes` runtime helper |
+| `str_starts_with` | calls `_str_starts_with` runtime helper |
+| `str_find` | calls `_str_find` runtime helper |
+| `str_trim` | calls `_str_trim` runtime helper |
 | `len` / `cap` | emitted directly for strings and dynamic arrays |
 | `push` | emitted by codegen for dynamic arrays |
+| `extend` | calls `_extend_i8` for `i8[]`; emits copy loops for other dynamic arrays |
 | slice syntax | calls `_str_slice` for strings and emits array copy loops directly |
 
 ## Codegen self-hosting
@@ -192,7 +205,7 @@ python runtests.py --linker py
 Current known result:
 
 ```text
-48 passed, 0 failed
+50 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.

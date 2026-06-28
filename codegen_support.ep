@@ -261,6 +261,9 @@ fun emit_runtime_helpers(e: EmitterState) -> i64 {
     emit_runtime(e, "runtime/str_cat.asm");
     emit_runtime(e, "runtime/str_slice.asm");
     emit_runtime(e, "runtime/str_replace_char.asm");
+    emit_runtime(e, "runtime/str_starts_with.asm");
+    emit_runtime(e, "runtime/str_find.asm");
+    emit_runtime(e, "runtime/str_trim.asm");
     emit_runtime(e, "runtime/extend_i8.asm");
     emit_runtime(e, "runtime/itoa.asm");
     emit_runtime(e, "runtime/argv.asm");

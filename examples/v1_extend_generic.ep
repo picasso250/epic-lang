@@ -1,0 +1,25 @@
+# EXIT: 0
+# STDOUT: 612
+struct Box {
+    value: i64
+}
+
+fun main() -> void {
+    let xs = new i64[1]
+    push(xs, 1)
+    push(xs, 2)
+    extend(xs, xs)
+    putstr(itoa(xs[0] + xs[1] + xs[2] + xs[3]))
+
+    let b1 = new Box
+    b1.value = 5
+    let b2 = new Box
+    b2.value = 7
+    let left = new Box[1]
+    let right = new Box[1]
+    push(left, b1)
+    push(right, b2)
+    extend(left, right)
+    putstr(itoa(left[0].value + left[1].value))
+    sys.ExitProcess(0)
+}

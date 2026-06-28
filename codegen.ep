@@ -253,6 +253,9 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
         if expr.name == "str_new" { return type_str(); }
         if expr.name == "str_slice" { return type_str(); }
         if expr.name == "str_replace_char" { return type_str(); }
+        if expr.name == "str_starts_with" { return type_i64(); }
+        if expr.name == "str_find" { return type_i64(); }
+        if expr.name == "str_trim" { return type_str(); }
         if expr.name == "read_file" { return type_str(); }
         if expr.name == "write_file" { return type_i64(); }
         if expr.name == "append_file" { return type_i64(); }
@@ -500,6 +503,32 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 32");
         return 0;
     }
+    if name == "str_starts_with" {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rcx", slots.data[0]);
+        emit_stack_load(e, "rdx", slots.data[1]);
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "_str_starts_with");
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
+    if name == "str_find" {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rcx", slots.data[0]);
+        emit_stack_load(e, "rdx", slots.data[1]);
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "_str_find");
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
+    if name == "str_trim" {
+        emit_expr(e, expr.args.data[0]);
+        emit_mov(e, "rcx", "rax");
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "_str_trim");
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
     if name == "len" {
         if expr.args.len != 1 {
             die("len expects one argument");
@@ -633,10 +662,134 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         return 0;
     }
     if name == "extend" {
-        let slots = spill_args(e, expr.args);
-        emit_stack_load(e, "rcx", slots.data[0]);
-        emit_stack_load(e, "rdx", slots.data[1]);
-        emit_call_inst(e, "_extend_i8");
+        if expr.args.len != 2 {
+            die("extend expects two arguments");
+        }
+        let dst_type = expr_type(e, expr.args.data[0]);
+        let src_type = expr_type(e, expr.args.data[1]);
+        if dst_type.kind != "array" || src_type.kind != "array" {
+            die("extend expects arrays");
+        }
+        if dst_type.name != src_type.name {
+            die("extend expects matching array element types");
+        }
+        let elem = dst_type.name;
+        let el_size = 8;
+        if elem == "i8" { el_size = 1; }
+        if el_size == 1 {
+            let slots = spill_args(e, expr.args);
+            emit_stack_load(e, "rcx", slots.data[0]);
+            emit_stack_load(e, "rdx", slots.data[1]);
+            emit_call_inst(e, "_extend_i8");
+            emit_inst(e, "xor eax, eax");
+            return 0;
+        }
+
+        emit_expr(e, expr.args.data[0]);
+        let dst_slot = temp_save_rax(e);
+        emit_expr(e, expr.args.data[1]);
+        let src_slot = temp_save_rax(e);
+
+        emit_stack_load(e, "rax", src_slot);
+        emit_mov(e, "rax", "[rax]");
+        let src_data_slot = temp_save_rax(e);
+        emit_stack_load(e, "rax", src_slot);
+        emit_mov(e, "rax", "[rax+8]");
+        let src_len_slot = temp_save_rax(e);
+        emit_stack_load(e, "rax", dst_slot);
+        emit_mov(e, "rax", "[rax+8]");
+        let dst_len_slot = temp_save_rax(e);
+        emit_stack_load(e, "rax", dst_len_slot);
+        emit_stack_load(e, "rcx", src_len_slot);
+        emit_inst(e, "add rax, rcx");
+        let needed_slot = temp_save_rax(e);
+
+        let have_cap = fresh_label(e);
+        let cap_loop = fresh_label(e);
+        let cap_ready = fresh_label(e);
+        let copy_old_loop = fresh_label(e);
+        let copy_old_done = fresh_label(e);
+        let copy_src_loop = fresh_label(e);
+        let copy_src_done = fresh_label(e);
+        emit_stack_load(e, "rax", dst_slot);
+        emit_stack_load(e, "rcx", needed_slot);
+        emit_inst(e, "cmp [rax+16], rcx");
+        emit_jmp_id(e, "jge", "L", have_cap);
+
+        emit_inst(e, "mov r8, [rax+16]");
+        emit_inst(e, "test r8, r8");
+        emit_jmp_id(e, "jnz", "L", cap_loop);
+        emit_inst(e, "mov r8, 2");
+        emit_label_id(e, "L", cap_loop);
+        emit_stack_load(e, "rcx", needed_slot);
+        emit_inst(e, "cmp r8, rcx");
+        emit_jmp_id(e, "jge", "L", cap_ready);
+        emit_inst(e, "add r8, r8");
+        emit_jmp_id(e, "jmp", "L", cap_loop);
+        emit_label_id(e, "L", cap_ready);
+        emit_mov(e, "rax", "r8");
+        let new_cap_slot = temp_save_rax(e);
+        out_s(e, "    imul r8, ");
+        out_i(e, el_size);
+        out_nl(e);
+        emit_mov(e, "rcx", "[_heap]");
+        emit_mov(e, "edx", "8");
+        emit_inst(e, "sub rsp, 40");
+        emit_call_inst(e, "HeapAlloc");
+        emit_inst(e, "add rsp, 40");
+        let new_data_slot = temp_save_rax(e);
+
+        emit_stack_load(e, "rax", dst_slot);
+        emit_inst(e, "mov r8, [rax]");
+        emit_stack_load(e, "r9", new_data_slot);
+        emit_stack_load(e, "r10", dst_len_slot);
+        emit_label_id(e, "L", copy_old_loop);
+        emit_inst(e, "test r10, r10");
+        emit_jmp_id(e, "jz", "L", copy_old_done);
+        emit_inst(e, "mov r11, [r8]");
+        emit_inst(e, "mov [r9], r11");
+        out_s(e, "    add r8, ");
+        out_i(e, el_size);
+        out_nl(e);
+        out_s(e, "    add r9, ");
+        out_i(e, el_size);
+        out_nl(e);
+        emit_inst(e, "dec r10");
+        emit_jmp_id(e, "jmp", "L", copy_old_loop);
+        emit_label_id(e, "L", copy_old_done);
+        emit_stack_load(e, "rax", dst_slot);
+        emit_stack_load(e, "rcx", new_data_slot);
+        emit_inst(e, "mov [rax], rcx");
+        emit_stack_load(e, "rcx", new_cap_slot);
+        emit_inst(e, "mov [rax+16], rcx");
+
+        emit_label_id(e, "L", have_cap);
+        emit_stack_load(e, "rax", dst_slot);
+        emit_inst(e, "mov r8, [rax]");
+        emit_stack_load(e, "r9", dst_len_slot);
+        out_s(e, "    imul r9, ");
+        out_i(e, el_size);
+        out_nl(e);
+        emit_inst(e, "add r8, r9");
+        emit_stack_load(e, "r9", src_data_slot);
+        emit_stack_load(e, "r10", src_len_slot);
+        emit_label_id(e, "L", copy_src_loop);
+        emit_inst(e, "test r10, r10");
+        emit_jmp_id(e, "jz", "L", copy_src_done);
+        emit_inst(e, "mov r11, [r9]");
+        emit_inst(e, "mov [r8], r11");
+        out_s(e, "    add r8, ");
+        out_i(e, el_size);
+        out_nl(e);
+        out_s(e, "    add r9, ");
+        out_i(e, el_size);
+        out_nl(e);
+        emit_inst(e, "dec r10");
+        emit_jmp_id(e, "jmp", "L", copy_src_loop);
+        emit_label_id(e, "L", copy_src_done);
+        emit_stack_load(e, "rax", dst_slot);
+        emit_stack_load(e, "rcx", needed_slot);
+        emit_inst(e, "mov [rax+8], rcx");
         emit_inst(e, "xor eax, eax");
         return 0;
     }

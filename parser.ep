@@ -234,6 +234,33 @@ fun parse_fn_def(p: Parser) -> AstNode {
     if name.text == "cap" {
         parse_error(name.line, "reserved builtin function name");
     }
+    if name.text == "push" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "extend" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "bytes" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "str_new" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "str_slice" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "str_replace_char" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "str_starts_with" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "str_find" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "str_trim" {
+        parse_error(name.line, "reserved builtin function name");
+    }
     expect(p, "LPAREN");
     let params = parse_params(p);
     expect(p, "RPAREN");

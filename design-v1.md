@@ -4,6 +4,17 @@ v1 starts from the `v0` bootstrap anchor and intentionally does not preserve
 source compatibility. The previous compiler is kept on the `v0` branch; v1
 source should move with the v1 language.
 
+## Bootstrap boundary
+
+The v1 compiler sources are still compiled by the v0 bootstrap anchor. That
+means `epic.ep`, `lexer.ep`, `parser.ep`, `codegen_support.ep`, and
+`codegen.ep` must stay in the source shape accepted by v0 until a future v2
+source tree is compiled by the v1 compiler.
+
+v1 features can and should be tested with examples, but they should not be
+used to rewrite the v1 compiler sources themselves. The dogfooding point for
+v1 syntax and builtins is v2-src, not the current v1-src.
+
 ## Current scope
 
 The first v1 pass is deliberately narrow:
@@ -85,7 +96,7 @@ the compiler's existing function-local variable behavior.
 String equality is already supported through `==`, so v1 should not add a
 duplicate `str_eq` builtin.
 
-The proposed v1 string additions are:
+The v1 string additions are:
 
 | Operation | Meaning |
 | --- | --- |
@@ -174,9 +185,11 @@ v1 should add array extension:
 extend(dst: T[], src: T[]) -> void
 ```
 
-`extend` appends all elements of `src` to `dst` in order. It mutates `dst` and
-does not allocate a separate result array for expression-style concatenation.
-v1 should not add generic `T[] + T[]` list addition.
+`extend` appends all elements of `src` to `dst` in order. It snapshots
+`src.data` and `src.len` before growing `dst`, so `extend(xs, xs)` appends the
+original contents once. It mutates `dst` and does not allocate a separate result
+array for expression-style concatenation. v1 should not add generic `T[] + T[]`
+list addition.
 
 Like `push`, `extend` is a reserved builtin name.
 
