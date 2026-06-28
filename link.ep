@@ -1,0 +1,714 @@
+# Epic minimal PE linker.
+# MVP: one NASM COFF obj -> PE64 console exe, matching link.py's support shape.
+
+struct Section {
+    name: str
+    data: i8[]
+    raw_sz: i64
+    raw_off: i64
+    rel_off: i64
+    nrel: i64
+    virtual_sz: i64
+}
+
+struct Symbol {
+    name_off: i64
+    raw_off: i64
+    value: i64
+    section: i64
+    aux: i64
+}
+
+struct Reloc {
+    si: i64
+    rva: i64
+    sym_i: i64
+}
+
+struct NameValue {
+    name: str
+    value: i64
+}
+
+struct LinkState {
+    data: i8[]
+    sections: Section[]
+    syms: Symbol[]
+    relocs: Reloc[]
+    strtab: i8[]
+    imports: str[]
+    thunk_rvas: NameValue[]
+    iat_offsets: NameValue[]
+    idata: i8[]
+    idata_rva: i64
+    data_rva: i64
+    entry_rva: i64
+}
+
+fun die_link(msg: str) -> void {
+    putstr("link.ep: ")
+    putstr(msg)
+    putc(10)
+    sys.ExitProcess(1)
+}
+
+fun align_to(n: i64, a: i64) -> i64 {
+    return ((n + a - 1) / a) * a
+}
+
+fun append_zero(buf: i8[], n: i64) -> void {
+    let i = 0
+    while i < n {
+        push(buf, 0)
+        i = i + 1
+    }
+}
+
+fun append_u16(buf: i8[], x: i64) -> void {
+    let off = len(buf)
+    append_zero(buf, 2)
+    put_u16_le(buf, off, x)
+}
+
+fun append_u32(buf: i8[], x: i64) -> void {
+    let off = len(buf)
+    append_zero(buf, 4)
+    put_u32_le(buf, off, x)
+}
+
+fun append_u64(buf: i8[], x: i64) -> void {
+    let off = len(buf)
+    append_zero(buf, 8)
+    put_u64_le(buf, off, x)
+}
+
+fun append_str(buf: i8[], s: str) -> void {
+    extend(buf, bytes(s))
+}
+
+fun append_name8(buf: i8[], name: str) -> void {
+    let bs = bytes(name)
+    let i = 0
+    while i < 8 {
+        if i < len(bs) {
+            push(buf, bs[i])
+        } else {
+            push(buf, 0)
+        }
+        i = i + 1
+    }
+}
+
+fun set_u32(buf: i8[], off: i64, x: i64) -> void {
+    put_u32_le(buf, off, x)
+}
+
+fun append_dos_stub(buf: i8[]) -> void {
+    push(buf, 77)
+    push(buf, 90)
+    push(buf, 120)
+    push(buf, 0)
+    push(buf, 1)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 4)
+    append_zero(buf, 51)
+    push(buf, 120)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 14)
+    push(buf, 31)
+    push(buf, 186)
+    push(buf, 14)
+    push(buf, 0)
+    push(buf, 180)
+    push(buf, 9)
+    push(buf, 205)
+    push(buf, 33)
+    push(buf, 184)
+    push(buf, 1)
+    push(buf, 76)
+    push(buf, 205)
+    push(buf, 33)
+    append_str(buf, "This program cannot be run in DOS mode.$")
+    push(buf, 0)
+    push(buf, 0)
+}
+
+fun copy_bytes(src: i8[], off: i64, n: i64) -> i8[] {
+    let out = new i8[n]
+    let i = 0
+    while i < n {
+        push(out, src[off + i])
+        i = i + 1
+    }
+    return out
+}
+
+fun str_from_bytes_until_zero(src: i8[], off: i64, max_n: i64) -> str {
+    let out = new i8[max_n]
+    let i = 0
+    while i < max_n {
+        let b = src[off + i]
+        if b == 0 {
+            return str(out)
+        }
+        push(out, b)
+        i = i + 1
+    }
+    return str(out)
+}
+
+fun has_text(s: str, needle: str) -> i64 {
+    return str_find(s, needle) >= 0
+}
+
+fun get_name_value(items: NameValue[], name: str) -> i64 {
+    let i = 0
+    while i < len(items) {
+        let item = items[i]
+        if item.name == name {
+            return item.value
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+fun put_name_value(items: NameValue[], name: str, value: i64) -> void {
+    let item = new NameValue
+    item.name = name
+    item.value = value
+    push(items, item)
+}
+
+fun contains_str(items: str[], name: str) -> i64 {
+    let i = 0
+    while i < len(items) {
+        if items[i] == name {
+            return 1
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+fun sym_name(st: LinkState, sym: Symbol) -> str {
+    if sym.name_off >= 0 {
+        return str_from_bytes_until_zero(st.strtab, sym.name_off, len(st.strtab) - sym.name_off)
+    }
+    return str_from_bytes_until_zero(st.data, sym.raw_off, 8)
+}
+
+fun parse_sections(st: LinkState, nsects: i64) -> void {
+    let i = 0
+    while i < nsects {
+        let off = 20 + i * 40
+        let sec = new Section
+        sec.name = str_from_bytes_until_zero(st.data, off, 8)
+        sec.raw_sz = u32_le(st.data, off + 16)
+        sec.raw_off = u32_le(st.data, off + 20)
+        sec.rel_off = u32_le(st.data, off + 24)
+        sec.nrel = u16_le(st.data, off + 32)
+        sec.virtual_sz = sec.raw_sz
+        sec.data = copy_bytes(st.data, sec.raw_off, sec.raw_sz)
+        push(st.sections, sec)
+        i = i + 1
+    }
+}
+
+fun parse_symbols(st: LinkState, symtab_off: i64, nsyms: i64) -> void {
+    let i = 0
+    while i < nsyms {
+        let pos = symtab_off + i * 18
+        let sym = new Symbol
+        sym.raw_off = pos
+        sym.name_off = 0 - 1
+        if u32_le(st.data, pos) == 0 {
+            sym.name_off = u32_le(st.data, pos + 4)
+        }
+        sym.value = u32_le(st.data, pos + 8)
+        sym.section = u16_le(st.data, pos + 12)
+        sym.aux = st.data[pos + 17]
+        push(st.syms, sym)
+
+        let j = 0
+        while j < sym.aux {
+            let aux_sym = new Symbol
+            aux_sym.name_off = 0 - 1
+            aux_sym.raw_off = 0
+            aux_sym.value = 0
+            aux_sym.section = 0 - 1
+            aux_sym.aux = 0
+            push(st.syms, aux_sym)
+            j = j + 1
+        }
+        i = i + 1 + sym.aux
+    }
+}
+
+fun parse_strtab(st: LinkState, symtab_off: i64, nsyms: i64) -> void {
+    let start = symtab_off + nsyms * 18
+    let size = u32_le(st.data, start)
+    st.strtab = copy_bytes(st.data, start, size)
+}
+
+fun collect_imports(st: LinkState) -> void {
+    let i = 0
+    while i < len(st.syms) {
+        let sym = st.syms[i]
+        if sym.section == 0 && sym.aux == 0 {
+            let name = sym_name(st, sym)
+            if len(name) > 0 && contains_str(st.imports, name) == 0 {
+                push(st.imports, name)
+            }
+        }
+        i = i + 1
+    }
+}
+
+fun collect_relocs(st: LinkState) -> void {
+    let si = 0
+    while si < len(st.sections) {
+        let sec = st.sections[si]
+        let ri = 0
+        while ri < sec.nrel {
+            let rp = sec.rel_off + ri * 10
+            let rtype = u16_le(st.data, rp + 8)
+            let sym_i = u32_le(st.data, rp + 4)
+            if rtype == 4 && sym_i < len(st.syms) {
+                let rel = new Reloc
+                rel.si = si
+                rel.rva = u32_le(st.data, rp)
+                rel.sym_i = sym_i
+                push(st.relocs, rel)
+            }
+            ri = ri + 1
+        }
+        si = si + 1
+    }
+}
+
+fun kernel32_hint(name: str) -> i64 {
+    if name == "CloseHandle" {
+        return 157
+    }
+    if name == "CreateFileA" {
+        return 222
+    }
+    if name == "CreateProcessA" {
+        return 253
+    }
+    if name == "ExitProcess" {
+        return 390
+    }
+    if name == "GetCommandLineA" {
+        return 511
+    }
+    if name == "GetExitCodeProcess" {
+        return 615
+    }
+    if name == "GetFileSize" {
+        return 631
+    }
+    if name == "GetProcessHeap" {
+        return 740
+    }
+    if name == "HeapAlloc" {
+        return 892
+    }
+    if name == "ReadFile" {
+        return 1193
+    }
+    if name == "SetFilePointer" {
+        return 1384
+    }
+    if name == "WaitForSingleObject" {
+        return 1573
+    }
+    if name == "WriteFile" {
+        return 1632
+    }
+    return 0
+}
+
+fun find_section(st: LinkState, needle: str) -> Section {
+    let i = 0
+    while i < len(st.sections) {
+        let sec = st.sections[i]
+        if has_text(sec.name, needle) == 1 {
+            return sec
+        }
+        i = i + 1
+    }
+    die_link("missing section")
+    return new Section
+}
+
+fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64) -> void {
+    while len(text_sec.data) % 16 != 0 {
+        push(text_sec.data, 204)
+    }
+    let thunk_base = text_rva + len(text_sec.data)
+    let i = 0
+    while i < len(st.imports) {
+        let name = st.imports[i]
+        let rva = thunk_base + i * 16
+        put_name_value(st.thunk_rvas, name, rva)
+        push(text_sec.data, 255)
+        push(text_sec.data, 37)
+        append_zero(text_sec.data, 4)
+        append_zero(text_sec.data, 10)
+        let j = 0
+        while j < 10 {
+            text_sec.data[len(text_sec.data) - 1 - j] = 204
+            j = j + 1
+        }
+        i = i + 1
+    }
+    text_sec.virtual_sz = len(text_sec.data)
+}
+
+fun hint_size(name: str) -> i64 {
+    let n = 2 + len(bytes(name)) + 1
+    if n % 2 != 0 {
+        n = n + 1
+    }
+    return n
+}
+
+fun build_idata(st: LinkState) -> void {
+    st.idata = new i8[256]
+    if len(st.imports) == 0 {
+        return
+    }
+
+    let ilt_off = 40
+    let table_size = len(st.imports) * 8 + 8
+    let iat_off = ilt_off + table_size
+    let hint_off = iat_off + table_size
+    let hint_blob = new i8[128]
+
+    let i = 0
+    while i < len(st.imports) {
+        let name = st.imports[i]
+        append_u16(hint_blob, kernel32_hint(name))
+        append_str(hint_blob, name)
+        push(hint_blob, 0)
+        if len(hint_blob) % 2 != 0 {
+            push(hint_blob, 0)
+        }
+        i = i + 1
+    }
+
+    let dll_off = hint_off + len(hint_blob)
+    append_u32(st.idata, st.idata_rva + ilt_off)
+    append_u32(st.idata, 0)
+    append_u32(st.idata, 0)
+    append_u32(st.idata, st.idata_rva + dll_off)
+    append_u32(st.idata, st.idata_rva + iat_off)
+    append_zero(st.idata, 20)
+
+    let hint_cursor = 0
+    i = 0
+    while i < len(st.imports) {
+        let name = st.imports[i]
+        append_u64(st.idata, st.idata_rva + hint_off + hint_cursor)
+        put_name_value(st.iat_offsets, name, iat_off + i * 8)
+        hint_cursor = hint_cursor + hint_size(name)
+        i = i + 1
+    }
+    append_u64(st.idata, 0)
+
+    i = 0
+    while i < len(st.imports) + 1 {
+        let val = u64_le(st.idata, ilt_off + i * 8)
+        append_u64(st.idata, val)
+        i = i + 1
+    }
+
+    extend(st.idata, hint_blob)
+    append_str(st.idata, "KERNEL32.dll")
+    push(st.idata, 0)
+}
+
+fun section_rva(st: LinkState, sec_index: i64) -> i64 {
+    let sec = st.sections[sec_index]
+    if has_text(sec.name, "text") == 1 {
+        return 4096
+    }
+    if has_text(sec.name, "data") == 1 {
+        return st.data_rva
+    }
+    return 0
+}
+
+fun find_entry(st: LinkState) -> void {
+    st.entry_rva = 4096
+    let i = 0
+    while i < len(st.syms) {
+        let sym = st.syms[i]
+        if sym.section > 0 {
+            let name = sym_name(st, sym)
+            if name == "_start" {
+                st.entry_rva = section_rva(st, sym.section - 1) + sym.value
+                return
+            }
+        }
+        i = i + 1
+    }
+}
+
+fun patch_thunks(st: LinkState, text_sec: Section) -> void {
+    let i = 0
+    while i < len(st.imports) {
+        let name = st.imports[i]
+        let thunk = get_name_value(st.thunk_rvas, name)
+        let iat = get_name_value(st.iat_offsets, name)
+        let off = thunk - 4096 + 2
+        let disp = st.idata_rva + iat - (thunk + 6)
+        put_u32_le(text_sec.data, off, disp)
+        i = i + 1
+    }
+}
+
+fun patch_relocs(st: LinkState, text_sec: Section) -> void {
+    let i = 0
+    while i < len(st.relocs) {
+        let rel = st.relocs[i]
+        let sym = st.syms[rel.sym_i]
+        let target = 0
+        if sym.section == 0 && sym.aux == 0 {
+            target = get_name_value(st.thunk_rvas, sym_name(st, sym))
+        } else if sym.section > 0 {
+            target = section_rva(st, sym.section - 1) + sym.value
+        }
+        if target != 0 {
+            let old = u32_le(text_sec.data, rel.rva)
+            let disp = old + target - (4096 + rel.rva + 4)
+            put_u32_le(text_sec.data, rel.rva, disp)
+        }
+        i = i + 1
+    }
+}
+
+fun append_section_header(buf: i8[], name: str, rva: i64, raw_sz: i64) -> void {
+    append_name8(buf, name)
+    append_u32(buf, raw_sz)
+    append_u32(buf, rva)
+    append_u32(buf, align_to(raw_sz, 512))
+    append_u32(buf, 0)
+    append_u32(buf, 0)
+    append_u32(buf, 0)
+    append_u16(buf, 0)
+    append_u16(buf, 0)
+    if name == ".text" {
+        append_u32(buf, 1610612768)
+    } else if name == ".rdata" {
+        append_u32(buf, 1073741888)
+    } else {
+        append_u32(buf, 3221225536)
+    }
+}
+
+fun patch_section_raw(buf: i8[], index: i64, raw_pos: i64, raw_sz: i64) -> void {
+    let opt_start = 120 + 4 + 20
+    let hdr_pos = opt_start + 240 + index * 40
+    set_u32(buf, hdr_pos + 20, raw_pos)
+    set_u32(buf, hdr_pos + 16, align_to(raw_sz, 512))
+}
+
+fun append_padded_section(buf: i8[], name: str, data: i8[]) -> void {
+    extend(buf, data)
+    let pad = 0
+    if name == ".text" {
+        pad = 204
+    }
+    while len(buf) % 512 != 0 {
+        push(buf, pad)
+    }
+}
+
+fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section) -> i64 {
+    let buf = new i8[4096]
+    let num_sec = 2
+    if len(st.idata) > 0 {
+        num_sec = 3
+    }
+    let text_raw = align_to(len(text_sec.data), 512)
+    let data_raw = align_to(len(data_sec.data), 512)
+    let idata_raw = align_to(len(st.idata), 512)
+    let last_rva = st.data_rva
+    let last_sz = len(data_sec.data)
+    let image_size = align_to(last_rva + last_sz, 4096)
+    let headers_sz = 1024
+
+    append_dos_stub(buf)
+    append_str(buf, "PE")
+    append_zero(buf, 2)
+    append_u16(buf, 34404)
+    append_u16(buf, num_sec)
+    append_u32(buf, 0)
+    append_u32(buf, 0)
+    append_u32(buf, 0)
+    append_u16(buf, 240)
+    append_u16(buf, 34)
+
+    append_u16(buf, 523)
+    push(buf, 14)
+    push(buf, 0)
+    append_u32(buf, text_raw)
+    append_u32(buf, data_raw + idata_raw)
+    append_u32(buf, 0)
+    append_u32(buf, st.entry_rva)
+    append_u32(buf, 4096)
+    append_u64(buf, 5368709120)
+    append_u32(buf, 4096)
+    append_u32(buf, 512)
+    append_u16(buf, 6)
+    append_u16(buf, 0)
+    append_u16(buf, 0)
+    append_u16(buf, 0)
+    append_u16(buf, 6)
+    append_u16(buf, 0)
+    append_u32(buf, 0)
+    append_u32(buf, image_size)
+    append_u32(buf, headers_sz)
+    append_u32(buf, 0)
+    append_u16(buf, 3)
+    append_u16(buf, 33120)
+    append_u64(buf, 1048576)
+    append_u64(buf, 4096)
+    append_u64(buf, 1048576)
+    append_u64(buf, 4096)
+    append_u32(buf, 0)
+    append_u32(buf, 16)
+
+    append_u32(buf, 0)
+    append_u32(buf, 0)
+    if len(st.idata) > 0 {
+        append_u32(buf, st.idata_rva)
+        append_u32(buf, 40)
+    } else {
+        append_u32(buf, 0)
+        append_u32(buf, 0)
+    }
+    append_zero(buf, 80)
+    if len(st.idata) > 0 {
+        append_u32(buf, st.idata_rva + 40 + (len(st.imports) + 1) * 8)
+        append_u32(buf, (len(st.imports) + 1) * 8)
+    } else {
+        append_u32(buf, 0)
+        append_u32(buf, 0)
+    }
+    append_zero(buf, 24)
+
+    append_section_header(buf, ".text", 4096, len(text_sec.data))
+    if len(st.idata) > 0 {
+        append_section_header(buf, ".rdata", st.idata_rva, len(st.idata))
+    }
+    append_section_header(buf, ".data", st.data_rva, len(data_sec.data))
+
+    while len(buf) < headers_sz {
+        push(buf, 0)
+    }
+
+    let raw_pos = headers_sz
+    patch_section_raw(buf, 0, raw_pos, len(text_sec.data))
+    raw_pos = raw_pos + align_to(len(text_sec.data), 512)
+    let data_index = 1
+    if len(st.idata) > 0 {
+        patch_section_raw(buf, 1, raw_pos, len(st.idata))
+        raw_pos = raw_pos + align_to(len(st.idata), 512)
+        data_index = 2
+    }
+    patch_section_raw(buf, data_index, raw_pos, len(data_sec.data))
+
+    append_padded_section(buf, ".text", text_sec.data)
+    if len(st.idata) > 0 {
+        append_padded_section(buf, ".rdata", st.idata)
+    }
+    append_padded_section(buf, ".data", data_sec.data)
+
+    write_file(exe_path, buf)
+    return len(buf)
+}
+
+fun link_obj(obj_path: str, exe_path: str) -> i64 {
+    let st = new LinkState
+    st.data = read_file(obj_path)
+    st.sections = new Section[8]
+    st.syms = new Symbol[128]
+    st.relocs = new Reloc[128]
+    st.strtab = new i8[1]
+    st.imports = new str[32]
+    st.thunk_rvas = new NameValue[32]
+    st.iat_offsets = new NameValue[32]
+    st.idata = new i8[1]
+    st.idata_rva = 0
+    st.data_rva = 0
+    st.entry_rva = 4096
+
+    if len(st.data) < 20 {
+        die_link("input object is too small")
+    }
+    let machine = u16_le(st.data, 0)
+    if machine != 34404 {
+        die_link("expected AMD64 COFF object")
+    }
+    let nsects = u16_le(st.data, 2)
+    let symtab_off = u32_le(st.data, 8)
+    let nsyms = u32_le(st.data, 12)
+    parse_sections(st, nsects)
+    parse_symbols(st, symtab_off, nsyms)
+    parse_strtab(st, symtab_off, nsyms)
+    collect_imports(st)
+    collect_relocs(st)
+
+    let text_sec = find_section(st, "text")
+    let data_sec = find_section(st, "data")
+    append_import_thunks(st, text_sec, 4096)
+    st.idata_rva = align_to(4096 + text_sec.virtual_sz, 4096)
+    build_idata(st)
+    st.data_rva = st.idata_rva
+    if len(st.idata) > 0 {
+        st.data_rva = align_to(st.idata_rva + len(st.idata), 4096)
+    }
+    patch_thunks(st, text_sec)
+    find_entry(st)
+    patch_relocs(st, text_sec)
+    return write_pe(st, exe_path, text_sec, data_sec)
+}
+
+fun default_out_path(obj_path: str) -> str {
+    let dot = str_find(obj_path, ".obj")
+    if dot >= 0 {
+        return obj_path[:dot] + ".exe"
+    }
+    return obj_path + ".exe"
+}
+
+fun main() -> i64 {
+    if len(argv) < 2 {
+        putstr("Usage: link.ep <file.obj> [-o out.exe]\n")
+        sys.ExitProcess(1)
+    }
+    let obj_path = argv[1]
+    let exe_path = default_out_path(obj_path)
+    let i = 2
+    while i + 1 < len(argv) {
+        if argv[i] == "-o" {
+            exe_path = argv[i + 1]
+        }
+        i = i + 1
+    }
+    let sz = link_obj(obj_path, exe_path)
+    putstr("  OK: ")
+    putstr(exe_path)
+    putstr(" (")
+    putstr(itoa(sz))
+    putstr(" bytes)\n")
+    return 0
+}

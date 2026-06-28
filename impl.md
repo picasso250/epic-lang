@@ -51,6 +51,8 @@ Current toolchain paths are configured in `epic.py`:
 - Windows SDK `kernel32.lib` and `user32.lib`
 
 `link.py` is the default linker. `lld-link` is available through `--linker lld-link`.
+`link.ep` is an Epic MVP linker for the same current single-object PE64 path;
+it is tested separately and is not yet the compiler driver's default linker.
 
 ## Runtime helpers
 
@@ -206,7 +208,7 @@ python runtests.py --linker py
 Current known result:
 
 ```text
-51 passed, 0 failed
+50 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.
@@ -217,3 +219,15 @@ python runtests.py
 ```
 
 The examples are the current behavioral acceptance suite, not a complete language specification.
+
+Epic linker MVP acceptance:
+
+```text
+python test_link_ep.py
+```
+
+Current known result:
+
+```text
+50 passed, 0 failed
+```

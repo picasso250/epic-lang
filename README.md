@@ -67,6 +67,15 @@ The test runner builds the current compiler with
 `build\fixed-point\epic-epic.exe`, then uses the current compiler to compile
 and run `examples/*.ep`. Override the anchor with `PREVIOUS_EPIC` if needed.
 
+The Epic linker MVP can be checked with:
+
+```powershell
+python test_link_ep.py
+```
+
+This builds `link.ep`, relinks every current example object with it, and runs
+the generated executables against the normal example annotations.
+
 ## v1 direction
 
 Initial v1 work:
@@ -77,6 +86,7 @@ Initial v1 work:
 - checked indexing and slice syntax
 - `else if` and half-open `for i in start..end` range loops
 - binary byte-buffer support as groundwork for replacing `link.py`
+- `link.ep` MVP for the current single-object PE64 path
 - split `codegen.ep`
 - revisit `map` after the first pass
 
