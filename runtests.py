@@ -145,17 +145,17 @@ def run_all(linker, label):
 
 def main():
     parser = argparse.ArgumentParser(description="Epic test runner")
-    parser.add_argument("--linker", choices=["lld", "py", "both"], default="py",
+    parser.add_argument("--linker", choices=["lld", "py"], default="py",
                         help="Which linker to use (default: py)")
     args = parser.parse_args()
 
     total_failed = 0
 
-    if args.linker in ("lld", "both"):
+    if args.linker == "lld":
         _, failed, _ = run_all("lld-link", "lld-link")
         total_failed += failed
 
-    if args.linker in ("py", "both"):
+    if args.linker == "py":
         _, failed, _ = run_all("py", "link.py")
         total_failed += failed
 

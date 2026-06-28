@@ -97,8 +97,31 @@ def link(obj_path, exe_path):
     text_sec = next(s for s in sections if 'text' in s['name'])
     data_sec = next(s for s in sections if 'data' in s['name'])
     text_rva = 0x1000
-    idata_rva = 0x2000
-    data_rva = 0x3000
+
+    # Match lld-link's stable import ordering for reproducible output.
+    imports = sorted(imports, key=str.lower)
+
+    # ── Build thunks ──
+    while len(text_sec['data']) % 16:
+        text_sec['data'].append(0xCC)
+    thunk_base = text_rva + len(text_sec['data'])
+    thunks = bytearray()
+    thunk_rva = {}
+    for func in imports:
+        thunk_rva[func] = thunk_base + len(thunks)
+        thunks += b'\xff\x25' + b'\x00\x00\x00\x00' + b'\xCC' * 10
+    text_sec['data'].extend(thunks)
+    text_sec['virtual_sz'] = len(text_sec['data'])
+
+    idata_rva = align(text_rva + text_sec['virtual_sz'], SECTION_ALIGN)
+    idata, iat_map = build_idata(imports, idata_rva)
+    data_rva = align(idata_rva + len(idata), SECTION_ALIGN) if idata else idata_rva
+
+    # Patch thunk RIP-relative IAT references now that .rdata has its final RVA.
+    for func in imports:
+        off = thunk_rva[func] - text_rva + 2
+        disp = idata_rva + iat_map[func] - (thunk_rva[func] + 6)
+        struct.pack_into('<i', text_sec['data'], off, disp)
 
     # Map section index → RVA
     sec_rva = {}
@@ -114,25 +137,6 @@ def link(obj_path, exe_path):
             if n == '_start':
                 entry_rva = sec_rva.get(s['section'] - 1, 0) + s['value']
                 break
-
-    # Match lld-link's stable import ordering for reproducible output.
-    imports = sorted(imports, key=str.lower)
-
-    # ── Build .rdata import tables ──
-    idata, iat_map = build_idata(imports, idata_rva)
-
-    # ── Build thunks ──
-    while len(text_sec['data']) % 16:
-        text_sec['data'].append(0xCC)
-    thunk_base = text_rva + len(text_sec['data'])
-    thunks = bytearray()
-    thunk_rva = {}
-    for func in imports:
-        thunk_rva[func] = thunk_base + len(thunks)
-        disp = idata_rva + iat_map[func] - (thunk_rva[func] + 6)
-        thunks += b'\xff\x25' + struct.pack('<i', disp) + b'\xCC' * 10
-    text_sec['data'].extend(thunks)
-    text_sec['virtual_sz'] = thunk_rva[imports[-1]] + 6 - text_rva if imports else len(text_sec['data'])
 
     # ── Patch all REL32s ──
     for (si, rva, sym_i) in relocs:
@@ -150,7 +154,7 @@ def link(obj_path, exe_path):
             struct.pack_into('<i', text_sec['data'], rva, disp)
 
     # ── Write PE ──
-    return write_pe(exe_path, text_sec, data_sec, idata, idata_rva, imports, entry_rva)
+    return write_pe(exe_path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entry_rva)
 
 
 def build_idata(imports, idata_rva):
@@ -182,14 +186,14 @@ def build_idata(imports, idata_rva):
     return bytes(idt + ilt + iat + hint_blob) + b'KERNEL32.dll\x00', iat_map
 
 
-def write_pe(path, text_sec, data_sec, idata, idata_rva, imports, entry_rva):
-    TEXT_RVA, DATA_RVA = 0x1000, 0x3000
+def write_pe(path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entry_rva):
+    TEXT_RVA = 0x1000
     all_sec = [
         ('.text', TEXT_RVA, bytes(text_sec['data']), 0x60000020, text_sec.get('virtual_sz', len(text_sec['data']))),
     ]
     if idata:
         all_sec.append(('.rdata', idata_rva, idata, 0x40000040, len(idata)))
-    all_sec.append(('.data', DATA_RVA, bytes(data_sec['data']), 0xC0000040, len(data_sec['data'])))
+    all_sec.append(('.data', data_rva, bytes(data_sec['data']), 0xC0000040, len(data_sec['data'])))
     num_sec = len(all_sec)
 
     text_raw = align(len(text_sec['data']), FILE_ALIGN)
