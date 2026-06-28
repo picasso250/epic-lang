@@ -10,8 +10,9 @@ The first v1 pass is deliberately narrow:
 
 1. Remove semicolons.
 2. Add the minimum stronger `str` operations needed by compiler code.
-3. Prepare for splitting `codegen.ep`.
-4. Revisit `map[str]T` only after the first three items show the real need.
+3. Add checked indexing and copy slices for strings and arrays.
+4. Prepare for splitting `codegen.ep`.
+5. Revisit `map[str]T` only after the first four items show the real need.
 
 `map` is not rejected. It is deferred because it should be justified by actual
 compiler simplification, not by being a generally expected high-level feature.
@@ -51,11 +52,49 @@ The proposed v1 string additions are:
 | --- | --- |
 | `str_starts_with(s: str, prefix: str) -> i64` | true when `s` starts with `prefix` |
 | `str_find(s: str, needle: str) -> i64` | first byte index, or `-1` when absent |
-| `str_sub(s: str, start: i64, len: i64) -> str` | byte slice copy |
 | `str_trim(s: str) -> str` | trim leading and trailing ASCII whitespace |
 
 These operations are byte-oriented like v0 strings. Unicode string semantics
 remain outside the v1 first pass.
+
+## Indexing and slices
+
+v1 should add bounds checks to ordinary indexing:
+
+```epic
+let c = s[i]
+let x = xs[i]
+xs[i] = x
+```
+
+If `i < 0` or `i >= len`, the program dies immediately. The current v0 codegen
+does not check this; it emits direct memory loads and stores.
+
+v1 should also add copy slice syntax for strings and arrays:
+
+```epic
+let a = s[start:end]
+let b = s[start:]
+let c = s[:end]
+let d = s[:]
+
+let xs2 = xs[start:end]
+let ys = xs[:]
+```
+
+Slice ranges are half-open: `[start, end)`.
+
+The initial semantics are deliberately strict:
+
+- omitted `start` means `0`
+- omitted `end` means `.len`
+- `start < 0` dies
+- `end < 0` dies
+- `start > end` dies
+- `end > len` dies
+- successful slices allocate and copy
+
+`str_sub` is not needed when slice syntax exists.
 
 ## Codegen split
 

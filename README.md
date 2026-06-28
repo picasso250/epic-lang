@@ -76,6 +76,7 @@ Initial v1 work:
 
 - stronger `str` operations
 - remove semicolons
+- checked indexing and slice syntax
 - split `codegen.ep`
 - revisit `map` after the first pass
 
