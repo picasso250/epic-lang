@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-Epic v0 test runner.
+Epic v1 test runner.
 Scans examples/*.ep, reads # EXIT: and # STDOUT: annotations,
-compiles, runs, and reports pass/fail.
+builds the current Epic compiler with the v0 bootstrap anchor, then compiles,
+runs, and reports pass/fail.
 """
 
-import os, sys, subprocess, re, shlex, argparse
+import os, sys, subprocess, re, shlex
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "epic.py")
+SOURCES = ["epic.ep", "codegen.ep", "parser.ep", "lexer.ep"]
+DEFAULT_PREVIOUS_EPIC = os.path.join(SCRIPT_DIR, "build", "fixed-point", "epic-epic.exe")
+PREVIOUS_EPIC = os.environ.get("PREVIOUS_EPIC", DEFAULT_PREVIOUS_EPIC)
+CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 EXEC_TIMEOUT = 1  # seconds, prevent link.py bugs from hanging
 
@@ -48,7 +52,42 @@ def clean_test_paths(paths):
             os.remove(path)
 
 
-def run_test(ep_file, linker="lld-link"):
+def run_checked(cmd, label, timeout=30):
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=SCRIPT_DIR,
+        timeout=timeout,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"{label} failed with exit {result.returncode}\n"
+            + result.stdout[-2000:]
+            + result.stderr[-2000:]
+        )
+    return result
+
+
+def ensure_current_compiler():
+    if not os.path.exists(PREVIOUS_EPIC):
+        raise RuntimeError(
+            "previous Epic compiler not found. Set PREVIOUS_EPIC or build "
+            + os.path.relpath(DEFAULT_PREVIOUS_EPIC, SCRIPT_DIR)
+        )
+    run_checked([PREVIOUS_EPIC, *SOURCES], "previous Epic -> current Epic", timeout=60)
+    if not os.path.exists(CURRENT_EPIC):
+        raise RuntimeError(f"expected compiler output missing: {CURRENT_EPIC}")
+
+
+def epic_output_exe(ep_file):
+    rel = os.path.relpath(ep_file, SCRIPT_DIR).replace("\\", "/")
+    return os.path.join(SCRIPT_DIR, "build", "epic", rel.replace("/", "_") + ".exe")
+
+
+def run_test(ep_file):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
@@ -62,16 +101,12 @@ def run_test(ep_file, linker="lld-link"):
     except RuntimeError as e:
         return False, str(e)
     
-    # Compile
-    result = subprocess.run(
-        [sys.executable, EPICC, ep_file, "--linker", linker],
-        capture_output=True, text=True, cwd=SCRIPT_DIR, timeout=30,
-    )
-    if result.returncode != 0:
-        return False, f"compile failed:\n{result.stderr[:500]}"
-    
-    rel = os.path.relpath(ep_file, SCRIPT_DIR)
-    exe_path = os.path.join(SCRIPT_DIR, "build", os.path.splitext(rel)[0] + ".exe")
+    try:
+        run_checked([CURRENT_EPIC, os.path.relpath(ep_file, SCRIPT_DIR)], "compile")
+    except RuntimeError as e:
+        return False, str(e)
+
+    exe_path = epic_output_exe(ep_file)
     if not os.path.exists(exe_path):
         return False, f"no exe produced: {exe_path}"
 
@@ -106,7 +141,7 @@ def run_test(ep_file, linker="lld-link"):
     return True, "OK"
 
 
-def run_all(linker):
+def run_all():
     examples = sorted(
         f for f in os.listdir(EXAMPLES_DIR) if f.endswith(".ep")
     )
@@ -122,7 +157,7 @@ def run_all(linker):
     for ep_name in examples:
         ep_path = os.path.join(EXAMPLES_DIR, ep_name)
         try:
-            ok, detail = run_test(ep_path, linker=linker)
+            ok, detail = run_test(ep_path)
         except subprocess.TimeoutExpired:
             ok, detail = False, "TIMEOUT (compile >30s)"
         except Exception as e:
@@ -142,16 +177,8 @@ def run_all(linker):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Epic test runner")
-    parser.add_argument("--linker", choices=["lld", "py"], default="py",
-                        help="Which linker to use (default: py)")
-    args = parser.parse_args()
-
-    if args.linker == "lld":
-        _, failed, _ = run_all("lld-link")
-    else:
-        _, failed, _ = run_all("py")
-
+    ensure_current_compiler()
+    _, failed, _ = run_all()
     sys.exit(0 if failed == 0 else 1)
 
 

@@ -33,23 +33,22 @@ From the `v0` branch:
 
 ```powershell
 git switch v0
-python epic.py --main epic.ep epic.ep codegen.ep parser.ep lexer.ep --out-dir build\v00
-Copy-Item build\v00\epic.exe build\v00.exe
-.\build\v00.exe epic.ep codegen.ep parser.ep lexer.ep
-Copy-Item build\epic\epic.ep.exe build\v0.exe
+python test_bootstrap_fixed_point.py
 ```
 
-The two stages are:
+This produces the stable previous-compiler artifacts under `build\fixed-point`,
+including:
 
-1. Python compiler -> `v00.exe`
-2. `v00.exe` compiles the Epic compiler -> `v0.exe`
+- `epic-py.exe`
+- `epic-epic.exe`
+- `epic-epic-epic.exe`
 
 After that, switch to the development branch and use the v0 compiler as the
 trusted previous compiler:
 
 ```powershell
 git switch v1
-.\build\v0.exe epic.ep codegen.ep parser.ep lexer.ep
+.\build\fixed-point\epic-epic.exe epic.ep codegen.ep parser.ep lexer.ep
 ```
 
 This gives v1 development a concrete predecessor: v0 remains available as the
@@ -58,17 +57,15 @@ compatible with old source.
 
 ## Tests
 
-Run the example suite with the Python driver:
+On `v1`, run the example suite with the previous Epic compiler as the anchor:
 
 ```powershell
 python runtests.py
 ```
 
-Run the self-hosted compiler smoke test:
-
-```powershell
-python test_epic_bootstrap.py
-```
+The test runner builds the current compiler with
+`build\fixed-point\epic-epic.exe`, then uses the current compiler to compile
+and run `examples/*.ep`. Override the anchor with `PREVIOUS_EPIC` if needed.
 
 ## v1 direction
 

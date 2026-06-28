@@ -184,13 +184,11 @@ Current known result:
 40 passed, 0 failed
 ```
 
-Bootstrap checks:
+v0-only historical bootstrap checks lived in the Python implementation path.
+On v1, the default acceptance path uses the previous Epic compiler anchor:
 
 ```text
-python test_lexer_bootstrap.py
-python test_parser_bootstrap.py
-python test_codegen_bootstrap.py
-python test_epic_bootstrap.py
+python runtests.py
 ```
 
 The examples are the current behavioral acceptance suite, not a complete language specification.
