@@ -125,12 +125,45 @@ Supported forms:
 | `cap(xs: T[]) -> i64` | array capacity |
 
 `cap(str)` is invalid.
+`len` and `cap` are reserved builtin names; user code cannot define functions
+with those names.
 
 The low-level `.data`, `.len`, and `.cap` fields should become deprecated escape
 hatches in v1. They remain allowed during the first v1 pass because compiler
 sources still depend on them and the language has no module/internal boundary
 yet. New ordinary code should use `len()`, `cap()`, checked indexing, and slice
 syntax instead.
+
+## Binary support and linker replacement
+
+Replacing `link.py` with Epic code would be a valuable v1 stretch goal because
+binary parsing and patching are core systems-language capabilities.
+
+The current Python linker depends on operations Epic does not yet expose well:
+
+- reading a file as raw bytes
+- writing raw bytes
+- mutable byte buffers with explicit length
+- little-endian `u16`, `u32`, `u64`, and signed `i32` load/store helpers
+- appending bytes and patching bytes at known offsets
+
+Before committing to an Epic linker, v1 should first add enough byte-buffer
+surface to make the port direct and testable. A possible minimal direction:
+
+```epic
+read_bytes(path: str) -> i8[]
+write_bytes(path: str, data: i8[]) -> i64
+u16_le(buf: i8[], off: i64) -> i64
+u32_le(buf: i8[], off: i64) -> i64
+u64_le(buf: i8[], off: i64) -> i64
+put_u16_le(buf: i8[], off: i64, x: i64) -> void
+put_u32_le(buf: i8[], off: i64, x: i64) -> void
+put_u64_le(buf: i8[], off: i64, x: i64) -> void
+```
+
+The linker should not block the first v1 syntax/string/indexing pass. It should
+be considered after byte-buffer support exists, and it can become the proof that
+Epic is ready for binary tooling.
 
 ## Codegen split
 
