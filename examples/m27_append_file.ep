@@ -1,5 +1,6 @@
 # EXIT 0
 # STDOUT hello world
+# CLEAN test_append_file.txt
 fun main() -> i64 {
     let path = "test_append_file.txt";
     let n = write_file(path, "hello");

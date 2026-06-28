@@ -1,5 +1,6 @@
 # EXIT 0
 # STDOUT hello
+# CLEAN test_write_file.txt
 fun main() -> i64 {
     let n = write_file("test_write_file.txt", "hello");
     if n != 5 {

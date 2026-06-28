@@ -17,6 +17,7 @@ def parse_annotations(source):
     exit_code = None
     stdout_lines = []
     argv = []
+    clean_paths = []
     for line in source.split("\n"):
         line = line.strip()
         if m := re.match(r'#\s*EXIT\s+(-?\d+)', line):
@@ -25,18 +26,40 @@ def parse_annotations(source):
             stdout_lines.append(m.group(1))
         elif m := re.match(r'#\s*ARGV(?:\s+(.*))?$', line):
             argv = shlex.split(m.group(1) or "")
+        elif m := re.match(r'#\s*CLEAN\s+(.+)$', line):
+            clean_paths.extend(shlex.split(m.group(1)))
     stdout = "\n".join(stdout_lines) if stdout_lines else None
-    return exit_code, stdout, argv
+    return exit_code, stdout, argv, clean_paths
+
+
+def clean_test_paths(paths):
+    """Delete declared test artifacts under the repo root."""
+    root = os.path.abspath(SCRIPT_DIR)
+    for rel in paths:
+        if os.path.isabs(rel):
+            raise RuntimeError(f"# CLEAN path must be relative: {rel}")
+        path = os.path.abspath(os.path.join(SCRIPT_DIR, rel))
+        if os.path.commonpath([root, path]) != root:
+            raise RuntimeError(f"# CLEAN path escapes repo root: {rel}")
+        if os.path.isdir(path):
+            raise RuntimeError(f"# CLEAN refuses to delete directory: {rel}")
+        if os.path.exists(path):
+            os.remove(path)
 
 
 def run_test(ep_file):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
-    exit_expected, stdout_expected, argv = parse_annotations(source)
+    exit_expected, stdout_expected, argv, clean_paths = parse_annotations(source)
     
     if exit_expected is None and stdout_expected is None:
         return True, "no annotations — skipped"
+
+    try:
+        clean_test_paths(clean_paths)
+    except RuntimeError as e:
+        return False, str(e)
     
     # Compile
     result = subprocess.run(
@@ -70,7 +93,15 @@ def run_test(ep_file):
             failures.append(f"STDOUT: expected {stdout_expected!r}, got {actual!r}")
     
     if failures:
+        try:
+            clean_test_paths(clean_paths)
+        except RuntimeError as e:
+            failures.append(str(e))
         return False, "; ".join(failures)
+    try:
+        clean_test_paths(clean_paths)
+    except RuntimeError as e:
+        return False, str(e)
     return True, "OK"
 
 
