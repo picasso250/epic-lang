@@ -75,6 +75,7 @@ python test_epic_bootstrap.py
 Initial v1 work:
 
 - stronger `str` operations
+- `len()` and `cap()` builtins
 - remove semicolons
 - checked indexing and slice syntax
 - split `codegen.ep`

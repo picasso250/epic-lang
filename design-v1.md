@@ -10,9 +10,10 @@ The first v1 pass is deliberately narrow:
 
 1. Remove semicolons.
 2. Add the minimum stronger `str` operations needed by compiler code.
-3. Add checked indexing and copy slices for strings and arrays.
-4. Prepare for splitting `codegen.ep`.
-5. Revisit `map[str]T` only after the first four items show the real need.
+3. Add `len()` and `cap()` builtins.
+4. Add checked indexing and copy slices for strings and arrays.
+5. Prepare for splitting `codegen.ep`.
+6. Revisit `map[str]T` only after the first five items show the real need.
 
 `map` is not rejected. It is deferred because it should be justified by actual
 compiler simplification, not by being a generally expected high-level feature.
@@ -70,6 +71,15 @@ xs[i] = x
 If `i < 0` or `i >= len`, the program dies immediately. The current v0 codegen
 does not check this; it emits direct memory loads and stores.
 
+String indexing returns `i8`, not a one-byte `str`:
+
+```epic
+let c = s[i]
+let one = s[i:i + 1]
+```
+
+Use a slice when a `str` result is needed.
+
 v1 should also add copy slice syntax for strings and arrays:
 
 ```epic
@@ -95,6 +105,32 @@ The initial semantics are deliberately strict:
 - successful slices allocate and copy
 
 `str_sub` is not needed when slice syntax exists.
+
+## Length and capacity
+
+v1 should add builtin functions for length and capacity:
+
+```epic
+let n = len(s)
+let m = len(xs)
+let c = cap(xs)
+```
+
+Supported forms:
+
+| Builtin | Meaning |
+| --- | --- |
+| `len(s: str) -> i64` | string byte length |
+| `len(xs: T[]) -> i64` | array element count |
+| `cap(xs: T[]) -> i64` | array capacity |
+
+`cap(str)` is invalid.
+
+The low-level `.data`, `.len`, and `.cap` fields should become deprecated escape
+hatches in v1. They remain allowed during the first v1 pass because compiler
+sources still depend on them and the language has no module/internal boundary
+yet. New ordinary code should use `len()`, `cap()`, checked indexing, and slice
+syntax instead.
 
 ## Codegen split
 
