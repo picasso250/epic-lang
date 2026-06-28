@@ -29,6 +29,8 @@ RUNTIME_DIR = os.path.join(SCRIPT_DIR, "runtime")
 RUNTIME_ASM_FILES = [
     "str_alloc.asm",
     "str_cat.asm",
+    "str_slice.asm",
+    "str_replace_char.asm",
     "itoa.asm",
     "argv.asm",
     "system.asm",
