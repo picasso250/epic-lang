@@ -1,13 +1,13 @@
 # EXIT: 18
 
 struct Token {
-    kind: i64;
+    kind: i64
 }
 
 fun main() -> void {
-    let a = 5;
-    let b = 6;
-    let c = 7;
-    let arr = new Token[1];
-    sys.ExitProcess(a + b + c);
+    let a = 5
+    let b = 6
+    let c = 7
+    let arr = new Token[1]
+    sys.ExitProcess(a + b + c)
 }

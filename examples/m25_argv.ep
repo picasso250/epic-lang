@@ -3,9 +3,9 @@
 # STDOUT: hello
 fun main() -> void {
     if argv.len < 2 {
-        putstr("missing");
-        sys.ExitProcess(1);
+        putstr("missing")
+        sys.ExitProcess(1)
     }
-    putstr(argv.data[1]);
-    sys.ExitProcess(0);
+    putstr(argv.data[1])
+    sys.ExitProcess(0)
 }

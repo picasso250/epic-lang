@@ -1,13 +1,13 @@
 # EXIT: 57
 
 fun divv(a: i64, b: i64) -> i64 {
-    return a / b;
+    return a / b
 }
 
 fun pair(a: i64, b: i64) -> i64 {
-    return a * 10 + b;
+    return a * 10 + b
 }
 
 fun main() -> void {
-    sys.ExitProcess(pair(divv(10, 2), 7));
+    sys.ExitProcess(pair(divv(10, 2), 7))
 }

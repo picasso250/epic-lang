@@ -2,8 +2,8 @@
 # STDOUT: 5
 
 fun main() -> void {
-    let s = "hello";
-    putstr(itoa(s.len));
-    putc(10);
-    sys.ExitProcess(0);
+    let s = "hello"
+    putstr(itoa(s.len))
+    putc(10)
+    sys.ExitProcess(0)
 }

@@ -3,14 +3,14 @@
 # STDOUT: 2
 # CLEAN: test_out.txt
 fun main() -> void {
-    let s = "42";
-    let n = write_file("test_out.txt", s);
-    let inp = read_file("test_out.txt");
+    let s = "42"
+    let n = write_file("test_out.txt", s)
+    let inp = read_file("test_out.txt")
 
-    putc(inp.data[0]);
-    putc(inp.data[1]);
-    putc(10);
-    putstr(itoa(n));
-    putc(10);
-    sys.ExitProcess(0);
+    putc(inp.data[0])
+    putc(inp.data[1])
+    putc(10)
+    putstr(itoa(n))
+    putc(10)
+    sys.ExitProcess(0)
 }

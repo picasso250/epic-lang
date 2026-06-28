@@ -3,15 +3,15 @@
 # CLEAN: test_sys_create.tmp
 
 fun main() -> void {
-    sys.Sleep(1);
-    let t = sys.GetTickCount64();
-    let n = sys.lstrlenA("abc");
-    let c = sys.lstrcmpA("same", "same");
-    let h = sys.CreateFileA("test_sys_create.tmp", 1073741824, 0, 0, 2, 128, 0);
+    sys.Sleep(1)
+    let t = sys.GetTickCount64()
+    let n = sys.lstrlenA("abc")
+    let c = sys.lstrcmpA("same", "same")
+    let h = sys.CreateFileA("test_sys_create.tmp", 1073741824, 0, 0, 2, 128, 0)
     if t >= 0 && n == 3 && c == 0 && h + 1 != 0 {
-        sys.CloseHandle(h);
-        putc(49);
-        sys.ExitProcess(0);
+        sys.CloseHandle(h)
+        putc(49)
+        sys.ExitProcess(0)
     }
-    sys.ExitProcess(1);
+    sys.ExitProcess(1)
 }

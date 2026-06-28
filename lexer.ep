@@ -64,6 +64,7 @@ fun lex(src: str) -> Token[] {
         }
         if consumed == 0 && ch == 10 {
             pos = pos + 1;
+            push_token(tokens, "NEWLINE", "\n", line);
             line = line + 1;
             consumed = 1;
         }
@@ -295,7 +296,10 @@ fun lex(src: str) -> Token[] {
         if consumed == 0 && ch == 41  { push_token(tokens, "RPAREN", ")", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 123 { push_token(tokens, "LBRACE", "{", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 125 { push_token(tokens, "RBRACE", "}", line); pos = pos + 1; consumed = 1; }
-        if consumed == 0 && ch == 59  { push_token(tokens, "SEMICOLON", ";", line); pos = pos + 1; consumed = 1; }
+        if consumed == 0 && ch == 59  {
+            putstr("unexpected semicolon\n");
+            sys.ExitProcess(1);
+        }
         if consumed == 0 && ch == 44  { push_token(tokens, "COMMA", ",", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 58  { push_token(tokens, "COLON", ":", line); pos = pos + 1; consumed = 1; }
 

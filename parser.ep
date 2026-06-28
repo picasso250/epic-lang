@@ -144,6 +144,23 @@ fun check(p: Parser, kind: str) -> i64 {
     return 0;
 }
 
+fun skip_newlines(p: Parser) -> i64 {
+    while peek_kind(p, "NEWLINE") == 1 {
+        advance(p);
+    }
+    return 0;
+}
+
+fun expect_stmt_end(p: Parser) -> i64 {
+    if check(p, "NEWLINE") == 1 {
+        skip_newlines(p);
+        return 0;
+    }
+    let t = peek(p);
+    parse_error(t.line, "Expected end of line");
+    return 1;
+}
+
 fun parse_type(p: Parser) -> str {
     let t = advance(p);
     if same(t.kind, "ID") == 0 {
@@ -187,11 +204,12 @@ fun parse_struct_def(p: Parser) -> AstNode {
     let node = ast_node("StructDef");
     node.name = name.text;
     expect(p, "LBRACE");
+    skip_newlines(p);
     while peek_kind(p, "RBRACE") == 0 {
         let fname = expect(p, "ID");
         expect(p, "COLON");
         let ftype = parse_type(p);
-        expect(p, "SEMICOLON");
+        expect_stmt_end(p);
         let field = ast_node("StructField");
         field.name = fname.text;
         field.type_name = ftype;
@@ -227,12 +245,14 @@ fun parse_fn_def(p: Parser) -> AstNode {
 
 fun parse_program(p: Parser) -> AstNode {
     let node = ast_node("Program");
+    skip_newlines(p);
     while peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p));
         } else {
             push(node.structs, parse_struct_def(p));
         }
+        skip_newlines(p);
     }
     if peek_kind(p, "EOF") == 0 {
         let t = peek(p);
@@ -244,12 +264,14 @@ fun parse_program(p: Parser) -> AstNode {
 fun parse_block(p: Parser) -> AstNode {
     let node = ast_node("Block");
     expect(p, "LBRACE");
+    skip_newlines(p);
     while peek_kind(p, "RBRACE") == 0 {
         if peek_kind(p, "EOF") == 1 {
             let t = peek(p);
             parse_error(t.line, "Unexpected end of file in block");
         }
         push(node.stmts, parse_stmt(p));
+        skip_newlines(p);
     }
     expect(p, "RBRACE");
     return node;
@@ -300,11 +322,11 @@ fun parse_return_stmt(p: Parser) -> AstNode {
     let line = ret.line;
     expect(p, "RETURN");
     let node = ast_node("Return");
-    if peek_kind(p, "SEMICOLON") == 0 {
+    if peek_kind(p, "NEWLINE") == 0 {
         node.expr = parse_expr(p);
     }
     node.line = line;
-    expect(p, "SEMICOLON");
+    expect_stmt_end(p);
     return node;
 }
 
@@ -320,7 +342,7 @@ fun parse_let_stmt(p: Parser) -> AstNode {
     if check(p, "ASSIGN") == 1 {
         node.value_expr = parse_expr(p);
     }
-    expect(p, "SEMICOLON");
+    expect_stmt_end(p);
     return node;
 }
 
@@ -350,7 +372,7 @@ fun parse_assign_stmt(p: Parser) -> AstNode {
     }
     expect(p, "ASSIGN");
     let value = parse_expr(p);
-    expect(p, "SEMICOLON");
+    expect_stmt_end(p);
     if same(lhs.kind, "Var") == 1 {
         let node = ast_node("Assign");
         node.name = lhs.name;
@@ -380,6 +402,7 @@ fun parse_if_stmt(p: Parser) -> AstNode {
     let node = ast_node("If");
     node.expr = parse_expr(p);
     node.then_block = parse_block(p);
+    skip_newlines(p);
     if check(p, "ELSE") == 1 {
         node.else_block = parse_block(p);
     }
@@ -397,7 +420,7 @@ fun parse_while_stmt(p: Parser) -> AstNode {
 fun parse_expr_stmt(p: Parser) -> AstNode {
     let node = ast_node("ExprStmt");
     node.expr = parse_expr(p);
-    expect(p, "SEMICOLON");
+    expect_stmt_end(p);
     return node;
 }
 

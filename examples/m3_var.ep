@@ -2,11 +2,11 @@
 # STDOUT: 42
 # STDOUT: 43
 fun main() -> void {
-    let x = 42;
-    putstr(itoa(x));
-    putc(10);
-    x = x + 1;
-    putstr(itoa(x));
-    putc(10);
-    sys.ExitProcess(0);
+    let x = 42
+    putstr(itoa(x))
+    putc(10)
+    x = x + 1
+    putstr(itoa(x))
+    putc(10)
+    sys.ExitProcess(0)
 }

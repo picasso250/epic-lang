@@ -2,20 +2,20 @@
 # STDOUT: hello world
 # CLEAN: test_append_file.txt
 fun main() -> void {
-    let path = "test_append_file.txt";
-    let n = write_file(path, "hello");
+    let path = "test_append_file.txt"
+    let n = write_file(path, "hello")
     if n != 5 {
-        sys.ExitProcess(1);
+        sys.ExitProcess(1)
     }
-    n = append_file(path, " ");
+    n = append_file(path, " ")
     if n != 1 {
-        sys.ExitProcess(2);
+        sys.ExitProcess(2)
     }
-    n = append_file(path, "world");
+    n = append_file(path, "world")
     if n != 5 {
-        sys.ExitProcess(3);
+        sys.ExitProcess(3)
     }
-    let s = read_file(path);
-    putstr(s);
-    sys.ExitProcess(0);
+    let s = read_file(path)
+    putstr(s)
+    sys.ExitProcess(0)
 }

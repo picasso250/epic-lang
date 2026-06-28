@@ -3,19 +3,19 @@
 # STDOUT: Epic
 # STDOUT: 65
 fun main() -> void {
-    let a = 65;
-    putc(a);
-    let b = 10;
-    putc(b);
-    let c = 'E';
-    putc(c);
-    let d = 'p';
-    putc(d);
-    let e = 'i';
-    putc(e);
-    putc('c');
-    putc(10);
-    putstr(itoa(a));
-    putc(10);
-    sys.ExitProcess(0);
+    let a = 65
+    putc(a)
+    let b = 10
+    putc(b)
+    let c = 'E'
+    putc(c)
+    let d = 'p'
+    putc(d)
+    let e = 'i'
+    putc(e)
+    putc('c')
+    putc(10)
+    putstr(itoa(a))
+    putc(10)
+    sys.ExitProcess(0)
 }
