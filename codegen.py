@@ -714,6 +714,12 @@ class Emitter:
             self.emit("    movzx eax, al")
             return
 
+        if op == "+" and left_type == "&str" and right_type == "&str":
+            self.emit_mov("rcx", "rax")
+            self.emit_stack_load("rdx", tmp)
+            self._call_with_shadow("_str_cat")
+            return
+
         self.emit_stack_load("rcx", tmp)
 
         op_map = {
@@ -1157,7 +1163,9 @@ class Emitter:
                 return inner
             return "i64"  # fallback
         if isinstance(expr, BinaryNode):
-            return "i64"  # all binary ops produce i64
+            if expr.op == "+" and self._expr_type(expr.left) == "&str" and self._expr_type(expr.right) == "&str":
+                return "&str"
+            return "i64"
         if isinstance(expr, NewNode):
             return "&" + expr.struct_name
         if isinstance(expr, NewArrayNode):

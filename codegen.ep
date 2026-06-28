@@ -251,6 +251,7 @@ fun emit_runtime(e: EmitterState, path: str) -> i64 {
 
 fun emit_runtime_helpers(e: EmitterState) -> i64 {
     emit_runtime(e, "runtime/str_alloc.asm");
+    emit_runtime(e, "runtime/str_cat.asm");
     emit_runtime(e, "runtime/itoa.asm");
     emit_runtime(e, "runtime/argv.asm");
     emit_runtime(e, "runtime/system.asm");
@@ -566,7 +567,14 @@ fun find_local_type(e: EmitterState, name: str) -> TypeInfo {
 fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
     if expr.kind == "String" { return type_str(); }
     if expr.kind == "Literal" { return type_i64(); }
-    if expr.kind == "Binary" { return type_i64(); }
+    if expr.kind == "Binary" {
+        if expr.op == "+" {
+            let lt = expr_type(e, expr.left);
+            let rt = expr_type(e, expr.right);
+            if lt.kind == "str" && rt.kind == "str" { return type_str(); }
+        }
+        return type_i64();
+    }
     if expr.kind == "Var" { return find_local_type(e, expr.name); }
     if expr.kind == "Call" {
         if is_sys_call(expr.name) == 1 { return type_i64(); }
@@ -867,6 +875,14 @@ fun emit_binary(e: EmitterState, expr: AstNode) -> i64 {
     emit_expr(e, expr.right);
     let tmp = temp_save_rax(e);
     emit_expr(e, expr.left);
+    if expr.op == "+" && left_type.kind == "str" && right_type.kind == "str" {
+        emit_mov(e, "rcx", "rax");
+        emit_stack_load(e, "rdx", tmp);
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "_str_cat");
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
     if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
         emit_mov(e, "rcx", "[rax]");
         emit_stack_load(e, "rax", tmp);
