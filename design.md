@@ -1,27 +1,45 @@
-# Epic v0 design
+# Epic v0 language design
 
 ## Core direction
 
-- User programs do not write pointer types. `&T` and `&&T` are compiler-internal codegen types only.
+- Epic is a small C-like systems language targeting Windows x64 in v0.
+- Source files use the `.ep` extension.
+- Blocks use `{}` and statements end with `;`.
+- `if` and `while` conditions do not require parentheses.
 - `let` has no type annotation. Use `let x = expr;` or `let x;`.
-- Function parameters, return types, and struct fields keep explicit user-facing types:
-  - `i64` and `i8` are value types.
-  - `str` lowers internally to `&str`.
-  - A user struct name such as `Token` lowers internally to `&Token`.
-  - `T[]` lowers internally to `&_arr_T`.
-- v0 uses heap objects and one extra pointer hop for non-primitive values. There is no by-value struct semantics.
+- Function parameters, return types, and struct fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
 - Memory is not freed in v0; process exit is the reclamation boundary.
-- v0 self-hosting only needs to compile the compiler's own known source shape. The happy path should be correct and deterministic; error handling only needs to reject bad input, and may abort immediately instead of recovering or producing polished diagnostics.
-- v0 does not preserve forward compatibility. When the implementation and design change, self-hosting code follows the current design directly.
+- v0 self-hosting only needs to compile the compiler's own known source shape. The happy path should be correct and deterministic; error handling may abort immediately.
+- v0 does not preserve forward compatibility. When implementation and design change, self-hosting code follows the current design directly.
 
-**自举路线**: Python 版原型 → Epic 版编译器逐步替换 → 完全自举。
+**Self-hosting route**: Python prototype -> Epic compiler components -> fully self-hosted compiler.
 
-## Modules
+## Program model
 
-v0 does not add a temporary shared-file convention just to factor compiler structs during self-hosting.
+A program is a set of top-level struct and function definitions.
 
-Future module design should use folders as module/package boundaries, similar to Go packages: files in one folder share declarations, and cross-folder use goes through an explicit module mechanism. Until that exists, compiler self-hosting code should avoid duplicating shared structures and should not introduce ad hoc compatibility layers.
+There are no imports, packages, visibility rules, or per-file namespaces in v0.
+
+## Multi-file compilation
+
+The current driver can compile multiple source files as one whole program:
+
+```text
+python epic.py --main main.ep main.ep lib.ep
+```
+
+This is whole-program source merging, not a module system.
+
+All top-level structs and functions from input files are merged into one global namespace. Duplicate struct or function names are rejected.
+
+When more than one input file is provided, `--main` is required. Only the `main` function from the selected main file is used; `main` functions in non-main files are ignored.
+
+## Future modules
+
+Future module design should use folders as module/package boundaries, similar to Go packages: files in one folder share declarations, and cross-folder use goes through an explicit module mechanism.
+
+Until that exists, compiler self-hosting code should avoid duplicating shared structures and should not introduce ad hoc compatibility layers.
 
 ## Types
 
@@ -42,16 +60,19 @@ Built-in globals:
 | --- | --- | --- |
 | `argv` | `str[]` | command-line arguments, including `argv.data[0]` as the executable name |
 
-Internal lowering:
+At the language level, `str`, user structs, and dynamic arrays have reference semantics in v0. Assignment and parameter passing copy references, not object contents. There is no by-value struct or array copy semantics in v0.
 
-| User type | Internal type |
-| --- | --- |
-| `i64` | `i64` |
-| `i8` | `i8` |
-| `str` | `&str` |
-| `Token` | `&Token` |
-| `i64[]` | `&_arr_i64` |
-| `Token[]` | `&_arr_Token` |
+## Functions
+
+Function definitions use explicit parameter and return types:
+
+```epic
+fun add(a: i64, b: i64) -> i64 {
+    return a + b;
+}
+```
+
+`void` functions may use `return;` or fall off the end. `return expr;` is invalid in a `void` function.
 
 ## Structs
 
@@ -64,19 +85,13 @@ struct Token {
 }
 ```
 
-`new Token` allocates a zero-initialized heap object and returns a `Token` value at the language level. Internally that value is a pointer.
+`new Token` allocates a zero-initialized object and returns a `Token` value at the language level. Struct values have reference semantics in v0.
 
-User struct fields use fixed 8-byte slots in v0. Field offsets are `index * 8`, and struct size is `field_count * 8`. `i8` fields still load/store one byte inside their slot. Built-in runtime layouts such as `str` and dynamic arrays keep their explicit layouts.
+Field access uses `obj.field`. Field assignment uses `obj.field = value;`.
 
 ## Strings
 
-`str` is immutable and heap allocated:
-
-```text
-str = { data: &i8, len: i64 }
-```
-
-String literals are expression values. Each evaluation deep-copies bytes into a new heap `str` and appends a trailing `\0` byte for Win32 API interop. `len` excludes that trailing null byte.
+`str` is immutable and heap allocated. String literals produce `str` values.
 
 Supported escapes in string and character literals:
 
@@ -86,17 +101,13 @@ Supported escapes in string and character literals:
 
 String and character literals are ASCII-only in v0. Non-ASCII literals are compile errors.
 
-Mutation through `str.data[i] = ...` is not part of the language contract. Use `new i8[n]` for mutable byte buffers.
+`len` counts bytes, not characters.
 
-## Dynamic Arrays
+For self-hosting, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new i8[n]` for mutable byte buffers.
 
-Dynamic arrays use:
+## Dynamic arrays
 
-```text
-_arr_T = { data, len: i64, cap: i64 }
-```
-
-Operations:
+Dynamic arrays are heap-allocated reference values.
 
 | Expression | Meaning |
 | --- | --- |
@@ -107,11 +118,21 @@ Operations:
 | `a.len` | current length |
 | `a.cap` | current capacity |
 
-Primitive arrays store primitive values. Struct and `str` arrays store references. `.data`, `.len`, and `.cap` remain exposed in v0 as a self-hosting escape hatch.
+`new T[n]` sets capacity, not length. The initial `len` is always 0.
 
-## Program Exit
+For self-hosting, v0 exposes `a.data`, `a.len`, and `a.cap` as low-level fields.
 
-`main` is the process entry point and has type `void`:
+## System calls
+
+`sys.*` names are reserved for selected system/runtime calls exposed by the compiler.
+
+In v0, `sys` is not a module, package, object, or namespace value. Calls such as `sys.ExitProcess(0)` are recognized specially by the compiler.
+
+General method calls are not supported in v0.
+
+## Program exit
+
+The program entry function must be exactly:
 
 ```epic
 fun main() -> void {
@@ -121,46 +142,30 @@ fun main() -> void {
 
 Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `sys.ExitProcess(code)`.
 
+`main -> i64` is not part of the v0 design.
+
 ## Builtins
 
-| Builtin | Signature | Notes |
-| --- | --- | --- |
-| `putc` | `putc(c: i64) -> void` | writes one byte |
-| `putstr` | `putstr(s: str) -> void` | writes `s.data` for `s.len` bytes |
-| `str_new` | `str_new(bytes: i8[], len: i64) -> str` | deep-copies bytes into a string |
-| `itoa` | `itoa(n: i64) -> str` | integer to heap string |
-| `system` | `system(cmd: str) -> i64` | returns process exit code or `-1` |
-| `read_file` | `read_file(path: str) -> str` | reads a whole file or returns empty string on failure |
-| `write_file` | `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
-| `append_file` | `append_file(path: str, data: str) -> i64` | appends to a file, creating it if needed, and returns bytes written, or `-1` on failure |
-| `push` | `push(a: T[], x: T) -> void` | appends to dynamic array |
+| Builtin | Meaning |
+| --- | --- |
+| `putc(c: i64) -> void` | writes one byte |
+| `putstr(s: str) -> void` | writes string bytes |
+| `str_new(bytes, len) -> str` | creates a string by copying `len` bytes from a low-level byte buffer such as `buf.data` |
+| `itoa(n: i64) -> str` | converts an integer to a heap string |
+| `system(cmd: str) -> i64` | runs a command and returns its process exit code, or `-1` on failure |
+| `read_file(path: str) -> str` | reads a whole file, or returns empty string on failure |
+| `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
+| `append_file(path: str, data: str) -> i64` | appends to a file, creating it if needed, and returns bytes written, or `-1` on failure |
+| `push(a: T[], x: T) -> void` | appends to a dynamic array |
 
 `argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for self-hosting: whitespace separates arguments, and double quotes group an argument.
 
-## Compiler Outputs
+## Unsupported in v0
 
-`epicc.py` writes generated files under `build/` by default and preserves source-relative paths:
-
-```text
-examples/m1_exit.ep -> build/examples/m1_exit.asm
-examples/m1_exit.ep -> build/examples/m1_exit.obj
-examples/m1_exit.ep -> build/examples/m1_exit.exe
-```
-
-Use `--out-dir DIR` to choose another output directory.
-
-## Codegen self-hosting plan
-
-The first Epic implementation of codegen is a standalone program:
-
-```text
-codegen <input.ep> <output.asm>
-```
-
-It reads one source file, calls the self-hosted lexer and parser directly, and emits a complete NASM file to `output.asm`. Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen appends those files to the generated program with `read_file` and `append_file`.
-
-Initial acceptance is behavioral, not textual: assembly generated by Epic codegen must assemble, link, and pass the single-file `examples/*.ep` tests. The first implementation slice targets `m1_exit.ep` through `m7_str.ep`.
-
-The first Epic codegen uses compiler-generated temp locals for expression intermediates. Each function reserves 64 hidden `i64` temp locals in its stack frame. Temps are reset at the start of each statement, and call arguments are evaluated left-to-right into temps before loading `rcx`, `rdx`, `r8`, and `r9`.
-
-Unsupported AST shapes should fail fast through a simple codegen error and `exit(1)`.
+- User-written pointer types.
+- General module/import/package system.
+- General method calls.
+- By-value struct or array semantics.
+- Memory freeing.
+- Unicode string semantics.
+- Polished diagnostics or error recovery.
