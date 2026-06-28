@@ -626,6 +626,15 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
             return user_type(bt.name);
         }
     }
+    if expr.kind == "Slice" {
+        let bt = expr_type(e, expr.base);
+        if bt.kind == "str" {
+            return type_str();
+        }
+        if bt.kind == "array" {
+            return bt;
+        }
+    }
     return type_i64();
 }
 
@@ -1152,6 +1161,118 @@ fun emit_subscript(e: EmitterState, expr: AstNode) -> i64 {
     return 0;
 }
 
+fun emit_slice(e: EmitterState, expr: AstNode) -> i64 {
+    let base_type = expr_type(e, expr.base);
+    if base_type.kind != "str" && base_type.kind != "array" {
+        die("slice base must be str or array");
+    }
+    emit_expr(e, expr.base);
+    let base_slot = temp_save_rax(e);
+    if expr.start.kind == "" {
+        emit_mov(e, "rax", "0");
+    } else {
+        emit_expr(e, expr.start);
+    }
+    let start_slot = temp_save_rax(e);
+    if expr.end.kind == "" {
+        emit_stack_load(e, "rax", base_slot);
+        emit_mov(e, "rax", "[rax+8]");
+    } else {
+        emit_expr(e, expr.end);
+    }
+    let end_slot = temp_save_rax(e);
+
+    let fail_id = fresh_label(e);
+    let ok_id = fresh_label(e);
+    emit_stack_load(e, "rax", start_slot);
+    emit_inst(e, "cmp rax, 0");
+    emit_jmp_id(e, "jl", "L", fail_id);
+    emit_stack_load(e, "rax", end_slot);
+    emit_inst(e, "cmp rax, 0");
+    emit_jmp_id(e, "jl", "L", fail_id);
+    emit_stack_load(e, "rcx", start_slot);
+    emit_inst(e, "cmp rcx, rax");
+    emit_jmp_id(e, "jg", "L", fail_id);
+    emit_stack_load(e, "rcx", base_slot);
+    emit_inst(e, "cmp rax, [rcx+8]");
+    emit_jmp_id(e, "jg", "L", fail_id);
+    emit_jmp_id(e, "jmp", "L", ok_id);
+    emit_label_id(e, "L", fail_id);
+    emit_inst(e, "mov ecx, 1");
+    emit_call_inst(e, "ExitProcess");
+    emit_label_id(e, "L", ok_id);
+
+    if base_type.kind == "str" {
+        emit_stack_load(e, "rcx", base_slot);
+        emit_stack_load(e, "rdx", start_slot);
+        emit_stack_load(e, "r8", end_slot);
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "_str_slice");
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
+
+    let elem = base_type.name;
+    let el_size = 8;
+    if elem == "i8" { el_size = 1; }
+    emit_stack_load(e, "rax", end_slot);
+    emit_stack_load(e, "rcx", start_slot);
+    emit_inst(e, "sub rax, rcx");
+    let count_slot = temp_save_rax(e);
+
+    emit_mov(e, "rcx", "[_heap]");
+    emit_mov(e, "edx", "8");
+    emit_mov(e, "r8d", "24");
+    emit_inst(e, "sub rsp, 40");
+    emit_call_inst(e, "HeapAlloc");
+    emit_inst(e, "add rsp, 40");
+    let header_slot = temp_save_rax(e);
+    emit_stack_load(e, "rcx", header_slot);
+    emit_stack_load(e, "rax", count_slot);
+    emit_mov(e, "[rcx+8]", "rax");
+    emit_mov(e, "[rcx+16]", "rax");
+
+    emit_stack_load(e, "r8", count_slot);
+    if el_size != 1 {
+        out_s(e, "    imul r8, ");
+        out_i(e, el_size);
+        out_nl(e);
+    }
+    emit_mov(e, "rcx", "[_heap]");
+    emit_mov(e, "edx", "8");
+    emit_inst(e, "sub rsp, 40");
+    emit_call_inst(e, "HeapAlloc");
+    emit_inst(e, "add rsp, 40");
+    let data_slot = temp_save_rax(e);
+    emit_stack_load(e, "rcx", header_slot);
+    emit_mov(e, "[rcx]", "rax");
+
+    let loop_id = fresh_label(e);
+    let done_id = fresh_label(e);
+    emit_stack_load(e, "rax", base_slot);
+    emit_inst(e, "mov r8, [rax]");
+    emit_stack_load(e, "r9", data_slot);
+    emit_stack_load(e, "r10", start_slot);
+    emit_stack_load(e, "r11", count_slot);
+    emit_inst(e, "xor rax, rax");
+    emit_label_id(e, "L", loop_id);
+    emit_inst(e, "cmp rax, r11");
+    emit_jmp_id(e, "jge", "L", done_id);
+    if el_size == 1 {
+        emit_inst(e, "mov cl, [r8+r10]");
+        emit_inst(e, "mov [r9+rax], cl");
+    } else {
+        emit_inst(e, "mov rcx, [r8+r10*8]");
+        emit_inst(e, "mov [r9+rax*8], rcx");
+    }
+    emit_inst(e, "inc r10");
+    emit_inst(e, "inc rax");
+    emit_jmp_id(e, "jmp", "L", loop_id);
+    emit_label_id(e, "L", done_id);
+    emit_stack_load(e, "rax", header_slot);
+    return 0;
+}
+
 fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
     if expr.kind == "Literal" {
         emit_mov(e, "rax", expr.value);
@@ -1200,6 +1321,10 @@ fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
     }
     if expr.kind == "Subscript" {
         emit_subscript(e, expr);
+        return 0;
+    }
+    if expr.kind == "Slice" {
+        emit_slice(e, expr);
         return 0;
     }
     die("unsupported expr");

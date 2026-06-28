@@ -124,6 +124,7 @@ User struct fields use fixed 8-byte slots in v0.
 - `sys.*` calls are recognized specially.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
+- Expression postfixes support checked indexing and copy slices for strings and arrays.
 
 ## Codegen notes
 
@@ -156,7 +157,9 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `write_file` | calls `_write_file` runtime helper |
 | `append_file` | calls `_append_file` runtime helper |
 | `str_new` | calls `_str_alloc` runtime helper |
+| `len` / `cap` | emitted directly for strings and dynamic arrays |
 | `push` | emitted by codegen for dynamic arrays |
+| slice syntax | calls `_str_slice` for strings and emits array copy loops directly |
 
 ## Codegen self-hosting
 
@@ -181,7 +184,7 @@ python runtests.py --linker py
 Current known result:
 
 ```text
-40 passed, 0 failed
+46 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.

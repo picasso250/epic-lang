@@ -27,6 +27,8 @@ struct AstNode {
     object: AstNode;
     base: AstNode;
     index: AstNode;
+    start: AstNode;
+    end: AstNode;
     count: AstNode;
 }
 
@@ -66,6 +68,8 @@ fun ast_node(kind: str) -> AstNode {
     n.object = ast_empty();
     n.base = ast_empty();
     n.index = ast_empty();
+    n.start = ast_empty();
+    n.end = ast_empty();
     n.count = ast_empty();
     return n;
 }
@@ -360,11 +364,7 @@ fun parse_assign_stmt(p: Parser) -> AstNode {
             lhs = n;
         } else {
             if check(p, "LBRACKET") == 1 {
-                let n = ast_node("Subscript");
-                n.base = lhs;
-                n.index = parse_expr(p);
-                expect(p, "RBRACKET");
-                lhs = n;
+                lhs = parse_bracket_postfix(p, lhs);
             } else {
                 done = 1;
             }
@@ -395,6 +395,36 @@ fun parse_assign_stmt(p: Parser) -> AstNode {
     }
     parse_error(name.line, "Invalid assignment target");
     return ast_empty();
+}
+
+fun parse_bracket_postfix(p: Parser, base: AstNode) -> AstNode {
+    let n = ast_empty();
+    if peek_kind(p, "COLON") == 1 {
+        expect(p, "COLON");
+        n = ast_node("Slice");
+        n.base = base;
+        if peek_kind(p, "RBRACKET") == 0 {
+            n.end = parse_expr(p);
+        }
+        expect(p, "RBRACKET");
+        return n;
+    }
+    let first = parse_expr(p);
+    if check(p, "COLON") == 1 {
+        n = ast_node("Slice");
+        n.base = base;
+        n.start = first;
+        if peek_kind(p, "RBRACKET") == 0 {
+            n.end = parse_expr(p);
+        }
+        expect(p, "RBRACKET");
+        return n;
+    }
+    n = ast_node("Subscript");
+    n.base = base;
+    n.index = first;
+    expect(p, "RBRACKET");
+    return n;
 }
 
 fun parse_if_stmt(p: Parser) -> AstNode {
@@ -505,11 +535,7 @@ fun parse_postfix(p: Parser, node: AstNode) -> AstNode {
             }
         } else {
             if check(p, "LBRACKET") == 1 {
-                let n = ast_node("Subscript");
-                n.base = current;
-                n.index = parse_expr(p);
-                expect(p, "RBRACKET");
-                current = n;
+                current = parse_bracket_postfix(p, current);
             } else {
                 done = 1;
             }
@@ -701,6 +727,8 @@ fun dump_node(node: AstNode, depth: i64) -> i64 {
     dump_node(node.object, depth + 1);
     dump_node(node.base, depth + 1);
     dump_node(node.index, depth + 1);
+    dump_node(node.start, depth + 1);
+    dump_node(node.end, depth + 1);
     dump_node(node.count, depth + 1);
     dump_list(node.args, depth + 1);
     return 0;
