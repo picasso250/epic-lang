@@ -1,5 +1,4 @@
 # Build artifacts
-*.asm
 *.obj
 *.exe
 build/

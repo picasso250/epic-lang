@@ -17,6 +17,12 @@
 
 **自举路线**: Python 版原型 → Epic 版编译器逐步替换 → 完全自举。
 
+## Modules
+
+v0 does not add a temporary shared-file convention just to factor compiler structs during self-hosting.
+
+Future module design should use folders as module/package boundaries, similar to Go packages: files in one folder share declarations, and cross-folder use goes through an explicit module mechanism. Until that exists, compiler self-hosting code should avoid duplicating shared structures and should not introduce ad hoc compatibility layers.
+
 ## Types
 
 User-facing types:

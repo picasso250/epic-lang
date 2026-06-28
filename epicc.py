@@ -14,7 +14,6 @@ import sys
 
 from codegen import Emitter
 from ast_nodes import ProgramNode
-from helpers_asm import STR_ALLOC_HELPER, ITOA_HELPER, ARGV_HELPER, SYSTEM_HELPER, LISTDIR_HELPER, READ_FILE_HELPER, WRITE_FILE_HELPER, APPEND_FILE_HELPER
 from lexer import LexError, lex
 from parser import ParseError, Parser
 
@@ -26,6 +25,17 @@ LLD_LINK = os.path.join(TOOLS_DIR, "lld-link.exe")
 LINK_PY = os.path.join(SCRIPT_DIR, "link.py")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
+RUNTIME_DIR = os.path.join(SCRIPT_DIR, "runtime")
+RUNTIME_ASM_FILES = [
+    "str_alloc.asm",
+    "itoa.asm",
+    "argv.asm",
+    "system.asm",
+    "listdir.asm",
+    "read_file.asm",
+    "write_file.asm",
+    "append_file.asm",
+]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -53,6 +63,13 @@ def _parse_file(input_path):
     tokens = lex(source)
     parser = Parser(tokens)
     return parser.parse_program()
+
+
+def _emit_runtime_helpers(emitter):
+    for name in RUNTIME_ASM_FILES:
+        path = os.path.join(RUNTIME_DIR, name)
+        with open(path, "r", encoding="utf-8") as f:
+            emitter.emit(f.read().rstrip())
 
 
 def _merge_programs(input_paths, main_path):
@@ -103,14 +120,7 @@ def compile_files(input_paths, main_path=None, linker="lld-link", out_dir=BUILD_
     print(f"[2/4] Compiling → {asm_path}")
     emitter = Emitter(asm_path)
     emitter.emit_program(ast)
-    emitter.emit(STR_ALLOC_HELPER)
-    emitter.emit(ITOA_HELPER)
-    emitter.emit(ARGV_HELPER)
-    emitter.emit(SYSTEM_HELPER)
-    emitter.emit(LISTDIR_HELPER)
-    emitter.emit(READ_FILE_HELPER)
-    emitter.emit(WRITE_FILE_HELPER)
-    emitter.emit(APPEND_FILE_HELPER)
+    _emit_runtime_helpers(emitter)
     emitter.close()
 
     print(f"[3/4] Assembling → {obj_path}")
