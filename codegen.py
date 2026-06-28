@@ -351,18 +351,10 @@ class Emitter:
         for s in ast.structs:
             fields = []
             offset = 0
-            max_align = 1
             for f in s.fields:
                 ftype = self._internal_type(f.type)
-                fsize = self._type_size(ftype)
-                falign = 8 if ftype in self.structs else fsize
-                if offset % falign != 0:
-                    offset += falign - (offset % falign)
                 fields.append({"name": f.name, "type": ftype, "offset": offset})
-                offset += fsize
-                max_align = max(max_align, falign)
-            if offset % max_align != 0:
-                offset += max_align - (offset % max_align)
+                offset += 8
             self.structs[s.name] = {"fields": fields, "size": offset}
 
     def _pre_scan_block(self, block):

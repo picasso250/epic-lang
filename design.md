@@ -66,7 +66,7 @@ struct Token {
 
 `new Token` allocates a zero-initialized heap object and returns a `Token` value at the language level. Internally that value is a pointer.
 
-Structs are naturally 8-byte aligned for v0 simplicity.
+User struct fields use fixed 8-byte slots in v0. Field offsets are `index * 8`, and struct size is `field_count * 8`. `i8` fields still load/store one byte inside their slot. Built-in runtime layouts such as `str` and dynamic arrays keep their explicit layouts.
 
 ## Strings
 
