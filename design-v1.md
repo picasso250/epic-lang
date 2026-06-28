@@ -151,8 +151,10 @@ Before committing to an Epic linker, v1 should first add enough byte-buffer
 surface to make the port direct and testable. A possible minimal direction:
 
 ```epic
-read_bytes(path: str) -> i8[]
-write_bytes(path: str, data: i8[]) -> i64
+read_file(path: str) -> i8[]
+write_file(path: str, data: i8[]) -> i64
+str(bytes: i8[]) -> str
+bytes(s: str) -> i8[]
 u16_le(buf: i8[], off: i64) -> i64
 u32_le(buf: i8[], off: i64) -> i64
 u64_le(buf: i8[], off: i64) -> i64
@@ -160,6 +162,26 @@ put_u16_le(buf: i8[], off: i64, x: i64) -> void
 put_u32_le(buf: i8[], off: i64, x: i64) -> void
 put_u64_le(buf: i8[], off: i64, x: i64) -> void
 ```
+
+This is a breaking change from v0: file IO should operate on bytes, not text.
+Compiler source loading should become explicit:
+
+```epic
+let source = str(read_file(path))
+```
+
+`read_file` returns an empty `i8[]` on failure, matching the v0 happy-path style
+without introducing `Result` or exceptions.
+
+`str(i8[])` copies the full array length and appends a trailing NUL for C
+compatibility. It does not scan for interior NUL bytes in v1; if such bytes are
+present, C APIs will observe the string only up to the first NUL. That is the
+caller's responsibility in the v1 happy path.
+
+Epic `str` remains length-carrying and NUL-terminated. Even an empty string
+should have non-null data pointing at a NUL byte. The implementation may later
+use a global empty string/data object for performance, but `data = 0` is not the
+empty string representation.
 
 The linker should not block the first v1 syntax/string/indexing pass. It should
 be considered after byte-buffer support exists, and it can become the proof that
