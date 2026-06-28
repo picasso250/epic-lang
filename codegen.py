@@ -14,7 +14,7 @@ from ast_nodes import *
 class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
-        self.builtins = {"exit", "putc", "putstr",
+        self.builtins = {"putc", "putstr",
                          "itoa", "system",
                          "str_new", "read_file", "write_file",
                          "append_file", "push"}
@@ -231,8 +231,10 @@ class Emitter:
         # Body
         self.emit_block(body)
 
-        # Epilogue (only for non-main; main never returns via ret)
-        if name != "main":
+        if name == "main":
+            self.emit_mov("ecx", "0")
+            self.emit_call_inst("ExitProcess")
+        else:
             self.emit_label(self.current_ep_label)
             self.emit_mov("rsp", "rbp")
             self.emit_inst("pop rbp")
@@ -470,11 +472,15 @@ class Emitter:
 
     def emit_return(self, stmt):
         if self.current_fn == "main":
-            self.emit_expr(stmt.expr)
-            self.emit_mov("ecx", "eax")
+            if stmt.expr is None:
+                self.emit_mov("ecx", "0")
+            else:
+                self.emit_expr(stmt.expr)
+                self.emit_mov("ecx", "eax")
             self.emit_call_inst("ExitProcess")
         else:
-            self.emit_expr(stmt.expr)
+            if stmt.expr is not None:
+                self.emit_expr(stmt.expr)
             ep_label = getattr(self, "current_ep_label", f"{self.current_fn}_ep")
             self.emit_jmp(ep_label)
 
@@ -596,11 +602,7 @@ class Emitter:
             return
 
         if name in self.builtins:
-            if name == "exit":
-                self.emit_expr(args[0])
-                self.emit_mov("ecx", "eax")
-                self.emit_call_inst("ExitProcess")
-            elif name == "putc":
+            if name == "putc":
                 self.emit_expr(args[0])
                 self.emit_mov("[_buf]", "al")
                 self.emit_mov("ecx", "-11")
@@ -1125,7 +1127,7 @@ class Emitter:
                 return "&str"
             if name in ("system", "write_file", "append_file"):
                 return "i64"
-            if name in ("exit", "putc", "putstr"):
+            if name in ("putc", "putstr"):
                 return "void"
             # User-defined function
             if name in self.funcs:

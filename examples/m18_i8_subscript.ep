@@ -1,6 +1,6 @@
 # EXIT: 66
-fun main() -> i64 {
+fun main() -> void {
     let s = "ABC";
     let bytes = s.data;
-    return bytes[1];
+    sys.ExitProcess(bytes[1]);
 }

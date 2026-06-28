@@ -4,7 +4,7 @@ struct Node {
     next: Node;
 }
 
-fun main() -> i64 {
+fun main() -> void {
     let a = new Node;
     a.val = 10;
     let b = new Node;
@@ -12,6 +12,6 @@ fun main() -> i64 {
     a.next = b;
 
     # a.next.val should be 20
-    return a.next.val;
+    sys.ExitProcess(a.next.val);
 }
 # EXIT: 20

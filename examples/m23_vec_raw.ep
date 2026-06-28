@@ -5,7 +5,7 @@ struct Point {
     y: i64;
 }
 
-fun main() -> i64 {
+fun main() -> void {
     let points = new Point[4];
     let p = new Point;
     p.x = 42;
@@ -15,6 +15,6 @@ fun main() -> i64 {
 
     let p2 = points.data[0];
     let result = p2.x + p2.y;
-    return result;
+    sys.ExitProcess(result);
 }
 # EXIT: 141

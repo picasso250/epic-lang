@@ -10,11 +10,11 @@ fun sum(p: Point) -> i64 {
     return p.x + p.y;
 }
 
-fun main() -> i64 {
+fun main() -> void {
     let p = new Point;
     p.x = 100;
     p.y = 100;
     putstr(itoa(sum(p)));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

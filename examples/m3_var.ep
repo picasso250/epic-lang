@@ -1,12 +1,12 @@
 # EXIT: 0
 # STDOUT: 42
 # STDOUT: 43
-fun main() -> i64 {
+fun main() -> void {
     let x = 42;
     putstr(itoa(x));
     putc(10);
     x = x + 1;
     putstr(itoa(x));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

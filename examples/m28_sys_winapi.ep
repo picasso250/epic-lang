@@ -2,7 +2,7 @@
 # STDOUT: 1
 # CLEAN: test_sys_create.tmp
 
-fun main() -> i64 {
+fun main() -> void {
     sys.Sleep(1);
     let t = sys.GetTickCount64();
     let n = sys.lstrlenA("abc");
@@ -11,7 +11,7 @@ fun main() -> i64 {
     if t >= 0 && n == 3 && c == 0 && h + 1 != 0 {
         sys.CloseHandle(h);
         putc(49);
-        return 0;
+        sys.ExitProcess(0);
     }
-    return 1;
+    sys.ExitProcess(1);
 }

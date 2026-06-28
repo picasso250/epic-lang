@@ -4,10 +4,10 @@ struct Token {
     kind: i64;
 }
 
-fun main() -> i64 {
+fun main() -> void {
     let a = 5;
     let b = 6;
     let c = 7;
     let arr = new Token[1];
-    return a + b + c;
+    sys.ExitProcess(a + b + c);
 }

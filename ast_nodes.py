@@ -54,7 +54,7 @@ class BlockNode(ASTNode):
 
 @dataclass
 class ReturnNode(ASTNode):
-    expr: ASTNode
+    expr: Optional[ASTNode]
     line: int
 
 

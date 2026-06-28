@@ -185,7 +185,9 @@ class Parser:
     def parse_return_stmt(self):
         line = self.peek()[2]
         self.expect("RETURN")
-        expr = self.parse_expr()
+        expr = None
+        if not self.peek_kind("SEMICOLON"):
+            expr = self.parse_expr()
         self.expect("SEMICOLON")
         return ReturnNode(expr=expr, line=line)
 

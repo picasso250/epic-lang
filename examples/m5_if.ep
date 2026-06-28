@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 1
 # STDOUT: 2
-fun main() -> i64 {
+fun main() -> void {
     let x = 10;
     if x > 5 {
         putstr(itoa(1));
@@ -14,5 +14,5 @@ fun main() -> i64 {
         putstr(itoa(2));
         putc(10);
     }
-    exit(0);
+    sys.ExitProcess(0);
 }

@@ -2,7 +2,7 @@
 # STDOUT: 42
 # STDOUT: 2
 # CLEAN: test_out.txt
-fun main() -> i64 {
+fun main() -> void {
     let s = "42";
     let n = write_file("test_out.txt", s);
     let inp = read_file("test_out.txt");
@@ -12,5 +12,5 @@ fun main() -> i64 {
     putc(10);
     putstr(itoa(n));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

@@ -2,7 +2,7 @@
 # STDOUT: A
 # STDOUT: Epic
 # STDOUT: 65
-fun main() -> i64 {
+fun main() -> void {
     let a = 65;
     putc(a);
     let b = 10;
@@ -17,5 +17,5 @@ fun main() -> i64 {
     putc(10);
     putstr(itoa(a));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

@@ -1,5 +1,5 @@
 # EXIT: 35
-fun main() -> i64 {
+fun main() -> void {
     let src = read_file("examples/m1_exit.ep");
-    return src.data[0];
+    sys.ExitProcess(src.data[0]);
 }

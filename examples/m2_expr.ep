@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 7
-fun main() -> i64 {
+fun main() -> void {
     putstr(itoa(1 + 2 * 3));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

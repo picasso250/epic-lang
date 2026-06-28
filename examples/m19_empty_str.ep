@@ -1,5 +1,5 @@
 # EXIT: 0
-fun main() -> i64 {
+fun main() -> void {
     putstr("");
-    return 0;
+    sys.ExitProcess(0);
 }

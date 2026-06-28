@@ -5,9 +5,9 @@ struct Point {
     y: i64;
 }
 
-fun main() -> i64 {
+fun main() -> void {
     let p = new Point;
     p.x = 30;
     p.y = 20;
-    return p.x + p.y;
+    sys.ExitProcess(p.x + p.y);
 }

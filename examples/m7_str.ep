@@ -1,10 +1,10 @@
 # EXIT: 0
 # STDOUT: Hello, Epic!
 # STDOUT: 42
-fun main() -> i64 {
+fun main() -> void {
     putstr("Hello, Epic!");
     putc(10);
     putstr(itoa(42));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

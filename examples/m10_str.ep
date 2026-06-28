@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: hellobye!
-fun main() -> i64 {
+fun main() -> void {
     let s = "hello";
     putstr(s);
 
@@ -14,5 +14,5 @@ fun main() -> i64 {
         putstr("!");
     }
 
-    exit(0);
+    sys.ExitProcess(0);
 }

@@ -1,9 +1,9 @@
 # EXIT: 0
 # STDOUT: 7
 
-fun main() -> i64 {
+fun main() -> void {
     let e = system("cmd /c exit 7");
     putstr(itoa(e));
     putc(10);
-    exit(0);
+    sys.ExitProcess(0);
 }

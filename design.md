@@ -34,7 +34,7 @@ User-facing types:
 | `str` | immutable heap string |
 | `Name` | heap-allocated struct reference |
 | `T[]` | heap-allocated dynamic array |
-| `void` | function return type only |
+| `void` | function return type only; no value is produced |
 
 Built-in globals:
 
@@ -109,14 +109,24 @@ Operations:
 
 Primitive arrays store primitive values. Struct and `str` arrays store references. `.data`, `.len`, and `.cap` remain exposed in v0 as a self-hosting escape hatch.
 
+## Program Exit
+
+`main` is the process entry point and has type `void`:
+
+```epic
+fun main() -> void {
+    sys.ExitProcess(0);
+}
+```
+
+Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `sys.ExitProcess(code)`.
+
 ## Builtins
 
 | Builtin | Signature | Notes |
 | --- | --- | --- |
-| `exit` | `exit(code: i64) -> void` | exits the process |
 | `putc` | `putc(c: i64) -> void` | writes one byte |
 | `putstr` | `putstr(s: str) -> void` | writes `s.data` for `s.len` bytes |
-| `strcmp` | `strcmp(a: str, b: str) -> i64` | Win32 `lstrcmpA` over null-terminated data |
 | `str_new` | `str_new(bytes: i8[], len: i64) -> str` | deep-copies bytes into a string |
 | `itoa` | `itoa(n: i64) -> str` | integer to heap string |
 | `system` | `system(cmd: str) -> i64` | returns process exit code or `-1` |
