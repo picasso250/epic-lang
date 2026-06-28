@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare the self-hosted Epic lexer against the Python lexer oracle.
+Compare the self-hosted lexer against the Python lexer on lexer.ep and examples/*.ep.
 """
 
 import os
@@ -17,7 +17,7 @@ LEXER_EXE = os.path.join(SCRIPT_DIR, "build", "lexer.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 
 
-def oracle_dump(path):
+def python_lexer_dump(path):
     with open(path, "r", encoding="utf-8") as f:
         source = f.read()
     lines = []
@@ -26,7 +26,7 @@ def oracle_dump(path):
     return "\n".join(lines) + ("\n" if lines else "")
 
 
-def epic_dump(path):
+def bootstrap_lexer_dump(path):
     result = subprocess.run(
         [LEXER_EXE, path],
         cwd=SCRIPT_DIR,
@@ -40,7 +40,7 @@ def epic_dump(path):
     return result.stdout
 
 
-def compile_lexer():
+def ensure_bootstrap_lexer():
     result = subprocess.run(
         [sys.executable, EPICC, LEXER_EP],
         cwd=SCRIPT_DIR,
@@ -53,7 +53,7 @@ def compile_lexer():
         raise RuntimeError(result.stdout + result.stderr)
 
 
-def test_paths():
+def lexer_test_paths():
     paths = [LEXER_EP]
     for name in sorted(os.listdir(EXAMPLES_DIR)):
         if name.endswith(".ep"):
@@ -62,18 +62,21 @@ def test_paths():
 
 
 def main():
-    compile_lexer()
+    ensure_bootstrap_lexer()
+    paths = lexer_test_paths()
     passed = 0
     failed = 0
-    for path in test_paths():
+
+    print(f"Comparing lexer dumps for {len(paths)} files...\n")
+    for path in paths:
         rel = os.path.relpath(path, SCRIPT_DIR)
-        expected = oracle_dump(path)
-        actual = epic_dump(path)
+        expected = python_lexer_dump(path)
+        actual = bootstrap_lexer_dump(path)
         if actual == expected:
-            print(f"PASS {rel}")
+            print(f"  PASS   {rel}")
             passed += 1
             continue
-        print(f"FAIL {rel}")
+        print(f"  FAIL   {rel}")
         failed += 1
         exp_lines = expected.splitlines()
         act_lines = actual.splitlines()

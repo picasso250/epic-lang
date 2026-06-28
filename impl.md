@@ -187,7 +187,7 @@ Current known result:
 Bootstrap checks:
 
 ```text
-python test_lexer.py
+python test_lexer_bootstrap.py
 python test_parser_bootstrap.py
 python test_codegen_bootstrap.py
 ```
