@@ -138,7 +138,7 @@ def compile_files(input_paths, main_path=None, linker="lld-link", out_dir=BUILD_
         )
     else:
         result = subprocess.run(
-            [LLD_LINK, "/subsystem:console", f"/entry:_start",
+            [LLD_LINK, "/subsystem:console", "/timestamp:0", f"/entry:_start",
              f"/out:{exe_path}", obj_path,
              os.path.join(SDK_LIB, "kernel32.lib"),
              os.path.join(SDK_LIB, "user32.lib")],

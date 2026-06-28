@@ -10,6 +10,28 @@ IMAGE_SUBSYSTEM_WINDOWS_CUI = 3
 SECTION_ALIGN = 0x1000
 FILE_ALIGN = 0x200
 IMAGE_BASE = 0x140000000
+DOS_STUB = bytes.fromhex(
+    "4d5a780001000000040000000000000000000000000000004000000000000000"
+    "0000000000000000000000000000000000000000000000000000000078000000"
+    "0e1fba0e00b409cd21b8014ccd21546869732070726f6772616d2063616e6e"
+    "6f742062652072756e20696e20444f53206d6f64652e240000"
+)
+
+KERNEL32_HINTS = {
+    "CloseHandle": 157,
+    "CreateFileA": 222,
+    "CreateProcessA": 253,
+    "ExitProcess": 390,
+    "GetCommandLineA": 511,
+    "GetExitCodeProcess": 615,
+    "GetFileSize": 631,
+    "GetProcessHeap": 740,
+    "HeapAlloc": 892,
+    "ReadFile": 1193,
+    "SetFilePointer": 1384,
+    "WaitForSingleObject": 1573,
+    "WriteFile": 1632,
+}
 
 
 def sym_name(sym, strtab):
@@ -75,8 +97,8 @@ def link(obj_path, exe_path):
     text_sec = next(s for s in sections if 'text' in s['name'])
     data_sec = next(s for s in sections if 'data' in s['name'])
     text_rva = 0x1000
-    data_rva = 0x2000
-    idata_rva = 0x3000
+    idata_rva = 0x2000
+    data_rva = 0x3000
 
     # Map section index → RVA
     sec_rva = {}
@@ -93,18 +115,24 @@ def link(obj_path, exe_path):
                 entry_rva = sec_rva.get(s['section'] - 1, 0) + s['value']
                 break
 
-    # ── Build .idata ──
+    # Match lld-link's stable import ordering for reproducible output.
+    imports = sorted(imports, key=str.lower)
+
+    # ── Build .rdata import tables ──
     idata, iat_map = build_idata(imports, idata_rva)
 
     # ── Build thunks ──
+    while len(text_sec['data']) % 16:
+        text_sec['data'].append(0xCC)
     thunk_base = text_rva + len(text_sec['data'])
     thunks = bytearray()
     thunk_rva = {}
     for func in imports:
         thunk_rva[func] = thunk_base + len(thunks)
         disp = idata_rva + iat_map[func] - (thunk_rva[func] + 6)
-        thunks += b'\xff\x25' + struct.pack('<i', disp)
+        thunks += b'\xff\x25' + struct.pack('<i', disp) + b'\xCC' * 10
     text_sec['data'].extend(thunks)
+    text_sec['virtual_sz'] = thunk_rva[imports[-1]] + 6 - text_rva if imports else len(text_sec['data'])
 
     # ── Patch all REL32s ──
     for (si, rva, sym_i) in relocs:
@@ -128,13 +156,14 @@ def link(obj_path, exe_path):
 def build_idata(imports, idata_rva):
     if not imports: return b'', {}
     ILT_OFF = 40
-    ILT_SIZE = len(imports) * 8 + 8
-    HINT_OFF = ILT_OFF + ILT_SIZE
+    TABLE_SIZE = len(imports) * 8 + 8
+    IAT_OFF = ILT_OFF + TABLE_SIZE
+    HINT_OFF = IAT_OFF + TABLE_SIZE
 
     iat_map = {}
     hint_blob = bytearray()
     for func in imports:
-        hint_blob += struct.pack('<H', 0) + func.encode() + b'\x00'
+        hint_blob += struct.pack('<H', KERNEL32_HINTS.get(func, 0)) + func.encode() + b'\x00'
         if len(hint_blob) % 2: hint_blob += b'\x00'
 
     DLL_OFF = HINT_OFF + len(hint_blob)
@@ -143,41 +172,41 @@ def build_idata(imports, idata_rva):
         hoff = sum(2 + len(f.encode()) + 1 + (1 if (2 + len(f.encode()) + 1) % 2 else 0)
                    for f in imports[:idx])
         ilt += struct.pack('<Q', idata_rva + HINT_OFF + hoff)
-        iat_map[func] = ILT_OFF + idx * 8
+        iat_map[func] = IAT_OFF + idx * 8
     ilt += struct.pack('<Q', 0)
+    iat = bytearray(ilt)
 
     idt = struct.pack('<IIIII', idata_rva + ILT_OFF, 0, 0,
-                      idata_rva + DLL_OFF, idata_rva + ILT_OFF)
+                      idata_rva + DLL_OFF, idata_rva + IAT_OFF)
     idt += bytes(20)
-    return bytes(idt + ilt + hint_blob) + b'kernel32.dll\x00', iat_map
+    return bytes(idt + ilt + iat + hint_blob) + b'KERNEL32.dll\x00', iat_map
 
 
 def write_pe(path, text_sec, data_sec, idata, idata_rva, imports, entry_rva):
-    TEXT_RVA, DATA_RVA = 0x1000, 0x2000
+    TEXT_RVA, DATA_RVA = 0x1000, 0x3000
     all_sec = [
-        ('.text', TEXT_RVA, bytes(text_sec['data']), 0x60000020),
-        ('.data', DATA_RVA, bytes(data_sec['data']), 0xC0000040),
+        ('.text', TEXT_RVA, bytes(text_sec['data']), 0x60000020, text_sec.get('virtual_sz', len(text_sec['data']))),
     ]
     if idata:
-        all_sec.append(('.idata', idata_rva, idata, 0xC0000040))
+        all_sec.append(('.rdata', idata_rva, idata, 0x40000040, len(idata)))
+    all_sec.append(('.data', DATA_RVA, bytes(data_sec['data']), 0xC0000040, len(data_sec['data'])))
     num_sec = len(all_sec)
 
     text_raw = align(len(text_sec['data']), FILE_ALIGN)
     data_raw = align(len(data_sec['data']), FILE_ALIGN)
     idata_raw = align(len(idata), FILE_ALIGN) if idata else 0
-    last_rva = idata_rva if idata else DATA_RVA
-    last_sz = len(idata) if idata else len(data_sec['data'])
+    last_rva = all_sec[-1][1]
+    last_sz = all_sec[-1][4]
     image_size = align(last_rva + last_sz, SECTION_ALIGN)
 
     OPT_HDR = 240
-    headers_sz = align(64 + 4 + 20 + OPT_HDR + num_sec * 40, FILE_ALIGN)
+    headers_sz = 0x400
 
-    buf = bytearray(b'MZ' + b'\x00' * 58)
-    buf[0x3C:0x40] = struct.pack('<I', 0x40)
+    buf = bytearray(DOS_STUB)
     buf += b'PE\x00\x00'
     buf += struct.pack('<HHIIIHH', IMAGE_FILE_MACHINE_AMD64, num_sec,
                        0, 0, 0, OPT_HDR, 0x0022)
-    buf += struct.pack('<HBB', 0x020B, 0, 0)
+    buf += struct.pack('<HBB', 0x020B, 14, 0)
     buf += struct.pack('<III', text_raw, data_raw + idata_raw, 0)
     buf += struct.pack('<II', entry_rva, TEXT_RVA)
     buf += struct.pack('<Q', IMAGE_BASE)
@@ -194,29 +223,35 @@ def write_pe(path, text_sec, data_sec, idata, idata_rva, imports, entry_rva):
     # Data directories
     buf += struct.pack('<II', 0, 0)
     if idata:
-        buf += struct.pack('<II', idata_rva, (len(imports) + 1) * 20)
+        buf += struct.pack('<II', idata_rva, 40)
     else:
         buf += struct.pack('<II', 0, 0)
-    buf += bytes(14 * 8)
+    buf += bytes(10 * 8)
+    if idata:
+        buf += struct.pack('<II', idata_rva + 40 + (len(imports) + 1) * 8, (len(imports) + 1) * 8)
+    else:
+        buf += struct.pack('<II', 0, 0)
+    buf += bytes(3 * 8)
     # Section headers
-    for name, rva, sdata, chars in all_sec:
+    for name, rva, sdata, chars, virtual_sz in all_sec:
         raw_sz = align(len(sdata), FILE_ALIGN)
         buf += struct.pack('<8sIIIIIIHHI', name.encode().ljust(8, b'\x00'),
-                           len(sdata), rva, raw_sz, 0, 0, 0, 0, 0, chars)
+                           virtual_sz, rva, raw_sz, 0, 0, 0, 0, 0, chars)
     # Pad
     while len(buf) < headers_sz: buf.append(0)
     # Patch PointerToRawData
     raw_pos = headers_sz
-    opt_start = 64 + 4 + 20
-    for i, (_, _, sdata, _) in enumerate(all_sec):
+    opt_start = len(DOS_STUB) + 4 + 20
+    for i, (_, _, sdata, _, _) in enumerate(all_sec):
         hdr_pos = opt_start + OPT_HDR + i * 40
         struct.pack_into('<I', buf, hdr_pos + 20, raw_pos)
         struct.pack_into('<I', buf, hdr_pos + 16, align(len(sdata), FILE_ALIGN))
         raw_pos += align(len(sdata), FILE_ALIGN)
     # Section data
-    for _, _, sdata, _ in all_sec:
+    for name, _, sdata, _, _ in all_sec:
         buf += sdata
-        while len(buf) % FILE_ALIGN: buf.append(0)
+        pad_byte = 0xCC if name == '.text' else 0
+        while len(buf) % FILE_ALIGN: buf.append(pad_byte)
 
     with open(path, 'wb') as f: f.write(bytes(buf))
     return len(buf)
