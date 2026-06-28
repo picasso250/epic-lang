@@ -468,10 +468,26 @@ fun parse_postfix(p: Parser, node: AstNode) -> AstNode {
     while done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID");
-            let n = ast_node("FieldAccess");
-            n.object = current;
-            n.name = field.text;
-            current = n;
+            if check(p, "LPAREN") == 1 {
+                let n = ast_node("Call");
+                if strcmp(current.kind, "Var") == 0 && strcmp(current.name, "sys") == 0 {
+                    n.name = field.text;
+                    n.type_name = "sys";
+                } else {
+                    parse_error(field.line, "method calls are only supported for sys.* in v0");
+                }
+                n.args = parse_args(p);
+                expect(p, "RPAREN");
+                if n.args.len > 4 {
+                    parse_error(field.line, "function calls may have at most 4 arguments in v0");
+                }
+                current = n;
+            } else {
+                let n = ast_node("FieldAccess");
+                n.object = current;
+                n.name = field.text;
+                current = n;
+            }
         } else {
             if check(p, "LBRACKET") == 1 {
                 let n = ast_node("Subscript");

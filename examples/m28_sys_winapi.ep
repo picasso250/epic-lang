@@ -1,0 +1,14 @@
+# EXIT 0
+# STDOUT 1
+
+fun main() -> i64 {
+    sys.Sleep(1);
+    let t = sys.GetTickCount64();
+    let n = sys.lstrlenA("abc");
+    let c = sys.lstrcmpA("same", "same");
+    if t >= 0 && n == 3 && c == 0 {
+        putc(49);
+        return 0;
+    }
+    return 1;
+}

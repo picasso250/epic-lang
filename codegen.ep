@@ -140,6 +140,50 @@ fun emit_call_inst(e: EmitterState, target: str) -> i64 {
     return 0;
 }
 
+fun sys_call_symbol(name: str) -> str {
+    if strcmp(name, "sys.Sleep") == 0 { return "Sleep"; }
+    if strcmp(name, "sys.GetTickCount64") == 0 { return "GetTickCount64"; }
+    if strcmp(name, "sys.GetLastError") == 0 { return "GetLastError"; }
+    if strcmp(name, "sys.SetLastError") == 0 { return "SetLastError"; }
+    if strcmp(name, "sys.GetStdHandle") == 0 { return "GetStdHandle"; }
+    if strcmp(name, "sys.CloseHandle") == 0 { return "CloseHandle"; }
+    if strcmp(name, "sys.lstrlenA") == 0 { return "lstrlenA"; }
+    if strcmp(name, "sys.lstrcmpA") == 0 { return "lstrcmpA"; }
+    if strcmp(name, "sys.MessageBoxA") == 0 { return "MessageBoxA"; }
+    if strcmp(name, "sys.Beep") == 0 { return "Beep"; }
+    if strcmp(name, "sys.GetCurrentProcess") == 0 { return "GetCurrentProcess"; }
+    if strcmp(name, "sys.GetCurrentProcessId") == 0 { return "GetCurrentProcessId"; }
+    if strcmp(name, "sys.GetCurrentThreadId") == 0 { return "GetCurrentThreadId"; }
+    if strcmp(name, "sys.ExitProcess") == 0 { return "ExitProcess"; }
+    if strcmp(name, "sys.GetFileAttributesA") == 0 { return "GetFileAttributesA"; }
+    return "";
+}
+
+fun sys_member_symbol(ns: str, name: str) -> str {
+    if strcmp(ns, "sys") != 0 { return ""; }
+    if strcmp(name, "Sleep") == 0 { return "Sleep"; }
+    if strcmp(name, "GetTickCount64") == 0 { return "GetTickCount64"; }
+    if strcmp(name, "GetLastError") == 0 { return "GetLastError"; }
+    if strcmp(name, "SetLastError") == 0 { return "SetLastError"; }
+    if strcmp(name, "GetStdHandle") == 0 { return "GetStdHandle"; }
+    if strcmp(name, "CloseHandle") == 0 { return "CloseHandle"; }
+    if strcmp(name, "lstrlenA") == 0 { return "lstrlenA"; }
+    if strcmp(name, "lstrcmpA") == 0 { return "lstrcmpA"; }
+    if strcmp(name, "MessageBoxA") == 0 { return "MessageBoxA"; }
+    if strcmp(name, "Beep") == 0 { return "Beep"; }
+    if strcmp(name, "GetCurrentProcess") == 0 { return "GetCurrentProcess"; }
+    if strcmp(name, "GetCurrentProcessId") == 0 { return "GetCurrentProcessId"; }
+    if strcmp(name, "GetCurrentThreadId") == 0 { return "GetCurrentThreadId"; }
+    if strcmp(name, "ExitProcess") == 0 { return "ExitProcess"; }
+    if strcmp(name, "GetFileAttributesA") == 0 { return "GetFileAttributesA"; }
+    return "";
+}
+
+fun is_sys_call(name: str) -> i64 {
+    if strcmp(sys_call_symbol(name), "") == 0 { return 0; }
+    return 1;
+}
+
 fun emit_jmp(e: EmitterState, label: str) -> i64 {
     out_s(e.out_path, "    jmp ");
     out_line(e.out_path, label);
@@ -513,6 +557,8 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
     if strcmp(expr.kind, "Binary") == 0 { return type_i64(); }
     if strcmp(expr.kind, "Var") == 0 { return find_local_type(e, expr.name); }
     if strcmp(expr.kind, "Call") == 0 {
+        if is_sys_call(expr.name) == 1 { return type_i64(); }
+        if strcmp(sys_member_symbol(expr.type_name, expr.name), "") != 0 { return type_i64(); }
         if strcmp(expr.name, "itoa") == 0 { return type_str(); }
         if strcmp(expr.name, "str_new") == 0 { return type_str(); }
         if strcmp(expr.name, "read_file") == 0 { return type_str(); }
@@ -627,6 +673,30 @@ fun load_spilled_args(e: EmitterState, slots: i64[]) -> i64 {
 
 fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
     let name = expr.name;
+    let sys_symbol = sys_call_symbol(name);
+    if strcmp(sys_symbol, "") == 0 {
+        sys_symbol = sys_member_symbol(expr.type_name, expr.name);
+    }
+    if strcmp(sys_symbol, "") != 0 {
+        let slots = new i64[4];
+        let i = 0;
+        while i < expr.args.len {
+            let arg = expr.args.data[i];
+            let arg_type = expr_type(e, arg);
+            emit_expr(e, arg);
+            if strcmp(arg_type.kind, "str") == 0 {
+                emit_mov(e, "rax", "[rax]");
+            }
+            let slot = temp_save_rax(e);
+            push(slots, slot);
+            i = i + 1;
+        }
+        load_spilled_args(e, slots);
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, sys_symbol);
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
     if strcmp(name, "exit") == 0 {
         emit_expr(e, expr.args.data[0]);
         emit_mov(e, "ecx", "eax");
@@ -1137,6 +1207,16 @@ fun emit_program(e: EmitterState, ast: AstNode) -> i64 {
     out_line(e.out_path, "extern GetCommandLineA");
     out_line(e.out_path, "extern HeapAlloc");
     out_line(e.out_path, "extern GetProcessHeap");
+    out_line(e.out_path, "extern Beep");
+    out_line(e.out_path, "extern GetCurrentProcess");
+    out_line(e.out_path, "extern GetCurrentProcessId");
+    out_line(e.out_path, "extern GetCurrentThreadId");
+    out_line(e.out_path, "extern GetFileAttributesA");
+    out_line(e.out_path, "extern GetLastError");
+    out_line(e.out_path, "extern GetTickCount64");
+    out_line(e.out_path, "extern MessageBoxA");
+    out_line(e.out_path, "extern SetLastError");
+    out_line(e.out_path, "extern Sleep");
     out_line(e.out_path, "default rel");
     out_nl(e.out_path);
     out_line(e.out_path, "section .data");

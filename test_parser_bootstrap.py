@@ -93,7 +93,8 @@ def py_dump(node, depth=0):
     elif isinstance(node, VarNode):
         emit(f"Var {node.name}")
     elif isinstance(node, CallNode):
-        emit(f"Call {node.name}")
+        suffix = f" : {node.namespace}" if node.namespace else ""
+        emit(f"Call {node.name}{suffix}")
         for arg in node.args:
             out.extend(py_dump(arg, depth + 1))
     elif isinstance(node, BinaryNode):

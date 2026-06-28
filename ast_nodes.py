@@ -124,6 +124,7 @@ class VarNode(ASTNode):
 class CallNode(ASTNode):
     name: str
     args: list      # list[ASTNode]
+    namespace: str = ""
 
 
 @dataclass

@@ -51,6 +51,7 @@ EXAMPLE_SLICE = [
     "m20_c_comment.ep",
     "m21_str_data_subscript.ep",
     "m22_self_ref.ep",
+    "m28_sys_winapi.ep",
 ]
 
 
@@ -106,6 +107,7 @@ def compile_with_bootstrap_codegen(example_name):
             "/out:" + exe_path,
             obj_path,
             "kernel32.lib",
+            "user32.lib",
             "/libpath:" + SDK_LIB,
         ],
         f"link {example_name}",

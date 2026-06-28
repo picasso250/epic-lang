@@ -18,6 +18,13 @@ class Emitter:
                          "strcmp", "itoa", "system",
                          "str_new", "read_file", "write_file",
                          "append_file", "push"}
+        self.winapi = {
+            "Sleep", "GetTickCount64", "GetLastError", "SetLastError",
+            "GetStdHandle", "CloseHandle", "lstrlenA", "lstrcmpA",
+            "MessageBoxA", "Beep", "GetCurrentProcess",
+            "GetCurrentProcessId", "GetCurrentThreadId", "ExitProcess",
+            "GetFileAttributesA",
+        }
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -89,6 +96,12 @@ class Emitter:
         self.emit("extern GetCommandLineA")
         self.emit("extern HeapAlloc")
         self.emit("extern GetProcessHeap")
+        for name in sorted(self.winapi):
+            if name not in {
+                "ExitProcess", "GetStdHandle", "CloseHandle",
+                "lstrcmpA", "lstrlenA",
+            }:
+                self.emit(f"extern {name}")
         self.emit("default rel")
         self.emit("")
 
@@ -264,6 +277,35 @@ class Emitter:
         self.emit("    sub rsp, 32")
         self.emit_call_inst(target)
         self.emit("    add rsp, 32")
+
+    def _syscall_symbol(self, name, namespace=""):
+        if namespace == "sys":
+            symbol = name
+        elif name.startswith("sys."):
+            symbol = name[4:]
+        else:
+            return None
+        if symbol not in self.winapi:
+            full_name = f"{namespace}.{name}" if namespace else name
+            raise RuntimeError(f"Unsupported sys call: {full_name}")
+        return symbol
+
+    def _emit_syscall(self, symbol, args):
+        if len(args) > 4:
+            raise RuntimeError(f"sys.{symbol} has >4 arguments (not supported)")
+        param_regs = ["rcx", "rdx", "r8", "r9"]
+        slots = []
+        for arg in args:
+            arg_type = self._expr_type(arg)
+            self.emit_expr(arg)
+            if arg_type == "&str":
+                self.emit_mov("rax", "[rax]")
+            slot = self._alloc_temp()
+            self.emit_stack_store(slot, "rax")
+            slots.append(slot)
+        for i, slot in enumerate(slots):
+            self.emit_stack_load(param_regs[i], slot)
+        self._call_with_shadow(symbol)
 
     def get_var_slot(self, name, typ=None):
         if name not in self.local_offset:
@@ -540,6 +582,10 @@ class Emitter:
     def emit_call(self, expr):
         name = expr.name
         args = expr.args
+
+        if symbol := self._syscall_symbol(name, expr.namespace):
+            self._emit_syscall(symbol, args)
+            return
 
         if name in self.builtins:
             if name == "exit":
@@ -1058,6 +1104,8 @@ class Emitter:
             return self.local_types.get(expr.name, "i64")
         if isinstance(expr, CallNode):
             name = expr.name
+            if self._syscall_symbol(name, expr.namespace):
+                return "i64"
             # Builtins with known return types
             if name in ("itoa", "str_new", "read_file"):
                 return "&str"

@@ -335,7 +335,17 @@ class Parser:
             while True:
                 if self.check("DOT"):
                     field = self.expect("ID")
-                    node = FieldAccessNode(object=node, field=field[1])
+                    if self.check("LPAREN"):
+                        args = self.parse_args()
+                        self.expect("RPAREN")
+                        if len(args) > 4:
+                            raise ParseError("function calls may have at most 4 arguments in v0", field[2])
+                        if isinstance(node, VarNode) and node.name == "sys":
+                            node = CallNode(name=field[1], args=args, namespace="sys")
+                        else:
+                            raise ParseError("method calls are only supported for sys.* in v0", field[2])
+                    else:
+                        node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):
                     index = self.parse_expr()
                     self.expect("RBRACKET")
