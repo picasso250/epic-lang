@@ -106,21 +106,19 @@ def run_test(ep_file, linker="lld-link"):
     return True, "OK"
 
 
-def run_all(linker, label):
+def run_all(linker):
     examples = sorted(
         f for f in os.listdir(EXAMPLES_DIR) if f.endswith(".ep")
     )
     if not examples:
         print("No .ep files found in examples/")
-        return 0, 0, 0
+        return 0, 1, 0
 
     passed = 0
     failed = 0
     skipped = 0
 
-    print(f"\n{'='*60}")
-    print(f"  Linker: {label}")
-    print(f"{'='*60}")
+    print(f"Running {len(examples)} tests...\n")
     for ep_name in examples:
         ep_path = os.path.join(EXAMPLES_DIR, ep_name)
         try:
@@ -139,7 +137,7 @@ def run_all(linker, label):
             failed += 1
         print(f"  {status:5}  {ep_name:20s}  {detail}")
 
-    print(f"\n  {label}: {passed} passed, {failed} failed, {skipped} skipped")
+    print(f"\n{passed} passed, {failed} failed, {skipped} skipped")
     return passed, failed, skipped
 
 
@@ -149,20 +147,12 @@ def main():
                         help="Which linker to use (default: py)")
     args = parser.parse_args()
 
-    total_failed = 0
-
     if args.linker == "lld":
-        _, failed, _ = run_all("lld-link", "lld-link")
-        total_failed += failed
+        _, failed, _ = run_all("lld-link")
+    else:
+        _, failed, _ = run_all("py")
 
-    if args.linker == "py":
-        _, failed, _ = run_all("py", "link.py")
-        total_failed += failed
-
-    print(f"\n{'='*60}")
-    print(f"  Total failed: {total_failed}")
-    print(f"{'='*60}")
-    sys.exit(0 if total_failed == 0 else 1)
+    sys.exit(0 if failed == 0 else 1)
 
 
 if __name__ == "__main__":
