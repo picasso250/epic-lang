@@ -163,7 +163,13 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 
 ## Codegen self-hosting
 
-The Epic implementation of codegen is currently a standalone program:
+The Epic implementation of codegen is split across `codegen_support.ep` and
+`codegen.ep`. `codegen_support.ep` owns shared codegen data structures,
+low-level assembly output helpers, runtime helper emission, and type helpers.
+`codegen.ep` owns AST collection, layout, expression emission, statement
+emission, function emission, and program emission.
+
+The old standalone codegen entry point shape is:
 
 ```text
 codegen <input.ep> <output.asm>

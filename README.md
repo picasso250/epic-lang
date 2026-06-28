@@ -48,7 +48,7 @@ trusted previous compiler:
 
 ```powershell
 git switch v1
-.\build\fixed-point\epic-epic.exe epic.ep codegen.ep parser.ep lexer.ep
+.\build\fixed-point\epic-epic.exe epic.ep codegen_support.ep codegen.ep parser.ep lexer.ep
 ```
 
 This gives v1 development a concrete predecessor: v0 remains available as the

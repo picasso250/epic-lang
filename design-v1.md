@@ -228,6 +228,12 @@ Epic is ready for binary tooling.
 `codegen.ep` is large enough that v1 should try to split it after the syntax
 and string improvements land.
 
+The first split moved shared codegen support into `codegen_support.ep`:
+emitter state, low-level assembly output helpers, runtime helper emission, and
+type helpers. `codegen.ep` remains the core emission file while later splits
+can carve expression, statement, layout, and program emission along existing
+function boundaries.
+
 The split should be driven by existing compiler boundaries rather than a new
 module system. Candidate boundaries:
 

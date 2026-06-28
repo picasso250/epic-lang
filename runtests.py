@@ -9,7 +9,7 @@ runs, and reports pass/fail.
 import os, sys, subprocess, re, shlex
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SOURCES = ["epic.ep", "codegen.ep", "parser.ep", "lexer.ep"]
+SOURCES = ["epic.ep", "codegen_support.ep", "codegen.ep", "parser.ep", "lexer.ep"]
 DEFAULT_PREVIOUS_EPIC = os.path.join(SCRIPT_DIR, "build", "fixed-point", "epic-epic.exe")
 PREVIOUS_EPIC = os.environ.get("PREVIOUS_EPIC", DEFAULT_PREVIOUS_EPIC)
 CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
