@@ -204,7 +204,6 @@ fun emit_runtime_helpers(e: EmitterState) -> i64 {
     emit_runtime(e, "runtime/itoa.asm");
     emit_runtime(e, "runtime/argv.asm");
     emit_runtime(e, "runtime/system.asm");
-    emit_runtime(e, "runtime/listdir.asm");
     emit_runtime(e, "runtime/read_file.asm");
     emit_runtime(e, "runtime/write_file.asm");
     emit_runtime(e, "runtime/append_file.asm");
@@ -1130,9 +1129,6 @@ fun emit_program(e: EmitterState, ast: AstNode) -> i64 {
     out_line(e.out_path, "extern GetCommandLineA");
     out_line(e.out_path, "extern HeapAlloc");
     out_line(e.out_path, "extern GetProcessHeap");
-    out_line(e.out_path, "extern FindFirstFileA");
-    out_line(e.out_path, "extern FindNextFileA");
-    out_line(e.out_path, "extern FindClose");
     out_line(e.out_path, "default rel");
     out_nl(e.out_path);
     out_line(e.out_path, "section .data");

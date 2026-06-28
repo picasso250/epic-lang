@@ -120,7 +120,6 @@ Primitive arrays store primitive values. Struct and `str` arrays store reference
 | `str_new` | `str_new(bytes: i8[], len: i64) -> str` | deep-copies bytes into a string |
 | `itoa` | `itoa(n: i64) -> str` | integer to heap string |
 | `system` | `system(cmd: str) -> i64` | returns process exit code or `-1` |
-| `listdir` | `listdir(pattern: str, max: i64) -> str[]` | lists matching files |
 | `read_file` | `read_file(path: str) -> str` | reads a whole file or returns empty string on failure |
 | `write_file` | `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
 | `append_file` | `append_file(path: str, data: str) -> i64` | appends to a file, creating it if needed, and returns bytes written, or `-1` on failure |

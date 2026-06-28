@@ -16,7 +16,7 @@ class Emitter:
         self.out = open(out_path, "w")
         self.builtins = {"exit", "putc", "putstr",
                          "strcmp", "itoa", "system",
-                         "listdir", "str_new", "read_file", "write_file",
+                         "str_new", "read_file", "write_file",
                          "append_file", "push"}
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
@@ -89,9 +89,6 @@ class Emitter:
         self.emit("extern GetCommandLineA")
         self.emit("extern HeapAlloc")
         self.emit("extern GetProcessHeap")
-        self.emit("extern FindFirstFileA")
-        self.emit("extern FindNextFileA")
-        self.emit("extern FindClose")
         self.emit("default rel")
         self.emit("")
 
@@ -346,7 +343,7 @@ class Emitter:
         self.structs = {}
         # Built-in str type: { data: &i8, len: i64 }
         self._register_len_data_type("str", "&i8")
-        # Array-of-str type used by listdir()
+        # Array-of-str type used by argv.
         self._register_len_data_type("_arr_str", "&&str", has_cap=True)
         for s in ast.structs:
             fields = []
@@ -441,8 +438,6 @@ class Emitter:
                 var_type = f"&{value.struct_name}"
             elif isinstance(value, NewArrayNode):
                 var_type = f"&_arr_{value.elem_type}"
-            elif isinstance(value, CallNode) and value.name == "listdir":
-                var_type = "&_arr_str"
             elif isinstance(value, CallNode) and value.name == "itoa":
                 var_type = "&str"
             elif isinstance(value, CallNode) and value.name == "str_new":
@@ -598,15 +593,6 @@ class Emitter:
                 self.emit_mov("rcx", "[rax]")    # rcx = cmd.data (offset 0)
                 self.emit("    sub rsp, 8")       # align for _system entry
                 self.emit_call_inst("_system")
-                self.emit("    add rsp, 8")
-            elif name == "listdir":
-                # listdir(pattern: &str, max) → extract pattern.data, call _listdir
-                slots = self._spill_args(args)
-                self.emit_stack_load("rdx", slots[1])
-                self.emit_stack_load("rax", slots[0])
-                self.emit_mov("rcx", "[rax]")  # rcx = pattern.data (offset 0)
-                self.emit("    sub rsp, 8")       # align for _listdir entry
-                self.emit_call_inst("_listdir")
                 self.emit("    add rsp, 8")
             elif name == "read_file":
                 self.emit_expr(args[0])
@@ -1075,8 +1061,6 @@ class Emitter:
             # Builtins with known return types
             if name in ("itoa", "str_new", "read_file"):
                 return "&str"
-            if name == "listdir":
-                return "&_arr_str"
             if name in ("strcmp", "system", "write_file", "append_file"):
                 return "i64"
             if name in ("exit", "putc", "putstr"):

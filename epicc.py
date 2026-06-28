@@ -31,7 +31,6 @@ RUNTIME_ASM_FILES = [
     "itoa.asm",
     "argv.asm",
     "system.asm",
-    "listdir.asm",
     "read_file.asm",
     "write_file.asm",
     "append_file.asm",
