@@ -208,6 +208,8 @@ fun lex(src: str) -> Token[] {
             if text == "if"     { kind = "IF"; }
             if text == "else"   { kind = "ELSE"; }
             if text == "while"  { kind = "WHILE"; }
+            if text == "for"    { kind = "FOR"; }
+            if text == "in"     { kind = "IN"; }
             if text == "struct" { kind = "STRUCT"; }
             if text == "new"    { kind = "NEW"; }
             if text == "let"    { kind = "LET"; }
@@ -282,6 +284,13 @@ fun lex(src: str) -> Token[] {
                 pos = pos + 1;
             }
             consumed = 1;
+        }
+        if consumed == 0 && ch == 46 {
+            if p[pos + 1] == 46 {
+                push_token(tokens, "RANGE", "..", line);
+                pos = pos + 2;
+                consumed = 1;
+            }
         }
 
         # ── single-char operators ──

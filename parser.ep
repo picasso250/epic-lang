@@ -35,6 +35,7 @@ struct AstNode {
 struct Parser {
     tokens: Token[];
     pos: i64;
+    for_counter: i64;
     eof: Token;
 }
 
@@ -78,6 +79,7 @@ fun make_parser(tokens: Token[]) -> Parser {
     let p = new Parser;
     p.tokens = tokens;
     p.pos = 0;
+    p.for_counter = 0;
     p.eof = new Token;
     p.eof.kind = "EOF";
     p.eof.text = "";
@@ -454,6 +456,69 @@ fun parse_while_stmt(p: Parser) -> AstNode {
     return node;
 }
 
+fun var_node(name: str) -> AstNode {
+    let n = ast_node("Var");
+    n.name = name;
+    return n;
+}
+
+fun lit_node(value: str) -> AstNode {
+    let n = ast_node("Literal");
+    n.value = value;
+    return n;
+}
+
+fun let_node(name: str, value: AstNode) -> AstNode {
+    let n = ast_node("Let");
+    n.name = name;
+    n.value_expr = value;
+    return n;
+}
+
+fun assign_node(name: str, value: AstNode) -> AstNode {
+    let n = ast_node("Assign");
+    n.name = name;
+    n.value_expr = value;
+    return n;
+}
+
+fun parse_for_stmt(p: Parser) -> AstNode {
+    expect(p, "FOR");
+    let name = expect(p, "ID");
+    expect(p, "IN");
+    let start = parse_expr(p);
+    expect(p, "RANGE");
+    let end = parse_expr(p);
+    let body = parse_block(p);
+
+    p.for_counter = p.for_counter + 1;
+    let suffix = itoa(p.for_counter);
+    let start_name = "__for_start_" + suffix;
+    let end_name = "__for_end_" + suffix;
+
+    let out = ast_node("Block");
+    push(out.stmts, let_node(start_name, start));
+    push(out.stmts, let_node(end_name, end));
+    push(out.stmts, let_node(name.text, var_node(start_name)));
+
+    let cond = ast_node("Binary");
+    cond.op = "<";
+    cond.left = var_node(name.text);
+    cond.right = var_node(end_name);
+
+    let inc = ast_node("Binary");
+    inc.op = "+";
+    inc.left = var_node(name.text);
+    inc.right = lit_node("1");
+    push(body.stmts, assign_node(name.text, inc));
+
+    let loop = ast_node("While");
+    loop.expr = cond;
+    loop.body = body;
+    push(out.stmts, loop);
+    return out;
+}
+
 fun parse_expr_stmt(p: Parser) -> AstNode {
     let node = ast_node("ExprStmt");
     node.expr = parse_expr(p);
@@ -477,6 +542,7 @@ fun parse_stmt(p: Parser) -> AstNode {
     if same(t.kind, "LET") == 1 { return parse_let_stmt(p); }
     if same(t.kind, "IF") == 1 { return parse_if_stmt(p); }
     if same(t.kind, "WHILE") == 1 { return parse_while_stmt(p); }
+    if same(t.kind, "FOR") == 1 { return parse_for_stmt(p); }
     if same(t.kind, "ID") == 1 {
         if is_assignment(p) == 1 {
             return parse_assign_stmt(p);

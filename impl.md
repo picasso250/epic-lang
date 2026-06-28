@@ -125,6 +125,8 @@ User struct fields use fixed 8-byte slots in v0.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
 - Expression postfixes support checked indexing and copy slices for strings and arrays.
+- `for i in start..end` is parsed as a lowering to existing `let` and `while`
+  nodes with hidden start/end locals.
 
 ## Codegen notes
 
@@ -190,7 +192,7 @@ python runtests.py --linker py
 Current known result:
 
 ```text
-46 passed, 0 failed
+48 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.

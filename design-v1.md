@@ -60,6 +60,26 @@ if x == 1 {
 This does not add a new runtime control-flow construct. The parser lowers it
 to the same AST shape as `else { if ... }`, keeping codegen unchanged.
 
+## For-in ranges
+
+v1 supports a deliberately narrow integer range loop:
+
+```epic
+for i in start..end {
+    putc(i)
+}
+```
+
+The first version only supports half-open ascending ranges. It is equivalent to
+evaluating `start` and `end` once before the loop, then running while `i < end`
+and incrementing `i` by `1` after each iteration. If `start >= end`, the body
+runs zero times.
+
+This is intended to shorten the common manual counter-loop shape in compiler
+sources. It does not yet support array or string iteration, reverse ranges,
+custom steps, or block-scoped loop variables. For now, the loop variable follows
+the compiler's existing function-local variable behavior.
+
 ## String operations
 
 String equality is already supported through `==`, so v1 should not add a

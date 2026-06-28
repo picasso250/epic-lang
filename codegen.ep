@@ -317,6 +317,10 @@ fun pre_scan_block(e: EmitterState, block: AstNode) -> i64 {
             } else {
                 if stmt.kind == "While" {
                     pre_scan_block(e, stmt.body);
+                } else {
+                    if stmt.kind == "Block" {
+                        pre_scan_block(e, stmt);
+                    }
                 }
             }
         }
@@ -1134,6 +1138,7 @@ fun emit_stmt(e: EmitterState, stmt: AstNode) -> i64 {
     if stmt.kind == "FieldSet" { return emit_field_set(e, stmt); }
     if stmt.kind == "If" { return emit_if(e, stmt); }
     if stmt.kind == "While" { return emit_while(e, stmt); }
+    if stmt.kind == "Block" { return emit_block(e, stmt); }
     die("unsupported stmt");
     return 0;
 }

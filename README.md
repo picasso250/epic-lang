@@ -75,6 +75,7 @@ Initial v1 work:
 - `len()` and `cap()` builtins
 - remove semicolons
 - checked indexing and slice syntax
+- `else if` and half-open `for i in start..end` range loops
 - binary byte-buffer support as groundwork for replacing `link.py`
 - split `codegen.ep`
 - revisit `map` after the first pass
