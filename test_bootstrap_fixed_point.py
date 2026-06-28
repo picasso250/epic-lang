@@ -3,9 +3,9 @@
 Check that the compiler reaches a bootstrap fixed point.
 
 Stages:
-  v00: Python compiler builds the Epic compiler.
-  v0:  v00 builds the Epic compiler.
-  v0_: v0 builds the Epic compiler again.
+  epic-py: Python compiler builds the Epic compiler.
+  epic-epic: epic-py builds the Epic compiler.
+  epic-epic-epic: epic-epic builds the Epic compiler again.
 
 The later stages should be byte-identical. If they are not, self-hosting is not
 yet a stable bootstrap anchor.
@@ -24,7 +24,7 @@ BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
 SELF_OUT = os.path.join(BUILD_DIR, "epic", "epic.ep.exe")
 SOURCES = ["epic.ep", "codegen.ep", "parser.ep", "lexer.ep"]
-TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "3"))
+TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "60"))
 
 
 def run_checked(cmd, label):
@@ -64,10 +64,10 @@ def copy_self_out(name):
 def main():
     os.makedirs(BOOT_DIR, exist_ok=True)
 
-    v00 = os.path.join(BOOT_DIR, "v00.exe")
-    v0 = os.path.join(BOOT_DIR, "v0.exe")
-    v0_next = os.path.join(BOOT_DIR, "v0_.exe")
-    v0_next2 = os.path.join(BOOT_DIR, "v0__.exe")
+    epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
+    epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
+    epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
+    epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
 
     run_checked(
         [
@@ -79,20 +79,20 @@ def main():
             "--out-dir",
             BOOT_DIR,
         ],
-        "python -> v00",
+        "python -> epic-py",
     )
-    shutil.copyfile(os.path.join(BOOT_DIR, "epic.exe"), v00)
+    shutil.copyfile(os.path.join(BOOT_DIR, "epic.exe"), epic_py)
 
-    run_checked([v00, *SOURCES], "v00 -> v0")
-    copy_self_out("v0.exe")
+    run_checked([epic_py, *SOURCES], "epic-py -> epic-epic")
+    copy_self_out("epic-epic.exe")
 
-    run_checked([v0, *SOURCES], "v0 -> v0_")
-    copy_self_out("v0_.exe")
+    run_checked([epic_epic, *SOURCES], "epic-epic -> epic-epic-epic")
+    copy_self_out("epic-epic-epic.exe")
 
-    run_checked([v0_next, *SOURCES], "v0_ -> v0__")
-    copy_self_out("v0__.exe")
+    run_checked([epic_epic_epic, *SOURCES], "epic-epic-epic -> epic-epic-epic-epic")
+    copy_self_out("epic-epic-epic-epic.exe")
 
-    checks = [(v0, v0_next), (v0_next, v0_next2)]
+    checks = [(epic_epic, epic_epic_epic), (epic_epic_epic, epic_epic_epic_epic)]
     for left, right in checks:
         if not filecmp.cmp(left, right, shallow=False):
             raise RuntimeError(

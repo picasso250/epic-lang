@@ -16,9 +16,9 @@ class Emitter:
         self.out = open(out_path, "w")
         self.builtins = {"putc", "putstr",
                          "itoa", "system",
-                         "str_new", "read_file", "write_file",
+                         "str_new", "bytes", "read_file", "write_file",
                          "append_file", "str_slice",
-                         "str_replace_char", "push"}
+                         "str_replace_char", "push", "extend"}
         self.winapi = {
             "Sleep", "GetTickCount64", "GetLastError", "SetLastError",
             "GetStdHandle", "CloseHandle", "lstrlenA", "lstrcmpA",
@@ -676,6 +676,10 @@ class Emitter:
                 self.emit_stack_load("rcx", slots[0])
                 self.emit_stack_load("rdx", slots[1])
                 self.emit_call_inst("_str_alloc")
+            elif name == "bytes":
+                self.emit_expr(args[0])
+                self.emit_mov("rcx", "rax")
+                self.emit_call_inst("_bytes")
             elif name == "str_slice":
                 slots = self._spill_args(args)
                 self.emit_stack_load("rcx", slots[0])
@@ -690,6 +694,12 @@ class Emitter:
                 self._call_with_shadow("_str_replace_char")
             elif name == "push":
                 self.emit_push(args)
+            elif name == "extend":
+                slots = self._spill_args(args)
+                self.emit_stack_load("rcx", slots[0])
+                self.emit_stack_load("rdx", slots[1])
+                self.emit_call_inst("_extend_i8")
+                self.emit("    xor eax, eax")
             return
 
         if len(args) > 4:
@@ -1144,9 +1154,11 @@ class Emitter:
             # Builtins with known return types
             if name in ("itoa", "str_new", "read_file", "str_slice", "str_replace_char"):
                 return "&str"
+            if name == "bytes":
+                return "&_arr_i8"
             if name in ("system", "write_file", "append_file"):
                 return "i64"
-            if name in ("putc", "putstr"):
+            if name in ("putc", "putstr", "extend"):
                 return "void"
             # User-defined function
             if name in self.funcs:

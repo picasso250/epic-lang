@@ -38,6 +38,7 @@ struct StructInfo {
 
 struct EmitterState {
     out_path: str;
+    out_buf: i8[];
     label_counter: i64;
     string_counter: i64;
     current_fn: str;
@@ -60,83 +61,88 @@ fun die(msg: str) -> i64 {
     return 0;
 }
 
-fun out_s(path: str, s: str) -> i64 {
-    append_file(path, s);
+fun out_s(e: EmitterState, s: str) -> i64 {
+    let bs = bytes(s);
+    extend(e.out_buf, bs);
     return 0;
 }
 
-fun out_i(path: str, n: i64) -> i64 {
-    append_file(path, itoa(n));
+fun out_i(e: EmitterState, n: i64) -> i64 {
+    let text = itoa(n);
+    let bs = bytes(text);
+    extend(e.out_buf, bs);
     return 0;
 }
 
-fun out_nl(path: str) -> i64 {
-    append_file(path, "\n");
+fun out_nl(e: EmitterState) -> i64 {
+    let s = "\n";
+    let bs = bytes(s);
+    extend(e.out_buf, bs);
     return 0;
 }
 
-fun out_line(path: str, s: str) -> i64 {
-    append_file(path, s);
-    append_file(path, "\n");
+fun out_line(e: EmitterState, s: str) -> i64 {
+    out_s(e, s);
+    out_nl(e);
     return 0;
 }
 
 fun emit_inst(e: EmitterState, op: str) -> i64 {
-    out_s(e.out_path, "    ");
-    out_line(e.out_path, op);
+    out_s(e, "    ");
+    out_line(e, op);
     return 0;
 }
 
 fun emit_label(e: EmitterState, name: str) -> i64 {
-    out_s(e.out_path, name);
-    out_line(e.out_path, ":");
+    out_s(e, name);
+    out_line(e, ":");
     return 0;
 }
 
 fun emit_label_id(e: EmitterState, prefix: str, id: i64) -> i64 {
-    out_s(e.out_path, prefix);
-    out_i(e.out_path, id);
-    out_line(e.out_path, ":");
+    out_s(e, prefix);
+    out_i(e, id);
+    out_line(e, ":");
     return 0;
 }
 
 fun emit_ref_id(e: EmitterState, prefix: str, id: i64) -> i64 {
-    out_s(e.out_path, "[");
-    out_s(e.out_path, prefix);
-    out_i(e.out_path, id);
-    out_s(e.out_path, "]");
+    out_s(e, "[");
+    out_s(e, prefix);
+    out_i(e, id);
+    out_s(e, "]");
     return 0;
 }
 
 fun emit_mov(e: EmitterState, dst: str, src: str) -> i64 {
-    out_s(e.out_path, "    mov ");
-    out_s(e.out_path, dst);
-    out_s(e.out_path, ", ");
-    out_line(e.out_path, src);
+    out_s(e, "    mov ");
+    out_s(e, dst);
+    out_s(e, ", ");
+    out_line(e, src);
     return 0;
 }
 
 fun emit_mov_i(e: EmitterState, dst: str, n: i64) -> i64 {
-    out_s(e.out_path, "    mov ");
-    out_s(e.out_path, dst);
-    out_s(e.out_path, ", ");
-    out_i(e.out_path, n);
-    out_nl(e.out_path);
+    out_s(e, "    mov ");
+    out_s(e, dst);
+    out_s(e, ", ");
+    out_i(e, n);
+    out_nl(e);
     return 0;
 }
 
 fun emit_lea_ref_id(e: EmitterState, dst: str, prefix: str, id: i64) -> i64 {
-    out_s(e.out_path, "    lea ");
-    out_s(e.out_path, dst);
-    out_s(e.out_path, ", ");
+    out_s(e, "    lea ");
+    out_s(e, dst);
+    out_s(e, ", ");
     emit_ref_id(e, prefix, id);
-    out_nl(e.out_path);
+    out_nl(e);
     return 0;
 }
 
 fun emit_call_inst(e: EmitterState, target: str) -> i64 {
-    out_s(e.out_path, "    call ");
-    out_line(e.out_path, target);
+    out_s(e, "    call ");
+    out_line(e, target);
     return 0;
 }
 
@@ -191,45 +197,45 @@ fun is_sys_call(name: str) -> i64 {
 }
 
 fun emit_jmp(e: EmitterState, label: str) -> i64 {
-    out_s(e.out_path, "    jmp ");
-    out_line(e.out_path, label);
+    out_s(e, "    jmp ");
+    out_line(e, label);
     return 0;
 }
 
 fun emit_jmp_id(e: EmitterState, op: str, prefix: str, id: i64) -> i64 {
-    out_s(e.out_path, "    ");
-    out_s(e.out_path, op);
-    out_s(e.out_path, " ");
-    out_s(e.out_path, prefix);
-    out_i(e.out_path, id);
-    out_nl(e.out_path);
+    out_s(e, "    ");
+    out_s(e, op);
+    out_s(e, " ");
+    out_s(e, prefix);
+    out_i(e, id);
+    out_nl(e);
     return 0;
 }
 
-fun emit_slot_ref(path: str, slot: i64) -> i64 {
-    out_s(path, "[rbp");
+fun emit_slot_ref(e: EmitterState, slot: i64) -> i64 {
+    out_s(e, "[rbp");
     if slot >= 0 {
-        out_s(path, "+");
+        out_s(e, "+");
     }
-    out_i(path, slot);
-    out_s(path, "]");
+    out_i(e, slot);
+    out_s(e, "]");
     return 0;
 }
 
 fun emit_stack_store(e: EmitterState, slot: i64, src: str) -> i64 {
-    out_s(e.out_path, "    mov ");
-    emit_slot_ref(e.out_path, slot);
-    out_s(e.out_path, ", ");
-    out_line(e.out_path, src);
+    out_s(e, "    mov ");
+    emit_slot_ref(e, slot);
+    out_s(e, ", ");
+    out_line(e, src);
     return 0;
 }
 
 fun emit_stack_load(e: EmitterState, dst: str, slot: i64) -> i64 {
-    out_s(e.out_path, "    mov ");
-    out_s(e.out_path, dst);
-    out_s(e.out_path, ", ");
-    emit_slot_ref(e.out_path, slot);
-    out_nl(e.out_path);
+    out_s(e, "    mov ");
+    out_s(e, dst);
+    out_s(e, ", ");
+    emit_slot_ref(e, slot);
+    out_nl(e);
     return 0;
 }
 
@@ -244,16 +250,18 @@ fun align16(n: i64) -> i64 {
 
 fun emit_runtime(e: EmitterState, path: str) -> i64 {
     let s = read_file(path);
-    append_file(e.out_path, s);
-    append_file(e.out_path, "\n");
+    out_s(e, s);
+    out_nl(e);
     return 0;
 }
 
 fun emit_runtime_helpers(e: EmitterState) -> i64 {
     emit_runtime(e, "runtime/str_alloc.asm");
+    emit_runtime(e, "runtime/bytes.asm");
     emit_runtime(e, "runtime/str_cat.asm");
     emit_runtime(e, "runtime/str_slice.asm");
     emit_runtime(e, "runtime/str_replace_char.asm");
+    emit_runtime(e, "runtime/extend_i8.asm");
     emit_runtime(e, "runtime/itoa.asm");
     emit_runtime(e, "runtime/argv.asm");
     emit_runtime(e, "runtime/system.asm");
@@ -266,6 +274,7 @@ fun emit_runtime_helpers(e: EmitterState) -> i64 {
 fun make_emitter(out_path: str) -> EmitterState {
     let e = new EmitterState;
     e.out_path = out_path;
+    e.out_buf = new i8[65536];
     e.label_counter = 0;
     e.string_counter = 0;
     e.current_fn = "";
@@ -379,15 +388,15 @@ fun emit_string_bytes(e: EmitterState, s: str) -> i64 {
     let i = 0;
     while i < s.len {
         if i != 0 {
-            out_s(e.out_path, ", ");
+            out_s(e, ", ");
         }
-        out_i(e.out_path, s.data[i]);
+        out_i(e, s.data[i]);
         i = i + 1;
     }
     if s.len != 0 {
-        out_s(e.out_path, ", ");
+        out_s(e, ", ");
     }
-    out_line(e.out_path, "0");
+    out_line(e, "0");
     return 0;
 }
 
@@ -580,12 +589,14 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
         if is_sys_call(expr.name) == 1 { return type_i64(); }
         if sys_member_symbol(expr.type_name, expr.name) != "" { return type_i64(); }
         if expr.name == "itoa" { return type_str(); }
+        if expr.name == "bytes" { return type_array("i8"); }
         if expr.name == "str_new" { return type_str(); }
         if expr.name == "str_slice" { return type_str(); }
         if expr.name == "str_replace_char" { return type_str(); }
         if expr.name == "read_file" { return type_str(); }
         if expr.name == "write_file" { return type_i64(); }
         if expr.name == "append_file" { return type_i64(); }
+        if expr.name == "extend" { return type_void(); }
         return find_func_ret(e, expr.name);
     }
     if expr.kind == "New" { return type_struct(expr.name); }
@@ -661,9 +672,9 @@ fun temp_save_rax(e: EmitterState) -> i64 {
 fun emit_prologue(e: EmitterState) -> i64 {
     emit_inst(e, "push rbp");
     emit_mov(e, "rbp", "rsp");
-    out_s(e.out_path, "    sub rsp, ");
-    out_i(e.out_path, e.alloc_size);
-    out_nl(e.out_path);
+    out_s(e, "    sub rsp, ");
+    out_i(e, e.alloc_size);
+    out_nl(e);
     return 0;
 }
 
@@ -718,21 +729,21 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         if stack_args < 0 { stack_args = 0; }
         let extra_frame = align16(stack_args * 8);
         let frame = 32 + extra_frame;
-        out_s(e.out_path, "    sub rsp, ");
-        out_i(e.out_path, frame);
-        out_nl(e.out_path);
+        out_s(e, "    sub rsp, ");
+        out_i(e, frame);
+        out_nl(e);
         i = 4;
         while i < slots.len {
             emit_stack_load(e, "rax", slots.data[i]);
-            out_s(e.out_path, "    mov [rsp+");
-            out_i(e.out_path, 32 + (i - 4) * 8);
-            out_line(e.out_path, "], rax");
+            out_s(e, "    mov [rsp+");
+            out_i(e, 32 + (i - 4) * 8);
+            out_line(e, "], rax");
             i = i + 1;
         }
         emit_call_inst(e, sys_symbol);
-        out_s(e.out_path, "    add rsp, ");
-        out_i(e.out_path, frame);
-        out_nl(e.out_path);
+        out_s(e, "    add rsp, ");
+        out_i(e, frame);
+        out_nl(e);
         return 0;
     }
     if name == "putc" {
@@ -741,9 +752,9 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_mov(e, "ecx", "-11");
         emit_call_inst(e, "GetStdHandle");
         emit_mov(e, "rcx", "rax");
-        out_line(e.out_path, "    lea rdx, [_buf]");
+        out_line(e, "    lea rdx, [_buf]");
         emit_mov(e, "r8", "1");
-        out_line(e.out_path, "    lea r9, [_written]");
+        out_line(e, "    lea r9, [_written]");
         emit_inst(e, "sub rsp, 16");
         emit_mov(e, "qword [rsp+32]", "0");
         emit_call_inst(e, "WriteFile");
@@ -759,7 +770,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_stack_load(e, "rax", tmp);
         emit_mov(e, "rdx", "[rax]");
         emit_mov(e, "r8", "[rax+8]");
-        out_line(e.out_path, "    lea r9, [_written]");
+        out_line(e, "    lea r9, [_written]");
         emit_inst(e, "sub rsp, 16");
         emit_mov(e, "qword [rsp+32]", "0");
         emit_call_inst(e, "WriteFile");
@@ -785,6 +796,12 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_stack_load(e, "rcx", slots.data[0]);
         emit_stack_load(e, "rdx", slots.data[1]);
         emit_call_inst(e, "_str_alloc");
+        return 0;
+    }
+    if name == "bytes" {
+        emit_expr(e, expr.args.data[0]);
+        emit_mov(e, "rcx", "rax");
+        emit_call_inst(e, "_bytes");
         return 0;
     }
     if name == "str_slice" {
@@ -840,7 +857,6 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         return 0;
     }
     if name == "push" {
-        # m8-m14 slice: capacity is sufficient; grow path comes later.
         let arr_type = expr_type(e, expr.args.data[0]);
         let elem = arr_type.name;
         let el_size = 8;
@@ -849,6 +865,60 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         let arr_slot = temp_save_rax(e);
         emit_expr(e, expr.args.data[1]);
         let val_slot = temp_save_rax(e);
+        let new_data_slot = temp_save_rax(e);
+        let grow = fresh_label(e);
+        let store = fresh_label(e);
+        let copy_loop = fresh_label(e);
+        let copy_done = fresh_label(e);
+        let cap_nonzero = fresh_label(e);
+        emit_stack_load(e, "rax", arr_slot);
+        emit_inst(e, "mov rcx, [rax+8]");
+        emit_inst(e, "cmp rcx, [rax+16]");
+        emit_jmp_id(e, "jge", "L", grow);
+        emit_jmp_id(e, "jmp", "L", store);
+        emit_label_id(e, "L", grow);
+        emit_inst(e, "mov rdx, [rax+16]");
+        emit_inst(e, "test rdx, rdx");
+        emit_jmp_id(e, "jnz", "L", cap_nonzero);
+        emit_inst(e, "mov rdx, 2");
+        emit_label_id(e, "L", cap_nonzero);
+        emit_inst(e, "add rdx, rdx");
+        emit_inst(e, "mov [rax+16], rdx");
+        emit_inst(e, "mov r8, rdx");
+        if el_size != 1 {
+            out_s(e, "    imul r8, ");
+            out_i(e, el_size);
+            out_nl(e);
+        }
+        emit_mov(e, "rcx", "[_heap]");
+        emit_mov(e, "edx", "8");
+        emit_inst(e, "sub rsp, 40");
+        emit_call_inst(e, "HeapAlloc");
+        emit_inst(e, "add rsp, 40");
+        emit_stack_store(e, new_data_slot, "rax");
+        emit_stack_load(e, "rax", arr_slot);
+        emit_inst(e, "mov r8, [rax]");
+        emit_inst(e, "mov r9, [rax+8]");
+        emit_inst(e, "xor r10, r10");
+        emit_label_id(e, "L", copy_loop);
+        emit_inst(e, "cmp r10, r9");
+        emit_jmp_id(e, "jge", "L", copy_done);
+        if el_size == 1 {
+            emit_inst(e, "mov r11b, [r8+r10]");
+            emit_stack_load(e, "rax", new_data_slot);
+            emit_inst(e, "mov [rax+r10], r11b");
+        } else {
+            emit_inst(e, "mov r11, [r8+r10*8]");
+            emit_stack_load(e, "rax", new_data_slot);
+            emit_inst(e, "mov [rax+r10*8], r11");
+        }
+        emit_inst(e, "inc r10");
+        emit_jmp_id(e, "jmp", "L", copy_loop);
+        emit_label_id(e, "L", copy_done);
+        emit_stack_load(e, "rax", arr_slot);
+        emit_stack_load(e, "rcx", new_data_slot);
+        emit_inst(e, "mov [rax], rcx");
+        emit_label_id(e, "L", store);
         emit_stack_load(e, "rax", arr_slot);
         emit_mov(e, "rcx", "[rax]");
         emit_mov(e, "rdx", "[rax+8]");
@@ -859,6 +929,14 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
             emit_inst(e, "mov [rcx+rdx*8], r8");
         }
         emit_inst(e, "inc qword [rax+8]");
+        emit_inst(e, "xor eax, eax");
+        return 0;
+    }
+    if name == "extend" {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rcx", slots.data[0]);
+        emit_stack_load(e, "rdx", slots.data[1]);
+        emit_call_inst(e, "_extend_i8");
         emit_inst(e, "xor eax, eax");
         return 0;
     }
@@ -977,9 +1055,9 @@ fun emit_new_array(e: EmitterState, expr: AstNode) -> i64 {
     emit_mov(e, "[rcx+16]", "rax");
     emit_mov(e, "r8", "rax");
     if el_size != 1 {
-        out_s(e.out_path, "    imul r8, ");
-        out_i(e.out_path, el_size);
-        out_nl(e.out_path);
+        out_s(e, "    imul r8, ");
+        out_i(e, el_size);
+        out_nl(e);
     }
     emit_mov(e, "rcx", "[_heap]");
     emit_mov(e, "edx", "8");
@@ -1005,13 +1083,13 @@ fun emit_field_access(e: EmitterState, expr: AstNode) -> i64 {
     emit_expr(e, expr.object);
     let field = find_field_info(e, field_layout_name(obj_type), expr.name);
     if type_is_i8(field.typ) == 1 {
-        out_s(e.out_path, "    movsx rax, byte [rax+");
-        out_i(e.out_path, field.offset);
-        out_line(e.out_path, "]");
+        out_s(e, "    movsx rax, byte [rax+");
+        out_i(e, field.offset);
+        out_line(e, "]");
     } else {
-        out_s(e.out_path, "    mov rax, [rax+");
-        out_i(e.out_path, field.offset);
-        out_line(e.out_path, "]");
+        out_s(e, "    mov rax, [rax+");
+        out_i(e, field.offset);
+        out_line(e, "]");
     }
     return 0;
 }
@@ -1048,9 +1126,9 @@ fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
             return 0;
         }
         if type_is_i8(find_local_type(e, expr.name)) == 1 {
-            out_s(e.out_path, "    movsx rax, byte ");
-            emit_slot_ref(e.out_path, find_local_slot(e, expr.name));
-            out_nl(e.out_path);
+            out_s(e, "    movsx rax, byte ");
+            emit_slot_ref(e, find_local_slot(e, expr.name));
+            out_nl(e);
         } else {
             emit_stack_load(e, "rax", find_local_slot(e, expr.name));
         }
@@ -1158,13 +1236,13 @@ fun emit_field_set(e: EmitterState, stmt: AstNode) -> i64 {
     emit_expr(e, stmt.object);
     emit_stack_load(e, "rcx", val_slot);
     if type_is_i8(field.typ) == 1 {
-        out_s(e.out_path, "    mov [rax+");
-        out_i(e.out_path, field.offset);
-        out_line(e.out_path, "], cl");
+        out_s(e, "    mov [rax+");
+        out_i(e, field.offset);
+        out_line(e, "], cl");
     } else {
-        out_s(e.out_path, "    mov [rax+");
-        out_i(e.out_path, field.offset);
-        out_line(e.out_path, "], rcx");
+        out_s(e, "    mov [rax+");
+        out_i(e, field.offset);
+        out_line(e, "], rcx");
     }
     return 0;
 }
@@ -1275,67 +1353,67 @@ fun emit_fn_def(e: EmitterState, fn: AstNode) -> i64 {
         emit_label_id(e, "L", e.current_ep_id);
         emit_epilogue(e);
     }
-    out_nl(e.out_path);
+    out_nl(e);
     return 0;
 }
 
 fun emit_program(e: EmitterState, ast: AstNode) -> i64 {
-    write_file(e.out_path, "");
     compute_struct_layouts(e, ast);
     add_func_infos(e, ast);
     collect_strings(e, ast);
-    out_line(e.out_path, "global _start");
-    out_line(e.out_path, "extern ExitProcess");
-    out_line(e.out_path, "extern GetStdHandle");
-    out_line(e.out_path, "extern WriteFile");
-    out_line(e.out_path, "extern CreateFileA");
-    out_line(e.out_path, "extern ReadFile");
-    out_line(e.out_path, "extern SetFilePointer");
-    out_line(e.out_path, "extern CloseHandle");
-    out_line(e.out_path, "extern GetFileSize");
-    out_line(e.out_path, "extern lstrcmpA");
-    out_line(e.out_path, "extern lstrcpyA");
-    out_line(e.out_path, "extern lstrlenA");
-    out_line(e.out_path, "extern CreateProcessA");
-    out_line(e.out_path, "extern WaitForSingleObject");
-    out_line(e.out_path, "extern GetExitCodeProcess");
-    out_line(e.out_path, "extern GetCommandLineA");
-    out_line(e.out_path, "extern HeapAlloc");
-    out_line(e.out_path, "extern GetProcessHeap");
-    out_line(e.out_path, "extern Beep");
-    out_line(e.out_path, "extern GetCurrentProcess");
-    out_line(e.out_path, "extern GetCurrentProcessId");
-    out_line(e.out_path, "extern GetCurrentThreadId");
-    out_line(e.out_path, "extern GetFileAttributesA");
-    out_line(e.out_path, "extern GetLastError");
-    out_line(e.out_path, "extern GetTickCount64");
-    out_line(e.out_path, "extern MessageBoxA");
-    out_line(e.out_path, "extern SetLastError");
-    out_line(e.out_path, "extern Sleep");
-    out_line(e.out_path, "default rel");
-    out_nl(e.out_path);
-    out_line(e.out_path, "section .data");
-    out_line(e.out_path, "    _buf times 32 db 0");
-    out_line(e.out_path, "    _buf_end db 0");
-    out_line(e.out_path, "    _written dd 0");
-    out_line(e.out_path, "    _heap dq 0");
-    out_line(e.out_path, "    _argv dq 0");
+    out_line(e, "global _start");
+    out_line(e, "extern ExitProcess");
+    out_line(e, "extern GetStdHandle");
+    out_line(e, "extern WriteFile");
+    out_line(e, "extern CreateFileA");
+    out_line(e, "extern ReadFile");
+    out_line(e, "extern SetFilePointer");
+    out_line(e, "extern CloseHandle");
+    out_line(e, "extern GetFileSize");
+    out_line(e, "extern lstrcmpA");
+    out_line(e, "extern lstrcpyA");
+    out_line(e, "extern lstrlenA");
+    out_line(e, "extern CreateProcessA");
+    out_line(e, "extern WaitForSingleObject");
+    out_line(e, "extern GetExitCodeProcess");
+    out_line(e, "extern GetCommandLineA");
+    out_line(e, "extern HeapAlloc");
+    out_line(e, "extern GetProcessHeap");
+    out_line(e, "extern Beep");
+    out_line(e, "extern GetCurrentProcess");
+    out_line(e, "extern GetCurrentProcessId");
+    out_line(e, "extern GetCurrentThreadId");
+    out_line(e, "extern GetFileAttributesA");
+    out_line(e, "extern GetLastError");
+    out_line(e, "extern GetTickCount64");
+    out_line(e, "extern MessageBoxA");
+    out_line(e, "extern SetLastError");
+    out_line(e, "extern Sleep");
+    out_line(e, "default rel");
+    out_nl(e);
+    out_line(e, "section .data");
+    out_line(e, "    _buf times 32 db 0");
+    out_line(e, "    _buf_end db 0");
+    out_line(e, "    _written dd 0");
+    out_line(e, "    _heap dq 0");
+    out_line(e, "    _argv dq 0");
     let i = 0;
     while i < e.strings.len {
         emit_label_id(e, "_str_", e.strings.data[i].id);
-        out_s(e.out_path, "    db ");
+        out_s(e, "    db ");
         emit_string_bytes(e, e.strings.data[i].text);
         i = i + 1;
     }
-    out_nl(e.out_path);
-    out_line(e.out_path, "section .text");
-    out_nl(e.out_path);
+    out_nl(e);
+    out_line(e, "section .text");
+    out_nl(e);
     i = 0;
     while i < ast.funcs.len {
         emit_fn_def(e, ast.funcs.data[i]);
         i = i + 1;
     }
     emit_runtime_helpers(e);
+    write_file(e.out_path, str_new(e.out_buf.data, e.out_buf.len));
     return 0;
 }
 
