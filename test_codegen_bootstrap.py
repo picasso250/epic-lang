@@ -28,6 +28,18 @@ EXAMPLE_SLICE = [
     "m5_if.ep",
     "m6_while.ep",
     "m7_str.ep",
+    "m8_i8.ep",
+    "m8_i8_fn.ep",
+    "m9_array.ep",
+    "m10_str.ep",
+    "m11_file.ep",
+    "m12_struct.ep",
+    "m12_struct_i8.ep",
+    "m13_ptr.ep",
+    "m13_ptr2.ep",
+    "m14_arr.ep",
+    "m14_debug.ep",
+    "m14_struct_arr.ep",
 ]
 
 

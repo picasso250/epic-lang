@@ -4,19 +4,36 @@
 
 struct Local {
     name: str;
-    type_name: str;
+    typ: TypeInfo;
     slot: i64;
 }
 
 struct FuncInfo {
     name: str;
-    ret_type: str;
+    ret_type: TypeInfo;
     params: AstNode[];
 }
 
 struct StringLit {
     text: str;
     id: i64;
+}
+
+struct TypeInfo {
+    kind: str;
+    name: str;
+}
+
+struct FieldInfo {
+    name: str;
+    typ: TypeInfo;
+    offset: i64;
+}
+
+struct StructInfo {
+    name: str;
+    size: i64;
+    fields: FieldInfo[];
 }
 
 struct EmitterState {
@@ -32,6 +49,7 @@ struct EmitterState {
     locals: Local[];
     funcs: FuncInfo[];
     strings: StringLit[];
+    structs: StructInfo[];
 }
 
 fun die(msg: str) -> i64 {
@@ -207,7 +225,63 @@ fun make_emitter(out_path: str) -> EmitterState {
     e.locals = new Local[128];
     e.funcs = new FuncInfo[64];
     e.strings = new StringLit[256];
+    e.structs = new StructInfo[64];
     return e;
+}
+
+fun type_info(kind: str, name: str) -> TypeInfo {
+    let t = new TypeInfo;
+    t.kind = kind;
+    t.name = name;
+    return t;
+}
+
+fun type_i64() -> TypeInfo { return type_info("i64", ""); }
+fun type_i8() -> TypeInfo { return type_info("i8", ""); }
+fun type_void() -> TypeInfo { return type_info("void", ""); }
+fun type_str() -> TypeInfo { return type_info("str", ""); }
+fun type_struct(name: str) -> TypeInfo { return type_info("struct", name); }
+fun type_array(elem: str) -> TypeInfo { return type_info("array", elem); }
+
+fun type_is_i8(t: TypeInfo) -> i64 {
+    if strcmp(t.kind, "i8") == 0 { return 1; }
+    return 0;
+}
+
+fun type_is_value_i8(t: TypeInfo) -> i64 {
+    return type_is_i8(t);
+}
+
+fun type_is_complex(t: TypeInfo) -> i64 {
+    if strcmp(t.kind, "str") == 0 { return 1; }
+    if strcmp(t.kind, "struct") == 0 { return 1; }
+    if strcmp(t.kind, "array") == 0 { return 1; }
+    return 0;
+}
+
+fun is_array_type_name(name: str) -> i64 {
+    if name.len >= 2 {
+        if name.data[name.len - 2] == 91 && name.data[name.len - 1] == 93 {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+fun array_elem_name(name: str) -> str {
+    if is_array_type_name(name) == 1 {
+        return str_new(name.data, name.len - 2);
+    }
+    return name;
+}
+
+fun user_type(name: str) -> TypeInfo {
+    if strcmp(name, "i64") == 0 { return type_i64(); }
+    if strcmp(name, "i8") == 0 { return type_i8(); }
+    if strcmp(name, "void") == 0 { return type_void(); }
+    if strcmp(name, "str") == 0 { return type_str(); }
+    if is_array_type_name(name) == 1 { return type_array(array_elem_name(name)); }
+    return type_struct(name);
 }
 
 fun get_string_id(e: EmitterState, text: str) -> i64 {
@@ -271,7 +345,7 @@ fun add_func_infos(e: EmitterState, ast: AstNode) -> i64 {
         let fn = ast.funcs.data[i];
         let f = new FuncInfo;
         f.name = fn.name;
-        f.ret_type = fn.type_name;
+        f.ret_type = user_type(fn.type_name);
         f.params = fn.params;
         push(e.funcs, f);
         i = i + 1;
@@ -279,7 +353,104 @@ fun add_func_infos(e: EmitterState, ast: AstNode) -> i64 {
     return 0;
 }
 
-fun find_func_ret(e: EmitterState, name: str) -> str {
+fun add_field(info: StructInfo, name: str, typ: TypeInfo, offset: i64) -> i64 {
+    let f = new FieldInfo;
+    f.name = name;
+    f.typ = typ;
+    f.offset = offset;
+    push(info.fields, f);
+    return 0;
+}
+
+fun add_struct_info(e: EmitterState, name: str, size: i64) -> StructInfo {
+    let s = new StructInfo;
+    s.name = name;
+    s.size = size;
+    s.fields = new FieldInfo[16];
+    push(e.structs, s);
+    return s;
+}
+
+fun find_struct_info(e: EmitterState, name: str) -> StructInfo {
+    let i = 0;
+    while i < e.structs.len {
+        if strcmp(e.structs.data[i].name, name) == 0 {
+            return e.structs.data[i];
+        }
+        i = i + 1;
+    }
+    die("unknown struct layout");
+    return new StructInfo;
+}
+
+fun find_field_info(e: EmitterState, struct_name: str, field_name: str) -> FieldInfo {
+    let s = find_struct_info(e, struct_name);
+    let i = 0;
+    while i < s.fields.len {
+        if strcmp(s.fields.data[i].name, field_name) == 0 {
+            return s.fields.data[i];
+        }
+        i = i + 1;
+    }
+    die("unknown field");
+    return new FieldInfo;
+}
+
+fun ensure_array_layout(e: EmitterState, elem: str) -> i64 {
+    let arr_name = elem;
+    # StructInfo.name for arrays is the element name with kind array resolved by callers.
+    # Builtin array layouts are materialized under a synthetic name: [] + elem is
+    # not constructible without string concatenation, so callers use array_layout_name.
+    return 0;
+}
+
+fun array_layout_name(elem: str) -> str {
+    # v0 only needs these names in m8-m14.
+    if strcmp(elem, "i8") == 0 { return "_arr_i8"; }
+    if strcmp(elem, "i64") == 0 { return "_arr_i64"; }
+    if strcmp(elem, "str") == 0 { return "_arr_str"; }
+    if strcmp(elem, "Point") == 0 { return "_arr_Point"; }
+    if strcmp(elem, "Token") == 0 { return "_arr_Token"; }
+    if strcmp(elem, "Data") == 0 { return "_arr_Data"; }
+    return "_arr_unknown";
+}
+
+fun compute_struct_layouts(e: EmitterState, ast: AstNode) -> i64 {
+    e.structs = new StructInfo[64];
+    let s = add_struct_info(e, "str", 16);
+    add_field(s, "data", type_info("ptr", "i8"), 0);
+    add_field(s, "len", type_i64(), 8);
+    let a = add_struct_info(e, "_arr_i8", 24);
+    add_field(a, "data", type_info("ptr", "i8"), 0);
+    add_field(a, "len", type_i64(), 8);
+    add_field(a, "cap", type_i64(), 16);
+    a = add_struct_info(e, "_arr_i64", 24);
+    add_field(a, "data", type_info("ptr", "i64"), 0);
+    add_field(a, "len", type_i64(), 8);
+    add_field(a, "cap", type_i64(), 16);
+    a = add_struct_info(e, "_arr_str", 24);
+    add_field(a, "data", type_info("ptr", "str"), 0);
+    add_field(a, "len", type_i64(), 8);
+    add_field(a, "cap", type_i64(), 16);
+    let i = 0;
+    while i < ast.structs.len {
+        let node = ast.structs.data[i];
+        s = add_struct_info(e, node.name, node.fields.len * 8);
+        let j = 0;
+        while j < node.fields.len {
+            add_field(s, node.fields.data[j].name, user_type(node.fields.data[j].type_name), j * 8);
+            j = j + 1;
+        }
+        a = add_struct_info(e, array_layout_name(node.name), 24);
+        add_field(a, "data", type_info("ptr", node.name), 0);
+        add_field(a, "len", type_i64(), 8);
+        add_field(a, "cap", type_i64(), 16);
+        i = i + 1;
+    }
+    return 0;
+}
+
+fun find_func_ret(e: EmitterState, name: str) -> TypeInfo {
     let i = 0;
     while i < e.funcs.len {
         if strcmp(e.funcs.data[i].name, name) == 0 {
@@ -287,7 +458,7 @@ fun find_func_ret(e: EmitterState, name: str) -> str {
         }
         i = i + 1;
     }
-    return "i64";
+    return type_i64();
 }
 
 fun reset_locals(e: EmitterState) -> i64 {
@@ -297,7 +468,7 @@ fun reset_locals(e: EmitterState) -> i64 {
     return 0;
 }
 
-fun add_local(e: EmitterState, name: str, type_name: str) -> i64 {
+fun add_local(e: EmitterState, name: str, typ: TypeInfo) -> i64 {
     let i = 0;
     while i < e.locals.len {
         if strcmp(e.locals.data[i].name, name) == 0 {
@@ -308,7 +479,7 @@ fun add_local(e: EmitterState, name: str, type_name: str) -> i64 {
     e.local_bytes = e.local_bytes + 8;
     let l = new Local;
     l.name = name;
-    l.type_name = type_name;
+    l.typ = typ;
     l.slot = 0 - e.local_bytes;
     push(e.locals, l);
     return l.slot;
@@ -326,32 +497,57 @@ fun find_local_slot(e: EmitterState, name: str) -> i64 {
     return 0;
 }
 
-fun find_local_type(e: EmitterState, name: str) -> str {
+fun find_local_type(e: EmitterState, name: str) -> TypeInfo {
     let i = 0;
     while i < e.locals.len {
         if strcmp(e.locals.data[i].name, name) == 0 {
-            return e.locals.data[i].type_name;
+            return e.locals.data[i].typ;
         }
         i = i + 1;
     }
-    return "i64";
+    return type_i64();
 }
 
-fun expr_type(e: EmitterState, expr: AstNode) -> str {
-    if strcmp(expr.kind, "String") == 0 { return "str"; }
-    if strcmp(expr.kind, "Literal") == 0 { return "i64"; }
-    if strcmp(expr.kind, "Binary") == 0 { return "i64"; }
+fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
+    if strcmp(expr.kind, "String") == 0 { return type_str(); }
+    if strcmp(expr.kind, "Literal") == 0 { return type_i64(); }
+    if strcmp(expr.kind, "Binary") == 0 { return type_i64(); }
     if strcmp(expr.kind, "Var") == 0 { return find_local_type(e, expr.name); }
     if strcmp(expr.kind, "Call") == 0 {
-        if strcmp(expr.name, "itoa") == 0 { return "str"; }
-        if strcmp(expr.name, "strcmp") == 0 { return "i64"; }
+        if strcmp(expr.name, "itoa") == 0 { return type_str(); }
+        if strcmp(expr.name, "str_new") == 0 { return type_str(); }
+        if strcmp(expr.name, "read_file") == 0 { return type_str(); }
+        if strcmp(expr.name, "strcmp") == 0 { return type_i64(); }
+        if strcmp(expr.name, "write_file") == 0 { return type_i64(); }
         return find_func_ret(e, expr.name);
     }
-    return "i64";
+    if strcmp(expr.kind, "New") == 0 { return type_struct(expr.name); }
+    if strcmp(expr.kind, "NewArray") == 0 { return type_array(expr.type_name); }
+    if strcmp(expr.kind, "FieldAccess") == 0 {
+        let base_type = expr_type(e, expr.object);
+        let layout = "";
+        if strcmp(base_type.kind, "str") == 0 { layout = "str"; }
+        else {
+            if strcmp(base_type.kind, "array") == 0 { layout = array_layout_name(base_type.name); }
+            else { layout = base_type.name; }
+        }
+        let f = find_field_info(e, layout, expr.name);
+        return f.typ;
+    }
+    if strcmp(expr.kind, "Subscript") == 0 {
+        let bt = expr_type(e, expr.base);
+        if strcmp(bt.kind, "array") == 0 {
+            return user_type(bt.name);
+        }
+        if strcmp(bt.kind, "ptr") == 0 {
+            return user_type(bt.name);
+        }
+    }
+    return type_i64();
 }
 
-fun infer_let_type(e: EmitterState, value: AstNode) -> str {
-    if strcmp(value.kind, "") == 0 { return "i64"; }
+fun infer_let_type(e: EmitterState, value: AstNode) -> TypeInfo {
+    if strcmp(value.kind, "") == 0 { return type_i64(); }
     return expr_type(e, value);
 }
 
@@ -475,6 +671,65 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_call_inst(e, "_itoa");
         return 0;
     }
+    if strcmp(name, "strcmp") == 0 {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rax", slots.data[1]);
+        emit_mov(e, "rdx", "[rax]");
+        emit_stack_load(e, "rax", slots.data[0]);
+        emit_mov(e, "rcx", "[rax]");
+        emit_call_inst(e, "lstrcmpA");
+        return 0;
+    }
+    if strcmp(name, "str_new") == 0 {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rcx", slots.data[0]);
+        emit_stack_load(e, "rdx", slots.data[1]);
+        emit_call_inst(e, "_str_alloc");
+        return 0;
+    }
+    if strcmp(name, "read_file") == 0 {
+        emit_expr(e, expr.args.data[0]);
+        emit_mov(e, "rcx", "[rax]");
+        emit_inst(e, "sub rsp, 8");
+        emit_call_inst(e, "_read_file");
+        emit_inst(e, "add rsp, 8");
+        return 0;
+    }
+    if strcmp(name, "write_file") == 0 {
+        let slots = spill_args(e, expr.args);
+        emit_stack_load(e, "rax", slots.data[0]);
+        emit_mov(e, "rcx", "[rax]");
+        emit_stack_load(e, "rax", slots.data[1]);
+        emit_mov(e, "rdx", "[rax]");
+        emit_mov(e, "r8", "[rax+8]");
+        emit_inst(e, "sub rsp, 8");
+        emit_call_inst(e, "_write_file");
+        emit_inst(e, "add rsp, 8");
+        return 0;
+    }
+    if strcmp(name, "push") == 0 {
+        # m8-m14 slice: capacity is sufficient; grow path comes later.
+        let arr_type = expr_type(e, expr.args.data[0]);
+        let elem = arr_type.name;
+        let el_size = 8;
+        if strcmp(elem, "i8") == 0 { el_size = 1; }
+        emit_expr(e, expr.args.data[0]);
+        let arr_slot = temp_save_rax(e);
+        emit_expr(e, expr.args.data[1]);
+        let val_slot = temp_save_rax(e);
+        emit_stack_load(e, "rax", arr_slot);
+        emit_mov(e, "rcx", "[rax]");
+        emit_mov(e, "rdx", "[rax+8]");
+        emit_stack_load(e, "r8", val_slot);
+        if el_size == 1 {
+            emit_inst(e, "mov [rcx+rdx], r8b");
+        } else {
+            emit_inst(e, "mov [rcx+rdx*8], r8");
+        }
+        emit_inst(e, "inc qword [rax+8]");
+        emit_inst(e, "xor eax, eax");
+        return 0;
+    }
     let slots = spill_args(e, expr.args);
     load_spilled_args(e, slots);
     emit_inst(e, "sub rsp, 32");
@@ -485,7 +740,25 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
 
 fun emit_binary(e: EmitterState, expr: AstNode) -> i64 {
     if strcmp(expr.op, "&&") == 0 || strcmp(expr.op, "||") == 0 {
-        die("short circuit not in first codegen slice");
+        let end_id = fresh_label(e);
+        let true_id = fresh_label(e);
+        emit_expr(e, expr.left);
+        if strcmp(expr.op, "&&") == 0 {
+            emit_inst(e, "test rax, rax");
+            emit_jmp_id(e, "jz", "L", end_id);
+        } else {
+            emit_inst(e, "test rax, rax");
+            emit_jmp_id(e, "jnz", "L", true_id);
+        }
+        emit_expr(e, expr.right);
+        if strcmp(expr.op, "||") == 0 {
+            emit_label_id(e, "L", true_id);
+        }
+        emit_inst(e, "test rax, rax");
+        emit_inst(e, "setne al");
+        emit_inst(e, "movzx eax, al");
+        emit_label_id(e, "L", end_id);
+        return 0;
     }
     emit_expr(e, expr.right);
     let tmp = temp_save_rax(e);
@@ -506,6 +779,99 @@ fun emit_binary(e: EmitterState, expr: AstNode) -> i64 {
     return 0;
 }
 
+fun emit_new(e: EmitterState, expr: AstNode) -> i64 {
+    let info = find_struct_info(e, expr.name);
+    emit_mov(e, "rcx", "[_heap]");
+    emit_mov(e, "edx", "8");
+    emit_mov_i(e, "r8d", info.size);
+    emit_inst(e, "sub rsp, 40");
+    emit_call_inst(e, "HeapAlloc");
+    emit_inst(e, "add rsp, 40");
+    return 0;
+}
+
+fun emit_new_array(e: EmitterState, expr: AstNode) -> i64 {
+    let elem = expr.type_name;
+    let el_size = 8;
+    if strcmp(elem, "i8") == 0 { el_size = 1; }
+    let header_slot = 0;
+    let cap_slot = 0;
+    emit_mov(e, "rcx", "[_heap]");
+    emit_mov(e, "edx", "8");
+    emit_mov(e, "r8d", "24");
+    emit_inst(e, "sub rsp, 40");
+    emit_call_inst(e, "HeapAlloc");
+    emit_inst(e, "add rsp, 40");
+    header_slot = temp_save_rax(e);
+    if strcmp(expr.count.kind, "") == 0 {
+        emit_mov(e, "rax", "4");
+    } else {
+        emit_expr(e, expr.count);
+    }
+    emit_inst(e, "cmp rax, 1");
+    let cap_ok = fresh_label(e);
+    emit_jmp_id(e, "jge", "L", cap_ok);
+    emit_mov(e, "rax", "1");
+    emit_label_id(e, "L", cap_ok);
+    cap_slot = temp_save_rax(e);
+    emit_stack_load(e, "rcx", header_slot);
+    emit_mov(e, "qword [rcx+8]", "0");
+    emit_mov(e, "[rcx+16]", "rax");
+    emit_mov(e, "r8", "rax");
+    if el_size != 1 {
+        out_s(e.out_path, "    imul r8, ");
+        out_i(e.out_path, el_size);
+        out_nl(e.out_path);
+    }
+    emit_mov(e, "rcx", "[_heap]");
+    emit_mov(e, "edx", "8");
+    emit_inst(e, "sub rsp, 40");
+    emit_call_inst(e, "HeapAlloc");
+    emit_inst(e, "add rsp, 40");
+    emit_stack_load(e, "rcx", header_slot);
+    emit_mov(e, "[rcx]", "rax");
+    emit_mov(e, "rax", "rcx");
+    return 0;
+}
+
+fun field_layout_name(t: TypeInfo) -> str {
+    if strcmp(t.kind, "str") == 0 { return "str"; }
+    if strcmp(t.kind, "array") == 0 { return array_layout_name(t.name); }
+    if strcmp(t.kind, "struct") == 0 { return t.name; }
+    if strcmp(t.kind, "ptr") == 0 { return t.name; }
+    return "";
+}
+
+fun emit_field_access(e: EmitterState, expr: AstNode) -> i64 {
+    let obj_type = expr_type(e, expr.object);
+    emit_expr(e, expr.object);
+    let field = find_field_info(e, field_layout_name(obj_type), expr.name);
+    if type_is_i8(field.typ) == 1 {
+        out_s(e.out_path, "    movsx rax, byte [rax+");
+        out_i(e.out_path, field.offset);
+        out_line(e.out_path, "]");
+    } else {
+        out_s(e.out_path, "    mov rax, [rax+");
+        out_i(e.out_path, field.offset);
+        out_line(e.out_path, "]");
+    }
+    return 0;
+}
+
+fun emit_subscript(e: EmitterState, expr: AstNode) -> i64 {
+    let elem_type = expr_type(e, expr);
+    emit_expr(e, expr.base);
+    let base_slot = temp_save_rax(e);
+    emit_expr(e, expr.index);
+    emit_stack_load(e, "rcx", base_slot);
+    if type_is_i8(elem_type) == 1 {
+        emit_inst(e, "movsx rax, byte [rcx+rax]");
+    } else {
+        emit_inst(e, "mov rax, [rcx+rax*8]");
+    }
+    return 0;
+}
+
 fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
     if strcmp(expr.kind, "Literal") == 0 {
         emit_mov(e, "rax", expr.value);
@@ -519,7 +885,13 @@ fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
         return 0;
     }
     if strcmp(expr.kind, "Var") == 0 {
-        emit_stack_load(e, "rax", find_local_slot(e, expr.name));
+        if type_is_i8(find_local_type(e, expr.name)) == 1 {
+            out_s(e.out_path, "    movsx rax, byte ");
+            emit_slot_ref(e.out_path, find_local_slot(e, expr.name));
+            out_nl(e.out_path);
+        } else {
+            emit_stack_load(e, "rax", find_local_slot(e, expr.name));
+        }
         return 0;
     }
     if strcmp(expr.kind, "Call") == 0 {
@@ -528,6 +900,22 @@ fun emit_expr(e: EmitterState, expr: AstNode) -> i64 {
     }
     if strcmp(expr.kind, "Binary") == 0 {
         emit_binary(e, expr);
+        return 0;
+    }
+    if strcmp(expr.kind, "New") == 0 {
+        emit_new(e, expr);
+        return 0;
+    }
+    if strcmp(expr.kind, "NewArray") == 0 {
+        emit_new_array(e, expr);
+        return 0;
+    }
+    if strcmp(expr.kind, "FieldAccess") == 0 {
+        emit_field_access(e, expr);
+        return 0;
+    }
+    if strcmp(expr.kind, "Subscript") == 0 {
+        emit_subscript(e, expr);
         return 0;
     }
     die("unsupported expr");
@@ -550,13 +938,65 @@ fun emit_let(e: EmitterState, stmt: AstNode) -> i64 {
         return 0;
     }
     emit_expr(e, stmt.value_expr);
-    emit_stack_store(e, find_local_slot(e, stmt.name), "rax");
+    if type_is_i8(find_local_type(e, stmt.name)) == 1 {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "al");
+    } else {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "rax");
+    }
     return 0;
 }
 
 fun emit_assign(e: EmitterState, stmt: AstNode) -> i64 {
     emit_expr(e, stmt.value_expr);
-    emit_stack_store(e, find_local_slot(e, stmt.name), "rax");
+    if type_is_i8(find_local_type(e, stmt.name)) == 1 {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "al");
+    } else {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "rax");
+    }
+    return 0;
+}
+
+fun emit_subscript_assign(e: EmitterState, stmt: AstNode) -> i64 {
+    let synth = ast_node("Subscript");
+    synth.base = stmt.base;
+    synth.index = stmt.index;
+    let elem_type = expr_type(e, synth);
+    emit_expr(e, stmt.value_expr);
+    let val_slot = temp_save_rax(e);
+    emit_expr(e, stmt.base);
+    let base_slot = temp_save_rax(e);
+    emit_expr(e, stmt.index);
+    emit_stack_load(e, "rcx", base_slot);
+    if type_is_i8(elem_type) == 1 {
+        emit_inst(e, "lea rcx, [rcx+rax]");
+    } else {
+        emit_inst(e, "lea rcx, [rcx+rax*8]");
+    }
+    emit_stack_load(e, "rax", val_slot);
+    if type_is_i8(elem_type) == 1 {
+        emit_inst(e, "mov [rcx], al");
+    } else {
+        emit_inst(e, "mov [rcx], rax");
+    }
+    return 0;
+}
+
+fun emit_field_set(e: EmitterState, stmt: AstNode) -> i64 {
+    let obj_type = expr_type(e, stmt.object);
+    let field = find_field_info(e, field_layout_name(obj_type), stmt.name);
+    emit_expr(e, stmt.value_expr);
+    let val_slot = temp_save_rax(e);
+    emit_expr(e, stmt.object);
+    emit_stack_load(e, "rcx", val_slot);
+    if type_is_i8(field.typ) == 1 {
+        out_s(e.out_path, "    mov [rax+");
+        out_i(e.out_path, field.offset);
+        out_line(e.out_path, "], cl");
+    } else {
+        out_s(e.out_path, "    mov [rax+");
+        out_i(e.out_path, field.offset);
+        out_line(e.out_path, "], rcx");
+    }
     return 0;
 }
 
@@ -598,6 +1038,8 @@ fun emit_stmt(e: EmitterState, stmt: AstNode) -> i64 {
     if strcmp(stmt.kind, "ExprStmt") == 0 { return emit_expr(e, stmt.expr); }
     if strcmp(stmt.kind, "Let") == 0 { return emit_let(e, stmt); }
     if strcmp(stmt.kind, "Assign") == 0 { return emit_assign(e, stmt); }
+    if strcmp(stmt.kind, "SubscriptAssign") == 0 { return emit_subscript_assign(e, stmt); }
+    if strcmp(stmt.kind, "FieldSet") == 0 { return emit_field_set(e, stmt); }
     if strcmp(stmt.kind, "If") == 0 { return emit_if(e, stmt); }
     if strcmp(stmt.kind, "While") == 0 { return emit_while(e, stmt); }
     die("unsupported stmt");
@@ -622,7 +1064,7 @@ fun emit_fn_def(e: EmitterState, fn: AstNode) -> i64 {
     e.current_ep_id = fresh_label(e);
     let i = 0;
     while i < fn.params.len {
-        add_local(e, fn.params.data[i].name, fn.params.data[i].type_name);
+        add_local(e, fn.params.data[i].name, user_type(fn.params.data[i].type_name));
         i = i + 1;
     }
     pre_scan_block(e, fn.body);
@@ -640,10 +1082,22 @@ fun emit_fn_def(e: EmitterState, fn: AstNode) -> i64 {
         emit_call_inst(e, "_argv_init");
         emit_mov(e, "[_argv]", "rax");
     }
-    if fn.params.len > 0 { emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "rcx"); }
-    if fn.params.len > 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "rdx"); }
-    if fn.params.len > 2 { emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8"); }
-    if fn.params.len > 3 { emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9"); }
+    if fn.params.len > 0 {
+        if type_is_i8(find_local_type(e, fn.params.data[0].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "cl"); }
+        else { emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "rcx"); }
+    }
+    if fn.params.len > 1 {
+        if type_is_i8(find_local_type(e, fn.params.data[1].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "dl"); }
+        else { emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "rdx"); }
+    }
+    if fn.params.len > 2 {
+        if type_is_i8(find_local_type(e, fn.params.data[2].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8b"); }
+        else { emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8"); }
+    }
+    if fn.params.len > 3 {
+        if type_is_i8(find_local_type(e, fn.params.data[3].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9b"); }
+        else { emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9"); }
+    }
     emit_block(e, fn.body);
     if strcmp(fn.name, "main") != 0 {
         emit_label_id(e, "L", e.current_ep_id);
@@ -655,6 +1109,7 @@ fun emit_fn_def(e: EmitterState, fn: AstNode) -> i64 {
 
 fun emit_program(e: EmitterState, ast: AstNode) -> i64 {
     write_file(e.out_path, "");
+    compute_struct_layouts(e, ast);
     add_func_infos(e, ast);
     collect_strings(e, ast);
     out_line(e.out_path, "global _start");
