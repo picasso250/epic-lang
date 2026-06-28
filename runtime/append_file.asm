@@ -1,4 +1,4 @@
-; ── _append_file: append whole str to a file ──
+; -- _append_file: append whole byte array payload to a file --
 ; rcx = path (C string), rdx = data pointer, r8 = len
 ; returns: rax = bytes written, or -1 on failure
 _append_file:

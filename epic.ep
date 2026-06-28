@@ -100,19 +100,19 @@ fun output_base(main_path: str) -> str {
 }
 
 fun write_build_script(cmd_path: str, asm_path: str, obj_path: str, exe_path: str) -> i64 {
-    write_file(cmd_path, "@echo off\n");
-    append_file(cmd_path, "tools\\nasm.exe -f win64 \"");
-    append_file(cmd_path, asm_path);
-    append_file(cmd_path, "\" -o \"");
-    append_file(cmd_path, obj_path);
-    append_file(cmd_path, "\"\n");
-    append_file(cmd_path, "if errorlevel 1 exit /b 1\n");
-    append_file(cmd_path, "python link.py \"");
-    append_file(cmd_path, obj_path);
-    append_file(cmd_path, "\" -o \"");
-    append_file(cmd_path, exe_path);
-    append_file(cmd_path, "\"\n");
-    append_file(cmd_path, "if errorlevel 1 exit /b 1\n");
+    write_file(cmd_path, bytes("@echo off\n"));
+    append_file(cmd_path, bytes("tools\\nasm.exe -f win64 \""));
+    append_file(cmd_path, bytes(asm_path));
+    append_file(cmd_path, bytes("\" -o \""));
+    append_file(cmd_path, bytes(obj_path));
+    append_file(cmd_path, bytes("\"\n"));
+    append_file(cmd_path, bytes("if errorlevel 1 exit /b 1\n"));
+    append_file(cmd_path, bytes("python link.py \""));
+    append_file(cmd_path, bytes(obj_path));
+    append_file(cmd_path, bytes("\" -o \""));
+    append_file(cmd_path, bytes(exe_path));
+    append_file(cmd_path, bytes("\"\n"));
+    append_file(cmd_path, bytes("if errorlevel 1 exit /b 1\n"));
     return 0;
 }
 

@@ -1,10 +1,10 @@
-; ── _read_file: read whole file into heap-allocated str ──
+; -- _read_file: read whole file into heap-allocated i8[] --
 ; rcx = path (C string)
-; returns: rax = &str
+; returns: rax = &_arr_i8 { data: &i8, len: i64, cap: i64 }
 _read_file:
     push rbp
     mov rbp, rsp
-    sub rsp, 64
+    sub rsp, 80
     mov [rbp-8], rcx       ; path
     ; CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
     mov rcx, [rbp-8]
@@ -20,18 +20,34 @@ _read_file:
     cmp rax, -1
     je _read_file_empty
     mov [rbp-16], rax      ; handle
+
+    ; header = HeapAlloc(heap, zero, 24)
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 24
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov [rbp-56], rax      ; header
+
     ; size = GetFileSize(handle, NULL)
-    mov rcx, rax
+    mov rcx, [rbp-16]
     xor edx, edx
     sub rsp, 40
     call GetFileSize
     add rsp, 40
     mov [rbp-24], rax      ; size
-    ; buf = HeapAlloc(heap, zero, size + 1)
+    mov r8, rax
+    test r8, r8
+    jnz _read_file_cap_ok
+    mov r8, 1
+_read_file_cap_ok:
+    mov [rbp-64], r8       ; cap
+
+    ; buf = HeapAlloc(heap, zero, cap)
     mov rcx, [_heap]
     mov edx, 8
-    mov r8, rax
-    inc r8
+    mov r8, [rbp-64]
     sub rsp, 40
     call HeapAlloc
     add rsp, 40
@@ -50,17 +66,36 @@ _read_file:
     sub rsp, 40
     call CloseHandle
     add rsp, 40
-    ; Deep-copy exactly the bytes read into str.
-    mov rcx, [rbp-32]
-    mov edx, [rbp-40]
-    call _str_alloc
+    ; Fill array header with the bytes read.
+    mov rcx, [rbp-56]
+    mov rax, [rbp-32]
+    mov [rcx], rax
+    mov eax, [rbp-40]
+    mov [rcx+8], rax
+    mov rax, [rbp-64]
+    mov [rcx+16], rax
+    mov rax, rcx
     jmp _read_file_done
 _read_file_empty:
-    lea rcx, [_read_file_empty_data]
-    xor edx, edx
-    call _str_alloc
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 24
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov [rbp-56], rax
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 1
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov rcx, [rbp-56]
+    mov [rcx], rax
+    mov qword [rcx+8], 0
+    mov qword [rcx+16], 1
+    mov rax, rcx
 _read_file_done:
     mov rsp, rbp
     pop rbp
     ret
-_read_file_empty_data: db 0

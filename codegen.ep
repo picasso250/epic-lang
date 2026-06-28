@@ -249,6 +249,7 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
         if expr.name == "len" { return type_i64(); }
         if expr.name == "cap" { return type_i64(); }
         if expr.name == "itoa" { return type_str(); }
+        if expr.name == "str" { return type_str(); }
         if expr.name == "bytes" { return type_array("i8"); }
         if expr.name == "str_new" { return type_str(); }
         if expr.name == "str_slice" { return type_str(); }
@@ -256,10 +257,16 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
         if expr.name == "str_starts_with" { return type_i64(); }
         if expr.name == "str_find" { return type_i64(); }
         if expr.name == "str_trim" { return type_str(); }
-        if expr.name == "read_file" { return type_str(); }
+        if expr.name == "read_file" { return type_array("i8"); }
         if expr.name == "write_file" { return type_i64(); }
         if expr.name == "append_file" { return type_i64(); }
         if expr.name == "extend" { return type_void(); }
+        if expr.name == "u16_le" { return type_i64(); }
+        if expr.name == "u32_le" { return type_i64(); }
+        if expr.name == "u64_le" { return type_i64(); }
+        if expr.name == "put_u16_le" { return type_void(); }
+        if expr.name == "put_u32_le" { return type_void(); }
+        if expr.name == "put_u64_le" { return type_void(); }
         return find_func_ret(e, expr.name);
     }
     if expr.kind == "New" { return type_struct(expr.name); }
@@ -383,6 +390,90 @@ fun load_spilled_args(e: EmitterState, slots: i64[]) -> i64 {
     return 0;
 }
 
+fun ensure_i8_array(t: TypeInfo, name: str) -> i64 {
+    if t.kind != "array" {
+        die(name);
+    }
+    if t.name != "i8" {
+        die(name);
+    }
+    return 0;
+}
+
+fun emit_byte_range_check(e: EmitterState, arr_slot: i64, off_slot: i64, width: i64) -> i64 {
+    let fail_id = fresh_label(e);
+    let ok_id = fresh_label(e);
+    emit_stack_load(e, "rax", off_slot);
+    emit_inst(e, "cmp rax, 0");
+    emit_jmp_id(e, "jl", "L", fail_id);
+    out_s(e, "    add rax, ");
+    out_i(e, width);
+    out_nl(e);
+    emit_stack_load(e, "rcx", arr_slot);
+    emit_inst(e, "cmp rax, [rcx+8]");
+    emit_jmp_id(e, "jg", "L", fail_id);
+    emit_jmp_id(e, "jmp", "L", ok_id);
+    emit_label_id(e, "L", fail_id);
+    emit_inst(e, "mov ecx, 1");
+    emit_call_inst(e, "ExitProcess");
+    emit_label_id(e, "L", ok_id);
+    return 0;
+}
+
+fun emit_le_load(e: EmitterState, args: AstNode[], width: i64) -> i64 {
+    if args.len != 2 {
+        die("little-endian load expects two arguments");
+    }
+    ensure_i8_array(expr_type(e, args.data[0]), "little-endian load expects i8[]");
+    emit_expr(e, args.data[0]);
+    let arr_slot = temp_save_rax(e);
+    emit_expr(e, args.data[1]);
+    let off_slot = temp_save_rax(e);
+    emit_byte_range_check(e, arr_slot, off_slot, width);
+    emit_stack_load(e, "rcx", arr_slot);
+    emit_inst(e, "mov rcx, [rcx]");
+    emit_stack_load(e, "rdx", off_slot);
+    if width == 2 {
+        emit_inst(e, "movzx rax, word [rcx+rdx]");
+    } else {
+        if width == 4 {
+            emit_inst(e, "mov eax, dword [rcx+rdx]");
+        } else {
+            emit_inst(e, "mov rax, [rcx+rdx]");
+        }
+    }
+    return 0;
+}
+
+fun emit_le_store(e: EmitterState, args: AstNode[], width: i64) -> i64 {
+    if args.len != 3 {
+        die("little-endian store expects three arguments");
+    }
+    ensure_i8_array(expr_type(e, args.data[0]), "little-endian store expects i8[]");
+    emit_expr(e, args.data[0]);
+    let arr_slot = temp_save_rax(e);
+    emit_expr(e, args.data[1]);
+    let off_slot = temp_save_rax(e);
+    emit_expr(e, args.data[2]);
+    let val_slot = temp_save_rax(e);
+    emit_byte_range_check(e, arr_slot, off_slot, width);
+    emit_stack_load(e, "rcx", arr_slot);
+    emit_inst(e, "mov rcx, [rcx]");
+    emit_stack_load(e, "rdx", off_slot);
+    emit_stack_load(e, "rax", val_slot);
+    if width == 2 {
+        emit_inst(e, "mov [rcx+rdx], ax");
+    } else {
+        if width == 4 {
+            emit_inst(e, "mov [rcx+rdx], eax");
+        } else {
+            emit_inst(e, "mov [rcx+rdx], rax");
+        }
+    }
+    emit_inst(e, "xor eax, eax");
+    return 0;
+}
+
 fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
     let name = expr.name;
     let sys_symbol = sys_call_symbol(name);
@@ -477,6 +568,19 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_call_inst(e, "_str_alloc");
         return 0;
     }
+    if name == "str" {
+        if expr.args.len != 1 {
+            die("str expects one argument");
+        }
+        ensure_i8_array(expr_type(e, expr.args.data[0]), "str expects i8[]");
+        emit_expr(e, expr.args.data[0]);
+        let arr_slot = temp_save_rax(e);
+        emit_stack_load(e, "rax", arr_slot);
+        emit_mov(e, "rcx", "[rax]");
+        emit_mov(e, "rdx", "[rax+8]");
+        emit_call_inst(e, "_str_alloc");
+        return 0;
+    }
     if name == "bytes" {
         emit_expr(e, expr.args.data[0]);
         emit_mov(e, "rcx", "rax");
@@ -562,6 +666,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         return 0;
     }
     if name == "write_file" {
+        ensure_i8_array(expr_type(e, expr.args.data[1]), "write_file expects i8[]");
         let slots = spill_args(e, expr.args);
         emit_stack_load(e, "rax", slots.data[0]);
         emit_mov(e, "rcx", "[rax]");
@@ -574,6 +679,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         return 0;
     }
     if name == "append_file" {
+        ensure_i8_array(expr_type(e, expr.args.data[1]), "append_file expects i8[]");
         let slots = spill_args(e, expr.args);
         emit_stack_load(e, "rax", slots.data[0]);
         emit_mov(e, "rcx", "[rax]");
@@ -585,6 +691,12 @@ fun emit_call_expr(e: EmitterState, expr: AstNode) -> i64 {
         emit_inst(e, "add rsp, 8");
         return 0;
     }
+    if name == "u16_le" { return emit_le_load(e, expr.args, 2); }
+    if name == "u32_le" { return emit_le_load(e, expr.args, 4); }
+    if name == "u64_le" { return emit_le_load(e, expr.args, 8); }
+    if name == "put_u16_le" { return emit_le_store(e, expr.args, 2); }
+    if name == "put_u32_le" { return emit_le_store(e, expr.args, 4); }
+    if name == "put_u64_le" { return emit_le_store(e, expr.args, 8); }
     if name == "push" {
         let arr_type = expr_type(e, expr.args.data[0]);
         let elem = arr_type.name;
@@ -1416,7 +1528,7 @@ fun emit_program(e: EmitterState, ast: AstNode) -> i64 {
         i = i + 1;
     }
     emit_runtime_helpers(e);
-    write_file(e.out_path, str_new(e.out_buf.data, e.out_buf.len));
+    write_file(e.out_path, e.out_buf);
     return 0;
 }
 

@@ -1,4 +1,4 @@
-; ── _write_file: write whole str to a file ──
+; -- _write_file: write whole byte array payload to a file --
 ; rcx = path (C string), rdx = data pointer, r8 = len
 ; returns: rax = bytes written, or -1 on failure
 _write_file:

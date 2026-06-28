@@ -243,6 +243,9 @@ fun parse_fn_def(p: Parser) -> AstNode {
     if name.text == "bytes" {
         parse_error(name.line, "reserved builtin function name");
     }
+    if name.text == "str" {
+        parse_error(name.line, "reserved builtin function name");
+    }
     if name.text == "str_new" {
         parse_error(name.line, "reserved builtin function name");
     }
@@ -259,6 +262,24 @@ fun parse_fn_def(p: Parser) -> AstNode {
         parse_error(name.line, "reserved builtin function name");
     }
     if name.text == "str_trim" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "u16_le" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "u32_le" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "u64_le" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "put_u16_le" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "put_u32_le" {
+        parse_error(name.line, "reserved builtin function name");
+    }
+    if name.text == "put_u64_le" {
         parse_error(name.line, "reserved builtin function name");
     }
     expect(p, "LPAREN");

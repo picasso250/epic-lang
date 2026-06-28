@@ -226,7 +226,8 @@ syntax instead.
 Replacing `link.py` with Epic code would be a valuable v1 stretch goal because
 binary parsing and patching are core systems-language capabilities.
 
-The current Python linker depends on operations Epic does not yet expose well:
+The current Python linker depends on byte-buffer operations that v1 now exposes
+directly:
 
 - reading a file as raw bytes
 - writing raw bytes
@@ -234,12 +235,12 @@ The current Python linker depends on operations Epic does not yet expose well:
 - little-endian `u16`, `u32`, `u64`, and signed `i32` load/store helpers
 - appending bytes and patching bytes at known offsets
 
-Before committing to an Epic linker, v1 should first add enough byte-buffer
-surface to make the port direct and testable. A possible minimal direction:
+The current minimal byte-buffer surface is:
 
 ```epic
 read_file(path: str) -> i8[]
 write_file(path: str, data: i8[]) -> i64
+append_file(path: str, data: i8[]) -> i64
 str(bytes: i8[]) -> str
 bytes(s: str) -> i8[]
 u16_le(buf: i8[], off: i64) -> i64
@@ -251,11 +252,16 @@ put_u64_le(buf: i8[], off: i64, x: i64) -> void
 ```
 
 This is a breaking change from v0: file IO should operate on bytes, not text.
-Compiler source loading should become explicit:
+Ordinary source loading should become explicit:
 
 ```epic
 let source = str(read_file(path))
 ```
+
+The current v1 compiler sources are still compiled by the v0 bootstrap anchor,
+so they may temporarily rely on the fact that `i8[]` and `str` share their first
+two layout fields: `.data` and `.len`. New v1 user code should use explicit
+`str(read_file(path))` conversion when it needs text.
 
 `read_file` returns an empty `i8[]` on failure, matching the v0 happy-path style
 without introducing `Result` or exceptions.
@@ -264,6 +270,9 @@ without introducing `Result` or exceptions.
 compatibility. It does not scan for interior NUL bytes in v1; if such bytes are
 present, C APIs will observe the string only up to the first NUL. That is the
 caller's responsibility in the v1 happy path.
+
+Little-endian load/store helpers are bounds checked. They exit immediately when
+`off < 0` or `off + width > len(buf)`.
 
 Epic `str` remains length-carrying and NUL-terminated. Even an empty string
 should have non-null data pointing at a NUL byte. The implementation may later

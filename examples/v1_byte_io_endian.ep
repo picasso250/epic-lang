@@ -1,0 +1,34 @@
+# EXIT: 0
+# STDOUT: MZ466016909060283686952306183
+# CLEAN: test_bytes.bin
+fun main() -> void {
+    let buf = new i8[16]
+    push(buf, 'M')
+    push(buf, 'Z')
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    push(buf, 0)
+    put_u16_le(buf, 2, 4660)
+    put_u32_le(buf, 4, 16909060)
+    put_u64_le(buf, 8, 283686952306183)
+    write_file("test_bytes.bin", buf)
+
+    let got = read_file("test_bytes.bin")
+    putc(got[0])
+    putc(got[1])
+    putstr(itoa(u16_le(got, 2)))
+    putstr(itoa(u32_le(got, 4)))
+    putstr(itoa(u64_le(got, 8)))
+    sys.ExitProcess(0)
+}

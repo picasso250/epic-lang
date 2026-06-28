@@ -163,14 +163,17 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `putstr` | writes `s.data` for `s.len` bytes |
 | `itoa` | calls `_itoa` runtime helper |
 | `system` | calls `_system` runtime helper |
-| `read_file` | calls `_read_file` runtime helper |
-| `write_file` | calls `_write_file` runtime helper |
-| `append_file` | calls `_append_file` runtime helper |
+| `read_file` | calls `_read_file` runtime helper and returns `i8[]` |
+| `write_file` | writes an `i8[]` payload through `_write_file` |
+| `append_file` | appends an `i8[]` payload through `_append_file` |
 | `str_new` | calls `_str_alloc` runtime helper |
+| `str` | converts `i8[]` to `str` through `_str_alloc` |
 | `bytes` | calls `_bytes` runtime helper |
 | `str_starts_with` | calls `_str_starts_with` runtime helper |
 | `str_find` | calls `_str_find` runtime helper |
 | `str_trim` | calls `_str_trim` runtime helper |
+| `u16_le` / `u32_le` / `u64_le` | emitted directly as checked little-endian loads from `i8[]` |
+| `put_u16_le` / `put_u32_le` / `put_u64_le` | emitted directly as checked little-endian stores into `i8[]` |
 | `len` / `cap` | emitted directly for strings and dynamic arrays |
 | `push` | emitted by codegen for dynamic arrays |
 | `extend` | calls `_extend_i8` for `i8[]`; emits copy loops for other dynamic arrays |
@@ -205,7 +208,7 @@ python runtests.py --linker py
 Current known result:
 
 ```text
-50 passed, 0 failed
+51 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.
