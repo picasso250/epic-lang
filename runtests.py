@@ -8,7 +8,7 @@ compiles, runs, and reports pass/fail.
 import os, sys, subprocess, re, shlex, argparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
+EPICC = os.path.join(SCRIPT_DIR, "epic.py")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 EXEC_TIMEOUT = 1  # seconds, prevent link.py bugs from hanging
 

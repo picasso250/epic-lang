@@ -14,7 +14,7 @@ from parser import Parser
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
+EPICC = os.path.join(SCRIPT_DIR, "epic.py")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 PARSER_EP = os.path.join(SCRIPT_DIR, "parser.ep")
 LEXER_EP = os.path.join(SCRIPT_DIR, "lexer.ep")

@@ -12,7 +12,7 @@ from runtests import parse_annotations, clean_test_paths
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
+EPICC = os.path.join(SCRIPT_DIR, "epic.py")
 NASM = os.path.join(SCRIPT_DIR, "tools", "nasm.exe")
 LLD_LINK = os.path.join(SCRIPT_DIR, "tools", "lld-link.exe")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"

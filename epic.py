@@ -2,9 +2,9 @@
 Epic v0 compiler CLI.
 
 Usage:
-    python epicc.py <file.ep>              # use default lld-link
-    python epicc.py <file.ep> --linker py  # use link.py
-    python epicc.py --main main.ep main.ep lib.ep
+    python epic.py <file.ep>              # use default link.py
+    python epic.py <file.ep> --linker lld-link  # use lld-link
+    python epic.py --main main.ep main.ep lib.ep
 """
 
 import argparse
@@ -109,7 +109,7 @@ def _merge_programs(input_paths, main_path):
     return ProgramNode(funcs=funcs, structs=structs)
 
 
-def compile_files(input_paths, main_path=None, linker="lld-link", out_dir=BUILD_DIR):
+def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
 
@@ -152,7 +152,7 @@ def compile_files(input_paths, main_path=None, linker="lld-link", out_dir=BUILD_
     return exe_path
 
 
-def compile_file(input_path, linker="lld-link", out_dir=BUILD_DIR):
+def compile_file(input_path, linker="py", out_dir=BUILD_DIR):
     return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
 
 
@@ -162,13 +162,13 @@ def compile_file(input_path, linker="lld-link", out_dir=BUILD_DIR):
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
-        prog="epicc.py",
+        prog="epic.py",
         description="Epic v0 compiler",
     )
     parser.add_argument("inputs", nargs="+", help="input .ep source files")
     parser.add_argument("--main", help="file whose main function is the program entry")
-    parser.add_argument("--linker", choices=["lld-link", "py"], default="lld-link",
-                        help="linker to use (default: lld-link)")
+    parser.add_argument("--linker", choices=["lld-link", "py"], default="py",
+                        help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
     return parser.parse_args(argv)

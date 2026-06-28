@@ -11,7 +11,7 @@ from lexer import lex
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "epicc.py")
+EPICC = os.path.join(SCRIPT_DIR, "epic.py")
 LEXER_EP = os.path.join(SCRIPT_DIR, "lexer.ep")
 LEXER_EXE = os.path.join(SCRIPT_DIR, "build", "lexer.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
