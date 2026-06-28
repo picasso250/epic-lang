@@ -1,15 +1,17 @@
 # EXIT: 0
-# STDOUT: hellobye
+# STDOUT: hellobye!
 fun main() -> i64 {
     let s = "hello";
     putstr(s);
 
-    # strcmp
     let t = "hello";
-    if strcmp(s, t) == 0 {
+    if s == t {
         putstr("bye");
     } else {
         putstr("no");
+    }
+    if s != "world" {
+        putstr("!");
     }
 
     exit(0);

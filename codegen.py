@@ -15,7 +15,7 @@ class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
         self.builtins = {"exit", "putc", "putstr",
-                         "strcmp", "itoa", "system",
+                         "itoa", "system",
                          "str_new", "read_file", "write_file",
                          "append_file", "push"}
         self.winapi = {
@@ -629,13 +629,6 @@ class Emitter:
                 self.emit_mov("qword [rsp+32]", "0")
                 self.emit_call_inst("WriteFile")
                 self._call_cleanup(1)
-            elif name == "strcmp":
-                slots = self._spill_args(args)
-                self.emit_stack_load("rax", slots[1])
-                self.emit_mov("rdx", "[rax]")    # rdx = b.data (offset 0)
-                self.emit_stack_load("rax", slots[0])
-                self.emit_mov("rcx", "[rax]")    # rcx = a.data (offset 0)
-                self.emit_call_inst("lstrcmpA")
             elif name == "itoa":
                 # itoa(n) → &str (heap-allocated)
                 self.emit_expr(args[0])     # rax = n
@@ -702,10 +695,23 @@ class Emitter:
         # Evaluate right to temp slot, evaluate left → rax, load right → rcx
         # Using temp slot (not push/pop) so left expr can contain calls without
         # clobbering stack alignment or shadow space.
+        left_type = self._expr_type(left)
+        right_type = self._expr_type(right)
         self.emit_expr(right)
         tmp = self._alloc_temp()
         self.emit_stack_store(tmp, "rax")
         self.emit_expr(left)
+
+        if op in ("==", "!=") and left_type == "&str" and right_type == "&str":
+            self.emit_mov("rcx", "[rax]")
+            self.emit_stack_load("rax", tmp)
+            self.emit_mov("rdx", "[rax]")
+            self._call_with_shadow("lstrcmpA")
+            self.emit("    cmp eax, 0")
+            self.emit("    sete al" if op == "==" else "    setne al")
+            self.emit("    movzx eax, al")
+            return
+
         self.emit_stack_load("rcx", tmp)
 
         op_map = {
@@ -1117,7 +1123,7 @@ class Emitter:
             # Builtins with known return types
             if name in ("itoa", "str_new", "read_file"):
                 return "&str"
-            if name in ("strcmp", "system", "write_file", "append_file"):
+            if name in ("system", "write_file", "append_file"):
                 return "i64"
             if name in ("exit", "putc", "putstr"):
                 return "void"
