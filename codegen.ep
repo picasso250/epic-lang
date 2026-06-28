@@ -616,6 +616,9 @@ fun expr_type(e: EmitterState, expr: AstNode) -> TypeInfo {
     }
     if expr.kind == "Subscript" {
         let bt = expr_type(e, expr.base);
+        if bt.kind == "str" {
+            return type_i8();
+        }
         if bt.kind == "array" {
             return user_type(bt.name);
         }
@@ -1121,11 +1124,26 @@ fun emit_field_access(e: EmitterState, expr: AstNode) -> i64 {
 }
 
 fun emit_subscript(e: EmitterState, expr: AstNode) -> i64 {
+    let base_type = expr_type(e, expr.base);
     let elem_type = expr_type(e, expr);
     emit_expr(e, expr.base);
     let base_slot = temp_save_rax(e);
     emit_expr(e, expr.index);
     emit_stack_load(e, "rcx", base_slot);
+    if base_type.kind == "str" || base_type.kind == "array" {
+        let ok_id = fresh_label(e);
+        let fail_id = fresh_label(e);
+        emit_inst(e, "cmp rax, 0");
+        emit_jmp_id(e, "jl", "L", fail_id);
+        emit_inst(e, "cmp rax, [rcx+8]");
+        emit_jmp_id(e, "jge", "L", fail_id);
+        emit_inst(e, "mov rcx, [rcx]");
+        emit_jmp_id(e, "jmp", "L", ok_id);
+        emit_label_id(e, "L", fail_id);
+        emit_inst(e, "mov ecx, 1");
+        emit_call_inst(e, "ExitProcess");
+        emit_label_id(e, "L", ok_id);
+    }
     if type_is_i8(elem_type) == 1 {
         emit_inst(e, "movsx rax, byte [rcx+rax]");
     } else {
@@ -1233,6 +1251,10 @@ fun emit_subscript_assign(e: EmitterState, stmt: AstNode) -> i64 {
     let synth = ast_node("Subscript");
     synth.base = stmt.base;
     synth.index = stmt.index;
+    let base_type = expr_type(e, stmt.base);
+    if base_type.kind == "str" {
+        die("cannot assign through str index");
+    }
     let elem_type = expr_type(e, synth);
     emit_expr(e, stmt.value_expr);
     let val_slot = temp_save_rax(e);
@@ -1240,6 +1262,20 @@ fun emit_subscript_assign(e: EmitterState, stmt: AstNode) -> i64 {
     let base_slot = temp_save_rax(e);
     emit_expr(e, stmt.index);
     emit_stack_load(e, "rcx", base_slot);
+    if base_type.kind == "array" {
+        let ok_id = fresh_label(e);
+        let fail_id = fresh_label(e);
+        emit_inst(e, "cmp rax, 0");
+        emit_jmp_id(e, "jl", "L", fail_id);
+        emit_inst(e, "cmp rax, [rcx+8]");
+        emit_jmp_id(e, "jge", "L", fail_id);
+        emit_inst(e, "mov rcx, [rcx]");
+        emit_jmp_id(e, "jmp", "L", ok_id);
+        emit_label_id(e, "L", fail_id);
+        emit_inst(e, "mov ecx, 1");
+        emit_call_inst(e, "ExitProcess");
+        emit_label_id(e, "L", ok_id);
+    }
     if type_is_i8(elem_type) == 1 {
         emit_inst(e, "lea rcx, [rcx+rax]");
     } else {
