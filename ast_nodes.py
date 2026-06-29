@@ -99,6 +99,16 @@ class WhileNode(ASTNode):
 
 
 @dataclass
+class BreakNode(ASTNode):
+    line: int
+
+
+@dataclass
+class ContinueNode(ASTNode):
+    line: int
+
+
+@dataclass
 class ExprStmtNode(ASTNode):
     expr: ASTNode
 

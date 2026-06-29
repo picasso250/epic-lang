@@ -126,6 +126,7 @@ User struct fields use fixed 8-byte slots in v0.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
 - `else if` is lowered by the parser to a nested `IfNode` in the `else` block.
+- `break` and `continue` are statements; codegen tracks the nearest `while` labels.
 
 ## Codegen notes
 

@@ -11,6 +11,8 @@ TOKEN_SPEC = [
     ("IF",        r'\bif\b'),
     ("ELSE",      r'\belse\b'),
     ("WHILE",     r'\bwhile\b'),
+    ("BREAK",     r'\bbreak\b'),
+    ("CONTINUE",  r'\bcontinue\b'),
     ("STRUCT",    r'\bstruct\b'),
     ("NEW",       r'\bnew\b'),
     ("LET",       r'\blet\b'),

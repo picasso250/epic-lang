@@ -91,6 +91,24 @@ if x == 1 {
 This does not add a separate control-flow construct; the parser lowers it to
 the same AST shape as `else { if ... }`.
 
+## Loop control
+
+`break` and `continue` are statement-only loop control:
+
+```epic
+while cond {
+    if done {
+        break
+    }
+    if skip {
+        continue
+    }
+}
+```
+
+Both statements bind to the nearest enclosing `while` loop. They are rejected
+outside loops.
+
 ## Structs
 
 Struct definitions use user-facing field types:

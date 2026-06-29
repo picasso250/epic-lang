@@ -1,0 +1,19 @@
+# EXIT: 0
+# STDOUT: 1
+# STDOUT: 3
+# STDOUT: 4
+fun main() -> void {
+    let i = 0
+    while i < 10 {
+        i = i + 1
+        if i == 2 {
+            continue
+        }
+        if i == 5 {
+            break
+        }
+        putstr(itoa(i))
+        putc(10)
+    }
+    os.ExitProcess(0)
+}

@@ -38,6 +38,7 @@ class Emitter:
         self.structs = {}       # name → {fields: [{name, type, offset}], size}
         self.funcs = {}         # name → {ret_type, params}
         self.globals = {"argv": {"type": "&_arr_str", "label": "_argv"}}
+        self.loop_stack = []
 
     def emit(self, s):
         self.out.write(s + "\n")
@@ -462,6 +463,10 @@ class Emitter:
             self.emit_if(stmt)
         elif isinstance(stmt, WhileNode):
             self.emit_while(stmt)
+        elif isinstance(stmt, BreakNode):
+            self.emit_break(stmt)
+        elif isinstance(stmt, ContinueNode):
+            self.emit_continue(stmt)
         elif isinstance(stmt, AssignNode):
             self.emit_assign(stmt)
         elif isinstance(stmt, FieldSetNode):
@@ -535,6 +540,7 @@ class Emitter:
     def emit_while(self, stmt):
         start_label = self.fresh_label()
         end_label = self.fresh_label()
+        self.loop_stack.append((start_label, end_label))
         self.emit_label(start_label)
         self.emit_expr(stmt.cond)
         self.emit("    test rax, rax")
@@ -542,6 +548,17 @@ class Emitter:
         self.emit_block(stmt.body)
         self.emit_jmp(start_label)
         self.emit_label(end_label)
+        self.loop_stack.pop()
+
+    def emit_break(self, stmt):
+        if not self.loop_stack:
+            raise RuntimeError("break outside loop")
+        self.emit_jmp(self.loop_stack[-1][1])
+
+    def emit_continue(self, stmt):
+        if not self.loop_stack:
+            raise RuntimeError("continue outside loop")
+        self.emit_jmp(self.loop_stack[-1][0])
 
     def emit_assign(self, stmt):
         name = stmt.name

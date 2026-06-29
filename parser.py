@@ -16,6 +16,7 @@ class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
         self.pos = 0
+        self.loop_depth = 0
 
     def peek(self):
         if self.pos < len(self.tokens):
@@ -191,6 +192,10 @@ class Parser:
             return self.parse_if_stmt()
         if t[0] == "WHILE":
             return self.parse_while_stmt()
+        if t[0] == "BREAK":
+            return self.parse_break_stmt()
+        if t[0] == "CONTINUE":
+            return self.parse_continue_stmt()
         if t[0] == "ID":
             if self._is_assignment():
                 return self.parse_assign_stmt()
@@ -261,8 +266,24 @@ class Parser:
     def parse_while_stmt(self):
         self.expect("WHILE")
         cond = self.parse_expr()
+        self.loop_depth += 1
         body = self.parse_block()
+        self.loop_depth -= 1
         return WhileNode(cond=cond, body=body)
+
+    def parse_break_stmt(self):
+        t = self.expect("BREAK")
+        if self.loop_depth == 0:
+            raise ParseError("break outside loop", t[2])
+        self.expect_stmt_end()
+        return BreakNode(line=t[2])
+
+    def parse_continue_stmt(self):
+        t = self.expect("CONTINUE")
+        if self.loop_depth == 0:
+            raise ParseError("continue outside loop", t[2])
+        self.expect_stmt_end()
+        return ContinueNode(line=t[2])
 
     def parse_expr_stmt(self):
         expr = self.parse_expr()
