@@ -87,25 +87,25 @@ fun lex(src: str): Token[] {
                         }
                         let e = p[pos]
                         if e == 110 { c = 10
- }
+                        }
                         else {
                             if e == 114 { c = 13
- }
+                            }
                             else {
                                 if e == 116 { c = 9
- }
+                                }
                                 else {
                                     if e == 92 { c = 92
- }
+                                    }
                                     else {
                                         if e == 34 { c = 34
- }
+                                        }
                                         else {
                                             if e == 39 { c = 39
- }
+                                            }
                                             else {
                                                 if e == 48 { c = 0
- }
+                                                }
                                                 else {
                                                     putstr("bad escape\n")
                                                     os.ExitProcess(1)
@@ -140,25 +140,25 @@ fun lex(src: str): Token[] {
                 pos = pos + 1
                 let e = p[pos]
                 if e == 110 { ch_val = 10
- }
+                }
                 else {
                     if e == 114 { ch_val = 13
- }
+                    }
                     else {
                         if e == 116 { ch_val = 9
- }
+                        }
                         else {
                             if e == 92 { ch_val = 92
- }
+                            }
                             else {
                                 if e == 34 { ch_val = 34
- }
+                                }
                                 else {
                                     if e == 39 { ch_val = 39
- }
+                                    }
                                     else {
                                         if e == 48 { ch_val = 0
- }
+                                        }
                                         else {
                                             putstr("bad escape\n")
                                             os.ExitProcess(1)
@@ -200,25 +200,25 @@ fun lex(src: str): Token[] {
             let text = str_new(p + start, pos - start)
             let kind = "ID"
             if text == "fun"    { kind = "FUN"
- }
+            }
             if text == "return" { kind = "RETURN"
- }
+            }
             if text == "if"     { kind = "IF"
- }
+            }
             if text == "else"   { kind = "ELSE"
- }
+            }
             if text == "while"  { kind = "WHILE"
-}
+            }
             if text == "break"  { kind = "BREAK"
-}
+            }
             if text == "continue" { kind = "CONTINUE"
-}
+            }
             if text == "struct" { kind = "STRUCT"
-}
+            }
             if text == "new"    { kind = "NEW"
- }
+            }
             if text == "let"    { kind = "LET"
- }
+            }
             push_token(tokens, kind, text, start_line)
             consumed = 1
         }
@@ -287,61 +287,61 @@ fun lex(src: str): Token[] {
         }
         # ── single-char operators ──
         if consumed == 0 && ch == 43  { push_token(tokens, "PLUS",   "+", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 42  { push_token(tokens, "STAR",   "*", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 47  { push_token(tokens, "SLASH",  "/", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 37  { push_token(tokens, "PERCENT", "%", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 46  { push_token(tokens, "DOT",    ".", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 91  { push_token(tokens, "LBRACKET", "[", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 93  { push_token(tokens, "RBRACKET", "]", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 40  { push_token(tokens, "LPAREN", "(", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 41  { push_token(tokens, "RPAREN", ")", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 123 { push_token(tokens, "LBRACE", "{", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 125 { push_token(tokens, "RBRACE", "}", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 59 {
             putstr("unexpected semicolon\n")
             os.ExitProcess(1)
         }
         if consumed == 0 && ch == 44  { push_token(tokens, "COMMA", ",", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         if consumed == 0 && ch == 58  { push_token(tokens, "COLON", ":", line)
- pos = pos + 1
- consumed = 1
- }
+            pos = pos + 1
+            consumed = 1
+        }
         # ── unknown ──
         if consumed == 0 {
             pos = pos + 1

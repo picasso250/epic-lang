@@ -129,87 +129,87 @@ fun emit_call_inst(e: EmitterState, target: str): i64 {
 }
 fun sys_call_symbol(name: str): str {
     if name == "os.Sleep" { return "Sleep"
- }
+    }
     if name == "os.GetTickCount64" { return "GetTickCount64"
- }
+    }
     if name == "os.GetLastError" { return "GetLastError"
- }
+    }
     if name == "os.SetLastError" { return "SetLastError"
- }
+    }
     if name == "os.GetStdHandle" { return "GetStdHandle"
- }
+    }
     if name == "os.CloseHandle" { return "CloseHandle"
- }
+    }
     if name == "os.lstrlenA" { return "lstrlenA"
- }
+    }
     if name == "os.lstrcmpA" { return "lstrcmpA"
- }
+    }
     if name == "os.MessageBoxA" { return "MessageBoxA"
- }
+    }
     if name == "os.Beep" { return "Beep"
- }
+    }
     if name == "os.GetCurrentProcess" { return "GetCurrentProcess"
- }
+    }
     if name == "os.GetCurrentProcessId" { return "GetCurrentProcessId"
- }
+    }
     if name == "os.GetCurrentThreadId" { return "GetCurrentThreadId"
- }
+    }
     if name == "os.ExitProcess" { return "ExitProcess"
- }
+    }
     if name == "os.GetFileAttributesA" { return "GetFileAttributesA"
- }
+    }
     if name == "os.CreateFileA" { return "CreateFileA"
- }
+    }
     if name == "os.ReadFile" { return "ReadFile"
- }
+    }
     if name == "os.WriteFile" { return "WriteFile"
- }
+    }
     return ""
 }
 fun sys_member_symbol(ns: str, name: str): str {
     if ns != "os" { return ""
- }
+    }
     if name == "Sleep" { return "Sleep"
- }
+    }
     if name == "GetTickCount64" { return "GetTickCount64"
- }
+    }
     if name == "GetLastError" { return "GetLastError"
- }
+    }
     if name == "SetLastError" { return "SetLastError"
- }
+    }
     if name == "GetStdHandle" { return "GetStdHandle"
- }
+    }
     if name == "CloseHandle" { return "CloseHandle"
- }
+    }
     if name == "lstrlenA" { return "lstrlenA"
- }
+    }
     if name == "lstrcmpA" { return "lstrcmpA"
- }
+    }
     if name == "MessageBoxA" { return "MessageBoxA"
- }
+    }
     if name == "Beep" { return "Beep"
- }
+    }
     if name == "GetCurrentProcess" { return "GetCurrentProcess"
- }
+    }
     if name == "GetCurrentProcessId" { return "GetCurrentProcessId"
- }
+    }
     if name == "GetCurrentThreadId" { return "GetCurrentThreadId"
- }
+    }
     if name == "ExitProcess" { return "ExitProcess"
- }
+    }
     if name == "GetFileAttributesA" { return "GetFileAttributesA"
- }
+    }
     if name == "CreateFileA" { return "CreateFileA"
- }
+    }
     if name == "ReadFile" { return "ReadFile"
- }
+    }
     if name == "WriteFile" { return "WriteFile"
- }
+    }
     return ""
 }
 fun is_sys_call(name: str): i64 {
     if sys_call_symbol(name) == "" { return 0
- }
+    }
     return 1
 }
 fun emit_jmp(e: EmitterState, label: str): i64 {
@@ -304,20 +304,20 @@ fun type_info(kind: str, name: str): TypeInfo {
     return t
 }
 fun type_i64(): TypeInfo { return type_info("i64", "")
- }
+}
 fun type_i8(): TypeInfo { return type_info("i8", "")
- }
+}
 fun type_void(): TypeInfo { return type_info("void", "")
- }
+}
 fun type_str(): TypeInfo { return type_info("str", "")
- }
+}
 fun type_struct(name: str): TypeInfo { return type_info("struct", name)
- }
+}
 fun type_array(elem: str): TypeInfo { return type_info("array", elem)
- }
+}
 fun type_is_i8(t: TypeInfo): i64 {
     if t.kind == "i8" { return 1
- }
+    }
     return 0
 }
 fun type_is_value_i8(t: TypeInfo): i64 {
@@ -325,11 +325,11 @@ fun type_is_value_i8(t: TypeInfo): i64 {
 }
 fun type_is_complex(t: TypeInfo): i64 {
     if t.kind == "str" { return 1
- }
+    }
     if t.kind == "struct" { return 1
- }
+    }
     if t.kind == "array" { return 1
- }
+    }
     return 0
 }
 fun is_array_type_name(name: str): i64 {
@@ -348,15 +348,15 @@ fun array_elem_name(name: str): str {
 }
 fun user_type(name: str): TypeInfo {
     if name == "i64" { return type_i64()
- }
+    }
     if name == "i8" { return type_i8()
- }
+    }
     if name == "void" { return type_void()
- }
+    }
     if name == "str" { return type_str()
- }
+    }
     if is_array_type_name(name) == 1 { return type_array(array_elem_name(name))
- }
+    }
     return type_struct(name)
 }
 fun get_string_id(e: EmitterState, text: str): i64 {
@@ -383,16 +383,16 @@ fun collect_strings(e: EmitterState, node: AstNode): i64 {
     }
     let i = 0
     while i < node.funcs.len { collect_strings(e, node.funcs.data[i])
- i = i + 1
- }
+        i = i + 1
+    }
     i = 0
     while i < node.stmts.len { collect_strings(e, node.stmts.data[i])
- i = i + 1
- }
+        i = i + 1
+    }
     i = 0
     while i < node.args.len { collect_strings(e, node.args.data[i])
- i = i + 1
- }
+        i = i + 1
+    }
     collect_strings(e, node.body)
     collect_strings(e, node.then_block)
     collect_strings(e, node.else_block)
@@ -579,57 +579,57 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
 }
 fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     if expr.kind == "String" { return type_str()
- }
+    }
     if expr.kind == "Literal" { return type_i64()
- }
+    }
     if expr.kind == "Binary" {
         if expr.op == "+" {
             let lt = expr_type(e, expr.left)
             let rt = expr_type(e, expr.right)
             if lt.kind == "str" && rt.kind == "str" { return type_str()
- }
+            }
         }
         return type_i64()
     }
     if expr.kind == "Var" { return find_local_type(e, expr.name)
- }
+    }
     if expr.kind == "Call" {
         if is_sys_call(expr.name) == 1 { return type_i64()
- }
+        }
         if sys_member_symbol(expr.type_name, expr.name) != "" { return type_i64()
- }
+        }
         if expr.name == "itoa" { return type_str()
- }
+        }
         if expr.name == "bytes" { return type_array("i8")
- }
+        }
         if expr.name == "str_new" { return type_str()
- }
+        }
         if expr.name == "str_slice" { return type_str()
- }
+        }
         if expr.name == "str_replace_char" { return type_str()
- }
+        }
         if expr.name == "read_file" { return type_str()
- }
+        }
         if expr.name == "write_file" { return type_i64()
- }
+        }
         if expr.name == "extend" { return type_void()
- }
+        }
         return find_func_ret(e, expr.name)
     }
     if expr.kind == "New" { return type_struct(expr.name)
- }
+    }
     if expr.kind == "NewArray" { return type_array(expr.type_name)
- }
+    }
     if expr.kind == "FieldAccess" {
         let base_type = expr_type(e, expr.object)
         let layout = ""
         if base_type.kind == "str" { layout = "str"
- }
+        }
         else {
             if base_type.kind == "array" { layout = array_layout_name(base_type.name)
- }
+            }
             else { layout = base_type.name
- }
+            }
         }
         let f = find_field_info(e, layout, expr.name)
         return f.typ
@@ -647,7 +647,7 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
 }
 fun infer_let_type(e: EmitterState, value: AstNode): TypeInfo {
     if value.kind == "" { return type_i64()
- }
+    }
     return expr_type(e, value)
 }
 fun pre_scan_block(e: EmitterState, block: AstNode): i64 {
@@ -713,13 +713,13 @@ fun spill_args(e: EmitterState, args: AstNode[]): i64[] {
 }
 fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     if slots.len > 0 { emit_stack_load(e, "rcx", slots.data[0])
- }
+    }
     if slots.len > 1 { emit_stack_load(e, "rdx", slots.data[1])
- }
+    }
     if slots.len > 2 { emit_stack_load(e, "r8", slots.data[2])
- }
+    }
     if slots.len > 3 { emit_stack_load(e, "r9", slots.data[3])
- }
+    }
     return 0
 }
 fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
@@ -745,7 +745,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         load_spilled_args(e, slots)
         let stack_args = slots.len - 4
         if stack_args < 0 { stack_args = 0
- }
+        }
         let extra_frame = align16(stack_args * 8)
         let frame = 32 + extra_frame
         out_s(e, "    sub rsp, ")
@@ -868,7 +868,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         let elem = arr_type.name
         let el_size = 8
         if elem == "i8" { el_size = 1
- }
+        }
         emit_expr(e, expr.args.data[0])
         let arr_slot = temp_save_rax(e)
         emit_expr(e, expr.args.data[1])
@@ -1008,53 +1008,53 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     }
     emit_stack_load(e, "rcx", tmp)
     if expr.op == "+" { emit_inst(e, "add rax, rcx")
- return 0
- }
+        return 0
+    }
     if expr.op == "-" { emit_inst(e, "sub rax, rcx")
- return 0
- }
+        return 0
+    }
     if expr.op == "*" { emit_inst(e, "imul rax, rcx")
- return 0
- }
+        return 0
+    }
     if expr.op == "/" { emit_inst(e, "cqo")
- emit_inst(e, "idiv rcx")
- return 0
- }
+        emit_inst(e, "idiv rcx")
+        return 0
+    }
     if expr.op == "%" { emit_inst(e, "cqo")
- emit_inst(e, "idiv rcx")
- emit_mov(e, "rax", "rdx")
- return 0
- }
+        emit_inst(e, "idiv rcx")
+        emit_mov(e, "rax", "rdx")
+        return 0
+    }
     if expr.op == "==" { emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "sete al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "sete al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == "!=" { emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setne al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setne al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == "<" { emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setl al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setl al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == ">" { emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setg al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setg al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == "<=" { emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setle al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setle al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == ">=" { emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setge al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setge al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     die("unknown binary op")
     return 0
 }
@@ -1072,7 +1072,7 @@ fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
     let elem = expr.type_name
     let el_size = 8
     if elem == "i8" { el_size = 1
- }
+    }
     let header_slot = 0
     let cap_slot = 0
     emit_mov(e, "rcx", "[_heap]")
@@ -1114,13 +1114,13 @@ fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
 }
 fun field_layout_name(t: TypeInfo): str {
     if t.kind == "str" { return "str"
- }
+    }
     if t.kind == "array" { return array_layout_name(t.name)
- }
+    }
     if t.kind == "struct" { return t.name
- }
+    }
     if t.kind == "ptr" { return t.name
- }
+    }
     return ""
 }
 fun emit_field_access(e: EmitterState, expr: AstNode): i64 {
@@ -1335,25 +1335,25 @@ fun emit_continue(e: EmitterState, stmt: AstNode): i64 {
 fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
     temp_reset(e)
     if stmt.kind == "Return" { return emit_return(e, stmt)
- }
+    }
     if stmt.kind == "ExprStmt" { return emit_expr(e, stmt.expr)
- }
+    }
     if stmt.kind == "Let" { return emit_let(e, stmt)
- }
+    }
     if stmt.kind == "Assign" { return emit_assign(e, stmt)
- }
+    }
     if stmt.kind == "SubscriptAssign" { return emit_subscript_assign(e, stmt)
- }
+    }
     if stmt.kind == "FieldSet" { return emit_field_set(e, stmt)
- }
+    }
     if stmt.kind == "If" { return emit_if(e, stmt)
- }
+    }
     if stmt.kind == "While" { return emit_while(e, stmt)
- }
+    }
     if stmt.kind == "Break" { return emit_break(e, stmt)
- }
+    }
     if stmt.kind == "Continue" { return emit_continue(e, stmt)
- }
+    }
     die("unsupported stmt")
     return 0
 }
@@ -1394,27 +1394,27 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
     }
     if fn.params.len > 0 {
         if type_is_i8(find_local_type(e, fn.params.data[0].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "cl")
- }
+        }
         else { emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "rcx")
- }
+        }
     }
     if fn.params.len > 1 {
         if type_is_i8(find_local_type(e, fn.params.data[1].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "dl")
- }
+        }
         else { emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "rdx")
- }
+        }
     }
     if fn.params.len > 2 {
         if type_is_i8(find_local_type(e, fn.params.data[2].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8b")
- }
+        }
         else { emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8")
- }
+        }
     }
     if fn.params.len > 3 {
         if type_is_i8(find_local_type(e, fn.params.data[3].name)) == 1 { emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9b")
- }
+        }
         else { emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9")
- }
+        }
     }
     emit_block(e, fn.body)
     if fn.name == "main" {
