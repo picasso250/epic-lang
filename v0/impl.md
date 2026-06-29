@@ -1,6 +1,6 @@
 # Epic v0 implementation notes
 
-This document describes the current compiler implementation. It is not the language spec. User-visible language semantics live in `design.md`.
+This document describes the current v0 compiler implementation. It is not the language spec. User-visible language semantics live in `design.md`.
 
 ## Compiler driver
 
@@ -29,6 +29,20 @@ examples/m1_exit.ep -> build/examples/m1_exit.exe
 
 The driver parses all input files, merges top-level definitions, emits one NASM assembly file, assembles it with NASM, then links it with either `link.py` or `lld-link`.
 
+## Tooling in v0
+
+v0 includes these implementation tools:
+
+| Tool | Role |
+| --- | --- |
+| `epic.py` | Python driver for the v0 compiler pipeline |
+| `lexer.py`, `parser.py`, `codegen.py` | Python prototype compiler components |
+| `lexer.ep`, `parser.ep`, `codegen.ep` | self-hosted compiler components |
+| `epicfmt.py` | formatter for indentation and brace line breaks |
+| `link.py` | default Python linker for the current single-object PE64 path |
+
+`lld-link` is available through `--linker lld-link`, but `link.py` is the default linker in v0.
+
 ## Multi-file merge
 
 `epic.py` supports whole-program source merging.
@@ -50,14 +64,17 @@ Current toolchain paths are configured in `epic.py`:
 - `link.py`
 - Windows SDK `kernel32.lib` and `user32.lib`
 
-`link.py` is the default linker. `lld-link` is available through `--linker lld-link`.
-
 ## Runtime helpers
 
 The driver appends runtime assembly helpers after emitted program assembly:
 
 ```text
 runtime/str_alloc.asm
+runtime/bytes.asm
+runtime/str_cat.asm
+runtime/str_slice.asm
+runtime/str_replace_char.asm
+runtime/extend_i8.asm
 runtime/itoa.asm
 runtime/argv.asm
 runtime/system.asm
@@ -125,6 +142,7 @@ User struct fields use fixed 8-byte slots in v0.
 - `os.*` calls are recognized specially.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
+- Subscript access is unchecked and lowers to direct memory access.
 - `else if` is lowered by the parser to a nested `IfNode` in the `else` block.
 - `break` and `continue` are statements; codegen tracks the nearest `while` labels.
 
@@ -155,10 +173,14 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `putstr` | writes `s.data` for `s.len` bytes |
 | `itoa` | calls `_itoa` runtime helper |
 | `system` | calls `_system` runtime helper |
-| `read_file` | calls `_read_file` runtime helper |
-| `write_file` | calls `_write_file` runtime helper |
+| `read_file` | calls `_read_file` runtime helper and returns `str` |
+| `write_file` | writes a `str` payload through `_write_file` |
 | `str_new` | calls `_str_alloc` runtime helper |
+| `bytes` | calls `_bytes` runtime helper |
+| `str_slice` | calls `_str_slice` runtime helper |
+| `str_replace_char` | calls `_str_replace_char` runtime helper |
 | `push` | emitted by codegen for dynamic arrays |
+| `extend` | calls `_extend_i8` for byte arrays |
 
 ## Codegen self-hosting
 
@@ -171,6 +193,16 @@ codegen <input.ep> <output.asm>
 It reads one source file, calls the self-hosted lexer and parser directly, and emits a complete NASM file to `output.asm`.
 
 Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen reads those files into the generated program.
+
+## Linker
+
+`link.py` is the default v0 linker. It implements the current narrow PE64 path needed by generated examples: one object input, `.text` and `.data` handling, selected imports, relocations, and executable output.
+
+It is intentionally a bootstrap tool, not a general COFF/PE linker.
+
+## Formatter
+
+`epicfmt.py` formats Epic source indentation and brace line breaks. It is part of the v0 tool surface, but it does not define language semantics.
 
 ## Status and acceptance
 

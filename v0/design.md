@@ -88,8 +88,7 @@ if x == 1 {
 }
 ```
 
-This does not add a separate control-flow construct; the parser lowers it to
-the same AST shape as `else { if ... }`.
+This does not add a separate control-flow construct; the parser lowers it to the same AST shape as `else { if ... }`.
 
 ## Loop control
 
@@ -106,8 +105,7 @@ while cond {
 }
 ```
 
-Both statements bind to the nearest enclosing `while` loop. They are rejected
-outside loops.
+Both statements bind to the nearest enclosing `while` loop. They are rejected outside loops.
 
 ## Structs
 
@@ -136,11 +134,13 @@ Supported escapes in string and character literals:
 
 String and character literals are ASCII-only in v0. Non-ASCII literals are compile errors.
 
-`len` counts bytes, not characters.
+`str` is length-carrying and NUL-terminated for Win32 interop. `s.len` counts bytes, not characters, and excludes the trailing NUL.
 
 For self-hosting, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new i8[n]` for mutable byte buffers.
 
-## Dynamic arrays
+String equality is supported through `==`.
+
+## Dynamic arrays and byte buffers
 
 Dynamic arrays are heap-allocated reference values.
 
@@ -149,13 +149,23 @@ Dynamic arrays are heap-allocated reference values.
 | `new T[]` | empty dynamic array with default capacity |
 | `new T[n]` | empty dynamic array with capacity at least `n` |
 | `push(a, x)` | append and grow as needed |
-| `a.data[i]` | low-level element access |
+| `extend(dst, src)` | append all elements of one byte array to another byte array |
+| `a.data[i]` | low-level unchecked element access |
 | `a.len` | current length |
 | `a.cap` | current capacity |
 
 `new T[n]` sets capacity, not length. The initial `len` is always 0.
 
 For self-hosting, v0 exposes `a.data`, `a.len`, and `a.cap` as low-level fields.
+
+The current v0 byte-buffer surface is intentionally small:
+
+```epic
+bytes(s: str): i8[]
+extend(dst: i8[], src: i8[]): void
+```
+
+`bytes` copies string bytes into a mutable byte array. `extend` appends byte-array contents to another byte array and snapshots the source length before appending, so `extend(xs, xs)` appends the original contents once.
 
 ## System calls
 
@@ -186,11 +196,15 @@ Falling off the end of `main` exits with status `0`. Non-zero process status is 
 | `putc(c: i64): void` | writes one byte |
 | `putstr(s: str): void` | writes string bytes |
 | `str_new(bytes, len): str` | creates a string by copying `len` bytes from a low-level byte buffer such as `buf.data` |
+| `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)` into a new string |
+| `str_replace_char(s: str, old: i64, new: i64): str` | copies a string while replacing matching byte values |
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `system(cmd: str): i64` | runs a command and returns its process exit code, or `-1` on failure |
-| `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
-| `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
+| `read_file(path: str): str` | reads a whole file as a string, or returns empty string on failure |
+| `write_file(path: str, data: str): i64` | writes a whole string and returns bytes written, or `-1` on failure |
+| `bytes(s: str): i8[]` | copies string bytes into a mutable byte array |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
+| `extend(dst: i8[], src: i8[]): void` | appends one byte array to another |
 
 `argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for self-hosting: whitespace separates arguments, and double quotes group an argument.
 
@@ -199,6 +213,13 @@ Falling off the end of `main` exits with status `0`. Non-zero process status is 
 - User-written pointer types.
 - General module/import/package system.
 - General method calls.
+- User-level bitwise and shift operators.
+- `bool`, `u8`, and `u64` user-facing types.
+- `let` type annotations.
+- Range `for` loops.
+- Compound assignment operators.
+- Checked indexing.
+- Slice syntax.
 - By-value struct or array semantics.
 - Memory freeing.
 - Unicode string semantics.
