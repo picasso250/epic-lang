@@ -99,23 +99,18 @@ fun output_base(main_path: str) -> str {
     return "build/epic/" + safe2;
 }
 
-fun write_build_script(cmd_path: str, asm_path: str, obj_path: str, exe_path: str) -> i64 {
-    let script = new i8[256];
-    extend(script, bytes("@echo off\n"));
-    extend(script, bytes("tools\\nasm.exe -f win64 \""));
-    extend(script, bytes(asm_path));
-    extend(script, bytes("\" -o \""));
-    extend(script, bytes(obj_path));
-    extend(script, bytes("\"\n"));
-    extend(script, bytes("if errorlevel 1 exit /b 1\n"));
-    extend(script, bytes("python link.py \""));
-    extend(script, bytes(obj_path));
-    extend(script, bytes("\" -o \""));
-    extend(script, bytes(exe_path));
-    extend(script, bytes("\"\n"));
-    extend(script, bytes("if errorlevel 1 exit /b 1\n"));
-    write_file(cmd_path, script);
-    return 0;
+fun quote_arg(s: str) -> str {
+    return "\"" + s + "\"";
+}
+
+fun run_toolchain(asm_path: str, obj_path: str, exe_path: str) -> i64 {
+    let nasm_cmd = "tools\\nasm.exe -f win64 " + quote_arg(asm_path) + " -o " + quote_arg(obj_path);
+    let code = system(nasm_cmd);
+    if code != 0 {
+        return code;
+    }
+    let link_cmd = "python link.py " + quote_arg(obj_path) + " -o " + quote_arg(exe_path);
+    return system(link_cmd);
 }
 
 fun main() -> i64 {
@@ -130,9 +125,7 @@ fun main() -> i64 {
     let e = make_emitter(asm_path);
     emit_program(e, ast);
 
-    let cmd_path = "build/epic/build.cmd";
-    write_build_script(cmd_path, asm_path, obj_path, exe_path);
-    let code = system("cmd /c build\\epic\\build.cmd");
+    let code = run_toolchain(asm_path, obj_path, exe_path);
     if code != 0 {
         die_driver("build failed");
     }

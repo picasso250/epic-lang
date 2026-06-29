@@ -44,6 +44,7 @@ def parse_annotations(source):
     exit_code = None
     stdout_lines = []
     argv = []
+    clean_paths = []
     for line in source.splitlines():
         line = line.strip()
         if m := re.match(r"#\s*EXIT:\s*(-?\d+)", line):
@@ -52,8 +53,24 @@ def parse_annotations(source):
             stdout_lines.append(m.group(1))
         elif m := re.match(r"#\s*ARGV:\s*(.*)$", line):
             argv = shlex.split(m.group(1) or "")
+        elif m := re.match(r"#\s*CLEAN:\s*(.+)$", line):
+            clean_paths.extend(shlex.split(m.group(1)))
     stdout = "\n".join(stdout_lines) if stdout_lines else None
-    return exit_code, stdout, argv
+    return exit_code, stdout, argv, clean_paths
+
+
+def clean_test_paths(paths):
+    root = os.path.abspath(SCRIPT_DIR)
+    for rel in paths:
+        if os.path.isabs(rel):
+            raise RuntimeError(f"# CLEAN path must be relative: {rel}")
+        path = os.path.abspath(os.path.join(SCRIPT_DIR, rel))
+        if os.path.commonpath([root, path]) != root:
+            raise RuntimeError(f"# CLEAN path escapes repo root: {rel}")
+        if os.path.isdir(path):
+            raise RuntimeError(f"# CLEAN refuses to delete directory: {rel}")
+        if os.path.exists(path):
+            os.remove(path)
 
 
 def example_obj_path(ep_name):
@@ -80,7 +97,7 @@ def main():
 
     for ep_name in examples:
         source = open(os.path.join(EXAMPLES_DIR, ep_name), encoding="utf-8").read()
-        exit_expected, stdout_expected, argv = parse_annotations(source)
+        exit_expected, stdout_expected, argv, clean_paths = parse_annotations(source)
         if exit_expected is None and stdout_expected is None:
             skipped += 1
             continue
@@ -93,6 +110,7 @@ def main():
             continue
 
         try:
+            clean_test_paths(clean_paths)
             run_checked([LINK_EP_EXE, obj_path, "-o", exe_path], "link.ep", timeout=10)
             proc = subprocess.run(
                 [exe_path, *argv],
@@ -100,7 +118,12 @@ def main():
                 capture_output=True,
                 timeout=1,
             )
+            clean_test_paths(clean_paths)
         except Exception as e:
+            try:
+                clean_test_paths(clean_paths)
+            except Exception as clean_e:
+                e = f"{e}; cleanup failed: {clean_e}"
             print(f"FAIL   {ep_name:24s} {e}")
             failed += 1
             continue
