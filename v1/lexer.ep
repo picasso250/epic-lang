@@ -420,14 +420,6 @@ fun lex(src: str): Token[] {
             }
             consumed = 1
         }
-        if consumed == 0 && ch == 46 {
-            if p[pos + 1] == 46 {
-                push_token(tokens, "RANGE", "..", line)
-                pos = pos + 2
-                consumed = 1
-            }
-        }
-
         # ── single-char operators ──
         if consumed == 0 && ch == 43  {
             push_token(tokens, "PLUS",   "+", line)

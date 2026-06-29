@@ -99,10 +99,10 @@ fun same(a: str, b: str): i64 {
 }
 
 fun is_upper_name(name: str): i64 {
-    if name.len == 0 {
+    if len(name) == 0 {
         return 0
     }
-    let c = name.data[0]
+    let c = name[0]
     if c >= 65 && c <= 90 {
         return 1
     }
@@ -110,8 +110,8 @@ fun is_upper_name(name: str): i64 {
 }
 
 fun peek(p: Parser): Token {
-    if p.pos < p.tokens.len {
-        return p.tokens.data[p.pos]
+    if p.pos < len(p.tokens) {
+        return p.tokens[p.pos]
     }
     return p.eof
 }
@@ -126,8 +126,8 @@ fun peek_kind(p: Parser, kind: str): i64 {
 
 fun peek_offset_kind(p: Parser, offset: i64, kind: str): i64 {
     let idx = p.pos + offset
-    if idx < p.tokens.len {
-        if same(p.tokens.data[idx].kind, kind) == 1 {
+    if idx < len(p.tokens) {
+        if same(p.tokens[idx].kind, kind) == 1 {
             return 1
         }
     }
@@ -136,7 +136,7 @@ fun peek_offset_kind(p: Parser, offset: i64, kind: str): i64 {
 
 fun advance(p: Parser): Token {
     let t = peek(p)
-    p.pos = p.pos + 1
+    p.pos += 1
     return t
 }
 
@@ -200,7 +200,7 @@ fun parse_type(p: Parser): str {
     let typ = t.text
     while check(p, "LBRACKET") == 1 {
         expect(p, "RBRACKET")
-        typ = typ + "[]"
+        typ += "[]"
     }
     return typ
 }
@@ -219,7 +219,7 @@ fun parse_params(p: Parser): AstNode[] {
         param.name = pname.text
         param.type_name = ptype
         push(params, param)
-        if params.len > 4 {
+        if len(params) > 4 {
             parse_error(pname.line, "functions may have at most 4 parameters in v0")
         }
         if check(p, "COMMA") == 0 {
@@ -340,18 +340,18 @@ fun parse_block(p: Parser): AstNode {
 
 fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     let depth = 1
-    i = i + 1
-    while i < p.tokens.len && depth > 0 {
-        let kind = p.tokens.data[i].kind
+    i += 1
+    while i < len(p.tokens) && depth > 0 {
+        let kind = p.tokens[i].kind
         if same(kind, "LBRACKET") == 1 {
-            depth = depth + 1
+            depth += 1
  }
         else {
             if same(kind, "RBRACKET") == 1 {
-                depth = depth - 1
+                depth -= 1
  }
         }
-        i = i + 1
+        i += 1
     }
     return i
 }
@@ -361,13 +361,13 @@ fun is_assignment(p: Parser): i64 {
         return 0
     }
     let i = p.pos + 1
-    while i < p.tokens.len {
-        let kind = p.tokens.data[i].kind
+    while i < len(p.tokens) {
+        let kind = p.tokens[i].kind
         if same(kind, "DOT") == 1 {
-            if i + 1 >= p.tokens.len || same(p.tokens.data[i + 1].kind, "ID") == 0 {
+            if i + 1 >= len(p.tokens) || same(p.tokens[i + 1].kind, "ID") == 0 {
                 return 0
             }
-            i = i + 2
+            i += 2
         } else {
             if same(kind, "LBRACKET") == 1 {
                 i = skip_balanced_brackets(p, i)
@@ -522,9 +522,9 @@ fun parse_while_stmt(p: Parser): AstNode {
     expect(p, "WHILE")
     let node = ast_node("While")
     node.expr = parse_expr(p)
-    p.loop_depth = p.loop_depth + 1
+    p.loop_depth += 1
     node.body = parse_block(p)
-    p.loop_depth = p.loop_depth - 1
+    p.loop_depth -= 1
     return node
 }
 
@@ -605,13 +605,13 @@ fun parse_for_stmt(p: Parser): AstNode {
     let name = expect(p, "ID")
     expect(p, "IN")
     let start = parse_expr(p)
-    expect(p, "RANGE")
+    expect(p, "COLON")
     let end = parse_expr(p)
-    p.loop_depth = p.loop_depth + 1
+    p.loop_depth += 1
     let body = parse_block(p)
-    p.loop_depth = p.loop_depth - 1
+    p.loop_depth -= 1
 
-    p.for_counter = p.for_counter + 1
+    p.for_counter += 1
     let suffix = itoa(p.for_counter)
     let start_name = "__for_start_" + suffix
     let end_name = "__for_end_" + suffix
@@ -1034,7 +1034,7 @@ fun parse_primary(p: Parser): AstNode {
             node.kind = "Call"
             node.args = parse_args(p)
             expect(p, "RPAREN")
-            if node.args.len > 4 {
+            if len(node.args) > 4 {
                 parse_error(t.line, "function calls may have at most 4 arguments in v0")
             }
             return parse_postfix(p, node)
@@ -1161,19 +1161,15 @@ fun parse_expr(p: Parser): AstNode {
 }
 
 fun indent(n: i64): i64 {
-    let i = 0
-    while i < n {
+    for i in 0:n {
         putstr("  ")
-        i = i + 1
     }
     return 0
 }
 
 fun dump_list(nodes: AstNode[], depth: i64): i64 {
-    let i = 0
-    while i < nodes.len {
-        dump_node(nodes.data[i], depth)
-        i = i + 1
+    for i in 0:len(nodes) {
+        dump_node(nodes[i], depth)
     }
     return 0
 }
@@ -1229,11 +1225,11 @@ fun dump_node(node: AstNode, depth: i64): i64 {
 }
 
 fun main(): i64 {
-    if argv.len < 2 {
+    if len(argv) < 2 {
         putstr("usage: parser <file>\n")
         os.ExitProcess(1)
     }
-    let src = read_file(argv.data[1])
+    let src = read_file(argv[1])
     let tokens = lex(src)
     let p = make_parser(tokens)
     let ast = parse_program(p)

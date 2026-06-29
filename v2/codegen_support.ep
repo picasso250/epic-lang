@@ -320,7 +320,7 @@ fun emit_stack_load(e: EmitterState, dst: str, slot: i64): i64 {
 }
 
 fun fresh_label(e: EmitterState): i64 {
-    e.label_counter = e.label_counter + 1
+    e.label_counter += 1
     return e.label_counter
 }
 
@@ -477,8 +477,8 @@ fun type_is_complex(t: TypeInfo): i64 {
 }
 
 fun is_array_type_name(name: str): i64 {
-    if name.len >= 2 {
-        if name.data[name.len - 2] == 91 && name.data[name.len - 1] == 93 {
+    if len(name) >= 2 {
+        if name[len(name) - 2] == 91 && name[len(name) - 1] == 93 {
             return 1
         }
     }
@@ -487,7 +487,7 @@ fun is_array_type_name(name: str): i64 {
 
 fun array_elem_name(name: str): str {
     if is_array_type_name(name) == 1 {
-        return str_new(name.data, name.len - 2)
+        return name[:len(name) - 2]
     }
     return name
 }
