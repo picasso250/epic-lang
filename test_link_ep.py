@@ -13,7 +13,7 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PREVIOUS_EPIC = os.environ.get(
     "PREVIOUS_EPIC",
-    os.path.join(SCRIPT_DIR, "build", "v0.exe"),
+    os.path.join(SCRIPT_DIR, "build", "v1.exe"),
 )
 CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
 LINK_EP_EXE = os.path.join(SCRIPT_DIR, "build", "epic", "link.ep.exe")
@@ -80,9 +80,9 @@ def example_obj_path(ep_name):
 
 def ensure_tools_and_objects():
     if not os.path.exists(PREVIOUS_EPIC):
-        raise RuntimeError("previous Epic compiler not found; run the v0 bootstrap first")
+        raise RuntimeError("previous Epic compiler not found; build build\\v1.exe from v1 first")
+    run_checked([PREVIOUS_EPIC, "link.ep"], "previous Epic -> link.ep")
     run_checked([PREVIOUS_EPIC, *SOURCES], "previous Epic -> current Epic")
-    run_checked([CURRENT_EPIC, "link.ep"], "current Epic -> link.ep")
 
     # runtests.py also builds each example .obj with the current compiler.
     run_checked([sys.executable, "runtests.py"], "example object build", timeout=120)

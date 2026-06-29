@@ -3,381 +3,517 @@
 #
 
 struct Local {
-    name: str;
-    typ: TypeInfo;
-    slot: i64;
+    name: str
+    typ: TypeInfo
+    slot: i64
 }
 
 struct FuncInfo {
-    name: str;
-    ret_type: TypeInfo;
-    params: AstNode[];
+    name: str
+    ret_type: TypeInfo
+    params: AstNode[]
 }
 
 struct StringLit {
-    text: str;
-    id: i64;
+    text: str
+    id: i64
 }
 
 struct TypeInfo {
-    kind: str;
-    name: str;
+    kind: str
+    name: str
 }
 
 struct FieldInfo {
-    name: str;
-    typ: TypeInfo;
-    offset: i64;
+    name: str
+    typ: TypeInfo
+    offset: i64
 }
 
 struct StructInfo {
-    name: str;
-    size: i64;
-    fields: FieldInfo[];
+    name: str
+    size: i64
+    fields: FieldInfo[]
 }
 
 struct EmitterState {
-    out_path: str;
-    out_buf: i8[];
-    label_counter: i64;
-    string_counter: i64;
-    current_fn: str;
-    current_ep_id: i64;
-    local_bytes: i64;
-    alloc_size: i64;
-    temp_base: i64;
-    temp_count: i64;
-    loop_break_label: i64;
-    loop_continue_label: i64;
-    locals: Local[];
-    funcs: FuncInfo[];
-    strings: StringLit[];
-    structs: StructInfo[];
+    out_path: str
+    out_buf: u8[]
+    label_counter: i64
+    string_counter: i64
+    current_fn: str
+    current_ep_id: i64
+    local_bytes: i64
+    alloc_size: i64
+    temp_base: i64
+    temp_count: i64
+    loop_break_label: i64
+    loop_continue_label: i64
+    locals: Local[]
+    funcs: FuncInfo[]
+    strings: StringLit[]
+    structs: StructInfo[]
 }
 
 fun die(msg: str) -> i64 {
-    putstr("Codegen error: ");
-    putstr(msg);
-    putc(10);
-    sys.ExitProcess(1);
-    return 0;
+    putstr("Codegen error: ")
+    putstr(msg)
+    putc(10)
+    os.ExitProcess(1)
+    return 0
 }
 
 fun out_s(e: EmitterState, s: str) -> i64 {
-    let bs = bytes(s);
-    extend(e.out_buf, bs);
-    return 0;
+    let bs = bytes(s)
+    extend(e.out_buf, bs)
+    return 0
 }
 
 fun out_i(e: EmitterState, n: i64) -> i64 {
-    let text = itoa(n);
-    let bs = bytes(text);
-    extend(e.out_buf, bs);
-    return 0;
+    let text = itoa(n)
+    let bs = bytes(text)
+    extend(e.out_buf, bs)
+    return 0
 }
 
 fun out_nl(e: EmitterState) -> i64 {
-    let s = "\n";
-    let bs = bytes(s);
-    extend(e.out_buf, bs);
-    return 0;
+    let s = "\n"
+    let bs = bytes(s)
+    extend(e.out_buf, bs)
+    return 0
 }
 
 fun out_line(e: EmitterState, s: str) -> i64 {
-    out_s(e, s);
-    out_nl(e);
-    return 0;
+    out_s(e, s)
+    out_nl(e)
+    return 0
 }
 
 fun emit_inst(e: EmitterState, op: str) -> i64 {
-    out_s(e, "    ");
-    out_line(e, op);
-    return 0;
+    out_s(e, "    ")
+    out_line(e, op)
+    return 0
 }
 
 fun emit_label(e: EmitterState, name: str) -> i64 {
-    out_s(e, name);
-    out_line(e, ":");
-    return 0;
+    out_s(e, name)
+    out_line(e, ":")
+    return 0
 }
 
 fun emit_label_id(e: EmitterState, prefix: str, id: i64) -> i64 {
-    out_s(e, prefix);
-    out_i(e, id);
-    out_line(e, ":");
-    return 0;
+    out_s(e, prefix)
+    out_i(e, id)
+    out_line(e, ":")
+    return 0
 }
 
 fun emit_ref_id(e: EmitterState, prefix: str, id: i64) -> i64 {
-    out_s(e, "[");
-    out_s(e, prefix);
-    out_i(e, id);
-    out_s(e, "]");
-    return 0;
+    out_s(e, "[")
+    out_s(e, prefix)
+    out_i(e, id)
+    out_s(e, "]")
+    return 0
 }
 
 fun emit_mov(e: EmitterState, dst: str, src: str) -> i64 {
-    out_s(e, "    mov ");
-    out_s(e, dst);
-    out_s(e, ", ");
-    out_line(e, src);
-    return 0;
+    out_s(e, "    mov ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    out_line(e, src)
+    return 0
 }
 
 fun emit_mov_i(e: EmitterState, dst: str, n: i64) -> i64 {
-    out_s(e, "    mov ");
-    out_s(e, dst);
-    out_s(e, ", ");
-    out_i(e, n);
-    out_nl(e);
-    return 0;
+    out_s(e, "    mov ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    out_i(e, n)
+    out_nl(e)
+    return 0
 }
 
 fun emit_lea_ref_id(e: EmitterState, dst: str, prefix: str, id: i64) -> i64 {
-    out_s(e, "    lea ");
-    out_s(e, dst);
-    out_s(e, ", ");
-    emit_ref_id(e, prefix, id);
-    out_nl(e);
-    return 0;
+    out_s(e, "    lea ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    emit_ref_id(e, prefix, id)
+    out_nl(e)
+    return 0
 }
 
 fun emit_call_inst(e: EmitterState, target: str) -> i64 {
-    out_s(e, "    call ");
-    out_line(e, target);
-    return 0;
+    out_s(e, "    call ")
+    out_line(e, target)
+    return 0
 }
 
 fun sys_call_symbol(name: str) -> str {
-    if name == "os.Sleep" { return "Sleep"; }
-    if name == "os.GetTickCount64" { return "GetTickCount64"; }
-    if name == "os.GetLastError" { return "GetLastError"; }
-    if name == "os.SetLastError" { return "SetLastError"; }
-    if name == "os.GetStdHandle" { return "GetStdHandle"; }
-    if name == "os.CloseHandle" { return "CloseHandle"; }
-    if name == "os.lstrlenA" { return "lstrlenA"; }
-    if name == "os.lstrcmpA" { return "lstrcmpA"; }
-    if name == "os.MessageBoxA" { return "MessageBoxA"; }
-    if name == "os.Beep" { return "Beep"; }
-    if name == "os.GetCurrentProcess" { return "GetCurrentProcess"; }
-    if name == "os.GetCurrentProcessId" { return "GetCurrentProcessId"; }
-    if name == "os.GetCurrentThreadId" { return "GetCurrentThreadId"; }
-    if name == "os.ExitProcess" { return "ExitProcess"; }
-    if name == "os.GetFileAttributesA" { return "GetFileAttributesA"; }
-    if name == "os.CreateFileA" { return "CreateFileA"; }
-    if name == "os.ReadFile" { return "ReadFile"; }
-    if name == "os.WriteFile" { return "WriteFile"; }
-    return "";
+    if name == "os.Sleep" {
+        return "Sleep"
+ }
+    if name == "os.GetTickCount64" {
+        return "GetTickCount64"
+ }
+    if name == "os.GetLastError" {
+        return "GetLastError"
+ }
+    if name == "os.SetLastError" {
+        return "SetLastError"
+ }
+    if name == "os.GetStdHandle" {
+        return "GetStdHandle"
+ }
+    if name == "os.CloseHandle" {
+        return "CloseHandle"
+ }
+    if name == "os.lstrlenA" {
+        return "lstrlenA"
+ }
+    if name == "os.lstrcmpA" {
+        return "lstrcmpA"
+ }
+    if name == "os.MessageBoxA" {
+        return "MessageBoxA"
+ }
+    if name == "os.Beep" {
+        return "Beep"
+ }
+    if name == "os.GetCurrentProcess" {
+        return "GetCurrentProcess"
+ }
+    if name == "os.GetCurrentProcessId" {
+        return "GetCurrentProcessId"
+ }
+    if name == "os.GetCurrentThreadId" {
+        return "GetCurrentThreadId"
+ }
+    if name == "os.ExitProcess" {
+        return "ExitProcess"
+ }
+    if name == "os.GetFileAttributesA" {
+        return "GetFileAttributesA"
+ }
+    if name == "os.CreateFileA" {
+        return "CreateFileA"
+ }
+    if name == "os.ReadFile" {
+        return "ReadFile"
+ }
+    if name == "os.WriteFile" {
+        return "WriteFile"
+ }
+    return ""
 }
 
 fun sys_member_symbol(ns: str, name: str) -> str {
-    if ns != "os" { return ""; }
-    if name == "Sleep" { return "Sleep"; }
-    if name == "GetTickCount64" { return "GetTickCount64"; }
-    if name == "GetLastError" { return "GetLastError"; }
-    if name == "SetLastError" { return "SetLastError"; }
-    if name == "GetStdHandle" { return "GetStdHandle"; }
-    if name == "CloseHandle" { return "CloseHandle"; }
-    if name == "lstrlenA" { return "lstrlenA"; }
-    if name == "lstrcmpA" { return "lstrcmpA"; }
-    if name == "MessageBoxA" { return "MessageBoxA"; }
-    if name == "Beep" { return "Beep"; }
-    if name == "GetCurrentProcess" { return "GetCurrentProcess"; }
-    if name == "GetCurrentProcessId" { return "GetCurrentProcessId"; }
-    if name == "GetCurrentThreadId" { return "GetCurrentThreadId"; }
-    if name == "ExitProcess" { return "ExitProcess"; }
-    if name == "GetFileAttributesA" { return "GetFileAttributesA"; }
-    if name == "CreateFileA" { return "CreateFileA"; }
-    if name == "ReadFile" { return "ReadFile"; }
-    if name == "WriteFile" { return "WriteFile"; }
-    return "";
+    if ns != "os" {
+        return ""
+ }
+    if name == "Sleep" {
+        return "Sleep"
+ }
+    if name == "GetTickCount64" {
+        return "GetTickCount64"
+ }
+    if name == "GetLastError" {
+        return "GetLastError"
+ }
+    if name == "SetLastError" {
+        return "SetLastError"
+ }
+    if name == "GetStdHandle" {
+        return "GetStdHandle"
+ }
+    if name == "CloseHandle" {
+        return "CloseHandle"
+ }
+    if name == "lstrlenA" {
+        return "lstrlenA"
+ }
+    if name == "lstrcmpA" {
+        return "lstrcmpA"
+ }
+    if name == "MessageBoxA" {
+        return "MessageBoxA"
+ }
+    if name == "Beep" {
+        return "Beep"
+ }
+    if name == "GetCurrentProcess" {
+        return "GetCurrentProcess"
+ }
+    if name == "GetCurrentProcessId" {
+        return "GetCurrentProcessId"
+ }
+    if name == "GetCurrentThreadId" {
+        return "GetCurrentThreadId"
+ }
+    if name == "ExitProcess" {
+        return "ExitProcess"
+ }
+    if name == "GetFileAttributesA" {
+        return "GetFileAttributesA"
+ }
+    if name == "CreateFileA" {
+        return "CreateFileA"
+ }
+    if name == "ReadFile" {
+        return "ReadFile"
+ }
+    if name == "WriteFile" {
+        return "WriteFile"
+ }
+    return ""
 }
 
 fun is_sys_call(name: str) -> i64 {
-    if sys_call_symbol(name) == "" { return 0; }
-    return 1;
+    if sys_call_symbol(name) == "" {
+        return 0
+ }
+    return 1
 }
 
 fun emit_jmp(e: EmitterState, label: str) -> i64 {
-    out_s(e, "    jmp ");
-    out_line(e, label);
-    return 0;
+    out_s(e, "    jmp ")
+    out_line(e, label)
+    return 0
 }
 
 fun emit_jmp_id(e: EmitterState, op: str, prefix: str, id: i64) -> i64 {
-    out_s(e, "    ");
-    out_s(e, op);
-    out_s(e, " ");
-    out_s(e, prefix);
-    out_i(e, id);
-    out_nl(e);
-    return 0;
+    out_s(e, "    ")
+    out_s(e, op)
+    out_s(e, " ")
+    out_s(e, prefix)
+    out_i(e, id)
+    out_nl(e)
+    return 0
 }
 
 fun emit_slot_ref(e: EmitterState, slot: i64) -> i64 {
-    out_s(e, "[rbp");
+    out_s(e, "[rbp")
     if slot >= 0 {
-        out_s(e, "+");
+        out_s(e, "+")
     }
-    out_i(e, slot);
-    out_s(e, "]");
-    return 0;
+    out_i(e, slot)
+    out_s(e, "]")
+    return 0
 }
 
 fun emit_stack_store(e: EmitterState, slot: i64, src: str) -> i64 {
-    out_s(e, "    mov ");
-    emit_slot_ref(e, slot);
-    out_s(e, ", ");
-    out_line(e, src);
-    return 0;
+    out_s(e, "    mov ")
+    emit_slot_ref(e, slot)
+    out_s(e, ", ")
+    out_line(e, src)
+    return 0
 }
 
 fun emit_stack_load(e: EmitterState, dst: str, slot: i64) -> i64 {
-    out_s(e, "    mov ");
-    out_s(e, dst);
-    out_s(e, ", ");
-    emit_slot_ref(e, slot);
-    out_nl(e);
-    return 0;
+    out_s(e, "    mov ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    emit_slot_ref(e, slot)
+    out_nl(e)
+    return 0
 }
 
 fun fresh_label(e: EmitterState) -> i64 {
-    e.label_counter = e.label_counter + 1;
-    return e.label_counter;
+    e.label_counter = e.label_counter + 1
+    return e.label_counter
 }
 
 fun align16(n: i64) -> i64 {
-    return ((n + 15) / 16) * 16;
+    return ((n + 15) / 16) * 16
 }
 
 fun emit_runtime(e: EmitterState, path: str) -> i64 {
-    let s = read_file(path);
-    out_s(e, s);
-    out_nl(e);
-    return 0;
+    let s = read_file(path)
+    out_s(e, s)
+    out_nl(e)
+    return 0
 }
 
 fun emit_runtime_helpers(e: EmitterState) -> i64 {
-    emit_runtime(e, "runtime/str_alloc.asm");
-    emit_runtime(e, "runtime/bytes.asm");
-    emit_runtime(e, "runtime/str_cat.asm");
-    emit_runtime(e, "runtime/str_slice.asm");
-    emit_runtime(e, "runtime/str_replace_char.asm");
-    emit_runtime(e, "runtime/str_starts_with.asm");
-    emit_runtime(e, "runtime/str_find.asm");
-    emit_runtime(e, "runtime/str_trim.asm");
-    emit_runtime(e, "runtime/extend_i8.asm");
-    emit_runtime(e, "runtime/itoa.asm");
-    emit_runtime(e, "runtime/argv.asm");
-    emit_runtime(e, "runtime/system.asm");
-    emit_runtime(e, "runtime/read_file.asm");
-    emit_runtime(e, "runtime/write_file.asm");
-    return 0;
+    emit_runtime(e, "runtime/str_alloc.asm")
+    emit_runtime(e, "runtime/bytes.asm")
+    emit_runtime(e, "runtime/str_cat.asm")
+    emit_runtime(e, "runtime/str_slice.asm")
+    emit_runtime(e, "runtime/str_replace_char.asm")
+    emit_runtime(e, "runtime/str_starts_with.asm")
+    emit_runtime(e, "runtime/str_find.asm")
+    emit_runtime(e, "runtime/str_trim.asm")
+    emit_runtime(e, "runtime/extend_i8.asm")
+    emit_runtime(e, "runtime/itoa.asm")
+    emit_runtime(e, "runtime/argv.asm")
+    emit_runtime(e, "runtime/system.asm")
+    emit_runtime(e, "runtime/read_file.asm")
+    emit_runtime(e, "runtime/write_file.asm")
+    return 0
 }
 
 fun make_emitter(out_path: str) -> EmitterState {
-    let e = new EmitterState;
-    e.out_path = out_path;
-    e.out_buf = new i8[65536];
-    e.label_counter = 0;
-    e.string_counter = 0;
-    e.current_fn = "";
-    e.current_ep_id = 0;
-    e.local_bytes = 0;
-    e.alloc_size = 0;
-    e.temp_base = 0;
-    e.temp_count = 0;
-    e.loop_break_label = 0;
-    e.loop_continue_label = 0;
-    e.locals = new Local[128];
-    e.funcs = new FuncInfo[64];
-    e.strings = new StringLit[256];
-    e.structs = new StructInfo[64];
-    return e;
+    let e = new EmitterState
+    e.out_path = out_path
+    e.out_buf = new u8[65536]
+    e.label_counter = 0
+    e.string_counter = 0
+    e.current_fn = ""
+    e.current_ep_id = 0
+    e.local_bytes = 0
+    e.alloc_size = 0
+    e.temp_base = 0
+    e.temp_count = 0
+    e.loop_break_label = 0
+    e.loop_continue_label = 0
+    e.locals = new Local[128]
+    e.funcs = new FuncInfo[64]
+    e.strings = new StringLit[256]
+    e.structs = new StructInfo[64]
+    return e
 }
 
 fun type_info(kind: str, name: str) -> TypeInfo {
-    let t = new TypeInfo;
-    t.kind = kind;
-    t.name = name;
-    return t;
+    let t = new TypeInfo
+    t.kind = kind
+    t.name = name
+    return t
 }
 
-fun type_i64() -> TypeInfo { return type_info("i64", ""); }
-fun type_i8() -> TypeInfo { return type_info("i8", ""); }
-fun type_u8() -> TypeInfo { return type_info("u8", ""); }
-fun type_u64() -> TypeInfo { return type_info("u64", ""); }
-fun type_bool() -> TypeInfo { return type_info("bool", ""); }
-fun type_void() -> TypeInfo { return type_info("void", ""); }
-fun type_str() -> TypeInfo { return type_info("str", ""); }
-fun type_struct(name: str) -> TypeInfo { return type_info("struct", name); }
-fun type_array(elem: str) -> TypeInfo { return type_info("array", elem); }
+fun type_i64() -> TypeInfo {
+    return type_info("i64", "")
+ }
+fun type_i8() -> TypeInfo {
+    return type_info("i8", "")
+ }
+fun type_u8() -> TypeInfo {
+    return type_info("u8", "")
+ }
+fun type_u64() -> TypeInfo {
+    return type_info("u64", "")
+ }
+fun type_bool() -> TypeInfo {
+    return type_info("bool", "")
+ }
+fun type_void() -> TypeInfo {
+    return type_info("void", "")
+ }
+fun type_str() -> TypeInfo {
+    return type_info("str", "")
+ }
+fun type_struct(name: str) -> TypeInfo {
+    return type_info("struct", name)
+ }
+fun type_array(elem: str) -> TypeInfo {
+    return type_info("array", elem)
+ }
 
 fun type_is_i8(t: TypeInfo) -> i64 {
-    if t.kind == "i8" { return 1; }
-    return 0;
+    if t.kind == "i8" {
+        return 1
+ }
+    return 0
 }
 
 fun type_is_u8(t: TypeInfo) -> i64 {
-    if t.kind == "u8" { return 1; }
-    return 0;
+    if t.kind == "u8" {
+        return 1
+ }
+    return 0
 }
 
 fun type_is_bool(t: TypeInfo) -> i64 {
-    if t.kind == "bool" { return 1; }
-    return 0;
+    if t.kind == "bool" {
+        return 1
+ }
+    return 0
 }
 
 fun type_is_byte_sized(t: TypeInfo) -> i64 {
-    if t.kind == "i8" { return 1; }
-    if t.kind == "u8" { return 1; }
-    if t.kind == "bool" { return 1; }
-    return 0;
+    if t.kind == "i8" {
+        return 1
+ }
+    if t.kind == "u8" {
+        return 1
+ }
+    if t.kind == "bool" {
+        return 1
+ }
+    return 0
 }
 
 fun type_is_integer(t: TypeInfo) -> i64 {
-    if t.kind == "i8" { return 1; }
-    if t.kind == "u8" { return 1; }
-    if t.kind == "i64" { return 1; }
-    if t.kind == "u64" { return 1; }
-    return 0;
+    if t.kind == "i8" {
+        return 1
+ }
+    if t.kind == "u8" {
+        return 1
+ }
+    if t.kind == "i64" {
+        return 1
+ }
+    if t.kind == "u64" {
+        return 1
+ }
+    return 0
 }
 
 fun type_is_value_i8(t: TypeInfo) -> i64 {
-    return type_is_i8(t);
+    return type_is_i8(t)
 }
 
 fun type_is_complex(t: TypeInfo) -> i64 {
-    if t.kind == "str" { return 1; }
-    if t.kind == "struct" { return 1; }
-    if t.kind == "array" { return 1; }
-    return 0;
+    if t.kind == "str" {
+        return 1
+ }
+    if t.kind == "struct" {
+        return 1
+ }
+    if t.kind == "array" {
+        return 1
+ }
+    return 0
 }
 
 fun is_array_type_name(name: str) -> i64 {
     if name.len >= 2 {
         if name.data[name.len - 2] == 91 && name.data[name.len - 1] == 93 {
-            return 1;
+            return 1
         }
     }
-    return 0;
+    return 0
 }
 
 fun array_elem_name(name: str) -> str {
     if is_array_type_name(name) == 1 {
-        return str_new(name.data, name.len - 2);
+        return str_new(name.data, name.len - 2)
     }
-    return name;
+    return name
 }
 
 fun user_type(name: str) -> TypeInfo {
-    if name == "i64" { return type_i64(); }
-    if name == "i8" { return type_i8(); }
-    if name == "u8" { return type_u8(); }
-    if name == "u64" { return type_u64(); }
-    if name == "bool" { return type_bool(); }
-    if name == "void" { return type_void(); }
-    if name == "str" { return type_str(); }
-    if is_array_type_name(name) == 1 { return type_array(array_elem_name(name)); }
-    return type_struct(name);
+    if name == "i64" {
+        return type_i64()
+ }
+    if name == "i8" {
+        return type_i8()
+ }
+    if name == "u8" {
+        return type_u8()
+ }
+    if name == "u64" {
+        return type_u64()
+ }
+    if name == "bool" {
+        return type_bool()
+ }
+    if name == "void" {
+        return type_void()
+ }
+    if name == "str" {
+        return type_str()
+ }
+    if is_array_type_name(name) == 1 {
+        return type_array(array_elem_name(name))
+ }
+    return type_struct(name)
 }

@@ -2,13 +2,14 @@
 
 Epic is a small self-hosting systems language experiment targeting Windows x64.
 
-The current stable milestone is `v0`: a Python prototype can compile the Epic
-compiler sources, and the resulting compiler can compile Epic programs.
+The current development line is `v2`: v1 is the previous compiler anchor, and
+the Epic linker is the default linker path.
 
 ## Repository branches
 
 - `v0` is the historical stable bootstrap point.
 - `v1` continues language development after v0.
+- `v2` compiles compiler sources with the v1 compiler and uses `link.ep`.
 
 Do not preserve forward compatibility for its own sake. When the language
 changes, compiler sources should move with the current design.
@@ -58,15 +59,24 @@ compatible with old source.
 
 ## Tests
 
-On `v1`, run the example suite with the previous Epic compiler as the anchor:
+On `v2`, first create the local v1 anchor from the `v1` branch:
+
+```powershell
+git switch v1
+.\build\v0.exe epic.ep codegen_support.ep codegen.ep parser.ep lexer.ep
+Copy-Item build\epic\epic.ep.exe build\v1.exe
+git switch v2
+```
+
+Then run the example suite with the previous Epic compiler as the anchor:
 
 ```powershell
 python runtests.py
 ```
 
-The test runner builds the current compiler with `build\v0.exe`, then uses the
-current compiler to compile and run `examples/*.ep`. Override the anchor with
-`PREVIOUS_EPIC` if needed.
+The test runner builds `link.ep` and the current compiler with `build\v1.exe`,
+then uses the current compiler and `build\epic\link.ep.exe` to compile and run
+`examples/*.ep`. Override the anchor with `PREVIOUS_EPIC` if needed.
 
 The Epic linker MVP can be checked with:
 

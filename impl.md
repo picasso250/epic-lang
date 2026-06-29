@@ -1,13 +1,13 @@
-# Epic v1 implementation notes
+# Epic v2 implementation notes
 
 This document describes the current compiler implementation. It is not the language spec. User-visible language semantics live in `design.md`.
 
 ## Compiler entry
 
-The v1 branch no longer keeps the Python compiler prototype or `epic.py`
-driver. Build the v0 fixed point compiler on the `v0` branch, copy
-`epic-epic-epic.exe` to `build\v0.exe`, then use `build\v0.exe` as the
-previous compiler anchor for v1.
+The v2 branch uses the v1 compiler as its previous compiler anchor. Build the
+v0 fixed point compiler on the `v0` branch, copy `epic-epic-epic.exe` to
+`build\v0.exe`, use it on `v1` to build `build\epic\epic.ep.exe`, then copy
+that executable to `build\v1.exe`.
 
 The current compiler sources are `epic.ep`, `lexer.ep`, `parser.ep`,
 `codegen_support.ep`, and `codegen.ep`. Test scripts invoke the previous
@@ -35,9 +35,9 @@ Current toolchain paths are configured by the Epic compiler/runtime path:
 - `link.py`
 - Windows SDK `kernel32.lib` and `user32.lib`
 
-`link.py` is the default linker. `lld-link` is available through `--linker lld-link`.
-`link.ep` is an Epic MVP linker for the same current single-object PE64 path;
-it is tested separately and is not yet the compiler driver's default linker.
+`link.ep` is the default linker path on v2 for the current single-object PE64
+path. Test scripts build it to `build\epic\link.ep.exe` with `build\v1.exe`
+before using the current compiler. `link.py` remains as historical reference.
 
 ## Runtime helpers
 
@@ -190,17 +190,17 @@ Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen reads
 Primary runtime acceptance:
 
 ```text
-python runtests.py --linker py
+python runtests.py
 ```
 
 Current known result:
 
 ```text
-50 passed, 0 failed
+54 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.
-On v1, the default acceptance path uses the previous Epic compiler anchor:
+On v2, the default acceptance path uses the previous Epic compiler anchor:
 
 ```text
 python runtests.py
@@ -217,5 +217,5 @@ python test_link_ep.py
 Current known result:
 
 ```text
-50 passed, 0 failed
+54 passed, 0 failed
 ```
