@@ -40,13 +40,13 @@ TOKEN_SPEC = [
     ("RPAREN",    r'\)'),
     ("LBRACE",    r'\{'),
     ("RBRACE",    r'\}'),
-    ("SEMICOLON", r';'),
     ("COMMA",     r','),
     ("COLON",     r':'),
     ("CHAR",      r"'(?:\\[nrt\\\\\"'0]|[^\\'\n\r])'"),
     ("STRING",    r'"(?:\\[nrt\\\\\"\'0]|[^\\\"\n\r])*"'),
     ("COMMENT",   r'#[^\n]*'),
-    ("WHITESPACE", r'[ \t\n\r]+'),
+    ("NEWLINE",   r'\n'),
+    ("WHITESPACE", r'[ \t\r]+'),
 ]
 
 TOKEN_RE = re.compile(

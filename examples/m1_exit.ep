@@ -1,4 +1,4 @@
 # EXIT: 42
 fun main() -> void {
-    os.ExitProcess(42);
+    os.ExitProcess(42)
 }

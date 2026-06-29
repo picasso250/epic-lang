@@ -41,16 +41,29 @@ class Parser:
             return self.advance()
         return None
 
+    def skip_newlines(self):
+        while self.peek_kind("NEWLINE"):
+            self.advance()
+
+    def expect_stmt_end(self):
+        if self.check("NEWLINE"):
+            self.skip_newlines()
+            return
+        t = self.peek()
+        raise ParseError("Expected end of line", t[2])
+
     # ── program ───────────────────────────────────────────────────────
 
     def parse_program(self):
         funcs = []
         structs = []
+        self.skip_newlines()
         while self.peek()[0] in ("FUN", "STRUCT"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
             else:
                 structs.append(self.parse_struct_def())
+            self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
@@ -62,12 +75,13 @@ class Parser:
         self.expect("STRUCT")
         name = self.expect("ID")
         self.expect("LBRACE")
+        self.skip_newlines()
         fields = []
         while not self.peek_kind("RBRACE"):
             fname = self.expect("ID")
             self.expect("COLON")
             ftype = self.parse_type()
-            self.expect("SEMICOLON")
+            self.expect_stmt_end()
             fields.append(StructField(name=fname[1], type=ftype))
         self.expect("RBRACE")
         return StructDefNode(name=name[1], fields=fields)
@@ -118,11 +132,13 @@ class Parser:
 
     def parse_block(self):
         self.expect("LBRACE")
+        self.skip_newlines()
         stmts = []
         while not self.peek_kind("RBRACE"):
             if self.peek()[0] == "EOF":
                 raise ParseError("Unexpected end of file in block")
             stmts.append(self.parse_stmt())
+            self.skip_newlines()
         self.expect("RBRACE")
         return BlockNode(stmts=stmts)
 
@@ -186,9 +202,9 @@ class Parser:
         line = self.peek()[2]
         self.expect("RETURN")
         expr = None
-        if not self.peek_kind("SEMICOLON"):
+        if not self.peek_kind("NEWLINE"):
             expr = self.parse_expr()
-        self.expect("SEMICOLON")
+        self.expect_stmt_end()
         return ReturnNode(expr=expr, line=line)
 
     def parse_let_stmt(self):
@@ -200,7 +216,7 @@ class Parser:
         value = None
         if self.check("ASSIGN"):
             value = self.parse_expr()
-        self.expect("SEMICOLON")
+        self.expect_stmt_end()
         return LetNode(name=name[1], var_type=typ, value=value)
 
     def parse_assign_stmt(self):
@@ -219,7 +235,7 @@ class Parser:
                 break
         self.expect("ASSIGN")
         value = self.parse_expr()
-        self.expect("SEMICOLON")
+        self.expect_stmt_end()
         if isinstance(lhs, VarNode):
             return AssignNode(name=lhs.name, value=value)
         elif isinstance(lhs, FieldAccessNode):
@@ -233,6 +249,7 @@ class Parser:
         cond = self.parse_expr()
         then_block = self.parse_block()
         else_block = None
+        self.skip_newlines()
         if self.check("ELSE"):
             else_block = self.parse_block()
         return IfNode(cond=cond, then_block=then_block, else_block=else_block)
@@ -245,7 +262,7 @@ class Parser:
 
     def parse_expr_stmt(self):
         expr = self.parse_expr()
-        self.expect("SEMICOLON")
+        self.expect_stmt_end()
         return ExprStmtNode(expr=expr)
 
     # ── expressions ───────────────────────────────────────────────────

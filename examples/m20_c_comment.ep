@@ -1,5 +1,5 @@
 # EXIT: 0
 fun main() -> void {
     # comment
-    os.ExitProcess(0);
+    os.ExitProcess(0)
 }

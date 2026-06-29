@@ -1,6 +1,6 @@
 # EXIT: 66
 fun main() -> void {
-    let s = "ABC";
-    let bytes = s.data;
-    os.ExitProcess(bytes[1]);
+    let s = "ABC"
+    let bytes = s.data
+    os.ExitProcess(bytes[1])
 }

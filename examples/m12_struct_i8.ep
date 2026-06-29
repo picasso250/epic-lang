@@ -1,16 +1,14 @@
 # EXIT: 65
-
 struct Data {
-    flag: i8;
-    value: i64;
+    flag: i8
+    value: i64
 }
-
 fun main() -> void {
-    let d = new Data;
-    d.flag = 1;
-    d.value = 65;
+    let d = new Data
+    d.flag = 1
+    d.value = 65
     if d.flag {
-        os.ExitProcess(d.value);
+        os.ExitProcess(d.value)
     }
-    os.ExitProcess(0);
+    os.ExitProcess(0)
 }

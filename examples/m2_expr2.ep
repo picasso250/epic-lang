@@ -6,17 +6,17 @@
 # STDOUT: -5
 # STDOUT: 5
 fun main() -> void {
-    putstr(itoa(10 / 3));
-    putc(10);
-    putstr(itoa(10 % 3));
-    putc(10);
-    putstr(itoa(10 + 20 * 3));
-    putc(10);
-    putstr(itoa((1 + 2) * 3));
-    putc(10);
-    putstr(itoa(0 - 5));
-    putc(10);
-    putstr(itoa(10 - 3 - 2));
-    putc(10);
-    os.ExitProcess(0);
+    putstr(itoa(10 / 3))
+    putc(10)
+    putstr(itoa(10 % 3))
+    putc(10)
+    putstr(itoa(10 + 20 * 3))
+    putc(10)
+    putstr(itoa((1 + 2) * 3))
+    putc(10)
+    putstr(itoa(0 - 5))
+    putc(10)
+    putstr(itoa(10 - 3 - 2))
+    putc(10)
+    os.ExitProcess(0)
 }

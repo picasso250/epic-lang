@@ -1,18 +1,16 @@
 # EXIT: 0
 # STDOUT: hellobye!
 fun main() -> void {
-    let s = "hello";
-    putstr(s);
-
-    let t = "hello";
+    let s = "hello"
+    putstr(s)
+    let t = "hello"
     if s == t {
-        putstr("bye");
+        putstr("bye")
     } else {
-        putstr("no");
+        putstr("no")
     }
     if s != "world" {
-        putstr("!");
+        putstr("!")
     }
-
-    os.ExitProcess(0);
+    os.ExitProcess(0)
 }

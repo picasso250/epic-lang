@@ -1,8 +1,8 @@
 # EXIT: 0
 # STDOUT: 42
 fun main() -> void {
-    let s = itoa(42);
-    putstr(s);
-    putc(10);
-    os.ExitProcess(0);
+    let s = itoa(42)
+    putstr(s)
+    putc(10)
+    os.ExitProcess(0)
 }

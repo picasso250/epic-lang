@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 7
 fun main() -> void {
-    putstr(itoa(1 + 2 * 3));
-    putc(10);
-    os.ExitProcess(0);
+    putstr(itoa(1 + 2 * 3))
+    putc(10)
+    os.ExitProcess(0)
 }

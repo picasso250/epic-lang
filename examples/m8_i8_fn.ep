@@ -3,16 +3,15 @@
 # STDOUT: 90
 fun to_upper(c: i8) -> i64 {
     if c >= 'a' && c <= 'z' {
-        return c - 32;
+        return c - 32
     }
-    return c;
+    return c
 }
-
 fun main() -> void {
-    putc(to_upper('h'));
-    putc(to_upper('i'));
-    putc(10);
-    putstr(itoa(to_upper('z')));
-    putc(10);
-    os.ExitProcess(0);
+    putc(to_upper('h'))
+    putc(to_upper('i'))
+    putc(10)
+    putstr(itoa(to_upper('z')))
+    putc(10)
+    os.ExitProcess(0)
 }

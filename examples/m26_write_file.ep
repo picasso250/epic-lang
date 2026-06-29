@@ -2,11 +2,11 @@
 # STDOUT: hello
 # CLEAN: test_write_file.txt
 fun main() -> void {
-    let n = write_file("test_write_file.txt", "hello");
+    let n = write_file("test_write_file.txt", "hello")
     if n != 5 {
-        os.ExitProcess(1);
+        os.ExitProcess(1)
     }
-    let s = read_file("test_write_file.txt");
-    putstr(s);
-    os.ExitProcess(0);
+    let s = read_file("test_write_file.txt")
+    putstr(s)
+    os.ExitProcess(0)
 }

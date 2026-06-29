@@ -4,9 +4,9 @@
 
 - Epic is a small C-like systems language targeting Windows x64 in v0.
 - Source files use the `.ep` extension.
-- Blocks use `{}` and statements end with `;`.
+- Blocks use `{}` and ordinary statements end at newlines. Semicolons are not part of v0 syntax.
 - `if` and `while` conditions do not require parentheses.
-- `let` has no type annotation. Use `let x = expr;` or `let x;`.
+- `let` has no type annotation. Use `let x = expr` or `let x`.
 - Function parameters, return types, and struct fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
 - Memory is not freed in v0; process exit is the reclamation boundary.
@@ -68,11 +68,11 @@ Function definitions use explicit parameter and return types:
 
 ```epic
 fun add(a: i64, b: i64) -> i64 {
-    return a + b;
+    return a + b
 }
 ```
 
-`void` functions may use `return;` or fall off the end. `return expr;` is invalid in a `void` function.
+`void` functions may use `return` or fall off the end. `return expr` is invalid in a `void` function.
 
 ## Structs
 
@@ -80,14 +80,14 @@ Struct definitions use user-facing field types:
 
 ```epic
 struct Token {
-    kind: str;
-    line: i64;
+    kind: str
+    line: i64
 }
 ```
 
 `new Token` allocates a zero-initialized object and returns a `Token` value at the language level. Struct values have reference semantics in v0.
 
-Field access uses `obj.field`. Field assignment uses `obj.field = value;`.
+Field access uses `obj.field`. Field assignment uses `obj.field = value`.
 
 ## Strings
 
@@ -136,7 +136,7 @@ The program entry function must be exactly:
 
 ```epic
 fun main() -> void {
-    os.ExitProcess(0);
+    os.ExitProcess(0)
 }
 ```
 

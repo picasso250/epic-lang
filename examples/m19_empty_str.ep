@@ -1,5 +1,5 @@
 # EXIT: 0
 fun main() -> void {
-    putstr("");
-    os.ExitProcess(0);
+    putstr("")
+    os.ExitProcess(0)
 }

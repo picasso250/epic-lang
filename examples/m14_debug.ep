@@ -1,15 +1,13 @@
 # EXIT: 0
-
 struct Token {
-    kind: i64;
-    value: i64;
+    kind: i64
+    value: i64
 }
-
 fun main() -> void {
-    let tokens = new Token[3];
-    push(tokens, new Token);
-    push(tokens, new Token);
-    push(tokens, new Token);
-    tokens.data[2].kind = 42;
-    os.ExitProcess(0);
+    let tokens = new Token[3]
+    push(tokens, new Token)
+    push(tokens, new Token)
+    push(tokens, new Token)
+    tokens.data[2].kind = 42
+    os.ExitProcess(0)
 }

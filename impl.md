@@ -117,6 +117,8 @@ User struct fields use fixed 8-byte slots in v0.
 ## Parser notes
 
 - Type names are parsed as identifiers in type context.
+- The lexer preserves newline tokens and rejects semicolons.
+- Ordinary statements use newlines as explicit statement terminators.
 - `let` annotations are rejected.
 - Functions may have at most 4 parameters.
 - Calls may have at most 4 arguments.
