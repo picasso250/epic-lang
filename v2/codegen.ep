@@ -1,5 +1,7 @@
 #
-# Epic v1 codegen core.
+# Epic v2 codegen core.
+# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
+# until the bootstrap plan changes.
 #
 
 
@@ -39,6 +41,11 @@ fun collect_strings(e: EmitterState, node: AstNode): i64 {
     i = 0
     while i < node.args.len {
         collect_strings(e, node.args.data[i])
+ i = i + 1
+ }
+    i = 0
+    while i < node.fields.len {
+        collect_strings(e, node.fields.data[i])
  i = i + 1
  }
     collect_strings(e, node.body)
@@ -252,6 +259,28 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
     return type_i64()
 }
 
+fun type_same(a: TypeInfo, b: TypeInfo): i64 {
+    if a.kind != b.kind {
+        return 0
+    }
+    if a.name != b.name {
+        return 0
+    }
+    return 1
+}
+
+fun type_can_assign(dst: TypeInfo, src: TypeInfo, expr: AstNode): i64 {
+    if type_same(dst, src) == 1 {
+        return 1
+    }
+    if expr.kind == "Literal" || expr.kind == "Char" {
+        if type_is_integer(dst) == 1 && type_is_integer(src) == 1 {
+            return 1
+        }
+    }
+    return 0
+}
+
 fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     if expr.kind == "String" {
         return type_str()
@@ -353,7 +382,13 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     if expr.kind == "New" {
         return type_struct(expr.name)
  }
+    if expr.kind == "StructInit" {
+        return type_struct(expr.name)
+ }
     if expr.kind == "NewArray" {
+        return type_array(expr.type_name)
+ }
+    if expr.kind == "ArrayLiteral" {
         return type_array(expr.type_name)
  }
     if expr.kind == "FieldAccess" {
@@ -1050,6 +1085,75 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
     return 0
 }
 
+fun emit_write_str_rax(e: EmitterState): i64 {
+    let tmp = temp_save_rax(e)
+    emit_stack_load(e, "rax", tmp)
+    emit_inst(e, "cmp qword [rax+8], 0")
+    let write_id = fresh_label(e)
+    let done_id = fresh_label(e)
+    emit_jmp_id(e, "jne", "L", write_id)
+    emit_jmp_id(e, "jmp", "L", done_id)
+    emit_label_id(e, "L", write_id)
+    emit_mov(e, "ecx", "-11")
+    emit_call_inst(e, "GetStdHandle")
+    emit_mov(e, "rcx", "rax")
+    emit_stack_load(e, "rax", tmp)
+    emit_mov(e, "rdx", "[rax]")
+    emit_mov(e, "r8", "[rax+8]")
+    out_line(e, "    lea r9, [_written]")
+    emit_inst(e, "sub rsp, 16")
+    emit_mov(e, "qword [rsp+32]", "0")
+    emit_call_inst(e, "WriteFile")
+    emit_inst(e, "add rsp, 16")
+    emit_label_id(e, "L", done_id)
+    return 0
+}
+
+fun emit_static_str(e: EmitterState, text: str): i64 {
+    let id = get_string_id(e, text)
+    emit_lea_ref_id(e, "rcx", "_str_", id)
+    emit_mov_i(e, "rdx", text.len)
+    emit_call_inst(e, "_str_alloc")
+    emit_write_str_rax(e)
+    return 0
+}
+
+fun emit_panic_message(e: EmitterState, line: i64, prefix: str, msg: AstNode): i64 {
+    emit_static_str(e, prefix)
+    emit_mov_i(e, "rcx", line)
+    emit_call_inst(e, "_itoa")
+    emit_write_str_rax(e)
+    emit_static_str(e, ": ")
+    if msg.kind != "" {
+        if expr_type(e, msg).kind != "str" {
+            die("panic/assert message must be str")
+        }
+        emit_expr(e, msg)
+        emit_write_str_rax(e)
+    }
+    emit_static_str(e, "\n")
+    emit_mov(e, "ecx", "1")
+    emit_call_inst(e, "ExitProcess")
+    return 0
+}
+
+fun emit_panic_stmt(e: EmitterState, stmt: AstNode): i64 {
+    return emit_panic_message(e, stmt.line, "panic line ", stmt.expr)
+}
+
+fun emit_assert_stmt(e: EmitterState, stmt: AstNode): i64 {
+    if expr_type(e, stmt.expr).kind != "bool" {
+        die("assert condition must be bool")
+    }
+    emit_expr(e, stmt.expr)
+    emit_inst(e, "cmp rax, 0")
+    let ok = fresh_label(e)
+    emit_jmp_id(e, "jne", "L", ok)
+    emit_panic_message(e, stmt.line, "assert line ", stmt.value_expr)
+    emit_label_id(e, "L", ok)
+    return 0
+}
+
 fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     if expr.op == "&&" || expr.op == "||" {
         let end_id = fresh_label(e)
@@ -1232,6 +1336,78 @@ fun emit_new(e: EmitterState, expr: AstNode): i64 {
     return 0
 }
 
+fun init_has_field(init: AstNode, name: str): i64 {
+    let i = 0
+    while i < init.fields.len {
+        if init.fields.data[i].name == name {
+            return 1
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+fun emit_struct_init(e: EmitterState, expr: AstNode): i64 {
+    let info = find_struct_info(e, expr.name)
+    let i = 0
+    while i < expr.fields.len {
+        let field = expr.fields.data[i]
+        find_field_info(e, expr.name, field.name)
+        let j = i + 1
+        while j < expr.fields.len {
+            if expr.fields.data[j].name == field.name {
+                die("duplicate initializer field")
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+
+    let n = ast_node("New")
+    n.name = expr.name
+    emit_new(e, n)
+    let obj_slot = temp_save_rax(e)
+    i = 0
+    while i < info.fields.len {
+        let layout_field = info.fields.data[i]
+        if init_has_field(expr, layout_field.name) == 0 {
+            if type_is_complex(layout_field.typ) == 1 {
+                emit_zero_complex(e, layout_field.typ)
+                emit_mov(e, "rcx", "rax")
+            } else {
+                emit_mov(e, "rcx", "0")
+            }
+            emit_stack_load(e, "rax", obj_slot)
+            out_s(e, "    mov [rax+")
+            out_i(e, layout_field.offset)
+            out_line(e, "], rcx")
+        }
+        i = i + 1
+    }
+    i = 0
+    while i < expr.fields.len {
+        let field = expr.fields.data[i]
+        let layout_field = find_field_info(e, expr.name, field.name)
+        if type_can_assign(layout_field.typ, expr_type(e, field.value_expr), field.value_expr) == 0 {
+            die("initializer field type mismatch")
+        }
+        emit_expr(e, field.value_expr)
+        emit_stack_load(e, "rcx", obj_slot)
+        if type_is_byte_sized(layout_field.typ) == 1 {
+            out_s(e, "    mov [rcx+")
+            out_i(e, layout_field.offset)
+            out_line(e, "], al")
+        } else {
+            out_s(e, "    mov [rcx+")
+            out_i(e, layout_field.offset)
+            out_line(e, "], rax")
+        }
+        i = i + 1
+    }
+    emit_stack_load(e, "rax", obj_slot)
+    return 0
+}
+
 fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
     let elem = expr.type_name
     let el_size = 8
@@ -1275,6 +1451,68 @@ fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
     emit_stack_load(e, "rcx", header_slot)
     emit_mov(e, "[rcx]", "rax")
     emit_mov(e, "rax", "rcx")
+    return 0
+}
+
+fun emit_array_literal(e: EmitterState, expr: AstNode): i64 {
+    let elem = expr.type_name
+    let elem_type = user_type(elem)
+    let el_size = 8
+    if elem == "i8" || elem == "u8" || elem == "bool" {
+        el_size = 1
+    }
+    let i = 0
+    while i < expr.args.len {
+        if type_can_assign(elem_type, expr_type(e, expr.args.data[i]), expr.args.data[i]) == 0 {
+            die("array literal element type mismatch")
+        }
+        i = i + 1
+    }
+
+    emit_mov(e, "rcx", "[_heap]")
+    emit_mov(e, "edx", "8")
+    emit_mov(e, "r8d", "24")
+    emit_inst(e, "sub rsp, 40")
+    emit_call_inst(e, "HeapAlloc")
+    emit_inst(e, "add rsp, 40")
+    let header_slot = temp_save_rax(e)
+    emit_stack_load(e, "rcx", header_slot)
+    emit_mov_i(e, "rax", expr.args.len)
+    emit_mov(e, "[rcx+8]", "rax")
+    emit_mov(e, "[rcx+16]", "rax")
+    if expr.args.len == 0 {
+        emit_mov(e, "qword [rcx]", "0")
+        emit_stack_load(e, "rax", header_slot)
+        return 0
+    }
+
+    let bytes = expr.args.len * el_size
+    emit_mov(e, "rcx", "[_heap]")
+    emit_mov(e, "edx", "8")
+    emit_mov_i(e, "r8d", bytes)
+    emit_inst(e, "sub rsp, 40")
+    emit_call_inst(e, "HeapAlloc")
+    emit_inst(e, "add rsp, 40")
+    let data_slot = temp_save_rax(e)
+    emit_stack_load(e, "rcx", header_slot)
+    emit_mov(e, "[rcx]", "rax")
+
+    i = 0
+    while i < expr.args.len {
+        emit_expr(e, expr.args.data[i])
+        emit_stack_load(e, "rcx", data_slot)
+        if el_size == 1 {
+            out_s(e, "    mov [rcx+")
+            out_i(e, i)
+            out_line(e, "], al")
+        } else {
+            out_s(e, "    mov [rcx+")
+            out_i(e, i * 8)
+            out_line(e, "], rax")
+        }
+        i = i + 1
+    }
+    emit_stack_load(e, "rax", header_slot)
     return 0
 }
 
@@ -1527,8 +1765,16 @@ fun emit_expr(e: EmitterState, expr: AstNode): i64 {
         emit_new(e, expr)
         return 0
     }
+    if expr.kind == "StructInit" {
+        emit_struct_init(e, expr)
+        return 0
+    }
     if expr.kind == "NewArray" {
         emit_new_array(e, expr)
+        return 0
+    }
+    if expr.kind == "ArrayLiteral" {
+        emit_array_literal(e, expr)
         return 0
     }
     if expr.kind == "FieldAccess" {
@@ -1983,6 +2229,12 @@ fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
     if stmt.kind == "Continue" {
         return emit_continue(e)
  }
+    if stmt.kind == "Panic" {
+        return emit_panic_stmt(e, stmt)
+ }
+    if stmt.kind == "Assert" {
+        return emit_assert_stmt(e, stmt)
+ }
     if stmt.kind == "Block" {
         return emit_block(e, stmt)
  }
@@ -2074,6 +2326,10 @@ fun emit_program(e: EmitterState, ast: AstNode): i64 {
     compute_struct_layouts(e, ast)
     add_func_infos(e, ast)
     collect_strings(e, ast)
+    get_string_id(e, "panic line ")
+    get_string_id(e, "assert line ")
+    get_string_id(e, ": ")
+    get_string_id(e, "\n")
     out_line(e, "global _start")
     out_line(e, "extern ExitProcess")
     out_line(e, "extern GetStdHandle")

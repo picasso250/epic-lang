@@ -1,0 +1,10 @@
+# EXIT: 42
+struct Point {
+    x: i64
+    y: i64
+}
+
+fun main() -> i64 {
+    let p = Point { y: 40, x: 2 }
+    return p.x + p.y
+}

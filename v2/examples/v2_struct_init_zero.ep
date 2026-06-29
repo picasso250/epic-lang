@@ -1,0 +1,13 @@
+# EXIT: 9
+struct Box {
+    n: i64
+    missing: i64
+}
+
+fun main() -> i64 {
+    let b = Box { n: 9 }
+    if b.missing == 0 {
+        return b.n
+    }
+    return 1
+}

@@ -1,0 +1,5 @@
+# EXIT: 5
+fun main() -> i64 {
+    assert true, "bad"
+    return 5
+}

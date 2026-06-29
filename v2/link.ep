@@ -1,6 +1,6 @@
 # Epic minimal PE linker.
 # MVP: one NASM COFF obj -> PE64 console exe.
-# Uses v1 source syntax and byte-buffer builtins; compile with the current v1 compiler.
+# Uses v1 source syntax and byte-buffer builtins; compile with the v1 compiler anchor.
 
 struct Section {
     name: str

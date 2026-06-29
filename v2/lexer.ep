@@ -1,5 +1,7 @@
 #
-# Epic v0 lexer — self-hosting bootstrap
+# Epic v2 lexer.
+# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
+# until the bootstrap plan changes.
 #
 
 struct Token {
@@ -258,6 +260,12 @@ fun lex(src: str): Token[] {
  }
             if text == "continue" {
                 kind = "CONTINUE"
+ }
+            if text == "panic" {
+                kind = "PANIC"
+ }
+            if text == "assert" {
+                kind = "ASSERT"
  }
             if text == "struct" {
                 kind = "STRUCT"

@@ -1,5 +1,7 @@
 #
-# Epic v2 self-hosted compiler driver.
+# Epic v2 compiler driver source.
+# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
+# until the bootstrap plan changes.
 #
 
 fun die_driver(msg: str): i64 {

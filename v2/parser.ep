@@ -1,5 +1,7 @@
 #
-# Epic v0 parser — self-hosting bootstrap
+# Epic v2 parser.
+# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
+# until the bootstrap plan changes.
 #
 
 struct AstNode {
@@ -96,6 +98,17 @@ fun same(a: str, b: str): i64 {
     return 0
 }
 
+fun is_upper_name(name: str): i64 {
+    if name.len == 0 {
+        return 0
+    }
+    let c = name.data[0]
+    if c >= 65 && c <= 90 {
+        return 1
+    }
+    return 0
+}
+
 fun peek(p: Parser): Token {
     if p.pos < p.tokens.len {
         return p.tokens.data[p.pos]
@@ -107,6 +120,16 @@ fun peek_kind(p: Parser, kind: str): i64 {
     let t = peek(p)
     if same(t.kind, kind) == 1 {
         return 1
+    }
+    return 0
+}
+
+fun peek_offset_kind(p: Parser, offset: i64, kind: str): i64 {
+    let idx = p.pos + offset
+    if idx < p.tokens.len {
+        if same(p.tokens.data[idx].kind, kind) == 1 {
+            return 1
+        }
     }
     return 0
 }
@@ -527,6 +550,30 @@ fun parse_continue_stmt(p: Parser): AstNode {
     return node
 }
 
+fun parse_panic_stmt(p: Parser): AstNode {
+    let t = expect(p, "PANIC")
+    let node = ast_node("Panic")
+    node.line = t.line
+    if peek_kind(p, "NEWLINE") == 1 {
+        parse_error(t.line, "panic expects message")
+    }
+    node.expr = parse_expr(p)
+    expect_stmt_end(p)
+    return node
+}
+
+fun parse_assert_stmt(p: Parser): AstNode {
+    let t = expect(p, "ASSERT")
+    let node = ast_node("Assert")
+    node.line = t.line
+    node.expr = parse_expr(p)
+    if check(p, "COMMA") == 1 {
+        node.value_expr = parse_expr(p)
+    }
+    expect_stmt_end(p)
+    return node
+}
+
 fun var_node(name: str): AstNode {
     let n = ast_node("Var")
     n.name = name
@@ -740,6 +787,12 @@ fun parse_stmt(p: Parser): AstNode {
     if same(t.kind, "CONTINUE") == 1 {
         return parse_continue_stmt(p)
  }
+    if same(t.kind, "PANIC") == 1 {
+        return parse_panic_stmt(p)
+ }
+    if same(t.kind, "ASSERT") == 1 {
+        return parse_assert_stmt(p)
+ }
     if same(t.kind, "ID") == 1 {
         if is_assignment(p) == 1 {
             return parse_assign_stmt(p)
@@ -830,6 +883,62 @@ fun parse_args(p: Parser): AstNode[] {
     return args
 }
 
+fun parse_struct_init(p: Parser, name: Token): AstNode {
+    let node = ast_node("StructInit")
+    node.name = name.text
+    expect(p, "LBRACE")
+    skip_newlines(p)
+    while peek_kind(p, "RBRACE") == 0 {
+        let field_name = expect(p, "ID")
+        expect(p, "COLON")
+        let field = ast_node("InitField")
+        field.name = field_name.text
+        field.line = field_name.line
+        field.value_expr = parse_expr(p)
+        push(node.fields, field)
+        if check(p, "COMMA") == 1 {
+            skip_newlines(p)
+        } else {
+            if peek_kind(p, "NEWLINE") == 1 {
+                skip_newlines(p)
+            } else {
+                if peek_kind(p, "RBRACE") == 0 {
+                    let t = peek(p)
+                    parse_error(t.line, "Expected comma or newline in initializer")
+                }
+            }
+        }
+    }
+    expect(p, "RBRACE")
+    return node
+}
+
+fun parse_array_literal(p: Parser, name: Token): AstNode {
+    expect(p, "LBRACKET")
+    expect(p, "RBRACKET")
+    let node = ast_node("ArrayLiteral")
+    node.type_name = name.text
+    expect(p, "LBRACE")
+    skip_newlines(p)
+    while peek_kind(p, "RBRACE") == 0 {
+        push(node.args, parse_expr(p))
+        if check(p, "COMMA") == 1 {
+            skip_newlines(p)
+        } else {
+            if peek_kind(p, "NEWLINE") == 1 {
+                skip_newlines(p)
+            } else {
+                if peek_kind(p, "RBRACE") == 0 {
+                    let t = peek(p)
+                    parse_error(t.line, "Expected comma or newline in array literal")
+                }
+            }
+        }
+    }
+    expect(p, "RBRACE")
+    return node
+}
+
 fun parse_postfix(p: Parser, node: AstNode): AstNode {
     let current = node
     let done = 0
@@ -913,8 +1022,14 @@ fun parse_primary(p: Parser): AstNode {
     }
     if peek_kind(p, "ID") == 1 {
         let t = advance(p)
+        if peek_offset_kind(p, 0, "LBRACKET") == 1 && peek_offset_kind(p, 1, "RBRACKET") == 1 && peek_offset_kind(p, 2, "LBRACE") == 1 {
+            return parse_postfix(p, parse_array_literal(p, t))
+        }
         let node = ast_node("Var")
         node.name = t.text
+        if peek_kind(p, "LBRACE") == 1 && is_upper_name(t.text) == 1 {
+            return parse_postfix(p, parse_struct_init(p, t))
+        }
         if check(p, "LPAREN") == 1 {
             node.kind = "Call"
             node.args = parse_args(p)
