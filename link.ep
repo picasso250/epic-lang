@@ -1,5 +1,6 @@
 # Epic minimal PE linker.
 # MVP: one NASM COFF obj -> PE64 console exe, matching link.py's support shape.
+# Uses v1 source syntax and byte-buffer builtins; compile with the current v1 compiler.
 
 struct Section {
     name: str
