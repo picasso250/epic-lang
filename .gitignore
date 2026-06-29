@@ -7,6 +7,9 @@ build/
 __pycache__/
 *.pyc
 
+# Node
+node_modules/
+
 # Binary tools (see README for setup)
 tools/
 
