@@ -183,7 +183,7 @@ python runtests.py --linker py
 Current known result:
 
 ```text
-40 passed, 0 failed
+41 passed, 0 failed
 ```
 
 Bootstrap checks:
@@ -193,6 +193,7 @@ python test_lexer_bootstrap.py
 python test_parser_bootstrap.py
 python test_codegen_bootstrap.py
 python test_epic_bootstrap.py
+python test_bootstrap_fixed_point.py
 ```
 
 The examples are the current behavioral acceptance suite, not a complete language specification.

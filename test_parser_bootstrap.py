@@ -84,6 +84,10 @@ def py_dump(node, depth=0):
         emit("While")
         out.extend(py_dump(node.body, depth + 1))
         out.extend(py_dump(node.cond, depth + 1))
+    elif isinstance(node, BreakNode):
+        emit("Break")
+    elif isinstance(node, ContinueNode):
+        emit("Continue")
     elif isinstance(node, ExprStmtNode):
         emit("ExprStmt")
         out.extend(py_dump(node.expr, depth + 1))

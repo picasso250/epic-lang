@@ -177,7 +177,7 @@ fun main(): void {
 
 Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
 
-`main -> i64` is not part of the v0 design.
+`main` returning `i64` is not part of the v0 design.
 
 ## Builtins
 
