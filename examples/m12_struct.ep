@@ -9,5 +9,5 @@ fun main() -> void {
     let p = new Point;
     p.x = 30;
     p.y = 20;
-    sys.ExitProcess(p.x + p.y);
+    os.ExitProcess(p.x + p.y);
 }

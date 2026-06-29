@@ -8,5 +8,5 @@ fun main() -> void {
     x = x + 1;
     putstr(itoa(x));
     putc(10);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

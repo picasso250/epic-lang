@@ -120,7 +120,7 @@ User struct fields use fixed 8-byte slots in v0.
 - `let` annotations are rejected.
 - Functions may have at most 4 parameters.
 - Calls may have at most 4 arguments.
-- `sys.*` calls are recognized specially.
+- `os.*` calls are recognized specially.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
 

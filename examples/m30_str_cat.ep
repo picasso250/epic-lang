@@ -5,5 +5,5 @@ fun main() -> void {
     let b = " ";
     let c = "world";
     putstr(a + b + c);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

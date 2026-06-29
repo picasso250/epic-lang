@@ -340,12 +340,12 @@ class Parser:
                     if self.check("LPAREN"):
                         args = self.parse_args()
                         self.expect("RPAREN")
-                        if isinstance(node, VarNode) and node.name == "sys":
-                            node = CallNode(name=field[1], args=args, namespace="sys")
+                        if isinstance(node, VarNode) and node.name == "os":
+                            node = CallNode(name=field[1], args=args, namespace="os")
                         else:
                             if len(args) > 4:
                                 raise ParseError("function calls may have at most 4 arguments in v0", field[2])
-                            raise ParseError("method calls are only supported for sys.* in v0", field[2])
+                            raise ParseError("method calls are only supported for os.* in v0", field[2])
                     else:
                         node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):

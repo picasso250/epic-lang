@@ -12,5 +12,5 @@ fun main() -> void {
     let y = add(x, 1);
     putstr(itoa(y));
     putc(10);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

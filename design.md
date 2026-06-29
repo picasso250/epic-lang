@@ -124,9 +124,9 @@ For self-hosting, v0 exposes `a.data`, `a.len`, and `a.cap` as low-level fields.
 
 ## System calls
 
-`sys.*` names are reserved for selected system/runtime calls exposed by the compiler.
+`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
 
-In v0, `sys` is not a module, package, object, or namespace value. Calls such as `sys.ExitProcess(0)` are recognized specially by the compiler.
+In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
 
 General method calls are not supported in v0.
 
@@ -136,11 +136,11 @@ The program entry function must be exactly:
 
 ```epic
 fun main() -> void {
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }
 ```
 
-Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `sys.ExitProcess(code)`.
+Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
 
 `main -> i64` is not part of the v0 design.
 

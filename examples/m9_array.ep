@@ -16,5 +16,5 @@ fun main() -> void {
     }
     putstr(itoa(buf.data[0]));
     putc(10);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

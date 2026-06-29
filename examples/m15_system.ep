@@ -5,5 +5,5 @@ fun main() -> void {
     let e = system("cmd /c exit 7");
     putstr(itoa(e));
     putc(10);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

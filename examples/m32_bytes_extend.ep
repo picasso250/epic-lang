@@ -8,5 +8,5 @@ fun main() -> void {
     let xs = bytes("ab");
     extend(xs, xs);
     putstr(str_new(xs.data, xs.len));
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

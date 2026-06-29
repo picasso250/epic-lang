@@ -11,5 +11,5 @@ fun main() -> void {
         putc(10);
         i = i + 1;
     }
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

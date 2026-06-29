@@ -10,7 +10,7 @@ fun main() -> void {
     d.flag = 1;
     d.value = 65;
     if d.flag {
-        sys.ExitProcess(d.value);
+        os.ExitProcess(d.value);
     }
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

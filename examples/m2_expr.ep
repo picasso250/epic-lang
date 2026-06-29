@@ -3,5 +3,5 @@
 fun main() -> void {
     putstr(itoa(1 + 2 * 3));
     putc(10);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

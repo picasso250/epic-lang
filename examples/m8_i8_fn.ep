@@ -14,5 +14,5 @@ fun main() -> void {
     putc(10);
     putstr(itoa(to_upper('z')));
     putc(10);
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }

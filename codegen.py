@@ -283,15 +283,15 @@ class Emitter:
         self.emit("    add rsp, 32")
 
     def _syscall_symbol(self, name, namespace=""):
-        if namespace == "sys":
+        if namespace == "os":
             symbol = name
-        elif name.startswith("sys."):
-            symbol = name[4:]
+        elif name.startswith("os."):
+            symbol = name[3:]
         else:
             return None
         if symbol not in self.winapi:
             full_name = f"{namespace}.{name}" if namespace else name
-            raise RuntimeError(f"Unsupported sys call: {full_name}")
+            raise RuntimeError(f"Unsupported os call: {full_name}")
         return symbol
 
     def _emit_syscall(self, symbol, args):

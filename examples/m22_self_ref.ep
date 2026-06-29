@@ -12,6 +12,6 @@ fun main() -> void {
     a.next = b;
 
     # a.next.val should be 20
-    sys.ExitProcess(a.next.val);
+    os.ExitProcess(a.next.val);
 }
 # EXIT: 20
