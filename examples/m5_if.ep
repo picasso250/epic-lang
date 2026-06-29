@@ -14,5 +14,5 @@ fun main() -> void {
         putstr(itoa(2))
         putc(10)
     }
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

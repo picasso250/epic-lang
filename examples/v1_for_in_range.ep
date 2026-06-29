@@ -9,5 +9,5 @@ fun main() -> void {
     for j in end..end {
         putc('?')
     }
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

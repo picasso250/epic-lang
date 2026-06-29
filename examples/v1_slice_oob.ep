@@ -3,5 +3,5 @@ fun main() -> void {
     let s = "Epic"
     let bad = s[3:2]
     putstr(bad)
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

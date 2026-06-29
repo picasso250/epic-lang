@@ -11,5 +11,5 @@ fun main() -> void {
     putstr("h")
     putstr("i")
     putstr("j")
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

@@ -1,37 +1,22 @@
-# Epic v0 implementation notes
+# Epic v1 implementation notes
 
 This document describes the current compiler implementation. It is not the language spec. User-visible language semantics live in `design.md`.
 
-## Compiler driver
+## Compiler entry
 
-The current compiler entry point is:
+The v1 branch no longer keeps the Python compiler prototype or `epic.py`
+driver. Build the v0 fixed point compiler on the `v0` branch, copy
+`epic-epic-epic.exe` to `v0.exe`, then use `v0.exe` as the previous compiler
+anchor for v1.
 
-```text
-python epic.py <file.ep>
-```
-
-Useful forms:
-
-```text
-python epic.py examples/m1_exit.ep
-python epic.py examples/m1_exit.ep --linker lld-link
-python epic.py --main main.ep main.ep lib.ep
-python epic.py examples/m1_exit.ep --out-dir build/custom
-```
-
-Generated files are written under `build/` by default while preserving source-relative paths:
-
-```text
-examples/m1_exit.ep -> build/examples/m1_exit.asm
-examples/m1_exit.ep -> build/examples/m1_exit.obj
-examples/m1_exit.ep -> build/examples/m1_exit.exe
-```
-
-The driver parses all input files, merges top-level definitions, emits one NASM assembly file, assembles it with NASM, then links it with either `link.py` or `lld-link`.
+The current compiler sources are `epic.ep`, `lexer.ep`, `parser.ep`,
+`codegen_support.ep`, and `codegen.ep`. Test scripts invoke the previous
+compiler to build `build/epic/epic.ep.exe`, then use that executable to compile
+examples.
 
 ## Multi-file merge
 
-`epic.py` supports whole-program source merging.
+The Epic compiler supports whole-program source merging.
 
 - More than one input file requires `--main`.
 - All structs share one global namespace.
@@ -43,7 +28,7 @@ The driver parses all input files, merges top-level definitions, emits one NASM 
 
 ## Toolchain
 
-Current toolchain paths are configured in `epic.py`:
+Current toolchain paths are configured by the Epic compiler/runtime path:
 
 - `tools/nasm.exe`
 - `tools/lld-link.exe`
@@ -82,7 +67,9 @@ User-facing types lower to implementation types:
 | User type | Internal type |
 | --- | --- |
 | `i64` | `i64` |
-| `i8` | `i8` |
+| `u8` | `u8` |
+| `u64` | `u64` |
+| `bool` | `bool` |
 | `str` | `&str` |
 | `Token` | `&Token` |
 | `i64[]` | `&_arr_i64` |
@@ -96,7 +83,7 @@ User programs do not write pointer types. `&T` and `&&T` are compiler-internal c
 
 ```text
 str = {
-    data: &i8,
+    data: &u8,
     len: i64,
 }
 ```
@@ -117,20 +104,20 @@ Primitive arrays store primitive values. Struct and `str` arrays store reference
 
 ### Struct layout
 
-User struct fields use fixed 8-byte slots in v0.
+User struct fields use fixed 8-byte slots in v1.
 
 - Field offset is `index * 8`.
 - Struct size is `field_count * 8`.
-- `i8` fields load/store one byte inside their 8-byte slot.
+- `u8` and `bool` fields load/store one byte inside their 8-byte slot.
 - Built-in runtime layouts such as `str` and dynamic arrays keep their explicit layouts.
 
 ## Parser notes
 
 - Type names are parsed as identifiers in type context.
-- `let` annotations are rejected.
+- `let` supports optional type annotations.
 - Functions may have at most 4 parameters.
 - Calls may have at most 4 arguments.
-- `sys.*` calls are recognized specially.
+- `os.*` calls are recognized specially.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
 - Expression postfixes support checked indexing and copy slices for strings and arrays.
@@ -164,19 +151,17 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `putstr` | writes `s.data` for `s.len` bytes |
 | `itoa` | calls `_itoa` runtime helper |
 | `system` | calls `_system` runtime helper |
-| `read_file` | calls `_read_file` runtime helper and returns `i8[]` |
-| `write_file` | writes an `i8[]` payload through `_write_file` |
+| `read_file` | calls `_read_file` runtime helper and returns `u8[]` |
+| `write_file` | writes a `u8[]` payload through `_write_file` |
 | `str_new` | calls `_str_alloc` runtime helper |
-| `str` | converts `i8[]` to `str` through `_str_alloc` |
+| `str` | converts `u8[]` to `str` through `_str_alloc` |
 | `bytes` | calls `_bytes` runtime helper |
 | `str_starts_with` | calls `_str_starts_with` runtime helper |
 | `str_find` | calls `_str_find` runtime helper |
 | `str_trim` | calls `_str_trim` runtime helper |
-| `u16_le` / `u32_le` / `u64_le` | emitted directly as checked little-endian loads from `i8[]` |
-| `put_u16_le` / `put_u32_le` / `put_u64_le` | emitted directly as checked little-endian stores into `i8[]` |
 | `len` / `cap` | emitted directly for strings and dynamic arrays |
 | `push` | emitted by codegen for dynamic arrays |
-| `extend` | calls `_extend_i8` for `i8[]`; emits copy loops for other dynamic arrays |
+| `extend` | calls `_extend_i8` for byte arrays; emits copy loops for other dynamic arrays |
 | slice syntax | calls `_str_slice` for strings and emits array copy loops directly |
 
 ## Codegen self-hosting

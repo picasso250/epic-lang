@@ -17,7 +17,8 @@ v1 syntax and builtins is v2-src, not the current v1-src.
 
 ## Current scope
 
-The first v1 pass is deliberately narrow:
+The first v1 pass is deliberately narrow, but v1 itself is allowed to break
+source compatibility whenever that simplifies the language:
 
 1. Remove semicolons.
 2. Add the minimum stronger `str` operations needed by compiler code.
@@ -28,6 +29,62 @@ The first v1 pass is deliberately narrow:
 
 `map` is not rejected. It is deferred because it should be justified by actual
 compiler simplification, not by being a generally expected high-level feature.
+
+## v1 breaking type and operator reset
+
+v1 removes the user-facing signed byte type. `u8` is the byte type used by
+strings, byte buffers, file IO, and character literals. The user-facing scalar
+types are:
+
+| Type | Meaning |
+| --- | --- |
+| `bool` | logical value, `true` or `false` |
+| `u8` | unsigned 8-bit byte |
+| `i64` | signed 64-bit integer |
+| `u64` | unsigned 64-bit integer |
+| `str` | immutable byte string descriptor |
+| `Name` | heap-allocated zero-value struct reference |
+| `T[]` | heap-allocated dynamic array descriptor |
+| `void` | function return type only |
+
+`if`, `while`, `!`, `&&`, and `||` operate on `bool`. Integers do not have
+implicit truthiness; write `x != 0` or `bool(x)`.
+
+Integer types do not implicitly mix. Untyped integer literals may adapt to a
+clear target type when the literal is representable; negative literals do not
+implicitly adapt to unsigned types. Same-width integer conversions such as
+`i64(x)` and `u64(x)` preserve the 64-bit bit pattern. Narrowing conversions
+such as `u8(x)` check the range at runtime and exit on failure.
+
+Arithmetic `+`, `-`, `*`, `/`, and `%` is checked and exits on overflow or
+division by zero. Bit operations are low-level operations and are not checked:
+`~`, `&`, `|`, `^`, `<<`, `>>`, and `>>>` operate on the fixed-width bit
+pattern. `>>` is arithmetic for `i64` and logical for unsigned integers;
+`>>>` is always logical.
+
+`let` supports type annotations:
+
+```epic
+let b: u8 = 1
+let ok: bool
+let token: Token
+```
+
+When the right-hand side clearly determines the type, the annotation should be
+omitted. `let x: T` without an initializer creates a zero value. For scalar
+types that is `0` or `false`. For `str`, arrays, and structs, the variable holds
+a non-null descriptor/object whose fields are zeroed; `str.data` and
+`array.data` may be `0` when their length is `0`.
+
+Length, capacity, indexes, and offsets use `i64`, following Go's choice that
+`len` and `cap` return a signed machine integer rather than an unsigned value.
+
+The system-call escape hatch is `os.*`, not `sys.*`. It still exposes Win32
+names directly, for example `os.ExitProcess(1)`.
+
+Little-endian helpers such as `u16_le` and `put_u32_le` are no longer compiler
+builtins. Programs that need them should write ordinary Epic helper functions
+using `u8[]`, `u64`, checked indexing, and bit operations.
 
 ## Semicolon removal
 
@@ -120,7 +177,7 @@ xs[i] = x
 If `i < 0` or `i >= len`, the program dies immediately. The current v0 codegen
 does not check this; it emits direct memory loads and stores.
 
-String indexing returns `i8`, not a one-byte `str`:
+String indexing returns `u8`, not a one-byte `str`:
 
 ```epic
 let c = s[i]
@@ -171,7 +228,7 @@ explicit in documentation because it affects byte-buffer code. To create output,
 append elements:
 
 ```epic
-let buf = new i8[4096]
+let buf = new u8[4096]
 push(buf, 77)
 push(buf, 90)
 ```
@@ -232,22 +289,16 @@ directly:
 - reading a file as raw bytes
 - writing raw bytes
 - mutable byte buffers with explicit length
-- little-endian `u16`, `u32`, `u64`, and signed `i32` load/store helpers
+- little-endian helper functions written in Epic with `u8[]`, `u64`, and bit operations
 - appending bytes and patching bytes at known offsets
 
 The current minimal byte-buffer surface is:
 
 ```epic
-read_file(path: str) -> i8[]
-write_file(path: str, data: i8[]) -> i64
-str(bytes: i8[]) -> str
-bytes(s: str) -> i8[]
-u16_le(buf: i8[], off: i64) -> i64
-u32_le(buf: i8[], off: i64) -> i64
-u64_le(buf: i8[], off: i64) -> i64
-put_u16_le(buf: i8[], off: i64, x: i64) -> void
-put_u32_le(buf: i8[], off: i64, x: i64) -> void
-put_u64_le(buf: i8[], off: i64, x: i64) -> void
+read_file(path: str) -> u8[]
+write_file(path: str, data: u8[]) -> i64
+str(bytes: u8[]) -> str
+bytes(s: str) -> u8[]
 ```
 
 This is a breaking change from v0: file IO should operate on bytes, not text.
@@ -258,25 +309,25 @@ let source = str(read_file(path))
 ```
 
 The current v1 compiler sources are still compiled by the v0 bootstrap anchor,
-so they may temporarily rely on the fact that `i8[]` and `str` share their first
-two layout fields: `.data` and `.len`. New v1 user code should use explicit
-`str(read_file(path))` conversion when it needs text.
+so they may temporarily rely on bootstrap-era byte/string layout details. New
+v1 user code should use explicit `str(read_file(path))` conversion when it
+needs text.
 
-`read_file` returns an empty `i8[]` on failure, matching the v0 happy-path style
+`read_file` returns an empty `u8[]` on failure, matching the v0 happy-path style
 without introducing `Result` or exceptions.
 
-`str(i8[])` copies the full array length and appends a trailing NUL for C
+`str(u8[])` copies the full array length and appends a trailing NUL for C
 compatibility. It does not scan for interior NUL bytes in v1; if such bytes are
 present, C APIs will observe the string only up to the first NUL. That is the
 caller's responsibility in the v1 happy path.
 
-Little-endian load/store helpers are bounds checked. They exit immediately when
-`off < 0` or `off + width > len(buf)`.
+Little-endian load/store helpers are ordinary Epic functions. Checked indexing
+provides their bounds checks.
 
 Epic `str` remains length-carrying and NUL-terminated. Even an empty string
-should have non-null data pointing at a NUL byte. The implementation may later
-use a global empty string/data object for performance, but `data = 0` is not the
-empty string representation.
+may have `data = 0` when `len = 0`; runtime and builtin boundaries must accept
+that representation without passing a null buffer to WinAPI for non-zero
+length operations.
 
 The linker should not block the first v1 syntax/string/indexing pass. It should
 be considered after byte-buffer support exists, and it can become the proof that

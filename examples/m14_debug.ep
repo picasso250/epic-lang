@@ -11,5 +11,5 @@ fun main() -> void {
     push(tokens, new Token)
     push(tokens, new Token)
     tokens.data[2].kind = 42
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

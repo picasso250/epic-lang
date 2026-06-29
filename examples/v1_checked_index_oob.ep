@@ -2,5 +2,5 @@
 fun main() -> void {
     let s = "A"
     putc(s[1])
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

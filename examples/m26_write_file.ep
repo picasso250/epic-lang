@@ -4,9 +4,9 @@
 fun main() -> void {
     let n = write_file("test_write_file.txt", bytes("hello"))
     if n != 5 {
-        sys.ExitProcess(1)
+        os.ExitProcess(1)
     }
     let s = str(read_file("test_write_file.txt"))
     putstr(s)
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

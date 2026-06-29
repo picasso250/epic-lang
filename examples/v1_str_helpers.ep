@@ -7,5 +7,5 @@ fun main() -> void {
     putstr(itoa(str_find(s, "language")))
     putstr(itoa(str_find(s, "missing")))
     putstr(str_trim(" \t\r\ntrim me\n "))
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

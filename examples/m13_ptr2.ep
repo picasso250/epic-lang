@@ -16,5 +16,5 @@ fun main() -> void {
     p.y = 100
     putstr(itoa(sum(p)))
     putc(10)
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

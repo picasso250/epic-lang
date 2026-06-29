@@ -26,7 +26,7 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-python epic.py --main main.ep main.ep lib.ep
+epic main.ep lib.ep
 ```
 
 This is whole-program source merging, not a module system.
@@ -47,12 +47,17 @@ User-facing types:
 
 | Type | Meaning |
 | --- | --- |
+| `bool` | logical value, `true` or `false` |
+| `u8` | unsigned byte |
 | `i64` | signed 64-bit integer |
-| `i8` | signed byte |
+| `u64` | unsigned 64-bit integer |
 | `str` | immutable heap string |
 | `Name` | heap-allocated struct reference |
 | `T[]` | heap-allocated dynamic array |
 | `void` | function return type only; no value is produced |
+
+`i8` is not a user-facing v1 type. Bytes, string storage, file data, and ASCII
+character literals use `u8`.
 
 Built-in globals:
 
@@ -103,7 +108,7 @@ String and character literals are ASCII-only in v0. Non-ASCII literals are compi
 
 `len` counts bytes, not characters.
 
-For self-hosting, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new i8[n]` for mutable byte buffers.
+For self-hosting, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new u8[n]` for mutable byte buffers.
 
 ## Dynamic arrays
 
@@ -124,9 +129,9 @@ For self-hosting, v0 exposes `a.data`, `a.len`, and `a.cap` as low-level fields.
 
 ## System calls
 
-`sys.*` names are reserved for selected system/runtime calls exposed by the compiler.
+`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
 
-In v0, `sys` is not a module, package, object, or namespace value. Calls such as `sys.ExitProcess(0)` are recognized specially by the compiler.
+In v1, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
 
 General method calls are not supported in v0.
 
@@ -136,11 +141,11 @@ The program entry function must be exactly:
 
 ```epic
 fun main() -> void {
-    sys.ExitProcess(0);
+    os.ExitProcess(0);
 }
 ```
 
-Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `sys.ExitProcess(code)`.
+Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
 
 `main -> i64` is not part of the v0 design.
 

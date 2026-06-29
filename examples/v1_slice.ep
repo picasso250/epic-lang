@@ -7,7 +7,7 @@ fun main() -> void {
     putstr(s[1:])
     putstr(s[:2])
 
-    let xs = new i8[4]
+    let xs = new u8[4]
     push(xs, 'x')
     push(xs, 'E')
     push(xs, 'i')
@@ -17,5 +17,5 @@ fun main() -> void {
     putc(ys[0])
     putc(ys[1])
 
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

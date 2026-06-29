@@ -1,5 +1,5 @@
 # EXIT: 35
 fun main() -> void {
     let src = read_file("examples/m1_exit.ep")
-    sys.ExitProcess(src[0])
+    os.ExitProcess(src[0])
 }

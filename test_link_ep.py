@@ -13,7 +13,7 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PREVIOUS_EPIC = os.environ.get(
     "PREVIOUS_EPIC",
-    os.path.join(SCRIPT_DIR, "build", "fixed-point", "epic-epic.exe"),
+    os.path.join(SCRIPT_DIR, "v0.exe"),
 )
 CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
 LINK_EP_EXE = os.path.join(SCRIPT_DIR, "build", "epic", "link.ep.exe")

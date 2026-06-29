@@ -15,6 +15,6 @@ fun main() -> void {
 
     let p2 = points.data[0]
     let result = p2.x + p2.y
-    sys.ExitProcess(result)
+    os.ExitProcess(result)
 }
 # EXIT: 141

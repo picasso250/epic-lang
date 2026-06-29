@@ -10,5 +10,5 @@ fun main() -> void {
     putc(10)
     putstr(itoa(len(xs)))
     putc(10)
-    sys.ExitProcess(len(s) + len(xs) + cap(xs) + xs.data[1])
+    os.ExitProcess(len(s) + len(xs) + cap(xs) + xs.data[1])
 }

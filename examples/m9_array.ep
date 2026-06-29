@@ -2,7 +2,7 @@
 # STDOUT: Epic
 # STDOUT: 69
 fun main() -> void {
-    let buf = new i8[10]
+    let buf = new u8[10]
     buf.data[0] = 'E'
     buf.data[1] = 'p'
     buf.data[2] = 'i'
@@ -16,5 +16,5 @@ fun main() -> void {
     }
     putstr(itoa(buf.data[0]))
     putc(10)
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

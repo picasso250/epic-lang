@@ -14,5 +14,5 @@ fun main() -> void {
         putstr("!")
     }
 
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

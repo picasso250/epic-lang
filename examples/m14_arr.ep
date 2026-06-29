@@ -8,5 +8,5 @@ fun main() -> void {
     xs.data[2] = 7
     putstr(itoa(xs.data[0]))
     putc(10)
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }

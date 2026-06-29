@@ -22,6 +22,8 @@ _write_file:
     cmp rax, -1
     je _write_file_fail
     mov [rbp-32], rax      ; handle
+    cmp qword [rbp-24], 0
+    je _write_file_skip_write
     ; WriteFile(handle, data, len, &written, NULL)
     mov rcx, [rbp-32]
     mov rdx, [rbp-16]
@@ -33,6 +35,10 @@ _write_file:
     add rsp, 40
     test eax, eax
     jz _write_file_close_fail
+    jmp _write_file_close
+_write_file_skip_write:
+    mov dword [rbp-40], 0
+_write_file_close:
     ; CloseHandle(handle)
     mov rcx, [rbp-32]
     sub rsp, 40

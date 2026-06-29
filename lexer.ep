@@ -213,6 +213,8 @@ fun lex(src: str) -> Token[] {
             if text == "struct" { kind = "STRUCT"; }
             if text == "new"    { kind = "NEW"; }
             if text == "let"    { kind = "LET"; }
+            if text == "true"   { kind = "TRUE"; }
+            if text == "false"  { kind = "FALSE"; }
             push_token(tokens, kind, text, start_line);
             consumed = 1;
         }
@@ -239,6 +241,10 @@ fun lex(src: str) -> Token[] {
             consumed = 1;
         }
         if consumed == 0 && ch == 60 {
+            if p[pos + 1] == 60 {
+                push_token(tokens, "SHL", "<<", line);
+                pos = pos + 2;
+            } else {
             if p[pos + 1] == 61 {
                 push_token(tokens, "LTE", "<=", line);
                 pos = pos + 2;
@@ -246,15 +252,26 @@ fun lex(src: str) -> Token[] {
                 push_token(tokens, "LT", "<", line);
                 pos = pos + 1;
             }
+            }
             consumed = 1;
         }
         if consumed == 0 && ch == 62 {
+            if p[pos + 1] == 62 && p[pos + 2] == 62 {
+                push_token(tokens, "USHR", ">>>", line);
+                pos = pos + 3;
+            } else {
+            if p[pos + 1] == 62 {
+                push_token(tokens, "SHR", ">>", line);
+                pos = pos + 2;
+            } else {
             if p[pos + 1] == 61 {
                 push_token(tokens, "GTE", ">=", line);
                 pos = pos + 2;
             } else {
                 push_token(tokens, "GT", ">", line);
                 pos = pos + 1;
+            }
+            }
             }
             consumed = 1;
         }
@@ -272,6 +289,9 @@ fun lex(src: str) -> Token[] {
             if p[pos + 1] == 124 {
                 push_token(tokens, "OR", "||", line);
                 pos = pos + 2;
+            } else {
+                push_token(tokens, "PIPE", "|", line);
+                pos = pos + 1;
             }
             consumed = 1;
         }
@@ -298,6 +318,8 @@ fun lex(src: str) -> Token[] {
         if consumed == 0 && ch == 42  { push_token(tokens, "STAR",   "*", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 47  { push_token(tokens, "SLASH",  "/", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 37  { push_token(tokens, "PERCENT", "%", line); pos = pos + 1; consumed = 1; }
+        if consumed == 0 && ch == 94  { push_token(tokens, "CARET", "^", line); pos = pos + 1; consumed = 1; }
+        if consumed == 0 && ch == 126 { push_token(tokens, "TILDE", "~", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 46  { push_token(tokens, "DOT",    ".", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 91  { push_token(tokens, "LBRACKET", "[", line); pos = pos + 1; consumed = 1; }
         if consumed == 0 && ch == 93  { push_token(tokens, "RBRACKET", "]", line); pos = pos + 1; consumed = 1; }

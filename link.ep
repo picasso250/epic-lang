@@ -3,7 +3,7 @@
 
 struct Section {
     name: str
-    data: i8[]
+    data: u8[]
     raw_sz: i64
     raw_off: i64
     rel_off: i64
@@ -31,15 +31,15 @@ struct NameValue {
 }
 
 struct LinkState {
-    data: i8[]
+    data: u8[]
     sections: Section[]
     syms: Symbol[]
     relocs: Reloc[]
-    strtab: i8[]
+    strtab: u8[]
     imports: str[]
     thunk_rvas: NameValue[]
     iat_offsets: NameValue[]
-    idata: i8[]
+    idata: u8[]
     idata_rva: i64
     data_rva: i64
     entry_rva: i64
@@ -49,14 +49,14 @@ fun die_link(msg: str) -> void {
     putstr("link.ep: ")
     putstr(msg)
     putc(10)
-    sys.ExitProcess(1)
+    os.ExitProcess(1)
 }
 
 fun align_to(n: i64, a: i64) -> i64 {
     return ((n + a - 1) / a) * a
 }
 
-fun append_zero(buf: i8[], n: i64) -> void {
+fun append_zero(buf: u8[], n: i64) -> void {
     let i = 0
     while i < n {
         push(buf, 0)
@@ -64,29 +64,70 @@ fun append_zero(buf: i8[], n: i64) -> void {
     }
 }
 
-fun append_u16(buf: i8[], x: i64) -> void {
+fun u16_le(buf: u8[], off: i64) -> u64 {
+    return u64(buf[off]) | (u64(buf[off + 1]) << 8)
+}
+
+fun u32_le(buf: u8[], off: i64) -> u64 {
+    return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
+}
+
+fun u64_le(buf: u8[], off: i64) -> u64 {
+    return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24) | (u64(buf[off + 4]) << 32) | (u64(buf[off + 5]) << 40) | (u64(buf[off + 6]) << 48) | (u64(buf[off + 7]) << 56)
+}
+
+fun put_u16_le(buf: u8[], off: i64, x: u64) -> void {
+    if x > 65535 {
+        os.ExitProcess(1)
+    }
+    buf[off] = u8(x & 255)
+    buf[off + 1] = u8((x >>> 8) & 255)
+}
+
+fun put_u32_le(buf: u8[], off: i64, x: u64) -> void {
+    if x > 4294967295 {
+        os.ExitProcess(1)
+    }
+    buf[off] = u8(x & 255)
+    buf[off + 1] = u8((x >>> 8) & 255)
+    buf[off + 2] = u8((x >>> 16) & 255)
+    buf[off + 3] = u8((x >>> 24) & 255)
+}
+
+fun put_u64_le(buf: u8[], off: i64, x: u64) -> void {
+    buf[off] = u8(x & 255)
+    buf[off + 1] = u8((x >>> 8) & 255)
+    buf[off + 2] = u8((x >>> 16) & 255)
+    buf[off + 3] = u8((x >>> 24) & 255)
+    buf[off + 4] = u8((x >>> 32) & 255)
+    buf[off + 5] = u8((x >>> 40) & 255)
+    buf[off + 6] = u8((x >>> 48) & 255)
+    buf[off + 7] = u8((x >>> 56) & 255)
+}
+
+fun append_u16(buf: u8[], x: u64) -> void {
     let off = len(buf)
     append_zero(buf, 2)
     put_u16_le(buf, off, x)
 }
 
-fun append_u32(buf: i8[], x: i64) -> void {
+fun append_u32(buf: u8[], x: u64) -> void {
     let off = len(buf)
     append_zero(buf, 4)
     put_u32_le(buf, off, x)
 }
 
-fun append_u64(buf: i8[], x: i64) -> void {
+fun append_u64(buf: u8[], x: u64) -> void {
     let off = len(buf)
     append_zero(buf, 8)
     put_u64_le(buf, off, x)
 }
 
-fun append_str(buf: i8[], s: str) -> void {
+fun append_str(buf: u8[], s: str) -> void {
     extend(buf, bytes(s))
 }
 
-fun append_name8(buf: i8[], name: str) -> void {
+fun append_name8(buf: u8[], name: str) -> void {
     let bs = bytes(name)
     let i = 0
     while i < 8 {
@@ -99,11 +140,11 @@ fun append_name8(buf: i8[], name: str) -> void {
     }
 }
 
-fun set_u32(buf: i8[], off: i64, x: i64) -> void {
+fun set_u32(buf: u8[], off: i64, x: u64) -> void {
     put_u32_le(buf, off, x)
 }
 
-fun append_dos_stub(buf: i8[]) -> void {
+fun append_dos_stub(buf: u8[]) -> void {
     push(buf, 77)
     push(buf, 90)
     push(buf, 120)
@@ -137,8 +178,8 @@ fun append_dos_stub(buf: i8[]) -> void {
     push(buf, 0)
 }
 
-fun copy_bytes(src: i8[], off: i64, n: i64) -> i8[] {
-    let out = new i8[n]
+fun copy_bytes(src: u8[], off: i64, n: i64) -> u8[] {
+    let out = new u8[n]
     let i = 0
     while i < n {
         push(out, src[off + i])
@@ -147,8 +188,8 @@ fun copy_bytes(src: i8[], off: i64, n: i64) -> i8[] {
     return out
 }
 
-fun str_from_bytes_until_zero(src: i8[], off: i64, max_n: i64) -> str {
-    let out = new i8[max_n]
+fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64) -> str {
+    let out = new u8[max_n]
     let i = 0
     while i < max_n {
         let b = src[off + i]
@@ -380,7 +421,7 @@ fun hint_size(name: str) -> i64 {
 }
 
 fun build_idata(st: LinkState) -> void {
-    st.idata = new i8[256]
+    st.idata = new u8[256]
     if len(st.imports) == 0 {
         return
     }
@@ -389,7 +430,7 @@ fun build_idata(st: LinkState) -> void {
     let table_size = len(st.imports) * 8 + 8
     let iat_off = ilt_off + table_size
     let hint_off = iat_off + table_size
-    let hint_blob = new i8[128]
+    let hint_blob = new u8[128]
 
     let i = 0
     while i < len(st.imports) {
@@ -494,7 +535,7 @@ fun patch_relocs(st: LinkState, text_sec: Section) -> void {
     }
 }
 
-fun append_section_header(buf: i8[], name: str, rva: i64, raw_sz: i64) -> void {
+fun append_section_header(buf: u8[], name: str, rva: i64, raw_sz: i64) -> void {
     append_name8(buf, name)
     append_u32(buf, raw_sz)
     append_u32(buf, rva)
@@ -513,14 +554,14 @@ fun append_section_header(buf: i8[], name: str, rva: i64, raw_sz: i64) -> void {
     }
 }
 
-fun patch_section_raw(buf: i8[], index: i64, raw_pos: i64, raw_sz: i64) -> void {
+fun patch_section_raw(buf: u8[], index: i64, raw_pos: i64, raw_sz: i64) -> void {
     let opt_start = 120 + 4 + 20
     let hdr_pos = opt_start + 240 + index * 40
     set_u32(buf, hdr_pos + 20, raw_pos)
     set_u32(buf, hdr_pos + 16, align_to(raw_sz, 512))
 }
 
-fun append_padded_section(buf: i8[], name: str, data: i8[]) -> void {
+fun append_padded_section(buf: u8[], name: str, data: u8[]) -> void {
     extend(buf, data)
     let pad = 0
     if name == ".text" {
@@ -532,7 +573,7 @@ fun append_padded_section(buf: i8[], name: str, data: i8[]) -> void {
 }
 
 fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section) -> i64 {
-    let buf = new i8[4096]
+    let buf = new u8[4096]
     let num_sec = 2
     if len(st.idata) > 0 {
         num_sec = 3
@@ -642,11 +683,11 @@ fun link_obj(obj_path: str, exe_path: str) -> i64 {
     st.sections = new Section[8]
     st.syms = new Symbol[128]
     st.relocs = new Reloc[128]
-    st.strtab = new i8[1]
+    st.strtab = new u8[1]
     st.imports = new str[32]
     st.thunk_rvas = new NameValue[32]
     st.iat_offsets = new NameValue[32]
-    st.idata = new i8[1]
+    st.idata = new u8[1]
     st.idata_rva = 0
     st.data_rva = 0
     st.entry_rva = 4096
@@ -693,7 +734,7 @@ fun default_out_path(obj_path: str) -> str {
 fun main() -> i64 {
     if len(argv) < 2 {
         putstr("Usage: link.ep <file.obj> [-o out.exe]\n")
-        sys.ExitProcess(1)
+        os.ExitProcess(1)
     }
     let obj_path = argv[1]
     let exe_path = default_out_path(obj_path)

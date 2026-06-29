@@ -4,5 +4,5 @@ fun main() -> void {
     let s = itoa(42)
     putstr(s)
     putc(10)
-    sys.ExitProcess(0)
+    os.ExitProcess(0)
 }
