@@ -10,7 +10,7 @@ import os, sys, subprocess, re, shlex
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SOURCES = ["epic.ep", "codegen_support.ep", "codegen.ep", "parser.ep", "lexer.ep"]
-DEFAULT_PREVIOUS_EPIC = os.path.join(SCRIPT_DIR, "v0.exe")
+DEFAULT_PREVIOUS_EPIC = os.path.join(SCRIPT_DIR, "build", "v0.exe")
 PREVIOUS_EPIC = os.environ.get("PREVIOUS_EPIC", DEFAULT_PREVIOUS_EPIC)
 CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")

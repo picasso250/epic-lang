@@ -6,8 +6,8 @@ This document describes the current compiler implementation. It is not the langu
 
 The v1 branch no longer keeps the Python compiler prototype or `epic.py`
 driver. Build the v0 fixed point compiler on the `v0` branch, copy
-`epic-epic-epic.exe` to `v0.exe`, then use `v0.exe` as the previous compiler
-anchor for v1.
+`epic-epic-epic.exe` to `build\v0.exe`, then use `build\v0.exe` as the
+previous compiler anchor for v1.
 
 The current compiler sources are `epic.ep`, `lexer.ep`, `parser.ep`,
 `codegen_support.ep`, and `codegen.ep`. Test scripts invoke the previous
