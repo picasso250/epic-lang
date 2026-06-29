@@ -85,7 +85,8 @@ Initial v1 work:
 - `len()` and `cap()` builtins
 - remove semicolons
 - checked indexing and slice syntax
-- `else if` and half-open `for i in start..end` range loops
+- `else if`, `break` / `continue`, and half-open `for i in start..end` range loops
+- compound assignment operators such as `+=`, `>>=`, and `^=`
 - binary byte-buffer support as groundwork for replacing `link.py`
 - `link.ep` MVP for the current single-object PE64 path
 - split `codegen.ep`

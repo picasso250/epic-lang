@@ -120,9 +120,12 @@ User struct fields use fixed 8-byte slots in v1.
 - `os.*` calls are recognized specially.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
+- Compound assignment is represented by a unified `AssignOp` node whose left
+  side is a variable, field access, or subscript expression.
 - Expression postfixes support checked indexing and copy slices for strings and arrays.
 - `for i in start..end` is parsed as a lowering to existing `let` and `while`
   nodes with hidden start/end locals.
+- `break` and `continue` are statements; codegen tracks the nearest loop labels.
 
 ## Codegen notes
 

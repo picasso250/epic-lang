@@ -128,6 +128,25 @@ if x == 1 {
 This does not add a new runtime control-flow construct. The parser lowers it
 to the same AST shape as `else { if ... }`, keeping codegen unchanged.
 
+## Loop control
+
+v1 supports `break` and `continue` as statement-only loop control:
+
+```epic
+while cond {
+    if done {
+        break
+    }
+    if skip {
+        continue
+    }
+}
+```
+
+Both statements bind to the nearest enclosing `while` or `for` loop. They are
+not expressions, cannot be chained, and are rejected outside loops. In range
+loops, `continue` jumps to the loop increment before re-checking the end bound.
+
 ## For-in ranges
 
 v1 supports a deliberately narrow integer range loop:
@@ -147,6 +166,23 @@ This is intended to shorten the common manual counter-loop shape in compiler
 sources. It does not yet support array or string iteration, reverse ranges,
 custom steps, or block-scoped loop variables. For now, the loop variable follows
 the compiler's existing function-local variable behavior.
+
+## Compound assignment
+
+v1 supports compound assignment for assignable variables, fields, and
+subscripts:
+
+```epic
+x += 1
+node.count -= n
+xs[i] <<= 1
+```
+
+Supported operators are `+=`, `-=`, `*=`, `/=`, `%=`, `<<=`, `>>=`, `>>>=`,
+`&=`, `|=`, and `^=`. The left-hand side is evaluated once, then its old value
+is combined with the right-hand side and written back to the same target.
+`str += str` performs string concatenation. Array concatenation and boolean
+compound assignment are not supported.
 
 ## String operations
 

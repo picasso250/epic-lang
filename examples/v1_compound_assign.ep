@@ -1,0 +1,36 @@
+# EXIT: 47
+struct Box {
+    value: i64
+    small: u8
+}
+
+fun main() -> void {
+    let x = 10
+    x += 5
+    x -= 3
+    x *= 2
+    x /= 4
+    x %= 4
+    x <<= 3
+    x >>= 1
+    x |= 2
+    x &= 14
+    x ^= 3
+    x >>>= 1
+
+    let b = new Box
+    b.value = 4
+    b.value += 6
+    b.value *= 2
+    b.small = 3
+    b.small += 4
+
+    let xs = new i64[1]
+    push(xs, 5)
+    xs[0] += 8
+
+    let s = "a"
+    s += "bc"
+
+    os.ExitProcess(x + b.value + b.small + xs[0] + len(s))
+}

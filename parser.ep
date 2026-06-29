@@ -345,7 +345,7 @@ fun is_assignment(p: Parser) -> i64 {
             if same(kind, "LBRACKET") == 1 {
                 i = skip_balanced_brackets(p, i);
             } else {
-                if same(kind, "ASSIGN") == 1 {
+                if is_assignment_op_kind(kind) == 1 {
                     return 1;
                 }
                 return 0;
@@ -403,9 +403,21 @@ fun parse_assign_stmt(p: Parser) -> AstNode {
             }
         }
     }
-    expect(p, "ASSIGN");
+    let op_token = advance(p);
+    if is_assignment_op_kind(op_token.kind) == 0 {
+        parse_error(op_token.line, "Expected assignment operator");
+    }
+    let op = assignment_op_from_kind(op_token.kind);
     let value = parse_expr(p);
     expect_stmt_end(p);
+    if op != "=" {
+        let node = ast_node("AssignOp");
+        node.expr = lhs;
+        node.op = op;
+        node.value_expr = value;
+        node.line = name.line;
+        return node;
+    }
     if same(lhs.kind, "Var") == 1 {
         let node = ast_node("Assign");
         node.name = lhs.name;
@@ -597,6 +609,38 @@ fun is_expr_first(kind: str) -> i64 {
     if same(kind, "MINUS") == 1 { return 1; }
     if same(kind, "TILDE") == 1 { return 1; }
     return 0;
+}
+
+fun is_assignment_op_kind(kind: str) -> i64 {
+    if same(kind, "ASSIGN") == 1 { return 1; }
+    if same(kind, "PLUS_ASSIGN") == 1 { return 1; }
+    if same(kind, "MINUS_ASSIGN") == 1 { return 1; }
+    if same(kind, "STAR_ASSIGN") == 1 { return 1; }
+    if same(kind, "SLASH_ASSIGN") == 1 { return 1; }
+    if same(kind, "PERCENT_ASSIGN") == 1 { return 1; }
+    if same(kind, "SHL_ASSIGN") == 1 { return 1; }
+    if same(kind, "SHR_ASSIGN") == 1 { return 1; }
+    if same(kind, "USHR_ASSIGN") == 1 { return 1; }
+    if same(kind, "AMPERSAND_ASSIGN") == 1 { return 1; }
+    if same(kind, "PIPE_ASSIGN") == 1 { return 1; }
+    if same(kind, "CARET_ASSIGN") == 1 { return 1; }
+    return 0;
+}
+
+fun assignment_op_from_kind(kind: str) -> str {
+    if same(kind, "ASSIGN") == 1 { return "="; }
+    if same(kind, "PLUS_ASSIGN") == 1 { return "+"; }
+    if same(kind, "MINUS_ASSIGN") == 1 { return "-"; }
+    if same(kind, "STAR_ASSIGN") == 1 { return "*"; }
+    if same(kind, "SLASH_ASSIGN") == 1 { return "/"; }
+    if same(kind, "PERCENT_ASSIGN") == 1 { return "%"; }
+    if same(kind, "SHL_ASSIGN") == 1 { return "<<"; }
+    if same(kind, "SHR_ASSIGN") == 1 { return ">>"; }
+    if same(kind, "USHR_ASSIGN") == 1 { return ">>>"; }
+    if same(kind, "AMPERSAND_ASSIGN") == 1 { return "&"; }
+    if same(kind, "PIPE_ASSIGN") == 1 { return "|"; }
+    if same(kind, "CARET_ASSIGN") == 1 { return "^"; }
+    return "";
 }
 
 fun parse_stmt(p: Parser) -> AstNode {

@@ -1480,6 +1480,181 @@ fun emit_field_set(e: EmitterState, stmt: AstNode) -> i64 {
     return 0;
 }
 
+fun validate_assign_op_type(lhs_type: TypeInfo, rhs_type: TypeInfo, op: str) -> i64 {
+    if type_is_bool(lhs_type) == 1 {
+        die("compound assignment does not support bool");
+    }
+    if lhs_type.kind == "str" {
+        if op == "+" && rhs_type.kind == "str" {
+            return 0;
+        }
+        die("str compound assignment only supports +=");
+    }
+    if lhs_type.kind == "array" {
+        die("array compound assignment is not supported");
+    }
+    if type_is_integer(lhs_type) == 1 {
+        if type_is_integer(rhs_type) == 1 {
+            return 0;
+        }
+        die("integer compound assignment requires integer rhs");
+    }
+    die("unsupported compound assignment target type");
+    return 0;
+}
+
+fun emit_assign_op_calc(e: EmitterState, op: str, lhs_type: TypeInfo, rhs_slot: i64) -> i64 {
+    if lhs_type.kind == "str" {
+        emit_mov(e, "rcx", "rax");
+        emit_stack_load(e, "rdx", rhs_slot);
+        emit_inst(e, "sub rsp, 32");
+        emit_call_inst(e, "_str_cat");
+        emit_inst(e, "add rsp, 32");
+        return 0;
+    }
+    emit_stack_load(e, "rcx", rhs_slot);
+    if op == "+" { emit_inst(e, "add rax, rcx"); emit_inst(e, "jo _epic_trap"); return 0; }
+    if op == "-" { emit_inst(e, "sub rax, rcx"); emit_inst(e, "jo _epic_trap"); return 0; }
+    if op == "*" { emit_inst(e, "imul rax, rcx"); emit_inst(e, "jo _epic_trap"); return 0; }
+    if op == "/" { emit_inst(e, "test rcx, rcx"); emit_inst(e, "jz _epic_trap"); emit_inst(e, "cqo"); emit_inst(e, "idiv rcx"); return 0; }
+    if op == "%" { emit_inst(e, "test rcx, rcx"); emit_inst(e, "jz _epic_trap"); emit_inst(e, "cqo"); emit_inst(e, "idiv rcx"); emit_mov(e, "rax", "rdx"); return 0; }
+    if op == "&" { emit_inst(e, "and rax, rcx"); return 0; }
+    if op == "|" { emit_inst(e, "or rax, rcx"); return 0; }
+    if op == "^" { emit_inst(e, "xor rax, rcx"); return 0; }
+    if op == "<<" { emit_inst(e, "shl rax, cl"); return 0; }
+    if op == ">>" {
+        if lhs_type.kind == "u64" || lhs_type.kind == "u8" {
+            emit_inst(e, "shr rax, cl");
+        } else {
+            emit_inst(e, "sar rax, cl");
+        }
+        return 0;
+    }
+    if op == ">>>" { emit_inst(e, "shr rax, cl"); return 0; }
+    die("unknown compound assignment op");
+    return 0;
+}
+
+fun emit_assign_op_var(e: EmitterState, stmt: AstNode, lhs: AstNode) -> i64 {
+    let lhs_type = find_local_type(e, lhs.name);
+    let rhs_type = expr_type(e, stmt.value_expr);
+    validate_assign_op_type(lhs_type, rhs_type, stmt.op);
+    let slot = find_local_slot(e, lhs.name);
+    if type_is_byte_sized(lhs_type) == 1 {
+        out_s(e, "    movzx rax, byte ");
+        emit_slot_ref(e, slot);
+        out_nl(e);
+    } else {
+        emit_stack_load(e, "rax", slot);
+    }
+    let old_slot = temp_save_rax(e);
+    emit_expr(e, stmt.value_expr);
+    let rhs_slot = temp_save_rax(e);
+    emit_stack_load(e, "rax", old_slot);
+    emit_assign_op_calc(e, stmt.op, lhs_type, rhs_slot);
+    if type_is_byte_sized(lhs_type) == 1 {
+        emit_stack_store(e, slot, "al");
+    } else {
+        emit_stack_store(e, slot, "rax");
+    }
+    return 0;
+}
+
+fun emit_assign_op_field(e: EmitterState, stmt: AstNode, lhs: AstNode) -> i64 {
+    let obj_type = expr_type(e, lhs.object);
+    let field = find_field_info(e, field_layout_name(obj_type), lhs.name);
+    let rhs_type = expr_type(e, stmt.value_expr);
+    validate_assign_op_type(field.typ, rhs_type, stmt.op);
+    emit_expr(e, lhs.object);
+    let obj_slot = temp_save_rax(e);
+    if type_is_byte_sized(field.typ) == 1 {
+        out_s(e, "    movzx rax, byte [rax+");
+        out_i(e, field.offset);
+        out_line(e, "]");
+    } else {
+        out_s(e, "    mov rax, [rax+");
+        out_i(e, field.offset);
+        out_line(e, "]");
+    }
+    let old_slot = temp_save_rax(e);
+    emit_expr(e, stmt.value_expr);
+    let rhs_slot = temp_save_rax(e);
+    emit_stack_load(e, "rax", old_slot);
+    emit_assign_op_calc(e, stmt.op, field.typ, rhs_slot);
+    emit_stack_load(e, "rcx", obj_slot);
+    if type_is_byte_sized(field.typ) == 1 {
+        out_s(e, "    mov [rcx+");
+        out_i(e, field.offset);
+        out_line(e, "], al");
+    } else {
+        out_s(e, "    mov [rcx+");
+        out_i(e, field.offset);
+        out_line(e, "], rax");
+    }
+    return 0;
+}
+
+fun emit_assign_op_subscript(e: EmitterState, stmt: AstNode, lhs: AstNode) -> i64 {
+    let base_type = expr_type(e, lhs.base);
+    if base_type.kind == "str" {
+        die("cannot assign through str index");
+    }
+    let elem_type = expr_type(e, lhs);
+    let rhs_type = expr_type(e, stmt.value_expr);
+    validate_assign_op_type(elem_type, rhs_type, stmt.op);
+    emit_expr(e, lhs.base);
+    let base_slot = temp_save_rax(e);
+    emit_expr(e, lhs.index);
+    emit_stack_load(e, "rcx", base_slot);
+    if base_type.kind == "array" {
+        let ok_id = fresh_label(e);
+        let fail_id = fresh_label(e);
+        emit_inst(e, "cmp rax, 0");
+        emit_jmp_id(e, "jl", "L", fail_id);
+        emit_inst(e, "cmp rax, [rcx+8]");
+        emit_jmp_id(e, "jge", "L", fail_id);
+        emit_inst(e, "mov rcx, [rcx]");
+        emit_jmp_id(e, "jmp", "L", ok_id);
+        emit_label_id(e, "L", fail_id);
+        emit_inst(e, "mov ecx, 1");
+        emit_call_inst(e, "ExitProcess");
+        emit_label_id(e, "L", ok_id);
+    }
+    if type_is_byte_sized(elem_type) == 1 {
+        emit_inst(e, "lea rcx, [rcx+rax]");
+    } else {
+        emit_inst(e, "lea rcx, [rcx+rax*8]");
+    }
+    emit_mov(e, "rax", "rcx");
+    let addr_slot = temp_save_rax(e);
+    if type_is_byte_sized(elem_type) == 1 {
+        emit_inst(e, "movzx rax, byte [rcx]");
+    } else {
+        emit_inst(e, "mov rax, [rcx]");
+    }
+    let old_slot = temp_save_rax(e);
+    emit_expr(e, stmt.value_expr);
+    let rhs_slot = temp_save_rax(e);
+    emit_stack_load(e, "rax", old_slot);
+    emit_assign_op_calc(e, stmt.op, elem_type, rhs_slot);
+    emit_stack_load(e, "rcx", addr_slot);
+    if type_is_byte_sized(elem_type) == 1 {
+        emit_inst(e, "mov [rcx], al");
+    } else {
+        emit_inst(e, "mov [rcx], rax");
+    }
+    return 0;
+}
+
+fun emit_assign_op(e: EmitterState, stmt: AstNode) -> i64 {
+    let lhs = stmt.expr;
+    if lhs.kind == "Var" { return emit_assign_op_var(e, stmt, lhs); }
+    if lhs.kind == "FieldAccess" { return emit_assign_op_field(e, stmt, lhs); }
+    if lhs.kind == "Subscript" { return emit_assign_op_subscript(e, stmt, lhs); }
+    die("invalid compound assignment target");
+    return 0;
+}
+
 fun emit_if(e: EmitterState, stmt: AstNode) -> i64 {
     if expr_type(e, stmt.expr).kind != "bool" {
         die("if condition must be bool");
@@ -1562,6 +1737,7 @@ fun emit_stmt(e: EmitterState, stmt: AstNode) -> i64 {
     if stmt.kind == "ExprStmt" { return emit_expr(e, stmt.expr); }
     if stmt.kind == "Let" { return emit_let(e, stmt); }
     if stmt.kind == "Assign" { return emit_assign(e, stmt); }
+    if stmt.kind == "AssignOp" { return emit_assign_op(e, stmt); }
     if stmt.kind == "SubscriptAssign" { return emit_subscript_assign(e, stmt); }
     if stmt.kind == "FieldSet" { return emit_field_set(e, stmt); }
     if stmt.kind == "If" { return emit_if(e, stmt); }

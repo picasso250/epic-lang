@@ -232,6 +232,31 @@ fun lex(src: str) -> Token[] {
             }
             consumed = 1;
         }
+        if consumed == 0 && ch == 43 && p[pos + 1] == 61 {
+            push_token(tokens, "PLUS_ASSIGN", "+=", line);
+            pos = pos + 2;
+            consumed = 1;
+        }
+        if consumed == 0 && ch == 42 && p[pos + 1] == 61 {
+            push_token(tokens, "STAR_ASSIGN", "*=", line);
+            pos = pos + 2;
+            consumed = 1;
+        }
+        if consumed == 0 && ch == 47 && p[pos + 1] == 61 {
+            push_token(tokens, "SLASH_ASSIGN", "/=", line);
+            pos = pos + 2;
+            consumed = 1;
+        }
+        if consumed == 0 && ch == 37 && p[pos + 1] == 61 {
+            push_token(tokens, "PERCENT_ASSIGN", "%=", line);
+            pos = pos + 2;
+            consumed = 1;
+        }
+        if consumed == 0 && ch == 94 && p[pos + 1] == 61 {
+            push_token(tokens, "CARET_ASSIGN", "^=", line);
+            pos = pos + 2;
+            consumed = 1;
+        }
         if consumed == 0 && ch == 33 {
             if p[pos + 1] == 61 {
                 push_token(tokens, "NEQ", "!=", line);
@@ -243,6 +268,10 @@ fun lex(src: str) -> Token[] {
             consumed = 1;
         }
         if consumed == 0 && ch == 60 {
+            if p[pos + 1] == 60 && p[pos + 2] == 61 {
+                push_token(tokens, "SHL_ASSIGN", "<<=", line);
+                pos = pos + 3;
+            } else {
             if p[pos + 1] == 60 {
                 push_token(tokens, "SHL", "<<", line);
                 pos = pos + 2;
@@ -255,11 +284,20 @@ fun lex(src: str) -> Token[] {
                 pos = pos + 1;
             }
             }
+            }
             consumed = 1;
         }
         if consumed == 0 && ch == 62 {
+            if p[pos + 1] == 62 && p[pos + 2] == 62 && p[pos + 3] == 61 {
+                push_token(tokens, "USHR_ASSIGN", ">>>=", line);
+                pos = pos + 4;
+            } else {
             if p[pos + 1] == 62 && p[pos + 2] == 62 {
                 push_token(tokens, "USHR", ">>>", line);
+                pos = pos + 3;
+            } else {
+            if p[pos + 1] == 62 && p[pos + 2] == 61 {
+                push_token(tokens, "SHR_ASSIGN", ">>=", line);
                 pos = pos + 3;
             } else {
             if p[pos + 1] == 62 {
@@ -275,9 +313,15 @@ fun lex(src: str) -> Token[] {
             }
             }
             }
+            }
+            }
             consumed = 1;
         }
         if consumed == 0 && ch == 38 {
+            if p[pos + 1] == 61 {
+                push_token(tokens, "AMPERSAND_ASSIGN", "&=", line);
+                pos = pos + 2;
+            } else {
             if p[pos + 1] == 38 {
                 push_token(tokens, "AND", "&&", line);
                 pos = pos + 2;
@@ -285,9 +329,14 @@ fun lex(src: str) -> Token[] {
                 push_token(tokens, "AMPERSAND", "&", line);
                 pos = pos + 1;
             }
+            }
             consumed = 1;
         }
         if consumed == 0 && ch == 124 {
+            if p[pos + 1] == 61 {
+                push_token(tokens, "PIPE_ASSIGN", "|=", line);
+                pos = pos + 2;
+            } else {
             if p[pos + 1] == 124 {
                 push_token(tokens, "OR", "||", line);
                 pos = pos + 2;
@@ -295,15 +344,21 @@ fun lex(src: str) -> Token[] {
                 push_token(tokens, "PIPE", "|", line);
                 pos = pos + 1;
             }
+            }
             consumed = 1;
         }
         if consumed == 0 && ch == 45 {
+            if p[pos + 1] == 61 {
+                push_token(tokens, "MINUS_ASSIGN", "-=", line);
+                pos = pos + 2;
+            } else {
             if p[pos + 1] == 62 {
                 push_token(tokens, "ARROW", "->", line);
                 pos = pos + 2;
             } else {
                 push_token(tokens, "MINUS", "-", line);
                 pos = pos + 1;
+            }
             }
             consumed = 1;
         }
