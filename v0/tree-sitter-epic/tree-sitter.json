@@ -1,0 +1,38 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "epic",
+      "camelcase": "Epic",
+      "title": "Epic",
+      "scope": "source.epic",
+      "file-types": [
+        "ep"
+      ],
+      "injection-regex": "^epic$",
+      "class-name": "TreeSitterEpic"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for Epic",
+    "authors": [
+      {
+        "name": "picasso250"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/picasso250/epic-lang"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "go": false,
+    "swift": false,
+    "zig": false
+  }
+}

@@ -1,0 +1,15 @@
+# EXIT: 0
+# STDOUT: abcdefghij
+fun main() -> void {
+    putstr("a")
+    putstr("b")
+    putstr("c")
+    putstr("d")
+    putstr("e")
+    putstr("f")
+    putstr("g")
+    putstr("h")
+    putstr("i")
+    putstr("j")
+    os.ExitProcess(0)
+}

@@ -1,0 +1,18 @@
+# EXIT: 0
+# STDOUT: OKZA
+fun main(): void {
+    let ok: bool = true
+    let b: u8 = 'A'
+    let mask: u64 = 240
+    let low: u64 = 15
+    if ok && !false {
+        putstr("OK")
+    }
+    let combined: u64 = (mask | low) ^ 165
+    if combined == 90 {
+        putc(u8(combined))
+    }
+    let shifted: u64 = (u64(b) << 1) >>> 1
+    putc(u8(shifted))
+    os.ExitProcess(0)
+}

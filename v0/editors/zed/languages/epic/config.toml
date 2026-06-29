@@ -1,0 +1,11 @@
+name = "Epic"
+grammar = "epic"
+path_suffixes = ["ep"]
+line_comments = ["# "]
+brackets = [
+  { start = "{", end = "}", close = true, newline = true },
+  { start = "[", end = "]", close = true, newline = false },
+  { start = "(", end = ")", close = true, newline = false },
+  { start = "\"", end = "\"", close = true, newline = false },
+  { start = "'", end = "'", close = true, newline = false },
+]

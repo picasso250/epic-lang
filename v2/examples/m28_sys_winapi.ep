@@ -1,0 +1,17 @@
+# EXIT: 0
+# STDOUT: 1
+# CLEAN: test_sys_create.tmp
+
+fun main() -> void {
+    os.Sleep(1)
+    let t = os.GetTickCount64()
+    let n = os.lstrlenA("abc")
+    let c = os.lstrcmpA("same", "same")
+    let h = os.CreateFileA("test_sys_create.tmp", 1073741824, 0, 0, 2, 128, 0)
+    if t >= 0 && n == 3 && c == 0 && h + 1 != 0 {
+        os.CloseHandle(h)
+        putc(49)
+        os.ExitProcess(0)
+    }
+    os.ExitProcess(1)
+}

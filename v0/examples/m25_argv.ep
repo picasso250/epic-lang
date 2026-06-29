@@ -1,0 +1,11 @@
+# ARGV: hello
+# EXIT: 0
+# STDOUT: hello
+fun main(): void {
+    if argv.len < 2 {
+        putstr("missing")
+        os.ExitProcess(1)
+    }
+    putstr(argv.data[1])
+    os.ExitProcess(0)
+}

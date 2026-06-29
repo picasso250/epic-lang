@@ -1,0 +1,15 @@
+# EXIT: 0
+# STDOUT: 0
+# STDOUT: 1
+# STDOUT: 2
+# STDOUT: 3
+# STDOUT: 4
+fun main(): void {
+    let i = 0
+    while i < 5 {
+        putstr(itoa(i))
+        putc(10)
+        i = i + 1
+    }
+    os.ExitProcess(0)
+}

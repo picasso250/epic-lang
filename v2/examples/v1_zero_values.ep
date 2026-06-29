@@ -1,0 +1,16 @@
+# EXIT: 0
+# STDOUT: 00X
+struct Box {
+    value: i64
+}
+
+fun main() -> void {
+    let s: str
+    let xs: u8[]
+    let b: Box
+    putstr(itoa(len(s)))
+    putstr(itoa(len(xs)))
+    push(xs, 'X')
+    putc(xs[0])
+    os.ExitProcess(b.value)
+}

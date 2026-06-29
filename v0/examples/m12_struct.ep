@@ -1,0 +1,11 @@
+# EXIT: 50
+struct Point {
+    x: i64
+    y: i64
+}
+fun main(): void {
+    let p = new Point
+    p.x = 30
+    p.y = 20
+    os.ExitProcess(p.x + p.y)
+}

@@ -1,0 +1,14 @@
+# EXIT: 0
+# STDOUT: Ei!
+fun main() -> void {
+    let s = "Epic"
+    putc(s[0])
+
+    let xs = new u8[4]
+    push(xs, 'x')
+    xs[0] = 'i'
+    putc(xs[0])
+    putc('!')
+
+    os.ExitProcess(0)
+}

@@ -1,0 +1,21 @@
+# EXIT: 0
+# STDOUT: picEpicpicEpEi
+fun main() -> void {
+    let s = "Epic"
+    putstr(s[1:4])
+    putstr(s[:])
+    putstr(s[1:])
+    putstr(s[:2])
+
+    let xs = new u8[4]
+    push(xs, 'x')
+    push(xs, 'E')
+    push(xs, 'i')
+    push(xs, 'x')
+    let ys = xs[1:3]
+    xs[1] = 'Z'
+    putc(ys[0])
+    putc(ys[1])
+
+    os.ExitProcess(0)
+}

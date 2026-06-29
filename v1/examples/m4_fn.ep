@@ -1,0 +1,16 @@
+# EXIT: 0
+# STDOUT: 42
+# STDOUT: 43
+fun add(a: i64, b: i64): i64 {
+    return a + b
+}
+
+fun main(): void {
+    let x = add(40, 2)
+    putstr(itoa(x))
+    putc(10)
+    let y = add(x, 1)
+    putstr(itoa(y))
+    putc(10)
+    os.ExitProcess(0)
+}

@@ -1,0 +1,18 @@
+# EXIT: 0
+# STDOUT: HI
+# STDOUT: 90
+fun to_upper(c: u8): i64 {
+    if c >= 'a' && c <= 'z' {
+        return c - 32
+    }
+    return c
+}
+
+fun main(): void {
+    putc(to_upper('h'))
+    putc(to_upper('i'))
+    putc(10)
+    putstr(itoa(to_upper('z')))
+    putc(10)
+    os.ExitProcess(0)
+}

@@ -1,6 +1,8 @@
 # Epic worklog
 
-This file is a chronological project log only. Current language design lives in `design.md`; current implementation notes live in `impl.md`.
+This file is a chronological project log for the whole repository. Current
+language design lives in each version directory's `design.md`; current
+implementation notes live in each version directory's `impl.md`.
 
 ## 2026-06-25
 
@@ -104,3 +106,13 @@ This file is a chronological project log only. Current language design lives in 
 - Added `impl.md` for current implementation notes.
 - Reduced `worklog.md` to a chronological log.
 - Fixed stale `epicc.py` references in current docs by using `epic.py`.
+
+## 2026-06-30
+
+### Directory-based versions
+
+- Moved version development from long-lived version branches to directories on `main`.
+- Added `v0/`, `v1/`, and `v2/` as version source trees from their branch HEAD snapshots.
+- Kept root `tools/` as the shared local tool directory and root `tree-sitter-epic/` as shared editor/parser support.
+- Removed root-level version sources, examples, runtime files, tests, and version design documents.
+- Added root `epic-bootstrap.py` to build `build/v0.exe` from the v0 fixed point and then `build/v1.exe` from v1 sources.

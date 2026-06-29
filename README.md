@@ -2,81 +2,62 @@
 
 Epic is a small self-hosting systems language experiment targeting Windows x64.
 
-The current stable milestone is `v0`: a Python prototype can compile the Epic
-compiler sources, and the resulting compiler can compile Epic programs.
+This repository keeps each language generation as a directory on `main`:
 
-## Repository branches
+- `v0/`: Python bootstrap compiler and the first fixed-point Epic compiler.
+- `v1/`: v1 compiler sources, compiled by the v0 compiler anchor.
+- `v2/`: reserved for sources compiled by the v1 compiler anchor; no distinct v2 feature work yet.
 
-- `v0` is the historical stable bootstrap point.
-- `master` continues toward `v1`.
+The repository root is not a language version. Version sources, examples,
+runtime files, tests, and implementation notes live inside the version
+directories.
 
-Do not preserve forward compatibility for its own sake. When the language
-changes, compiler sources should move with the current design.
+## Root Layout
 
-## Tooling
+- `AGENTS.md`: repository-wide development rules.
+- `README.md`: this overview.
+- `worklog.md`: cross-version chronological project log.
+- `epic-bootstrap.py`: top-level bootstrap chain.
+- `tools/`: local shared Windows tool binaries such as `nasm.exe` and `lld-link.exe`.
+- `tree-sitter-epic/`: shared editor/parser support.
+- `v0/`, `v1/`, `v2/`: version source trees.
 
-This repository expects Windows x64 and these local tools:
+`tools/` and `build/` are local directories and are ignored by git.
 
-- Python 3
-- `tools/nasm.exe`
-- `tools/lld-link.exe` when using `--linker lld-link`
-- Windows SDK libraries matching the path in `epic.py`
+## Bootstrap
 
-`tools/` and build outputs are intentionally ignored by git.
-
-## v0 bootstrap ritual
-
-The important v0 invariant is reproducible bootstrapping from the Python
-compiler to a self-hosted compiler.
-
-From the `v0` branch:
+Run the top-level bootstrap chain from the repository root:
 
 ```powershell
-git switch v0
-python epic.py --main epic.ep epic.ep codegen.ep parser.ep lexer.ep --out-dir build\v00
-Copy-Item build\v00\epic.exe build\v00.exe
-.\build\v00.exe epic.ep codegen.ep parser.ep lexer.ep
-Copy-Item build\epic\epic.ep.exe build\v0.exe
+python epic-bootstrap.py
 ```
 
-The two stages are:
+The script:
 
-1. Python compiler -> `v00.exe`
-2. `v00.exe` compiles the Epic compiler -> `v0.exe`
+1. runs the v0 fixed-point bootstrap in `v0/`
+2. copies the resulting compiler to `build/v0.exe`
+3. uses `build/v0.exe` to compile the v1 compiler sources
+4. copies that compiler to `build/v1.exe`
 
-After that, switch to the development branch and use the v0 compiler as the
-trusted previous compiler:
+It intentionally does not build v2 yet. Current v2 has no new feature surface,
+and v1 sources are still written in the v0-accepted source shape.
 
-```powershell
-git switch master
-.\build\v0.exe epic.ep codegen.ep parser.ep lexer.ep
-```
+## Version Tests
 
-This gives v1 development a concrete predecessor: v0 remains available as the
-bootstrap anchor, while v1 can change the language without pretending to be
-compatible with old source.
-
-## Tests
-
-Run the example suite with the Python driver:
+Run version-specific tests inside the corresponding directory:
 
 ```powershell
+cd v0
+python runtests.py
+
+cd ..\v1
 python runtests.py
 ```
 
-Run the self-hosted compiler smoke test:
+The root bootstrap script is a cross-version chain check, not a replacement for
+each version's own tests.
 
-```powershell
-python test_epic_bootstrap.py
-```
+## Development Rule
 
-## v1 direction
-
-Initial v1 feature candidates:
-
-- map
-- stronger `str` operations
-- remove semicolons
-
-The exact v1 scope should be decided by design dependency order: syntax first,
-then type/model changes, then runtime and compiler implementation.
+Do not preserve forward compatibility for its own sake. When the language
+changes, compiler sources should move with the current design.
