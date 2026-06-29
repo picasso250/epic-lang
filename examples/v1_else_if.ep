@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: mid
-fun main() -> void {
+fun main(): void {
     let x = 2
     if x == 1 {
         putstr("low")

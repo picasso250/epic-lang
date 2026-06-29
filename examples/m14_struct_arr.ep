@@ -5,7 +5,7 @@ struct Token {
     value: i64
 }
 
-fun main() -> void {
+fun main(): void {
     let tokens = new Token[1]
     push(tokens, new Token)
     tokens.data[0].kind = 100

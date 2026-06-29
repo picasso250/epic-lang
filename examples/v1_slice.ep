@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: picEpicpicEpEi
-fun main() -> void {
+fun main(): void {
     let s = "Epic"
     putstr(s[1:4])
     putstr(s[:])

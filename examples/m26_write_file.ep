@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: hello
 # CLEAN: test_write_file.txt
-fun main() -> void {
+fun main(): void {
     let n = write_file("test_write_file.txt", bytes("hello"))
     if n != 5 {
         os.ExitProcess(1)

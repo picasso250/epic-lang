@@ -152,7 +152,7 @@ loops, `continue` jumps to the loop increment before re-checking the end bound.
 v1 supports a deliberately narrow integer range loop:
 
 ```epic
-for i in start..end {
+for i in start:end {
     putc(i)
 }
 ```
@@ -193,9 +193,9 @@ The v1 string additions are:
 
 | Operation | Meaning |
 | --- | --- |
-| `str_starts_with(s: str, prefix: str) -> i64` | true when `s` starts with `prefix` |
-| `str_find(s: str, needle: str) -> i64` | first byte index, or `-1` when absent |
-| `str_trim(s: str) -> str` | trim leading and trailing ASCII whitespace |
+| `str_starts_with(s: str, prefix: str): i64` | true when `s` starts with `prefix` |
+| `str_find(s: str, needle: str): i64` | first byte index, or `-1` when absent |
+| `str_trim(s: str): str` | trim leading and trailing ASCII whitespace |
 
 These operations are byte-oriented like v0 strings. Unicode string semantics
 remain outside the v1 first pass.
@@ -275,7 +275,7 @@ separate `reserve` builtin.
 v1 should add array extension:
 
 ```epic
-extend(dst: T[], src: T[]) -> void
+extend(dst: T[], src: T[]): void
 ```
 
 `extend` appends all elements of `src` to `dst` in order. It snapshots
@@ -300,9 +300,9 @@ Supported forms:
 
 | Builtin | Meaning |
 | --- | --- |
-| `len(s: str) -> i64` | string byte length |
-| `len(xs: T[]) -> i64` | array element count |
-| `cap(xs: T[]) -> i64` | array capacity |
+| `len(s: str): i64` | string byte length |
+| `len(xs: T[]): i64` | array element count |
+| `cap(xs: T[]): i64` | array capacity |
 
 `cap(str)` is invalid.
 `len` and `cap` are reserved builtin names; user code cannot define functions
@@ -331,10 +331,10 @@ directly:
 The current minimal byte-buffer surface is:
 
 ```epic
-read_file(path: str) -> u8[]
-write_file(path: str, data: u8[]) -> i64
-str(bytes: u8[]) -> str
-bytes(s: str) -> u8[]
+read_file(path: str): u8[]
+write_file(path: str, data: u8[]): i64
+str(bytes: u8[]): str
+bytes(s: str): u8[]
 ```
 
 This is a breaking change from v0: file IO should operate on bytes, not text.
@@ -408,7 +408,7 @@ Tentative semantics:
 - value type is explicit: `map[str]T`
 - `m[key] = value` inserts or overwrites
 - `m[key]` returns the value type's zero value when the key is absent
-- `map_has(m, key) -> i64` distinguishes absence from stored zero values
+- `map_has(m, key): i64` distinguishes absence from stored zero values
 
 This section is intentionally non-committal until the earlier v1 work clarifies
 whether maps materially improve the compiler sources.

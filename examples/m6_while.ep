@@ -4,7 +4,7 @@
 # STDOUT: 2
 # STDOUT: 3
 # STDOUT: 4
-fun main() -> void {
+fun main(): void {
     let i = 0
     while i < 5 {
         putstr(itoa(i))

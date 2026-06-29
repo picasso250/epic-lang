@@ -1,7 +1,7 @@
 # ARGV: hello
 # EXIT: 0
 # STDOUT: hello
-fun main() -> void {
+fun main(): void {
     if argv.len < 2 {
         putstr("missing")
         os.ExitProcess(1)

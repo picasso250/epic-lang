@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: 105-1trim me
-fun main() -> void {
+fun main(): void {
     let s = "epic language"
     putstr(itoa(str_starts_with(s, "epic")))
     putstr(itoa(str_starts_with(s, "lang")))

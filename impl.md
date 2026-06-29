@@ -123,7 +123,7 @@ User struct fields use fixed 8-byte slots in v1.
 - Compound assignment is represented by a unified `AssignOp` node whose left
   side is a variable, field access, or subscript expression.
 - Expression postfixes support checked indexing and copy slices for strings and arrays.
-- `for i in start..end` is parsed as a lowering to existing `let` and `while`
+- `for i in start:end` is parsed as a lowering to existing `let` and `while`
   nodes with hidden start/end locals.
 - `break` and `continue` are statements; codegen tracks the nearest loop labels.
 
@@ -190,13 +190,13 @@ Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen reads
 Primary runtime acceptance:
 
 ```text
-python runtests.py --linker py
+python runtests.py
 ```
 
 Current known result:
 
 ```text
-50 passed, 0 failed
+54 passed, 0 failed
 ```
 
 v0-only historical bootstrap checks lived in the Python implementation path.
@@ -217,5 +217,5 @@ python test_link_ep.py
 Current known result:
 
 ```text
-50 passed, 0 failed
+54 passed, 0 failed
 ```

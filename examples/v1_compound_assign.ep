@@ -4,7 +4,7 @@ struct Box {
     small: u8
 }
 
-fun main() -> void {
+fun main(): void {
     let x = 10
     x += 5
     x -= 3
