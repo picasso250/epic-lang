@@ -74,15 +74,6 @@ The test runner builds the current compiler with `build\v1.exe`, then uses the
 current compiler and `build\link.exe` to compile and run `examples/*.ep`.
 Override the compiler anchor with `PREVIOUS_EPIC` if needed.
 
-The Epic linker MVP can be checked with:
-
-```powershell
-python test_link_ep.py
-```
-
-This relinks every current example object with `build\link.exe` and runs the
-generated executables against the normal example annotations.
-
 ## v1 direction
 
 Initial v1 work:
