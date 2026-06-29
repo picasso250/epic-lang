@@ -13,7 +13,8 @@ SOURCES = ["epic.ep", "codegen_support.ep", "codegen.ep", "parser.ep", "lexer.ep
 DEFAULT_PREVIOUS_EPIC = os.path.join(SCRIPT_DIR, "build", "v1.exe")
 PREVIOUS_EPIC = os.environ.get("PREVIOUS_EPIC", DEFAULT_PREVIOUS_EPIC)
 CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
-LINK_EP_EXE = os.path.join(SCRIPT_DIR, "build", "epic", "link.ep.exe")
+LINK_EXE = os.path.join(SCRIPT_DIR, "build", "link.exe")
+LEGACY_LINK_EP_EXE = os.path.join(SCRIPT_DIR, "build", "epic", "link.ep.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 EXEC_TIMEOUT = 1
 
@@ -78,9 +79,16 @@ def ensure_current_compiler():
             "previous Epic compiler not found. Set PREVIOUS_EPIC or build "
             + os.path.relpath(DEFAULT_PREVIOUS_EPIC, SCRIPT_DIR)
         )
-    run_checked([PREVIOUS_EPIC, "link.ep"], "previous Epic -> link.ep", timeout=60)
-    if not os.path.exists(LINK_EP_EXE):
-        raise RuntimeError(f"expected linker output missing: {LINK_EP_EXE}")
+    if not os.path.exists(LINK_EXE):
+        raise RuntimeError(
+            "Epic linker not found. Run python ..\\epic-bootstrap.py to build "
+            + os.path.relpath(LINK_EXE, SCRIPT_DIR)
+        )
+    os.makedirs(os.path.dirname(LEGACY_LINK_EP_EXE), exist_ok=True)
+    if not os.path.exists(LEGACY_LINK_EP_EXE):
+        import shutil
+
+        shutil.copy2(LINK_EXE, LEGACY_LINK_EP_EXE)
     run_checked([PREVIOUS_EPIC, *SOURCES], "previous Epic -> current Epic", timeout=60)
     if not os.path.exists(CURRENT_EPIC):
         raise RuntimeError(f"expected compiler output missing: {CURRENT_EPIC}")

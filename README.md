@@ -38,6 +38,9 @@ The script:
 2. copies the resulting compiler to `build/v0.exe`
 3. uses `build/v0.exe` to compile the v1 compiler sources
 4. copies that compiler to `build/v1.exe`
+5. uses `build/v1.exe` to compile `v1/link.ep`
+6. copies that linker to `build/link.exe` and `v2/build/link.exe`
+7. copies the v1 compiler anchor to `v2/build/v1.exe`
 
 It intentionally does not build v2 yet. Current v2 has no new feature surface,
 and v1 sources are still written in the v0-accepted source shape.

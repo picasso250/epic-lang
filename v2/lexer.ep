@@ -10,7 +10,7 @@ struct Token {
 
 # ── Token ───────────────────────────────────────────────────────────────
 
-fun push_token(tokens: Token[], kind: str, text: str, line: i64) -> i64 {
+fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
     let t = new Token
     t.kind = kind
     t.text = text
@@ -22,21 +22,21 @@ fun push_token(tokens: Token[], kind: str, text: str, line: i64) -> i64 {
 
 # ── Char predicates ─────────────────────────────────────────────────────
 
-fun is_alpha(c: i64) -> i64 {
+fun is_alpha(c: i64): i64 {
     if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 {
         return 1
     }
     return 0
 }
 
-fun is_alnum(c: i64) -> i64 {
+fun is_alnum(c: i64): i64 {
     if is_alpha(c) == 1 || (c >= 48 && c <= 57) {
         return 1
     }
     return 0
 }
 
-fun is_digit(c: i64) -> i64 {
+fun is_digit(c: i64): i64 {
     if c >= 48 && c <= 57 {
         return 1
     }
@@ -46,7 +46,7 @@ fun is_digit(c: i64) -> i64 {
 
 # ── Lexer ───────────────────────────────────────────────────────────────
 
-fun lex(src: str) -> Token[] {
+fun lex(src: str): Token[] {
     let tokens = new Token[4096]
     let n = src.len
     let pos = 0
@@ -520,7 +520,7 @@ fun lex(src: str) -> Token[] {
 
 # ── Dump ────────────────────────────────────────────────────────────────
 
-fun dump_tokens(tokens: Token[]) -> i64 {
+fun dump_tokens(tokens: Token[]): i64 {
     let i = 0
     while i < tokens.len {
         let t = tokens.data[i]
@@ -538,7 +538,7 @@ fun dump_tokens(tokens: Token[]) -> i64 {
 
 # ── Main ────────────────────────────────────────────────────────────────
 
-fun main() -> i64 {
+fun main(): i64 {
     if argv.len < 2 {
         putstr("usage: lexer <file>\n")
         os.ExitProcess(1)

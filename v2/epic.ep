@@ -2,7 +2,7 @@
 # Epic v2 self-hosted compiler driver.
 #
 
-fun die_driver(msg: str) -> i64 {
+fun die_driver(msg: str): i64 {
     putstr("epic: ")
     putstr(msg)
     putc(10)
@@ -10,14 +10,14 @@ fun die_driver(msg: str) -> i64 {
     return 0
 }
 
-fun parse_file(path: str) -> AstNode {
+fun parse_file(path: str): AstNode {
     let src = read_file(path)
     let tokens = lex(src)
     let p = make_parser(tokens)
     return parse_program(p)
 }
 
-fun has_main(ast: AstNode) -> i64 {
+fun has_main(ast: AstNode): i64 {
     let i = 0
     while i < ast.funcs.len {
         if ast.funcs.data[i].name == "main" {
@@ -28,7 +28,7 @@ fun has_main(ast: AstNode) -> i64 {
     return 0
 }
 
-fun check_duplicate_struct(out: AstNode, name: str) -> i64 {
+fun check_duplicate_struct(out: AstNode, name: str): i64 {
     let i = 0
     while i < out.structs.len {
         if out.structs.data[i].name == name {
@@ -39,7 +39,7 @@ fun check_duplicate_struct(out: AstNode, name: str) -> i64 {
     return 0
 }
 
-fun check_duplicate_func(out: AstNode, name: str) -> i64 {
+fun check_duplicate_func(out: AstNode, name: str): i64 {
     let i = 0
     while i < out.funcs.len {
         if out.funcs.data[i].name == name {
@@ -50,7 +50,7 @@ fun check_duplicate_func(out: AstNode, name: str) -> i64 {
     return 0
 }
 
-fun merge_one(out: AstNode, ast: AstNode, is_main_file: i64) -> i64 {
+fun merge_one(out: AstNode, ast: AstNode, is_main_file: i64): i64 {
     let i = 0
     while i < ast.structs.len {
         let s = ast.structs.data[i]
@@ -73,7 +73,7 @@ fun merge_one(out: AstNode, ast: AstNode, is_main_file: i64) -> i64 {
     return 0
 }
 
-fun merge_inputs() -> AstNode {
+fun merge_inputs(): AstNode {
     if argv.len < 2 {
         die_driver("usage: epic <input.ep>...")
     }
@@ -93,27 +93,27 @@ fun merge_inputs() -> AstNode {
     return out
 }
 
-fun output_base(main_path: str) -> str {
+fun output_base(main_path: str): str {
     let safe1 = str_replace_char(main_path, '/', '_')
     let safe2 = str_replace_char(safe1, 92, '_')
     return "build/epic/" + safe2
 }
 
-fun quote_arg(s: str) -> str {
+fun quote_arg(s: str): str {
     return "\"" + s + "\""
 }
 
-fun run_toolchain(asm_path: str, obj_path: str, exe_path: str) -> i64 {
+fun run_toolchain(asm_path: str, obj_path: str, exe_path: str): i64 {
     let nasm_cmd = "tools\\nasm.exe -f win64 " + quote_arg(asm_path) + " -o " + quote_arg(obj_path)
     let code = system(nasm_cmd)
     if code != 0 {
         return code
     }
-    let link_cmd = "build\\epic\\link.ep.exe " + quote_arg(obj_path) + " -o " + quote_arg(exe_path)
+    let link_cmd = "build\\link.exe " + quote_arg(obj_path) + " -o " + quote_arg(exe_path)
     return system(link_cmd)
 }
 
-fun main() -> i64 {
+fun main(): i64 {
     system("cmd /c if not exist build mkdir build")
     system("cmd /c if not exist build\\epic mkdir build\\epic")
 

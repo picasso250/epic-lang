@@ -16,7 +16,8 @@ PREVIOUS_EPIC = os.environ.get(
     os.path.join(SCRIPT_DIR, "build", "v1.exe"),
 )
 CURRENT_EPIC = os.path.join(SCRIPT_DIR, "build", "epic", "epic.ep.exe")
-LINK_EP_EXE = os.path.join(SCRIPT_DIR, "build", "epic", "link.ep.exe")
+LINK_EXE = os.path.join(SCRIPT_DIR, "build", "link.exe")
+LEGACY_LINK_EP_EXE = os.path.join(SCRIPT_DIR, "build", "epic", "link.ep.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 SOURCES = ["epic.ep", "codegen_support.ep", "codegen.ep", "parser.ep", "lexer.ep"]
 
@@ -81,7 +82,13 @@ def example_obj_path(ep_name):
 def ensure_tools_and_objects():
     if not os.path.exists(PREVIOUS_EPIC):
         raise RuntimeError("previous Epic compiler not found; build build\\v1.exe from v1 first")
-    run_checked([PREVIOUS_EPIC, "link.ep"], "previous Epic -> link.ep")
+    if not os.path.exists(LINK_EXE):
+        raise RuntimeError("Epic linker not found; run python ..\\epic-bootstrap.py first")
+    os.makedirs(os.path.dirname(LEGACY_LINK_EP_EXE), exist_ok=True)
+    if not os.path.exists(LEGACY_LINK_EP_EXE):
+        import shutil
+
+        shutil.copy2(LINK_EXE, LEGACY_LINK_EP_EXE)
     run_checked([PREVIOUS_EPIC, *SOURCES], "previous Epic -> current Epic")
 
     # runtests.py also builds each example .obj with the current compiler.
@@ -111,7 +118,7 @@ def main():
 
         try:
             clean_test_paths(clean_paths)
-            run_checked([LINK_EP_EXE, obj_path, "-o", exe_path], "link.ep", timeout=10)
+            run_checked([LINK_EXE, obj_path, "-o", exe_path], "link.ep", timeout=10)
             proc = subprocess.run(
                 [exe_path, *argv],
                 cwd=SCRIPT_DIR,
