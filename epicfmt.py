@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Indent-only formatter for Epic source files."""
+"""Formatter for Epic source files."""
 
 from __future__ import annotations
 
@@ -68,6 +68,70 @@ def brace_delta(line: str) -> tuple[int, int]:
     return leading_closes, delta
 
 
+def split_structural_lines(line: str) -> list[str]:
+    """Split after { and before } outside literals/comments."""
+    out: list[str] = []
+    start = 0
+    i = 0
+    n = len(line)
+    did_split = False
+    in_string = False
+    in_char = False
+    escaped = False
+
+    while i < n:
+        ch = line[i]
+        if escaped:
+            escaped = False
+            i += 1
+            continue
+        if ch == "\\" and (in_string or in_char):
+            escaped = True
+            i += 1
+            continue
+        if in_string:
+            if ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if in_char:
+            if ch == "'":
+                in_char = False
+            i += 1
+            continue
+        if ch == "#":
+            break
+        if ch == '"':
+            in_string = True
+            i += 1
+            continue
+        if ch == "'":
+            in_char = True
+            i += 1
+            continue
+        if ch == "{":
+            segment = line[start : i + 1].strip()
+            if segment:
+                out.append(segment)
+            start = i + 1
+            did_split = True
+        elif ch == "}":
+            segment = line[start:i].strip()
+            if segment:
+                out.append(segment)
+            start = i
+            did_split = True
+        i += 1
+
+    if not did_split:
+        return [line.lstrip(" \t")]
+
+    segment = line[start:].strip()
+    if segment:
+        out.append(segment)
+    return out
+
+
 def format_text(text: str, indent_width: int = 4) -> str:
     indent = 0
     out: list[str] = []
@@ -88,10 +152,14 @@ def format_text(text: str, indent_width: int = 4) -> str:
             out.append(newline)
             continue
 
-        leading_closes, delta = brace_delta(line)
-        line_indent = max(0, indent - leading_closes)
-        out.append(" " * (line_indent * indent_width) + content + newline)
-        indent = max(0, indent + delta)
+        structural_lines = split_structural_lines(line)
+        inserted_newline = newline if newline else "\n"
+        for index, structural_line in enumerate(structural_lines):
+            line_newline = newline if index == len(structural_lines) - 1 else inserted_newline
+            leading_closes, delta = brace_delta(structural_line)
+            line_indent = max(0, indent - leading_closes)
+            out.append(" " * (line_indent * indent_width) + structural_line + line_newline)
+            indent = max(0, indent + delta)
 
     return "".join(out)
 
@@ -112,7 +180,7 @@ def write_file(path: Path, indent_width: int) -> bool:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Format Epic source indentation without changing other spacing."
+        description="Format Epic source indentation and brace line breaks."
     )
     parser.add_argument("files", nargs="*", type=Path)
     parser.add_argument(
