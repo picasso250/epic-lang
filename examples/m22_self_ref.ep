@@ -3,7 +3,7 @@ struct Node {
     val: i64
     next: Node
 }
-fun main() -> void {
+fun main(): void {
     let a = new Node
     a.val = 10
     let b = new Node

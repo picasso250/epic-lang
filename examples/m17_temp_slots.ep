@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: abcdefghij
-fun main() -> void {
+fun main(): void {
     putstr("a")
     putstr("b")
     putstr("c")

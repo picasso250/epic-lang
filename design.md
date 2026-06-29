@@ -67,7 +67,7 @@ At the language level, `str`, user structs, and dynamic arrays have reference se
 Function definitions use explicit parameter and return types:
 
 ```epic
-fun add(a: i64, b: i64) -> i64 {
+fun add(a: i64, b: i64): i64 {
     return a + b
 }
 ```
@@ -170,7 +170,7 @@ General method calls are not supported in v0.
 The program entry function must be exactly:
 
 ```epic
-fun main() -> void {
+fun main(): void {
     os.ExitProcess(0)
 }
 ```
@@ -183,14 +183,14 @@ Falling off the end of `main` exits with status `0`. Non-zero process status is 
 
 | Builtin | Meaning |
 | --- | --- |
-| `putc(c: i64) -> void` | writes one byte |
-| `putstr(s: str) -> void` | writes string bytes |
-| `str_new(bytes, len) -> str` | creates a string by copying `len` bytes from a low-level byte buffer such as `buf.data` |
-| `itoa(n: i64) -> str` | converts an integer to a heap string |
-| `system(cmd: str) -> i64` | runs a command and returns its process exit code, or `-1` on failure |
-| `read_file(path: str) -> str` | reads a whole file, or returns empty string on failure |
-| `write_file(path: str, data: str) -> i64` | writes a whole file and returns bytes written, or `-1` on failure |
-| `push(a: T[], x: T) -> void` | appends to a dynamic array |
+| `putc(c: i64): void` | writes one byte |
+| `putstr(s: str): void` | writes string bytes |
+| `str_new(bytes, len): str` | creates a string by copying `len` bytes from a low-level byte buffer such as `buf.data` |
+| `itoa(n: i64): str` | converts an integer to a heap string |
+| `system(cmd: str): i64` | runs a command and returns its process exit code, or `-1` on failure |
+| `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
+| `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
+| `push(a: T[], x: T): void` | appends to a dynamic array |
 
 `argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for self-hosting: whitespace separates arguments, and double quotes group an argument.
 

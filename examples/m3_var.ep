@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 42
 # STDOUT: 43
-fun main() -> void {
+fun main(): void {
     let x = 42
     putstr(itoa(x))
     putc(10)

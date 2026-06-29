@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: Hello, Epic!
 # STDOUT: 42
-fun main() -> void {
+fun main(): void {
     putstr("Hello, Epic!")
     putc(10)
     putstr(itoa(42))

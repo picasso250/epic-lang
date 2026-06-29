@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 1
 # CLEAN: test_os_create.tmp
-fun main() -> void {
+fun main(): void {
     os.Sleep(1)
     let t = os.GetTickCount64()
     let n = os.lstrlenA("abc")

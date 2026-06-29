@@ -4,10 +4,10 @@ struct Point {
     x: i64
     y: i64
 }
-fun sum(p: Point) -> i64 {
+fun sum(p: Point): i64 {
     return p.x + p.y
 }
-fun main() -> void {
+fun main(): void {
     let p = new Point
     p.x = 100
     p.y = 100

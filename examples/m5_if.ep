@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 1
 # STDOUT: 2
-fun main() -> void {
+fun main(): void {
     let x = 10
     if x > 5 {
         putstr(itoa(1))

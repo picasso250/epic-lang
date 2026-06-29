@@ -3,7 +3,7 @@ struct Token {
     kind: i64
     value: i64
 }
-fun main() -> void {
+fun main(): void {
     let tokens = new Token[3]
     push(tokens, new Token)
     push(tokens, new Token)

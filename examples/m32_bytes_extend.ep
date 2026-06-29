@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: hiabab
-fun main() -> void {
+fun main(): void {
     let buf = new i8[1]
     extend(buf, bytes("hi"))
     putstr(str_new(buf.data, buf.len))

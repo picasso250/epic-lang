@@ -2,7 +2,7 @@
 # STDOUT: 1
 # STDOUT: 3
 # STDOUT: 4
-fun main() -> void {
+fun main(): void {
     let i = 0
     while i < 10 {
         i = i + 1

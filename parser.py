@@ -93,7 +93,7 @@ class Parser:
         self.expect("LPAREN")
         params = self.parse_params()
         self.expect("RPAREN")
-        self.expect("ARROW")
+        self.expect("COLON")
         ret_type = self.parse_type()
         body = self.parse_block()
         return FunDefNode(

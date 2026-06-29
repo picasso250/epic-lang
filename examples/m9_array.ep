@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: Epic
 # STDOUT: 69
-fun main() -> void {
+fun main(): void {
     let buf = new i8[10]
     buf.data[0] = 'E'
     buf.data[1] = 'p'
