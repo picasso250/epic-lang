@@ -87,34 +87,15 @@ fun lex(src: str): Token[] {
                         }
                         let e = p[pos]
                         if e == 110 { c = 10
-                        }
-                        else {
-                            if e == 114 { c = 13
-                            }
-                            else {
-                                if e == 116 { c = 9
-                                }
-                                else {
-                                    if e == 92 { c = 92
-                                    }
-                                    else {
-                                        if e == 34 { c = 34
-                                        }
-                                        else {
-                                            if e == 39 { c = 39
-                                            }
-                                            else {
-                                                if e == 48 { c = 0
-                                                }
-                                                else {
-                                                    putstr("bad escape\n")
-                                                    os.ExitProcess(1)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        } else if e == 114 { c = 13
+                        } else if e == 116 { c = 9
+                        } else if e == 92 { c = 92
+                        } else if e == 34 { c = 34
+                        } else if e == 39 { c = 39
+                        } else if e == 48 { c = 0
+                        } else {
+                            putstr("bad escape\n")
+                            os.ExitProcess(1)
                         }
                     }
                     buf.data[out_len] = c
@@ -140,34 +121,15 @@ fun lex(src: str): Token[] {
                 pos = pos + 1
                 let e = p[pos]
                 if e == 110 { ch_val = 10
-                }
-                else {
-                    if e == 114 { ch_val = 13
-                    }
-                    else {
-                        if e == 116 { ch_val = 9
-                        }
-                        else {
-                            if e == 92 { ch_val = 92
-                            }
-                            else {
-                                if e == 34 { ch_val = 34
-                                }
-                                else {
-                                    if e == 39 { ch_val = 39
-                                    }
-                                    else {
-                                        if e == 48 { ch_val = 0
-                                        }
-                                        else {
-                                            putstr("bad escape\n")
-                                            os.ExitProcess(1)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                } else if e == 114 { ch_val = 13
+                } else if e == 116 { ch_val = 9
+                } else if e == 92 { ch_val = 92
+                } else if e == 34 { ch_val = 34
+                } else if e == 39 { ch_val = 39
+                } else if e == 48 { ch_val = 0
+                } else {
+                    putstr("bad escape\n")
+                    os.ExitProcess(1)
                 }
             }
             pos = pos + 1
@@ -365,7 +327,7 @@ fun dump_tokens(tokens: Token[]): i64 {
     return 0
 }
 # ── Main ────────────────────────────────────────────────────────────────
-fun main(): i64 {
+fun main(): void {
     if argv.len < 2 {
         putstr("usage: lexer <file>\n")
         os.ExitProcess(1)
@@ -373,5 +335,4 @@ fun main(): i64 {
     let src = read_file(argv.data[1])
     let tokens = lex(src)
     dump_tokens(tokens)
-    return 0
 }

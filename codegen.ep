@@ -624,12 +624,8 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
         let base_type = expr_type(e, expr.object)
         let layout = ""
         if base_type.kind == "str" { layout = "str"
-        }
-        else {
-            if base_type.kind == "array" { layout = array_layout_name(base_type.name)
-            }
-            else { layout = base_type.name
-            }
+        } else if base_type.kind == "array" { layout = array_layout_name(base_type.name)
+        } else { layout = base_type.name
         }
         let f = find_field_info(e, layout, expr.name)
         return f.typ
@@ -659,15 +655,11 @@ fun pre_scan_block(e: EmitterState, block: AstNode): i64 {
         let stmt = block.stmts.data[i]
         if stmt.kind == "Let" {
             add_local(e, stmt.name, infer_let_type(e, stmt.value_expr))
-        } else {
-            if stmt.kind == "If" {
-                pre_scan_block(e, stmt.then_block)
-                pre_scan_block(e, stmt.else_block)
-            } else {
-                if stmt.kind == "While" {
-                    pre_scan_block(e, stmt.body)
-                }
-            }
+        } else if stmt.kind == "If" {
+            pre_scan_block(e, stmt.then_block)
+            pre_scan_block(e, stmt.else_block)
+        } else if stmt.kind == "While" {
+            pre_scan_block(e, stmt.body)
         }
         i = i + 1
     }
@@ -1486,7 +1478,7 @@ fun emit_program(e: EmitterState, ast: AstNode): i64 {
     write_file(e.out_path, str_new(e.out_buf.data, e.out_buf.len))
     return 0
 }
-fun main(): i64 {
+fun main(): void {
     if argv.len < 3 {
         putstr("usage: codegen <input.ep> <output.asm>\n")
         os.ExitProcess(1)
@@ -1497,5 +1489,4 @@ fun main(): i64 {
     let ast = parse_program(p)
     let e = make_emitter(argv.data[2])
     emit_program(e, ast)
-    return 0
 }

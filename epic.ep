@@ -106,7 +106,7 @@ fun write_build_script(cmd_path: str, asm_path: str, obj_path: str, exe_path: st
     write_file(cmd_path, script)
     return 0
 }
-fun main(): i64 {
+fun main(): void {
     system("cmd /c if not exist build mkdir build")
     system("cmd /c if not exist build\\epic mkdir build\\epic")
     let ast = merge_inputs()
@@ -124,5 +124,4 @@ fun main(): i64 {
     }
     putstr(exe_path)
     putc(10)
-    return 0
 }
