@@ -36,6 +36,7 @@ struct Parser {
     tokens: Token[];
     pos: i64;
     for_counter: i64;
+    loop_depth: i64;
     eof: Token;
 }
 
@@ -80,6 +81,7 @@ fun make_parser(tokens: Token[]) -> Parser {
     p.tokens = tokens;
     p.pos = 0;
     p.for_counter = 0;
+    p.loop_depth = 0;
     p.eof = new Token;
     p.eof.kind = "EOF";
     p.eof.text = "";
@@ -481,7 +483,31 @@ fun parse_while_stmt(p: Parser) -> AstNode {
     expect(p, "WHILE");
     let node = ast_node("While");
     node.expr = parse_expr(p);
+    p.loop_depth = p.loop_depth + 1;
     node.body = parse_block(p);
+    p.loop_depth = p.loop_depth - 1;
+    return node;
+}
+
+fun parse_break_stmt(p: Parser) -> AstNode {
+    let t = expect(p, "BREAK");
+    if p.loop_depth == 0 {
+        parse_error(t.line, "break outside loop");
+    }
+    let node = ast_node("Break");
+    node.line = t.line;
+    expect_stmt_end(p);
+    return node;
+}
+
+fun parse_continue_stmt(p: Parser) -> AstNode {
+    let t = expect(p, "CONTINUE");
+    if p.loop_depth == 0 {
+        parse_error(t.line, "continue outside loop");
+    }
+    let node = ast_node("Continue");
+    node.line = t.line;
+    expect_stmt_end(p);
     return node;
 }
 
@@ -518,7 +544,9 @@ fun parse_for_stmt(p: Parser) -> AstNode {
     let start = parse_expr(p);
     expect(p, "RANGE");
     let end = parse_expr(p);
+    p.loop_depth = p.loop_depth + 1;
     let body = parse_block(p);
+    p.loop_depth = p.loop_depth - 1;
 
     p.for_counter = p.for_counter + 1;
     let suffix = itoa(p.for_counter);
@@ -542,6 +570,7 @@ fun parse_for_stmt(p: Parser) -> AstNode {
     push(body.stmts, assign_node(name.text, inc));
 
     let loop = ast_node("While");
+    loop.op = "for";
     loop.expr = cond;
     loop.body = body;
     push(out.stmts, loop);
@@ -577,6 +606,8 @@ fun parse_stmt(p: Parser) -> AstNode {
     if same(t.kind, "IF") == 1 { return parse_if_stmt(p); }
     if same(t.kind, "WHILE") == 1 { return parse_while_stmt(p); }
     if same(t.kind, "FOR") == 1 { return parse_for_stmt(p); }
+    if same(t.kind, "BREAK") == 1 { return parse_break_stmt(p); }
+    if same(t.kind, "CONTINUE") == 1 { return parse_continue_stmt(p); }
     if same(t.kind, "ID") == 1 {
         if is_assignment(p) == 1 {
             return parse_assign_stmt(p);

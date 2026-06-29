@@ -210,6 +210,8 @@ fun lex(src: str) -> Token[] {
             if text == "while"  { kind = "WHILE"; }
             if text == "for"    { kind = "FOR"; }
             if text == "in"     { kind = "IN"; }
+            if text == "break"  { kind = "BREAK"; }
+            if text == "continue" { kind = "CONTINUE"; }
             if text == "struct" { kind = "STRUCT"; }
             if text == "new"    { kind = "NEW"; }
             if text == "let"    { kind = "LET"; }

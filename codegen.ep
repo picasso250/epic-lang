@@ -1508,13 +1508,51 @@ fun emit_while(e: EmitterState, stmt: AstNode) -> i64 {
     }
     let start_id = fresh_label(e);
     let end_id = fresh_label(e);
+    let continue_id = start_id;
+    if stmt.op == "for" {
+        continue_id = fresh_label(e);
+    }
+    let old_break = e.loop_break_label;
+    let old_continue = e.loop_continue_label;
+    e.loop_break_label = end_id;
+    e.loop_continue_label = continue_id;
     emit_label_id(e, "L", start_id);
     emit_expr(e, stmt.expr);
     emit_inst(e, "test rax, rax");
     emit_jmp_id(e, "jz", "L", end_id);
-    emit_block(e, stmt.body);
+    if stmt.op == "for" {
+        let i = 0;
+        while i + 1 < stmt.body.stmts.len {
+            emit_stmt(e, stmt.body.stmts.data[i]);
+            i = i + 1;
+        }
+        emit_label_id(e, "L", continue_id);
+        if stmt.body.stmts.len > 0 {
+            emit_stmt(e, stmt.body.stmts.data[stmt.body.stmts.len - 1]);
+        }
+    } else {
+        emit_block(e, stmt.body);
+    }
     emit_jmp_id(e, "jmp", "L", start_id);
     emit_label_id(e, "L", end_id);
+    e.loop_break_label = old_break;
+    e.loop_continue_label = old_continue;
+    return 0;
+}
+
+fun emit_break(e: EmitterState) -> i64 {
+    if e.loop_break_label == 0 {
+        die("break outside loop");
+    }
+    emit_jmp_id(e, "jmp", "L", e.loop_break_label);
+    return 0;
+}
+
+fun emit_continue(e: EmitterState) -> i64 {
+    if e.loop_continue_label == 0 {
+        die("continue outside loop");
+    }
+    emit_jmp_id(e, "jmp", "L", e.loop_continue_label);
     return 0;
 }
 
@@ -1528,6 +1566,8 @@ fun emit_stmt(e: EmitterState, stmt: AstNode) -> i64 {
     if stmt.kind == "FieldSet" { return emit_field_set(e, stmt); }
     if stmt.kind == "If" { return emit_if(e, stmt); }
     if stmt.kind == "While" { return emit_while(e, stmt); }
+    if stmt.kind == "Break" { return emit_break(e); }
+    if stmt.kind == "Continue" { return emit_continue(e); }
     if stmt.kind == "Block" { return emit_block(e, stmt); }
     die("unsupported stmt");
     return 0;

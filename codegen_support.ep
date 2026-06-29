@@ -47,6 +47,8 @@ struct EmitterState {
     alloc_size: i64;
     temp_base: i64;
     temp_count: i64;
+    loop_break_label: i64;
+    loop_continue_label: i64;
     locals: Local[];
     funcs: FuncInfo[];
     strings: StringLit[];
@@ -285,6 +287,8 @@ fun make_emitter(out_path: str) -> EmitterState {
     e.alloc_size = 0;
     e.temp_base = 0;
     e.temp_count = 0;
+    e.loop_break_label = 0;
+    e.loop_continue_label = 0;
     e.locals = new Local[128];
     e.funcs = new FuncInfo[64];
     e.strings = new StringLit[256];
