@@ -251,7 +251,11 @@ class Parser:
         else_block = None
         self.skip_newlines()
         if self.check("ELSE"):
-            else_block = self.parse_block()
+            self.skip_newlines()
+            if self.peek_kind("IF"):
+                else_block = BlockNode(stmts=[self.parse_if_stmt()])
+            else:
+                else_block = self.parse_block()
         return IfNode(cond=cond, then_block=then_block, else_block=else_block)
 
     def parse_while_stmt(self):

@@ -74,6 +74,23 @@ fun add(a: i64, b: i64) -> i64 {
 
 `void` functions may use `return` or fall off the end. `return expr` is invalid in a `void` function.
 
+## Else-if chains
+
+`else if` is syntax sugar for a nested `if` in the `else` branch:
+
+```epic
+if x == 1 {
+    putstr("one")
+} else if x == 2 {
+    putstr("two")
+} else {
+    putstr("many")
+}
+```
+
+This does not add a separate control-flow construct; the parser lowers it to
+the same AST shape as `else { if ... }`.
+
 ## Structs
 
 Struct definitions use user-facing field types:

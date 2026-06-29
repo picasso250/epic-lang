@@ -7,11 +7,14 @@ fun main() -> void {
         putstr(itoa(1))
         putc(10)
     }
-    if x < 5 {
+    if x == 1 {
         putstr(itoa(999))
         putc(10)
-    } else {
+    } else if x == 10 {
         putstr(itoa(2))
+        putc(10)
+    } else {
+        putstr(itoa(999))
         putc(10)
     }
     os.ExitProcess(0)
