@@ -10,6 +10,9 @@ __pycache__/
 # Node
 node_modules/
 
+# Zed generated grammars
+editors/zed/grammars/
+
 # Binary tools (see README for setup)
 tools/
 
