@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap"))
-from lexer import lex
+from lexer import dump_tokens, lex
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,10 +21,7 @@ EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 def python_lexer_dump(path):
     with open(path, "r", encoding="utf-8") as f:
         source = f.read()
-    lines = []
-    for kind, value, line in lex(source):
-        lines.append(f"{kind} {value} {line}")
-    return "\n".join(lines) + ("\n" if lines else "")
+    return dump_tokens(lex(source))
 
 
 def bootstrap_lexer_dump(path):

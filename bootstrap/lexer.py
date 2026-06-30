@@ -238,3 +238,20 @@ def lex(source_text):
         tokens.append((kind, value, line))
         pos = m.end()
     return tokens
+
+
+def dump_tokens(tokens):
+    lines = []
+    for kind, value, line in tokens:
+        if kind == "FSTRING":
+            lines.append(f"{kind}  {line}")
+            for part_kind, part_value in value:
+                if part_kind == "text":
+                    lines.append(f"  TEXT {part_value}")
+                elif part_kind == "expr":
+                    lines.append(f"  EXPR {part_value}")
+                else:
+                    raise LexError(f"Unknown f-string part {part_kind}", line)
+            continue
+        lines.append(f"{kind} {value} {line}")
+    return "\n".join(lines) + ("\n" if lines else "")

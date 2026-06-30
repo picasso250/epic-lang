@@ -8,16 +8,48 @@ struct Token {
     kind: str
     text: str
     line: i64
+    data: TokenData
+}
+
+type TokenData {
+    Plain
+    FString {
+        parts: FStringPart[]
+    }
+}
+
+type FStringPart {
+    Text {
+        text: str
+    }
+    Expr {
+        text: str
+    }
 }
 
 # ── Token ───────────────────────────────────────────────────────────────
 
 fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
-    let t = new Token
+    let t = new Token {}
     t.kind = kind
     t.text = text
     t.line = line
+    t.data = new TokenData.Plain
     push(tokens, t)
+    return 0
+}
+
+fun push_fstring_text(parts: FStringPart[], text: str): i64 {
+    if len(text) > 0 {
+        let p = new FStringPart.Text { text: text }
+        push(parts, p)
+    }
+    return 0
+}
+
+fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
+    let p = new FStringPart.Expr { text: text }
+    push(parts, p)
     return 0
 }
 
@@ -43,6 +75,201 @@ fun is_digit(c: i64): i64 {
         return 1
     }
     return 0
+}
+
+fun decode_escape(e: i64): i64 {
+    if e == 110 {
+        return 10
+    }
+    if e == 114 {
+        return 13
+    }
+    if e == 116 {
+        return 9
+    }
+    if e == 92 {
+        return 92
+    }
+    if e == 34 {
+        return 34
+    }
+    if e == 39 {
+        return 39
+    }
+    if e == 48 {
+        return 0
+    }
+    putstr("bad escape\n")
+    os.ExitProcess(1)
+    return 0
+}
+
+fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
+    let p = src.data
+    let buf = new u8[end - start + 1]
+    let out_len = 0
+    let pos = start
+    while pos < end {
+        let c = p[pos]
+        if c == 10 || c == 13 {
+            putstr("unterminated string\n")
+            os.ExitProcess(1)
+        }
+        if c == 92 {
+            pos += 1
+            if pos >= end {
+                putstr("bad escape\n")
+                os.ExitProcess(1)
+            }
+            c = decode_escape(p[pos])
+        }
+        buf.data[out_len] = c
+        out_len += 1
+        pos += 1
+    }
+    return str_new(buf.data, out_len)
+}
+
+fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
+    let n = len(src)
+    let p = src.data
+    let parens = 0
+    let brackets = 0
+    let braces = 0
+    while pos < n {
+        let c = p[pos]
+        if c == 10 || c == 13 {
+            putstr("unterminated f-string expression\n")
+            os.ExitProcess(1)
+        }
+        if c == 34 || c == 39 {
+            let quote = c
+            pos += 1
+            let found = 0
+            while found == 0 && pos < n {
+                let q = p[pos]
+                if q == 10 || q == 13 {
+                    putstr("unterminated string in f-string expression\n")
+                    os.ExitProcess(1)
+                }
+                if q == 92 {
+                    pos += 2
+                } else {
+                    if q == quote {
+                        found = 1
+                        pos += 1
+                    } else {
+                        pos += 1
+                    }
+                }
+            }
+            if found == 0 {
+                putstr("unterminated string in f-string expression\n")
+                os.ExitProcess(1)
+            }
+        } else {
+            if c == 40 {
+                parens += 1
+            } else {
+            if c == 41 {
+                parens -= 1
+                if parens < 0 {
+                    putstr("unbalanced ')' in f-string expression\n")
+                    os.ExitProcess(1)
+                }
+            } else {
+            if c == 91 {
+                brackets += 1
+            } else {
+            if c == 93 {
+                brackets -= 1
+                if brackets < 0 {
+                    putstr("unbalanced ']' in f-string expression\n")
+                    os.ExitProcess(1)
+                }
+            } else {
+            if c == 123 {
+                braces += 1
+            } else {
+            if c == 125 {
+                if parens == 0 && brackets == 0 && braces == 0 {
+                    return pos
+                }
+                braces -= 1
+                if braces < 0 {
+                    putstr("unbalanced '}' in f-string expression\n")
+                    os.ExitProcess(1)
+                }
+            }
+            }
+            }
+            }
+            }
+            }
+            pos += 1
+        }
+    }
+    putstr("unterminated f-string expression\n")
+    os.ExitProcess(1)
+    return pos
+}
+
+fun scan_fstring(src: str, start: i64, line: i64): Token {
+    let n = len(src)
+    let p = src.data
+    let parts = new FStringPart[4]
+    let pos = start + 2
+    let segment_start = pos
+
+    while pos < n {
+        let ch = p[pos]
+        if ch == 10 || ch == 13 {
+            putstr("unterminated f-string literal\n")
+            os.ExitProcess(1)
+        }
+        if ch == 92 {
+            pos += 2
+        } else {
+        if ch == 34 {
+            if pos > segment_start {
+                push_fstring_text(parts, decode_escaped_range(src, segment_start, pos, line))
+            }
+            let t = new Token {}
+            t.kind = "FSTRING"
+            t.text = ""
+            t.line = line
+            t.data = new TokenData.FString { parts: parts }
+            return t
+        } else {
+        if ch == 125 {
+            putstr("unexpected '}' in f-string literal\n")
+            os.ExitProcess(1)
+        } else {
+        if ch == 123 {
+            if pos > segment_start {
+                push_fstring_text(parts, decode_escaped_range(src, segment_start, pos, line))
+            }
+            let expr_start = pos + 1
+            let expr_end = scan_fstring_expr_end(src, expr_start, line)
+            let expr = str_trim(str_new(p + expr_start, expr_end - expr_start))
+            if len(expr) == 0 {
+                putstr("empty f-string expression\n")
+                os.ExitProcess(1)
+            }
+            push_fstring_expr(parts, expr)
+            pos = expr_end + 1
+            segment_start = pos
+        } else {
+            pos += 1
+        }
+        }
+        }
+        }
+    }
+    putstr("unterminated f-string literal\n")
+    os.ExitProcess(1)
+    let t = new Token {}
+    return t
 }
 
 
@@ -81,6 +308,28 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
 
+        # ── f-string literal ──
+        if consumed == 0 && ch == 102 && pos + 1 < n && p[pos + 1] == 34 {
+            let t = scan_fstring(src, pos, line)
+            pos += 2
+            while pos < n && p[pos] != 34 {
+                if p[pos] == 92 {
+                    pos += 2
+                } else {
+                if p[pos] == 123 {
+                    pos = scan_fstring_expr_end(src, pos + 1, line) + 1
+                } else {
+                    pos += 1
+                }
+                }
+            }
+            if pos < n && p[pos] == 34 {
+                pos += 1
+            }
+            push(tokens, t)
+            consumed = 1
+        }
+
         # ── string literal ──
         if consumed == 0 && ch == 34 {
             let start_line = line
@@ -104,43 +353,7 @@ fun lex(src: str): Token[] {
                             os.ExitProcess(1)
                         }
                         let e = p[pos]
-                        if e == 110 {
-                            c = 10
- }
-                        else {
-                            if e == 114 {
-                                c = 13
- }
-                            else {
-                                if e == 116 {
-                                    c = 9
- }
-                                else {
-                                    if e == 92 {
-                                        c = 92
- }
-                                    else {
-                                        if e == 34 {
-                                            c = 34
- }
-                                        else {
-                                            if e == 39 {
-                                                c = 39
- }
-                                            else {
-                                                if e == 48 {
-                                                    c = 0
- }
-                                                else {
-                                                    putstr("bad escape\n")
-                                                    os.ExitProcess(1)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        c = decode_escape(e)
                     }
                     buf.data[out_len] = c
                     out_len += 1
@@ -165,43 +378,7 @@ fun lex(src: str): Token[] {
             if ch_val == 92 {
                 pos += 1
                 let e = p[pos]
-                if e == 110 {
-                    ch_val = 10
- }
-                else {
-                    if e == 114 {
-                        ch_val = 13
- }
-                    else {
-                        if e == 116 {
-                            ch_val = 9
- }
-                        else {
-                            if e == 92 {
-                                ch_val = 92
- }
-                            else {
-                                if e == 34 {
-                                    ch_val = 34
- }
-                                else {
-                                    if e == 39 {
-                                        ch_val = 39
- }
-                                    else {
-                                        if e == 48 {
-                                            ch_val = 0
- }
-                                        else {
-                                            putstr("bad escape\n")
-                                            os.ExitProcess(1)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                ch_val = decode_escape(e)
             }
             pos += 1
             if pos >= n || p[pos] != 39 {
@@ -529,12 +706,28 @@ fun lex(src: str): Token[] {
 fun dump_tokens(tokens: Token[]): i64 {
     for i in 0:len(tokens) {
         let t = tokens[i]
-        putstr(t.kind)
-        putc(32)
-        putstr(t.text)
-        putc(32)
-        putstr(itoa(t.line))
-        putc(10)
+        match t.data {
+            TokenData.FString { parts }: {
+                println(f"{t.kind} {t.text} {t.line}")
+                for j in 0:len(parts) {
+                    match parts[j] {
+                        FStringPart.Text { text }: {
+                            putstr("  TEXT ")
+                            putstr(text)
+                            putc(10)
+                        }
+                        FStringPart.Expr { text }: {
+                            putstr("  EXPR ")
+                            putstr(text)
+                            putc(10)
+                        }
+                    }
+                }
+            }
+            else: {
+                println(f"{t.kind} {t.text} {t.line}")
+            }
+        }
     }
     return 0
 }
