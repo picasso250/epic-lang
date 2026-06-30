@@ -48,7 +48,7 @@ The check builds:
 Run the current Python reference compiler against all annotated examples:
 
 ```powershell
-python runtests.py --linker py
+python test_examples_py.py
 ```
 
 Formatter and bootstrap checks:

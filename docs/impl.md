@@ -66,7 +66,7 @@ multi-file compilation model.
 Core acceptance checks:
 
 ```powershell
-python runtests.py --linker py
+python test_examples_py.py
 python test_bootstrap_fixed_point.py
 ```
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Epic v0 test runner.
-Scans examples/*.ep, reads # EXIT: and # STDOUT: annotations,
-compiles, runs, and reports pass/fail.
+Example test runner for the Python reference compiler.
+Scans examples/*.ep, reads # EXIT and # STDOUT annotations,
+compiles through bootstrap/epic.py, runs, and reports pass/fail.
 """
 
 import os, sys, subprocess, re, shlex, argparse
@@ -110,6 +110,29 @@ def run_test(ep_file, linker="lld-link"):
     return True, "OK"
 
 
+def resolve_example(arg):
+    if arg is None:
+        return None
+
+    if arg.endswith(".ep") or os.sep in arg or "/" in arg:
+        path = os.path.abspath(os.path.join(SCRIPT_DIR, arg))
+    else:
+        path = os.path.abspath(os.path.join(EXAMPLES_DIR, arg + ".ep"))
+
+    root = os.path.abspath(SCRIPT_DIR)
+    if os.path.commonpath([root, path]) != root:
+        raise RuntimeError(f"example path escapes repo root: {arg}")
+
+    if not path.endswith(".ep"):
+        raise RuntimeError(f"example must be a .ep file: {arg}")
+
+    if not os.path.exists(path):
+        rel = os.path.relpath(path, SCRIPT_DIR)
+        raise RuntimeError(f"example not found: {rel}")
+
+    return path
+
+
 def run_all(linker):
     examples = sorted(
         f for f in os.listdir(EXAMPLES_DIR) if f.endswith(".ep")
@@ -146,17 +169,32 @@ def run_all(linker):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Epic test runner")
+    parser = argparse.ArgumentParser(description="Epic Python example test runner")
+    parser.add_argument("example", nargs="?", help="exact example name or .ep path")
     parser.add_argument("--linker", choices=["lld", "py"], default="py",
                         help="Which linker to use (default: py)")
     args = parser.parse_args()
 
-    if args.linker == "lld":
-        _, failed, _ = run_all("lld-link")
-    else:
-        _, failed, _ = run_all("py")
+    ep_path = resolve_example(args.example)
+    linker_val = "lld-link" if args.linker == "lld" else "py"
 
-    sys.exit(0 if failed == 0 else 1)
+    if ep_path is not None:
+        # Single example mode
+        try:
+            ok, detail = run_test(ep_path, linker=linker_val)
+        except subprocess.TimeoutExpired:
+            ok, detail = False, "TIMEOUT (compile >30s)"
+        except Exception as e:
+            ok, detail = False, f"exception: {e}"
+        status = "PASS" if ok else "FAIL"
+        if "skipped" in detail:
+            status = "SKIP"
+        name = os.path.relpath(ep_path, EXAMPLES_DIR)
+        print(f"  {status:5}  {name:20s}  {detail}")
+        sys.exit(0 if ok else 1)
+    else:
+        _, failed, _ = run_all(linker_val)
+        sys.exit(0 if failed == 0 else 1)
 
 
 if __name__ == "__main__":
