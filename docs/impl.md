@@ -111,7 +111,6 @@ runtime/write_file.asm
 | `Token[]`  | `&_arr_Token`     |
 
 用户程序不编写指针类型。`&T` 和 `&&T` 仅属于 codegen 内部类型。
-todo slice 的泛型以后要做更普适的（或许现在已经是了？这里过时了？
 
 ## 运行时布局 (Runtime Layouts)
 
@@ -164,7 +163,7 @@ ADT 值是指向 16 字节 header 对象的引用：
 
 ### 降级说明 (Lowering Notes)
 
-- **花括号消歧义 (Brace disambiguation)**：出现在表达式或模式位置的后缀 `{ ... }` 始终被解析为初始化器或模式有效载荷候选。语义检查和 codegen 拒绝非法使用。（这里因为使用new，已经没有歧义了吧）
+- **花括号语境 (Brace contexts)**：`new S { ... }` 和 `new A.V { ... }` 在表达式位置表示初始化器；`A.V { ... }` 在 `match` 模式位置表示 ADT payload pattern。Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
 - **ADT match 降级**：对检视表达式求值一次，加载 tag，对变体标签做线性比较/跳转链，从 header 槽位 1 加载 `data`，按布局偏移绑定有效载荷字段，发射分支代码块。
 - **Map 降级**：`map[str]T` 使用线性探测或基于动态数组的条目表。`m[key] = value` 插入或覆盖。不存在的键查找返回零值。`map_has` 区分是否缺失。

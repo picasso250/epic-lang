@@ -226,11 +226,10 @@ let ok = map_has(ids, "main")
 | `new T[n]`            | 空数组，容量至少为 `n`                            |
 | `push(a, x)`          | 追加并扩容                                        |
 | `extend(dst, src)`    | 将一个数组的所有元素追加到另一个数组               |
-| `a.data[i]`           | 底层无检查的元素访问                              |
-| `a.len` / `len(a)`    | 当前长度                                          |
-| `a.cap` / `cap(a)`    | 当前容量                                          |
-
-todo a[i] 提正  ； a.len/cap 老旧该删
+| `a[i]`                | 带边界检查的元素访问（推荐）                      |
+| `len(a)`              | 当前长度（推荐）                                  |
+| `cap(a)`              | 当前容量（推荐）                                  |
+| `a.data[i]`           | 底层 unchecked 元素访问，普通代码不推荐            |
 
 ### 索引与切片 (Indexing and Slices)
 
@@ -259,6 +258,31 @@ let d = s[:]
 | `cap(xs: T[]): i64`     | 数组容量                 |
 
 `cap(str)` 非法。
+
+### 底层接口与过时写法
+
+Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 bootstrap 代码。普通应用代码不应优先使用这些接口。
+
+| 场景 | 推荐写法 | 底层/过时写法 |
+|------|----------|---------------|
+| 数组索引 | `a[i]` | `a.data[i]` |
+| 字符串索引 | `s[i]` | `s.data[i]` |
+| 长度 | `len(x)` | `x.len` |
+| 容量 | `cap(a)` | `a.cap` |
+| 切片 | `s[start:end]` / `a[start:end]` | `str_slice(s, start, end)` |
+| 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)` |
+
+> `a.data[i]` 是底层 unchecked 访问，仅适合明确需要绕过边界检查或处理 runtime layout 的代码。新代码默认使用 `a[i]`。
+>
+> `s.data`、`s.len`、`a.data`、`a.len`、`a.cap` 暂时仍是可访问字段，但属于 layout 暴露，不应作为普通代码风格。
+>
+> `str_new(ptr, len)` 接受任意 `ptr`（指针）+ `len`，不能完全被 `str(u8[])` 替代；它在底层代码中保留为合法 escape hatch。
+
+**三档分类**：
+
+1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`a[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
+2. **底层接口** — compiler / runtime / linker / bootstrap 可用，普通代码不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_new(ptr, len)`、`str_slice(s, start, end)`。
+3. **历史写法** — 仍可解析/运行，但新代码不应写；未来可删除。（当前尚无明确归入此类的语法。）
 
 ## 文件 IO（面向字节, byte-oriented）
 
