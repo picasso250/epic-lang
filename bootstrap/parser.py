@@ -562,6 +562,16 @@ class Parser:
                 node = VarNode(name=name)
             if self._lookahead_named_fields() and self.check("LBRACE"):
                 return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
+            # Empty struct init: ID {} (with optional newlines between braces)
+            if self.peek_kind("LBRACE"):
+                i = self.pos + 1
+                while i < len(self.tokens) and self.tokens[i][0] == "NEWLINE":
+                    i += 1
+                if i < len(self.tokens) and self.tokens[i][0] == "RBRACE":
+                    self.advance()  # consume LBRACE
+                    self.skip_newlines()
+                    self.advance()  # consume RBRACE
+                    return StructInitNode(type_name=name, fields=[])
             # Postfix: .field and [index]
             while True:
                 if self.check("DOT"):

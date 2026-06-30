@@ -21,6 +21,9 @@ The current language includes:
 - scalar types: `bool`, `u8`, `i64`, `u64`
 - reference types: `str`, user structs, `T[]`
 - typed `let` declarations and zero values
+- `StructName {}` for zero/default struct initialization (`new StructName` is deprecated, pending removal)
+- `new T[n]` for array allocation (remains)
+- `new map[str]T` for map allocation (remains)
 - explicit boolean conditions
 - checked arithmetic, checked indexing, and copy slices
 - bitwise and shift operators
@@ -31,6 +34,15 @@ The current language includes:
 - struct initializers and array literals
 - algebraic data types and `match`
 - narrow `map[str]T`
+
+## Struct Initialization
+
+`StructName {}` initializes a struct with all fields set to their zero/default
+values (heap-allocated). `new StructName` is the deprecated equivalent form
+and will be removed in a future step.
+
+`new T[n]` (array allocation) and `new map[str]T` (map allocation) remain
+valid in the current language.
 
 ## Bootstrap Model
 

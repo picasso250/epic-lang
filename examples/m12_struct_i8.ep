@@ -6,7 +6,7 @@ struct Data {
 }
 
 fun main(): void {
-    let d = new Data
+    let d = Data {}
     d.flag = 1
     d.value = 65
     if d.flag != 0 {

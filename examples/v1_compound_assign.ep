@@ -18,7 +18,7 @@ fun main(): void {
     x ^= 3
     x >>>= 1
 
-    let b = new Box
+    let b = Box {}
     b.value = 4
     b.value += 6
     b.value *= 2

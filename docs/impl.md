@@ -59,7 +59,13 @@ should enforce this at the syntax level: after parsing the pattern, expect
 a colon token before the case body. This is a flat grammar rule with no
 look-ahead ambiguity.
 
-### Acceptance
+### Struct Init Syntax
+
+`StructName {}` is the preferred syntax for zero/default struct
+initialization. `new StructName` is deprecated and will be removed.
+`new T[n]` and `new map[str]T` remain valid for now.
+
+## Acceptance
 
 When changing parser or AST code related to braces or match cases, verify:
 

@@ -11,7 +11,7 @@ fun sum(p: Point): i64 {
 }
 
 fun main(): void {
-    let p = new Point
+    let p = Point {}
     p.x = 100
     p.y = 100
     putstr(itoa(sum(p)))

@@ -134,6 +134,20 @@ fun peek_offset_kind(p: Parser, offset: i64, kind: str): i64 {
     return 0
 }
 
+fun peek_empty_braces(p: Parser): i64 {
+    if peek_kind(p, "LBRACE") == 0 {
+        return 0
+    }
+    let i = p.pos + 1
+    while i < len(p.tokens) && same(p.tokens[i].kind, "NEWLINE") == 1 {
+        i += 1
+    }
+    if i < len(p.tokens) && same(p.tokens[i].kind, "RBRACE") == 1 {
+        return 1
+    }
+    return 0
+}
+
 fun advance(p: Parser): Token {
     let t = peek(p)
     p.pos += 1
@@ -1228,6 +1242,9 @@ fun parse_primary(p: Parser): AstNode {
         let node = ast_node("Var")
         node.name = t.text
         if peek_offset_kind(p, 0, "LBRACE") == 1 && peek_offset_kind(p, 1, "ID") == 1 && peek_offset_kind(p, 2, "COLON") == 1 {
+            return parse_postfix(p, parse_struct_init(p, t))
+        }
+        if peek_empty_braces(p) == 1 {
             return parse_postfix(p, parse_struct_init(p, t))
         }
         if check(p, "LPAREN") == 1 {
