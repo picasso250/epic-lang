@@ -36,6 +36,9 @@ struct StructInfo {
     name: str
     size: i64
     fields: FieldInfo[]
+    kind: str
+    parent: str
+    tag: i64
 }
 
 struct EmitterState {

@@ -88,8 +88,42 @@ fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     s.name = name
     s.size = size
     s.fields = new FieldInfo[16]
+    s.kind = "struct"
+    s.parent = ""
+    s.tag = 0
     push(e.structs, s)
     return s
+}
+
+fun adt_payload_name(type_name: str, variant_name: str): str {
+    return type_name + "." + variant_name
+}
+
+fun is_adt_info(info: StructInfo): i64 {
+    if info.kind == "adt" {
+        return 1
+    }
+    return 0
+}
+
+fun is_adt_type(e: EmitterState, name: str): i64 {
+    for i in 0:len(e.structs) {
+        if e.structs[i].name == name && e.structs[i].kind == "adt" {
+            return 1
+        }
+    }
+    return 0
+}
+
+fun find_variant_info(e: EmitterState, type_name: str, variant_name: str): StructInfo {
+    let payload_name = adt_payload_name(type_name, variant_name)
+    for i in 0:len(e.structs) {
+        if e.structs[i].name == payload_name && e.structs[i].kind == "variant" {
+            return e.structs[i]
+        }
+    }
+    die("unknown ADT variant")
+    return new StructInfo
 }
 
 fun find_struct_info(e: EmitterState, name: str): StructInfo {
@@ -161,14 +195,35 @@ fun compute_struct_layouts(e: EmitterState, ast: AstNode): i64 {
     add_field(a, "cap", type_i64(), 16)
     for i in 0:len(ast.structs) {
         let node = ast.structs[i]
-        s = add_struct_info(e, node.name, len(node.fields) * 8)
-        for j in 0:len(node.fields) {
-            add_field(s, node.fields[j].name, user_type(node.fields[j].type_name), j * 8)
+        if node.kind == "TypeDef" {
+            s = add_struct_info(e, node.name, 16)
+            s.kind = "adt"
+            add_field(s, "tag", type_i64(), 0)
+            add_field(s, "data", type_info("ptr", node.name), 8)
+            for j in 0:len(node.fields) {
+                let variant = node.fields[j]
+                let payload = add_struct_info(e, adt_payload_name(node.name, variant.name), len(variant.fields) * 8)
+                payload.kind = "variant"
+                payload.parent = node.name
+                payload.tag = j
+                for k in 0:len(variant.fields) {
+                    add_field(payload, variant.fields[k].name, user_type(variant.fields[k].type_name), k * 8)
+                }
+            }
+            a = add_struct_info(e, array_layout_name(node.name), 24)
+            add_field(a, "data", type_info("ptr", node.name), 0)
+            add_field(a, "len", type_i64(), 8)
+            add_field(a, "cap", type_i64(), 16)
+        } else {
+            s = add_struct_info(e, node.name, len(node.fields) * 8)
+            for j in 0:len(node.fields) {
+                add_field(s, node.fields[j].name, user_type(node.fields[j].type_name), j * 8)
+            }
+            a = add_struct_info(e, array_layout_name(node.name), 24)
+            add_field(a, "data", type_info("ptr", node.name), 0)
+            add_field(a, "len", type_i64(), 8)
+            add_field(a, "cap", type_i64(), 16)
         }
-        a = add_struct_info(e, array_layout_name(node.name), 24)
-        add_field(a, "data", type_info("ptr", node.name), 0)
-        add_field(a, "len", type_i64(), 8)
-        add_field(a, "cap", type_i64(), 16)
     }
     return 0
 }
@@ -248,6 +303,19 @@ fun type_can_assign(dst: TypeInfo, src: TypeInfo, expr: AstNode): i64 {
             return 1
         }
     }
+    return 0
+}
+
+fun emit_heap_alloc(e: EmitterState, size: i64): i64 {
+    if size < 1 {
+        size = 8
+    }
+    emit_mov(e, "rcx", "[_heap]")
+    emit_mov(e, "edx", "8")
+    emit_mov_i(e, "r8d", size)
+    emit_inst(e, "sub rsp, 40")
+    emit_call_inst(e, "HeapAlloc")
+    emit_inst(e, "add rsp, 40")
     return 0
 }
 
@@ -354,7 +422,10 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
  }
     if expr.kind == "StructInit" {
         return type_struct(expr.name)
- }
+    }
+    if expr.kind == "VariantInit" {
+        return type_struct(expr.name)
+    }
     if expr.kind == "NewArray" {
         return type_array(expr.type_name)
  }
@@ -1289,6 +1360,9 @@ fun emit_unary(e: EmitterState, expr: AstNode): i64 {
 
 fun emit_new(e: EmitterState, expr: AstNode): i64 {
     let info = find_struct_info(e, expr.name)
+    if is_adt_info(info) == 1 {
+        die("use ADT variant initializer")
+    }
     emit_mov(e, "rcx", "[_heap]")
     emit_mov(e, "edx", "8")
     emit_mov_i(e, "r8d", info.size)
@@ -1309,6 +1383,9 @@ fun init_has_field(init: AstNode, name: str): i64 {
 
 fun emit_struct_init(e: EmitterState, expr: AstNode): i64 {
     let info = find_struct_info(e, expr.name)
+    if is_adt_info(info) == 1 {
+        die("use ADT variant initializer")
+    }
     for i in 0:len(expr.fields) {
         let field = expr.fields[i]
         find_field_info(e, expr.name, field.name)
@@ -1357,6 +1434,74 @@ fun emit_struct_init(e: EmitterState, expr: AstNode): i64 {
         }
     }
     emit_stack_load(e, "rax", obj_slot)
+    return 0
+}
+
+fun emit_payload_field_zero(e: EmitterState, obj_slot: i64, field: FieldInfo): i64 {
+    if type_is_complex(field.typ) == 1 {
+        emit_zero_complex(e, field.typ)
+        emit_mov(e, "rcx", "rax")
+    } else {
+        emit_mov(e, "rcx", "0")
+    }
+    emit_stack_load(e, "rax", obj_slot)
+    out_s(e, "    mov [rax+")
+    out_i(e, field.offset)
+    out_line(e, "], rcx")
+    return 0
+}
+
+fun emit_variant_init(e: EmitterState, expr: AstNode): i64 {
+    if is_adt_type(e, expr.name) == 0 {
+        die("unknown ADT type")
+    }
+    let payload = find_variant_info(e, expr.name, expr.type_name)
+    for i in 0:len(expr.fields) {
+        let field = expr.fields[i]
+        find_field_info(e, payload.name, field.name)
+        for j in i + 1:len(expr.fields) {
+            if expr.fields[j].name == field.name {
+                die("duplicate initializer field")
+            }
+        }
+    }
+
+    emit_heap_alloc(e, 16)
+    let header_slot = temp_save_rax(e)
+    emit_stack_load(e, "rcx", header_slot)
+    emit_mov_i(e, "rax", payload.tag)
+    emit_mov(e, "[rcx]", "rax")
+
+    emit_heap_alloc(e, payload.size)
+    let payload_slot = temp_save_rax(e)
+    emit_stack_load(e, "rcx", header_slot)
+    emit_mov(e, "[rcx+8]", "rax")
+
+    for i in 0:len(payload.fields) {
+        let layout_field = payload.fields[i]
+        if init_has_field(expr, layout_field.name) == 0 {
+            emit_payload_field_zero(e, payload_slot, layout_field)
+        }
+    }
+    for i in 0:len(expr.fields) {
+        let field = expr.fields[i]
+        let layout_field = find_field_info(e, payload.name, field.name)
+        if type_can_assign(layout_field.typ, expr_type(e, field.value_expr), field.value_expr) == 0 {
+            die("initializer field type mismatch")
+        }
+        emit_expr(e, field.value_expr)
+        emit_stack_load(e, "rcx", payload_slot)
+        if type_is_byte_sized(layout_field.typ) == 1 {
+            out_s(e, "    mov [rcx+")
+            out_i(e, layout_field.offset)
+            out_line(e, "], al")
+        } else {
+            out_s(e, "    mov [rcx+")
+            out_i(e, layout_field.offset)
+            out_line(e, "], rax")
+        }
+    }
+    emit_stack_load(e, "rax", header_slot)
     return 0
 }
 
@@ -1466,6 +1611,26 @@ fun emit_array_literal(e: EmitterState, expr: AstNode): i64 {
 
 fun emit_zero_complex(e: EmitterState, typ: TypeInfo): i64 {
     if typ.kind == "struct" {
+        if is_adt_type(e, typ.name) == 1 {
+            for i in 0:len(e.structs) {
+                if e.structs[i].kind == "variant" && e.structs[i].parent == typ.name && e.structs[i].tag == 0 {
+                    emit_heap_alloc(e, 16)
+                    let header_slot = temp_save_rax(e)
+                    emit_stack_load(e, "rcx", header_slot)
+                    emit_mov(e, "qword [rcx]", "0")
+                    emit_heap_alloc(e, e.structs[i].size)
+                    let payload_slot = temp_save_rax(e)
+                    emit_stack_load(e, "rcx", header_slot)
+                    emit_mov(e, "[rcx+8]", "rax")
+                    for j in 0:len(e.structs[i].fields) {
+                        emit_payload_field_zero(e, payload_slot, e.structs[i].fields[j])
+                    }
+                    emit_stack_load(e, "rax", header_slot)
+                    return 0
+                }
+            }
+            die("ADT has no variants")
+        }
         let n = ast_node("New")
         n.name = typ.name
         emit_new(e, n)
@@ -1715,6 +1880,10 @@ fun emit_expr(e: EmitterState, expr: AstNode): i64 {
     }
     if expr.kind == "StructInit" {
         emit_struct_init(e, expr)
+        return 0
+    }
+    if expr.kind == "VariantInit" {
+        emit_variant_init(e, expr)
         return 0
     }
     if expr.kind == "NewArray" {

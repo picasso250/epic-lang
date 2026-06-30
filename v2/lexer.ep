@@ -270,6 +270,9 @@ fun lex(src: str): Token[] {
             if text == "struct" {
                 kind = "STRUCT"
  }
+            if text == "type" {
+                kind = "TYPE"
+ }
             if text == "new"    {
                 kind = "NEW"
  }

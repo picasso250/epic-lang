@@ -250,6 +250,38 @@ fun parse_struct_def(p: Parser): AstNode {
     return node
 }
 
+fun parse_type_def(p: Parser): AstNode {
+    expect(p, "TYPE")
+    let name = expect(p, "ID")
+    let node = ast_node("TypeDef")
+    node.name = name.text
+    expect(p, "LBRACE")
+    skip_newlines(p)
+    while peek_kind(p, "RBRACE") == 0 {
+        let vname = expect(p, "ID")
+        let variant = ast_node("VariantDef")
+        variant.name = vname.text
+        if check(p, "LBRACE") == 1 {
+            skip_newlines(p)
+            while peek_kind(p, "RBRACE") == 0 {
+                let fname = expect(p, "ID")
+                expect(p, "COLON")
+                let ftype = parse_type(p)
+                expect_stmt_end(p)
+                let field = ast_node("StructField")
+                field.name = fname.text
+                field.type_name = ftype
+                push(variant.fields, field)
+            }
+            expect(p, "RBRACE")
+        }
+        push(node.fields, variant)
+        skip_newlines(p)
+    }
+    expect(p, "RBRACE")
+    return node
+}
+
 fun parse_fn_def(p: Parser): AstNode {
     expect(p, "FUN")
     let name = expect(p, "ID")
@@ -307,11 +339,15 @@ fun parse_fn_def(p: Parser): AstNode {
 fun parse_program(p: Parser): AstNode {
     let node = ast_node("Program")
     skip_newlines(p)
-    while peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 {
+    while peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 || peek_kind(p, "TYPE") == 1 {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
-            push(node.structs, parse_struct_def(p))
+            if peek_kind(p, "STRUCT") == 1 {
+                push(node.structs, parse_struct_def(p))
+            } else {
+                push(node.structs, parse_type_def(p))
+            }
         }
         skip_newlines(p)
     }
@@ -913,6 +949,42 @@ fun parse_struct_init(p: Parser, name: Token): AstNode {
     return node
 }
 
+fun parse_named_init_fields(p: Parser, node: AstNode): AstNode {
+    expect(p, "LBRACE")
+    skip_newlines(p)
+    while peek_kind(p, "RBRACE") == 0 {
+        let field_name = expect(p, "ID")
+        expect(p, "COLON")
+        let field = ast_node("InitField")
+        field.name = field_name.text
+        field.line = field_name.line
+        field.value_expr = parse_expr(p)
+        push(node.fields, field)
+        if check(p, "COMMA") == 1 {
+            skip_newlines(p)
+        } else {
+            if peek_kind(p, "NEWLINE") == 1 {
+                skip_newlines(p)
+            } else {
+                if peek_kind(p, "RBRACE") == 0 {
+                    let t = peek(p)
+                    parse_error(t.line, "Expected comma or newline in initializer")
+                }
+            }
+        }
+    }
+    expect(p, "RBRACE")
+    return node
+}
+
+fun parse_variant_init(p: Parser, type_name: str, variant_name: Token): AstNode {
+    let node = ast_node("VariantInit")
+    node.name = type_name
+    node.type_name = variant_name.text
+    node.line = variant_name.line
+    return parse_named_init_fields(p, node)
+}
+
 fun parse_array_literal(p: Parser, name: Token): AstNode {
     expect(p, "LBRACKET")
     expect(p, "RBRACKET")
@@ -945,6 +1017,9 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
     while done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
+            if peek_kind(p, "LBRACE") == 1 && current.kind == "Var" && is_upper_name(current.name) == 1 {
+                current = parse_variant_init(p, current.name, field)
+            } else {
             if check(p, "LPAREN") == 1 {
                 let n = ast_node("Call")
                 if current.kind == "Var" && current.name == "os" {
@@ -961,6 +1036,7 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
                 n.object = current
                 n.name = field.text
                 current = n
+            }
             }
         } else {
             if check(p, "LBRACKET") == 1 {

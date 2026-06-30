@@ -1,0 +1,26 @@
+# EXIT: 0
+# STDOUT: 012
+
+type Expr {
+    Empty
+
+    IntLit {
+        value: i64
+    }
+
+    Binary {
+        op: str
+        left: Expr
+        right: Expr
+    }
+}
+
+fun main() -> i64 {
+    let z: Expr
+    let a = Expr.IntLit { value: 123 }
+    let b = Expr.Binary { op: "+", left: z, right: a }
+    putstr(itoa(z.tag))
+    putstr(itoa(a.tag))
+    putstr(itoa(b.tag))
+    return 0
+}
