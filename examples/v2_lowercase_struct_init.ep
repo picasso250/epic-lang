@@ -6,6 +6,6 @@ struct point {
 }
 
 fun main(): i64 {
-    let p = point { x: 7, y: 3 }
+    let p = new point { x: 7, y: 3 }
     return p.x
 }

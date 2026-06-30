@@ -17,8 +17,8 @@ type Expr {
 
 fun main(): i64 {
     let z: Expr
-    let a = Expr.IntLit { value: 123 }
-    let b = Expr.Binary { op: "+", left: z, right: a }
+    let a = new Expr.IntLit { value: 123 }
+    let b = new Expr.Binary { op: "+", left: z, right: a }
     putstr(itoa(z.tag))
     putstr(itoa(a.tag))
     putstr(itoa(b.tag))

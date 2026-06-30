@@ -21,7 +21,10 @@ The current language includes:
 - scalar types: `bool`, `u8`, `i64`, `u64`
 - reference types: `str`, user structs, `T[]`
 - typed `let` declarations and zero values
-- `StructName {}` for zero/default struct initialization (`new StructName` is deprecated, pending removal)
+- `new StructName {}` for zero/default struct initialization
+- `new StructName { field: value }` for named struct initialization
+- `new TypeName.Variant` and `new TypeName.Variant { field: value }` for ADT values
+- `new T[] { ... }` for dynamic array literals
 - `new T[n]` for array allocation (remains)
 - `new map[str]T` for map allocation (remains)
 - explicit boolean conditions
@@ -37,12 +40,18 @@ The current language includes:
 
 ## Struct Initialization
 
-`StructName {}` initializes a struct with all fields set to their zero/default
-values (heap-allocated). `new StructName` is the deprecated equivalent form
-and will be removed in a future step.
+`new StructName {}` initializes a struct with all fields set to their
+zero/default values (heap-allocated). Named fields can be supplied with
+`new StructName { field: value }`; omitted fields keep their zero/default
+values.
 
-`new T[n]` (array allocation) and `new map[str]T` (map allocation) remain
-valid in the current language.
+ADT values use the same constructor marker. Payload variants are written as
+`new TypeName.Variant { field: value }`; no-payload variants are written as
+`new TypeName.Variant`.
+
+Dynamic array literals are written as `new T[] { ... }`. `new T[n]` (array
+allocation) and `new map[str]T` (map allocation) remain valid in the current
+language.
 
 ## Bootstrap Model
 
@@ -72,10 +81,10 @@ grammar explicitly expects one:
   - `match` body
   - `match` case body (after the colon)
 
-- **Expression/pattern position**: postfix `{ ... }` is an initializer or
-pattern-payload candidate, never a block. The parser may create init/pattern
-candidate AST nodes from token shape and syntactic context, but legality
-belongs to semantic and codegen checks:
+- **Expression/pattern position**: `new ... { ... }` is an initializer, and
+postfix `{ ... }` is a pattern-payload candidate in match patterns, never a
+block. The parser may create init/pattern candidate AST nodes from token shape
+and syntactic context, but legality belongs to semantic and codegen checks:
   - the target must be a real struct, type, or ADT variant
   - fields/payload bindings must exist and be valid
   - types must be compatible

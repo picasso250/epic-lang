@@ -61,15 +61,19 @@ look-ahead ambiguity.
 
 ### Struct Init Syntax
 
-`StructName {}` is the preferred syntax for zero/default struct
-initialization. `new StructName` is deprecated and will be removed.
-`new T[n]` and `new map[str]T` remain valid for now.
+`new StructName {}` is the syntax for zero/default struct initialization.
+Named struct initialization uses `new StructName { field: value }`.
+ADT construction uses `new TypeName.Variant` for no-payload variants and
+`new TypeName.Variant { field: value }` for payload variants. Dynamic array
+literals use `new T[] { ... }`.
+
+`new T[n]` and `new map[str]T` remain valid allocation forms.
 
 ## Acceptance
 
 When changing parser or AST code related to braces or match cases, verify:
 
-1. All examples in `v2/examples/` parse without error.
+1. All examples parse without error.
 2. No match case uses the old double-brace form.
 3. Every match case has a colon between pattern and body.
 4. Tests that depend on uppercase-name heuristics for init detection are

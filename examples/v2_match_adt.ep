@@ -34,8 +34,8 @@ fun show(e: Expr): i64 {
 
 fun main(): i64 {
     let z: Expr
-    let a = Expr.IntLit { value: 7 }
-    let b = Expr.Binary { op: "+", left: z, right: a }
+    let a = new Expr.IntLit { value: 7 }
+    let b = new Expr.Binary { op: "+", left: z, right: a }
     show(a)
     putstr(" ")
     show(b)

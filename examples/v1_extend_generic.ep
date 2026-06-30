@@ -11,9 +11,9 @@ fun main(): void {
     extend(xs, xs)
     putstr(itoa(xs[0] + xs[1] + xs[2] + xs[3]))
 
-    let b1 = Box {}
+    let b1 = new Box {}
     b1.value = 5
-    let b2 = Box {}
+    let b2 = new Box {}
     b2.value = 7
     let left = new Box[1]
     let right = new Box[1]

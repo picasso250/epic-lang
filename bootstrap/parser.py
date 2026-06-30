@@ -519,14 +519,23 @@ class Parser:
                 self.expect("RBRACKET")
                 value = self.parse_type()
                 return NewNode(struct_name=f"map[{key[1]}]{value}")
-            elem = t[1]
+            name = t[1]
             if self.check("LBRACKET"):
                 count = None
                 if not self.peek_kind("RBRACKET"):
                     count = self.parse_expr()
                 self.expect("RBRACKET")
-                return NewArrayNode(elem_type=elem, count=count)
-            return NewNode(struct_name=elem)
+                if count is None and self.check("LBRACE"):
+                    return ArrayLiteralNode(elem_type=name, values=self.parse_brace_values())
+                return NewArrayNode(elem_type=name, count=count)
+            if self.check("DOT"):
+                variant = self.expect("ID")
+                if self.check("LBRACE"):
+                    return StructInitNode(type_name=name, variant=variant[1], fields=self.parse_named_fields_after_lbrace())
+                return StructInitNode(type_name=name, variant=variant[1], fields=[])
+            if self.check("LBRACE"):
+                return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
+            raise ParseError("Expected constructor body, variant, array allocation, or map allocation after new", t[2])
         if self.peek_kind("NUMBER"):
             t = self.advance()
             return LiteralNode(value=t[1])
@@ -560,18 +569,6 @@ class Parser:
                 node = CallNode(name=name, args=args)
             else:
                 node = VarNode(name=name)
-            if self._lookahead_named_fields() and self.check("LBRACE"):
-                return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
-            # Empty struct init: ID {} (with optional newlines between braces)
-            if self.peek_kind("LBRACE"):
-                i = self.pos + 1
-                while i < len(self.tokens) and self.tokens[i][0] == "NEWLINE":
-                    i += 1
-                if i < len(self.tokens) and self.tokens[i][0] == "RBRACE":
-                    self.advance()  # consume LBRACE
-                    self.skip_newlines()
-                    self.advance()  # consume RBRACE
-                    return StructInitNode(type_name=name, fields=[])
             # Postfix: .field and [index]
             while True:
                 if self.check("DOT"):
@@ -585,8 +582,6 @@ class Parser:
                             if len(args) > 4:
                                 raise ParseError("function calls may have at most 4 arguments in v0", field[2])
                             raise ParseError("method calls are only supported for os.* in v0", field[2])
-                    elif isinstance(node, VarNode) and self._lookahead_named_fields() and self.check("LBRACE"):
-                        node = StructInitNode(type_name=node.name, variant=field[1], fields=self.parse_named_fields_after_lbrace())
                     else:
                         node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):
@@ -612,17 +607,6 @@ class Parser:
             return expr
         t = self.peek()
         raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-
-    def _lookahead_named_fields(self):
-        """Check if the next brace starts named fields: LBRACE then (NEWLINE*) then ID COLON."""
-        if not self.peek_kind("LBRACE"):
-            return False
-        i = self.pos + 1
-        while i < len(self.tokens) and self.tokens[i][0] == "NEWLINE":
-            i += 1
-        return (i + 1 < len(self.tokens) and
-                self.tokens[i][0] == "ID" and
-                self.tokens[i + 1][0] == "COLON")
 
     def parse_named_fields_after_lbrace(self):
         fields = []

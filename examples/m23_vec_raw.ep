@@ -7,7 +7,7 @@ struct Point {
 
 fun main(): void {
     let points = new Point[4]
-    let p = Point {}
+    let p = new Point {}
     p.x = 42
     p.y = 99
 

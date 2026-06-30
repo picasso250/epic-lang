@@ -6,7 +6,7 @@ struct Node {
 }
 
 fun main(): void {
-    let n = Node {}
+    let n = new Node {}
     n.kind = 42
     n.value = 10
     os.ExitProcess(n.kind)

@@ -5,9 +5,9 @@ struct Node {
 }
 
 fun main(): void {
-    let a = Node {}
+    let a = new Node {}
     a.val = 10
-    let b = Node {}
+    let b = new Node {}
     b.val = 20
     a.next = b
 

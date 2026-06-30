@@ -6,7 +6,7 @@ struct Point {
 }
 
 fun main(): void {
-    let p = Point {}
+    let p = new Point {}
     p.x = 30
     p.y = 20
     os.ExitProcess(p.x + p.y)
