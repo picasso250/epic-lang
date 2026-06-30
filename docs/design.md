@@ -281,7 +281,7 @@ Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 
 **三档分类**：
 
 1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`a[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
-2. **底层接口** — compiler / runtime / linker / bootstrap 可用，普通代码不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_new(ptr, len)`、`str_slice(s, start, end)`。
+2. **底层接口** — compiler / runtime / linker / bootstrap 可用，但也不推荐使用，普通代码绝不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_new(ptr, len)`、`str_slice(s, start, end)`。
 3. **历史写法** — 仍可解析/运行，但新代码不应写；未来可删除。（当前尚无明确归入此类的语法。）
 
 ## 文件 IO（面向字节, byte-oriented）
