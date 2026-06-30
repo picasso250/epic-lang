@@ -102,8 +102,7 @@ fun decode_escape(e: i64): i64 {
 
 fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
     let p = src.data
-    let buf = new u8[end - start + 1]
-    let out_len = 0
+    let buf = new u8[]
     let pos = start
     while pos < end {
         let c = p[pos]
@@ -119,11 +118,10 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
             }
             c = decode_escape(p[pos])
         }
-        buf.data[out_len] = c
-        out_len += 1
+        push(buf, c)
         pos += 1
     }
-    return str_new(buf.data, out_len)
+    return str(buf)
 }
 
 fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
@@ -330,8 +328,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && ch == 34 {
             let start_line = line
             pos += 1
-            let buf = new u8[n - pos + 1]
-            let out_len = 0
+            let buf = new u8[]
             let scanning = 1
             while scanning == 1 && pos < n {
                 if p[pos] == 34 {
@@ -351,8 +348,7 @@ fun lex(src: str): Token[] {
                         let e = p[pos]
                         c = decode_escape(e)
                     }
-                    buf.data[out_len] = c
-                    out_len += 1
+                    push(buf, c)
                     pos += 1
                 }
             }
@@ -360,7 +356,7 @@ fun lex(src: str): Token[] {
                 println("unterminated string")
                 os.ExitProcess(1)
             }
-            let text = str_new(buf.data, out_len)
+            let text = str(buf)
             pos += 1
             push_token(tokens, "STRING", text, start_line)
             consumed = 1
