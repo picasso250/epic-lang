@@ -15,3 +15,8 @@
   - `python runtests.py --linker py`
   - `python test_bootstrap_fixed_point.py`
 - 不要为了新 feature 同步维护旧目录化版本；需要历史行为时看 tag 或旧提交。
+
+## 现状
+
+- Python reference compiler ok `python runtests.py --linker py`
+- 正在 eat dog food . test_lexer_bootstrap.py 通过，其他还未通过
