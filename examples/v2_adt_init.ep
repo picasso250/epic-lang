@@ -15,7 +15,7 @@ type Expr {
     }
 }
 
-fun main() -> i64 {
+fun main(): i64 {
     let z: Expr
     let a = Expr.IntLit { value: 123 }
     let b = Expr.Binary { op: "+", left: z, right: a }

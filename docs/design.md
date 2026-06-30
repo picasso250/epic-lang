@@ -42,3 +42,48 @@ Python reference compiler -> Epic compiler -> Epic compiler
 
 The staged v0/v1 directory chain is historical. Git tags preserve that chain;
 it is no longer part of the maintained source layout.
+
+## Brace Disambiguation
+
+Braces `{ ... }` serve different roles depending on grammatical position,
+not on identifier spelling or capitalization.
+
+- **Block/body position**: `{ ... }` is a block or body only where the
+grammar explicitly expects one:
+  - function body
+  - `if` then block
+  - `else` block
+  - `while` block
+  - `for` block
+  - struct body
+  - type body
+  - `match` body
+  - `match` case body (after the colon)
+
+- **Expression/pattern position**: postfix `{ ... }` is an initializer or
+pattern-payload candidate, never a block. The parser may create init/pattern
+candidate AST nodes from token shape and syntactic context, but legality
+belongs to semantic and codegen checks:
+  - the target must be a real struct, type, or ADT variant
+  - fields/payload bindings must exist and be valid
+  - types must be compatible
+
+## Match Case Colon Rule
+
+Every `match` case must use a colon to separate the pattern from its body:
+
+```text
+pattern: { ... }
+else:    { ... }
+```
+
+ADT patterns with payload use the same colon form:
+
+```text
+Expr.IntLit { value: n }: { ... }
+```
+
+**Rationale.** This rule eliminates the old double-brace ambiguity
+(`Expr.IntLit { value: n } { ... }`), removes the need for
+uppercase-name heuristics, and makes the match syntax uniform across all
+pattern forms.

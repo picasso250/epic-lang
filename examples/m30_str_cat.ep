@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: hello world
-fun main() -> void {
+fun main(): void {
     let a = "hello"
     let b = " "
     let c = "world"

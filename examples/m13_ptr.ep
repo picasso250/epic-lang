@@ -5,7 +5,7 @@ struct Node {
     value: i64
 }
 
-fun main() -> void {
+fun main(): void {
     let n = new Node
     n.kind = 42
     n.value = 10

@@ -4,7 +4,7 @@ struct Box {
     value: i64
 }
 
-fun main() -> void {
+fun main(): void {
     let xs = new i64[1]
     push(xs, 1)
     push(xs, 2)

@@ -1,5 +1,5 @@
 # EXIT: 22
-fun main() -> void {
+fun main(): void {
     let i = 0
     let sum = 0
     while i < 10 {

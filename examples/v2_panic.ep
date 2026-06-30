@@ -1,5 +1,5 @@
 # EXIT: 1
 # STDOUT: panic line 4: boom
-fun main() -> void {
+fun main(): void {
     panic "boom"
 }

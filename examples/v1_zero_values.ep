@@ -4,7 +4,7 @@ struct Box {
     value: i64
 }
 
-fun main() -> void {
+fun main(): void {
     let s: str
     let xs: u8[]
     let b: Box

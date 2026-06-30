@@ -5,7 +5,7 @@ struct Data {
     value: i64
 }
 
-fun main() -> void {
+fun main(): void {
     let d = new Data
     d.flag = 1
     d.value = 65

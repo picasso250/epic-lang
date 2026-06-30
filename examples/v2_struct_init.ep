@@ -4,7 +4,7 @@ struct Point {
     y: i64
 }
 
-fun main() -> i64 {
+fun main(): i64 {
     let p = Point { y: 40, x: 2 }
     return p.x + p.y
 }

@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: Ei!
-fun main() -> void {
+fun main(): void {
     let s = "Epic"
     putc(s[0])
 

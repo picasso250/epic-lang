@@ -2,7 +2,7 @@
 # STDOUT: A
 # STDOUT: Epic
 # STDOUT: 65
-fun main() -> void {
+fun main(): void {
     let a = 65
     putc(a)
     let b = 10

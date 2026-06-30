@@ -1,31 +1,31 @@
 # EXIT: 0
 # STDOUT: MZ466016909060283686952306183
 # CLEAN: test_bytes.bin
-fun u16_le(buf: u8[], off: i64) -> u64 {
+fun u16_le(buf: u8[], off: i64): u64 {
     return u64(buf[off]) | (u64(buf[off + 1]) << 8)
 }
 
-fun u32_le(buf: u8[], off: i64) -> u64 {
+fun u32_le(buf: u8[], off: i64): u64 {
     return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
 }
 
-fun u64_le(buf: u8[], off: i64) -> u64 {
+fun u64_le(buf: u8[], off: i64): u64 {
     return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24) | (u64(buf[off + 4]) << 32) | (u64(buf[off + 5]) << 40) | (u64(buf[off + 6]) << 48) | (u64(buf[off + 7]) << 56)
 }
 
-fun put_u16_le(buf: u8[], off: i64, x: u64) -> void {
+fun put_u16_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & 255)
     buf[off + 1] = u8((x >>> 8) & 255)
 }
 
-fun put_u32_le(buf: u8[], off: i64, x: u64) -> void {
+fun put_u32_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & 255)
     buf[off + 1] = u8((x >>> 8) & 255)
     buf[off + 2] = u8((x >>> 16) & 255)
     buf[off + 3] = u8((x >>> 24) & 255)
 }
 
-fun put_u64_le(buf: u8[], off: i64, x: u64) -> void {
+fun put_u64_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & 255)
     buf[off + 1] = u8((x >>> 8) & 255)
     buf[off + 2] = u8((x >>> 16) & 255)
@@ -36,7 +36,7 @@ fun put_u64_le(buf: u8[], off: i64, x: u64) -> void {
     buf[off + 7] = u8((x >>> 56) & 255)
 }
 
-fun main() -> void {
+fun main(): void {
     let buf = new u8[16]
     push(buf, 'M')
     push(buf, 'Z')

@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: 101
-fun main() -> i64 {
+fun main(): i64 {
     let ids = new map[str]i64
 
     if ids["main"] != 0 {

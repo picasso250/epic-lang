@@ -119,8 +119,7 @@ class Parser:
         self.expect("LPAREN")
         params = self.parse_params()
         self.expect("RPAREN")
-        if not self.check("ARROW"):
-            self.expect("COLON")
+        self.expect("COLON")
         ret_type = self.parse_type()
         body = self.parse_block()
         return FunDefNode(
@@ -288,7 +287,7 @@ class Parser:
         self.expect_stmt_end()
         op = self.ASSIGN_TOKENS[op_token[0]]
         if op:
-            value = BinaryNode(op=op, left=lhs, right=value)
+            return AssignOpNode(op=op, target=lhs, value=value)
         if isinstance(lhs, VarNode):
             return AssignNode(name=lhs.name, value=value)
         elif isinstance(lhs, FieldAccessNode):
@@ -370,6 +369,7 @@ class Parser:
         while not self.peek_kind("RBRACE"):
             if self.peek_kind("ELSE"):
                 self.advance()
+                self.expect("COLON")
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
             else:
@@ -397,6 +397,7 @@ class Parser:
                             if not self.check("COMMA"):
                                 break
                     self.expect("RBRACE")
+                self.expect("COLON")
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=pattern, bindings=bindings, body=body))
             self.skip_newlines()
@@ -531,13 +532,13 @@ class Parser:
             return LiteralNode(value=t[1])
         if self.peek_kind("TRUE"):
             self.advance()
-            return LiteralNode(value=1)
+            return BoolNode(value=1)
         if self.peek_kind("FALSE"):
             self.advance()
-            return LiteralNode(value=0)
+            return BoolNode(value=0)
         if self.peek_kind("CHAR"):
             t = self.advance()
-            return LiteralNode(value=t[1])
+            return CharNode(value=t[1])
         if self.peek_kind("STRING"):
             t = self.advance()
             return StringNode(value=t[1])

@@ -73,10 +73,18 @@ class AssignNode(ASTNode):
 
 
 @dataclass
+class AssignOpNode(ASTNode):
+    op: str
+    target: ASTNode
+    value: ASTNode
+
+
+@dataclass
 class FieldSetNode(ASTNode):
     object: ASTNode
     field: str
     value: ASTNode
+
 
 
 @dataclass
@@ -84,6 +92,7 @@ class SubscriptAssignNode(ASTNode):
     base: ASTNode
     index: ASTNode
     value: ASTNode
+
 
 
 @dataclass
@@ -153,6 +162,16 @@ class ExprStmtNode(ASTNode):
 
 @dataclass
 class LiteralNode(ASTNode):
+    value: int
+
+
+@dataclass
+class CharNode(ASTNode):
+    value: int
+
+
+@dataclass
+class BoolNode(ASTNode):
     value: int
 
 

@@ -15,24 +15,24 @@ type Expr {
     }
 }
 
-fun show(e: Expr) -> i64 {
+fun show(e: Expr): i64 {
     match e {
-        Expr.IntLit { value: n } {
+        Expr.IntLit { value: n }: {
             putstr("int=")
             putstr(itoa(n))
         }
-        Expr.Binary { op } {
+        Expr.Binary { op }: {
             putstr("bin=")
             putstr(op)
         }
-        else {
+        else: {
             putstr("empty")
         }
     }
     return 0
 }
 
-fun main() -> i64 {
+fun main(): i64 {
     let z: Expr
     let a = Expr.IntLit { value: 7 }
     let b = Expr.Binary { op: "+", left: z, right: a }

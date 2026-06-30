@@ -36,6 +36,8 @@ def py_dump(node, depth=0):
         emit("Program")
         for struct in node.structs:
             out.extend(py_dump(struct, depth + 1))
+        for typ in getattr(node, "types", []):
+            out.extend(py_dump(typ, depth + 1))
         for func in node.funcs:
             out.extend(py_dump(func, depth + 1))
     elif isinstance(node, StructDefNode):
@@ -60,11 +62,16 @@ def py_dump(node, depth=0):
         if node.expr is not None:
             out.extend(py_dump(node.expr, depth + 1))
     elif isinstance(node, LetNode):
-        emit(f"Let {node.name}")
+        suffix = f" : {node.var_type}" if node.var_type else ""
+        emit(f"Let {node.name}{suffix}")
         if node.value is not None:
             out.extend(py_dump(node.value, depth + 1))
     elif isinstance(node, AssignNode):
         emit(f"Assign {node.name}")
+        out.extend(py_dump(node.value, depth + 1))
+    elif isinstance(node, AssignOpNode):
+        emit(f"AssignOp {node.op}")
+        out.extend(py_dump(node.target, depth + 1))
         out.extend(py_dump(node.value, depth + 1))
     elif isinstance(node, FieldSetNode):
         emit(f"FieldSet {node.field}")
@@ -89,11 +96,40 @@ def py_dump(node, depth=0):
         emit("Break")
     elif isinstance(node, ContinueNode):
         emit("Continue")
+    elif isinstance(node, ForRangeNode):
+        emit(f"For {node.name}")
+        out.extend(py_dump(node.body, depth + 1))
+        out.extend(py_dump(node.start, depth + 1))
+        out.extend(py_dump(node.end, depth + 1))
+    elif isinstance(node, PanicNode):
+        emit("Panic")
+        out.extend(py_dump(node.message, depth + 1))
+    elif isinstance(node, AssertNode):
+        emit("Assert")
+        out.extend(py_dump(node.cond, depth + 1))
+        if node.message is not None:
+            out.extend(py_dump(node.message, depth + 1))
+    elif isinstance(node, MatchNode):
+        emit("Match")
+        out.extend(py_dump(node.expr, depth + 1))
+        for case in node.cases:
+            out.extend(py_dump(case, depth + 1))
+    elif isinstance(node, MatchCase):
+        emit("MatchCase")
+        if node.pattern is not None:
+            out.extend(py_dump(node.pattern, depth + 1))
+        for field, bind in node.bindings:
+            emit(f"  MatchBinding {field} : {bind}")
+        out.extend(py_dump(node.body, depth + 1))
     elif isinstance(node, ExprStmtNode):
         emit("ExprStmt")
         out.extend(py_dump(node.expr, depth + 1))
     elif isinstance(node, LiteralNode):
         emit(f"Literal {node.value}")
+    elif isinstance(node, CharNode):
+        emit(f"Char {node.value}")
+    elif isinstance(node, BoolNode):
+        emit(f"Bool {node.value}")
     elif isinstance(node, StringNode):
         emit(f"String {node.value}")
     elif isinstance(node, VarNode):
@@ -107,6 +143,9 @@ def py_dump(node, depth=0):
         emit(f"Binary {node.op}")
         out.extend(py_dump(node.left, depth + 1))
         out.extend(py_dump(node.right, depth + 1))
+    elif isinstance(node, UnaryNode):
+        emit(f"Unary {node.op}")
+        out.extend(py_dump(node.expr, depth + 1))
     elif isinstance(node, FieldAccessNode):
         emit(f"FieldAccess {node.field}")
         out.extend(py_dump(node.object, depth + 1))
@@ -114,12 +153,39 @@ def py_dump(node, depth=0):
         emit("Subscript")
         out.extend(py_dump(node.base, depth + 1))
         out.extend(py_dump(node.index, depth + 1))
+    elif isinstance(node, SliceNode):
+        emit("Slice")
+        out.extend(py_dump(node.base, depth + 1))
+        if node.start is not None:
+            out.extend(py_dump(node.start, depth + 1))
+        if node.end is not None:
+            out.extend(py_dump(node.end, depth + 1))
     elif isinstance(node, NewNode):
         emit(f"New {node.struct_name}")
     elif isinstance(node, NewArrayNode):
         emit(f"NewArray : {node.elem_type}")
         if node.count is not None:
             out.extend(py_dump(node.count, depth + 1))
+    elif isinstance(node, StructInitNode):
+        kind = "VariantInit" if node.variant else "StructInit"
+        name = node.variant if node.variant else node.type_name
+        suffix = f" : {node.type_name}" if node.variant else ""
+        emit(f"{kind} {name}{suffix}")
+        for field, value in node.fields:
+            out.append(line(depth + 1, f"InitField {field}"))
+            out.extend(py_dump(value, depth + 2))
+    elif isinstance(node, ArrayLiteralNode):
+        emit(f"ArrayLiteral : {node.elem_type}")
+        for value in node.values:
+            out.extend(py_dump(value, depth + 1))
+    elif isinstance(node, TypeDefNode):
+        emit(f"TypeDef {node.name}")
+        for variant in node.variants:
+            out.extend(py_dump(variant, depth + 1))
+    elif isinstance(node, TypeVariant):
+        emit(f"VariantDef {node.name}")
+        for field in node.fields:
+            out.extend(py_dump(field, depth + 1))
     else:
         raise TypeError(f"unsupported AST node: {type(node).__name__}")
 

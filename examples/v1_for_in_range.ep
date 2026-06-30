@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: 0123
-fun main() -> void {
+fun main(): void {
     let end = 4
     for i in 0:end {
         putc('0' + i)

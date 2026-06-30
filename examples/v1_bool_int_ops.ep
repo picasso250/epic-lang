@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: OKZA
-fun main() -> void {
+fun main(): void {
     let ok: bool = true
     let b: u8 = 'A'
     let mask: u64 = 240

@@ -486,10 +486,8 @@ fun type_is_complex(t: TypeInfo): i64 {
 }
 
 fun is_array_type_name(name: str): i64 {
-    if len(name) >= 2 {
-        if name[len(name) - 2] == 91 && name[len(name) - 1] == 93 {
-            return 1
-        }
+    if str_find(name, "[]") == len(name) - 2 {
+        return 1
     }
     return 0
 }

@@ -63,22 +63,37 @@ fun merge_one(out: AstNode, ast: AstNode, is_main_file: i64): i64 {
     return 0
 }
 
-fun merge_inputs(): AstNode {
+fun merge_inputs(out: AstNode): i64 {
     if len(argv) < 2 {
         die_driver("usage: epic <input.ep>...")
     }
-    let out = ast_node("Program")
-    let main_ast = parse_file(argv[1])
+    putstr("merge start\n")
+    putstr(argv[1])
+    putc(10)
+    let main_src = read_file(argv[1])
+    let main_tokens = lex(main_src)
+    let main_parser = make_parser(main_tokens)
+    let main_ast = parse_program(main_parser)
+    putstr("main parsed\n")
     if has_main(main_ast) == 0 {
         die_driver("main file has no main function")
     }
     merge_one(out, main_ast, 1)
 
     for i in 2:len(argv) {
-        let ast = parse_file(argv[i])
+        putstr("file ")
+        putstr(argv[i])
+        putc(10)
+        let src = read_file(argv[i])
+        let tokens = lex(src)
+        let p = make_parser(tokens)
+        let ast = parse_program(p)
+        putstr("parsed\n")
         merge_one(out, ast, 0)
+        putstr("merged\n")
     }
-    return out
+    putstr("merge done\n")
+    return 0
 }
 
 fun output_base(main_path: str): str {
@@ -102,16 +117,17 @@ fun run_toolchain(asm_path: str, obj_path: str, exe_path: str): i64 {
 }
 
 fun main(): i64 {
-    system("cmd /c if not exist build mkdir build")
-    system("cmd /c if not exist build\\epic mkdir build\\epic")
-
-    let ast = merge_inputs()
+    putstr("main start\n")
+    let ast = ast_node("Program")
+    merge_inputs(ast)
+    putstr("emit start\n")
     let base = output_base(argv[1])
     let asm_path = base + ".asm"
     let obj_path = base + ".obj"
     let exe_path = base + ".exe"
     let e = make_emitter(asm_path)
     emit_program(e, ast)
+    putstr("emit done\n")
 
     let code = run_toolchain(asm_path, obj_path, exe_path)
     if code != 0 {

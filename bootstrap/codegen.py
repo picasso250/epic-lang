@@ -211,7 +211,7 @@ class Emitter:
 
         # Pre-scan: count max temp slots needed
         max_temps = self._pre_scan_temps(body)
-        temp_bytes = max(max_temps + 1, 256) * 8
+        temp_bytes = max(max_temps + 1, 1024) * 8
 
         # Entry label: main → _start
         label = "_start" if name == "main" else name
@@ -553,6 +553,8 @@ class Emitter:
             self.emit_field_set(stmt)
         elif isinstance(stmt, SubscriptAssignNode):
             self.emit_subscript_assign(stmt)
+        elif isinstance(stmt, AssignOpNode):
+            self.emit_assign_op(stmt)
         else:
             raise RuntimeError(f"Unknown stmt type: {type(stmt).__name__}")
 
@@ -708,10 +710,23 @@ class Emitter:
         else:
             self.emit_stack_store(slot, "rax")
 
+    def emit_assign_op(self, stmt):
+        # Lower AssignOp into equivalent plain assign with binary on the RHS
+        binary = BinaryNode(op=stmt.op, left=stmt.target, right=stmt.value)
+        target = stmt.target
+        if isinstance(target, VarNode):
+            self.emit_assign(AssignNode(name=target.name, value=binary))
+        elif isinstance(target, FieldAccessNode):
+            self.emit_field_set(FieldSetNode(object=target.object, field=target.field, value=binary))
+        elif isinstance(target, SubscriptNode):
+            self.emit_subscript_assign(SubscriptAssignNode(base=target.base, index=target.index, value=binary))
+        else:
+            raise RuntimeError(f"Unknown AssignOp target: {type(target).__name__}")
+
     # ── expressions ────────────────────────────────────────────────────
 
     def emit_expr(self, expr):
-        if isinstance(expr, LiteralNode):
+        if isinstance(expr, (LiteralNode, CharNode, BoolNode)):
             self.emit_mov("rax", expr.value)
         elif isinstance(expr, StringNode):
             label = self.get_string_label(expr.value)
@@ -1073,7 +1088,8 @@ class Emitter:
             self.emit_field_access(obj)
             self._emit_field_read_from_rax(obj, field_name)
         else:
-            raise RuntimeError(f"Field access on non-variable: {type(obj).__name__}")
+            self.emit_expr(obj)
+            self._emit_field_read_from_rax(obj, field_name)
 
     def _emit_field_read_from_rax(self, source_expr, field_name):
         """Read field_name from a struct pointer already in rax."""
@@ -1744,7 +1760,7 @@ class Emitter:
 
     def _expr_type(self, expr):
         """Return the type string of an expression. Minimal but principled."""
-        if isinstance(expr, LiteralNode):
+        if isinstance(expr, (LiteralNode, CharNode, BoolNode)):
             return "i64"
         if isinstance(expr, StringNode):
             return "&str"
