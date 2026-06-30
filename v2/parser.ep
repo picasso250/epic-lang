@@ -197,6 +197,16 @@ fun parse_type(p: Parser): str {
     if same(t.kind, "ID") == 0 {
         parse_error(t.line, "Expected type")
     }
+    if t.text == "map" {
+        expect(p, "LBRACKET")
+        let key = expect(p, "ID")
+        if key.text != "str" {
+            parse_error(key.line, "map key type must be str")
+        }
+        expect(p, "RBRACKET")
+        let value_type = parse_type(p)
+        return "map[str]" + value_type
+    }
     let typ = t.text
     while check(p, "LBRACKET") == 1 {
         expect(p, "RBRACKET")
@@ -319,6 +329,9 @@ fun parse_fn_def(p: Parser): AstNode {
         parse_error(name.line, "reserved builtin function name")
     }
     if name.text == "str_trim" {
+        parse_error(name.line, "reserved builtin function name")
+    }
+    if name.text == "map_has" {
         parse_error(name.line, "reserved builtin function name")
     }
     expect(p, "LPAREN")
@@ -1198,6 +1211,17 @@ fun parse_primary(p: Parser): AstNode {
     if peek_kind(p, "NEW") == 1 {
         expect(p, "NEW")
         let t = expect(p, "ID")
+        if t.text == "map" {
+            expect(p, "LBRACKET")
+            let key = expect(p, "ID")
+            if key.text != "str" {
+                parse_error(key.line, "map key type must be str")
+            }
+            expect(p, "RBRACKET")
+            let n = ast_node("NewMap")
+            n.type_name = parse_type(p)
+            return n
+        }
         if check(p, "LBRACKET") == 1 {
             let n = ast_node("NewArray")
             n.type_name = t.text

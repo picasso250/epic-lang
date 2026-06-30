@@ -411,6 +411,9 @@ fun type_struct(name: str): TypeInfo {
 fun type_array(elem: str): TypeInfo {
     return type_info("array", elem)
  }
+fun type_map(value: str): TypeInfo {
+    return type_info("map", value)
+ }
 
 fun type_is_i8(t: TypeInfo): i64 {
     if t.kind == "i8" {
@@ -476,6 +479,9 @@ fun type_is_complex(t: TypeInfo): i64 {
     if t.kind == "array" {
         return 1
  }
+    if t.kind == "map" {
+        return 1
+ }
     return 0
 }
 
@@ -491,6 +497,22 @@ fun is_array_type_name(name: str): i64 {
 fun array_elem_name(name: str): str {
     if is_array_type_name(name) == 1 {
         return name[:len(name) - 2]
+    }
+    return name
+}
+
+fun is_map_type_name(name: str): i64 {
+    if len(name) > 8 {
+        if name[:8] == "map[str]" {
+            return 1
+        }
+    }
+    return 0
+}
+
+fun map_value_name(name: str): str {
+    if is_map_type_name(name) == 1 {
+        return name[8:]
     }
     return name
 }
@@ -519,6 +541,9 @@ fun user_type(name: str): TypeInfo {
  }
     if is_array_type_name(name) == 1 {
         return type_array(array_elem_name(name))
+ }
+    if is_map_type_name(name) == 1 {
+        return type_map(map_value_name(name))
  }
     return type_struct(name)
 }
