@@ -1,9 +1,0 @@
-# EXIT: 0
-# STDOUT: hello world
-fun main(): void {
-    let a = "hello"
-    let b = " "
-    let c = "world"
-    putstr(a + b + c)
-    os.ExitProcess(0)
-}

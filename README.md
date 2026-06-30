@@ -2,63 +2,64 @@
 
 Epic is a small self-hosting systems language experiment targeting Windows x64.
 
-This repository keeps each language generation as a directory on `main`:
+The active development line has two compiler implementations:
 
-- `v0/`: Python bootstrap compiler and the first fixed-point Epic compiler.
-- `v1/`: v1 compiler sources, compiled by the v0 compiler anchor.
-- `v2/`: reserved for sources compiled by the v1 compiler anchor; no distinct v2 feature work yet.
+- `bootstrap/`: Python reference compiler for the current Epic language.
+- `src/`: Epic compiler and Epic-written tools, written in the current language.
 
-The repository root is not a language version. Version sources, examples,
-runtime files, tests, and implementation notes live inside the version
-directories.
+Earlier staged bootstrap directories are preserved in Git history and tags, not
+as maintained source directories. The last directory-based chain is tagged as:
 
-## Root Layout
+```text
+staged-bootstrap-archive-2026-06-30
+```
 
-- `AGENTS.md`: repository-wide development rules.
-- `README.md`: this overview.
-- `worklog.md`: cross-version chronological project log.
-- `epic-bootstrap.py`: top-level bootstrap chain.
-- `tools/`: local shared Windows tool binaries such as `nasm.exe` and `lld-link.exe`.
-- `tree-sitter-epic/`: shared editor/parser support.
-- `v0/`, `v1/`, `v2/`: version source trees.
+## Layout
 
-`tools/` and `build/` are local directories and are ignored by git.
+- `bootstrap/`: Python lexer, parser, AST, codegen, and compiler driver.
+- `src/`: self-hosted compiler sources and `link.ep`.
+- `runtime/`: NASM runtime helpers appended by the compiler.
+- `examples/`: annotated acceptance examples for the current language.
+- `docs/`: merged design and implementation notes, plus archived source notes.
+- `editors/`: editor integration assets.
+- `tree-sitter-epic/`: shared tree-sitter grammar support.
+- `tools/`: local ignored tool binaries such as `nasm.exe` and `lld-link.exe`.
+- `build/`: local ignored build output.
 
 ## Bootstrap
 
-Run the top-level bootstrap chain from the repository root:
+Build and verify the self-hosted compiler fixed point from the repository root:
 
 ```powershell
-python epic-bootstrap.py
+python test_bootstrap_fixed_point.py
 ```
 
-The script:
+The check builds:
 
-1. runs the v0 fixed-point bootstrap in `v0/`
-2. copies the resulting compiler to `build/v0.exe`
-3. uses `build/v0.exe` to compile the v1 compiler sources
-4. copies that compiler to `build/v1.exe`
-5. uses `build/v1.exe` to compile `v1/link.ep`
-6. copies that linker to `build/link.exe` and `v2/build/link.exe`
-7. copies the v1 compiler anchor to `v2/build/v1.exe`
+1. `epic-py`: Python reference compiler builds the Epic compiler.
+2. `epic-epic`: `epic-py` builds the Epic compiler.
+3. `epic-epic-epic`: `epic-epic` builds the Epic compiler again.
+4. a fourth compiler to verify repeated output is byte-identical.
 
-It intentionally does not build v2 yet. Current v2 has no new feature surface,
-and v1 sources are still written in the v0-accepted source shape.
+`python epic-bootstrap.py` is a thin wrapper around that fixed-point check.
 
-## Version Tests
+## Tests
 
-Run version-specific tests inside the corresponding directory:
+Run the current Python reference compiler against all annotated examples:
 
 ```powershell
-cd v0
-python runtests.py
-
-cd ..\v1
-python runtests.py
+python runtests.py --linker py
 ```
 
-The root bootstrap script is a cross-version chain check, not a replacement for
-each version's own tests.
+Formatter and bootstrap checks:
+
+```powershell
+python test_epicfmt.py
+python test_bootstrap_fixed_point.py
+```
+
+`link.py` is the default Python linker. `src/link.ep` is the Epic linker
+implementation and is tested separately.
 
 ## Development Rule
 
