@@ -59,12 +59,11 @@ fun add(a: i64, b: i64): i64 {
 程序入口函数必须为：
 
 ```epic
-fun main(): i64 {
-    return 0
+fun main(): void {
 }
 ```
 
-`main` 也可以返回 `void`。从 `main` 末尾自然结束时以状态 `0` 退出。非零退出需显式调用 `os.ExitProcess(code)`。
+从 `main` 末尾自然结束时以状态 `0` 退出。非零退出需显式调用 `os.ExitProcess(code)`。
 
 ## 表达式与语句 (Expressions and Statements)
 
@@ -230,6 +229,8 @@ let ok = map_has(ids, "main")
 | `a.data[i]`           | 底层无检查的元素访问                              |
 | `a.len` / `len(a)`    | 当前长度                                          |
 | `a.cap` / `cap(a)`    | 当前容量                                          |
+
+todo a[i] 提正  ； a.len/cap 老旧该删
 
 ### 索引与切片 (Indexing and Slices)
 
