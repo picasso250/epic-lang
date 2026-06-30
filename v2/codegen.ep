@@ -500,13 +500,38 @@ fun pre_scan_block(e: EmitterState, block: AstNode): i64 {
                 if stmt.kind == "While" {
                     pre_scan_block(e, stmt.body)
                 } else {
-                    if stmt.kind == "Block" {
-                        pre_scan_block(e, stmt)
+                    if stmt.kind == "Match" {
+                        pre_scan_match(e, stmt)
+                    } else {
+                        if stmt.kind == "Block" {
+                            pre_scan_block(e, stmt)
+                        }
                     }
                 }
             }
         }
     }
+    return 0
+}
+
+fun pre_scan_match(e: EmitterState, stmt: AstNode): i64 {
+    let mt = expr_type(e, stmt.expr)
+    for i in 0:len(stmt.fields) {
+        let c = stmt.fields[i]
+        if c.name != "" {
+            if mt.kind != "struct" {
+                die("ADT match requires ADT scrutinee")
+            }
+            let payload = find_variant_info(e, mt.name, c.type_name)
+            for j in 0:len(c.args) {
+                let b = c.args[j]
+                let f = find_field_info(e, payload.name, b.name)
+                add_local(e, b.type_name, f.typ)
+            }
+        }
+        pre_scan_block(e, c.body)
+    }
+    pre_scan_block(e, stmt.else_block)
     return 0
 }
 
@@ -2309,6 +2334,218 @@ fun emit_continue(e: EmitterState): i64 {
     return 0
 }
 
+fun type_is_match_basic(t: TypeInfo): i64 {
+    if type_is_integer(t) == 1 {
+        return 1
+    }
+    if t.kind == "bool" {
+        return 1
+    }
+    if t.kind == "str" {
+        return 1
+    }
+    return 0
+}
+
+fun match_literal_ok(scrutinee: TypeInfo, lit: AstNode): i64 {
+    if scrutinee.kind == "str" && lit.kind == "String" {
+        return 1
+    }
+    if scrutinee.kind == "bool" && lit.kind == "Bool" {
+        return 1
+    }
+    if type_is_integer(scrutinee) == 1 {
+        if lit.kind == "Literal" || lit.kind == "Char" {
+            return 1
+        }
+    }
+    return 0
+}
+
+fun validate_basic_match_cases(e: EmitterState, stmt: AstNode, mt: TypeInfo): i64 {
+    for i in 0:len(stmt.fields) {
+        let c = stmt.fields[i]
+        if c.name != "" {
+            die("ADT case in basic match")
+        }
+        if match_literal_ok(mt, c.expr) == 0 {
+            die("match literal type mismatch")
+        }
+        for j in i + 1:len(stmt.fields) {
+            let other = stmt.fields[j]
+            if other.name == "" {
+                if c.expr.kind == other.expr.kind && c.expr.value == other.expr.value {
+                    die("duplicate match literal case")
+                }
+            }
+        }
+    }
+    return 0
+}
+
+fun validate_adt_match_cases(e: EmitterState, stmt: AstNode, mt: TypeInfo): i64 {
+    if is_adt_type(e, mt.name) == 0 {
+        die("match scrutinee must be basic type or ADT")
+    }
+    for i in 0:len(stmt.fields) {
+        let c = stmt.fields[i]
+        if c.name == "" {
+            die("literal case in ADT match")
+        }
+        if c.name != mt.name {
+            die("ADT match case uses wrong type")
+        }
+        let payload = find_variant_info(e, mt.name, c.type_name)
+        for j in i + 1:len(stmt.fields) {
+            let other = stmt.fields[j]
+            if other.name != "" && other.type_name == c.type_name {
+                die("duplicate ADT match variant case")
+            }
+        }
+        for j in 0:len(c.args) {
+            let b = c.args[j]
+            find_field_info(e, payload.name, b.name)
+            for k in j + 1:len(c.args) {
+                if c.args[k].name == b.name {
+                    die("duplicate match payload binding")
+                }
+                if c.args[k].type_name == b.type_name {
+                    die("duplicate match payload local")
+                }
+            }
+        }
+    }
+    return 0
+}
+
+fun emit_match_panic(e: EmitterState, line: i64): i64 {
+    let msg = ast_node("String")
+    msg.value = "no match"
+    return emit_panic_message(e, line, "match line ", msg)
+}
+
+fun emit_basic_match_case_test(e: EmitterState, scrutinee_slot: i64, c: AstNode, hit_id: i64): i64 {
+    let lit = c.expr
+    if lit.kind == "String" {
+        emit_stack_load(e, "rax", scrutinee_slot)
+        emit_mov(e, "rax", "[rax]")
+        let data_slot = temp_save_rax(e)
+        emit_expr(e, lit)
+        emit_mov(e, "rdx", "[rax]")
+        emit_stack_load(e, "rcx", data_slot)
+        emit_inst(e, "sub rsp, 32")
+        emit_call_inst(e, "lstrcmpA")
+        emit_inst(e, "add rsp, 32")
+        emit_inst(e, "cmp eax, 0")
+        emit_jmp_id(e, "je", "L", hit_id)
+        return 0
+    }
+    emit_stack_load(e, "rax", scrutinee_slot)
+    emit_expr(e, lit)
+    emit_mov(e, "rcx", "rax")
+    emit_stack_load(e, "rax", scrutinee_slot)
+    emit_inst(e, "cmp rax, rcx")
+    emit_jmp_id(e, "je", "L", hit_id)
+    return 0
+}
+
+fun emit_basic_match(e: EmitterState, stmt: AstNode, mt: TypeInfo): i64 {
+    validate_basic_match_cases(e, stmt, mt)
+    emit_expr(e, stmt.expr)
+    let scrutinee_slot = temp_save_rax(e)
+    let end_id = fresh_label(e)
+    let default_id = fresh_label(e)
+    for i in 0:len(stmt.fields) {
+        let c = stmt.fields[i]
+        let hit_id = fresh_label(e)
+        let next_id = fresh_label(e)
+        emit_basic_match_case_test(e, scrutinee_slot, c, hit_id)
+        emit_jmp_id(e, "jmp", "L", next_id)
+        emit_label_id(e, "L", hit_id)
+        emit_block(e, c.body)
+        emit_jmp_id(e, "jmp", "L", end_id)
+        emit_label_id(e, "L", next_id)
+    }
+    emit_jmp_id(e, "jmp", "L", default_id)
+    emit_label_id(e, "L", default_id)
+    if stmt.else_block.kind == "" {
+        emit_match_panic(e, stmt.line)
+    } else {
+        emit_block(e, stmt.else_block)
+    }
+    emit_label_id(e, "L", end_id)
+    return 0
+}
+
+fun emit_adt_case_bindings(e: EmitterState, payload: StructInfo, data_slot: i64, c: AstNode): i64 {
+    for i in 0:len(c.args) {
+        let b = c.args[i]
+        let f = find_field_info(e, payload.name, b.name)
+        emit_stack_load(e, "rcx", data_slot)
+        if type_is_byte_sized(f.typ) == 1 {
+            out_s(e, "    movzx rax, byte [rcx+")
+            out_i(e, f.offset)
+            out_line(e, "]")
+            emit_stack_store(e, find_local_slot(e, b.type_name), "al")
+        } else {
+            out_s(e, "    mov rax, [rcx+")
+            out_i(e, f.offset)
+            out_line(e, "]")
+            emit_stack_store(e, find_local_slot(e, b.type_name), "rax")
+        }
+    }
+    return 0
+}
+
+fun emit_adt_match(e: EmitterState, stmt: AstNode, mt: TypeInfo): i64 {
+    validate_adt_match_cases(e, stmt, mt)
+    emit_expr(e, stmt.expr)
+    let header_slot = temp_save_rax(e)
+    let end_id = fresh_label(e)
+    let default_id = fresh_label(e)
+    for i in 0:len(stmt.fields) {
+        let c = stmt.fields[i]
+        let payload = find_variant_info(e, mt.name, c.type_name)
+        let hit_id = fresh_label(e)
+        let next_id = fresh_label(e)
+        emit_stack_load(e, "rax", header_slot)
+        emit_mov(e, "rax", "[rax]")
+        emit_mov_i(e, "rcx", payload.tag)
+        emit_inst(e, "cmp rax, rcx")
+        emit_jmp_id(e, "je", "L", hit_id)
+        emit_jmp_id(e, "jmp", "L", next_id)
+        emit_label_id(e, "L", hit_id)
+        emit_stack_load(e, "rax", header_slot)
+        emit_mov(e, "rax", "[rax+8]")
+        let data_slot = temp_save_rax(e)
+        emit_adt_case_bindings(e, payload, data_slot, c)
+        emit_block(e, c.body)
+        emit_jmp_id(e, "jmp", "L", end_id)
+        emit_label_id(e, "L", next_id)
+    }
+    emit_jmp_id(e, "jmp", "L", default_id)
+    emit_label_id(e, "L", default_id)
+    if stmt.else_block.kind == "" {
+        emit_match_panic(e, stmt.line)
+    } else {
+        emit_block(e, stmt.else_block)
+    }
+    emit_label_id(e, "L", end_id)
+    return 0
+}
+
+fun emit_match(e: EmitterState, stmt: AstNode): i64 {
+    let mt = expr_type(e, stmt.expr)
+    if type_is_match_basic(mt) == 1 {
+        return emit_basic_match(e, stmt, mt)
+    }
+    if mt.kind == "struct" {
+        return emit_adt_match(e, stmt, mt)
+    }
+    die("unsupported match scrutinee type")
+    return 0
+}
+
 fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
     temp_reset(e)
     if stmt.kind == "Return" {
@@ -2349,6 +2586,9 @@ fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
  }
     if stmt.kind == "Assert" {
         return emit_assert_stmt(e, stmt)
+ }
+    if stmt.kind == "Match" {
+        return emit_match(e, stmt)
  }
     if stmt.kind == "Block" {
         return emit_block(e, stmt)
@@ -2439,6 +2679,8 @@ fun emit_program(e: EmitterState, ast: AstNode): i64 {
     collect_strings(e, ast)
     get_string_id(e, "panic line ")
     get_string_id(e, "assert line ")
+    get_string_id(e, "match line ")
+    get_string_id(e, "no match")
     get_string_id(e, ": ")
     get_string_id(e, "\n")
     out_line(e, "global _start")

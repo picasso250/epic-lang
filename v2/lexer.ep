@@ -267,6 +267,9 @@ fun lex(src: str): Token[] {
             if text == "assert" {
                 kind = "ASSERT"
  }
+            if text == "match" {
+                kind = "MATCH"
+ }
             if text == "struct" {
                 kind = "STRUCT"
  }

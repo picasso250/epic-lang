@@ -1,0 +1,51 @@
+# EXIT: 0
+# STDOUT: one,s,true,else
+
+fun main() -> i64 {
+    let n = 1
+    match n {
+        0 {
+            putstr("zero")
+        }
+        1 {
+            putstr("one")
+        }
+        else {
+            putstr("many")
+        }
+    }
+    putstr(",")
+
+    let s = "x"
+    match s {
+        "x" {
+            putstr("s")
+        }
+        else {
+            putstr("no")
+        }
+    }
+    putstr(",")
+
+    let b = true
+    match b {
+        true {
+            putstr("true")
+        }
+        else {
+            putstr("false")
+        }
+    }
+    putstr(",")
+
+    let m = 3
+    match m {
+        1 {
+            putstr("bad")
+        }
+        else {
+            putstr("else")
+        }
+    }
+    return 0
+}
