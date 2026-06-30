@@ -59,7 +59,7 @@ fun emit_string_bytes(e: EmitterState, s: str): i64 {
         if i != 0 {
             out_s(e, ", ")
         }
-        out_i(e, s[i])
+        out_i(e, s.data[i])
     }
     if len(s) != 0 {
         out_s(e, ", ")
@@ -427,13 +427,16 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
         return find_func_ret(e, expr.name)
     }
     if expr.kind == "New" {
+        if expr.name == "map[str]i64" {
+            return type_map("i64")
+        }
         return type_struct(expr.name)
  }
     if expr.kind == "StructInit" {
         return type_struct(expr.name)
     }
     if expr.kind == "VariantInit" {
-        return type_struct(expr.name)
+        return type_struct(expr.type_name)
     }
     if expr.kind == "NewArray" {
         return type_array(expr.type_name)
@@ -515,11 +518,17 @@ fun pre_scan_block(e: EmitterState, block: AstNode): i64 {
                 if stmt.kind == "While" {
                     pre_scan_block(e, stmt.body)
                 } else {
-                    if stmt.kind == "Match" {
-                        pre_scan_match(e, stmt)
+                    if stmt.kind == "For" {
+                        add_local(e, stmt.name, type_i64())
+                        add_local(e, stmt.name + "$end", type_i64())
+                        pre_scan_block(e, stmt.body)
                     } else {
-                        if stmt.kind == "Block" {
-                            pre_scan_block(e, stmt)
+                        if stmt.kind == "Match" {
+                            pre_scan_match(e, stmt)
+                        } else {
+                            if stmt.kind == "Block" {
+                                pre_scan_block(e, stmt)
+                            }
                         }
                     }
                 }
@@ -1517,10 +1526,10 @@ fun emit_payload_field_zero(e: EmitterState, obj_slot: i64, field: FieldInfo): i
 }
 
 fun emit_variant_init(e: EmitterState, expr: AstNode): i64 {
-    if is_adt_type(e, expr.name) == 0 {
+    if is_adt_type(e, expr.type_name) == 0 {
         die("unknown ADT type")
     }
-    let payload = find_variant_info(e, expr.name, expr.type_name)
+    let payload = find_variant_info(e, expr.type_name, expr.name)
     for i in 0:len(expr.fields) {
         let field = expr.fields[i]
         find_field_info(e, payload.name, field.name)
@@ -2081,6 +2090,10 @@ fun emit_expr(e: EmitterState, expr: AstNode): i64 {
         return 0
     }
     if expr.kind == "New" {
+        if expr.name == "map[str]i64" {
+            emit_new_map(e, expr)
+            return 0
+        }
         emit_new(e, expr)
         return 0
     }
@@ -2563,6 +2576,40 @@ fun emit_while(e: EmitterState, stmt: AstNode): i64 {
     return 0
 }
 
+fun emit_for_range(e: EmitterState, stmt: AstNode): i64 {
+    let slot = add_local(e, stmt.name, type_i64())
+    let end_slot = add_local(e, stmt.name + "$end", type_i64())
+    emit_expr(e, stmt.start)
+    emit_stack_store(e, slot, "rax")
+    emit_expr(e, stmt.end)
+    emit_stack_store(e, end_slot, "rax")
+
+    let start_id = fresh_label(e)
+    let continue_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    let old_break = e.loop_break_label
+    let old_continue = e.loop_continue_label
+    e.loop_break_label = end_id
+    e.loop_continue_label = continue_id
+
+    emit_label_id(e, "L", start_id)
+    emit_stack_load(e, "rax", slot)
+    emit_stack_load(e, "rcx", end_slot)
+    emit_inst(e, "cmp rax, rcx")
+    emit_jmp_id(e, "jge", "L", end_id)
+    emit_block(e, stmt.body)
+    emit_label_id(e, "L", continue_id)
+    emit_stack_load(e, "rax", slot)
+    emit_inst(e, "inc rax")
+    emit_stack_store(e, slot, "rax")
+    emit_jmp_id(e, "jmp", "L", start_id)
+    emit_label_id(e, "L", end_id)
+
+    e.loop_break_label = old_break
+    e.loop_continue_label = old_continue
+    return 0
+}
+
 fun emit_break(e: EmitterState): i64 {
     if e.loop_break_label == 0 {
         die("break outside loop")
@@ -2819,6 +2866,9 @@ fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
  }
     if stmt.kind == "While" {
         return emit_while(e, stmt)
+ }
+    if stmt.kind == "For" {
+        return emit_for_range(e, stmt)
  }
     if stmt.kind == "Break" {
         return emit_break(e)

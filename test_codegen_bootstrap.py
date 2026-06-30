@@ -18,7 +18,7 @@ NASM = os.path.join(SCRIPT_DIR, "tools", "nasm.exe")
 LLD_LINK = os.path.join(SCRIPT_DIR, "tools", "lld-link.exe")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 BOOT_DIR = os.path.join(SCRIPT_DIR, "build", "bootstrap-codegen")
-CODEGEN_EXE = os.path.join(BOOT_DIR, "codegen.exe")
+CODEGEN_EXE = os.path.join(BOOT_DIR, "src", "codegen.exe")
 
 EXAMPLE_SLICE = [
     name for name in sorted(os.listdir(os.path.join(SCRIPT_DIR, "examples")))
