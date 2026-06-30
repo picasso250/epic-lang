@@ -69,6 +69,7 @@ def copy_self_out(name):
 
 def main():
     os.makedirs(BOOT_DIR, exist_ok=True)
+    os.makedirs(os.path.join(BUILD_DIR, "epic"), exist_ok=True)
 
     epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
     epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
