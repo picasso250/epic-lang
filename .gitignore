@@ -10,6 +10,9 @@ __pycache__/
 # Binary tools (see README for setup)
 tools/
 
+# Zed editor - generated grammar files (compiled WASM)
+editors/zed/grammars/
+
 # Temporary files produced by examples
 test_out.txt
 test_write_file.txt
