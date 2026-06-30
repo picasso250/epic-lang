@@ -154,11 +154,7 @@ fun advance(p: Parser): Token {
 }
 
 fun parse_error(line: i64, msg: str): i64 {
-    putstr("Parse error line ")
-    putstr(itoa(line))
-    putstr(": ")
-    putstr(msg)
-    putc(10)
+    println(f"Parse error line {line}: {msg}")
     os.ExitProcess(1)
     return 1
 }
@@ -166,15 +162,7 @@ fun parse_error(line: i64, msg: str): i64 {
 fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
     if same(t.kind, kind) == 0 {
-        putstr("Parse error line ")
-        putstr(itoa(t.line))
-        putstr(": Expected ")
-        putstr(kind)
-        putstr(", got ")
-        putstr(t.kind)
-        putstr("('")
-        putstr(t.text)
-        putstr("')\n")
+        println(f"Parse error line {t.line}: Expected {kind}, got {t.kind}('{t.text}')")
         os.ExitProcess(1)
     }
     return t
@@ -1424,7 +1412,7 @@ fun parse_expr(p: Parser): AstNode {
 
 fun indent(n: i64): i64 {
     for i in 0:n {
-        putstr("  ")
+        print("  ")
     }
     return 0
 }
@@ -1442,28 +1430,24 @@ fun dump_node(node: AstNode, depth: i64): i64 {
     }
     if same(node.kind, "Match") == 1 {
         indent(depth)
-        putstr("Match\n")
+        println("Match")
         dump_node(node.expr, depth + 1)
         dump_list(node.fields, depth + 1)
         if same(node.else_block.kind, "") == 0 {
             indent(depth + 1)
-            putstr("MatchCase\n")
+            println("MatchCase")
             dump_node(node.else_block, depth + 2)
         }
         return 0
     }
     if same(node.kind, "MatchCase") == 1 {
         indent(depth)
-        putstr("MatchCase\n")
+        println("MatchCase")
         if same(node.name, "") == 0 {
             indent(depth + 1)
-            putstr("FieldAccess ")
-            putstr(node.type_name)
-            putc(10)
+            println(f"FieldAccess {node.type_name}")
             indent(depth + 2)
-            putstr("Var ")
-            putstr(node.name)
-            putc(10)
+            println(f"Var {node.name}")
         } else {
             dump_node(node.expr, depth + 1)
         }
@@ -1472,29 +1456,24 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         return 0
     }
     indent(depth)
-    putstr(node.kind)
+    print(node.kind)
     if same(node.name, "") == 0 {
-        putc(32)
-        putstr(node.name)
+        print(f" {node.name}")
     }
     if same(node.type_name, "") == 0 {
-        putstr(" : ")
-        putstr(node.type_name)
+        print(f" : {node.type_name}")
     }
     if same(node.op, "") == 0 {
-        putstr(" ")
-        putstr(node.op)
+        print(f" {node.op}")
     }
     if same(node.kind, "String") == 1 {
-        putstr(" ")
-        putstr(node.value)
+        print(f" {node.value}")
     } else {
         if same(node.value, "") == 0 {
-            putstr(" ")
-            putstr(node.value)
+            print(f" {node.value}")
         }
     }
-    putc(10)
+    println("")
     dump_list(node.structs, depth + 1)
     dump_list(node.fields, depth + 1)
     dump_list(node.funcs, depth + 1)
@@ -1519,7 +1498,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
 
 fun main(): i64 {
     if len(argv) < 2 {
-        putstr("usage: parser <file>\n")
+        println("usage: parser <file>")
         os.ExitProcess(1)
     }
     let src = read_file(argv[1])
