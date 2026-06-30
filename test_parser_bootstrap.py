@@ -132,6 +132,13 @@ def py_dump(node, depth=0):
         emit(f"Bool {node.value}")
     elif isinstance(node, StringNode):
         emit(f"String {node.value}")
+    elif isinstance(node, FStringNode):
+        emit("FString")
+        for kind, value in node.parts:
+            if kind == "text":
+                emit(f"  FStringText {value}")
+            else:
+                out.extend(py_dump(value, depth + 1))
     elif isinstance(node, VarNode):
         emit(f"Var {node.name}")
     elif isinstance(node, CallNode):

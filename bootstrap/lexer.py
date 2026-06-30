@@ -117,6 +117,86 @@ def decode_escaped(raw, line):
     return "".join(out)
 
 
+def scan_fstring(source_text, start, line):
+    parts = []
+    i = start + 2
+    segment_start = i
+    while i < len(source_text):
+        ch = source_text[i]
+        if ch == "\n" or ch == "\r":
+            raise LexError("Unterminated f-string literal", line)
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == '"':
+            if i > segment_start:
+                parts.append(("text", decode_escaped(source_text[segment_start:i], line)))
+            return parts, i + 1
+        if ch == "}":
+            raise LexError("Unexpected '}' in f-string literal", line)
+        if ch == "{":
+            if i > segment_start:
+                parts.append(("text", decode_escaped(source_text[segment_start:i], line)))
+            expr_start = i + 1
+            i = expr_start
+            parens = 0
+            brackets = 0
+            braces = 0
+            while i < len(source_text):
+                c = source_text[i]
+                if c == "\n" or c == "\r":
+                    raise LexError("Unterminated f-string expression", line)
+                if c in ('"', "'"):
+                    quote = c
+                    i += 1
+                    while i < len(source_text):
+                        q = source_text[i]
+                        if q == "\n" or q == "\r":
+                            raise LexError("Unterminated string in f-string expression", line)
+                        if q == "\\":
+                            i += 2
+                            continue
+                        if q == quote:
+                            i += 1
+                            break
+                        i += 1
+                    else:
+                        raise LexError("Unterminated string in f-string expression", line)
+                    continue
+                if c == "(":
+                    parens += 1
+                elif c == ")":
+                    parens -= 1
+                    if parens < 0:
+                        raise LexError("Unbalanced ')' in f-string expression", line)
+                elif c == "[":
+                    brackets += 1
+                elif c == "]":
+                    brackets -= 1
+                    if brackets < 0:
+                        raise LexError("Unbalanced ']' in f-string expression", line)
+                elif c == "{":
+                    braces += 1
+                elif c == "}":
+                    if parens == 0 and brackets == 0 and braces == 0:
+                        expr = source_text[expr_start:i].strip()
+                        if not expr:
+                            raise LexError("Empty f-string expression", line)
+                        parts.append(("expr", expr))
+                        i += 1
+                        segment_start = i
+                        break
+                    braces -= 1
+                    if braces < 0:
+                        raise LexError("Unbalanced '}' in f-string expression", line)
+                i += 1
+            else:
+                raise LexError("Unterminated f-string expression", line)
+            continue
+        i += 1
+    raise LexError("Unterminated f-string literal", line)
+
+
 def lex(source_text):
     """Tokenize source text. Detects and rejects invalid characters."""
     tokens = []
@@ -131,9 +211,14 @@ def lex(source_text):
 
     pos = 0
     while pos < len(source_text):
+        line = line_numbers[pos] if pos < len(line_numbers) else 1
+        if source_text.startswith('f"', pos):
+            value, end = scan_fstring(source_text, pos, line)
+            tokens.append(("FSTRING", value, line))
+            pos = end
+            continue
         m = TOKEN_RE.match(source_text, pos)
         if not m:
-            line = line_numbers[pos] if pos < len(line_numbers) else 1
             raise LexError(f"Unexpected character {source_text[pos]!r}", line)
         kind = m.lastgroup
         value = m.group()

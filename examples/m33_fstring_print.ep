@@ -1,0 +1,17 @@
+# EXIT: 0
+# STDOUT: an int 42
+# STDOUT: word epic
+# STDOUT: expr 43
+# STDOUT: 
+# STDOUT: tail
+fun main(): void {
+    let a = 42
+    let word = "epic"
+    println(f"an int {a}")
+    println(f"word {word}")
+    println(f"expr {a + 1}")
+    println()
+    print(f"")
+    print("tail")
+    os.ExitProcess(0)
+}

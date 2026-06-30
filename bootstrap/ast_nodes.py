@@ -181,6 +181,11 @@ class StringNode(ASTNode):
 
 
 @dataclass
+class FStringNode(ASTNode):
+    parts: list
+
+
+@dataclass
 class VarNode(ASTNode):
     name: str
 

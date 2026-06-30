@@ -14,7 +14,7 @@ from ast_nodes import *
 class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
-        self.builtins = {"putc", "putstr",
+        self.builtins = {"putc", "putstr", "print", "println",
                          "itoa", "system",
                          "str", "str_new", "bytes", "read_file", "write_file",
                          "str_slice", "str_starts_with", "str_find", "str_trim",
@@ -167,6 +167,15 @@ class Emitter:
         """Recursively find string literals and register them."""
         if isinstance(node, StringNode):
             self.get_string_label(node.value)
+        if isinstance(node, FStringNode):
+            if not node.parts:
+                self.get_string_label("")
+            for kind, value in node.parts:
+                if kind == "text":
+                    self.get_string_label(value)
+                else:
+                    self._collect_strings(value)
+            return
         if isinstance(node, ASTNode):
             for f in dataclasses.fields(node):
                 self._collect_strings(getattr(node, f.name))
@@ -500,8 +509,8 @@ class Emitter:
                 count = 1
             elif isinstance(node, CallNode):
                 count = len(node.args)
-                if node.name == "putstr":
-                    count += 1  # putstr saves &str across GetStdHandle
+                if node.name in ("putstr", "print", "println"):
+                    count += 1  # string output saves &str across GetStdHandle
                 elif node.name == "push":
                     count += 3
             elif isinstance(node, NewArrayNode):
@@ -734,6 +743,8 @@ class Emitter:
             self.emit_lea("rcx", f"[{label}]")
             self.emit_mov("rdx", strlen)
             self.emit_call_inst("_str_alloc")
+        elif isinstance(expr, FStringNode):
+            self.emit_expr(self._fstring_expr(expr))
         elif isinstance(expr, VarNode):
             name = expr.name
             if sym := self._global_symbol(name):
@@ -799,21 +810,11 @@ class Emitter:
                 self.emit_call_inst("WriteFile")
                 self._call_cleanup(1)
             elif name == "putstr":
-                # putstr(s: &str): save &str in temp slot, GetStdHandle, then WriteFile
-                self.emit_expr(args[0])       # rax = &str
-                tmp = self._alloc_temp()
-                self.emit_stack_store(tmp, "rax")  # save &str
-                self.emit_mov("ecx", "-11")  # STD_OUTPUT_HANDLE
-                self.emit_call_inst("GetStdHandle")
-                self.emit_mov("rcx", "rax")   # rcx = stdout handle
-                self.emit_stack_load("rax", tmp)  # rax = &str
-                self.emit_mov("rdx", "[rax]")      # rdx = str.data (offset 0)
-                self.emit_mov("r8", "[rax+8]")    # r8 = str.len (offset 8)
-                self.emit_lea("r9", "[_written]")
-                self._call_prep(1)             # 1 stack arg (lpOverlapped)
-                self.emit_mov("qword [rsp+32]", "0")
-                self.emit_call_inst("WriteFile")
-                self._call_cleanup(1)
+                self.emit_write_str_expr(args[0])
+            elif name == "print":
+                self.emit_print(args, newline=False)
+            elif name == "println":
+                self.emit_print(args, newline=True)
             elif name == "itoa":
                 # itoa(n) → &str (heap-allocated)
                 self.emit_expr(args[0])     # rax = n
@@ -996,6 +997,58 @@ class Emitter:
             self.emit("    movzx eax, al")
         else:
             raise RuntimeError(f"Unknown binary op: {op}")
+
+    def emit_write_str_expr(self, expr):
+        self.emit_expr(expr)
+        tmp = self._alloc_temp()
+        self.emit_stack_store(tmp, "rax")
+        self.emit_mov("ecx", "-11")
+        self.emit_call_inst("GetStdHandle")
+        self.emit_mov("rcx", "rax")
+        self.emit_stack_load("rax", tmp)
+        self.emit_mov("rdx", "[rax]")
+        self.emit_mov("r8", "[rax+8]")
+        self.emit_lea("r9", "[_written]")
+        self._call_prep(1)
+        self.emit_mov("qword [rsp+32]", "0")
+        self.emit_call_inst("WriteFile")
+        self._call_cleanup(1)
+
+    def emit_print(self, args, newline):
+        if len(args) > 1:
+            raise RuntimeError("print and println take at most one argument")
+        if args:
+            arg = args[0]
+            typ = self._expr_type(arg)
+            if typ == "&str":
+                self.emit_write_str_expr(arg)
+            elif typ in ("i64", "i8"):
+                self.emit_write_str_expr(CallNode(name="itoa", args=[arg]))
+            else:
+                raise RuntimeError(f"print does not support type {typ}")
+        if newline:
+            self.emit_call(CallNode(name="putc", args=[LiteralNode(10)]))
+
+    def _fstring_expr(self, expr):
+        nodes = []
+        for kind, value in expr.parts:
+            if kind == "text":
+                if value:
+                    nodes.append(StringNode(value))
+                continue
+            typ = self._expr_type(value)
+            if typ == "&str":
+                nodes.append(value)
+            elif typ in ("i64", "i8"):
+                nodes.append(CallNode(name="itoa", args=[value]))
+            else:
+                raise RuntimeError(f"f-string interpolation does not support type {typ}")
+        if not nodes:
+            return StringNode("")
+        out = nodes[0]
+        for node in nodes[1:]:
+            out = BinaryNode(op="+", left=out, right=node)
+        return out
 
     def emit_short_circuit(self, expr):
         op = expr.op
@@ -1764,6 +1817,8 @@ class Emitter:
             return "i64"
         if isinstance(expr, StringNode):
             return "&str"
+        if isinstance(expr, FStringNode):
+            return "&str"
         if isinstance(expr, VarNode):
             if sym := self._global_symbol(expr.name):
                 return sym["type"]
@@ -1781,7 +1836,7 @@ class Emitter:
                 return "&_arr_i8"
             if name in ("system", "write_file", "len", "cap", "str_starts_with", "str_find", "map_has"):
                 return "i64"
-            if name in ("putc", "putstr", "extend"):
+            if name in ("putc", "putstr", "print", "println", "extend"):
                 return "void"
             # User-defined function
             if name in self.funcs:

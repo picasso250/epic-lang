@@ -178,7 +178,7 @@ class Parser:
 
     # ── statements ────────────────────────────────────────────────────
 
-    EXPR_FIRST = {"NUMBER", "STRING", "CHAR", "ID", "LPAREN", "TRUE", "FALSE", "BANG", "TILDE", "NEW"}
+    EXPR_FIRST = {"NUMBER", "STRING", "FSTRING", "CHAR", "ID", "LPAREN", "TRUE", "FALSE", "BANG", "TILDE", "NEW"}
 
     def _skip_balanced_brackets(self, i):
         depth = 1
@@ -551,6 +551,9 @@ class Parser:
         if self.peek_kind("STRING"):
             t = self.advance()
             return StringNode(value=t[1])
+        if self.peek_kind("FSTRING"):
+            t = self.advance()
+            return FStringNode(parts=self.parse_fstring_parts(t[1], t[2]))
         if self.peek_kind("ID"):
             t = self.advance()
             name = t[1]
@@ -607,6 +610,25 @@ class Parser:
             return expr
         t = self.peek()
         raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
+
+    def parse_fstring_parts(self, parts, line):
+        parsed = []
+        for kind, value in parts:
+            if kind == "text":
+                if value:
+                    parsed.append((kind, value))
+                continue
+            if kind == "expr":
+                from lexer import lex
+                p = Parser(lex(value))
+                expr = p.parse_expr()
+                if p.peek()[0] != "EOF":
+                    t = p.peek()
+                    raise ParseError(f"Unexpected token {t[0]}('{t[1]}') in f-string expression", line)
+                parsed.append((kind, expr))
+                continue
+            raise ParseError(f"Unknown f-string part {kind}", line)
+        return parsed
 
     def parse_named_fields_after_lbrace(self):
         fields = []
