@@ -816,6 +816,9 @@ fun is_expr_first(kind: str): i64 {
     if same(kind, "STRING") == 1 {
         return 1
  }
+    if same(kind, "FSTRING") == 1 {
+        return 1
+ }
     if same(kind, "TRUE") == 1 {
         return 1
  }
@@ -1112,8 +1115,6 @@ fun parse_variant_init(p: Parser, type_name: str, variant_name: Token): AstNode 
 }
 
 fun parse_array_literal(p: Parser, name: Token): AstNode {
-    expect(p, "LBRACKET")
-    expect(p, "RBRACKET")
     let node = ast_node("ArrayLiteral")
     node.type_name = name.text
     expect(p, "LBRACE")
@@ -1137,15 +1138,38 @@ fun parse_array_literal(p: Parser, name: Token): AstNode {
     return node
 }
 
+fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
+    let out = new AstNode[4]
+    for i in 0:len(parts) {
+        match parts[i] {
+            FStringPart.Text { text }: {
+                if len(text) > 0 {
+                    let n = ast_node("FStringText")
+                    n.value = text
+                    push(out, n)
+                }
+            }
+            FStringPart.Expr { text }: {
+                let tokens = lex(text)
+                let p = make_parser(tokens)
+                let expr = parse_expr(p)
+                if peek_kind(p, "EOF") == 0 {
+                    let t = peek(p)
+                    parse_error(line, "Unexpected token in f-string expression")
+                }
+                push(out, expr)
+            }
+        }
+    }
+    return out
+}
+
 fun parse_postfix(p: Parser, node: AstNode): AstNode {
     let current = node
     let done = 0
     while done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
-            if peek_offset_kind(p, 0, "LBRACE") == 1 && peek_offset_kind(p, 1, "ID") == 1 && peek_offset_kind(p, 2, "COLON") == 1 && current.kind == "Var" {
-                current = parse_variant_init(p, current.name, field)
-            } else {
             if check(p, "LPAREN") == 1 {
                 let n = ast_node("Call")
                 if current.kind == "Var" && current.name == "os" {
@@ -1162,7 +1186,6 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
                 n.object = current
                 n.name = field.text
                 current = n
-            }
             }
         } else {
             if check(p, "LBRACKET") == 1 {
@@ -1191,15 +1214,34 @@ fun parse_primary(p: Parser): AstNode {
             return n
         }
         if check(p, "LBRACKET") == 1 {
-            let n = ast_node("NewArray")
-            n.type_name = t.text
+            let count = ast_empty()
             if peek_kind(p, "RBRACKET") == 0 {
-                n.count = parse_expr(p)
+                count = parse_expr(p)
             }
             expect(p, "RBRACKET")
+            if same(count.kind, "") == 1 && peek_kind(p, "LBRACE") == 1 {
+                return parse_array_literal(p, t)
+            }
+            let n = ast_node("NewArray")
+            n.type_name = t.text
+            n.count = count
             return n
         }
-        let n = ast_node("New")
+        if check(p, "DOT") == 1 {
+            let variant = expect(p, "ID")
+            let n = ast_node("VariantInit")
+            n.name = variant.text
+            n.type_name = t.text
+            n.line = variant.line
+            if peek_kind(p, "LBRACE") == 1 {
+                return parse_named_init_fields(p, n)
+            }
+            return n
+        }
+        if peek_kind(p, "LBRACE") == 1 {
+            return parse_struct_init(p, t)
+        }
+        let n = ast_node("StructInit")
         n.name = t.text
         return n
     }
@@ -1221,6 +1263,19 @@ fun parse_primary(p: Parser): AstNode {
         n.value = t.text
         return n
     }
+    if peek_kind(p, "FSTRING") == 1 {
+        let t = advance(p)
+        let n = ast_node("FString")
+        match t.data {
+            TokenData.FString { parts }: {
+                n.fields = parse_fstring_parts(parts, t.line)
+            }
+            else: {
+                parse_error(t.line, "Expected f-string parts")
+            }
+        }
+        return n
+    }
     if peek_kind(p, "TRUE") == 1 {
         advance(p)
         let n = ast_node("Bool")
@@ -1235,17 +1290,8 @@ fun parse_primary(p: Parser): AstNode {
     }
     if peek_kind(p, "ID") == 1 {
         let t = advance(p)
-        if peek_offset_kind(p, 0, "LBRACKET") == 1 && peek_offset_kind(p, 1, "RBRACKET") == 1 && peek_offset_kind(p, 2, "LBRACE") == 1 {
-            return parse_postfix(p, parse_array_literal(p, t))
-        }
         let node = ast_node("Var")
         node.name = t.text
-        if peek_offset_kind(p, 0, "LBRACE") == 1 && peek_offset_kind(p, 1, "ID") == 1 && peek_offset_kind(p, 2, "COLON") == 1 {
-            return parse_postfix(p, parse_struct_init(p, t))
-        }
-        if peek_empty_braces(p) == 1 {
-            return parse_postfix(p, parse_struct_init(p, t))
-        }
         if check(p, "LPAREN") == 1 {
             node.kind = "Call"
             node.args = parse_args(p)
