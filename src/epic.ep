@@ -1,5 +1,6 @@
 #
 # Epic v2 compiler driver source.
+# TODO dogfood: migrate output to print/println/f-strings and bare `new Type` to `new Type {}`.
 #
 
 fun die_driver(msg: str): i64 {

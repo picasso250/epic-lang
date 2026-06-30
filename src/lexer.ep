@@ -99,7 +99,7 @@ fun decode_escape(e: i64): i64 {
     if e == 48 {
         return 0
     }
-    putstr("bad escape\n")
+    println("bad escape")
     os.ExitProcess(1)
     return 0
 }
@@ -112,13 +112,13 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
     while pos < end {
         let c = p[pos]
         if c == 10 || c == 13 {
-            putstr("unterminated string\n")
+            println("unterminated string")
             os.ExitProcess(1)
         }
         if c == 92 {
             pos += 1
             if pos >= end {
-                putstr("bad escape\n")
+                println("bad escape")
                 os.ExitProcess(1)
             }
             c = decode_escape(p[pos])
@@ -139,7 +139,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
     while pos < n {
         let c = p[pos]
         if c == 10 || c == 13 {
-            putstr("unterminated f-string expression\n")
+            println("unterminated f-string expression")
             os.ExitProcess(1)
         }
         if c == 34 || c == 39 {
@@ -149,7 +149,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             while found == 0 && pos < n {
                 let q = p[pos]
                 if q == 10 || q == 13 {
-                    putstr("unterminated string in f-string expression\n")
+                    println("unterminated string in f-string expression")
                     os.ExitProcess(1)
                 }
                 if q == 92 {
@@ -164,7 +164,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                 }
             }
             if found == 0 {
-                putstr("unterminated string in f-string expression\n")
+                println("unterminated string in f-string expression")
                 os.ExitProcess(1)
             }
         } else {
@@ -174,7 +174,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             if c == 41 {
                 parens -= 1
                 if parens < 0 {
-                    putstr("unbalanced ')' in f-string expression\n")
+                    println("unbalanced ')' in f-string expression")
                     os.ExitProcess(1)
                 }
             } else {
@@ -184,7 +184,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             if c == 93 {
                 brackets -= 1
                 if brackets < 0 {
-                    putstr("unbalanced ']' in f-string expression\n")
+                    println("unbalanced ']' in f-string expression")
                     os.ExitProcess(1)
                 }
             } else {
@@ -197,7 +197,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                 }
                 braces -= 1
                 if braces < 0 {
-                    putstr("unbalanced '}' in f-string expression\n")
+                    println("unbalanced '}' in f-string expression")
                     os.ExitProcess(1)
                 }
             }
@@ -209,7 +209,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             pos += 1
         }
     }
-    putstr("unterminated f-string expression\n")
+    println("unterminated f-string expression")
     os.ExitProcess(1)
     return pos
 }
@@ -224,7 +224,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
     while pos < n {
         let ch = p[pos]
         if ch == 10 || ch == 13 {
-            putstr("unterminated f-string literal\n")
+            println("unterminated f-string literal")
             os.ExitProcess(1)
         }
         if ch == 92 {
@@ -242,7 +242,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
             return t
         } else {
         if ch == 125 {
-            putstr("unexpected '}' in f-string literal\n")
+            println("unexpected '}' in f-string literal")
             os.ExitProcess(1)
         } else {
         if ch == 123 {
@@ -253,7 +253,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
             let expr_end = scan_fstring_expr_end(src, expr_start, line)
             let expr = str_trim(str_new(p + expr_start, expr_end - expr_start))
             if len(expr) == 0 {
-                putstr("empty f-string expression\n")
+                println("empty f-string expression")
                 os.ExitProcess(1)
             }
             push_fstring_expr(parts, expr)
@@ -266,7 +266,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
         }
         }
     }
-    putstr("unterminated f-string literal\n")
+    println("unterminated f-string literal")
     os.ExitProcess(1)
     let t = new Token {}
     return t
@@ -343,13 +343,13 @@ fun lex(src: str): Token[] {
                 } else {
                     let c = p[pos]
                     if c == 10 || c == 13 {
-                        putstr("unterminated string\n")
+                        println("unterminated string")
                         os.ExitProcess(1)
                     }
                     if c == 92 {
                         pos += 1
                         if pos >= n {
-                            putstr("bad escape\n")
+                            println("bad escape")
                             os.ExitProcess(1)
                         }
                         let e = p[pos]
@@ -361,7 +361,7 @@ fun lex(src: str): Token[] {
                 }
             }
             if scanning == 1 {
-                putstr("unterminated string\n")
+                println("unterminated string")
                 os.ExitProcess(1)
             }
             let text = str_new(buf.data, out_len)
@@ -382,7 +382,7 @@ fun lex(src: str): Token[] {
             }
             pos += 1
             if pos >= n || p[pos] != 39 {
-                putstr("bad char\n")
+                println("bad char")
                 os.ExitProcess(1)
             }
             pos += 1
@@ -677,7 +677,7 @@ fun lex(src: str): Token[] {
  consumed = 1
  }
         if consumed == 0 && ch == 59  {
-            putstr("unexpected semicolon\n")
+            println("unexpected semicolon")
             os.ExitProcess(1)
         }
         if consumed == 0 && ch == 44  {
@@ -712,14 +712,10 @@ fun dump_tokens(tokens: Token[]): i64 {
                 for j in 0:len(parts) {
                     match parts[j] {
                         FStringPart.Text { text }: {
-                            putstr("  TEXT ")
-                            putstr(text)
-                            putc(10)
+                            println(f"  TEXT {text}")
                         }
                         FStringPart.Expr { text }: {
-                            putstr("  EXPR ")
-                            putstr(text)
-                            putc(10)
+                            println(f"  EXPR {text}")
                         }
                     }
                 }
@@ -737,7 +733,7 @@ fun dump_tokens(tokens: Token[]): i64 {
 
 fun main(): i64 {
     if len(argv) < 2 {
-        putstr("usage: lexer <file>\n")
+        println("usage: lexer <file>")
         os.ExitProcess(1)
     }
     let src = read_file(argv[1])

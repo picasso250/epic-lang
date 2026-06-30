@@ -1,5 +1,6 @@
 #
 # Epic v2 parser.
+# TODO dogfood: migrate output to print/println/f-strings and bare `new Type` to `new Type {}`.
 #
 
 struct AstNode {
