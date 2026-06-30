@@ -1,8 +1,4 @@
 #
-# Epic v2 lexer.
-# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
-# until the bootstrap plan changes.
-#
 
 struct Token {
     kind: str

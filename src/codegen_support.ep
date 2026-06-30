@@ -1,7 +1,5 @@
 #
 # Epic v2 codegen support layer.
-# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
-# until the bootstrap plan changes.
 #
 
 struct Local {

@@ -1,7 +1,5 @@
 #
 # Epic v2 codegen core.
-# This source file is compiled by the v1 compiler anchor, so it must use v1 syntax
-# until the bootstrap plan changes.
 # TODO dogfood: migrate output to print/println/f-strings and bare `new Type` to `new Type {}`.
 #
 
