@@ -1459,6 +1459,8 @@ class Emitter:
         if expr.variant:
             self.emit_adt_init(expr)
             return
+        if expr.type_name in self.adts:
+            raise RuntimeError(f"ADT construction must name a variant: {expr.type_name}")
         self.emit_new(NewNode(struct_name=expr.type_name))
         tmp = self._alloc_temp()
         self.emit_stack_store(tmp, "rax")

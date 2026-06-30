@@ -1,5 +1,5 @@
 # EXIT: 0
-# STDOUT: 0017
+# STDOUT: 00107
 
 struct Box {
     n: i64
@@ -21,6 +21,13 @@ fun main(): i64 {
 
     let x = new Expr.IntLit
     putstr(itoa(x.tag))
+    match x {
+        Expr.IntLit { value: v }: {
+            putstr(itoa(v))
+        }
+        else: {
+        }
+    }
 
     # explicit field init still works alongside shorthand
     let y = new Expr.IntLit { value: 7 }
