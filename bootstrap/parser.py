@@ -560,7 +560,7 @@ class Parser:
                 node = CallNode(name=name, args=args)
             else:
                 node = VarNode(name=name)
-            if name[:1].isupper() and self.check("LBRACE"):
+            if self._lookahead_named_fields() and self.check("LBRACE"):
                 return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
             # Postfix: .field and [index]
             while True:
@@ -575,8 +575,8 @@ class Parser:
                             if len(args) > 4:
                                 raise ParseError("function calls may have at most 4 arguments in v0", field[2])
                             raise ParseError("method calls are only supported for os.* in v0", field[2])
-                    elif name[:1].isupper() and self.check("LBRACE"):
-                        node = StructInitNode(type_name=name, variant=field[1], fields=self.parse_named_fields_after_lbrace())
+                    elif isinstance(node, VarNode) and self._lookahead_named_fields() and self.check("LBRACE"):
+                        node = StructInitNode(type_name=node.name, variant=field[1], fields=self.parse_named_fields_after_lbrace())
                     else:
                         node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):
@@ -602,6 +602,17 @@ class Parser:
             return expr
         t = self.peek()
         raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
+
+    def _lookahead_named_fields(self):
+        """Check if the next brace starts named fields: LBRACE then (NEWLINE*) then ID COLON."""
+        if not self.peek_kind("LBRACE"):
+            return False
+        i = self.pos + 1
+        while i < len(self.tokens) and self.tokens[i][0] == "NEWLINE":
+            i += 1
+        return (i + 1 < len(self.tokens) and
+                self.tokens[i][0] == "ID" and
+                self.tokens[i + 1][0] == "COLON")
 
     def parse_named_fields_after_lbrace(self):
         fields = []

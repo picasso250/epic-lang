@@ -1,0 +1,11 @@
+# EXIT: 7
+
+struct point {
+    x: i64
+    y: i64
+}
+
+fun main(): i64 {
+    let p = point { x: 7, y: 3 }
+    return p.x
+}
