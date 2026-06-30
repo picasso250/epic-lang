@@ -1,0 +1,36 @@
+# EXIT: 0
+# STDOUT: 0017
+
+struct Box {
+    n: i64
+}
+
+type Expr {
+    Empty {}
+    IntLit {
+        value: i64
+    }
+}
+
+fun main(): i64 {
+    let b = new Box
+    putstr(itoa(b.n))
+
+    let e = new Expr.Empty
+    putstr(itoa(e.tag))
+
+    let x = new Expr.IntLit
+    putstr(itoa(x.tag))
+
+    # explicit field init still works alongside shorthand
+    let y = new Expr.IntLit { value: 7 }
+    match y {
+        Expr.IntLit { value: v }: {
+            putstr(itoa(v))
+        }
+        else: {
+        }
+    }
+
+    return 0
+}

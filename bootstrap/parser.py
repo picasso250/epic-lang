@@ -535,7 +535,7 @@ class Parser:
                 return StructInitNode(type_name=name, variant=variant[1], fields=[])
             if self.check("LBRACE"):
                 return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
-            raise ParseError("Expected constructor body, variant, array allocation, or map allocation after new", t[2])
+            return StructInitNode(type_name=name, fields=[])
         if self.peek_kind("NUMBER"):
             t = self.advance()
             return LiteralNode(value=t[1])

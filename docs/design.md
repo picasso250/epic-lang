@@ -150,6 +150,14 @@ let q = new Pos { line: 3 }     # omitted fields get zero
 let z = new Pos {}              # all fields zero
 ```
 
+`new Ctor` is shorthand for `new Ctor {}`. For structs, `Ctor` is a struct
+name. Omitted fields are initialized to zero values.
+
+```epic
+let b = new Box
+let b2 = new Box {}
+```
+
 Fields are named. Order is irrelevant. Unknown or duplicate fields are compile
 errors.
 
@@ -180,6 +188,15 @@ payload. Variant initializers use named brace syntax:
 let e = new Expr.IntLit { value: 123 }
 let empty: Expr
 ```
+
+Constructor shorthand applies to ADT variants as well:
+
+```epic
+let e = new Expr.Empty              # shorthand for new Expr.Empty {}
+let e2 = new Expr.Empty {}
+```
+
+`new AdtName` is not an ADT constructor; ADT construction must name a variant.
 
 ### Match
 

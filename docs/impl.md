@@ -47,6 +47,12 @@ src/codegen.ep
 src/link.ep              # Epic linker (separate tool, not compiler fixed-point)
 ```
 
+### Constructor Shorthand
+
+The Python parser lowers constructor shorthand to the same AST form as an empty
+initializer: `new S` → `new S {}` and `new A.V` → `new A.V {}`. Codegen has no
+separate shorthand path.
+
 ### Codegen Split
 
 `codegen_support.ep` owns shared codegen data structures, low-level assembly
