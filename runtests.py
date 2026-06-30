@@ -7,6 +7,10 @@ compiles, runs, and reports pass/fail.
 
 import os, sys, subprocess, re, shlex, argparse
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "bootstrap", "epic.py")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")

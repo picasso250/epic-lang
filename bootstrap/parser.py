@@ -58,17 +58,20 @@ class Parser:
     def parse_program(self):
         funcs = []
         structs = []
+        types = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "STRUCT"):
+        while self.peek()[0] in ("FUN", "STRUCT", "TYPE"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
-            else:
+            elif self.peek_kind("STRUCT"):
                 structs.append(self.parse_struct_def())
+            else:
+                types.append(self.parse_type_def())
             self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return ProgramNode(funcs=funcs, structs=structs)
+        return ProgramNode(funcs=funcs, structs=structs, types=types)
 
     # ── fun definition ─────────────────────────────────────────────────
 
@@ -87,13 +90,37 @@ class Parser:
         self.expect("RBRACE")
         return StructDefNode(name=name[1], fields=fields)
 
+    def parse_type_def(self):
+        self.expect("TYPE")
+        name = self.expect("ID")
+        self.expect("LBRACE")
+        self.skip_newlines()
+        variants = []
+        while not self.peek_kind("RBRACE"):
+            vname = self.expect("ID")
+            fields = []
+            if self.check("LBRACE"):
+                self.skip_newlines()
+                while not self.peek_kind("RBRACE"):
+                    fname = self.expect("ID")
+                    self.expect("COLON")
+                    ftype = self.parse_type()
+                    self.expect_stmt_end()
+                    fields.append(StructField(name=fname[1], type=ftype))
+                self.expect("RBRACE")
+            variants.append(TypeVariant(name=vname[1], fields=fields))
+            self.skip_newlines()
+        self.expect("RBRACE")
+        return TypeDefNode(name=name[1], variants=variants)
+
     def parse_fn_def(self):
         self.expect("FUN")
         name = self.expect("ID")
         self.expect("LPAREN")
         params = self.parse_params()
         self.expect("RPAREN")
-        self.expect("COLON")
+        if not self.check("ARROW"):
+            self.expect("COLON")
         ret_type = self.parse_type()
         body = self.parse_block()
         return FunDefNode(
@@ -120,8 +147,15 @@ class Parser:
         return params
 
     def parse_type(self):
+        if self.peek_kind("ID") and self.peek()[1] == "map":
+            self.advance()
+            self.expect("LBRACKET")
+            key = self.expect("ID")
+            self.expect("RBRACKET")
+            value = self.parse_type()
+            return f"map[{key[1]}]{value}"
         t = self.advance()
-        if t[0] == "ID":
+        if t[0] in ("ID",):
             typ = t[1]
             while self.check("LBRACKET"):
                 self.expect("RBRACKET")
@@ -145,7 +179,7 @@ class Parser:
 
     # ── statements ────────────────────────────────────────────────────
 
-    EXPR_FIRST = {"NUMBER", "STRING", "ID", "LPAREN"}
+    EXPR_FIRST = {"NUMBER", "STRING", "CHAR", "ID", "LPAREN", "TRUE", "FALSE", "BANG", "TILDE", "NEW"}
 
     def _skip_balanced_brackets(self, i):
         depth = 1
@@ -173,7 +207,7 @@ class Parser:
                 i += 2
             elif kind == "LBRACKET":
                 i = self._skip_balanced_brackets(i)
-            elif kind == "ASSIGN":
+            elif kind in self.ASSIGN_TOKENS:
                 return i
             else:
                 return None
@@ -192,10 +226,18 @@ class Parser:
             return self.parse_if_stmt()
         if t[0] == "WHILE":
             return self.parse_while_stmt()
+        if t[0] == "FOR":
+            return self.parse_for_stmt()
         if t[0] == "BREAK":
             return self.parse_break_stmt()
         if t[0] == "CONTINUE":
             return self.parse_continue_stmt()
+        if t[0] == "PANIC":
+            return self.parse_panic_stmt()
+        if t[0] == "ASSERT":
+            return self.parse_assert_stmt()
+        if t[0] == "MATCH":
+            return self.parse_match_stmt()
         if t[0] == "ID":
             if self._is_assignment():
                 return self.parse_assign_stmt()
@@ -217,7 +259,8 @@ class Parser:
         name = self.expect("ID")
         typ = None
         if self.peek_kind("COLON"):
-            raise ParseError("let type annotations are not supported in v0", self.peek()[2])
+            self.advance()
+            typ = self.parse_type()
         value = None
         if self.check("ASSIGN"):
             value = self.parse_expr()
@@ -238,9 +281,14 @@ class Parser:
                 lhs = SubscriptNode(base=lhs, index=index)
             else:
                 break
-        self.expect("ASSIGN")
+        op_token = self.advance()
+        if op_token[0] not in self.ASSIGN_TOKENS:
+            raise ParseError(f"Expected assignment operator, got {op_token[0]}", op_token[2])
         value = self.parse_expr()
         self.expect_stmt_end()
+        op = self.ASSIGN_TOKENS[op_token[0]]
+        if op:
+            value = BinaryNode(op=op, left=lhs, right=value)
         if isinstance(lhs, VarNode):
             return AssignNode(name=lhs.name, value=value)
         elif isinstance(lhs, FieldAccessNode):
@@ -248,6 +296,21 @@ class Parser:
         elif isinstance(lhs, SubscriptNode):
             return SubscriptAssignNode(base=lhs.base, index=lhs.index, value=value)
         raise ParseError(f"Invalid assignment target: {type(lhs).__name__}")
+
+    ASSIGN_TOKENS = {
+        "ASSIGN": "",
+        "PLUS_ASSIGN": "+",
+        "MINUS_ASSIGN": "-",
+        "STAR_ASSIGN": "*",
+        "SLASH_ASSIGN": "/",
+        "PERCENT_ASSIGN": "%",
+        "SHL_ASSIGN": "<<",
+        "SHR_ASSIGN": ">>",
+        "USHR_ASSIGN": ">>>",
+        "AMP_ASSIGN": "&",
+        "PIPE_ASSIGN": "|",
+        "CARET_ASSIGN": "^",
+    }
 
     def parse_if_stmt(self):
         self.expect("IF")
@@ -270,6 +333,75 @@ class Parser:
         body = self.parse_block()
         self.loop_depth -= 1
         return WhileNode(cond=cond, body=body)
+
+    def parse_for_stmt(self):
+        self.expect("FOR")
+        name = self.expect("ID")
+        self.expect("IN")
+        start = self.parse_expr()
+        self.expect("COLON")
+        end = self.parse_expr()
+        self.loop_depth += 1
+        body = self.parse_block()
+        self.loop_depth -= 1
+        return ForRangeNode(name=name[1], start=start, end=end, body=body)
+
+    def parse_panic_stmt(self):
+        t = self.expect("PANIC")
+        message = self.parse_expr()
+        self.expect_stmt_end()
+        return PanicNode(message=message, line=t[2])
+
+    def parse_assert_stmt(self):
+        t = self.expect("ASSERT")
+        cond = self.parse_expr()
+        message = None
+        if self.check("COMMA"):
+            message = self.parse_expr()
+        self.expect_stmt_end()
+        return AssertNode(cond=cond, message=message, line=t[2])
+
+    def parse_match_stmt(self):
+        self.expect("MATCH")
+        expr = self.parse_expr()
+        self.expect("LBRACE")
+        self.skip_newlines()
+        cases = []
+        while not self.peek_kind("RBRACE"):
+            if self.peek_kind("ELSE"):
+                self.advance()
+                body = self.parse_block()
+                cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
+            else:
+                bindings = []
+                if (
+                    self.peek_kind("ID")
+                    and self.pos + 2 < len(self.tokens)
+                    and self.tokens[self.pos + 1][0] == "DOT"
+                    and self.tokens[self.pos + 2][0] == "ID"
+                ):
+                    type_name = self.advance()[1]
+                    self.expect("DOT")
+                    variant = self.expect("ID")[1]
+                    pattern = FieldAccessNode(object=VarNode(type_name), field=variant)
+                else:
+                    pattern = self.parse_expr()
+                if isinstance(pattern, FieldAccessNode) and self.check("LBRACE"):
+                    if not self.peek_kind("RBRACE"):
+                        while True:
+                            field = self.expect("ID")
+                            bind_name = field[1]
+                            if self.check("COLON"):
+                                bind_name = self.expect("ID")[1]
+                            bindings.append((field[1], bind_name))
+                            if not self.check("COMMA"):
+                                break
+                    self.expect("RBRACE")
+                body = self.parse_block()
+                cases.append(MatchCase(pattern=pattern, bindings=bindings, body=body))
+            self.skip_newlines()
+        self.expect("RBRACE")
+        return MatchNode(expr=expr, cases=cases)
 
     def parse_break_stmt(self):
         t = self.expect("BREAK")
@@ -314,18 +446,44 @@ class Parser:
         "PLUS": "+", "MINUS": "-", "STAR": "*", "SLASH": "/", "PERCENT": "%",
         "EQEQ": "==", "NEQ": "!=", "LT": "<", "GT": ">",
         "LTE": "<=", "GTE": ">=", "AND": "&&", "OR": "||",
+        "PIPE": "|", "CARET": "^", "AMPERSAND": "&",
+        "SHL": "<<", "SHR": ">>", "USHR": ">>>",
     }
 
     def parse_equality(self):
-        left = self.parse_comparison()
+        left = self.parse_bit_or()
         while op := self.check("EQEQ") or self.check("NEQ"):
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_bit_or())
+        return left
+
+    def parse_bit_or(self):
+        left = self.parse_bit_xor()
+        while op := self.check("PIPE"):
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_bit_xor())
+        return left
+
+    def parse_bit_xor(self):
+        left = self.parse_bit_and()
+        while op := self.check("CARET"):
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_bit_and())
+        return left
+
+    def parse_bit_and(self):
+        left = self.parse_comparison()
+        while op := self.check("AMPERSAND"):
             left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_comparison())
         return left
 
     def parse_comparison(self):
-        left = self.parse_term()
+        left = self.parse_shift()
         while op := (self.check("LT") or self.check("GT")
                      or self.check("LTE") or self.check("GTE")):
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_shift())
+        return left
+
+    def parse_shift(self):
+        left = self.parse_term()
+        while op := (self.check("SHL") or self.check("SHR") or self.check("USHR")):
             left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_term())
         return left
 
@@ -336,10 +494,17 @@ class Parser:
         return left
 
     def parse_factor(self):
-        left = self.parse_primary()
+        left = self.parse_unary()
         while op := (self.check("STAR") or self.check("SLASH") or self.check("PERCENT")):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_primary())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_unary())
         return left
+
+    def parse_unary(self):
+        if self.check("BANG"):
+            return UnaryNode(op="!", expr=self.parse_unary())
+        if self.check("TILDE"):
+            return UnaryNode(op="~", expr=self.parse_unary())
+        return self.parse_primary()
 
     def parse_primary(self):
         if self.peek_kind("NEW"):
@@ -347,6 +512,12 @@ class Parser:
             t = self.advance()
             if t[0] != "ID":
                 raise ParseError(f"Expected type after new, got {t[0]}", t[2])
+            if t[1] == "map":
+                self.expect("LBRACKET")
+                key = self.expect("ID")
+                self.expect("RBRACKET")
+                value = self.parse_type()
+                return NewNode(struct_name=f"map[{key[1]}]{value}")
             elem = t[1]
             if self.check("LBRACKET"):
                 count = None
@@ -358,6 +529,12 @@ class Parser:
         if self.peek_kind("NUMBER"):
             t = self.advance()
             return LiteralNode(value=t[1])
+        if self.peek_kind("TRUE"):
+            self.advance()
+            return LiteralNode(value=1)
+        if self.peek_kind("FALSE"):
+            self.advance()
+            return LiteralNode(value=0)
         if self.peek_kind("CHAR"):
             t = self.advance()
             return LiteralNode(value=t[1])
@@ -367,6 +544,13 @@ class Parser:
         if self.peek_kind("ID"):
             t = self.advance()
             name = t[1]
+            if self.peek_kind("LBRACKET") and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "RBRACKET":
+                self.advance()
+                self.advance()
+                elem_type = name
+                if self.check("LBRACE"):
+                    return ArrayLiteralNode(elem_type=elem_type, values=self.parse_brace_values())
+                raise ParseError("Expected array literal after type[]", t[2])
             if self.check("LPAREN"):
                 args = self.parse_args()
                 self.expect("RPAREN")
@@ -375,6 +559,8 @@ class Parser:
                 node = CallNode(name=name, args=args)
             else:
                 node = VarNode(name=name)
+            if name[:1].isupper() and self.check("LBRACE"):
+                return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
             # Postfix: .field and [index]
             while True:
                 if self.check("DOT"):
@@ -388,10 +574,22 @@ class Parser:
                             if len(args) > 4:
                                 raise ParseError("function calls may have at most 4 arguments in v0", field[2])
                             raise ParseError("method calls are only supported for os.* in v0", field[2])
+                    elif name[:1].isupper() and self.check("LBRACE"):
+                        node = StructInitNode(type_name=name, variant=field[1], fields=self.parse_named_fields_after_lbrace())
                     else:
                         node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):
-                    index = self.parse_expr()
+                    start = None
+                    if not self.peek_kind("COLON") and not self.peek_kind("RBRACKET"):
+                        start = self.parse_expr()
+                    if self.check("COLON"):
+                        end = None
+                        if not self.peek_kind("RBRACKET"):
+                            end = self.parse_expr()
+                        self.expect("RBRACKET")
+                        node = SliceNode(base=node, start=start, end=end)
+                        continue
+                    index = start
                     self.expect("RBRACKET")
                     node = SubscriptNode(base=node, index=index)
                 else:
@@ -403,6 +601,29 @@ class Parser:
             return expr
         t = self.peek()
         raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
+
+    def parse_named_fields_after_lbrace(self):
+        fields = []
+        if not self.peek_kind("RBRACE"):
+            while True:
+                name = self.expect("ID")
+                self.expect("COLON")
+                value = self.parse_expr()
+                fields.append((name[1], value))
+                if not self.check("COMMA"):
+                    break
+        self.expect("RBRACE")
+        return fields
+
+    def parse_brace_values(self):
+        values = []
+        if not self.peek_kind("RBRACE"):
+            while True:
+                values.append(self.parse_expr())
+                if not self.check("COMMA"):
+                    break
+        self.expect("RBRACE")
+        return values
 
     def parse_args(self):
         args = []

@@ -33,6 +33,9 @@ RUNTIME_ASM_FILES = [
     "str_cat.asm",
     "str_slice.asm",
     "str_replace_char.asm",
+    "str_starts_with.asm",
+    "str_find.asm",
+    "str_trim.asm",
     "extend_i8.asm",
     "itoa.asm",
     "argv.asm",
@@ -79,6 +82,7 @@ def _emit_runtime_helpers(emitter):
 def _merge_programs(input_paths, main_path):
     funcs = []
     structs = []
+    types = []
     seen_funcs = {}
     seen_structs = {}
     found_main = False
@@ -96,6 +100,14 @@ def _merge_programs(input_paths, main_path):
             seen_structs[struct.name] = input_path
             structs.append(struct)
 
+        for typ in getattr(ast, "types", []):
+            if typ.name in seen_structs:
+                raise RuntimeError(
+                    f"Duplicate type {typ.name}: {input_path} and {seen_structs[typ.name]}"
+                )
+            seen_structs[typ.name] = input_path
+            types.append(typ)
+
         for func in ast.funcs:
             if func.name == "main" and not is_main_file:
                 continue
@@ -111,7 +123,7 @@ def _merge_programs(input_paths, main_path):
     if not found_main:
         raise RuntimeError(f"Main file has no main function: {main_path}")
 
-    return ProgramNode(funcs=funcs, structs=structs)
+    return ProgramNode(funcs=funcs, structs=structs, types=types)
 
 
 def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):

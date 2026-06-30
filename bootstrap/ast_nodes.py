@@ -16,6 +16,7 @@ class ASTNode:
 class ProgramNode(ASTNode):
     funcs: list      # list[FunDefNode]
     structs: list    # list[StructDefNode]
+    types: list = field(default_factory=list)
 
 
 @dataclass
@@ -109,6 +110,41 @@ class ContinueNode(ASTNode):
 
 
 @dataclass
+class ForRangeNode(ASTNode):
+    name: str
+    start: ASTNode
+    end: ASTNode
+    body: 'BlockNode'
+
+
+@dataclass
+class PanicNode(ASTNode):
+    message: ASTNode
+    line: int
+
+
+@dataclass
+class AssertNode(ASTNode):
+    cond: ASTNode
+    message: Optional[ASTNode]
+    line: int
+
+
+@dataclass
+class MatchCase(ASTNode):
+    pattern: ASTNode
+    bindings: list
+    body: 'BlockNode'
+    is_else: bool = False
+
+
+@dataclass
+class MatchNode(ASTNode):
+    expr: ASTNode
+    cases: list
+
+
+@dataclass
 class ExprStmtNode(ASTNode):
     expr: ASTNode
 
@@ -145,6 +181,12 @@ class BinaryNode(ASTNode):
 
 
 @dataclass
+class UnaryNode(ASTNode):
+    op: str
+    expr: ASTNode
+
+
+@dataclass
 class FieldAccessNode(ASTNode):
     object: ASTNode
     field: str
@@ -157,6 +199,13 @@ class SubscriptNode(ASTNode):
 
 
 @dataclass
+class SliceNode(ASTNode):
+    base: ASTNode
+    start: Optional[ASTNode]
+    end: Optional[ASTNode]
+
+
+@dataclass
 class NewNode(ASTNode):
     struct_name: str
 
@@ -165,3 +214,28 @@ class NewNode(ASTNode):
 class NewArrayNode(ASTNode):
     elem_type: str
     count: Optional[ASTNode] = None
+
+
+@dataclass
+class StructInitNode(ASTNode):
+    type_name: str
+    fields: list
+    variant: str = ""
+
+
+@dataclass
+class ArrayLiteralNode(ASTNode):
+    elem_type: str
+    values: list
+
+
+@dataclass
+class TypeVariant(ASTNode):
+    name: str
+    fields: list
+
+
+@dataclass
+class TypeDefNode(ASTNode):
+    name: str
+    variants: list
