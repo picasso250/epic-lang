@@ -8,8 +8,8 @@ import os
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap"))
-from runtests import parse_annotations, clean_test_paths
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_examples_py import parse_annotations, clean_test_paths
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

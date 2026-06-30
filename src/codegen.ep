@@ -22,8 +22,11 @@ fun collect_strings(e: EmitterState, node: AstNode): i64 {
     if node.kind == "" {
         return 0
     }
-    if node.kind == "String" {
+    if node.kind == "String" || node.kind == "FStringText" {
         get_string_id(e, node.value)
+    }
+    if node.kind == "FString" && len(node.fields) == 0 {
+        get_string_id(e, "")
     }
     for i in 0:len(node.funcs) {
         collect_strings(e, node.funcs[i])
@@ -311,6 +314,54 @@ fun type_can_assign(dst: TypeInfo, src: TypeInfo, expr: AstNode): i64 {
     return 0
 }
 
+fun string_node(value: str): AstNode {
+    let n = ast_node("String")
+    n.value = value
+    return n
+}
+
+fun call1_node(name: str, arg: AstNode): AstNode {
+    let n = ast_node("Call")
+    n.name = name
+    push(n.args, arg)
+    return n
+}
+
+fun fstring_expr(e: EmitterState, expr: AstNode): AstNode {
+    let nodes = new AstNode[4]
+    for i in 0:len(expr.fields) {
+        let part = expr.fields[i]
+        if part.kind == "FStringText" {
+            if len(part.value) > 0 {
+                push(nodes, string_node(part.value))
+            }
+        } else {
+            let typ = expr_type(e, part)
+            if typ.kind == "str" {
+                push(nodes, part)
+            } else {
+                if type_is_integer(typ) == 1 {
+                    push(nodes, call1_node("itoa", part))
+                } else {
+                    die("f-string interpolation does not support type")
+                }
+            }
+        }
+    }
+    if len(nodes) == 0 {
+        return string_node("")
+    }
+    let out = nodes[0]
+    for i in 1:len(nodes) {
+        let n = ast_node("Binary")
+        n.op = "+"
+        n.left = out
+        n.right = nodes[i]
+        out = n
+    }
+    return out
+}
+
 fun emit_heap_alloc(e: EmitterState, size: i64): i64 {
     if size < 1 {
         size = 8
@@ -326,6 +377,9 @@ fun emit_heap_alloc(e: EmitterState, size: i64): i64 {
 
 fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     if expr.kind == "String" {
+        return type_str()
+ }
+    if expr.kind == "FString" {
         return type_str()
  }
     if expr.kind == "Bool" {
@@ -776,6 +830,38 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         emit_call_inst(e, "WriteFile")
         emit_inst(e, "add rsp, 16")
         emit_label_id(e, "L", done_id)
+        return 0
+    }
+    if name == "print" || name == "println" {
+        if len(expr.args) > 1 {
+            die("print and println take at most one argument")
+        }
+        if len(expr.args) == 1 {
+            let arg = expr.args[0]
+            let typ = expr_type(e, arg)
+            if typ.kind == "str" {
+                let put = ast_node("Call")
+                put.name = "putstr"
+                push(put.args, arg)
+                emit_call_expr(e, put)
+            } else {
+                if type_is_integer(typ) == 1 {
+                    let put = ast_node("Call")
+                    put.name = "putstr"
+                    push(put.args, call1_node("itoa", arg))
+                    emit_call_expr(e, put)
+                } else {
+                    die("print does not support type")
+                }
+            }
+        }
+        if name == "println" {
+            let nl = ast_node("Call")
+            nl.name = "putc"
+            push(nl.args, string_node("10"))
+            nl.args[0].kind = "Literal"
+            emit_call_expr(e, nl)
+        }
         return 0
     }
     if name == "itoa" {
@@ -2060,6 +2146,10 @@ fun emit_expr(e: EmitterState, expr: AstNode): i64 {
         emit_lea_ref_id(e, "rcx", "_str_", id)
         emit_mov_i(e, "rdx", len(expr.value))
         emit_call_inst(e, "_str_alloc")
+        return 0
+    }
+    if expr.kind == "FString" {
+        emit_expr(e, fstring_expr(e, expr))
         return 0
     }
     if expr.kind == "Var" {
