@@ -1,64 +1,52 @@
-# Epic Language Design
+# Epic 语言设计 (Epic Language Design)
 
-This document describes the current Epic language. Earlier version notes
-(design-v0, design-v1, design-v2) are preserved in git history and tag
-`staged-bootstrap-archive-2026-06-30` as historical anchors.
+本文档描述当前的 Epic 语言。早期版本说明（design-v0、design-v1、design-v2）保留在 git 历史及标签 `staged-bootstrap-archive-2026-06-30` 中，作为历史锚点。
 
-## Direction
+## 方向 (Direction)
 
-Epic is a small C-like systems language targeting Windows x64. It is designed
-around whole-program compilation, explicit types at function and struct
-boundaries, heap-allocated reference values for strings, structs, dynamic
-arrays, and ADTs, and a self-hosted compiler written in Epic.
+Epic 是一门面向 Windows x64 的小型 C-like 系统语言（systems language）。它的设计围绕：**全程序编译 (whole-program compilation)**、函数和结构体边界上的显式类型、字符串/结构体/动态数组/ADT 的堆分配引用值，以及一个用 Epic 编写的自举编译器 (self-hosted compiler)。
 
-The implementation does not preserve forward compatibility. When the language
-changes, compiler sources move with the current design.
+本实现不保留向前兼容性。语言变化时，编译器源码随当前设计一起演进。
 
-## Program Model
+## 程序模型 (Program Model)
 
-A program is a set of top-level struct, type, and function definitions. There
-are no imports, packages, visibility rules, or per-file namespaces.
+一个程序由一组顶层 struct、type 和 function 定义组成。没有导入（import）、包（package）、可见性规则或按文件的命名空间。
 
-The current driver supports whole-program source merging:
+当前驱动程序支持全程序源码合并：
 
 ```text
 python epic.py --main main.ep main.ep lib.ep
 ```
 
-All top-level definitions from input files are merged into one global
-namespace. Duplicate names are rejected. When more than one input file is
-provided, `--main` is required; only the `main` function from the selected main
-file is used.
+所有输入文件中的顶层定义合并到一个全局命名空间。重名定义会被拒绝。当提供多个输入文件时，需要 `--main` 参数；只有所选主文件中的 `main` 函数被使用。
 
-## Types
+## 类型 (Types)
 
-User-facing types:
+面向用户的类型：
 
-| Type     | Meaning                                    |
-|----------|--------------------------------------------|
-| `bool`   | logical value, `true` or `false`           |
-| `u8`     | unsigned 8-bit byte                        |
-| `i64`    | signed 64-bit integer                      |
-| `u64`    | unsigned 64-bit integer                    |
-| `str`    | immutable byte string descriptor           |
-| `Name`   | heap-allocated struct or ADT reference     |
-| `T[]`    | heap-allocated dynamic array descriptor    |
-| `map[str]T` | heap-allocated map (str key)           |
-| `void`   | function return type only                  |
+| 类型    | 含义                                    |
+|---------|-----------------------------------------|
+| `bool`  | 逻辑值，`true` 或 `false`              |
+| `u8`    | 无符号 8 位字节                         |
+| `i64`   | 有符号 64 位整数                        |
+| `u64`   | 无符号 64 位整数                        |
+| `str`   | 不可变字节字符串描述符 (immutable byte string descriptor) |
+| `Name`  | 堆分配的结构体或 ADT 引用               |
+| `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
+| `map[str]T` | 堆分配的映射表（str 键）           |
+| `void`  | 仅用于函数返回类型                      |
 
-`str`, user structs, ADTs, dynamic arrays, and maps have reference semantics.
-Assignment and parameter passing copy references, not object contents. There is
-no by-value struct or array copy semantics.
+`str`、用户结构体、ADT、动态数组和映射表具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。
 
-### Built-in Globals
+### 内置全局变量 (Built-in Globals)
 
-| Name   | Type     | Meaning                                                        |
-|--------|----------|----------------------------------------------------------------|
-| `argv` | `str[]`  | command-line arguments, `argv.data[0]` is the executable name  |
+| 名称   | 类型     | 含义                                                        |
+|--------|----------|-------------------------------------------------------------|
+| `argv` | `str[]`  | 命令行参数，`argv.data[0]` 是可执行文件名                   |
 
-## Functions
+## 函数 (Functions)
 
-Function definitions use explicit parameter and return types:
+函数定义使用显式的参数和返回类型：
 
 ```epic
 fun add(a: i64, b: i64): i64 {
@@ -66,11 +54,9 @@ fun add(a: i64, b: i64): i64 {
 }
 ```
 
-Functions have at most 4 parameters. Calls have at most 4 arguments. `void`
-functions may use `return` or fall off the end. `return expr` is invalid in a
-`void` function.
+函数最多有 4 个参数。调用最多有 4 个参数。`void` 函数可以使用 `return` 或自然结束。`void` 函数中不允许 `return expr`。
 
-The program entry function must be:
+程序入口函数必须为：
 
 ```epic
 fun main(): i64 {
@@ -78,23 +64,20 @@ fun main(): i64 {
 }
 ```
 
-`main` may also return `void`. Falling off the end of `main` exits with status
-`0`. Non-zero exit is explicit through `os.ExitProcess(code)`.
+`main` 也可以返回 `void`。从 `main` 末尾自然结束时以状态 `0` 退出。非零退出需显式调用 `os.ExitProcess(code)`。
 
-## Expressions and Statements
+## 表达式与语句 (Expressions and Statements)
 
-### Literals
+### 字面量 (Literals)
 
-- Integer literals adapt to the target type when representable. Negative
-  literals do not adapt to unsigned types.
-- `true` and `false` are `bool` literals.
-- String literals produce `str` values. Supported escapes:
-  `\n \r \t \\ \" \' \0`. ASCII-only.
-- Character literals produce `u8`. Supported escapes match strings.
+- 整数字面量在可表示时会适配目标类型。负数不会被适配为无符号类型。
+- `true` 和 `false` 是 `bool` 字面量。
+- 字符串字面量产生 `str` 值。支持的转义：`\n \r \t \\ \" \' \0`。仅支持 ASCII。
+- 字符字面量产生 `u8`。支持的转义同字符串。
 
-### Let Declarations
+### Let 声明 (Let Declarations)
 
-`let` supports optional type annotations:
+`let` 支持可选的类型注解：
 
 ```epic
 let b: u8 = 1
@@ -102,76 +85,62 @@ let ok: bool
 let token: Token
 ```
 
-When the RHS clearly determines the type, the annotation should be omitted.
+当右侧明显确定类型时，应省略注解。
 
-`let x: T` without an initializer creates a zero value. For scalars that is
-`0` or `false`. For `str`, arrays, structs, and ADTs, the variable holds a
-non-null descriptor whose fields are zeroed; `.data` may be `0` when `.len`
-is `0`.
+不带初始化器的 `let x: T` 创建零值。对标量类型为零或 `false`。对 `str`、数组、结构体和 ADT，变量持有一个非空的描述符，其字段被归零；当 `.len` 为 `0` 时，`.data` 可能为 `0`。
 
-### Operators
+### 运算符 (Operators)
 
-Arithmetic `+`, `-`, `*`, `/`, `%` is checked and exits on overflow or
-division by zero.
+算术运算符 `+`、`-`、`*`、`/`、`%` 带检查，溢出或除零时退出程序。
 
-Comparison `==`, `!=`, `<`, `<=`, `>`, `>=` operates on `bool` for logical
-results.
+比较运算符 `==`、`!=`、`<`、`<=`、`>`、`>=` 操作 `bool`，产生逻辑结果。
 
-Logical `&&`, `||`, `!` operate on `bool`. Integers do not have implicit
-truthiness; write `x != 0` or `bool(x)`.
+逻辑运算符 `&&`、`||`、`!` 操作 `bool`。整数没有隐式的布尔性；请写 `x != 0` 或 `bool(x)`。
 
-Bitwise `~`, `&`, `|`, `^` and shift `<<`, `>>`, `>>>` are low-level and not
-checked. `>>` is arithmetic for `i64` and logical for unsigned integers.
-`>>>` is always logical.
+位运算符 `~`、`&`、`|`、`^` 和移位运算符 `<<`、`>>`、`>>>` 是低层操作，不经过检查。`>>` 对 `i64` 是算术移位，对无符号整数是逻辑移位。`>>>` 始终是逻辑移位。
 
-### Compound Assignment
+### 复合赋值 (Compound Assignment)
 
-Supported: `+=`, `-=`, `*=`, `/=`, `%=`, `<<=`, `>>=`, `>>>=`, `&=`, `|=`, `^=`.
-The left-hand side is evaluated once. `str += str` performs string
-concatenation.
+支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。`str += str` 执行字符串拼接。
 
-### Control Flow
+### 控制流 (Control Flow)
 
-- `if` / `else if` / `else` with explicit boolean conditions.
-- `while` with explicit boolean condition.
-- `break` and `continue` bind to the nearest enclosing `while` loop.
-- `for i in start:end` — half-open ascending range, evaluates `start` and
-  `end` once, runs while `i < end`. `continue` jumps to the increment.
-- `return expr` / `return`.
-- `panic "message"` — prints source position and message, exits non-zero.
-- `assert cond` / `assert cond, "message"` — always enabled, exits on failure.
+- `if` / `else if` / `else`，条件为显式布尔表达式。
+- `while`，条件为显式布尔表达式。
+- `break` 和 `continue` 绑定到最近的 `while` 循环。
+- `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`continue` 跳到增量步骤。
+- `return expr` / `return`。
+- `panic "消息"` — 打印源码位置和消息，以非零状态退出。
+- `assert cond` / `assert cond, "消息"` — 始终启用，失败时退出。
 
-### Struct Initialization
+### 结构体初始化 (Struct Initialization)
 
 ```epic
 struct Pos { line: i64; col: i64 }
 let p = new Pos { line: 3, col: 9 }
-let q = new Pos { line: 3 }     # omitted fields get zero
-let z = new Pos {}              # all fields zero
+let q = new Pos { line: 3 }     # 省略的字段被归零
+let z = new Pos {}              # 所有字段为零
 ```
 
-`new Ctor` is shorthand for `new Ctor {}`. For structs, `Ctor` is a struct
-name. Omitted fields are initialized to zero values.
+`new Ctor` 是 `new Ctor {}` 的简写。对于结构体，`Ctor` 是结构体名称。省略的字段被初始化为零值。
 
 ```epic
 let b = new Box
 let b2 = new Box {}
 ```
 
-Fields are named. Order is irrelevant. Unknown or duplicate fields are compile
-errors.
+字段按名称指定。顺序无关。未知字段或重复字段是编译错误。
 
-### Array Literals
+### 数组字面量 (Array Literals)
 
 ```epic
 let xs = new i64[] { 1, 2, 3 }
 let bs = new u8[] { 65, 66, 67 }
 ```
 
-Allocates a dynamic array whose `len` and `cap` are the element count.
-`new T[n]` allocates an empty array with capacity for at least `n` elements.
+分配一个动态数组，其 `len` 和 `cap` 等于元素个数。`new T[n]` 分配一个空数组，容量至少为 `n` 个元素。
 
-### ADTs
+### ADT (代数数据类型, Algebraic Data Types)
 
 ```epic
 type Expr {
@@ -181,28 +150,27 @@ type Expr {
 }
 ```
 
-ADTs are reference types. The zero value is the first variant with zero-valued
-payload. Variant initializers use named brace syntax:
+ADT 是引用类型。零值是第一个变体（variant），有效载荷归零。变体初始化使用具名花括号语法：
 
 ```epic
 let e = new Expr.IntLit { value: 123 }
 let empty: Expr
 ```
 
-Constructor shorthand applies to ADT variants as well:
+构造器简写同样适用于 ADT 变体：
 
 ```epic
-let e = new Expr.Empty              # shorthand for new Expr.Empty {}
+let e = new Expr.Empty              # new Expr.Empty {} 的简写
 let e2 = new Expr.Empty {}
 ```
 
-`new AdtName` is not an ADT constructor; ADT construction must name a variant.
+`new AdtName` 不是 ADT 构造器；ADT 构造必须指定变体名称。
 
-### Match
+### Match (模式匹配)
 
-`match` is a statement. Supports literal cases and ADT variant cases.
+`match` 是一个语句。支持字面量分支和 ADT 变体分支。
 
-Basic type match:
+基本类型匹配：
 
 ```epic
 match n {
@@ -212,9 +180,9 @@ match n {
 }
 ```
 
-Supported scrutinee types: `i64`, `u64`, `u8`, `bool`, `str`.
+支持的检视类型：`i64`、`u64`、`u8`、`bool`、`str`。
 
-ADT match:
+ADT 匹配：
 
 ```epic
 match e {
@@ -224,15 +192,15 @@ match e {
 }
 ```
 
-Rules:
-- Every case uses a colon between pattern and body.
-- `else` is optional, must be last when present.
-- No fallthrough.
-- ADT payload patterns bind fields by name (`{ value: n }` or `{ value }`).
-- Unknown or duplicate payload bindings are compile errors.
-- No exhaustiveness checking — missing cases produce a runtime panic.
+规则：
+- 每个分支在模式和主体之间使用冒号。
+- `else` 可选，必须置于最后（如果存在）。
+- 没有 fallthrough（向下穿透）。
+- ADT 有效载荷模式按名称绑定字段（`{ value: n }` 或 `{ value }`）。
+- 未知或重复的有效载荷绑定是编译错误。
+- 不进行穷尽性检查 — 缺失的分支会产生运行时 panic。
 
-### Map
+### Map (映射表)
 
 ```epic
 let ids = new map[str]i64
@@ -241,35 +209,33 @@ let id = ids["main"]
 let ok = map_has(ids, "main")
 ```
 
-Key type is fixed to `str`. Absent lookup returns the value type's zero value.
+键类型固定为 `str`。不存在的键查找返回该值类型的零值。
 
-## Strings and Arrays
+## 字符串与数组 (Strings and Arrays)
 
-### String Layout
+### 字符串布局 (String Layout)
 
-`str` is length-carrying and NUL-terminated for Win32 interop. `s.len` counts
-bytes, excludes the trailing NUL. `s.data` and `s.len` are low-level fields;
-new code should use `len()` and slice syntax.
+`str` 带长度信息且以 NUL 结尾，以便与 Win32 互操作。`s.len` 计数字节数，不包含尾部 NUL。`s.data` 和 `s.len` 是底层字段；新代码应使用 `len()` 和切片语法。
 
-### Dynamic Arrays
+### 动态数组 (Dynamic Arrays)
 
-`T[]` is a heap-allocated reference value.
+`T[]` 是堆分配的引用值。
 
-| Expression           | Meaning                                              |
-|----------------------|------------------------------------------------------|
-| `new T[]`            | empty array with default capacity                    |
-| `new T[n]`           | empty array with capacity at least `n`               |
-| `push(a, x)`         | append and grow                                      |
-| `extend(dst, src)`   | append all elements of one array to another          |
-| `a.data[i]`          | low-level unchecked element access                   |
-| `a.len` / `len(a)`   | current length                                       |
-| `a.cap` / `cap(a)`   | current capacity                                     |
+| 表达式                | 含义                                              |
+|-----------------------|---------------------------------------------------|
+| `new T[]`             | 空数组，默认容量                                  |
+| `new T[n]`            | 空数组，容量至少为 `n`                            |
+| `push(a, x)`          | 追加并扩容                                        |
+| `extend(dst, src)`    | 将一个数组的所有元素追加到另一个数组               |
+| `a.data[i]`           | 底层无检查的元素访问                              |
+| `a.len` / `len(a)`    | 当前长度                                          |
+| `a.cap` / `cap(a)`    | 当前容量                                          |
 
-### Indexing and Slices
+### 索引与切片 (Indexing and Slices)
 
-Indexing is bounds-checked. `s[i]` on a string returns `u8`.
+索引带边界检查。对字符串使用 `s[i]` 返回 `u8`。
 
-Slice syntax (copy semantics, half-open `[start, end)`):
+切片语法（复制语义，半开区间 `[start, end)`）：
 
 ```epic
 let a = s[start:end]
@@ -278,22 +244,22 @@ let c = s[:end]
 let d = s[:]
 ```
 
-- omitted `start` = `0`, omitted `end` = `.len`
-- `start < 0` or `end < 0` dies
-- `start > end` or `end > len` dies
-- successful slices allocate and copy
+- 省略 `start` = `0`，省略 `end` = `.len`
+- `start < 0` 或 `end < 0` 会退出
+- `start > end` 或 `end > len` 会退出
+- 成功的切片会分配并复制
 
-### Length and Capacity (builtins)
+### 长度与容量 (Length and Capacity，内置函数)
 
-| Builtin            | Meaning                     |
-|--------------------|-----------------------------|
-| `len(s: str): i64`   | string byte length          |
-| `len(xs: T[]): i64`  | array element count         |
-| `cap(xs: T[]): i64`  | array capacity              |
+| 内置函数                 | 含义                     |
+|-------------------------|--------------------------|
+| `len(s: str): i64`      | 字符串字节长度           |
+| `len(xs: T[]): i64`     | 数组元素个数             |
+| `cap(xs: T[]): i64`     | 数组容量                 |
 
-`cap(str)` is invalid.
+`cap(str)` 非法。
 
-## File IO (byte-oriented)
+## 文件 IO（面向字节, byte-oriented）
 
 ```epic
 read_file(path: str): u8[]
@@ -302,41 +268,35 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` returns an empty `u8[]` on failure. `str(u8[])` copies the full
-array length and appends a trailing NUL. Ordinary source loading:
+`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 复制整个数组长度并追加尾部 NUL。常规源码加载方式：
 
 ```epic
 let source = str(read_file(path))
 ```
 
-## Other Builtins
+## 其他内置函数 (Other Builtins)
 
-| Builtin                                | Meaning                                       |
-|----------------------------------------|-----------------------------------------------|
-| `putc(c: i64): void`                   | writes one byte                               |
-| `putstr(s: str): void`                 | writes string bytes                           |
-| `itoa(n: i64): str`                    | integer to heap string                        |
-| `str_new(bytes, len): str`             | creates a string by copying `len` bytes from a low-level buffer |
-| `str_starts_with(s, prefix): i64`      | true when `s` starts with `prefix`            |
-| `str_find(s, needle): i64`             | first byte index, or `-1`                     |
-| `str_trim(s): str`                     | trim leading/trailing ASCII whitespace        |
-| `system(cmd: str): i64`                | runs a command, returns exit code             |
-| `push(a: T[], x: T): void`             | append to dynamic array                       |
-| `extend(dst: T[], src: T[]): void`      | append all elements                           |
+| 内置函数                               | 含义                                        |
+|----------------------------------------|---------------------------------------------|
+| `putc(c: i64): void`                   | 写入一个字节                                |
+| `putstr(s: str): void`                 | 写入字符串字节                              |
+| `itoa(n: i64): str`                    | 整数转堆分配字符串                          |
+| `str_new(bytes, len): str`             | 从底层缓冲区复制 `len` 个字节创建字符串     |
+| `str_starts_with(s, prefix): i64`      | 若 `s` 以 `prefix` 开头则为真               |
+| `str_find(s, needle): i64`             | 第一个字节的索引，或 `-1`                   |
+| `str_trim(s): str`                     | 去除前导/尾随 ASCII 空白字符                |
+| `system(cmd: str): i64`                | 执行命令，返回退出码                        |
+| `push(a: T[], x: T): void`             | 追加到动态数组                              |
+| `extend(dst: T[], src: T[]): void`     | 追加所有元素                                |
 
-`os.*` names are reserved for system/runtime calls exposed by the compiler.
-`os.ExitProcess(code)`, `os.WriteFile`, etc. are recognized specially.
+`os.*` 名称保留给编译器暴露的系统/运行时调用。`os.ExitProcess(code)`、`os.WriteFile` 等被特别识别。
 
-## Bootstrap Model
+## 自举模型 (Bootstrap Model)
 
 ```text
 Python reference compiler -> Epic compiler -> Epic compiler
 ```
 
-The Python reference compiler lives in `bootstrap/`. The self-hosted Epic
-compiler lives in `src/`. The fixed-point test
-(`test_bootstrap_fixed_point.py`) verifies that repeated Epic-built compilers
-are byte-identical.
+Python reference compiler 位于 `bootstrap/`。自托管的 Epic compiler 位于 `src/`。不动点测试（`test_bootstrap_fixed_point.py`）验证反复由 Epic 构建的编译器在字节级别保持一致。
 
-The staged v0/v1/v2 directory chain is historical. Git tags preserve that
-chain; it is no longer part of the maintained source layout.
+分阶段的 v0/v1/v2 目录链是历史遗留。Git 标签保留了该链路；它不再是当前维护源码布局的一部分。
