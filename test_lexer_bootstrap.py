@@ -32,13 +32,12 @@ def bootstrap_lexer_dump(path):
         [LEXER_EXE, path],
         cwd=SCRIPT_DIR,
         capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
     )
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
     if result.returncode != 0:
-        raise RuntimeError(f"lexer.exe failed for {path}:\n{result.stdout}\n{result.stderr}")
-    return result.stdout
+        raise RuntimeError(f"lexer.exe failed for {path}:\n{stdout}\n{stderr}")
+    return stdout
 
 
 def ensure_bootstrap_lexer():
