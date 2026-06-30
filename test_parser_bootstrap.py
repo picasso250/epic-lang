@@ -219,15 +219,16 @@ def bootstrap_parser_dump(path):
         [PARSER_EXE, path],
         cwd=SCRIPT_DIR,
         capture_output=True,
-        text=True,
     )
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
     if result.returncode != 0:
         raise RuntimeError(
             f"self-hosted parser failed for {path}:\n"
-            + result.stdout[-2000:]
-            + result.stderr[-2000:]
+            + stdout[-2000:]
+            + stderr[-2000:]
         )
-    return result.stdout
+    return stdout
 
 
 def main():
