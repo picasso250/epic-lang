@@ -30,16 +30,16 @@ fun collect_strings(e: EmitterState, node: AstNode): i64 {
     }
     for i in 0:len(node.funcs) {
         collect_strings(e, node.funcs[i])
- }
+    }
     for i in 0:len(node.stmts) {
         collect_strings(e, node.stmts[i])
- }
+    }
     for i in 0:len(node.args) {
         collect_strings(e, node.args[i])
- }
+    }
     for i in 0:len(node.fields) {
         collect_strings(e, node.fields[i])
- }
+    }
     collect_strings(e, node.body)
     collect_strings(e, node.then_block)
     collect_strings(e, node.else_block)
@@ -374,23 +374,23 @@ fun emit_heap_alloc(e: EmitterState, size: i64): i64 {
 fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     if expr.kind == "String" {
         return type_str()
- }
+    }
     if expr.kind == "FString" {
         return type_str()
- }
+    }
     if expr.kind == "Bool" {
         return type_bool()
- }
+    }
     if expr.kind == "Char" {
         return type_u8()
- }
+    }
     if expr.kind == "Literal" {
         return type_i64()
- }
+    }
     if expr.kind == "Unary" {
         if expr.op == "!" {
             return type_bool()
- }
+        }
         return expr_type(e, expr.expr)
     }
     if expr.kind == "Binary" {
@@ -399,7 +399,7 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
             let rt = expr_type(e, expr.right)
             if lt.kind == "str" && rt.kind == "str" {
                 return type_str()
- }
+            }
         }
         if expr.op == "==" || expr.op == "!=" || expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" || expr.op == "&&" || expr.op == "||" {
             return type_bool()
@@ -408,71 +408,71 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     }
     if expr.kind == "Var" {
         return find_local_type(e, expr.name)
- }
+    }
     if expr.kind == "Call" {
         if is_sys_call(expr.name) == 1 {
             return type_i64()
- }
+        }
         if sys_member_symbol(expr.type_name, expr.name) != "" {
             return type_i64()
- }
+        }
         if expr.name == "len" {
             return type_i64()
- }
+        }
         if expr.name == "cap" {
             return type_i64()
- }
+        }
         if expr.name == "itoa" {
             return type_str()
- }
+        }
         if expr.name == "str" {
             return type_str()
- }
+        }
         if expr.name == "bytes" {
             return type_array("u8")
- }
+        }
         if expr.name == "str_new" {
             return type_str()
- }
+        }
         if expr.name == "str_slice" {
             return type_str()
- }
+        }
         if expr.name == "str_replace_char" {
             return type_str()
- }
+        }
         if expr.name == "str_starts_with" {
             return type_i64()
- }
+        }
         if expr.name == "str_find" {
             return type_i64()
- }
+        }
         if expr.name == "str_trim" {
             return type_str()
- }
+        }
         if expr.name == "map_has" {
             return type_bool()
- }
+        }
         if expr.name == "read_file" {
             return type_array("u8")
- }
+        }
         if expr.name == "write_file" {
             return type_i64()
- }
+        }
         if expr.name == "extend" {
             return type_void()
- }
+        }
         if expr.name == "i64" {
             return type_i64()
- }
+        }
         if expr.name == "u64" {
             return type_u64()
- }
+        }
         if expr.name == "u8" {
             return type_u8()
- }
+        }
         if expr.name == "bool" {
             return type_bool()
- }
+        }
         return find_func_ret(e, expr.name)
     }
     if expr.kind == "New" {
@@ -480,7 +480,7 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
             return type_map("i64")
         }
         return type_struct(expr.name)
- }
+    }
     if expr.kind == "StructInit" {
         return type_struct(expr.name)
     }
@@ -489,26 +489,26 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     }
     if expr.kind == "NewArray" {
         return type_array(expr.type_name)
- }
+    }
     if expr.kind == "NewMap" {
         return type_map(expr.type_name)
- }
+    }
     if expr.kind == "ArrayLiteral" {
         return type_array(expr.type_name)
- }
+    }
     if expr.kind == "FieldAccess" {
         let base_type = expr_type(e, expr.object)
         let layout = ""
         if base_type.kind == "str" {
             layout = "str"
- }
+        }
         else {
             if base_type.kind == "array" {
                 layout = array_layout_name(base_type.name)
- }
+            }
             else {
                 layout = base_type.name
- }
+            }
         }
         let f = find_field_info(e, layout, expr.name)
         return f.typ
@@ -543,7 +543,7 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
 fun infer_let_type(e: EmitterState, value: AstNode): TypeInfo {
     if value.kind == "" {
         return type_i64()
- }
+    }
     return expr_type(e, value)
 }
 
@@ -652,16 +652,16 @@ fun spill_args(e: EmitterState, args: AstNode[]): i64[] {
 fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     if len(slots) > 0 {
         emit_stack_load(e, "rcx", slots[0])
- }
+    }
     if len(slots) > 1 {
         emit_stack_load(e, "rdx", slots[1])
- }
+    }
     if len(slots) > 2 {
         emit_stack_load(e, "r8", slots[2])
- }
+    }
     if len(slots) > 3 {
         emit_stack_load(e, "r9", slots[3])
- }
+    }
     return 0
 }
 
@@ -771,7 +771,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         let stack_args = len(slots) - 4
         if stack_args < 0 {
             stack_args = 0
- }
+        }
         let extra_frame = align16(stack_args * 8)
         let frame = 32 + extra_frame
         out_s(e, "    sub rsp, ")
@@ -1059,7 +1059,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         let el_size = 8
         if elem == "i8" || elem == "u8" || elem == "bool" {
             el_size = 1
- }
+        }
         emit_expr(e, expr.args[0])
         let arr_slot = temp_save_rax(e)
         emit_expr(e, expr.args[1])
@@ -1147,7 +1147,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         let el_size = 8
         if elem == "i8" || elem == "u8" || elem == "bool" {
             el_size = 1
- }
+        }
         if el_size == 1 {
             let slots = spill_args(e, expr.args)
             emit_stack_load(e, "rcx", slots[0])
@@ -1396,50 +1396,50 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     emit_stack_load(e, "rcx", tmp)
     if expr.op == "+" {
         emit_inst(e, "add rax, rcx")
- emit_inst(e, "jo _epic_trap")
- return 0
- }
+        emit_inst(e, "jo _epic_trap")
+        return 0
+    }
     if expr.op == "-" {
         emit_inst(e, "sub rax, rcx")
- emit_inst(e, "jo _epic_trap")
- return 0
- }
+        emit_inst(e, "jo _epic_trap")
+        return 0
+    }
     if expr.op == "*" {
         emit_inst(e, "imul rax, rcx")
- emit_inst(e, "jo _epic_trap")
- return 0
- }
+        emit_inst(e, "jo _epic_trap")
+        return 0
+    }
     if expr.op == "/" {
         emit_inst(e, "test rcx, rcx")
- emit_inst(e, "jz _epic_trap")
- emit_inst(e, "cqo")
- emit_inst(e, "idiv rcx")
- return 0
- }
+        emit_inst(e, "jz _epic_trap")
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        return 0
+    }
     if expr.op == "%" {
         emit_inst(e, "test rcx, rcx")
- emit_inst(e, "jz _epic_trap")
- emit_inst(e, "cqo")
- emit_inst(e, "idiv rcx")
- emit_mov(e, "rax", "rdx")
- return 0
- }
+        emit_inst(e, "jz _epic_trap")
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        emit_mov(e, "rax", "rdx")
+        return 0
+    }
     if expr.op == "&" {
         emit_inst(e, "and rax, rcx")
- return 0
- }
+        return 0
+    }
     if expr.op == "|" {
         emit_inst(e, "or rax, rcx")
- return 0
- }
+        return 0
+    }
     if expr.op == "^" {
         emit_inst(e, "xor rax, rcx")
- return 0
- }
+        return 0
+    }
     if expr.op == "<<" {
         emit_inst(e, "shl rax, cl")
- return 0
- }
+        return 0
+    }
     if expr.op == ">>" {
         if left_type.kind == "u64" || left_type.kind == "u8" {
             emit_inst(e, "shr rax, cl")
@@ -1450,44 +1450,44 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     }
     if expr.op == ">>>" {
         emit_inst(e, "shr rax, cl")
- return 0
- }
+        return 0
+    }
     if expr.op == "==" {
         emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "sete al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "sete al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == "!=" {
         emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setne al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setne al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == "<" {
         emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setl al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setl al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == ">" {
         emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setg al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setg al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == "<=" {
         emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setle al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setle al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     if expr.op == ">=" {
         emit_inst(e, "cmp rax, rcx")
- emit_inst(e, "setge al")
- emit_inst(e, "movzx eax, al")
- return 0
- }
+        emit_inst(e, "setge al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
     die("unknown binary op")
     return 0
 }
@@ -1771,7 +1771,7 @@ fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
     let el_size = 8
     if elem == "i8" || elem == "u8" || elem == "bool" {
         el_size = 1
- }
+    }
     let header_slot = 0
     let cap_slot = 0
     emit_mov(e, "rcx", "[_heap]")
@@ -1920,16 +1920,16 @@ fun emit_zero_complex(e: EmitterState, typ: TypeInfo): i64 {
 fun field_layout_name(t: TypeInfo): str {
     if t.kind == "str" {
         return "str"
- }
+    }
     if t.kind == "array" {
         return array_layout_name(t.name)
- }
+    }
     if t.kind == "struct" {
         return t.name
- }
+    }
     if t.kind == "ptr" {
         return t.name
- }
+    }
     return ""
 }
 
@@ -2065,7 +2065,7 @@ fun emit_slice(e: EmitterState, expr: AstNode): i64 {
     let el_size = 8
     if elem == "i8" || elem == "u8" || elem == "bool" {
         el_size = 1
- }
+    }
     emit_stack_load(e, "rax", end_slot)
     emit_stack_load(e, "rcx", start_slot)
     emit_inst(e, "sub rax, rcx")
@@ -2414,50 +2414,50 @@ fun emit_assign_op_calc(e: EmitterState, op: str, lhs_type: TypeInfo, rhs_slot: 
     emit_stack_load(e, "rcx", rhs_slot)
     if op == "+" {
         emit_inst(e, "add rax, rcx")
- emit_inst(e, "jo _epic_trap")
- return 0
- }
+        emit_inst(e, "jo _epic_trap")
+        return 0
+    }
     if op == "-" {
         emit_inst(e, "sub rax, rcx")
- emit_inst(e, "jo _epic_trap")
- return 0
- }
+        emit_inst(e, "jo _epic_trap")
+        return 0
+    }
     if op == "*" {
         emit_inst(e, "imul rax, rcx")
- emit_inst(e, "jo _epic_trap")
- return 0
- }
+        emit_inst(e, "jo _epic_trap")
+        return 0
+    }
     if op == "/" {
         emit_inst(e, "test rcx, rcx")
- emit_inst(e, "jz _epic_trap")
- emit_inst(e, "cqo")
- emit_inst(e, "idiv rcx")
- return 0
- }
+        emit_inst(e, "jz _epic_trap")
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        return 0
+    }
     if op == "%" {
         emit_inst(e, "test rcx, rcx")
- emit_inst(e, "jz _epic_trap")
- emit_inst(e, "cqo")
- emit_inst(e, "idiv rcx")
- emit_mov(e, "rax", "rdx")
- return 0
- }
+        emit_inst(e, "jz _epic_trap")
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        emit_mov(e, "rax", "rdx")
+        return 0
+    }
     if op == "&" {
         emit_inst(e, "and rax, rcx")
- return 0
- }
+        return 0
+    }
     if op == "|" {
         emit_inst(e, "or rax, rcx")
- return 0
- }
+        return 0
+    }
     if op == "^" {
         emit_inst(e, "xor rax, rcx")
- return 0
- }
+        return 0
+    }
     if op == "<<" {
         emit_inst(e, "shl rax, cl")
- return 0
- }
+        return 0
+    }
     if op == ">>" {
         if lhs_type.kind == "u64" || lhs_type.kind == "u8" {
             emit_inst(e, "shr rax, cl")
@@ -2468,8 +2468,8 @@ fun emit_assign_op_calc(e: EmitterState, op: str, lhs_type: TypeInfo, rhs_slot: 
     }
     if op == ">>>" {
         emit_inst(e, "shr rax, cl")
- return 0
- }
+        return 0
+    }
     die("unknown compound assignment op")
     return 0
 }
@@ -2592,13 +2592,13 @@ fun emit_assign_op(e: EmitterState, stmt: AstNode): i64 {
     let lhs = stmt.expr
     if lhs.kind == "Var" {
         return emit_assign_op_var(e, stmt, lhs)
- }
+    }
     if lhs.kind == "FieldAccess" {
         return emit_assign_op_field(e, stmt, lhs)
- }
+    }
     if lhs.kind == "Subscript" {
         return emit_assign_op_subscript(e, stmt, lhs)
- }
+    }
     die("invalid compound assignment target")
     return 0
 }
@@ -2927,52 +2927,52 @@ fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
     temp_reset(e)
     if stmt.kind == "Return" {
         return emit_return(e, stmt)
- }
+    }
     if stmt.kind == "ExprStmt" {
         return emit_expr(e, stmt.expr)
- }
+    }
     if stmt.kind == "Let" {
         return emit_let(e, stmt)
- }
+    }
     if stmt.kind == "Assign" {
         return emit_assign(e, stmt)
- }
+    }
     if stmt.kind == "AssignOp" {
         return emit_assign_op(e, stmt)
- }
+    }
     if stmt.kind == "SubscriptAssign" {
         return emit_subscript_assign(e, stmt)
- }
+    }
     if stmt.kind == "FieldSet" {
         return emit_field_set(e, stmt)
- }
+    }
     if stmt.kind == "If" {
         return emit_if(e, stmt)
- }
+    }
     if stmt.kind == "While" {
         return emit_while(e, stmt)
- }
+    }
     if stmt.kind == "For" {
         return emit_for_range(e, stmt)
- }
+    }
     if stmt.kind == "Break" {
         return emit_break(e)
- }
+    }
     if stmt.kind == "Continue" {
         return emit_continue(e)
- }
+    }
     if stmt.kind == "Panic" {
         return emit_panic_stmt(e, stmt)
- }
+    }
     if stmt.kind == "Assert" {
         return emit_assert_stmt(e, stmt)
- }
+    }
     if stmt.kind == "Match" {
         return emit_match(e, stmt)
- }
+    }
     if stmt.kind == "Block" {
         return emit_block(e, stmt)
- }
+    }
     die("unsupported stmt")
     return 0
 }
@@ -3012,34 +3012,34 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
     if len(fn.params) > 0 {
         if type_is_byte_sized(find_local_type(e, fn.params[0].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params[0].name), "cl")
- }
+        }
         else {
             emit_stack_store(e, find_local_slot(e, fn.params[0].name), "rcx")
- }
+        }
     }
     if len(fn.params) > 1 {
         if type_is_byte_sized(find_local_type(e, fn.params[1].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params[1].name), "dl")
- }
+        }
         else {
             emit_stack_store(e, find_local_slot(e, fn.params[1].name), "rdx")
- }
+        }
     }
     if len(fn.params) > 2 {
         if type_is_byte_sized(find_local_type(e, fn.params[2].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params[2].name), "r8b")
- }
+        }
         else {
             emit_stack_store(e, find_local_slot(e, fn.params[2].name), "r8")
- }
+        }
     }
     if len(fn.params) > 3 {
         if type_is_byte_sized(find_local_type(e, fn.params[3].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params[3].name), "r9b")
- }
+        }
         else {
             emit_stack_store(e, find_local_slot(e, fn.params[3].name), "r9")
- }
+        }
     }
     emit_block(e, fn.body)
     if fn.name == "main" {

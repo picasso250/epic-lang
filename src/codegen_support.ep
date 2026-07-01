@@ -152,126 +152,126 @@ fun emit_call_inst(e: EmitterState, target: str): i64 {
 fun sys_call_symbol(name: str): str {
     if name == "os.Sleep" {
         return "Sleep"
- }
+    }
     if name == "os.GetTickCount64" {
         return "GetTickCount64"
- }
+    }
     if name == "os.GetLastError" {
         return "GetLastError"
- }
+    }
     if name == "os.SetLastError" {
         return "SetLastError"
- }
+    }
     if name == "os.GetStdHandle" {
         return "GetStdHandle"
- }
+    }
     if name == "os.CloseHandle" {
         return "CloseHandle"
- }
+    }
     if name == "os.lstrlenA" {
         return "lstrlenA"
- }
+    }
     if name == "os.lstrcmpA" {
         return "lstrcmpA"
- }
+    }
     if name == "os.MessageBoxA" {
         return "MessageBoxA"
- }
+    }
     if name == "os.Beep" {
         return "Beep"
- }
+    }
     if name == "os.GetCurrentProcess" {
         return "GetCurrentProcess"
- }
+    }
     if name == "os.GetCurrentProcessId" {
         return "GetCurrentProcessId"
- }
+    }
     if name == "os.GetCurrentThreadId" {
         return "GetCurrentThreadId"
- }
+    }
     if name == "os.ExitProcess" {
         return "ExitProcess"
- }
+    }
     if name == "os.GetFileAttributesA" {
         return "GetFileAttributesA"
- }
+    }
     if name == "os.CreateFileA" {
         return "CreateFileA"
- }
+    }
     if name == "os.ReadFile" {
         return "ReadFile"
- }
+    }
     if name == "os.WriteFile" {
         return "WriteFile"
- }
+    }
     return ""
 }
 
 fun sys_member_symbol(ns: str, name: str): str {
     if ns != "os" {
         return ""
- }
+    }
     if name == "Sleep" {
         return "Sleep"
- }
+    }
     if name == "GetTickCount64" {
         return "GetTickCount64"
- }
+    }
     if name == "GetLastError" {
         return "GetLastError"
- }
+    }
     if name == "SetLastError" {
         return "SetLastError"
- }
+    }
     if name == "GetStdHandle" {
         return "GetStdHandle"
- }
+    }
     if name == "CloseHandle" {
         return "CloseHandle"
- }
+    }
     if name == "lstrlenA" {
         return "lstrlenA"
- }
+    }
     if name == "lstrcmpA" {
         return "lstrcmpA"
- }
+    }
     if name == "MessageBoxA" {
         return "MessageBoxA"
- }
+    }
     if name == "Beep" {
         return "Beep"
- }
+    }
     if name == "GetCurrentProcess" {
         return "GetCurrentProcess"
- }
+    }
     if name == "GetCurrentProcessId" {
         return "GetCurrentProcessId"
- }
+    }
     if name == "GetCurrentThreadId" {
         return "GetCurrentThreadId"
- }
+    }
     if name == "ExitProcess" {
         return "ExitProcess"
- }
+    }
     if name == "GetFileAttributesA" {
         return "GetFileAttributesA"
- }
+    }
     if name == "CreateFileA" {
         return "CreateFileA"
- }
+    }
     if name == "ReadFile" {
         return "ReadFile"
- }
+    }
     if name == "WriteFile" {
         return "WriteFile"
- }
+    }
     return ""
 }
 
 fun is_sys_call(name: str): i64 {
     if sys_call_symbol(name) == "" {
         return 0
- }
+    }
     return 1
 }
 
@@ -382,82 +382,82 @@ fun type_info(kind: str, name: str): TypeInfo {
 
 fun type_i64(): TypeInfo {
     return type_info("i64", "")
- }
+}
 fun type_i8(): TypeInfo {
     return type_info("i8", "")
- }
+}
 fun type_u8(): TypeInfo {
     return type_info("u8", "")
- }
+}
 fun type_u64(): TypeInfo {
     return type_info("u64", "")
- }
+}
 fun type_bool(): TypeInfo {
     return type_info("bool", "")
- }
+}
 fun type_void(): TypeInfo {
     return type_info("void", "")
- }
+}
 fun type_str(): TypeInfo {
     return type_info("str", "")
- }
+}
 fun type_struct(name: str): TypeInfo {
     return type_info("struct", name)
- }
+}
 fun type_array(elem: str): TypeInfo {
     return type_info("array", elem)
- }
+}
 fun type_map(value: str): TypeInfo {
     return type_info("map", value)
- }
+}
 
 fun type_is_i8(t: TypeInfo): i64 {
     if t.kind == "i8" {
         return 1
- }
+    }
     return 0
 }
 
 fun type_is_u8(t: TypeInfo): i64 {
     if t.kind == "u8" {
         return 1
- }
+    }
     return 0
 }
 
 fun type_is_bool(t: TypeInfo): i64 {
     if t.kind == "bool" {
         return 1
- }
+    }
     return 0
 }
 
 fun type_is_byte_sized(t: TypeInfo): i64 {
     if t.kind == "i8" {
         return 1
- }
+    }
     if t.kind == "u8" {
         return 1
- }
+    }
     if t.kind == "bool" {
         return 1
- }
+    }
     return 0
 }
 
 fun type_is_integer(t: TypeInfo): i64 {
     if t.kind == "i8" {
         return 1
- }
+    }
     if t.kind == "u8" {
         return 1
- }
+    }
     if t.kind == "i64" {
         return 1
- }
+    }
     if t.kind == "u64" {
         return 1
- }
+    }
     return 0
 }
 
@@ -468,16 +468,16 @@ fun type_is_value_i8(t: TypeInfo): i64 {
 fun type_is_complex(t: TypeInfo): i64 {
     if t.kind == "str" {
         return 1
- }
+    }
     if t.kind == "struct" {
         return 1
- }
+    }
     if t.kind == "array" {
         return 1
- }
+    }
     if t.kind == "map" {
         return 1
- }
+    }
     return 0
 }
 
@@ -514,30 +514,30 @@ fun map_value_name(name: str): str {
 fun user_type(name: str): TypeInfo {
     if name == "i64" {
         return type_i64()
- }
+    }
     if name == "i8" {
         return type_i8()
- }
+    }
     if name == "u8" {
         return type_u8()
- }
+    }
     if name == "u64" {
         return type_u64()
- }
+    }
     if name == "bool" {
         return type_bool()
- }
+    }
     if name == "void" {
         return type_void()
- }
+    }
     if name == "str" {
         return type_str()
- }
+    }
     if is_array_type_name(name) == 1 {
         return type_array(array_elem_name(name))
- }
+    }
     if is_map_type_name(name) == 1 {
         return type_map(map_value_name(name))
- }
+    }
     return type_struct(name)
 }

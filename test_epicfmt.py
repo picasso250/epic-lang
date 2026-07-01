@@ -53,7 +53,7 @@ def test_preserves_crlf_newlines():
     assert epicfmt.format_text(source) == "fun main(): void {\r\n    putc(65)\r\n}\r\n"
 
 
-def test_splits_statements_after_open_braces_and_before_close_braces():
+def test_preserves_existing_line_breaks():
     source = """fun main(): void {
 if a { x = 1
 y = 2
@@ -62,14 +62,28 @@ w = 4 } else { q = 5 }
 }
 """
     assert epicfmt.format_text(source) == """fun main(): void {
-    if a {
-        x = 1
+    if a { x = 1
         y = 2
-    } else if b {
-        z = 3
-        w = 4
-    } else {
-        q = 5
+    } else if b { z = 3
+        w = 4 } else { q = 5 }
+}
+"""
+
+
+def test_keeps_inline_match_patterns_on_one_line():
+    source = """fun main(): void {
+match t.data {
+TokenData.FString { parts }: {
+println("x")
+}
+}
+}
+"""
+    assert epicfmt.format_text(source) == """fun main(): void {
+    match t.data {
+        TokenData.FString { parts }: {
+            println("x")
+        }
     }
 }
 """
@@ -79,7 +93,6 @@ def test_does_not_split_braces_in_literals_or_comments():
     source = """fun main(): void { putstr("{ }") # } {
 }
 """
-    assert epicfmt.format_text(source) == """fun main(): void {
-    putstr("{ }") # } {
+    assert epicfmt.format_text(source) == """fun main(): void { putstr("{ }") # } {
 }
 """
