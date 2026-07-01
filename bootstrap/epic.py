@@ -151,7 +151,7 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, b
     stage_start = _now()
     emitter = Emitter(asm_path)
     if backend == "machine":
-        emitter.include_main_runtime_init = False
+        emitter.include_main_argv_init = False
     emitter.emit_program(ast)
     if backend != "machine":
         _emit_runtime_helpers(emitter)
