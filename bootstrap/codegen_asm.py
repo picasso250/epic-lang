@@ -1,14 +1,60 @@
 """Code generation mixin split from bootstrap.codegen."""
 
+import re
+
 
 
 
 class AsmEmitterMixin:
     def emit(self, s):
         if getattr(self, "asm_program", None) is not None:
+            if self._emit_structured_asm(s):
+                return
             self.asm_program.raw(s)
             return
         self.out.write(s + "\n")
+
+    def _emit_structured_asm(self, s):
+        if "\n" in s:
+            return False
+        line = s.split(";", 1)[0].strip()
+        if not line:
+            self.asm_program.raw(s)
+            return True
+        if line.startswith("global "):
+            self.asm_program.global_(line.split(None, 1)[1])
+            return True
+        if line.startswith("extern "):
+            self.asm_program.extern(line.split(None, 1)[1])
+            return True
+        if line == "default rel":
+            self.asm_program.default_rel()
+            return True
+        if line.startswith("section "):
+            self.asm_program.section(line.split(None, 1)[1])
+            return True
+        if self.asm_program.current_section == ".data" and self._emit_structured_data(line):
+            return True
+        if self.asm_program.current_section == ".text" and not line.startswith(";"):
+            self.asm_program.inst(line)
+            return True
+        return False
+
+    def _emit_structured_data(self, line):
+        m = re.match(r"^([A-Za-z_.$][\w.$]*):?\s+times\s+(\d+)\s+db\s+0$", line)
+        if m:
+            self.asm_program.data_zero(m.group(1), int(m.group(2)))
+            return True
+        m = re.match(r"^([A-Za-z_.$][\w.$]*):?\s+db\s+(.+)$", line)
+        if m:
+            values = [int(part.strip()) for part in m.group(2).split(",")]
+            self.asm_program.data_bytes(m.group(1), values)
+            return True
+        m = re.match(r"^([A-Za-z_.$][\w.$]*):?\s+d([dq])\s+(-?\d+)$", line)
+        if m:
+            self.asm_program.data_int(m.group(1), 4 if m.group(2) == "d" else 8, int(m.group(3)))
+            return True
+        return False
 
     def emit_label(self, name):
         if getattr(self, "asm_program", None) is not None:

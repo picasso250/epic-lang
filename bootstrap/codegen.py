@@ -18,6 +18,7 @@ class Emitter(AsmEmitterMixin, TypeEmitterMixin, StringEmitterMixin, ExprEmitter
         self.out_path = out_path
         self.asm_program = MirAsmProgram()
         self.out = None
+        self.include_main_runtime_init = True
         self.builtins = {"putc", "putstr", "print", "println",
                          "itoa", "system",
                          "str", "str_new", "bytes", "read_file", "write_file",
@@ -149,7 +150,7 @@ class Emitter(AsmEmitterMixin, TypeEmitterMixin, StringEmitterMixin, ExprEmitter
         self.emit_inst(f"sub rsp, {self.alloc_size}")
 
         # Heap init for main
-        if name == "main":
+        if name == "main" and self.include_main_runtime_init:
             self.emit_call_inst("GetProcessHeap")
             self.emit_mov("[_heap]", "rax")
             self.emit_call_inst("_argv_init")

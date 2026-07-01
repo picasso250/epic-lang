@@ -14,6 +14,7 @@ import sys
 import time
 
 from codegen import Emitter
+from machine import write_machine_obj
 from ast_nodes import ProgramNode
 from lexer import LexError, lex
 from parser import ParseError, Parser
@@ -136,7 +137,7 @@ def _merge_programs(input_paths, main_path):
     return ProgramNode(funcs=funcs, structs=structs, types=types)
 
 
-def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
+def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, backend="asm"):
     total_start = _now()
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
@@ -149,19 +150,25 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
     print(f"[2/4] Compiling → {asm_path}")
     stage_start = _now()
     emitter = Emitter(asm_path)
+    if backend == "machine":
+        emitter.include_main_runtime_init = False
     emitter.emit_program(ast)
-    _emit_runtime_helpers(emitter)
+    if backend != "machine":
+        _emit_runtime_helpers(emitter)
     emitter.close()
     _print_timing("emit asm", stage_start)
 
     print(f"[3/4] Assembling → {obj_path}")
     stage_start = _now()
-    result = subprocess.run(
-        [NASM, "-f", "win64", asm_path, "-o", obj_path],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("NASM error:\n" + result.stderr[:500])
+    if backend == "machine":
+        write_machine_obj(emitter.asm_program, obj_path)
+    else:
+        result = subprocess.run(
+            [NASM, "-f", "win64", asm_path, "-o", obj_path],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("NASM error:\n" + result.stderr[:500])
     _print_timing("assemble", stage_start)
 
     print(f"[4/4] Linking (via {linker}) → {exe_path}")
@@ -189,8 +196,8 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
     return exe_path
 
 
-def compile_file(input_path, linker="py", out_dir=BUILD_DIR):
-    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
+def compile_file(input_path, linker="py", out_dir=BUILD_DIR, backend="asm"):
+    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir, backend=backend)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -208,6 +215,8 @@ def parse_args(argv):
                         help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
+    parser.add_argument("--backend", choices=["asm", "machine"], default="asm",
+                        help="object backend to use (default: asm)")
     return parser.parse_args(argv)
 
 
@@ -232,6 +241,7 @@ def main(argv=None):
             main_path=args.main or args.inputs[0],
             linker=args.linker,
             out_dir=args.out_dir,
+            backend=args.backend,
         )
     except (LexError, ParseError) as e:
         print(f"Error: {e}", file=sys.stderr)
