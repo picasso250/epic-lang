@@ -123,6 +123,15 @@ class MirImport:
 
 
 @dataclass
+class MirExtern:
+    name: str
+    signature: MirSignature
+
+    def text(self):
+        return f"extern {self.name}: {self.signature}"
+
+
+@dataclass
 class MirGlobal:
     name: str
     type: MirType
@@ -246,12 +255,14 @@ class MirFunction:
 @dataclass
 class MirProgram:
     imports: list[MirImport] = field(default_factory=list)
+    externs: list[MirExtern] = field(default_factory=list)
     globals: list[MirGlobal] = field(default_factory=list)
     functions: list[MirFunction] = field(default_factory=list)
 
     def text(self):
         parts = []
         parts.extend(imp.text() for imp in self.imports)
+        parts.extend(ext.text() for ext in self.externs)
         parts.extend(glob.text() for glob in self.globals)
         parts.extend(fn.text() for fn in self.functions)
         return "\n\n".join(parts)
@@ -275,7 +286,7 @@ class MirValidator:
             raise MirValidationError("\n".join(self.errors))
 
     def _collect_symbols(self):
-        for item in [*self.program.imports, *self.program.globals, *self.program.functions]:
+        for item in [*self.program.imports, *self.program.externs, *self.program.globals, *self.program.functions]:
             if item.name in self.symbols:
                 self.errors.append(f"duplicate module symbol: {item.name}")
             self.symbols[item.name] = item

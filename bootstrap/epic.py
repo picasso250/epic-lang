@@ -15,6 +15,8 @@ import time
 
 from codegen import Emitter
 from machine import write_machine_obj
+from mir_codegen import ast_to_mir
+from mir_lower import lower_mir_to_x64
 from ast_nodes import ProgramNode
 from lexer import LexError, lex
 from parser import ParseError, Parser
@@ -149,19 +151,22 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, b
 
     print(f"[2/4] Compiling → {asm_path}")
     stage_start = _now()
-    emitter = Emitter(asm_path)
     if backend == "machine":
-        emitter.include_main_argv_init = False
-    emitter.emit_program(ast)
-    if backend != "machine":
+        mir_program = ast_to_mir(ast)
+        machine_program = lower_mir_to_x64(mir_program)
+        with open(asm_path, "w", encoding="utf-8", newline="\n") as out:
+            out.write(machine_program.text())
+    else:
+        emitter = Emitter(asm_path)
+        emitter.emit_program(ast)
         _emit_runtime_helpers(emitter)
-    emitter.close()
-    _print_timing("emit asm", stage_start)
+        emitter.close()
+    _print_timing("emit machine" if backend == "machine" else "emit asm", stage_start)
 
     print(f"[3/4] Assembling → {obj_path}")
     stage_start = _now()
     if backend == "machine":
-        write_machine_obj(emitter.asm_program, obj_path)
+        write_machine_obj(machine_program, obj_path)
     else:
         result = subprocess.run(
             [NASM, "-f", "win64", asm_path, "-o", obj_path],

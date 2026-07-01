@@ -1,11 +1,10 @@
-"""Machine-code backend for the initial MirAsmProgram subset."""
+"""Machine-code backend for structured X64Program input."""
 
-import re
 import struct
 
 from coff import write_coff_obj
-from mir_asm import MirAsmDataBytes, MirAsmDataInt, MirAsmDataZero, MirAsmDefaultRel
-from mir_asm import MirAsmExtern, MirAsmGlobal, MirAsmInst, MirAsmLabel, MirAsmRaw, MirAsmSection
+from x64 import Imm, LabelRef, Mem, Reg, Symbol, X64DataBytes, X64DataZero
+from x64 import X64Extern, X64Global, X64Inst, X64Label, X64Section
 
 
 REG64 = {
@@ -81,135 +80,127 @@ class MachineObjectBuilder:
             self._emit_item(item)
 
     def _emit_item(self, item):
-            if isinstance(item, MirAsmRaw):
-                for line in item.lines():
-                    if line.strip():
-                        raise MachineBackendError(f"raw ASM is not supported by machine backend: {line.strip()}")
-            elif isinstance(item, MirAsmGlobal):
-                pass
-            elif isinstance(item, MirAsmExtern):
-                self.externs.add(item.name)
-            elif isinstance(item, MirAsmDefaultRel):
-                pass
-            elif isinstance(item, MirAsmSection):
-                self.section = item.name
-            elif isinstance(item, MirAsmLabel):
-                if self.section == ".text":
-                    self.text_labels[item.name] = len(self.text)
-                elif self.section == ".data":
-                    self.data_labels[item.name] = len(self.data)
-                else:
-                    raise MachineBackendError(f"label outside section: {item.name}")
-            elif isinstance(item, MirAsmInst):
-                self._emit_inst(item.op)
-            elif isinstance(item, MirAsmDataBytes):
-                self._require_data_section(item.label)
-                self.data_labels[item.label] = len(self.data)
-                self.data.extend(v & 0xFF for v in item.values)
-            elif isinstance(item, MirAsmDataZero):
-                self._require_data_section(item.label)
-                self.data_labels[item.label] = len(self.data)
-                self.data.extend(b"\x00" * item.count)
-            elif isinstance(item, MirAsmDataInt):
-                self._require_data_section(item.label)
-                self.data_labels[item.label] = len(self.data)
-                self.data.extend(item.value.to_bytes(item.size, "little", signed=True))
+        if isinstance(item, X64Global):
+            pass
+        elif isinstance(item, X64Extern):
+            self.externs.add(item.name)
+        elif isinstance(item, X64Section):
+            self.section = item.name
+        elif isinstance(item, X64Label):
+            if self.section == ".text":
+                self.text_labels[item.name] = len(self.text)
+            elif self.section == ".data":
+                self.data_labels[item.name] = len(self.data)
+            else:
+                raise MachineBackendError(f"label outside section: {item.name}")
+        elif isinstance(item, X64Inst):
+            if self.section != ".text":
+                raise MachineBackendError(f"instruction outside .text: {item.op}")
+            self._emit_inst(item)
+        elif isinstance(item, X64DataBytes):
+            self._require_data_section(item.label)
+            self.data_labels[item.label] = len(self.data)
+            self.data.extend(v & 0xFF for v in item.values)
+        elif isinstance(item, X64DataZero):
+            self._require_data_section(item.label)
+            self.data_labels[item.label] = len(self.data)
+            self.data.extend(b"\x00" * item.count)
+        else:
+            raise MachineBackendError(f"unsupported machine item: {type(item).__name__}")
 
     def _require_data_section(self, label):
         if self.section != ".data":
             raise MachineBackendError(f"data item outside .data section: {label}")
 
-    def _strip_comment(self, line):
-        return line.split(";", 1)[0]
-
-    def _emit_inst(self, op):
-        op = self._strip_comment(op).strip()
-        if not op:
-            return
-        if op == "push rbp":
+    def _emit_inst(self, inst):
+        op = inst.op
+        operands = inst.operands
+        if op == "push" and self._regs(operands, "rbp"):
             self.text.append(0x55)
-        elif op == "push r8":
+        elif op == "push" and self._regs(operands, "r8"):
             self.text.extend(b"\x41\x50")
-        elif op == "pop rdx":
+        elif op == "pop" and self._regs(operands, "rdx"):
             self.text.append(0x5A)
-        elif op == "pop rbp":
+        elif op == "pop" and self._regs(operands, "rbp"):
             self.text.append(0x5D)
-        elif op == "ret":
+        elif op == "ret" and not operands:
             self.text.append(0xC3)
-        elif op == "mov rbp, rsp":
-            self.text.extend(b"\x48\x89\xe5")
-        elif op == "mov rsp, rbp":
-            self.text.extend(b"\x48\x89\xec")
-        elif m := re.match(r"^sub rsp, (-?\d+)$", op):
-            self._emit_rsp_imm(0xEC, int(m.group(1)))
-        elif m := re.match(r"^add rsp, (-?\d+)$", op):
-            self._emit_rsp_imm(0xC4, int(m.group(1)))
-        elif m := re.match(r"^call ([A-Za-z_.$][\w.$]*)$", op):
-            self._emit_call(m.group(1))
-        elif m := re.match(r"^(jmp|jo|jz|jnz|jns) ([A-Za-z_.$][\w.$]*)$", op):
-            self._emit_jump(m.group(1), m.group(2))
-        elif op == "cqo":
+        elif op in ("sub", "add") and self._reg_imm(operands, "rsp"):
+            self._emit_rsp_imm(0xEC if op == "sub" else 0xC4, operands[1].value)
+        elif op == "call" and len(operands) == 1 and isinstance(operands[0], Symbol):
+            self._emit_call(operands[0].name)
+        elif op in ("jmp", "jo", "jz", "jnz", "jns") and len(operands) == 1 and isinstance(operands[0], LabelRef):
+            self._emit_jump(op, operands[0].name)
+        elif op == "cqo" and not operands:
             self.text.extend(b"\x48\x99")
-        elif op == "idiv rcx":
-            self.text.extend(b"\x48\xf7\xf9")
-        elif op == "div rcx":
-            self.text.extend(b"\x48\xf7\xf1")
-        elif op == "imul rax, rcx":
+        elif op in ("idiv", "div") and self._regs(operands, "rcx"):
+            self.text.extend(b"\x48\xf7\xf9" if op == "idiv" else b"\x48\xf7\xf1")
+        elif op == "imul" and self._regs(operands, "rax", "rcx"):
             self.text.extend(b"\x48\x0f\xaf\xc1")
-        elif op == "neg rax":
+        elif op == "neg" and self._regs(operands, "rax"):
             self.text.extend(b"\x48\xf7\xd8")
-        elif m := re.match(r"^cmp ([a-z0-9]+), ([a-z0-9]+)$", op):
-            self._emit_cmp_reg_reg(m.group(1), m.group(2))
-        elif op == "setg al":
-            self.text.extend(b"\x0f\x9f\xc0")
-        elif op == "setl al":
-            self.text.extend(b"\x0f\x9c\xc0")
-        elif op == "movzx eax, al":
+        elif op == "cmp" and self._two_regs(operands):
+            self._emit_cmp_reg_reg(operands[0].name, operands[1].name)
+        elif op in ("sete", "setne", "setg", "setl", "setge", "setle") and self._regs(operands, "al"):
+            self._emit_setcc(op)
+        elif op == "movzx" and self._regs(operands, "eax", "al"):
             self.text.extend(b"\x0f\xb6\xc0")
-        elif m := re.match(r"^test ([a-z0-9]+), \1$", op):
-            self._emit_test_reg_reg(m.group(1))
-        elif m := re.match(r"^xor ([a-z0-9]+), \1$", op):
-            self._emit_xor_reg_reg(m.group(1))
-        elif m := re.match(r"^(inc|dec) ([a-z0-9]+)$", op):
-            self._emit_inc_dec(m.group(1), m.group(2))
-        elif m := re.match(r"^(add|sub) ([a-z][a-z0-9]*), ([a-z][a-z0-9]*)$", op):
-            self._emit_reg_reg_alu(m.group(1), m.group(2), m.group(3))
-        elif m := re.match(r"^add ([a-z0-9]+), (-?\d+|'0')$", op):
-            imm = 48 if m.group(2) == "'0'" else int(m.group(2))
-            self._emit_add_reg_imm(m.group(1), imm)
-        elif m := re.match(r"^mov (e?[a-z0-9]+), (-?\d+)$", op):
-            self._emit_mov_reg_imm(m.group(1), int(m.group(2)))
-        elif m := re.match(r"^mov ([a-z0-9]+), ([a-z0-9]+)$", op):
-            self._emit_mov_reg_reg(m.group(1), m.group(2))
-        elif m := re.match(r"^lea ([a-z0-9]+), \[([A-Za-z_.$][\w.$]*)\]$", op):
-            self._emit_lea_symbol(m.group(1), m.group(2))
-        elif m := re.match(r"^lea ([a-z0-9]+), \[rbp([+-]\d+)\]$", op):
-            self._emit_lea_base_disp(m.group(1), "rbp", int(m.group(2)))
-        elif m := re.match(r"^mov \[([A-Za-z_.$][\w.$]*)\], rax$", op):
-            self._emit_mov_symbol_reg(m.group(1), "rax")
-        elif m := re.match(r"^mov \[([A-Za-z_.$][\w.$]*)\], al$", op):
-            self._emit_mov_symbol_reg8(m.group(1), "al")
-        elif m := re.match(r"^mov \[rbp([+-]\d+)\], rax$", op):
-            self._emit_mov_mem_reg("rbp", int(m.group(1)), "rax")
-        elif m := re.match(r"^mov \[rbp([+-]\d+)\], ([a-z0-9]+)$", op):
-            self._emit_mov_mem_reg("rbp", int(m.group(1)), m.group(2))
-        elif m := re.match(r"^mov ([a-z0-9]+), \[rbp([+-]\d+)\]$", op):
-            self._emit_mov_reg_mem(m.group(1), "rbp", int(m.group(2)))
-        elif m := re.match(r"^mov ([a-z0-9]+), \[([a-z0-9]+)\]$", op):
-            self._emit_mov_reg_mem(m.group(1), m.group(2), 0)
-        elif m := re.match(r"^mov ([a-z0-9]+), \[([a-z0-9]+)([+-]\d+)\]$", op):
-            self._emit_mov_reg_mem(m.group(1), m.group(2), int(m.group(3)))
-        elif m := re.match(r"^mov \[([a-z0-9]+)\], ([a-z0-9]+)$", op):
-            self._emit_mov_mem_reg(m.group(1), 0, m.group(2))
-        elif m := re.match(r"^mov \[([a-z0-9]+)([+-]\d+)\], ([a-z0-9]+)$", op):
-            self._emit_mov_mem_reg(m.group(1), int(m.group(2)), m.group(3))
-        elif m := re.match(r"^mov qword \[rsp\+(\d+)\], (-?\d+)$", op):
-            self._emit_mov_mem_imm("rsp", int(m.group(1)), int(m.group(2)), 8)
-        elif m := re.match(r"^mov byte \[([a-z0-9]+)\], (-?\d+|'[^']')$", op):
-            imm = ord(m.group(2)[1]) if m.group(2).startswith("'") else int(m.group(2))
-            self._emit_mov_mem_imm(m.group(1), 0, imm, 1)
+        elif op == "test" and self._two_regs(operands):
+            self._emit_test_reg_reg(operands[0].name)
+        elif op == "xor" and self._two_regs(operands):
+            self._emit_xor_reg_reg(operands[0].name)
+        elif op in ("inc", "dec") and len(operands) == 1 and isinstance(operands[0], Reg):
+            self._emit_inc_dec(op, operands[0].name)
+        elif op in ("add", "sub") and self._two_regs(operands):
+            self._emit_reg_reg_alu(op, operands[0].name, operands[1].name)
+        elif op == "add" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Imm):
+            self._emit_add_reg_imm(operands[0].name, operands[1].value)
+        elif op == "mov":
+            self._emit_mov_operands(operands)
+        elif op == "lea" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Mem):
+            mem = operands[1]
+            if mem.symbol is not None:
+                self._emit_lea_symbol(operands[0].name, mem.symbol)
+            else:
+                self._emit_lea_base_disp(operands[0].name, mem.base.name, mem.disp)
         else:
-            raise MachineBackendError(f"unsupported instruction: {op}")
+            raise MachineBackendError(f"unsupported instruction: {inst.lines()[0].strip()}")
+
+    def _emit_mov_operands(self, operands):
+        if len(operands) != 2:
+            raise MachineBackendError("mov needs two operands")
+        dst, src = operands
+        if isinstance(dst, Reg) and isinstance(src, Imm):
+            self._emit_mov_reg_imm(dst.name, src.value)
+        elif isinstance(dst, Reg) and isinstance(src, Reg):
+            self._emit_mov_reg_reg(dst.name, src.name)
+        elif isinstance(dst, Reg) and isinstance(src, Mem):
+            if src.symbol is not None:
+                raise MachineBackendError("symbol load is not implemented; use lea for addresses")
+            self._emit_mov_reg_mem(dst.name, src.base.name, src.disp)
+        elif isinstance(dst, Mem) and isinstance(src, Reg):
+            if dst.symbol is not None:
+                if src.name in REG8:
+                    self._emit_mov_symbol_reg8(dst.symbol, src.name)
+                else:
+                    self._emit_mov_symbol_reg(dst.symbol, src.name)
+            else:
+                self._emit_mov_mem_reg(dst.base.name, dst.disp, src.name)
+        elif isinstance(dst, Mem) and isinstance(src, Imm):
+            if dst.symbol is not None:
+                raise MachineBackendError("immediate store to symbol is not implemented")
+            self._emit_mov_mem_imm(dst.base.name, dst.disp, src.value, dst.size)
+        else:
+            raise MachineBackendError("unsupported mov operands")
+
+    def _regs(self, operands, *names):
+        return len(operands) == len(names) and all(isinstance(op, Reg) and op.name == name for op, name in zip(operands, names))
+
+    def _two_regs(self, operands):
+        return len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Reg)
+
+    def _reg_imm(self, operands, reg):
+        return len(operands) == 2 and isinstance(operands[0], Reg) and operands[0].name == reg and isinstance(operands[1], Imm)
 
     def _emit_rsp_imm(self, modrm_ext, imm):
         if 0 <= imm <= 127:
@@ -353,6 +344,17 @@ class MachineObjectBuilder:
         self.text.append(0x39)
         self._modrm(3, REG64[right], REG64[left])
 
+    def _emit_setcc(self, op):
+        codes = {
+            "sete": 0x94,
+            "setne": 0x95,
+            "setg": 0x9F,
+            "setl": 0x9C,
+            "setge": 0x9D,
+            "setle": 0x9E,
+        }
+        self.text.extend(bytes([0x0F, codes[op], 0xC0]))
+
     def _emit_add_reg_imm(self, reg, imm):
         if reg in REG8:
             self._rex(b=REG8[reg] >> 3)
@@ -396,11 +398,7 @@ class MachineObjectBuilder:
             raise MachineBackendError(f"unsupported register: {reg}")
 
     def _emit_needed_runtime_helpers(self):
-        referenced = {sym for _, sym in self.text_relocs}
-        if "_itoa" not in referenced or "_itoa" in self.text_labels:
-            return
-        for item in _itoa_helper_items():
-            self._emit_item(item)
+        return
 
     def _patch_internal_fixups(self):
         for off, symbol in self.internal_fixups:
@@ -414,54 +412,3 @@ def write_machine_obj(program, obj_path):
     MachineObjectBuilder(program).write_obj(obj_path)
 
 
-def _itoa_helper_items():
-    return [
-        MirAsmSection(".data"),
-        MirAsmDataZero("_itoa_header", 16),
-        MirAsmDataZero("_itoa_buf", 32),
-        MirAsmSection(".text"),
-        MirAsmLabel("_itoa"),
-        MirAsmInst("push rbp"),
-        MirAsmInst("mov rbp, rsp"),
-        MirAsmInst("sub rsp, 16"),
-        MirAsmInst("lea r10, [_itoa_buf]"),
-        MirAsmInst("add r10, 31"),
-        MirAsmInst("mov byte [r10], 0"),
-        MirAsmInst("mov r11, 0"),
-        MirAsmInst("mov rax, rcx"),
-        MirAsmInst("mov r8, 0"),
-        MirAsmInst("test rax, rax"),
-        MirAsmInst("jns _itoa_positive"),
-        MirAsmInst("neg rax"),
-        MirAsmInst("mov r8, 1"),
-        MirAsmLabel("_itoa_positive"),
-        MirAsmInst("test rax, rax"),
-        MirAsmInst("jnz _itoa_loop"),
-        MirAsmInst("dec r10"),
-        MirAsmInst("mov byte [r10], 48"),
-        MirAsmInst("inc r11"),
-        MirAsmInst("jmp _itoa_digits_done"),
-        MirAsmLabel("_itoa_loop"),
-        MirAsmInst("xor rdx, rdx"),
-        MirAsmInst("mov rcx, 10"),
-        MirAsmInst("div rcx"),
-        MirAsmInst("add dl, 48"),
-        MirAsmInst("dec r10"),
-        MirAsmInst("mov [r10], dl"),
-        MirAsmInst("inc r11"),
-        MirAsmInst("test rax, rax"),
-        MirAsmInst("jnz _itoa_loop"),
-        MirAsmLabel("_itoa_digits_done"),
-        MirAsmInst("test r8, r8"),
-        MirAsmInst("jz _itoa_finish"),
-        MirAsmInst("dec r10"),
-        MirAsmInst("mov byte [r10], 45"),
-        MirAsmInst("inc r11"),
-        MirAsmLabel("_itoa_finish"),
-        MirAsmInst("lea rax, [_itoa_header]"),
-        MirAsmInst("mov [rax], r10"),
-        MirAsmInst("mov [rax+8], r11"),
-        MirAsmInst("mov rsp, rbp"),
-        MirAsmInst("pop rbp"),
-        MirAsmInst("ret"),
-    ]
