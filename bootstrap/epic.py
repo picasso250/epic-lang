@@ -29,6 +29,7 @@ BUILD_DIR = os.path.join(ROOT_DIR, "build")
 RUNTIME_DIR = os.path.join(ROOT_DIR, "runtime")
 RUNTIME_ASM_FILES = [
     "str_alloc.asm",
+    "str_repr.asm",
     "bytes.asm",
     "str_cat.asm",
     "str_slice.asm",

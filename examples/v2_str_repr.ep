@@ -1,0 +1,73 @@
+# EXIT: 0
+# STDOUT: -3
+# STDOUT: 3
+# STDOUT: 65
+# STDOUT: true
+# STDOUT: false
+# STDOUT: abc
+# STDOUT: 65
+# STDOUT: Val{val: 3}
+# STDOUT: User{name: "Ada", age: 0}
+# STDOUT: i64[]{1, 2, 3}
+# STDOUT: AB
+# STDOUT: str[]{"a", "b"}
+# STDOUT: bool[]{true, false}
+# STDOUT: Token.Id{text: "abc", line: 1}
+# STDOUT: Token.Plus{text: "+", line: 2}
+# STDOUT: Bytes{data: u8[]{65, 66}}
+# STDOUT: hello Val{val: 3}
+# STDOUT: Val{val: 3}
+# STDOUT: map[str]i64{"a": 1, "b": 2}
+
+struct Val {
+    val: i64
+}
+
+struct User {
+    name: str
+    age: i64
+}
+
+struct Bytes {
+    data: u8[]
+}
+
+type Token {
+    Id {
+        text: str
+        line: i64
+    }
+    Plus {
+        text: str
+        line: i64
+    }
+}
+
+fun main(): i64 {
+    println(str(0 - 3))
+    println(str(u64(3)))
+    println(str(u8(65)))
+    println(str(true))
+    println(str(false))
+    println(str("abc"))
+    println(str('A'))
+    println(str(new Val { val: 3 }))
+    println(str(new User { name: "Ada" }))
+    println(str(new i64[] { 1, 2, 3 }))
+    println(str(new u8[] { 65, 66 }))
+    println(str(new str[] { "a", "b" }))
+    println(str(new bool[] { true, false }))
+    println(str(new Token.Id { text: "abc", line: 1 }))
+    println(str(new Token.Plus { text: "+", line: 2 }))
+    println(str(new Bytes { data: new u8[] { 65, 66 } }))
+    println(f"hello {new Val { val: 3 }}")
+    println(new Val { val: 3 })
+
+    # TODO: map repr currently follows internal iteration order. Stabilize
+    # this after hash/layout semantics are settled.
+    let m = new map[str]i64
+    m["a"] = 1
+    m["b"] = 2
+    println(str(m))
+    return 0
+}
