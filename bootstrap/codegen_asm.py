@@ -5,12 +5,21 @@
 
 class AsmEmitterMixin:
     def emit(self, s):
+        if getattr(self, "asm_program", None) is not None:
+            self.asm_program.raw(s)
+            return
         self.out.write(s + "\n")
 
     def emit_label(self, name):
+        if getattr(self, "asm_program", None) is not None:
+            self.asm_program.label(name)
+            return
         self.emit(f"{name}:")
 
     def emit_inst(self, op):
+        if getattr(self, "asm_program", None) is not None:
+            self.asm_program.inst(op)
+            return
         self.emit(f"    {op}")
 
     def emit_mov(self, dst, src):
@@ -39,6 +48,11 @@ class AsmEmitterMixin:
         return f"L{self.label_counter}"
 
     def close(self):
+        if getattr(self, "asm_program", None) is not None:
+            from mir_asm import write_asm_program
+
+            write_asm_program(self.asm_program, self.out_path)
+            return
         self.out.close()
 
     # ── program header ──────────────────────────────────────────────────

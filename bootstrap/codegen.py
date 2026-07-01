@@ -8,13 +8,16 @@ from codegen_expr import ExprEmitterMixin
 from codegen_stmt import StmtEmitterMixin
 from codegen_strings import StringEmitterMixin
 from codegen_types import TypeEmitterMixin
+from mir_asm import MirAsmProgram
 
 
 # Emitter facade. Most behavior lives in focused mixins to keep the
 # reference compiler readable while preserving the public import surface.
 class Emitter(AsmEmitterMixin, TypeEmitterMixin, StringEmitterMixin, ExprEmitterMixin, StmtEmitterMixin):
     def __init__(self, out_path):
-        self.out = open(out_path, "w")
+        self.out_path = out_path
+        self.asm_program = MirAsmProgram()
+        self.out = None
         self.builtins = {"putc", "putstr", "print", "println",
                          "itoa", "system",
                          "str", "str_new", "bytes", "read_file", "write_file",
