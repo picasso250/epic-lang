@@ -59,6 +59,9 @@ def run_checked(cmd, label):
             + result.stderr[-4000:]
         )
     elapsed = time.perf_counter() - start
+    for line in result.stdout.splitlines():
+        if line.startswith("  timing: "):
+            print(f"  {label} {line.strip()}", flush=True)
     print(f"{label}: {elapsed:.2f}s", flush=True)
     return result
 

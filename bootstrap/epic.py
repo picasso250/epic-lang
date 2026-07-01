@@ -11,6 +11,7 @@ import argparse
 import os
 import subprocess
 import sys
+import time
 
 from codegen import Emitter
 from ast_nodes import ProgramNode
@@ -44,6 +45,14 @@ RUNTIME_ASM_FILES = [
     "read_file.asm",
     "write_file.asm",
 ]
+
+
+def _now():
+    return time.perf_counter()
+
+
+def _print_timing(label, start):
+    print(f"  timing: {label}: {_now() - start:.3f}s", flush=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -128,27 +137,35 @@ def _merge_programs(input_paths, main_path):
 
 
 def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
+    total_start = _now()
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
 
     print(f"[1/4] Reading {len(input_paths)} file(s)")
+    stage_start = _now()
     ast = _merge_programs(input_paths, main_path)
+    _print_timing("read+lex+parse+merge", stage_start)
 
     print(f"[2/4] Compiling → {asm_path}")
+    stage_start = _now()
     emitter = Emitter(asm_path)
     emitter.emit_program(ast)
     _emit_runtime_helpers(emitter)
     emitter.close()
+    _print_timing("emit asm", stage_start)
 
     print(f"[3/4] Assembling → {obj_path}")
+    stage_start = _now()
     result = subprocess.run(
         [NASM, "-f", "win64", asm_path, "-o", obj_path],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
         raise RuntimeError("NASM error:\n" + result.stderr[:500])
+    _print_timing("assemble", stage_start)
 
     print(f"[4/4] Linking (via {linker}) → {exe_path}")
+    stage_start = _now()
     if linker == "py":
         result = subprocess.run(
             [sys.executable, LINK_PY, obj_path, "-o", exe_path],
@@ -164,9 +181,11 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
         )
     if result.returncode != 0:
         raise RuntimeError("Link error:\n" + result.stderr[:500])
+    _print_timing("link", stage_start)
 
     size = os.path.getsize(exe_path)
     print(f"  OK: {exe_path} ({size} bytes)")
+    _print_timing("total", total_start)
     return exe_path
 
 
