@@ -22,4 +22,8 @@
 
 py 拆 codegen
 
-现有 parser 限制：Python 版 unary - 没有进 parse_unary
+python -> epic-py: 9.77s
+  epic-py -> epic-epic: 10.55s
+  epic-epic -> epic-epic-epic: 11.31s
+  epic-epic-epic -> epic-epic-epic-epic: 11.18s
+  bootstrap fixed point reached
