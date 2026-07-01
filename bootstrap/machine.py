@@ -158,6 +158,14 @@ class MachineObjectBuilder:
             self.text.extend(b"\x48\x0f\xaf\xc1")
         elif op == "neg rax":
             self.text.extend(b"\x48\xf7\xd8")
+        elif m := re.match(r"^cmp ([a-z0-9]+), ([a-z0-9]+)$", op):
+            self._emit_cmp_reg_reg(m.group(1), m.group(2))
+        elif op == "setg al":
+            self.text.extend(b"\x0f\x9f\xc0")
+        elif op == "setl al":
+            self.text.extend(b"\x0f\x9c\xc0")
+        elif op == "movzx eax, al":
+            self.text.extend(b"\x0f\xb6\xc0")
         elif m := re.match(r"^test ([a-z0-9]+), \1$", op):
             self._emit_test_reg_reg(m.group(1))
         elif m := re.match(r"^xor ([a-z0-9]+), \1$", op):
@@ -337,6 +345,13 @@ class MachineObjectBuilder:
         self._rex(w=True, r=REG64[src] >> 3, b=REG64[dst] >> 3)
         self.text.append(opcode)
         self._modrm(3, REG64[src], REG64[dst])
+
+    def _emit_cmp_reg_reg(self, left, right):
+        self._require_reg64(left)
+        self._require_reg64(right)
+        self._rex(w=True, r=REG64[right] >> 3, b=REG64[left] >> 3)
+        self.text.append(0x39)
+        self._modrm(3, REG64[right], REG64[left])
 
     def _emit_add_reg_imm(self, reg, imm):
         if reg in REG8:
