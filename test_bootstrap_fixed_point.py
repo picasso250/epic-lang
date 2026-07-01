@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +35,7 @@ TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "60"))
 
 
 def run_checked(cmd, label):
+    start = time.perf_counter()
     try:
         result = subprocess.run(
             cmd,
@@ -56,6 +58,8 @@ def run_checked(cmd, label):
             + result.stdout[-4000:]
             + result.stderr[-4000:]
         )
+    elapsed = time.perf_counter() - start
+    print(f"{label}: {elapsed:.2f}s", flush=True)
     return result
 
 
