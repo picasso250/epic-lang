@@ -503,6 +503,8 @@ class Parser:
     def parse_unary(self):
         if self.check("BANG"):
             return UnaryNode(op="!", expr=self.parse_unary())
+        if self.check("MINUS"):
+            return UnaryNode(op="-", expr=self.parse_unary())
         if self.check("TILDE"):
             return UnaryNode(op="~", expr=self.parse_unary())
         return self.parse_primary()

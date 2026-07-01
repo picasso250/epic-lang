@@ -144,6 +144,10 @@ class Emitter:
         for func in ast.funcs:
             self.emit_fn_def(func)
 
+        self.emit_label("_epic_trap")
+        self.emit_inst("mov ecx, 1")
+        self.emit_call_inst("ExitProcess")
+
     def _collect_strings_from_block(self, block):
         """Recursively collect strings from AST."""
         for stmt in block.stmts:
@@ -1343,6 +1347,9 @@ class Emitter:
             self.emit("    test rax, rax")
             self.emit("    sete al")
             self.emit("    movzx eax, al")
+        elif expr.op == "-":
+            self.emit("    neg rax")
+            self.emit("    jo _epic_trap")
         elif expr.op == "~":
             self.emit("    not rax")
         else:
