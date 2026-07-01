@@ -2,13 +2,12 @@
 # STDOUT: Ei!
 fun main(): void {
     let s = "Epic"
-    putc(s[0])
 
     let xs = new u8[4]
     push(xs, 'x')
     xs[0] = 'i'
-    putc(xs[0])
-    putc('!')
+    let out = new u8[] { s[0], xs[0], '!' }
+    println(str(out))
 
     os.ExitProcess(0)
 }

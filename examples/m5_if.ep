@@ -4,15 +4,12 @@
 fun main(): void {
     let x = 10
     if x > 5 {
-        putstr(itoa(1))
-        putc(10)
+        println(1)
     }
     if x < 5 {
-        putstr(itoa(999))
-        putc(10)
+        println(999)
     } else {
-        putstr(itoa(2))
-        putc(10)
+        println(2)
     }
     os.ExitProcess(0)
 }

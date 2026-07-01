@@ -14,16 +14,16 @@ type Expr {
 
 fun main(): i64 {
     let b = new Box
-    putstr(itoa(b.n))
+    print(b.n)
 
     let e = new Expr.Empty
-    putstr(itoa(e.tag))
+    print(e.tag)
 
     let x = new Expr.IntLit
-    putstr(itoa(x.tag))
+    print(x.tag)
     match x {
         Expr.IntLit { value: v }: {
-            putstr(itoa(v))
+            print(v)
         }
         else: {
         }
@@ -33,7 +33,7 @@ fun main(): i64 {
     let y = new Expr.IntLit { value: 7 }
     match y {
         Expr.IntLit { value: v }: {
-            putstr(itoa(v))
+            print(v)
         }
         else: {
         }

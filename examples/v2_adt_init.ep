@@ -19,8 +19,8 @@ fun main(): i64 {
     let z: Expr
     let a = new Expr.IntLit { value: 123 }
     let b = new Expr.Binary { op: "+", left: z, right: a }
-    putstr(itoa(z.tag))
-    putstr(itoa(a.tag))
-    putstr(itoa(b.tag))
+    print(z.tag)
+    print(a.tag)
+    print(b.tag)
     return 0
 }

@@ -3,11 +3,11 @@
 fun main(): void {
     let x = 2
     if x == 1 {
-        putstr("low")
+        println("low")
     } else if x == 2 {
-        putstr("mid")
+        println("mid")
     } else {
-        putstr("high")
+        println("high")
     }
     os.ExitProcess(0)
 }

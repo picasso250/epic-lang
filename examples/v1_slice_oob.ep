@@ -2,6 +2,5 @@
 fun main(): void {
     let s = "Epic"
     let bad = s[3:2]
-    putstr(bad)
     os.ExitProcess(0)
 }

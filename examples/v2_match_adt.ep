@@ -18,15 +18,15 @@ type Expr {
 fun show(e: Expr): i64 {
     match e {
         Expr.IntLit { value: n }: {
-            putstr("int=")
-            putstr(itoa(n))
+            print("int=")
+            print(n)
         }
         Expr.Binary { op }: {
-            putstr("bin=")
-            putstr(op)
+            print("bin=")
+            print(op)
         }
         else: {
-            putstr("empty")
+            print("empty")
         }
     }
     return 0
@@ -37,7 +37,7 @@ fun main(): i64 {
     let a = new Expr.IntLit { value: 7 }
     let b = new Expr.Binary { op: "+", left: z, right: a }
     show(a)
-    putstr(" ")
+    print(" ")
     show(b)
     return 0
 }

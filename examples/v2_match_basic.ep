@@ -5,46 +5,46 @@ fun main(): i64 {
     let n = 1
     match n {
         0: {
-            putstr("zero")
+            print("zero")
         }
         1: {
-            putstr("one")
+            print("one")
         }
         else: {
-            putstr("many")
+            print("many")
         }
     }
-    putstr(",")
+    print(",")
 
     let s = "x"
     match s {
         "x": {
-            putstr("s")
+            print("s")
         }
         else: {
-            putstr("no")
+            print("no")
         }
     }
-    putstr(",")
+    print(",")
 
     let b = true
     match b {
         true: {
-            putstr("true")
+            print("true")
         }
         else: {
-            putstr("false")
+            print("false")
         }
     }
-    putstr(",")
+    print(",")
 
     let m = 3
     match m {
         1: {
-            putstr("bad")
+            print("bad")
         }
         else: {
-            putstr("else")
+            print("else")
         }
     }
     return 0

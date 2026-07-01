@@ -3,18 +3,12 @@
 # STDOUT: 69
 fun main(): void {
     let buf = new u8[10]
-    buf.data[0] = 'E'
-    buf.data[1] = 'p'
-    buf.data[2] = 'i'
-    buf.data[3] = 'c'
-    buf.data[4] = 10
+    push(buf, 'E')
+    push(buf, 'p')
+    push(buf, 'i')
+    push(buf, 'c')
 
-    let i = 0
-    while i < 5 {
-        putc(buf.data[i])
-        i = i + 1
-    }
-    putstr(itoa(buf.data[0]))
-    putc(10)
+    println(str(buf))
+    println(buf[0])
     os.ExitProcess(0)
 }

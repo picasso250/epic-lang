@@ -1,13 +1,16 @@
 # EXIT: 0
-# STDOUT: 0123
+# STDOUT: 0
+# STDOUT: 1
+# STDOUT: 2
+# STDOUT: 3
 fun main(): void {
     let end = 4
     for i in 0:end {
-        putc('0' + i)
+        println(i)
         end = end + 1
     }
     for j in end:end {
-        putc('?')
+        println(j)
     }
     os.ExitProcess(0)
 }

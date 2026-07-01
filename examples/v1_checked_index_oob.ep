@@ -1,6 +1,6 @@
 # EXIT: 1
 fun main(): void {
     let s = "A"
-    putc(s[1])
+    let x = s[1]
     os.ExitProcess(0)
 }

@@ -7,10 +7,8 @@ fun main(): void {
     let n = write_file("test_out.txt", bytes(s))
     let inp = read_file("test_out.txt")
 
-    putc(inp[0])
-    putc(inp[1])
-    putc(10)
-    putstr(itoa(n))
-    putc(10)
+    let prefix = new u8[] { inp[0], inp[1] }
+    println(str(prefix))
+    println(n)
     os.ExitProcess(0)
 }

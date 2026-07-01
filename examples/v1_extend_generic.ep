@@ -9,7 +9,7 @@ fun main(): void {
     push(xs, 1)
     push(xs, 2)
     extend(xs, xs)
-    putstr(itoa(xs[0] + xs[1] + xs[2] + xs[3]))
+    print(xs[0] + xs[1] + xs[2] + xs[3])
 
     let b1 = new Box {}
     b1.value = 5
@@ -20,6 +20,6 @@ fun main(): void {
     push(left, b1)
     push(right, b2)
     extend(left, right)
-    putstr(itoa(left[0].value + left[1].value))
+    print(left[0].value + left[1].value)
     os.ExitProcess(0)
 }

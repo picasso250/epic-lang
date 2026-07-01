@@ -1,5 +1,7 @@
 # EXIT: 0
-# STDOUT: 00X
+# STDOUT: 0
+# STDOUT: 0
+# STDOUT: 88
 struct Box {
     value: i64
 }
@@ -8,9 +10,9 @@ fun main(): void {
     let s: str
     let xs: u8[]
     let b: Box
-    putstr(itoa(len(s)))
-    putstr(itoa(len(xs)))
+    println(len(s))
+    println(len(xs))
     push(xs, 'X')
-    putc(xs[0])
+    println(xs[0])
     os.ExitProcess(b.value)
 }
