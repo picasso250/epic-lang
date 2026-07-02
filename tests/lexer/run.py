@@ -166,9 +166,8 @@ def main():
         try:
             lexer_exe = ensure_bootstrap_lexer()
         except (RuntimeError, subprocess.TimeoutExpired) as e:
-            print(f"  SKIP  self-hosted lexer (build failed: {e})")
-            print("  PASS  lexer (golden only)")
-            sys.exit(0)
+            print(f"  FAIL  self-hosted lexer build: {e}")
+            sys.exit(1)
 
         # Compare on all.ep
         all_ok = check_self_hosted_lexer(
