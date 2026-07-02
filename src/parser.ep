@@ -86,6 +86,7 @@ fun make_parser(tokens: Token[]): Parser {
     p.eof = new Token
     p.eof.kind = "EOF"
     p.eof.text = ""
+    p.eof.dump_text = ""
     p.eof.line = 0
     return p
 }
@@ -1130,14 +1131,14 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[4]
     for i in 0:len(parts) {
         match parts[i] {
-            FStringPart.Text { text }: {
+            FStringPart.Text { text, dump_text }: {
                 if len(text) > 0 {
                     let n = ast_node("FStringText")
                     n.value = text
                     push(out, n)
                 }
             }
-            FStringPart.Expr { text }: {
+            FStringPart.Expr { text, dump_text }: {
                 let tokens = lex(text)
                 let p = make_parser(tokens)
                 let expr = parse_expr(p)

@@ -612,7 +612,7 @@ class Parser:
 
     def parse_fstring_parts(self, parts, line):
         parsed = []
-        for kind, value in parts:
+        for kind, value, _dump_value in parts:
             if kind == "text":
                 if value:
                     parsed.append((kind, value))

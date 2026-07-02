@@ -1,6 +1,6 @@
 """
 Epic v0 — lexer
-Tokenizes .ep source into a list of (kind, value, line) tuples.
+Tokenizes .ep source into a list of (kind, value, line, dump_value) tuples.
 """
 
 import re
@@ -130,13 +130,15 @@ def scan_fstring(source_text, start, line):
             continue
         if ch == '"':
             if i > segment_start:
-                parts.append(("text", decode_escaped(source_text[segment_start:i], line)))
+                raw = source_text[segment_start:i]
+                parts.append(("text", decode_escaped(raw, line), raw))
             return parts, i + 1
         if ch == "}":
             raise LexError("Unexpected '}' in f-string literal", line)
         if ch == "{":
             if i > segment_start:
-                parts.append(("text", decode_escaped(source_text[segment_start:i], line)))
+                raw = source_text[segment_start:i]
+                parts.append(("text", decode_escaped(raw, line), raw))
             expr_start = i + 1
             i = expr_start
             parens = 0
@@ -182,7 +184,7 @@ def scan_fstring(source_text, start, line):
                         expr = source_text[expr_start:i].strip()
                         if not expr:
                             raise LexError("Empty f-string expression", line)
-                        parts.append(("expr", expr))
+                        parts.append(("expr", expr, expr))
                         i += 1
                         segment_start = i
                         break
@@ -214,75 +216,57 @@ def lex(source_text):
         line = line_numbers[pos] if pos < len(line_numbers) else 1
         if source_text.startswith('f"', pos):
             value, end = scan_fstring(source_text, pos, line)
-            tokens.append(("FSTRING", value, line))
+            tokens.append(("FSTRING", value, line, ""))
             pos = end
             continue
         m = TOKEN_RE.match(source_text, pos)
         if not m:
             raise LexError(f"Unexpected character {source_text[pos]!r}", line)
         kind = m.lastgroup
-        value = m.group()
+        source_spelling = m.group()
+        value = source_spelling
+        dump_value = source_spelling
         if kind == "WHITESPACE" or kind == "COMMENT":
             pos = m.end()
             continue
         line = line_numbers[m.start()] if m.start() < len(line_numbers) else 1
         if kind == "NUMBER":
-            value = int(value)
+            value = int(source_spelling)
         elif kind == "STRING":
-            value = decode_escaped(value[1:-1], line)
+            dump_value = source_spelling[1:-1]
+            value = decode_escaped(dump_value, line)
         elif kind == "CHAR":
-            decoded = decode_escaped(value[1:-1], line)
+            decoded = decode_escaped(source_spelling[1:-1], line)
             if len(decoded) != 1:
                 raise LexError("Character literal must contain exactly one byte", line)
             value = ord(decoded)
-        tokens.append((kind, value, line))
+            dump_value = str(value)
+        elif kind == "NEWLINE":
+            dump_value = "\\n"
+        tokens.append((kind, value, line, dump_value))
         pos = m.end()
     return tokens
 
 
-def escape_dump_value(value):
-    if isinstance(value, int):
-        return str(value)
-
-    out = []
-    for ch in value:
-        code = ord(ch)
-        if ch == "\\":
-            out.append("\\\\")
-        elif ch == "\n":
-            out.append("\\n")
-        elif ch == "\r":
-            out.append("\\r")
-        elif ch == "\t":
-            out.append("\\t")
-        elif ch == "\0":
-            out.append("\\0")
-        elif 32 <= code <= 126:
-            out.append(ch)
-        else:
-            out.append(f"\\x{code:02x}")
-    return "".join(out)
-
-
-def dump_line(line, kind, value=""):
-    return f"{line}\t{kind}\t{escape_dump_value(value)}"
+def dump_line(line, kind, dump_value=""):
+    return f"{line}\t{kind}\t{len(dump_value)}\t{dump_value}"
 
 
 def dump_tokens(tokens):
     lines = []
-    for kind, value, line in tokens:
+    for kind, value, line, dump_value in tokens:
         if kind == "FSTRING":
             lines.append(dump_line(line, "FSTRING_BEGIN"))
-            for part_kind, part_value in value:
+            for part_kind, part_value, part_dump_value in value:
                 if part_kind == "text":
-                    lines.append(dump_line(line, "FSTRING_TEXT", part_value))
+                    lines.append(dump_line(line, "FSTRING_TEXT", part_dump_value))
                 elif part_kind == "expr":
-                    lines.append(dump_line(line, "FSTRING_EXPR", part_value))
+                    lines.append(dump_line(line, "FSTRING_EXPR", part_dump_value))
                 else:
                     raise LexError(f"Unknown f-string part {part_kind}", line)
             lines.append(dump_line(line, "FSTRING_END"))
             continue
 
-        lines.append(dump_line(line, kind, value))
+        lines.append(dump_line(line, kind, dump_value))
 
     return "\n".join(lines) + ("\n" if lines else "")
