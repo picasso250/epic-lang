@@ -4,6 +4,8 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 (bootstrap Python reference compiler + self-hosted Epic compiler).
 
 > This document records the **status quo** — no judgment, no removal.
+> `bootstrap/epic_builtins.py` now records the Python-side builtin inventory,
+> but it is not wired into parser, sema, or codegen yet.
 > Four source files define the builtin surface:
 > - `bootstrap/sema.py` — type checking (bootstrap path)
 > - `bootstrap/mir_codegen.py` — codegen (bootstrap path)
