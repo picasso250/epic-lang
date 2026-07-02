@@ -1,10 +1,29 @@
 # Epic MIR 设计
 
-本文档定义 Epic 目标 MIR。MIR 是删除 NASM 计划里的核心中间层，但它不是 NASM 文本的结构化包装，也不是完整 LLVM IR 兼容层。
+本文档定义 Epic **目标** MIR。MIR 是删除 NASM 计划里的核心中间层，但它不是 NASM 文本的结构化包装，也不是完整 LLVM IR 兼容层。
 
 MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“生成结构化 IR，再 lowering 到 LowMIR/X64MIR，最后输出 ASM pretty print 或机器码”。
 
 对应路线见 `docs/remove-nasm-plan.md`。
+
+## Target vs Current Implementation
+
+本文档描述的 MIR 是 **目标设计**，不是当前 Python prototype 的真实快照。
+
+| 方面 | 目标 MIR | 当前 Python prototype |
+|------|----------|----------------------|
+| 高层操作 | 禁止 `struct.new`、`field.load`、`field.store`、`array.push`、`adt.payload` | ✅ validator 已拒绝这些 op，但 `mir_codegen.py` 仍在产生部分 old-path 操作（如 `arr_i8_get` 等被 lower 为 MIR call 而非直接 op） |
+| Runtime helper | MIR helper 作为 `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
+| 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
+| struct layout | 显式 `MirProgram.structs` 字段 | ⚠️ 通过 `program.structs` 动态挂载，不在 `MirProgram` dataclass 上显式声明 |
+| symbol 拼写 | `@name` 统一规则 | ⚠️ `main`、`str_i64`、`ExitProcess` 混用，未统一到 `@` 前缀 |
+| 命名 | 语义名：`arr_i8_str`, `str_bytes` | ❌ 遗留名：`str_arr_i8`, `bytes_str` |
+| `__epic_` 前缀 | 仅保留给真正 x64 primitive（`__epic_alloc`） | ❌ 错误地用于 MIR helper：`__epic_arr_i64_push` 等 |
+| `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
+
+> **使用本文档时请注意**：所有 code block 中的 MIR 示例是 target 格式，不代表当前 `mir_codegen.py` 的实际输出。当前实现的实际 MIR 行为通过 `docs/x64-instruction-subset.md`（lowering 后的 X64IR 合约）和 `docs/mir-lowering-contract.md`（lowering 规则）描述。
+
+当前实现债的跟踪见 `docs/x64-instruction-subset.md §8 Design audit`。
 
 ## 1. 定位
 

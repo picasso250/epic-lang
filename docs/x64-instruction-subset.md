@@ -216,6 +216,86 @@ ret
 | `mov [symbol], r64` | RIP-relative symbol store relocation. |
 | `mov [symbol], al` | RIP-relative byte store relocation. |
 
+### 5.1 Instruction form contract
+
+以下规则是 `machine.py` 当前 encoder 的实际限制。**超出此合约的指令形式会在 encoding 时静默产生错误字节或崩溃**，因为当前 encoder 不做完整输入验证（`validate_x64_program` 只做部分检查）。
+
+#### Register contract
+
+| 类别 | 支持 | 不支持 |
+|------|------|--------|
+| 64-bit | `rax rcx rdx rbx rsp rbp rsi rdi r8 r9 r10 r11` | `r12 r13 r14 r15` — encoder 未实现 REX.B 编码 |
+| 32-bit | `eax ecx edx` | `ebx esi edi r8d`… — 仅用于 `mov` 的 imm32 形式 |
+| 8-bit | `al cl dl r8b r9b r10b r11b` | `bl sil dil r12b`… — encoder 未实现低 8-bit 编码 |
+
+#### `mov` contract
+
+| 形式 | 状态 | 说明 |
+|------|------|------|
+| `mov al, byte [mem]` | ❌ 不支持 | `movsx rax, byte [mem]` 代替 |
+| `mov byte [mem], imm` | ✅ 支持 | 需 `Mem(size=1)` |
+| `mov qword [mem], imm` | ✅ 支持 | 需 `Mem(size=8)` |
+| `mov r64, byte [mem]` | ❌ 不支持 | 使用 `movsx r64, byte [mem]` |
+| `movzx r64, byte [mem]` | ❌ 不支持 | 零扩展 load 需拆成 `movsx` + `and` 或直接用 `movzx eax, al` |
+| `mov r64, dword [mem]` | ❌ 不支持 | 当前只有 qword 和 byte 两种 size |
+| `mov [mem], dword` | ❌ 不支持 | 同上 |
+| `mov [rsp+disp], r64` | ✅ 支持 | 通过 `Mem("rsp", disp)` |
+| `mov [rbp+disp], r64` | ✅ 支持 | 通过 `Mem("rbp", disp)` |
+| `mov [reg+disp], r64` | ❌ 不支持 | 当前只有 `rsp` 和 `rbp` 两种 base 通过 lowering 产生；其他 reg 需改用 `Mem(base, disp)` 但不保证 encoder 支持 |
+
+#### Byte load/store contract
+
+当前 byte 访问的合约：
+
+| 操作 | 支持形式 |
+|------|----------|
+| byte load (sign-extend) | `movsx r64, byte [mem]` |
+| byte store (8-bit reg) | `mov byte [mem], al/dl/r8b/r9b/r10b/r11b` |
+| byte store (immediate) | `mov byte [mem], imm8` |
+| byte load (zero-extend) | ❌ 无直接形式；需 `movsx` 后自己 mask，或走 `movzx eax, al` 链条 |
+
+#### ALU contract
+
+| 形式 | 状态 | 说明 |
+|------|------|------|
+| `add/sub/and/or/xor r64, r64` | ✅ | 二地址运算 |
+| `add/sub r64, imm8` | ✅ | 仅有 `add` 支持 imm8；`sub` 当前未直接使用此形式 |
+| `add r8, imm8` | ✅ | lowering 中 `i8` 加法使用 |
+| `cmp r64, r64` | ✅ | |
+| `cmp r64, imm32/imm8` | ✅ | imm32 和 imm8 均支持 |
+| `test r64, r64` | ✅ | 当前合约只允许两个 operand 相同寄存器 |
+| `test r64, imm` | ❌ 不支持 | |
+| `imul rax, rcx` | ✅ | 仅此一种支持形式 |
+| `cqo; idiv rcx` | ✅ | signed divide 的标准形式 |
+| `div rcx` | ✅ | unsigned divide，used by runtime helpers |
+
+#### Memory addressing contract
+
+| 形式 | 状态 | 说明 |
+|------|------|------|
+| `[base+disp]` | ✅ | base 必须是 `rsp` 或 `rbp`（当前 lowering 只产生这两种） |
+| `[symbol]` | ✅ | RIP-relative symbol load/store |
+| `[base+index*scale+disp]` | ❌ | SIB 未实现 |
+| `[base]` | ✅ | disp=0 的 `Mem(base, 0)` |
+| `Mem(size=N)` | ✅ | size=1 (byte), size=8 (qword) — 仅支持这两种 |
+
+#### Branch/call contract
+
+| 形式 | 状态 | 说明 |
+|------|------|------|
+| `jmp LabelRef` | ✅ | 内部 branch fixup |
+| `jcc LabelRef` | ✅ | 条件跳转 fixup |
+| `call Symbol` | ✅ | 外部符号或 section 符号；E8 rel32 |
+| `call LabelRef` | ❌ 不支持 | 当前 call 目标必须是 `Symbol`，内部 label 用 `jmp` |
+| `jmp Symbol` | ❌ 不支持 | 必须使用 `LabelRef` |
+
+#### 可执行但应避免的形式
+
+这些形式在 encoder 中能工作，但语义容易混淆或未来可能移除：
+
+- `mov [rsp+disp], r8` — byte store to stack (当前没有 MIR lowering 路径产生此形式，但 encoder 支持)
+- `mov [symbol], imm` — 当前 `machine.py` 中 RIP-relative 形式的 imm store 只在 `.data` section 场景测试过
+
 Current unsupported examples:
 
 - Generic SIB/index addressing.

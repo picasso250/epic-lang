@@ -1,0 +1,417 @@
+# MIR Lowering Contract
+
+## Scope
+
+本文档记录 **当前实现** 的 MIR → X64Program lowering 规则。它不是目标设计，也不是理想合约，而是 `bootstrap/mir_lower.py` 的真实行为。
+
+目标 MIR 设计见 `docs/mir-design.md`。X64IR 合约见 `docs/x64-instruction-subset.md`。
+
+```text
+MIR -> MirLower -> X64Program -> X64IR text (debug) / machine -> COFF -> PE
+```
+
+## 1. 总体流程
+
+```
+MirLower.__init__(program)
+  ├─ self.x64 = X64Program()
+  └─ 初始化栈槽、scratch、临时状态
+
+lower():
+  ├─ x64.global("_start")
+  ├─ x64.extern(...) for each program.import
+  ├─ x64.section(".data")
+  ├─ emit_runtime_data(x64, program)    # 数据全局、string header
+  ├─ x64.section(".text")
+  ├─ for each fn: _lower_function(fn)
+  └─ append_runtime_helpers(self)       # runtime helper x64 标签 + 函数体
+```
+
+`lower()` 后，`X64Program` 包含：
+1. 数据段：运行时数据（`_heap`、`_argv`、string headers、`_str_i64_buf` 等）
+2. 代码段：每个用户函数 + runtime helpers
+
+## 2. Function lowering
+
+### 2.1 Entry label
+
+| 函数名 | X64 label |
+|--------|-----------|
+| `main` | `_start` |
+| 其他 | `fn.name`（如 `foo`、`bar`） |
+
+### 2.2 Prologue
+
+```
+push rbp
+mov  rbp, rsp
+sub  rsp, aligned_frame   # 仅当 frame > 0
+```
+
+对 `main`：prologue 后插入 `__epic_runtime_start` 调用（初始化 `_heap` 和 `_argv`）：
+
+```
+sub  rsp, 32
+call __epic_runtime_start
+add  rsp, 32
+```
+
+### 2.3 Parameter setup
+
+前 4 个参数从 `rcx`/`rdx`/`r8`/`r9` 写入对应 value slot：
+
+```
+mov [rbp+slot], rcx/rdx/r8/r9
+```
+
+超过 4 个参数 → 抛出 `MirLowerError`。
+
+### 2.4 Block lowering
+
+每个 MIR block → 一个 x64 label（格式 `fn_name.block_name`），后面跟其指令序列和 terminator。
+
+### 2.5 Epilogue
+
+所有非 `main` 函数共享一个 return label（`fn_name.__return`）：
+
+```
+add  rsp, aligned_frame   # 仅当 frame > 0
+pop  rbp
+ret
+```
+
+`main` 不走此路径——它直接 `call ExitProcess`。
+
+## 3. Stack model
+
+### 3.1 Slot allocation
+
+`_plan_slots(fn)` 为每个函数计算栈槽：
+
+| 项目 | 分配位置 | 大小 |
+|------|----------|------|
+| 参数 | `value_slots` | 每个 8 字节 |
+| 指令 result (临时值) | `value_slots` | 每个 8 字节 |
+| `alloca` 地址 | `addr_slots` | 每个 8 字节 |
+| scratch | `scratch_slots` (固定 8 个) | 每个 8 字节，共 64 字节 |
+
+```
+next_slot 从 0 开始，每分配一个 slot += 8。
+slot 是负值：-8, -16, -24, ...
+```
+
+### 3.2 Frame alignment
+
+```
+aligned_frame = ((next_slot + 32 + 15) // 16) * 16
+```
+
+额外 `+32` 是因为 Windows x64 ABI 要求 call 前 RSP 16 字节对齐，`push rbp` + `mov rbp, rsp` 后，`sub rsp, N` 的 N 必须保证 `(rbp - N) % 16 == 0`。
+
+### 3.3 Value slot vs address slot
+
+| Slot 类型 | 存放内容 | 加载方式 |
+|-----------|----------|----------|
+| `value_slots[name]` | 计算出的值 | `mov reg, [rbp+slot]` |
+| `addr_slots[name]` | 指向 `alloca` 的指针 | `lea reg, [rbp+slot]` |
+
+## 4. Operand loading
+
+`_load_operand(reg, operand)` 将 MIR operand 的值加载到指定 x64 寄存器中。
+
+| Operand 类型 | 对应寄存器加载 |
+|-------------|---------------|
+| `ConstBoolOperand(true)` | `mov reg, 1` |
+| `ConstBoolOperand(false)` | `mov reg, 0` |
+| `ConstIntOperand(value)` | `mov reg, imm(value)` |
+| `ConstNullOperand` | `mov reg, 0` |
+| `ValueOperand(name)` — value slot | `mov reg, [rbp+slot]` |
+| `ValueOperand(name)` — address slot | `lea reg, [rbp+slot]` |
+| `SymbolOperand("@argv")` | `mov reg, [_argv]` |
+| `SymbolOperand(string_global)` | 构造 string header 到 reg（见下文） |
+
+### 4.1 String global materialization
+
+SymbolOperand 用于字面量字符串。`_load_operand` 会构造一个 Epic string header（`{ptr, len}`）：
+
+```
+lea  r11, [data_label]        # string data pointer
+lea  reg,  [header_label]     # string header slot
+mov  [reg], r11               # header.ptr = data_label
+mov  r11, length              # length 立即数
+mov  [reg+8], r11             # header.len = length
+```
+
+注意：`r11` 是固定的临时寄存器，不经过 slot 分配。如果 `_load_operand` 在 r11 未释放时被嵌套调用可能导致状态污染——但当前 lowering 中 string global 只在 `load` 指令中调用一次，无嵌套。
+
+## 5. Core op lowering
+
+### 5.1 `alloca`
+
+不发射任何 x64 指令。只是分配一个 `addr_slot`，后续 `lea` 访问。
+
+### 5.2 `store`
+
+```
+_load_operand("rax", value)
+_load_operand("rcx", addr)
+mov [rcx], rax                    # qword
+mov byte [rcx], al                # i8 (value.type == I8)
+```
+
+注意：i8 store 只能使用 `al` 寄存器，由 `_load_operand` 保证值在 `rax`。
+
+### 5.3 `load`
+
+```
+_load_operand("rax", operand)     # 加载地址到 rax
+movsx rax, byte [rax]             # i8 (sign-extend)
+mov   rax, qword [rax]            # 其他类型
+_store_result(inst.result, "rax")
+```
+
+**当前重要行为**：i8 load 有符号扩展（`movsx`），而非零扩展（`movzx`）。所有 `i8` 类型在 MIR 中做有符号语义处理。
+
+### 5.4 Arithmetic
+
+二元运算统一策略：
+
+```
+_load_operand("rax", operands[0])   # 左值
+_load_operand("rcx", operands[1])   # 右值
+ALU_op(rax, rcx)                    # 运算
+_store_result(inst.result, "rax")   # 结果存入 value_slot
+```
+
+| MIR op | x64 指令 | 说明 |
+|--------|----------|------|
+| `add` | `add rax, rcx` | |
+| `sub` | `sub rax, rcx` | |
+| `mul` | `imul rax, rcx` | 有符号，结果截断到 64-bit |
+| `div` | `cqo; idiv rcx` | 有符号，商在 rax |
+| `mod` | `cqo; idiv rcx; mov rax, rdx` | 有符号，余数在 rdx |
+| `and` | `and rax, rcx` | |
+| `or` | `or rax, rcx` | |
+| `xor` | `xor rax, rcx` | |
+| `shl` | `shl rax, cl` | 只使用 cl |
+| `sar` | `sar rax, cl` | 只使用 cl |
+| `shr` | `shr rax, cl` | 只使用 cl |
+| `not` | `test rax, rax; sete al; movzx eax, al` | bool not（不是 bitwise not） |
+
+### 5.5 `icmp.*`
+
+```
+_load_operand("rax", operands[0])
+_load_operand("rcx", operands[1])
+cmp rax, rcx
+setcc al
+movzx eax, al
+_store_result(inst.result, "rax")
+```
+
+| icmp 谓词 | setcc 指令 |
+|-----------|-----------|
+| `eq` | `sete` |
+| `ne` | `setne` |
+| `lt` | `setl` |
+| `gt` | `setg` |
+| `le` | `setle` |
+| `ge` | `setge` |
+
+均使用**有符号**比较。
+
+### 5.6 `ptrtoint`
+
+```
+_load_operand("rax", operands[0])   # 指针值
+_store_result(inst.result, "rax")   # 作为 i64 存入
+```
+
+不涉及截断或符号问题。
+
+### 5.7 `gep`
+
+GEP lowering 依赖于 source type 和 indices：
+
+| Source type | index 数量 | 行为 |
+|-------------|-----------|------|
+| `struct` | 1 | `base_ptr + index0 * sizeof(struct)` |
+| `struct` | 2 | `base_ptr + index0 * sizeof(struct) + field_offset(index1)` |
+| `i8` | 1 | `base_ptr + index0 * 1` |
+| `i64`/`ptr` | 1 | `base_ptr + index0 * 8` |
+| `array` | 1 | `base_ptr + index0 * sizeof(elem)` |
+
+```
+_load_operand("rax", operands[0])   # 基址
+# 处理每个 index
+for each index:
+  if index is ConstIntOperand:
+    rax += index.value * scale         # 通过 mov rcx, imm; add rax, rcx
+  else:
+    _load_operand("rcx", index)
+    if scale == 8:  rcx = rcx*8       # scale_rcx_by_8: add rcx x 3
+    rax += rcx                         # add rax, rcx
+_store_result(inst.result, "rax")
+```
+
+**scale_rcx_by_8** 通过三次 `add rcx, rcx` 实现 `rcx *= 8`。这只在 scale == 8 时使用，scale == 1 时直加。
+
+Struct field offset 通过 `program.structs[struct_name]["fields"]` 查表获取，field index 必须是编译期常量。
+
+## 6. Call lowering
+
+`_lower_call(inst)` 实现 Windows x64 ABI 调用序列：
+
+```
+# 前四个参数放入寄存器
+_load_operand("rcx", operands[0])   # 第一个参数
+_load_operand("rdx", operands[1])   # 第二个参数
+_load_operand("r8",  operands[2])   # 第三个参数
+_load_operand("r9",  operands[3])   # 第四个参数
+
+# 分配 shadow space + 栈参数空间
+frame = 32 + ((max(0, arg_count - 4) * 8 + 15) // 16) * 16
+sub rsp, frame
+
+# 第 5+ 个参数写入栈
+for idx, operand in enumerate(operands[4:]):
+  _load_operand("rax", operand)
+  mov [rsp+32+idx*8], rax
+
+# 调用
+call Symbol(callee_name)
+
+# 恢复栈
+add rsp, frame
+
+# 保存返回值（如有）
+if inst.result is not None:
+  _store_result(inst.result, "rax")
+```
+
+### 6.1 Callee symbol
+
+`Symbol(callee)` 的 `callee` 直接取 `inst.callee` 字符串。可以是：
+
+- 用户函数名（如 `main`、`foo`）
+- WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
+- Runtime helper 名（如 `str_i64`、`print_str`）
+- `__epic_alloc`
+
+### 6.2 Frame alignment
+
+Shadow space (32) 已包含在 frame 计算中。栈参数按 16 字节对齐计算 extra。
+
+## 7. Terminator lowering
+
+### 7.1 `br`
+
+```
+jmp LabelRef(fn_name.block_name)
+```
+
+### 7.2 `condbr`
+
+```
+_load_operand("rax", cond)
+test rax, rax
+jnz  LabelRef(fn_name.then_target)
+jmp  LabelRef(fn_name.else_target)
+```
+
+注意：condbr 对 `bool` 值检查 "非零即真"。
+
+### 7.3 `ret`
+
+| 函数 | 行为 |
+|------|------|
+| `main` (有值) | `mov rcx, rax; sub rsp, 32; call ExitProcess` |
+| `main` (无值) | `mov rcx, 0; sub rsp, 32; call ExitProcess` |
+| 非 main (有值) | `_load_operand("rax", value); jmp return_label` |
+| 非 main (无值) | `jmp return_label` |
+
+## 8. Runtime boundary
+
+### 8.1 Runtime data
+
+`emit_runtime_data()` 在 `.data` section 生成：
+
+- `_written: i32` (4 bytes zero)
+- `_heap: qword` (8 bytes zero) — 进程堆句柄
+- `_argv: qword` (8 bytes zero) — 命令行参数数组
+- `_str_i64_buf: [32]byte` — i64→str 转换用的缓冲区
+- `_newline: byte 0x0a`
+- `_putc_buf: byte 0`
+- `_cstr_panic_prefix: "panic line "`
+- `_cstr_panic_suffix: ": invalid cstr"`
+- `_bool_true_data` / `_bool_false_data` — 预制的 bool 字符串 header 和数据
+- map repr 辅助字符串（`_map_repr_prefix` 等）
+- 每个程序全局 string 的 `data_label` 和 `header_label`
+
+### 8.2 Startup hook
+
+`__epic_runtime_start` 在 `main` 的 prologue 中被调用：
+
+```
+push  rbp
+mov   rbp, rsp
+sub   rsp, 32
+call  GetProcessHeap
+add   rsp, 32
+mov   [_heap], rax
+sub   rsp, 32
+call  argv_init
+add   rsp, 32
+mov   [_argv], rax
+pop   rbp
+ret
+```
+
+### 8.3 Runtime helper emission
+
+`append_runtime_helpers()` 在当前实现下无条件发射所有 helper：
+
+- `__epic_alloc` (x64 primitive)
+- `__epic_arr_qword_new` (array header allocation)
+- `__epic_arr_i64_push` / `__epic_arr_ptr_push`
+- `__epic_arr_qword_extend`
+- `__epic_arr_i64_get` / `__epic_arr_ptr_get`
+- `bytes_str` / `str_arr_i8` / `new_arr_i8` / `new_arr_i8_empty` / `arr_i8_*` / `extend_i8`
+- `map_new` / `map_get` / `map_set` / `map_has` / `map_repr`
+- `cstr` (`__epic_cstr`)
+- `write_file` / `read_file` / `system_cmd`
+- `argv_init`
+- `str_cat` / `str_eq` / `str_slice` / `str_replace_char` / `str_get` / `str_starts_with` / `str_find` / `str_trim` / `str_i64` / `str_bool`
+- `print_str` / `print_newline`
+- `putc`
+- `array_oob`
+
+这些函数的 x64 标签和函数体全部手写在 `mir_lower.py` 的 `_emit_*()` 方法中。
+
+**迁移计划**：详见 `docs/mir-runtime-helper-plan.md`。
+
+## 9. Known debts
+
+### 9.1 Unused helpers
+
+`putc` 和 `_putc_buf` 被发射但未被任何 MIR call 引用。
+
+### 9.2 No register allocation
+
+所有值走栈槽，第一版不做寄存器分配。性能不是目标。
+
+### 9.3 No callee-saved register preservation
+
+当前 lowering 不使用被调用者保存的寄存器（`rbx`、`rsi`、`rdi`、`r12`–`r15`），因此不需要保存它们。
+
+### 9.4 Dynamic GEP scale
+
+`_add_scaled_index` 在 `scale != 1` 且 `scale != 8` 时抛出 `MirLowerError`。scale=8 仅通过三次 `add rcx, rcx` 实现，不是真正的 shift。
+
+### 9.5 `_add_rax_imm` 不使用 `add rax, imm32/imm8`
+
+当前总是 `mov rcx, imm; add rax, rcx`，即使 imm 可以用单指令 `add rax, imm` 完成。
+
+### 9.6 No `.data` relocations
+
+`machine.py` 支持 `data_relocs` API 但当前不发射任何 `.data` section relocations。string header 初始化由 runtime `_load_operand` 以代码形式生成（lea + mov 序列），而非数据重定位。
