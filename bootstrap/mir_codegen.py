@@ -86,6 +86,7 @@ class MirCodegen:
         self.program.externs.append(MirExtern("str_bool", MirSignature([BOOL], ptr_str())))
         self.program.externs.append(MirExtern("str_arr_i8", MirSignature([ptr_arr_i8()], ptr_str())))
         self.program.externs.append(MirExtern("str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
+        self.program.externs.append(MirExtern("str_eq", MirSignature([ptr_str(), ptr_str()], BOOL)))
         self.program.externs.append(MirExtern("str_slice", MirSignature([ptr_str(), I64, I64], ptr_str())))
         self.program.externs.append(MirExtern("str_replace_char", MirSignature([ptr_str(), I64, I64], ptr_str())))
         self.program.externs.append(MirExtern("str_get", MirSignature([ptr_str(), I64], I64)))
@@ -562,6 +563,12 @@ class MirCodegen:
         if expr.op == "+" and left.type == ptr_str() and right.type == ptr_str():
             result = self._inst("call", [left, right], result_type=ptr_str(), type=ptr_str(), callee="str_cat")
             return ValueOperand(result)
+        if expr.op in ("==", "!=") and left.type == ptr_str() and right.type == ptr_str():
+            result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="str_eq")
+            value = ValueOperand(result)
+            if expr.op == "!=":
+                value = ValueOperand(self._inst("not", [value], result_type=BOOL))
+            return value
         if expr.op in op_map:
             return ValueOperand(self._inst(op_map[expr.op], [left, right], result_type=I64))
         if expr.op in bool_map:

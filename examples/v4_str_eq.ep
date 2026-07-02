@@ -1,0 +1,37 @@
+# EXIT: 0
+# STDOUT: slice cat ne-true ne-false nul
+fun main(): void {
+    let sliced = str_slice("xabcx", 1, 4)
+    if sliced == "abc" {
+        print("slice ")
+    } else {
+        print("bad-slice ")
+    }
+
+    if ("a" + "bc") == "abc" {
+        print("cat ")
+    } else {
+        print("bad-cat ")
+    }
+
+    if sliced != "abd" {
+        print("ne-true ")
+    } else {
+        print("bad-ne-true ")
+    }
+
+    if sliced != "abc" {
+        print("bad-ne-false ")
+    } else {
+        print("ne-false ")
+    }
+
+    let with_nul = str_slice("xA\0Bx", 1, 4)
+    if with_nul == "A\0B" {
+        print("nul")
+    } else {
+        print("bad-nul")
+    }
+
+    exit(0)
+}
