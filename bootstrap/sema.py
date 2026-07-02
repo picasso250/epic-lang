@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ast_nodes import *
+from epic_builtins import BUILTIN_FUNCTIONS, PSEUDO_BUILTINS
 
 
 class SemanticError(RuntimeError):
@@ -141,6 +142,8 @@ class SemanticAnalyzer:
                 if typ == VOID:
                     self._fail_global(f"function {fn.name} parameter {param.name} cannot have type void")
                 params.append(typ)
+            if fn.name in BUILTIN_FUNCTIONS or fn.name in PSEUDO_BUILTINS:
+                self._fail_global(f"reserved builtin function name: {fn.name}")
             self.func_sigs[fn.name] = (params, self._type_name(fn.ret_type))
 
     def _analyze_function(self, fn):
