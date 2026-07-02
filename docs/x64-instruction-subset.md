@@ -41,8 +41,9 @@ Runtime emission is split from MIR lowering at the policy boundary:
 
 ### 1.1 MIR
 
-MIR 是语义层：typed values、basic blocks、terminators、load/store、call。
-MIR 不承诺寄存器、栈帧、机器指令编码。
+MIR 是语义层：typed values、basic blocks、terminators、load/store、gep、call。
+目标 MIR 合约见 `docs/mir-design.md`：pointer 是 opaque `ptr`，aggregate 操作要分解成 `gep/load/store/call/branch`。
+本文档下方列出的 Epic-specific MIR ops 是当前 Python prototype 的真实状态，不是目标 MIR 设计。
 
 ### 1.2 X64IR / LowIR
 
@@ -144,7 +145,7 @@ ret
 | `condbr` | `test rax, rax; jnz then; jmp else`。 |
 | `ret` | `ExitProcess` for `main`，普通函数跳转到 shared return label。 |
 
-当前 Epic-specific MIR ops：
+当前 Python prototype-only Epic-specific MIR ops：
 
 | MIR op | 说明 |
 | --- | --- |
@@ -159,8 +160,9 @@ ret
 | `ptr.i8.get` | 指针按字节读取并 sign-extend。 |
 | `ptr.i64.get` | 指针按 8 字节读取。 |
 
-这些 op 已经是实际语义面的一部分。它们不能继续停留在“临时 hack”状态；
-validator 和文档必须逐步覆盖它们。
+这些 op 是当前实现债：它们能让 examples 先跑通，但不应固化为目标 MIR。
+迁移方向是按 `docs/mir-design.md` 把它们分解成 `gep/load/store/call/branch`，
+或在必要时显式放进独立 HighMIR，而不是继续扩大 MIR validator 对这类便捷 op 的接受面。
 
 ## 5. 当前 machine instruction subset
 
@@ -292,17 +294,17 @@ Recommended next step: move helper body methods into `x64_runtime.py` as named
 fragments, then keep the current `full` policy while making `used_only` a later
 policy.
 
-### 8.2 X64Program needs a validator
+### 8.2 X64Program validator exists
 
-Invalid X64IR currently fails late inside the encoder, or worse, is encoded with
-an unintended interpretation. Examples:
+`validate_x64_program(program)` now runs before machine encoding through
+`MachineObjectBuilder.__init__()`. The two previously risky forms are covered:
 
-- `test a, b` currently ignores the second operand and encodes `test a, a`。
-- `add r64, imm` uses an imm8 encoding path and should reject out-of-range
-  immediates instead of silently truncating.
-- `call Symbol` does not verify the symbol is declared or defined.
+- `test a, b` is rejected unless both operands are the same register.
+- `add r64, imm` rejects immediates outside signed imm8 for the current encoder path.
+- `call Symbol` requires a defined or declared symbol.
 
-Recommended next step: add `validate_x64_program(program)` before encoding.
+Recommended next step: keep validator tests next to each newly supported X64IR
+instruction form.
 
 ### 8.3 MachineObjectBuilder lacks a public build result
 
@@ -312,14 +314,16 @@ labels, and relocs must reach into private methods.
 Recommended next step: expose a small `build_machine_object(program)` result
 object and let `write_machine_obj()` wrap it.
 
-### 8.4 MIR validator lags actual MIR
+### 8.4 MIR still accepts prototype high-level ops
 
-The validator documents and checks core MIR, but actual codegen already emits
-Epic-specific ops such as `struct.new`, `field.load`, `array.push`, and
-`adt.payload`. Unknown ops are effectively unchecked.
+The target MIR design no longer treats `struct.new`, `field.load`,
+`array.push`, and `adt.payload` as MIR ops. Current Python codegen still emits
+them, and the validator only checks the older core MIR subset. Unknown ops are
+effectively unchecked.
 
-Recommended next step: extend validator coverage to the current op set before
-adding more language features to the machine path.
+Recommended next step: first align codegen with `docs/mir-design.md` by lowering
+aggregate allocation/access into `gep/load/store/call/branch`; then make the
+validator reject unknown ops and reject the prototype-only high-level ops.
 
 ### 8.5 Dynamic metadata on MirProgram
 
@@ -328,7 +332,7 @@ contract from the MIR dataclass and will make the Epic port harder to keep in
 sync.
 
 Recommended next step: make struct and ADT layout metadata explicit fields on
-`MirProgram`.
+`MirProgram`, matching `docs/mir-design.md`.
 
 ### 8.6 Symbol spelling is inconsistent
 
