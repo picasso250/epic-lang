@@ -240,18 +240,49 @@ def lex(source_text):
     return tokens
 
 
+def escape_dump_value(value):
+    if isinstance(value, int):
+        return str(value)
+
+    out = []
+    for ch in value:
+        code = ord(ch)
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\0":
+            out.append("\\0")
+        elif 32 <= code <= 126:
+            out.append(ch)
+        else:
+            out.append(f"\\x{code:02x}")
+    return "".join(out)
+
+
+def dump_line(line, kind, value=""):
+    return f"{line}\t{kind}\t{escape_dump_value(value)}"
+
+
 def dump_tokens(tokens):
     lines = []
     for kind, value, line in tokens:
         if kind == "FSTRING":
-            lines.append(f"{kind}  {line}")
+            lines.append(dump_line(line, "FSTRING_BEGIN"))
             for part_kind, part_value in value:
                 if part_kind == "text":
-                    lines.append(f"  TEXT {part_value}")
+                    lines.append(dump_line(line, "FSTRING_TEXT", part_value))
                 elif part_kind == "expr":
-                    lines.append(f"  EXPR {part_value}")
+                    lines.append(dump_line(line, "FSTRING_EXPR", part_value))
                 else:
                     raise LexError(f"Unknown f-string part {part_kind}", line)
+            lines.append(dump_line(line, "FSTRING_END"))
             continue
-        lines.append(f"{kind} {value} {line}")
+
+        lines.append(dump_line(line, kind, value))
+
     return "\n".join(lines) + ("\n" if lines else "")
