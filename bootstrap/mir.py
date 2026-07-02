@@ -15,7 +15,7 @@ class MirType:
 
     def __str__(self):
         if self.kind == "ptr":
-            return f"ptr {self.pointee}"
+            return "ptr"
         if self.kind == "array":
             return f"array {self.count} x {self.elem}"
         if self.kind == "struct":
@@ -25,13 +25,17 @@ class MirType:
 
 I64 = MirType("i64")
 U64 = MirType("u64")
+I32 = MirType("i32")
 I8 = MirType("i8")
 U8 = MirType("u8")
 BOOL = MirType("bool")
 VOID = MirType("void")
+PTR = MirType("ptr")
 
 
-def ptr(pointee):
+def ptr(pointee=None):
+    if pointee is None:
+        return PTR
     return MirType("ptr", pointee=pointee)
 
 
@@ -102,6 +106,15 @@ class ConstBoolOperand(MirOperand):
 
     def text(self):
         return "true" if self.value else "false"
+
+
+@dataclass(frozen=True)
+class ConstNullOperand(MirOperand):
+    def __init__(self):
+        object.__setattr__(self, "type", PTR)
+
+    def text(self):
+        return "null"
 
 
 @dataclass(frozen=True)
@@ -187,8 +200,13 @@ class MirInst:
         if self.op == "not":
             return f"{prefix}not {self.operands[0].typed_text()}"
         if self.op == "gep":
-            base, offset = self.operands
-            return f"{prefix}gep {base.typed_text()}, {offset.typed_text()}"
+            base = self.operands[0]
+            indices = ", ".join(op.typed_text() for op in self.operands[1:])
+            suffix = f", {indices}" if indices else ""
+            return f"{prefix}gep {self.type}, {base.typed_text()}{suffix}"
+        if self.op == "ptrtoint":
+            target = self.type if self.type is not None else self.result.type
+            return f"{prefix}ptrtoint {self.operands[0].typed_text()} to {target}"
         rendered = ", ".join(op.typed_text() for op in self.operands)
         return f"{prefix}{self.op} {rendered}"
 
@@ -262,6 +280,8 @@ class MirProgram:
     externs: list[MirExtern] = field(default_factory=list)
     globals: list[MirGlobal] = field(default_factory=list)
     functions: list[MirFunction] = field(default_factory=list)
+    structs: dict = field(default_factory=dict)
+    adts: dict = field(default_factory=dict)
 
     def text(self):
         parts = []
@@ -277,6 +297,20 @@ class MirValidationError(Exception):
 
 
 class MirValidator:
+    HIGH_LEVEL_OPS = {
+        "struct.new",
+        "field.load",
+        "field.store",
+        "array.new",
+        "array.push",
+        "array.extend",
+        "array.index.load",
+        "ptr.index.load",
+        "ptr.i8.get",
+        "ptr.i64.get",
+        "adt.payload",
+    }
+
     def __init__(self, program):
         self.program = program
         self.errors = []
@@ -338,30 +372,38 @@ class MirValidator:
         for operand in inst.operands:
             self._check_operand(fn, where, operand, values)
 
-        if inst.op == "alloca":
+        if inst.op in self.HIGH_LEVEL_OPS:
+            self.errors.append(f"{fn.name}.{where}: high-level MIR op is not allowed: {inst.op}")
+        elif inst.op == "alloca":
             self._require(inst.result is not None, fn, where, "alloca needs a result")
             self._require(inst.type is not None, fn, where, "alloca needs an element type")
             if inst.result is not None and inst.type is not None:
                 self._require(
-                    inst.result.type == ptr(inst.type),
+                    self._is_ptr(inst.result.type),
                     fn,
                     where,
-                    "alloca result must be ptr element type",
+                    "alloca result must be ptr",
                 )
         elif inst.op == "load":
             self._require(len(inst.operands) == 1, fn, where, "load needs one operand")
             self._require(inst.result is not None, fn, where, "load needs a result")
+            self._require(inst.type is not None, fn, where, "load needs an access type")
             if inst.operands:
-                self._require(inst.operands[0].type == ptr(inst.type), fn, where, "load type mismatch")
+                self._require(self._is_ptr(inst.operands[0].type), fn, where, "load address must be ptr")
             if inst.result is not None:
-                self._require(inst.result.type == inst.type, fn, where, "load result type mismatch")
+                self._require(
+                    self._same_type(inst.result.type, inst.type) or (inst.type == I8 and inst.result.type == I64),
+                    fn,
+                    where,
+                    "load result type mismatch",
+                )
         elif inst.op == "store":
             self._require(len(inst.operands) == 2, fn, where, "store needs two operands")
             self._require(inst.result is None, fn, where, "store must not have a result")
             if len(inst.operands) == 2:
                 value, addr = inst.operands
-                self._require(addr.type == ptr(value.type), fn, where, "store type mismatch")
-        elif inst.op in ("add", "sub", "mul", "div", "mod", "and", "or"):
+                self._require(self._is_ptr(addr.type), fn, where, "store address must be ptr")
+        elif inst.op in ("add", "sub", "mul", "div", "mod", "and", "or", "xor", "shl", "sar", "shr"):
             self._require(len(inst.operands) == 2, fn, where, f"{inst.op} needs two operands")
             self._validate_same_typed_result(fn, where, inst)
         elif inst.op == "not":
@@ -376,13 +418,25 @@ class MirValidator:
             self._require(inst.result is not None and inst.result.type == BOOL, fn, where, "icmp returns bool")
         elif inst.op == "call":
             self._validate_call(fn, where, inst)
+        elif inst.op == "gep":
+            self._validate_gep(fn, where, inst)
+        elif inst.op == "ptrtoint":
+            self._require(len(inst.operands) == 1, fn, where, "ptrtoint needs one operand")
+            self._require(inst.result is not None, fn, where, "ptrtoint needs a result")
+            self._require(inst.type == I64, fn, where, "ptrtoint target must be i64")
+            if inst.operands:
+                self._require(self._is_ptr(inst.operands[0].type), fn, where, "ptrtoint operand must be ptr")
+            if inst.result is not None:
+                self._require(inst.result.type == I64, fn, where, "ptrtoint result type mismatch")
+        else:
+            self.errors.append(f"{fn.name}.{where}: unknown MIR op: {inst.op}")
 
     def _validate_same_typed_result(self, fn, where, inst):
         if len(inst.operands) == 2:
-            self._require(inst.operands[0].type == inst.operands[1].type, fn, where, f"{inst.op} type mismatch")
+            self._require(self._same_type(inst.operands[0].type, inst.operands[1].type), fn, where, f"{inst.op} type mismatch")
         self._require(inst.result is not None, fn, where, f"{inst.op} needs a result")
         if inst.result is not None and inst.operands:
-            self._require(inst.result.type == inst.operands[0].type, fn, where, f"{inst.op} result type mismatch")
+            self._require(self._same_type(inst.result.type, inst.operands[0].type), fn, where, f"{inst.op} result type mismatch")
 
     def _validate_call(self, fn, where, inst):
         self._require(inst.callee is not None, fn, where, "call needs callee")
@@ -392,14 +446,38 @@ class MirValidator:
         if signature is None:
             self.errors.append(f"{fn.name}.{where}: callee is not callable: {inst.callee}")
             return
-        self._require(signature.ret == inst.type, fn, where, "call return type mismatch")
+        self._require(self._same_type(signature.ret, inst.type), fn, where, "call return type mismatch")
         self._require(len(signature.params) == len(inst.operands), fn, where, "call arity mismatch")
         for idx, (expected, operand) in enumerate(zip(signature.params, inst.operands)):
-            self._require(expected == operand.type, fn, where, f"call argument {idx} type mismatch")
+            self._require(self._same_type(expected, operand.type), fn, where, f"call argument {idx} type mismatch")
         if inst.type == VOID:
             self._require(inst.result is None, fn, where, "void call must not have a result")
         else:
-            self._require(inst.result is not None and inst.result.type == inst.type, fn, where, "call result type mismatch")
+            self._require(inst.result is not None and self._same_type(inst.result.type, inst.type), fn, where, "call result type mismatch")
+
+    def _validate_gep(self, fn, where, inst):
+        self._require(inst.result is not None, fn, where, "gep needs a result")
+        self._require(inst.type is not None, fn, where, "gep needs a source type")
+        if inst.result is not None:
+            self._require(self._is_ptr(inst.result.type), fn, where, "gep result must be ptr")
+        self._require(len(inst.operands) >= 2, fn, where, "gep needs base and at least one index")
+        if not inst.operands:
+            return
+        self._require(self._is_ptr(inst.operands[0].type), fn, where, "gep base must be ptr")
+        for operand in inst.operands[1:]:
+            self._require(operand.type in (I64, I32), fn, where, "gep indices must be integer")
+        if inst.type is None:
+            return
+        if inst.type.kind == "struct":
+            if len(inst.operands) == 2:
+                return
+            self._require(len(inst.operands) == 3, fn, where, "struct gep needs one or two indices")
+            field_index = inst.operands[2]
+            if isinstance(field_index, ConstIntOperand):
+                fields = self.program.structs.get(inst.type.name, {}).get("fields", {})
+                self._require(0 <= field_index.value < len(fields), fn, where, f"unknown struct field index: {inst.type.name}.{field_index.value}")
+            return
+        self._require(inst.type.kind in {"i64", "i8", "ptr", "array"}, fn, where, f"unsupported gep source type: {inst.type}")
 
     def _validate_terminator(self, fn, block, term, values, blocks):
         if term is None:
@@ -419,7 +497,7 @@ class MirValidator:
                 self._require(term.value is not None, fn, where, "non-void function must return a value")
                 if term.value is not None:
                     self._check_operand(fn, where, term.value, values)
-                    self._require(term.value.type == fn.return_type, fn, where, "return type mismatch")
+                    self._require(self._same_type(term.value.type, fn.return_type), fn, where, "return type mismatch")
 
     def _check_label(self, fn, where, label, blocks):
         if label not in blocks:
@@ -428,6 +506,16 @@ class MirValidator:
     def _require(self, condition, fn, where, message):
         if not condition:
             self.errors.append(f"{fn.name}.{where}: {message}")
+
+    def _is_ptr(self, typ):
+        return typ is not None and typ.kind == "ptr"
+
+    def _same_type(self, left, right):
+        if left is None or right is None:
+            return left == right
+        if self._is_ptr(left) and self._is_ptr(right):
+            return True
+        return left == right
 
 
 def validate(program):

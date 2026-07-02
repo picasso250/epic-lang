@@ -1,6 +1,6 @@
 """Lower Epic MIR to structured X64 MachineIR."""
 
-from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, Ret, SymbolOperand, ValueOperand, VOID
+from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
 from x64_runtime import append_runtime_helpers, emit_runtime_data, emit_startup_hook_call
 
@@ -93,85 +93,22 @@ class MirLower:
         if inst.op == "store":
             value, addr = inst.operands
             self._load_operand("rax", value)
-            self.x64.inst("mov", M("rbp", self._addr_slot(addr)), R("rax"))
+            self._load_operand("rcx", addr)
+            self.x64.inst("mov", M("rcx", 0, 1 if value.type == I8 else 8), R("al") if value.type == I8 else R("rax"))
             return
         if inst.op == "load":
-            self.x64.inst("mov", R("rax"), M("rbp", self._addr_slot(inst.operands[0])))
-            self._store_result(inst.result, "rax")
-            return
-        if inst.op == "struct.new":
-            info = self.program.structs[inst.callee]
-            self.x64.inst("mov", R("rcx"), MS("_heap"))
-            self.x64.inst("mov", R("rdx"), I(8))
-            self.x64.inst("mov", R("r8"), I(info["size"]))
-            self.x64.inst("sub", R("rsp"), I(32))
-            self.x64.inst("call", Symbol("HeapAlloc"))
-            self.x64.inst("add", R("rsp"), I(32))
-            self._store_result(inst.result, "rax")
-            return
-        if inst.op == "field.store":
-            base, value = inst.operands
-            offset = self._field_offset(base.type, inst.callee)
-            self._load_operand("rax", base)
-            self._load_operand("rcx", value)
-            self.x64.inst("mov", M("rax", offset), R("rcx"))
-            return
-        if inst.op == "field.load":
-            offset = self._field_offset(inst.operands[0].type, inst.callee)
             self._load_operand("rax", inst.operands[0])
-            self.x64.inst("mov", R("rax"), M("rax", offset))
+            if inst.type == I8:
+                self.x64.inst("movsx", R("rax"), M("rax", 0, 1))
+            else:
+                self.x64.inst("mov", R("rax"), M("rax"))
             self._store_result(inst.result, "rax")
             return
-        if inst.op == "adt.payload":
+        if inst.op == "gep":
+            self._lower_gep(inst)
+            return
+        if inst.op == "ptrtoint":
             self._load_operand("rax", inst.operands[0])
-            self.x64.inst("mov", R("rax"), M("rax", 8))
-            self._store_result(inst.result, "rax")
-            return
-        if inst.op == "array.new":
-            self._lower_array_new(inst)
-            return
-        if inst.op == "array.push":
-            self._lower_array_push(inst)
-            return
-        if inst.op == "array.extend":
-            self._lower_array_extend(inst)
-            return
-        if inst.op == "ptr.index.load":
-            self._load_operand("rax", inst.operands[0])
-            self._load_operand("rcx", inst.operands[1])
-            self._scale_rcx_by_8()
-            self.x64.inst("add", R("rax"), R("rcx"))
-            self.x64.inst("mov", R("rax"), M("rax"))
-            self._store_result(inst.result, "rax")
-            return
-        if inst.op == "array.index.load":
-            self._load_operand("rax", inst.operands[0])
-            self._load_operand("rdx", inst.operands[1])
-            self.x64.inst("cmp", R("rdx"), I(0))
-            self.x64.inst("jl", LabelRef("array_oob"))
-            self.x64.inst("mov", R("r8"), M("rax", 8))
-            self.x64.inst("cmp", R("rdx"), R("r8"))
-            self.x64.inst("jge", LabelRef("array_oob"))
-            self.x64.inst("mov", R("rax"), M("rax"))
-            self.x64.inst("mov", R("rcx"), R("rdx"))
-            self._scale_rcx_by_8()
-            self.x64.inst("add", R("rax"), R("rcx"))
-            self.x64.inst("mov", R("rax"), M("rax"))
-            self._store_result(inst.result, "rax")
-            return
-        if inst.op == "ptr.i8.get":
-            self._load_operand("rax", inst.operands[0])
-            self._load_operand("rcx", inst.operands[1])
-            self.x64.inst("add", R("rax"), R("rcx"))
-            self.x64.inst("movsx", R("rax"), M("rax", 0, 1))
-            self._store_result(inst.result, "rax")
-            return
-        if inst.op == "ptr.i64.get":
-            self._load_operand("rax", inst.operands[0])
-            self._load_operand("rcx", inst.operands[1])
-            self._scale_rcx_by_8()
-            self.x64.inst("add", R("rax"), R("rcx"))
-            self.x64.inst("mov", R("rax"), M("rax"))
             self._store_result(inst.result, "rax")
             return
         if inst.op in ("add", "sub", "mul", "div", "mod", "and", "or", "xor", "shl", "sar", "shr"):
@@ -259,6 +196,8 @@ class MirLower:
             self.x64.inst("mov", R(reg), I(1 if operand.value else 0))
         elif isinstance(operand, ConstIntOperand):
             self.x64.inst("mov", R(reg), I(operand.value))
+        elif isinstance(operand, ConstNullOperand):
+            self.x64.inst("mov", R(reg), I(0))
         elif isinstance(operand, ValueOperand):
             name = operand.value.name
             if name in self.value_slots:
@@ -290,216 +229,80 @@ class MirLower:
             raise MirLowerError("only alloca addresses are supported in first MIR lowering")
         return self.addr_slots[operand.value.name]
 
-    def _field_offset(self, base_type, field):
-        if base_type.kind != "ptr" or base_type.pointee.kind != "struct":
-            raise MirLowerError("field access base must be ptr struct")
-        struct_name = base_type.pointee.name
-        try:
-            return self.program.structs[struct_name]["fields"][field]["offset"]
-        except KeyError as exc:
-            raise MirLowerError(f"unknown field {struct_name}.{field}") from exc
-
-    def _lower_array_new(self, inst):
-        self._load_operand("r11", inst.operands[0])
-        self.x64.inst("mov", M("rbp", self.scratch_slots[0]), R("r11"))
-        self.x64.inst("mov", R("rcx"), MS("_heap"))
-        self.x64.inst("mov", R("rdx"), I(8))
-        self.x64.inst("mov", R("r8"), I(24))
-        self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("HeapAlloc"))
-        self.x64.inst("add", R("rsp"), I(32))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[1]), R("rax"))
-        self.x64.inst("mov", R("r8"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("mov", R("rcx"), MS("_heap"))
-        self.x64.inst("mov", R("rdx"), I(8))
-        self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("HeapAlloc"))
-        self.x64.inst("add", R("rsp"), I(32))
-        self.x64.inst("mov", R("rcx"), M("rbp", self.scratch_slots[1]))
-        self.x64.inst("mov", M("rcx"), R("rax"))
-        self.x64.inst("mov", R("rdx"), I(0))
-        self.x64.inst("mov", M("rcx", 8), R("rdx"))
-        self.x64.inst("mov", R("rdx"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", M("rcx", 16), R("rdx"))
-        self.x64.inst("mov", R("rax"), R("rcx"))
+    def _lower_gep(self, inst):
+        self._load_operand("rax", inst.operands[0])
+        source = inst.type
+        indices = inst.operands[1:]
+        if source.kind == "struct":
+            if len(indices) == 1:
+                self._add_scaled_index(indices[0], self._sizeof_type(source))
+            elif len(indices) == 2:
+                self._add_scaled_index(indices[0], self._sizeof_type(source))
+                field_index = indices[1]
+                if not isinstance(field_index, ConstIntOperand):
+                    raise MirLowerError("struct field gep needs a constant field index")
+                self._add_rax_imm(self._field_offset_by_index(source.name, field_index.value))
+            else:
+                raise MirLowerError("struct gep needs one or two indices")
+        elif source.kind == "i8":
+            self._add_scaled_index(indices[0], 1)
+        elif source.kind in ("i64", "ptr"):
+            self._add_scaled_index(indices[0], 8)
+        elif source.kind == "array":
+            self._add_scaled_index(indices[0], self._sizeof_type(source.elem))
+        else:
+            raise MirLowerError(f"unsupported gep source type: {source}")
         self._store_result(inst.result, "rax")
 
-    def _lower_array_push(self, inst):
-        grow = self._fresh_label("array_push.grow")
-        store = self._fresh_label("array_push.store")
-        copy_loop = self._fresh_label("array_push.copy")
-        copy_done = self._fresh_label("array_push.copy_done")
-        cap_nonzero = self._fresh_label("array_push.cap_nonzero")
-        self._load_operand("rax", inst.operands[0])
-        self.x64.inst("mov", M("rbp", self.scratch_slots[0]), R("rax"))
-        self._load_operand("rdx", inst.operands[1])
-        self.x64.inst("mov", M("rbp", self.scratch_slots[1]), R("rdx"))
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("rcx"), M("rax", 8))
-        self.x64.inst("mov", R("rdx"), M("rax", 16))
-        self.x64.inst("cmp", R("rcx"), R("rdx"))
-        self.x64.inst("jge", LabelRef(grow))
-        self.x64.inst("jmp", LabelRef(store))
-        self.x64.label(grow)
-        self.x64.inst("test", R("rdx"), R("rdx"))
-        self.x64.inst("jnz", LabelRef(cap_nonzero))
-        self.x64.inst("mov", R("rdx"), I(2))
-        self.x64.label(cap_nonzero)
-        self.x64.inst("add", R("rdx"), R("rdx"))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[2]), R("rdx"))
-        self.x64.inst("mov", R("r8"), R("rdx"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("mov", R("rcx"), MS("_heap"))
-        self.x64.inst("mov", R("rdx"), I(8))
-        self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("HeapAlloc"))
-        self.x64.inst("add", R("rsp"), I(32))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[3]), R("rax"))
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("r8"), M("rax"))
-        self.x64.inst("mov", R("r9"), M("rbp", self.scratch_slots[3]))
-        self.x64.inst("mov", R("r10"), M("rax", 8))
-        self.x64.inst("mov", R("r11"), I(0))
-        self.x64.label(copy_loop)
-        self.x64.inst("cmp", R("r11"), R("r10"))
-        self.x64.inst("jge", LabelRef(copy_done))
-        self.x64.inst("mov", R("rcx"), R("r11"))
-        self._scale_rcx_by_8()
-        self.x64.inst("mov", R("rax"), R("r8"))
+    def _add_scaled_index(self, operand, scale):
+        if isinstance(operand, ConstIntOperand):
+            self._add_rax_imm(operand.value * scale)
+            return
+        self._load_operand("rcx", operand)
+        if scale == 8:
+            self._scale_rcx_by_8()
+        elif scale != 1:
+            raise MirLowerError(f"dynamic gep scale is not supported yet: {scale}")
         self.x64.inst("add", R("rax"), R("rcx"))
-        self.x64.inst("mov", R("rdx"), M("rax"))
-        self.x64.inst("mov", R("rax"), R("r9"))
+
+    def _add_rax_imm(self, value):
+        if value == 0:
+            return
+        self.x64.inst("mov", R("rcx"), I(value))
         self.x64.inst("add", R("rax"), R("rcx"))
-        self.x64.inst("mov", M("rax"), R("rdx"))
-        self.x64.inst("add", R("r11"), I(1))
-        self.x64.inst("jmp", LabelRef(copy_loop))
-        self.x64.label(copy_done)
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("rdx"), M("rbp", self.scratch_slots[3]))
-        self.x64.inst("mov", M("rax"), R("rdx"))
-        self.x64.inst("mov", R("rdx"), M("rbp", self.scratch_slots[2]))
-        self.x64.inst("mov", M("rax", 16), R("rdx"))
-        self.x64.label(store)
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("rdx"), M("rbp", self.scratch_slots[1]))
-        self.x64.inst("mov", R("rcx"), M("rax", 8))
-        self.x64.inst("mov", R("r10"), M("rax"))
-        self.x64.inst("mov", R("r11"), R("rcx"))
-        self.x64.inst("add", R("r11"), R("r11"))
-        self.x64.inst("add", R("r11"), R("r11"))
-        self.x64.inst("add", R("r11"), R("r11"))
-        self.x64.inst("add", R("r10"), R("r11"))
-        self.x64.inst("mov", M("r10"), R("rdx"))
-        self.x64.inst("add", R("rcx"), I(1))
-        self.x64.inst("mov", M("rax", 8), R("rcx"))
+
+    def _sizeof_type(self, typ):
+        if typ.kind == "struct":
+            try:
+                return self.program.structs[typ.name]["size"]
+            except KeyError as exc:
+                raise MirLowerError(f"unknown struct layout: {typ.name}") from exc
+        if typ.kind == "array":
+            return typ.count * self._sizeof_type(typ.elem)
+        if typ.kind == "i8":
+            return 1
+        return 8
+
+    def _field_offset_by_index(self, struct_name, field_index):
+        try:
+            fields = list(self.program.structs[struct_name]["fields"].values())
+            return fields[field_index]["offset"]
+        except (KeyError, IndexError) as exc:
+            raise MirLowerError(f"unknown field index {struct_name}.{field_index}") from exc
 
     def _scale_rcx_by_8(self):
         self.x64.inst("add", R("rcx"), R("rcx"))
         self.x64.inst("add", R("rcx"), R("rcx"))
         self.x64.inst("add", R("rcx"), R("rcx"))
 
-    def _fresh_label(self, prefix):
-        self.label_counter += 1
-        return f"{prefix}.{self.label_counter}"
-
-    def _lower_array_extend(self, inst):
-        grow = self._fresh_label("array_extend.grow")
-        have_cap = self._fresh_label("array_extend.have_cap")
-        cap_loop = self._fresh_label("array_extend.cap_loop")
-        cap_ready = self._fresh_label("array_extend.cap_ready")
-        copy_old = self._fresh_label("array_extend.copy_old")
-        swap = self._fresh_label("array_extend.swap")
-        copy_src = self._fresh_label("array_extend.copy_src")
-        finish = self._fresh_label("array_extend.finish")
-        self._load_operand("rax", inst.operands[0])
-        self.x64.inst("mov", M("rbp", self.scratch_slots[0]), R("rax"))
-        self._load_operand("rax", inst.operands[1])
-        self.x64.inst("mov", M("rbp", self.scratch_slots[1]), R("rax"))
-        self.x64.inst("mov", R("rcx"), R("rax"))
-        self.x64.inst("mov", R("rdx"), M("rcx"))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[2]), R("rdx"))
-        self.x64.inst("mov", R("rdx"), M("rcx", 8))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[3]), R("rdx"))
-        self.x64.inst("mov", R("rcx"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("rax"), M("rcx", 8))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[4]), R("rax"))
-        self.x64.inst("add", R("rax"), R("rdx"))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[5]), R("rax"))
-        self.x64.inst("mov", R("rdx"), M("rcx", 16))
-        self.x64.inst("cmp", R("rdx"), R("rax"))
-        self.x64.inst("jl", LabelRef(grow))
-        self.x64.inst("jmp", LabelRef(have_cap))
-        self.x64.label(grow)
-        self.x64.inst("test", R("rdx"), R("rdx"))
-        self.x64.inst("jnz", LabelRef(cap_loop))
-        self.x64.inst("mov", R("rdx"), I(2))
-        self.x64.label(cap_loop)
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[5]))
-        self.x64.inst("cmp", R("rdx"), R("rax"))
-        self.x64.inst("jge", LabelRef(cap_ready))
-        self.x64.inst("add", R("rdx"), R("rdx"))
-        self.x64.inst("jmp", LabelRef(cap_loop))
-        self.x64.label(cap_ready)
-        self.x64.inst("mov", M("rbp", self.scratch_slots[6]), R("rdx"))
-        self.x64.inst("mov", R("r8"), R("rdx"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("add", R("r8"), R("r8"))
-        self.x64.inst("mov", R("rcx"), MS("_heap"))
-        self.x64.inst("mov", R("rdx"), I(8))
-        self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("HeapAlloc"))
-        self.x64.inst("add", R("rsp"), I(32))
-        self.x64.inst("mov", M("rbp", self.scratch_slots[7]), R("rax"))
-        self.x64.inst("mov", R("rcx"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("r8"), M("rcx"))
-        self.x64.inst("mov", R("r9"), M("rbp", self.scratch_slots[7]))
-        self.x64.inst("mov", R("r10"), M("rbp", self.scratch_slots[4]))
-        self.x64.label(copy_old)
-        self.x64.inst("test", R("r10"), R("r10"))
-        self.x64.inst("jz", LabelRef(swap))
-        self.x64.inst("mov", R("rax"), M("r8"))
-        self.x64.inst("mov", M("r9"), R("rax"))
-        self.x64.inst("add", R("r8"), I(8))
-        self.x64.inst("add", R("r9"), I(8))
-        self.x64.inst("dec", R("r10"))
-        self.x64.inst("jmp", LabelRef(copy_old))
-        self.x64.label(swap)
-        self.x64.inst("mov", R("rcx"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[7]))
-        self.x64.inst("mov", M("rcx"), R("rax"))
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[6]))
-        self.x64.inst("mov", M("rcx", 16), R("rax"))
-        self.x64.label(have_cap)
-        self.x64.inst("mov", R("rcx"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("r8"), M("rcx"))
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[4]))
-        self.x64.inst("add", R("rax"), R("rax"))
-        self.x64.inst("add", R("rax"), R("rax"))
-        self.x64.inst("add", R("rax"), R("rax"))
-        self.x64.inst("add", R("r8"), R("rax"))
-        self.x64.inst("mov", R("r9"), M("rbp", self.scratch_slots[2]))
-        self.x64.inst("mov", R("r10"), M("rbp", self.scratch_slots[3]))
-        self.x64.label(copy_src)
-        self.x64.inst("test", R("r10"), R("r10"))
-        self.x64.inst("jz", LabelRef(finish))
-        self.x64.inst("mov", R("rax"), M("r9"))
-        self.x64.inst("mov", M("r8"), R("rax"))
-        self.x64.inst("add", R("r8"), I(8))
-        self.x64.inst("add", R("r9"), I(8))
-        self.x64.inst("dec", R("r10"))
-        self.x64.inst("jmp", LabelRef(copy_src))
-        self.x64.label(finish)
-        self.x64.inst("mov", R("rcx"), M("rbp", self.scratch_slots[0]))
-        self.x64.inst("mov", R("rax"), M("rbp", self.scratch_slots[5]))
-        self.x64.inst("mov", M("rcx", 8), R("rax"))
-
     def _emit_runtime_helpers(self):
+        self._emit_epic_alloc()
+        self._emit_epic_arr_qword_new()
+        self._emit_epic_arr_qword_push("__epic_arr_i64_push")
+        self._emit_epic_arr_qword_push("__epic_arr_ptr_push")
+        self._emit_epic_arr_qword_extend()
+        self._emit_epic_arr_qword_get("__epic_arr_i64_get", "array_oob")
+        self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
         self._emit_bytes_str()
         self._emit_str_arr_i8()
         self._emit_new_arr_i8()
@@ -539,6 +342,240 @@ class MirLower:
 
     def _header_label(self, name):
         return name.replace("@", "_").replace(".", "_") + "_header"
+
+    def _emit_epic_alloc(self):
+        x = self.x64
+        x.label("__epic_alloc")
+        x.inst("push", R("rbp"))
+        x.inst("mov", R("rbp"), R("rsp"))
+        x.inst("mov", R("r8"), R("rcx"))
+        x.inst("mov", R("rcx"), MS("_heap"))
+        x.inst("mov", R("rdx"), I(8))
+        x.inst("sub", R("rsp"), I(32))
+        x.inst("call", Symbol("HeapAlloc"))
+        x.inst("add", R("rsp"), I(32))
+        x.inst("pop", R("rbp"))
+        x.inst("ret")
+
+    def _emit_epic_arr_qword_new(self):
+        x = self.x64
+        x.label("__epic_arr_qword_new")
+        x.inst("push", R("rbp"))
+        x.inst("mov", R("rbp"), R("rsp"))
+        x.inst("sub", R("rsp"), I(64))
+        x.inst("mov", M("rbp", -8), R("rcx"))
+        x.inst("mov", R("rcx"), MS("_heap"))
+        x.inst("mov", R("rdx"), I(8))
+        x.inst("mov", R("r8"), I(24))
+        x.inst("sub", R("rsp"), I(32))
+        x.inst("call", Symbol("HeapAlloc"))
+        x.inst("add", R("rsp"), I(32))
+        x.inst("mov", M("rbp", -16), R("rax"))
+        x.inst("mov", R("r8"), M("rbp", -8))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("mov", R("rcx"), MS("_heap"))
+        x.inst("mov", R("rdx"), I(8))
+        x.inst("sub", R("rsp"), I(32))
+        x.inst("call", Symbol("HeapAlloc"))
+        x.inst("add", R("rsp"), I(32))
+        x.inst("mov", R("rcx"), M("rbp", -16))
+        x.inst("mov", M("rcx"), R("rax"))
+        x.inst("mov", M("rcx", 8), I(0))
+        x.inst("mov", R("rdx"), M("rbp", -8))
+        x.inst("mov", M("rcx", 16), R("rdx"))
+        x.inst("mov", R("rax"), R("rcx"))
+        x.inst("add", R("rsp"), I(64))
+        x.inst("pop", R("rbp"))
+        x.inst("ret")
+
+    def _emit_epic_arr_qword_push(self, label):
+        x = self.x64
+        grow = f"{label}.grow"
+        store = f"{label}.store"
+        copy_loop = f"{label}.copy"
+        copy_done = f"{label}.copy_done"
+        cap_nonzero = f"{label}.cap_nonzero"
+        x.label(label)
+        x.inst("push", R("rbp"))
+        x.inst("mov", R("rbp"), R("rsp"))
+        x.inst("sub", R("rsp"), I(96))
+        x.inst("mov", M("rbp", -8), R("rcx"))
+        x.inst("mov", M("rbp", -16), R("rdx"))
+        x.inst("mov", R("rax"), M("rcx", 8))
+        x.inst("mov", M("rbp", -24), R("rax"))
+        x.inst("mov", R("rdx"), M("rcx", 16))
+        x.inst("cmp", R("rax"), R("rdx"))
+        x.inst("jge", LabelRef(grow))
+        x.inst("jmp", LabelRef(store))
+        x.label(grow)
+        x.inst("test", R("rdx"), R("rdx"))
+        x.inst("jnz", LabelRef(cap_nonzero))
+        x.inst("mov", R("rdx"), I(2))
+        x.label(cap_nonzero)
+        x.inst("add", R("rdx"), R("rdx"))
+        x.inst("mov", M("rbp", -32), R("rdx"))
+        x.inst("mov", R("r8"), R("rdx"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("mov", R("rcx"), MS("_heap"))
+        x.inst("mov", R("rdx"), I(8))
+        x.inst("sub", R("rsp"), I(32))
+        x.inst("call", Symbol("HeapAlloc"))
+        x.inst("add", R("rsp"), I(32))
+        x.inst("mov", M("rbp", -40), R("rax"))
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("r8"), M("rcx"))
+        x.inst("mov", R("r9"), M("rbp", -40))
+        x.inst("mov", R("r10"), M("rbp", -24))
+        x.label(copy_loop)
+        x.inst("test", R("r10"), R("r10"))
+        x.inst("jz", LabelRef(copy_done))
+        x.inst("mov", R("rax"), M("r8"))
+        x.inst("mov", M("r9"), R("rax"))
+        x.inst("add", R("r8"), I(8))
+        x.inst("add", R("r9"), I(8))
+        x.inst("dec", R("r10"))
+        x.inst("jmp", LabelRef(copy_loop))
+        x.label(copy_done)
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("rax"), M("rbp", -40))
+        x.inst("mov", M("rcx"), R("rax"))
+        x.inst("mov", R("rax"), M("rbp", -32))
+        x.inst("mov", M("rcx", 16), R("rax"))
+        x.label(store)
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("rax"), M("rcx"))
+        x.inst("mov", R("r8"), M("rbp", -24))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("rax"), R("r8"))
+        x.inst("mov", R("rdx"), M("rbp", -16))
+        x.inst("mov", M("rax"), R("rdx"))
+        x.inst("mov", R("rax"), M("rbp", -24))
+        x.inst("add", R("rax"), I(1))
+        x.inst("mov", M("rcx", 8), R("rax"))
+        x.inst("add", R("rsp"), I(96))
+        x.inst("pop", R("rbp"))
+        x.inst("ret")
+
+    def _emit_epic_arr_qword_extend(self):
+        x = self.x64
+        label = "__epic_arr_qword_extend"
+        grow = f"{label}.grow"
+        have_cap = f"{label}.have_cap"
+        cap_loop = f"{label}.cap_loop"
+        cap_ready = f"{label}.cap_ready"
+        copy_old = f"{label}.copy_old"
+        swap = f"{label}.swap"
+        copy_src = f"{label}.copy_src"
+        finish = f"{label}.finish"
+        x.label(label)
+        x.inst("push", R("rbp"))
+        x.inst("mov", R("rbp"), R("rsp"))
+        x.inst("sub", R("rsp"), I(96))
+        x.inst("mov", M("rbp", -8), R("rcx"))
+        x.inst("mov", M("rbp", -16), R("rdx"))
+        x.inst("mov", R("rax"), M("rdx"))
+        x.inst("mov", M("rbp", -24), R("rax"))
+        x.inst("mov", R("rax"), M("rdx", 8))
+        x.inst("mov", M("rbp", -32), R("rax"))
+        x.inst("mov", R("rax"), M("rcx", 8))
+        x.inst("mov", M("rbp", -40), R("rax"))
+        x.inst("mov", R("r8"), M("rbp", -32))
+        x.inst("add", R("rax"), R("r8"))
+        x.inst("mov", M("rbp", -48), R("rax"))
+        x.inst("mov", R("rdx"), M("rcx", 16))
+        x.inst("cmp", R("rdx"), R("rax"))
+        x.inst("jl", LabelRef(grow))
+        x.inst("jmp", LabelRef(have_cap))
+        x.label(grow)
+        x.inst("test", R("rdx"), R("rdx"))
+        x.inst("jnz", LabelRef(cap_loop))
+        x.inst("mov", R("rdx"), I(2))
+        x.label(cap_loop)
+        x.inst("mov", R("rax"), M("rbp", -48))
+        x.inst("cmp", R("rdx"), R("rax"))
+        x.inst("jge", LabelRef(cap_ready))
+        x.inst("add", R("rdx"), R("rdx"))
+        x.inst("jmp", LabelRef(cap_loop))
+        x.label(cap_ready)
+        x.inst("mov", M("rbp", -56), R("rdx"))
+        x.inst("mov", R("r8"), R("rdx"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("mov", R("rcx"), MS("_heap"))
+        x.inst("mov", R("rdx"), I(8))
+        x.inst("sub", R("rsp"), I(32))
+        x.inst("call", Symbol("HeapAlloc"))
+        x.inst("add", R("rsp"), I(32))
+        x.inst("mov", M("rbp", -64), R("rax"))
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("r8"), M("rcx"))
+        x.inst("mov", R("r9"), M("rbp", -64))
+        x.inst("mov", R("r10"), M("rbp", -40))
+        x.label(copy_old)
+        x.inst("test", R("r10"), R("r10"))
+        x.inst("jz", LabelRef(swap))
+        x.inst("mov", R("rax"), M("r8"))
+        x.inst("mov", M("r9"), R("rax"))
+        x.inst("add", R("r8"), I(8))
+        x.inst("add", R("r9"), I(8))
+        x.inst("dec", R("r10"))
+        x.inst("jmp", LabelRef(copy_old))
+        x.label(swap)
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("rax"), M("rbp", -64))
+        x.inst("mov", M("rcx"), R("rax"))
+        x.inst("mov", R("rax"), M("rbp", -56))
+        x.inst("mov", M("rcx", 16), R("rax"))
+        x.label(have_cap)
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("r8"), M("rcx"))
+        x.inst("mov", R("rax"), M("rbp", -40))
+        x.inst("add", R("rax"), R("rax"))
+        x.inst("add", R("rax"), R("rax"))
+        x.inst("add", R("rax"), R("rax"))
+        x.inst("add", R("r8"), R("rax"))
+        x.inst("mov", R("r9"), M("rbp", -24))
+        x.inst("mov", R("r10"), M("rbp", -32))
+        x.label(copy_src)
+        x.inst("test", R("r10"), R("r10"))
+        x.inst("jz", LabelRef(finish))
+        x.inst("mov", R("rax"), M("r9"))
+        x.inst("mov", M("r8"), R("rax"))
+        x.inst("add", R("r8"), I(8))
+        x.inst("add", R("r9"), I(8))
+        x.inst("dec", R("r10"))
+        x.inst("jmp", LabelRef(copy_src))
+        x.label(finish)
+        x.inst("mov", R("rcx"), M("rbp", -8))
+        x.inst("mov", R("rax"), M("rbp", -48))
+        x.inst("mov", M("rcx", 8), R("rax"))
+        x.inst("add", R("rsp"), I(96))
+        x.inst("pop", R("rbp"))
+        x.inst("ret")
+
+    def _emit_epic_arr_qword_get(self, label, oob_label):
+        x = self.x64
+        x.label(label)
+        x.inst("cmp", R("rdx"), I(0))
+        x.inst("jl", LabelRef(oob_label))
+        x.inst("mov", R("r8"), M("rcx", 8))
+        x.inst("cmp", R("rdx"), R("r8"))
+        x.inst("jge", LabelRef(oob_label))
+        x.inst("mov", R("rax"), M("rcx"))
+        x.inst("mov", R("r8"), R("rdx"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("r8"), R("r8"))
+        x.inst("add", R("rax"), R("r8"))
+        x.inst("mov", R("rax"), M("rax"))
+        x.inst("ret")
 
     def _emit_bytes_str(self):
         x = self.x64

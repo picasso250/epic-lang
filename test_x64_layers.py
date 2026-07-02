@@ -7,8 +7,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap"))
 
 from machine import MachineObjectBuilder
-from mir import I64, ConstIntOperand, MirBlock, MirFunction, MirInst, MirParam
-from mir import MirProgram, MirValue, Ret, ValueOperand
+from mir import I32, I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirFunction, MirInst, MirParam
+from mir import MirProgram, MirSignature, MirValue, Ret, ValueOperand, ptr, struct as mir_struct
 from mir_lower import MirLower
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
 from x64 import X64ValidationError, validate_x64_program
@@ -113,6 +113,76 @@ add1.__return:
     assert lower.x64.text() == expected
 
 
+def test_target_mir_memory_ops_to_x64_golden():
+    size_ptr = MirValue("%size.ptr", ptr())
+    size = MirValue("%size", I64)
+    obj = MirValue("%obj", ptr(mir_struct("Pair")))
+    field_ptr = MirValue("%field.ptr", ptr(I64))
+    loaded = MirValue("%loaded", I64)
+    block = MirBlock(
+        "entry",
+        [
+            MirInst("gep", [ConstNullOperand(), ConstIntOperand(I64, 1)], result=size_ptr, type=mir_struct("Pair")),
+            MirInst("ptrtoint", [ValueOperand(size_ptr)], result=size, type=I64),
+            MirInst("call", [ValueOperand(size)], result=obj, type=ptr(), callee="__epic_alloc"),
+            MirInst(
+                "gep",
+                [ValueOperand(obj), ConstIntOperand(I64, 0), ConstIntOperand(I32, 1)],
+                result=field_ptr,
+                type=mir_struct("Pair"),
+            ),
+            MirInst("store", [ConstIntOperand(I64, 42), ValueOperand(field_ptr)]),
+            MirInst("load", [ValueOperand(field_ptr)], result=loaded, type=I64),
+        ],
+        Ret(ValueOperand(loaded)),
+    )
+    fn = MirFunction("pair_field", [], I64, [block])
+    program = MirProgram(
+        externs=[MirExtern("__epic_alloc", MirSignature([I64], ptr()))],
+        functions=[fn],
+        structs={"Pair": {"fields": {"left": {"type": I64, "offset": 0}, "right": {"type": I64, "offset": 8}}, "size": 16}},
+    )
+    lower = MirLower(program)
+    lower.x64.section(".text")
+    lower._lower_function(fn)
+
+    expected = """section .text
+pair_field:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 144
+pair_field.entry:
+    mov rax, 0
+    mov rcx, 16
+    add rax, rcx
+    mov qword [rbp-8], rax
+    mov rax, qword [rbp-8]
+    mov qword [rbp-16], rax
+    mov rcx, qword [rbp-16]
+    sub rsp, 32
+    call __epic_alloc
+    add rsp, 32
+    mov qword [rbp-24], rax
+    mov rax, qword [rbp-24]
+    mov rcx, 8
+    add rax, rcx
+    mov qword [rbp-32], rax
+    mov rax, 42
+    mov rcx, qword [rbp-32]
+    mov qword [rcx], rax
+    mov rax, qword [rbp-32]
+    mov rax, qword [rax]
+    mov qword [rbp-40], rax
+    mov rax, qword [rbp-40]
+    jmp pair_field.__return
+pair_field.__return:
+    add rsp, 144
+    pop rbp
+    ret
+"""
+    assert lower.x64.text() == expected
+
+
 def test_startup_hook_call_golden():
     program = X64Program()
     program.section(".text")
@@ -198,6 +268,7 @@ def test_x64_validator_rejects_bad_forms():
 def main():
     test_x64_pretty_print_golden()
     test_mir_function_to_x64_golden()
+    test_target_mir_memory_ops_to_x64_golden()
     test_startup_hook_call_golden()
     test_runtime_start_helper_golden()
     test_x64_to_machine_bytes_and_fixups_golden()

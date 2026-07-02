@@ -10,6 +10,8 @@ from mir import (
     CondBr,
     ConstBoolOperand,
     ConstIntOperand,
+    ConstNullOperand,
+    I32,
     MirBlock,
     MirExtern,
     MirFunction,
@@ -24,6 +26,7 @@ from mir import (
     SymbolOperand,
     ValueOperand,
     ptr,
+    struct as mir_struct,
     validate,
 )
 
@@ -103,6 +106,13 @@ class MirCodegen:
         self.program.externs.append(MirExtern("print_str", MirSignature([ptr_str()], VOID)))
         self.program.externs.append(MirExtern("print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("putc", MirSignature([I64], VOID)))
+        self.program.externs.append(MirExtern("__epic_alloc", MirSignature([I64], ptr())))
+        self.program.externs.append(MirExtern("__epic_arr_qword_new", MirSignature([I64], ptr())))
+        self.program.externs.append(MirExtern("__epic_arr_i64_push", MirSignature([ptr(), I64], VOID)))
+        self.program.externs.append(MirExtern("__epic_arr_ptr_push", MirSignature([ptr(), ptr()], VOID)))
+        self.program.externs.append(MirExtern("__epic_arr_qword_extend", MirSignature([ptr(), ptr()], VOID)))
+        self.program.externs.append(MirExtern("__epic_arr_i64_get", MirSignature([ptr(), I64], I64)))
+        self.program.externs.append(MirExtern("__epic_arr_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.globals.append(MirGlobal("@argv", ptr_arr_str(), None))
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
@@ -176,6 +186,63 @@ class MirCodegen:
         self.local_types[name] = typ
         return addr
 
+    def _alloc_struct(self, struct_name):
+        size_ptr = self._inst(
+            "gep",
+            [ConstNullOperand(), ConstIntOperand(I64, 1)],
+            result_type=ptr(),
+            type=mir_struct(struct_name),
+        )
+        size = self._inst("ptrtoint", [ValueOperand(size_ptr)], result_type=I64, type=I64)
+        obj = self._inst(
+            "call",
+            [ValueOperand(size)],
+            result_type=ptr_struct(struct_name),
+            type=ptr(),
+            callee="__epic_alloc",
+        )
+        return ValueOperand(obj)
+
+    def _field_index(self, struct_name, field):
+        try:
+            return list(self.structs[struct_name]["fields"]).index(field)
+        except (KeyError, ValueError) as exc:
+            raise MirCodegenError(f"unknown field: {struct_name}.{field}") from exc
+
+    def _field_addr(self, base, struct_name, field, result_type=None):
+        if struct_name not in self.structs or field not in self.structs[struct_name]["fields"]:
+            raise MirCodegenError(f"unknown field: {struct_name}.{field}")
+        field_type = result_type or self.structs[struct_name]["fields"][field]["type"]
+        addr = self._inst(
+            "gep",
+            [base, ConstIntOperand(I64, 0), ConstIntOperand(I32, self._field_index(struct_name, field))],
+            result_type=ptr(field_type),
+            type=mir_struct(struct_name),
+        )
+        return ValueOperand(addr)
+
+    def _load_field(self, base, struct_name, field, result_type=None):
+        field_type = result_type or self.structs[struct_name]["fields"][field]["type"]
+        addr = self._field_addr(base, struct_name, field, result_type=field_type)
+        value = self._inst("load", [addr], result_type=field_type, type=field_type)
+        return ValueOperand(value)
+
+    def _store_field(self, base, struct_name, field, value):
+        addr = self._field_addr(base, struct_name, field)
+        self._inst("store", [value, addr])
+
+    def _ptr_struct_name(self, typ):
+        if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct":
+            return typ.pointee.name
+        return None
+
+    def _array_struct_elem(self, typ):
+        struct_name = self._ptr_struct_name(typ)
+        if struct_name is None or not struct_name.startswith("_arr_"):
+            return None
+        elem = struct_name[len("_arr_"):]
+        return elem if elem in self.structs else None
+
     def _emit_block(self, block):
         for stmt in block.stmts:
             if self.block.terminator is not None:
@@ -212,7 +279,10 @@ class MirCodegen:
         elif isinstance(stmt, FieldSetNode):
             base = self._emit_expr(stmt.object)
             value = self._emit_expr(stmt.value)
-            self._inst("field.store", [base, value], callee=stmt.field)
+            struct_name = self._ptr_struct_name(base.type)
+            if struct_name is None:
+                raise MirCodegenError("field assignment base must be a struct pointer")
+            self._store_field(base, struct_name, stmt.field, value)
         elif isinstance(stmt, SubscriptAssignNode):
             base = self._emit_expr(stmt.base)
             index = self._emit_expr(stmt.index)
@@ -373,7 +443,7 @@ class MirCodegen:
         if isinstance(case.pattern, FieldAccessNode) and isinstance(case.pattern.object, VarNode):
             adt_name = case.pattern.object.name
             tag = self.adts[adt_name][case.pattern.field]["tag"]
-            tag_value = self._inst("field.load", [scrut_op], result_type=I64, type=I64, callee="tag")
+            tag_value = self._load_field(scrut_op, adt_name, "tag").value
             cond = self._inst("icmp.eq", [ValueOperand(tag_value), ConstIntOperand(I64, tag)], result_type=BOOL)
             self.block.terminator = CondBr(ValueOperand(cond), case_block.name, next_block.name)
             return
@@ -392,11 +462,10 @@ class MirCodegen:
         if payload_name is None:
             return
         scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_addr.type.pointee, type=match_addr.type.pointee)
-        payload_value = self._inst("adt.payload", [ValueOperand(scrut)], result_type=ptr_struct(payload_name), type=ptr_struct(payload_name), callee=payload_name)
-        payload = ValueOperand(payload_value)
+        payload = self._load_field(ValueOperand(scrut), adt_name, "data", result_type=ptr_struct(payload_name))
         for field, bind_name in case.bindings:
             field_type = self.structs[payload_name]["fields"][field]["type"]
-            loaded = self._inst("field.load", [payload], result_type=field_type, type=field_type, callee=field)
+            loaded = self._load_field(payload, payload_name, field, result_type=field_type).value
             addr = self._alloc_local(bind_name, field_type)
             self._inst("store", [ValueOperand(loaded), ValueOperand(addr)])
 
@@ -558,19 +627,23 @@ class MirCodegen:
             args = [self._emit_expr(arg) for arg in expr.args]
             if args[0].type == ptr_arr_i8():
                 self._inst("call", args, type=VOID, callee="arr_i8_push")
+            elif args[0].type == ptr_arr_i64():
+                self._inst("call", args, type=VOID, callee="__epic_arr_i64_push")
             else:
-                self._inst("array.push", args)
+                self._inst("call", args, type=VOID, callee="__epic_arr_ptr_push")
             return ConstIntOperand(I64, 0)
         if name in ("len", "cap"):
             base = self._emit_expr(expr.args[0])
-            result = self._inst("field.load", [base], result_type=I64, type=I64, callee=name)
-            return ValueOperand(result)
+            struct_name = self._ptr_struct_name(base.type)
+            if struct_name is None:
+                raise MirCodegenError(f"{name} expects an aggregate pointer")
+            return self._load_field(base, struct_name, name, result_type=I64)
         if name == "extend":
             args = [self._emit_expr(arg) for arg in expr.args]
             if args[0].type == ptr_arr_i8():
                 self._inst("call", args, type=VOID, callee="extend_i8")
             else:
-                self._inst("array.extend", args)
+                self._inst("call", args, type=VOID, callee="__epic_arr_qword_extend")
             return ConstIntOperand(I64, 0)
         if name == "map_has":
             args = [self._emit_expr(arg) for arg in expr.args]
@@ -643,11 +716,10 @@ class MirCodegen:
                 return I64
             if base_type == ptr_arr_i64():
                 return I64
-            if base_type.kind == "ptr" and base_type.pointee.kind == "struct" and base_type.pointee.name.startswith("_arr_"):
-                elem = base_type.pointee.name[len("_arr_"):]
-                if elem in self.structs:
-                    return ptr_struct(elem)
-            if base_type.kind == "ptr" and base_type.pointee.kind == "ptr":
+            elem = self._array_struct_elem(base_type)
+            if elem is not None:
+                return ptr_struct(elem)
+            if base_type.kind == "ptr" and base_type.pointee is not None and base_type.pointee.kind == "ptr":
                 return base_type.pointee
             if base_type == ptr(I8):
                 return I64
@@ -660,7 +732,7 @@ class MirCodegen:
             return ptr_struct(expr.type_name)
         if isinstance(expr, FieldAccessNode):
             base_type = self._infer_type(expr.object)
-            struct_name = base_type.pointee.name if base_type.kind == "ptr" and base_type.pointee.kind == "struct" else None
+            struct_name = self._ptr_struct_name(base_type)
             if struct_name in self.structs:
                 return self.structs[struct_name]["fields"][expr.field]["type"]
         if isinstance(expr, BinaryNode) and expr.op in ("==", "!=", "<", ">", "<=", ">="):
@@ -679,22 +751,24 @@ class MirCodegen:
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="str_get")
             return ValueOperand(result)
         if base.type == ptr_arr_i64():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i64_get")
+            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__epic_arr_i64_get")
             return ValueOperand(result)
-        if base.type.kind == "ptr" and base.type.pointee.kind == "struct" and base.type.pointee.name.startswith("_arr_"):
-            elem = base.type.pointee.name[len("_arr_"):]
-            if elem in self.structs:
-                result_type = ptr_struct(elem)
-                result = self._inst("array.index.load", [base, index], result_type=result_type, type=result_type)
-                return ValueOperand(result)
-        if base.type.kind == "ptr" and base.type.pointee.kind == "ptr":
-            result = self._inst("ptr.index.load", [base, index], result_type=base.type.pointee, type=base.type.pointee)
+        elem = self._array_struct_elem(base.type)
+        if elem is not None:
+            result_type = ptr_struct(elem)
+            result = self._inst("call", [base, index], result_type=result_type, type=ptr(), callee="__epic_arr_ptr_get")
+            return ValueOperand(result)
+        if base.type.kind == "ptr" and base.type.pointee is not None and base.type.pointee.kind == "ptr":
+            addr = self._inst("gep", [base, index], result_type=ptr(base.type.pointee), type=ptr())
+            result = self._inst("load", [ValueOperand(addr)], result_type=base.type.pointee, type=base.type.pointee)
             return ValueOperand(result)
         if base.type == ptr(I8):
-            result = self._inst("ptr.i8.get", [base, index], result_type=I64, type=I64)
+            addr = self._inst("gep", [base, index], result_type=ptr(I8), type=I8)
+            result = self._inst("load", [ValueOperand(addr)], result_type=I64, type=I8)
             return ValueOperand(result)
         if base.type == ptr(I64):
-            result = self._inst("ptr.i64.get", [base, index], result_type=I64, type=I64)
+            addr = self._inst("gep", [base, index], result_type=ptr(I64), type=I64)
+            result = self._inst("load", [ValueOperand(addr)], result_type=I64, type=I64)
             return ValueOperand(result)
         result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i8_get")
         return ValueOperand(result)
@@ -702,10 +776,16 @@ class MirCodegen:
     def _emit_array_literal(self, expr):
         arr_type = self._type(expr.elem_type + "[]")
         if arr_type == ptr_arr_i64():
-            result = self._inst("array.new", [ConstIntOperand(I64, len(expr.values))], result_type=arr_type, type=arr_type, callee="i64")
+            result = self._inst(
+                "call",
+                [ConstIntOperand(I64, len(expr.values))],
+                result_type=arr_type,
+                type=ptr(),
+                callee="__epic_arr_qword_new",
+            )
             arr = ValueOperand(result)
             for value in expr.values:
-                self._inst("array.push", [arr, self._emit_expr(value)])
+                self._inst("call", [arr, self._emit_expr(value)], type=VOID, callee="__epic_arr_i64_push")
             return arr
         if arr_type != ptr_arr_i8():
             raise MirCodegenError(f"unsupported array literal element type: {expr.elem_type}")
@@ -728,11 +808,11 @@ class MirCodegen:
             return ValueOperand(result)
         if expr.elem_type in ("i64", "u64"):
             result_type = ptr_arr_i64()
-            result = self._inst("array.new", [count], result_type=result_type, type=result_type, callee="i64")
+            result = self._inst("call", [count], result_type=result_type, type=ptr(), callee="__epic_arr_qword_new")
             return ValueOperand(result)
         if expr.elem_type in self.structs:
             result_type = ptr_arr_struct(expr.elem_type)
-            result = self._inst("array.new", [count], result_type=result_type, type=result_type, callee=expr.elem_type)
+            result = self._inst("call", [count], result_type=result_type, type=ptr(), callee="__epic_arr_qword_new")
             return ValueOperand(result)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
@@ -741,8 +821,7 @@ class MirCodegen:
             result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="map_new")
             return ValueOperand(result)
         if expr.struct_name in self.structs:
-            result = self._inst("struct.new", [], result_type=ptr_struct(expr.struct_name), type=ptr_struct(expr.struct_name), callee=expr.struct_name)
-            return ValueOperand(result)
+            return self._alloc_struct(expr.struct_name)
         raise MirCodegenError(f"unsupported new target: {expr.struct_name}")
 
     def _emit_slice(self, expr):
@@ -751,8 +830,10 @@ class MirCodegen:
         if expr.end is not None:
             end = self._emit_expr(expr.end)
         else:
-            end_val = self._inst("field.load", [base], result_type=I64, type=I64, callee="len")
-            end = ValueOperand(end_val)
+            struct_name = self._ptr_struct_name(base.type)
+            if struct_name is None:
+                raise MirCodegenError("slice base must be an aggregate pointer")
+            end = self._load_field(base, struct_name, "len", result_type=I64)
         if base.type == ptr_str():
             result = self._inst("call", [base, start, end], result_type=ptr_str(), type=ptr_str(), callee="str_slice")
             return ValueOperand(result)
@@ -766,37 +847,32 @@ class MirCodegen:
             return self._emit_adt_init(expr)
         if expr.type_name not in self.structs:
             raise MirCodegenError(f"unknown struct: {expr.type_name}")
-        result = self._inst("struct.new", [], result_type=ptr_struct(expr.type_name), type=ptr_struct(expr.type_name), callee=expr.type_name)
-        obj = ValueOperand(result)
+        obj = self._alloc_struct(expr.type_name)
         for field, value_expr in expr.fields:
-            self._inst("field.store", [obj, self._emit_expr(value_expr)], callee=field)
+            self._store_field(obj, expr.type_name, field, self._emit_expr(value_expr))
         return obj
 
     def _emit_adt_init(self, expr):
         if expr.type_name not in self.adts or expr.variant not in self.adts[expr.type_name]:
             raise MirCodegenError(f"unknown ADT variant: {expr.type_name}.{expr.variant}")
         info = self.adts[expr.type_name][expr.variant]
-        header_value = self._inst("struct.new", [], result_type=ptr_struct(expr.type_name), type=ptr_struct(expr.type_name), callee=expr.type_name)
-        header = ValueOperand(header_value)
-        self._inst("field.store", [header, ConstIntOperand(I64, info["tag"])], callee="tag")
+        header = self._alloc_struct(expr.type_name)
+        self._store_field(header, expr.type_name, "tag", ConstIntOperand(I64, info["tag"]))
         payload_name = info["payload"]
         if payload_name is not None:
-            payload_value = self._inst("struct.new", [], result_type=ptr_struct(payload_name), type=ptr_struct(payload_name), callee=payload_name)
-            payload = ValueOperand(payload_value)
-            self._inst("field.store", [header, payload], callee="data")
+            payload = self._alloc_struct(payload_name)
+            self._store_field(header, expr.type_name, "data", payload)
             for field, value_expr in expr.fields:
-                self._inst("field.store", [payload, self._emit_expr(value_expr)], callee=field)
+                self._store_field(payload, payload_name, field, self._emit_expr(value_expr))
         return header
 
     def _emit_field_access(self, expr):
         base = self._emit_expr(expr.object)
-        base_type = base.type
-        struct_name = base_type.pointee.name if base_type.kind == "ptr" and base_type.pointee.kind == "struct" else None
+        struct_name = self._ptr_struct_name(base.type)
         if struct_name not in self.structs or expr.field not in self.structs[struct_name]["fields"]:
             raise MirCodegenError(f"unknown field: {expr.field}")
         field_type = self.structs[struct_name]["fields"][expr.field]["type"]
-        result = self._inst("field.load", [base], result_type=field_type, type=field_type, callee=expr.field)
-        return ValueOperand(result)
+        return self._load_field(base, struct_name, expr.field, result_type=field_type)
 
     def _emit_os_call(self, expr):
         if expr.name not in {imp.name for imp in self.program.imports}:
@@ -805,8 +881,7 @@ class MirCodegen:
         for arg_expr in expr.args:
             if self._infer_type(arg_expr) == ptr_str():
                 base = self._emit_expr(arg_expr)
-                data = self._inst("field.load", [base], result_type=ptr(I8), type=ptr(I8), callee="data")
-                args.append(ValueOperand(data))
+                args.append(self._load_field(base, "str", "data", result_type=ptr(I8)))
             else:
                 args.append(self._emit_expr(arg_expr))
         signature = next(imp.signature for imp in self.program.imports if imp.name == expr.name)
@@ -922,7 +997,7 @@ class MirCodegen:
             return self._quote("")
         if typ == ptr_arr_i8():
             return "u8[]{}"
-        if typ.kind == "ptr" and typ.pointee.kind == "struct":
+        if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct":
             name = typ.pointee.name
             if name in self.adts:
                 return f"{name}.Empty" + "{}"
@@ -938,14 +1013,13 @@ class MirCodegen:
             result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
             return ValueOperand(result)
         if typ == ptr_arr_i64():
-            result = self._inst("array.new", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i64(), type=ptr_arr_i64(), callee="i64")
+            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i64(), type=ptr(), callee="__epic_arr_qword_new")
             return ValueOperand(result)
         if typ == ptr_map_str_i64():
             result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="map_new")
             return ValueOperand(result)
-        if typ.kind == "ptr" and typ.pointee.kind == "struct" and typ.pointee.name in self.structs and not typ.pointee.name.startswith("_arr_"):
-            result = self._inst("struct.new", [], result_type=typ, type=typ, callee=typ.pointee.name)
-            return ValueOperand(result)
+        if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct" and typ.pointee.name in self.structs and not typ.pointee.name.startswith("_arr_"):
+            return self._alloc_struct(typ.pointee.name)
         return ConstIntOperand(typ, 0)
 
     def _string_label(self, text):

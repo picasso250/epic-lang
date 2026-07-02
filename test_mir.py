@@ -6,8 +6,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap"))
 
-from mir import BOOL, I64, Br, CondBr, MirBlock, MirFunction, MirInst, MirParam
-from mir import MirProgram, MirValue, Ret, ValueOperand, ConstIntOperand, validate, ptr
+from lexer import lex
+from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirFunction, MirInst, MirParam
+from mir import MirProgram, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
+from mir import MirValidationError, validate, ptr, struct as mir_struct
+from mir_codegen import ast_to_mir
+from parser import Parser
 
 
 def build_smoke_program():
@@ -57,30 +61,132 @@ def test_smoke_text_and_validation():
     validate(program)
     expected = """fn @main() -> i64 {
 entry:
-  %x.addr: ptr i64 = alloca i64
-  store i64 0, ptr i64 %x.addr
+  %x.addr: ptr = alloca i64
+  store i64 0, ptr %x.addr
   br label %loop
 
 loop:
-  %x0: i64 = load i64, ptr i64 %x.addr
+  %x0: i64 = load i64, ptr %x.addr
   %c0: bool = icmp.lt i64 %x0, i64 3
   condbr bool %c0, label %body, label %done
 
 body:
   %x1: i64 = add i64 %x0, i64 1
-  store i64 %x1, ptr i64 %x.addr
+  store i64 %x1, ptr %x.addr
   br label %loop
 
 done:
-  %r: i64 = load i64, ptr i64 %x.addr
+  %r: i64 = load i64, ptr %x.addr
   ret i64 %r
 }"""
     assert program.text() == expected
 
 
+def assert_mir_invalid(program, message):
+    try:
+        validate(program)
+    except MirValidationError as e:
+        assert message in str(e), str(e)
+        return
+    raise AssertionError("expected MirValidationError")
+
+
+def test_gep_null_and_ptrtoint_text_and_validation():
+    size_ptr = MirValue("%size.ptr", ptr())
+    size = MirValue("%size", I64)
+    field_ptr = MirValue("%field.ptr", ptr(I64))
+    block = MirBlock(
+        "entry",
+        [
+            MirInst("gep", [ConstNullOperand(), ConstIntOperand(I64, 1)], result=size_ptr, type=mir_struct("Pair")),
+            MirInst("ptrtoint", [ValueOperand(size_ptr)], result=size, type=I64),
+            MirInst(
+                "gep",
+                [ConstNullOperand(), ConstIntOperand(I64, 0), ConstIntOperand(I32, 1)],
+                result=field_ptr,
+                type=mir_struct("Pair"),
+            ),
+        ],
+        Ret(ValueOperand(size)),
+    )
+    program = MirProgram(
+        functions=[MirFunction("@main", [], I64, [block])],
+        structs={"Pair": {"fields": {"left": {"type": I64, "offset": 0}, "right": {"type": I64, "offset": 8}}, "size": 16}},
+    )
+    validate(program)
+    expected = """fn @main() -> i64 {
+entry:
+  %size.ptr: ptr = gep struct Pair, ptr null, i64 1
+  %size: i64 = ptrtoint ptr %size.ptr to i64
+  %field.ptr: ptr = gep struct Pair, ptr null, i64 0, i32 1
+  ret i64 %size
+}"""
+    assert program.text() == expected
+
+
+def test_validator_rejects_unknown_and_high_level_ops():
+    result = MirValue("%x", I64)
+    unknown = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [MirInst("mystery", result=result)], Ret(ValueOperand(result)))])])
+    assert_mir_invalid(unknown, "unknown MIR op: mystery")
+
+    high = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [MirInst("field.load", [ConstNullOperand()], result=result, type=I64, callee="x")], Ret(ValueOperand(result)))])])
+    assert_mir_invalid(high, "high-level MIR op is not allowed: field.load")
+
+
+def test_codegen_emits_target_mir_only_for_aggregates():
+    source = """
+struct Point {
+    x: i64
+    y: i64
+}
+
+type Expr {
+    Empty
+    IntLit {
+        value: i64
+    }
+}
+
+fun main(): i64 {
+    let p = new Point { y: 2, x: 1 }
+    let xs = new i64[] { 4 }
+    push(xs, 5)
+    let e = new Expr.IntLit { value: p.x }
+    match e {
+        Expr.IntLit { value: n }: {
+            return xs[0] + n
+        }
+        else: {
+            return 0
+        }
+    }
+    return 0
+}
+"""
+    program = ast_to_mir(Parser(lex(source)).parse_program())
+    text = program.text()
+    for op in (
+        "struct.new",
+        "field.load",
+        "field.store",
+        "array.new",
+        "array.push",
+        "array.extend",
+        "array.index.load",
+        "ptr.index.load",
+        "ptr.i8.get",
+        "ptr.i64.get",
+        "adt.payload",
+    ):
+        assert op not in text
+
+
 def main():
     test_smoke_text_and_validation()
-    print("PASS test_smoke_text_and_validation")
+    test_gep_null_and_ptrtoint_text_and_validation()
+    test_validator_rejects_unknown_and_high_level_ops()
+    test_codegen_emits_target_mir_only_for_aggregates()
+    print("PASS test_mir")
 
 
 if __name__ == "__main__":
