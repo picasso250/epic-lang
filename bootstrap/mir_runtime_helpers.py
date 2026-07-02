@@ -12,16 +12,13 @@ from mir import (
     I64,
     I8,
     VOID,
-    Br,
     CondBr,
     ConstIntOperand,
     MirBlock,
-    MirExtern,
     MirFunction,
     MirInst,
     MirParam,
     MirProgram,
-    MirSignature,
     MirValue,
     Ret,
     ValueOperand,
@@ -131,12 +128,6 @@ class MirHelperBuilder:
         block = MirBlock(prefix)
         self.fn.blocks.append(block)
         return block
-
-    def br(self, target):
-        """Set br terminator on the current working block (entry)."""
-        self.entry.terminator = Br(target)
-        # Switch builder to the target block for subsequent instructions
-        self.entry = self.fn.blocks[-1]
 
     def ret(self, value=None):
         """Set ret terminator on entry.  Call this last."""
@@ -362,6 +353,15 @@ _HELPER_EMITTERS = {
     "arr_i8_set": lambda p: emit_arr_i8_set(),
 }
 
+_HELPER_ORDER = [
+    "bytes_str",
+    "str_arr_i8",
+    "new_arr_i8",
+    "new_arr_i8_empty",
+    "arr_i8_get",
+    "arr_i8_set",
+]
+
 
 def inject_required_mir_helpers(program: MirProgram, helper_names: set[str]) -> None:
     """Inject MirFunction implementations for the given helper names.
@@ -370,14 +370,24 @@ def inject_required_mir_helpers(program: MirProgram, helper_names: set[str]) -> 
       1. Remove any matching MirExtern from *program.externs* so the
          validator does not see a duplicate symbol.
       2. Build the MirFunction and append it to *program.functions*.
+
+    Injection order is deterministic (per _HELPER_ORDER).  Unknown names
+    raise RuntimeError immediately to avoid silent extern deletion.
     """
     if not helper_names:
         return
 
-    # Remove any matching externs in one pass
-    program.externs[:] = [e for e in program.externs if e.name not in helper_names]
+    implemented = helper_names & set(_HELPER_EMITTERS)
+    unknown = helper_names - set(_HELPER_EMITTERS)
+    if unknown:
+        raise RuntimeError(
+            f"no MIR emitter registered for helper(s): {sorted(unknown)}"
+        )
 
-    for name in helper_names:
-        emitter = _HELPER_EMITTERS.get(name)
-        if emitter is not None:
-            program.functions.append(emitter(program))
+    # Remove matching externs so validate() doesn't see duplicate symbols.
+    program.externs[:] = [e for e in program.externs if e.name not in implemented]
+
+    # Inject in deterministic order.
+    for name in _HELPER_ORDER:
+        if name in implemented:
+            program.functions.append(_HELPER_EMITTERS[name](program))

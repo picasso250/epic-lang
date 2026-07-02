@@ -182,11 +182,81 @@ fun main(): i64 {
         assert op not in text
 
 
+def test_mir_helper_injection():
+    """Verify MIR runtime helpers are injected correctly."""
+
+    def check(source, expect_injected, expect_extern):
+        ast = sema.analyze_program(Parser(lex(source)).parse_program())
+        prog = ast_to_mir(ast)
+        injected = {fn.name for fn in prog.functions}
+        externs = {ext.name for ext in prog.externs}
+        for name in expect_injected:
+            assert name in injected, f"{name} should be injected as MirFunction, got injected={injected}"
+            assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
+        for name in expect_extern:
+            assert name in externs, f"{name} should remain as extern"
+
+    # bytes(s) → bytes_str
+    check(
+        """fun main(): i64 {
+    let b = bytes("AB")
+    return 0
+}""",
+        expect_injected={"bytes_str"},
+        expect_extern={"str_arr_i8", "new_arr_i8", "new_arr_i8_empty", "arr_i8_get", "arr_i8_set"},
+    )
+
+    # str(u8[]) → str_arr_i8
+    check(
+        """fun main(): i64 {
+    let a = new u8[] { 65 }
+    println(str(a))
+    return 0
+}""",
+        expect_injected={"str_arr_i8", "new_arr_i8", "arr_i8_set"},
+        expect_extern={"bytes_str", "new_arr_i8_empty", "arr_i8_get"},
+    )
+
+    # new u8[] literal → new_arr_i8 + arr_i8_set
+    check(
+        """fun main(): i64 {
+    let a = new u8[] { 1, 2 }
+    return 0
+}""",
+        expect_injected={"new_arr_i8", "arr_i8_set"},
+        expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty", "arr_i8_get"},
+    )
+
+    # b[i] → arr_i8_get
+    check(
+        """fun main(): i64 {
+    let b = new u8[] { 1, 2 }
+    return b[0]
+}""",
+        expect_injected={"new_arr_i8", "arr_i8_set", "arr_i8_get"},
+        expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty"},
+    )
+
+    # Deterministic order: running twice gives same injection list
+    src = """fun main(): i64 {
+    let b = new u8[] { 65, 66 }
+    b[0] = 99
+    return b[0]
+}"""
+    ast = sema.analyze_program(Parser(lex(src)).parse_program())
+    prog1 = ast_to_mir(ast)
+    prog2 = ast_to_mir(ast)
+    order1 = [fn.name for fn in prog1.functions if fn.name != "main"]
+    order2 = [fn.name for fn in prog2.functions if fn.name != "main"]
+    assert order1 == order2, f"helper order differs between runs: {order1} != {order2}"
+
+
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
+    test_mir_helper_injection()
     print("PASS test_mir")
 
 
