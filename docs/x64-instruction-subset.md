@@ -366,14 +366,22 @@ the Epic implementation grows around them.
 
 ### 8.1 Runtime emission is too global
 
-Runtime data and startup hook ownership now lives in `x64_runtime.py`, and
-`MirLower` calls `__epic_runtime_start` instead of inlining heap/argv
-initialization. The current remaining coupling is that helper body methods are
-still physically on `MirLower` and are invoked through the runtime policy module.
+Runtime data, startup hook emission, and runtime append policy now live in
+`x64_runtime.py`.
 
-Recommended next step: move helper body methods into `x64_runtime.py` as named
-fragments, then keep the current `full` policy while making `used_only` a later
-policy.
+MIR helper bodies for `bytes_str`, `str_arr_i8`, `new_arr_i8`,
+`new_arr_i8_empty`, `arr_i8_get`, and `arr_i8_set` now live in
+`mir_runtime_helpers.py` and are injected as ordinary `MirFunction`s by
+`mir_codegen.py`.
+
+Most remaining x64-backed helper bodies still live on `MirLower` as `_emit_*`
+methods. `append_runtime_helpers()` passes `skip_helpers` so helpers already
+implemented as MIR functions are not emitted again as legacy x64 helper bodies.
+
+Recommended next step: migrate the remaining x64-backed helper families out of
+`MirLower` one family at a time, preferably into MIR helpers first. Only keep
+true machine/runtime primitives such as heap setup and process startup in the
+x64 runtime layer.
 
 ### 8.2 X64Program validator exists
 

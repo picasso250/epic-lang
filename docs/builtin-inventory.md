@@ -142,22 +142,31 @@ The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
 
 ---
 
-## Backend Private Helpers (not public builtins)
+## Backend Private Helpers
 
-The MIR lowerer (`bootstrap/mir_lower.py`) registers runtime helper labels that are
-not exposed as Epic language builtins:
+Backend private helpers are not public Epic builtins. They are implementation
+symbols used by the Python backend.
 
-| Label | Implementation | Notes |
-|-------|---------------|-------|
-| `print_str` | WriteFile via GetStdHandle | Used by `print`/`putstr`; takes `ptr<str>` |
-| `print_newline` | WriteFile via GetStdHandle | Writes a single `\n` byte; used by `println` |
-| `putc` | WriteFile via GetStdHandle + `_putc_buf` | Was callee of `putc` builtin; currently unreferenced as MIR callee |
-| `_newline` | Data byte 0x0a | Shared by `print_newline` |
-| `_putc_buf` | Data byte 0 | Private to `putc` helper |
+### MIR-implemented private helpers
 
-These are implementation details of the X64 backend and should not be confused
-with Epic language builtins. Cleanup of unreferenced helpers (e.g., `putc` label)
-is a separate concern from the language surface.
+| helper | purpose |
+|---|---|
+| `bytes_str` | convert `str` to `_arr_i8` |
+| `str_arr_i8` | view/convert `_arr_i8` as `str` |
+| `new_arr_i8` | allocate initialized-capacity byte array |
+| `new_arr_i8_empty` | allocate empty byte array with capacity |
+| `arr_i8_get` | bounds-checked byte array read |
+| `arr_i8_set` | bounds-checked byte array write |
+
+These are currently injected by `bootstrap/mir_runtime_helpers.py`.
+
+### x64-backed private helpers
+
+Most other private helpers are still emitted as x64 helper bodies from
+`bootstrap/mir_lower.py`. This includes string helpers, map helpers, file/process
+helpers, argv setup, printing helpers, and several array helpers.
+
+These should be treated as backend implementation details, not language builtins.
 
 ---
 

@@ -26,6 +26,90 @@
 - `__epic_alloc` 由 x64 primitive 迁移为 MIR helper（它依赖 `_heap` 全局变量，是 platform primitive；保持不动）
 - 引入 `.ep` runtime 源码（中期用 Python builder 注入 MIR helper，不急着自举）
 
+## Current Python implementation status
+
+As of the current Python backend, runtime helpers are split into two implementation paths.
+
+### MIR-implemented helpers
+
+These helpers are emitted as normal `MirFunction`s by `bootstrap/mir_runtime_helpers.py`.
+`bootstrap/mir_codegen.py` tracks them through `required_mir_helpers`, then calls
+`inject_required_mir_helpers(program, required_mir_helpers)` after user functions are emitted.
+
+Implemented MIR helpers:
+
+| helper | current trigger | implementation |
+|---|---|---|
+| `bytes_str` | `bytes(str)` conversion | `bootstrap/mir_runtime_helpers.py` |
+| `str_arr_i8` | `str(u8[])` conversion | `bootstrap/mir_runtime_helpers.py` |
+| `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
+| `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
+| `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
+| `arr_i8_set` | `u8[]` subscript write | `bootstrap/mir_runtime_helpers.py` |
+
+Injection rules:
+
+1. `mir_codegen.py` records required helper names in `required_mir_helpers`.
+2. `inject_required_mir_helpers()` removes matching `MirExtern`s.
+3. It appends deterministic `MirFunction` bodies using `_HELPER_ORDER`.
+4. The normal MIR validator then sees these helpers as ordinary functions.
+
+### Still x64-backed helpers
+
+Most runtime helpers still live as `_emit_*` methods on `MirLower` in
+`bootstrap/mir_lower.py`. `bootstrap/x64_runtime.py` owns the runtime append policy,
+but most helper bodies have not moved into that module yet.
+
+Important x64-backed families include:
+
+| family | current owner |
+|---|---|
+| heap allocation primitive | `MirLower._emit_epic_alloc` |
+| qword array primitives | `MirLower._emit_epic_arr_qword_*` |
+| string helpers | `MirLower._emit_str_*` |
+| byte-array push/slice helpers | `MirLower._emit_arr_i8_push`, `MirLower._emit_arr_i8_slice` |
+| i64-array helpers | `MirLower._emit_arr_i64_get`, `MirLower._emit_arr_i64_set` |
+| map helpers | `MirLower._emit_map_*` |
+| file/process helpers | `MirLower._emit_read_file`, `_emit_write_file`, `_emit_system_cmd` |
+| argv helper | `MirLower._emit_argv_init` |
+| printing helpers | `MirLower._emit_print_str`, `_emit_print_newline`, `_emit_putc` |
+| error helpers | `MirLower._emit_array_oob` |
+
+### Duplicate-emission guard
+
+`MirLower.lower()` computes:
+
+```python
+migrated_helpers = {fn.name for fn in self.program.functions}
+append_runtime_helpers(self, skip_helpers=migrated_helpers)
+```
+
+This means that helpers already injected as MIR functions are skipped when appending
+legacy x64 helper bodies. The current bridge is therefore:
+
+```text
+MIR helper present as MirFunction
+  -> normal function lowering emits x64
+  -> same-named legacy x64 helper is skipped
+```
+
+### Current boundary
+
+The current ownership boundary is:
+
+| responsibility                                  | owner                    |
+| ----------------------------------------------- | ------------------------ |
+| Tracking required MIR helpers                   | `mir_codegen.py`         |
+| Building MIR helper bodies                      | `mir_runtime_helpers.py` |
+| Removing externs and injecting helper functions | `mir_runtime_helpers.py` |
+| Runtime data emission                           | `x64_runtime.py`         |
+| Startup hook call                               | `x64_runtime.py`         |
+| Runtime append policy                           | `x64_runtime.py`         |
+| Most x64 helper bodies                          | `mir_lower.py`           |
+
+The next migration step should move one helper family at a time from x64-backed
+`MirLower._emit_*` methods into MIR helper implementations.
+
 ## Layering
 
 ```
@@ -384,10 +468,9 @@ This requires a separate investigation and is a **language semantics decision**,
 ## Progress Tracking
 
 | Phase | Status |
-|-------|--------|
-| Phase 1: Docs and inventory cleanup | **This commit** |
-| Phase 2: Helper naming rename | ❌ |
-| Phase 3: `required_helpers` plumbing | ❌ |
-| Phase 4: Python builder injects MIR helpers | ❌ |
-| Phase 5: Migrate str↔bytes | ❌ |
-| Phase 6: Future TODO | ❌ |
+|---|---|
+| Phase 1: Write plan | ✅ done |
+| Phase 2: Helper naming cleanup | not done |
+| Phase 3: `required_helpers` plumbing | ✅ partially done |
+| Phase 4: Python builder injects MIR helpers | ✅ partially done |
+| Phase 5: migrate remaining x64-backed helpers | in progress |
