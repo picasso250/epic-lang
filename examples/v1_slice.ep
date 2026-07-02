@@ -16,5 +16,5 @@ fun main(): void {
     xs[1] = 'Z'
     println(str(ys))
 
-    os.ExitProcess(0)
+    exit(0)
 }

@@ -4,5 +4,5 @@
 fun main(): void {
     println("Hello, Epic!")
     println(42)
-    os.ExitProcess(0)
+    exit(0)
 }

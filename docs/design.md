@@ -56,7 +56,7 @@ fun add(a: i64, b: i64): i64 {
 }
 ```
 
-函数最多有 4 个参数。调用最多有 4 个参数。`void` 函数可以使用 `return` 或自然结束。`void` 函数中不允许 `return expr`。
+Epic 函数最多有 4 个参数。普通 Epic 调用最多有 4 个参数；编译器内置的 WinAPI 调用可按其白名单签名使用更多参数。`void` 函数可以使用 `return` 或自然结束。`void` 函数中不允许 `return expr`。
 
 程序入口函数必须为：
 
@@ -65,7 +65,7 @@ fun main(): void {
 }
 ```
 
-从 `main` 末尾自然结束时以状态 `0` 退出。非零退出需显式调用 `os.ExitProcess(code)`。
+从 `main` 末尾自然结束时以状态 `0` 退出。非零退出使用 `exit(code)`。
 
 ## 表达式与语句 (Expressions and Statements)
 
@@ -122,6 +122,7 @@ let token: Token
 - `break` 和 `continue` 绑定到最近的 `while` 循环。
 - `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`continue` 跳到增量步骤。
 - `return expr` / `return`。
+- `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。
 - `assert cond` / `assert cond, "消息"` — 始终启用，失败时退出。
 
@@ -320,6 +321,7 @@ let source = str(read_file(path))
 | `putstr(s: str): void`                 | 写入字符串字节                              |
 | `itoa(n: i64): str`                    | 整数转堆分配字符串                          |
 | `str_new(bytes, len): str`             | 从底层缓冲区复制 `len` 个字节创建字符串     |
+| `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
 | `str_starts_with(s, prefix): i64`      | 若 `s` 以 `prefix` 开头则为真               |
 | `str_find(s, needle): i64`             | 第一个字节的索引，或 `-1`                   |
 | `str_trim(s): str`                     | 去除前导/尾随 ASCII 空白字符                |
@@ -327,7 +329,17 @@ let source = str(read_file(path))
 | `push(a: T[], x: T): void`             | 追加到动态数组                              |
 | `extend(dst: T[], src: T[]): void`     | 追加所有元素                                |
 
-`os.*` 名称保留给编译器暴露的系统/运行时调用。`os.ExitProcess(code)`、`os.WriteFile` 等被特别识别。
+`cstr` 要求 `s.data != 0`、`s.len >= 0`、`s[0:len(s)]` 不含 `0`，并且 `s.data[s.len] == 0`。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
+
+`os.*` 名称保留给编译器暴露的系统调用。WinAPI 调用使用 `os.<dll>.<Function>(...)`，DLL 段目前只支持 `kernel32` 和 `user32`，函数必须在编译器白名单内。FFI 参数统一按 `i64` 传递；C 字符串参数必须显式写 `cstr(...)`：
+
+```epic
+os.kernel32.Sleep(u32(1000))
+let n = os.kernel32.lstrlenA(cstr("abc"))
+let r = os.user32.MessageBoxA(0, cstr("hi"), cstr("Epic"), u32(0))
+```
+
+普通代码应使用 `exit(code)` 退出。`os.kernel32.ExitProcess(code)` 仍在 WinAPI 白名单内，但不作为日常写法。
 
 ## 自举模型 (Bootstrap Model)
 

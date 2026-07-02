@@ -9,5 +9,5 @@ fun main(): void {
     let out = new u8[] { s[0], xs[0], '!' }
     println(str(out))
 
-    os.ExitProcess(0)
+    exit(0)
 }

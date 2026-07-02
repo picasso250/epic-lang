@@ -13,5 +13,5 @@ fun main(): void {
     println()
     print(f"")
     print("tail")
-    os.ExitProcess(0)
+    exit(0)
 }

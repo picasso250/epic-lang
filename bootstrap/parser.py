@@ -562,7 +562,7 @@ class Parser:
                 self.expect("RPAREN")
                 if len(args) > 4:
                     raise ParseError("function calls may have at most 4 arguments in v0", t[2])
-                node = CallNode(name=name, args=args)
+                node = CallNode(name=name, args=args, line=t[2])
             else:
                 node = VarNode(name=name)
             # Postfix: .field and [index]
@@ -572,12 +572,18 @@ class Parser:
                     if self.check("LPAREN"):
                         args = self.parse_args()
                         self.expect("RPAREN")
-                        if isinstance(node, VarNode) and node.name == "os":
-                            node = CallNode(name=field[1], args=args, namespace="os")
+                        if (
+                            isinstance(node, FieldAccessNode)
+                            and isinstance(node.object, VarNode)
+                            and node.object.name == "os"
+                        ):
+                            node = CallNode(name=field[1], args=args, namespace="os", dll=node.field, line=field[2])
+                        elif isinstance(node, VarNode) and node.name == "os":
+                            raise ParseError("WinAPI calls use os.<dll>.<Function>(...)", field[2])
                         else:
                             if len(args) > 4:
                                 raise ParseError("function calls may have at most 4 arguments in v0", field[2])
-                            raise ParseError("method calls are only supported for os.* in v0", field[2])
+                            raise ParseError("method calls are only supported for os.<dll>.* in v0", field[2])
                     else:
                         node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):

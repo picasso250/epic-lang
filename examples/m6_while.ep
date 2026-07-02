@@ -10,5 +10,5 @@ fun main(): void {
         println(i)
         i = i + 1
     }
-    os.ExitProcess(0)
+    exit(0)
 }

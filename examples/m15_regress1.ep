@@ -9,5 +9,5 @@ fun main(): void {
     let b = 6
     let c = 7
     let arr = new Token[1]
-    os.ExitProcess(a + b + c)
+    exit(a + b + c)
 }

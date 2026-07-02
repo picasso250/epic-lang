@@ -195,6 +195,8 @@ class CallNode(ASTNode):
     name: str
     args: list      # list[ASTNode]
     namespace: str = ""
+    dll: str = ""
+    line: int = 0
 
 
 @dataclass

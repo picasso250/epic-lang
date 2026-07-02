@@ -16,5 +16,5 @@ fun main(): void {
     }
     let shifted: u64 = (u64(b) << 1) >>> 1
     println(shifted)
-    os.ExitProcess(0)
+    exit(0)
 }

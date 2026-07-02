@@ -21,5 +21,5 @@ fun main(): void {
     push(right, b2)
     extend(left, right)
     print(left[0].value + left[1].value)
-    os.ExitProcess(0)
+    exit(0)
 }

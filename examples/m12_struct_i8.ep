@@ -10,7 +10,7 @@ fun main(): void {
     d.flag = 1
     d.value = 65
     if d.flag != 0 {
-        os.ExitProcess(d.value)
+        exit(d.value)
     }
-    os.ExitProcess(0)
+    exit(0)
 }

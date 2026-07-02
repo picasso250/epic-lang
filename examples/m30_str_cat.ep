@@ -5,5 +5,5 @@ fun main(): void {
     let b = " "
     let c = "world"
     println(a + b + c)
-    os.ExitProcess(0)
+    exit(0)
 }

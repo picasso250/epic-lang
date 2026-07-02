@@ -14,5 +14,5 @@ fun main(): void {
     println(len(xs))
     push(xs, 'X')
     println(xs[0])
-    os.ExitProcess(b.value)
+    exit(b.value)
 }

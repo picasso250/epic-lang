@@ -4,5 +4,5 @@
 fun main(): void {
     let e = system("cmd /c exit 7")
     println(e)
-    os.ExitProcess(0)
+    exit(0)
 }

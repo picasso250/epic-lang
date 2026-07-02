@@ -12,5 +12,5 @@ fun main(): void {
     for j in end:end {
         println(j)
     }
-    os.ExitProcess(0)
+    exit(0)
 }

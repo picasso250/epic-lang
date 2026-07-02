@@ -10,5 +10,5 @@ fun main(): void {
 
     println(str(buf))
     println(buf[0])
-    os.ExitProcess(0)
+    exit(0)
 }

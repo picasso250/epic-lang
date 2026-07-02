@@ -14,5 +14,5 @@ fun main(): void {
         print("!")
     }
 
-    os.ExitProcess(0)
+    exit(0)
 }

@@ -8,5 +8,5 @@ fun main(): void {
     let xs = bytes("ab")
     extend(xs, xs)
     print(str(xs))
-    os.ExitProcess(0)
+    exit(0)
 }

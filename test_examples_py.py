@@ -24,6 +24,7 @@ def parse_annotations(source):
     argv = []
     clean_paths = []
     compile_fail = None
+    compile_only = False
     for line in source.split("\n"):
         line = line.strip()
         if m := re.match(r'#\s*EXIT:\s*(-?\d+)', line):
@@ -36,8 +37,10 @@ def parse_annotations(source):
             clean_paths.extend(shlex.split(m.group(1)))
         elif m := re.match(r'#\s*COMPILE_FAIL:\s*(.*)$', line):
             compile_fail = m.group(1).strip() or ""
+        elif re.match(r'#\s*COMPILE_ONLY\b', line):
+            compile_only = True
     stdout = "\n".join(stdout_lines) if stdout_lines else None
-    return exit_code, stdout, argv, clean_paths, compile_fail
+    return exit_code, stdout, argv, clean_paths, compile_fail, compile_only
 
 
 def clean_test_paths(paths):
@@ -59,9 +62,9 @@ def run_test(ep_file, linker="lld-link"):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
-    exit_expected, stdout_expected, argv, clean_paths, compile_fail = parse_annotations(source)
+    exit_expected, stdout_expected, argv, clean_paths, compile_fail, compile_only = parse_annotations(source)
     
-    if exit_expected is None and stdout_expected is None and compile_fail is None:
+    if exit_expected is None and stdout_expected is None and compile_fail is None and not compile_only:
         return True, "no annotations — skipped"
 
     try:
@@ -83,6 +86,8 @@ def run_test(ep_file, linker="lld-link"):
         return True, "compile failed as expected"
     if result.returncode != 0:
         return False, f"compile failed:\n{result.stderr[:500]}"
+    if compile_only:
+        return True, "compile only"
     
     rel = os.path.relpath(ep_file, SCRIPT_DIR)
     exe_path = os.path.join(SCRIPT_DIR, "build", os.path.splitext(rel)[0] + ".exe")

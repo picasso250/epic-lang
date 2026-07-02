@@ -32,5 +32,5 @@ fun main(): void {
     let s = "a"
     s += "bc"
 
-    os.ExitProcess(x + b.value + b.small + xs[0] + len(s))
+    exit(x + b.value + b.small + xs[0] + len(s))
 }

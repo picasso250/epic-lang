@@ -73,23 +73,24 @@ class SemanticAnalyzer:
     }
 
     OS_SIGNATURES = {
-        "ExitProcess": ([I64], VOID),
-        "Sleep": ([I64], VOID),
-        "GetTickCount64": ([], I64),
-        "lstrlenA": ([STR], I64),
-        "lstrcmpA": ([STR, STR], I64),
-        "GetStdHandle": ([I64], I64),
-        "GetProcessHeap": ([], I64),
-        "HeapAlloc": ([I64, I64, I64], I64),
-        "CreateFileA": ([STR, I64, I64, I64, I64, I64, I64], I64),
-        "GetFileSize": ([I64, I64], I64),
-        "ReadFile": ([I64, I64, I64, I64, I64], I64),
-        "WriteFile": ([I64, I64, I64, I64, I64], I64),
-        "CloseHandle": ([I64], I64),
-        "CreateProcessA": ([], I64),
-        "WaitForSingleObject": ([I64, I64], I64),
-        "GetExitCodeProcess": ([I64, I64], I64),
-        "GetCommandLineA": ([], I64),
+        ("kernel32", "ExitProcess"): ([I64], VOID),
+        ("kernel32", "Sleep"): ([I64], VOID),
+        ("kernel32", "GetTickCount64"): ([], I64),
+        ("kernel32", "lstrlenA"): ([I64], I64),
+        ("kernel32", "lstrcmpA"): ([I64, I64], I64),
+        ("kernel32", "GetStdHandle"): ([I64], I64),
+        ("kernel32", "GetProcessHeap"): ([], I64),
+        ("kernel32", "HeapAlloc"): ([I64, I64, I64], I64),
+        ("kernel32", "CreateFileA"): ([I64, I64, I64, I64, I64, I64, I64], I64),
+        ("kernel32", "GetFileSize"): ([I64, I64], I64),
+        ("kernel32", "ReadFile"): ([I64, I64, I64, I64, I64], I64),
+        ("kernel32", "WriteFile"): ([I64, I64, I64, I64, I64], I64),
+        ("kernel32", "CloseHandle"): ([I64], I64),
+        ("kernel32", "CreateProcessA"): ([], I64),
+        ("kernel32", "WaitForSingleObject"): ([I64, I64], I64),
+        ("kernel32", "GetExitCodeProcess"): ([I64, I64], I64),
+        ("kernel32", "GetCommandLineA"): ([], I64),
+        ("user32", "MessageBoxA"): ([I64, I64, I64, I64], I64),
     }
 
     def __init__(self, program):
@@ -410,12 +411,18 @@ class SemanticAnalyzer:
             self._check_arity(name, 1, expr.args)
             self._expect_integer(self._expr(expr.args[0]), "putc argument")
             return ExprInfo(VOID)
+        if name == "exit":
+            self._check_call_args(name, [I64], expr.args)
+            return ExprInfo(VOID)
         if name == "str":
             self._check_arity(name, 1, expr.args)
             arg = self._expr(expr.args[0])
             if arg.type == VOID:
                 self._fail("str argument cannot be void")
             return ExprInfo(STR)
+        if name == "cstr":
+            self._check_call_args(name, [STR], expr.args)
+            return ExprInfo(I64)
         if name in ("i64", "u64", "i32", "u32", "u8"):
             self._check_arity(name, 1, expr.args)
             self._expect_integer(self._expr(expr.args[0]), f"{name} argument")
@@ -495,10 +502,13 @@ class SemanticAnalyzer:
         return ExprInfo(ret)
 
     def _os_call(self, expr):
-        if expr.name not in self.OS_SIGNATURES:
-            self._fail(f"unsupported os call os.{expr.name}")
-        params, ret = self.OS_SIGNATURES[expr.name]
-        self._check_call_args(f"os.{expr.name}", params, expr.args)
+        key = (expr.dll, expr.name)
+        if expr.dll not in {"kernel32", "user32"}:
+            self._fail(f"unsupported os dll os.{expr.dll}")
+        if key not in self.OS_SIGNATURES:
+            self._fail(f"unsupported os call os.{expr.dll}.{expr.name}")
+        params, ret = self.OS_SIGNATURES[key]
+        self._check_call_args(f"os.{expr.dll}.{expr.name}", params, expr.args)
         return ExprInfo(ret)
 
     def _struct_init_expr(self, expr):
@@ -685,7 +695,7 @@ class SemanticAnalyzer:
             return True
         if isinstance(stmt, PanicNode):
             return True
-        if isinstance(stmt, ExprStmtNode) and self._is_exitprocess_call(stmt.expr):
+        if isinstance(stmt, ExprStmtNode) and self._is_terminating_call(stmt.expr):
             return True
         if isinstance(stmt, IfNode):
             return (
@@ -699,8 +709,12 @@ class SemanticAnalyzer:
             return all(self._block_returns(case.body) for case in stmt.cases)
         return False
 
-    def _is_exitprocess_call(self, expr):
-        return isinstance(expr, CallNode) and expr.namespace == "os" and expr.name == "ExitProcess"
+    def _is_terminating_call(self, expr):
+        if not isinstance(expr, CallNode):
+            return False
+        if not expr.namespace and expr.name == "exit":
+            return True
+        return expr.namespace == "os" and expr.dll == "kernel32" and expr.name == "ExitProcess"
 
     def _is_adt_pattern(self, pattern):
         return (

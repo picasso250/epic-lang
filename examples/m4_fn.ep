@@ -10,5 +10,5 @@ fun main(): void {
     println(x)
     let y = add(x, 1)
     println(y)
-    os.ExitProcess(0)
+    exit(0)
 }

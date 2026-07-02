@@ -6,5 +6,5 @@ fun main(): void {
     let out = str_replace_char(mid, '/', '_')
     let empty = str_slice(s, 0, 0)
     println(out + empty)
-    os.ExitProcess(0)
+    exit(0)
 }

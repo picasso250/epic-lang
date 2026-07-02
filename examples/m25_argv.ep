@@ -4,8 +4,8 @@
 fun main(): void {
     if argv.len < 2 {
         println("missing")
-        os.ExitProcess(1)
+        exit(1)
     }
     println(argv.data[1])
-    os.ExitProcess(0)
+    exit(0)
 }

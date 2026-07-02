@@ -14,5 +14,5 @@ fun main(): void {
     println(0 - 5)
     println(-5)
     println(10 - 3 - 2)
-    os.ExitProcess(0)
+    exit(0)
 }

@@ -35,6 +35,28 @@ class MirCodegenError(RuntimeError):
     pass
 
 
+WINAPI_IMPORTS = [
+    ("kernel32", "ExitProcess", [I64], VOID),
+    ("kernel32", "Sleep", [I64], VOID),
+    ("kernel32", "GetTickCount64", [], I64),
+    ("kernel32", "lstrlenA", [I64], I64),
+    ("kernel32", "lstrcmpA", [I64, I64], I64),
+    ("kernel32", "GetStdHandle", [I64], I64),
+    ("kernel32", "GetProcessHeap", [], I64),
+    ("kernel32", "HeapAlloc", [I64, I64, I64], I64),
+    ("kernel32", "CreateFileA", [I64, I64, I64, I64, I64, I64, I64], I64),
+    ("kernel32", "GetFileSize", [I64, I64], I64),
+    ("kernel32", "ReadFile", [I64, I64, I64, I64, I64], I64),
+    ("kernel32", "WriteFile", [I64, I64, I64, I64, I64], I64),
+    ("kernel32", "CloseHandle", [I64], I64),
+    ("kernel32", "CreateProcessA", [], I64),
+    ("kernel32", "WaitForSingleObject", [I64, I64], I64),
+    ("kernel32", "GetExitCodeProcess", [I64, I64], I64),
+    ("kernel32", "GetCommandLineA", [], I64),
+    ("user32", "MessageBoxA", [I64, I64, I64, I64], I64),
+]
+
+
 class MirCodegen:
     def __init__(self):
         self.program = MirProgram()
@@ -57,23 +79,8 @@ class MirCodegen:
             fn.name: MirSignature([self._type(p.type) for p in fn.params], self._type(fn.ret_type))
             for fn in ast.funcs
         }
-        self.program.imports.append(MirImport("ExitProcess", MirSignature([I64], VOID), "kernel32.dll"))
-        self.program.imports.append(MirImport("Sleep", MirSignature([I64], VOID), "kernel32.dll"))
-        self.program.imports.append(MirImport("GetTickCount64", MirSignature([], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("lstrlenA", MirSignature([ptr(I8)], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("lstrcmpA", MirSignature([ptr(I8), ptr(I8)], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("GetStdHandle", MirSignature([I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("GetProcessHeap", MirSignature([], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("HeapAlloc", MirSignature([I64, I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("CreateFileA", MirSignature([ptr(I8), I64, I64, I64, I64, I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("GetFileSize", MirSignature([I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("ReadFile", MirSignature([I64, I64, I64, I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("WriteFile", MirSignature([I64, I64, I64, I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("CloseHandle", MirSignature([I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("CreateProcessA", MirSignature([], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("WaitForSingleObject", MirSignature([I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("GetExitCodeProcess", MirSignature([I64, I64], I64), "kernel32.dll"))
-        self.program.imports.append(MirImport("GetCommandLineA", MirSignature([], I64), "kernel32.dll"))
+        for dll, name, params, ret in WINAPI_IMPORTS:
+            self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
         self.program.externs.append(MirExtern("str_i64", MirSignature([I64], ptr_str())))
         self.program.externs.append(MirExtern("str_new", MirSignature([I64, I64], ptr_str())))
         self.program.externs.append(MirExtern("str_bool", MirSignature([BOOL], ptr_str())))
@@ -86,9 +93,10 @@ class MirCodegen:
         self.program.externs.append(MirExtern("str_find", MirSignature([ptr_str(), ptr_str()], I64)))
         self.program.externs.append(MirExtern("str_trim", MirSignature([ptr_str()], ptr_str())))
         self.program.externs.append(MirExtern("bytes_str", MirSignature([ptr_str()], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("read_file", MirSignature([ptr_str()], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("write_file", MirSignature([ptr_str(), ptr_arr_i8()], I64)))
-        self.program.externs.append(MirExtern("system_cmd", MirSignature([ptr_str()], I64)))
+        self.program.externs.append(MirExtern("__epic_cstr", MirSignature([ptr_str(), I64], I64)))
+        self.program.externs.append(MirExtern("read_file", MirSignature([ptr_str(), I64], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("write_file", MirSignature([ptr_str(), ptr_arr_i8(), I64], I64)))
+        self.program.externs.append(MirExtern("system_cmd", MirSignature([ptr_str(), I64], I64)))
         self.program.externs.append(MirExtern("new_arr_i8", MirSignature([I64], ptr_arr_i8())))
         self.program.externs.append(MirExtern("new_arr_i8_empty", MirSignature([I64], ptr_arr_i8())))
         self.program.externs.append(MirExtern("arr_i8_get", MirSignature([ptr_arr_i8(), I64], I64)))
@@ -387,7 +395,7 @@ class MirCodegen:
         self._emit_call(CallNode("print", [StringNode(f"assert line {stmt.line}: ")]))
         self._emit_call(CallNode("print", [message]))
         self._emit_call(CallNode("println", []))
-        self._emit_call(CallNode("ExitProcess", [LiteralNode(1)], namespace="os"))
+        self._emit_call(CallNode("exit", [LiteralNode(1)]))
         self.block.terminator = self._dummy_return()
         self.block = ok_block
 
@@ -395,7 +403,7 @@ class MirCodegen:
         self._emit_call(CallNode("print", [StringNode(f"panic line {stmt.line}: ")]))
         self._emit_call(CallNode("print", [stmt.message]))
         self._emit_call(CallNode("println", []))
-        self._emit_call(CallNode("ExitProcess", [LiteralNode(1)], namespace="os"))
+        self._emit_call(CallNode("exit", [LiteralNode(1)]))
         self.block.terminator = self._dummy_return()
 
     def _dummy_return(self):
@@ -565,10 +573,6 @@ class MirCodegen:
 
     def _emit_call(self, expr):
         name = expr.name
-        if expr.namespace == "os" and name == "ExitProcess":
-            arg = self._emit_expr(expr.args[0])
-            self._inst("call", [arg], type=VOID, callee="ExitProcess")
-            return ConstIntOperand(I64, 0)
         if expr.namespace == "os":
             return self._emit_os_call(expr)
         if expr.namespace:
@@ -596,6 +600,10 @@ class MirCodegen:
             arg = self._emit_expr(expr.args[0])
             self._inst("call", [arg], type=VOID, callee="putc")
             return ConstIntOperand(I64, 0)
+        if name == "exit":
+            arg = self._emit_expr(expr.args[0])
+            self._inst("call", [arg], type=VOID, callee="ExitProcess")
+            return ConstIntOperand(I64, 0)
         if name == "str":
             static = self._static_repr(expr.args[0], repr_context=False)
             if static is not None:
@@ -621,6 +629,16 @@ class MirCodegen:
             args = [self._emit_expr(arg) for arg in expr.args]
             result = self._inst("call", args, result_type=ptr_str(), type=ptr_str(), callee="str_new")
             return ValueOperand(result)
+        if name == "cstr":
+            arg = self._emit_expr(expr.args[0])
+            result = self._inst(
+                "call",
+                [arg, ConstIntOperand(I64, expr.line)],
+                result_type=I64,
+                type=I64,
+                callee="__epic_cstr",
+            )
+            return ValueOperand(result)
         if name == "itoa":
             arg = self._emit_expr(expr.args[0])
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_i64")
@@ -635,10 +653,17 @@ class MirCodegen:
             return ValueOperand(result)
         if name == "read_file":
             arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="read_file")
+            result = self._inst(
+                "call",
+                [arg, ConstIntOperand(I64, expr.line)],
+                result_type=ptr_arr_i8(),
+                type=ptr_arr_i8(),
+                callee="read_file",
+            )
             return ValueOperand(result)
         if name == "write_file":
             args = [self._emit_expr(arg) for arg in expr.args]
+            args.append(ConstIntOperand(I64, expr.line))
             result = self._inst("call", args, result_type=I64, type=I64, callee="write_file")
             return ValueOperand(result)
         if name in ("str_slice", "str_replace_char"):
@@ -655,7 +680,7 @@ class MirCodegen:
             return ValueOperand(result)
         if name == "system":
             arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=I64, type=I64, callee="system_cmd")
+            result = self._inst("call", [arg, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="system_cmd")
             return ValueOperand(result)
         if name == "push":
             args = [self._emit_expr(arg) for arg in expr.args]
@@ -714,6 +739,10 @@ class MirCodegen:
             return ptr_str()
         if isinstance(expr, CallNode) and expr.name in ("str_starts_with", "str_find"):
             return I64
+        if isinstance(expr, CallNode) and expr.name == "cstr":
+            return I64
+        if isinstance(expr, CallNode) and expr.name == "exit":
+            return VOID
         if isinstance(expr, CallNode) and expr.name == "map_has":
             return BOOL
         if isinstance(expr, CallNode) and expr.name in ("i64", "u64", "i32", "u32"):
@@ -909,16 +938,11 @@ class MirCodegen:
         return self._load_field(base, struct_name, expr.field, result_type=field_type)
 
     def _emit_os_call(self, expr):
-        if expr.name not in {imp.name for imp in self.program.imports}:
-            raise MirCodegenError(f"unsupported os call: os.{expr.name}")
-        args = []
-        for arg_expr in expr.args:
-            if self._infer_type(arg_expr) == ptr_str():
-                base = self._emit_expr(arg_expr)
-                args.append(self._load_field(base, "str", "data", result_type=ptr(I8)))
-            else:
-                args.append(self._emit_expr(arg_expr))
-        signature = next(imp.signature for imp in self.program.imports if imp.name == expr.name)
+        try:
+            signature = next(imp.signature for imp in self.program.imports if imp.name == expr.name and imp.dll == f"{expr.dll}.dll")
+        except StopIteration as exc:
+            raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}") from exc
+        args = [self._emit_expr(arg) for arg in expr.args]
         result_type = None if signature.ret == VOID else signature.ret
         result = self._inst("call", args, result_type=result_type, type=signature.ret, callee=expr.name)
         return ValueOperand(result) if result is not None else ConstIntOperand(I64, 0)
