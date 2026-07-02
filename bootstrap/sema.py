@@ -6,60 +6,16 @@ from dataclasses import dataclass
 
 from ast_nodes import *
 from epic_builtins import BUILTIN_FUNCTIONS, PSEUDO_BUILTINS
+from epic_types import ARRAY, BOOL, I32, I64, I8, MAP, NAMED, PTR, STR, U32, U64, U8, VOID, EpicType
 
 
 class SemanticError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True)
-class SemType:
-    kind: str
-    elem: "SemType | None" = None
-    name: str = ""
-
-    def __str__(self):
-        if self.kind == "array":
-            return f"{self.elem}[]"
-        if self.kind == "map":
-            return f"map[str]{self.elem}"
-        if self.kind == "ptr":
-            return f"&{self.elem}"
-        if self.kind == "named":
-            return self.name
-        return self.kind
-
-
-I64 = SemType("i64")
-U64 = SemType("u64")
-I32 = SemType("i32")
-U32 = SemType("u32")
-I8 = SemType("i8")
-U8 = SemType("u8")
-BOOL = SemType("bool")
-VOID = SemType("void")
-STR = SemType("str")
-
-
-def ARRAY(elem):
-    return SemType("array", elem=elem)
-
-
-def MAP(value):
-    return SemType("map", elem=value)
-
-
-def PTR(elem):
-    return SemType("ptr", elem=elem)
-
-
-def NAMED(name):
-    return SemType("named", name=name)
-
-
 @dataclass
 class ExprInfo:
-    type: SemType
+    type: EpicType
     literal_int: int | None = None
 
 
@@ -110,6 +66,7 @@ class SemanticAnalyzer:
         self._build_functions()
         for fn in self.program.funcs:
             self._analyze_function(fn)
+        assert_typed_program(self.program)
         return self.program
 
     def _build_types(self):
@@ -118,7 +75,8 @@ class SemanticAnalyzer:
             for field in struct.fields:
                 if field.name in fields:
                     self._fail_global(f"duplicate field {struct.name}.{field.name}")
-                fields[field.name] = self._type_name(field.type)
+                field.resolved_type = self._type_name(field.type)
+                fields[field.name] = field.resolved_type
             self.struct_fields[struct.name] = fields
 
         for typ in getattr(self.program, "types", []):
@@ -130,7 +88,8 @@ class SemanticAnalyzer:
                 for field in variant.fields:
                     if field.name in fields:
                         self._fail_global(f"duplicate field {typ.name}.{variant.name}.{field.name}")
-                    fields[field.name] = self._type_name(field.type)
+                    field.resolved_type = self._type_name(field.type)
+                    fields[field.name] = field.resolved_type
                 variants[variant.name] = fields
             self.adt_variants[typ.name] = variants
 
@@ -138,23 +97,25 @@ class SemanticAnalyzer:
         for fn in self.program.funcs:
             params = []
             for param in fn.params:
-                typ = self._type_name(param.type)
+                param.resolved_type = self._type_name(param.type)
+                typ = param.resolved_type
                 if typ == VOID:
                     self._fail_global(f"function {fn.name} parameter {param.name} cannot have type void")
                 params.append(typ)
             if fn.name in BUILTIN_FUNCTIONS or fn.name in PSEUDO_BUILTINS:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
-            self.func_sigs[fn.name] = (params, self._type_name(fn.ret_type))
+            fn.resolved_type = self._type_name(fn.ret_type)
+            self.func_sigs[fn.name] = (params, fn.resolved_type)
 
     def _analyze_function(self, fn):
         self.fn_name = fn.name
         self.locals = {"argv": ARRAY(STR)}
         self.loop_depth = 0
         for param in fn.params:
-            self.locals[param.name] = self._type_name(param.type)
+            self.locals[param.name] = param.resolved_type
 
         self._analyze_block(fn.body)
-        ret_type = self._type_name(fn.ret_type)
+        ret_type = fn.resolved_type
         if ret_type != VOID and not self._block_returns(fn.body):
             self._fail(f"function must return {ret_type} on all paths")
 
@@ -199,6 +160,7 @@ class SemanticAnalyzer:
         if isinstance(stmt, ForRangeNode):
             self._expect_integer(self._expr(stmt.start), "for range start")
             self._expect_integer(self._expr(stmt.end), "for range end")
+            stmt.resolved_type = I64
             self.locals[stmt.name] = I64
             self.loop_depth += 1
             self._analyze_block(stmt.body)
@@ -241,6 +203,7 @@ class SemanticAnalyzer:
             self._fail(f"let {stmt.name} cannot have type void")
         if value is not None:
             self._check_assign(target, value, f"let {stmt.name}")
+        stmt.resolved_type = target
         self.locals[stmt.name] = target
 
     def _analyze_assign_op(self, stmt):
@@ -303,6 +266,13 @@ class SemanticAnalyzer:
         self._analyze_block(case.body)
 
     def _expr(self, expr):
+        if expr is None:
+            self._fail("missing expression")
+        info = self._expr_info(expr)
+        expr.resolved_type = info.type
+        return info
+
+    def _expr_info(self, expr):
         if expr is None:
             self._fail("missing expression")
         if isinstance(expr, LiteralNode):
@@ -545,11 +515,12 @@ class SemanticAnalyzer:
 
     def _lvalue_type(self, target):
         if isinstance(target, VarNode):
-            return self._lookup(target.name)
+            target.resolved_type = self._lookup(target.name)
+            return target.resolved_type
         if isinstance(target, FieldAccessNode):
-            return self._field_type(self._expr(target.object).type, target.field)
+            return self._expr(target).type
         if isinstance(target, SubscriptNode):
-            return self._subscript_type(target.base, target.index)
+            return self._expr(target).type
         self._fail(f"unsupported assignment target {type(target).__name__}")
 
     def _subscript_type(self, base_expr, index_expr):
@@ -595,7 +566,7 @@ class SemanticAnalyzer:
         self._fail(f"field access expected aggregate, got {base_type}")
 
     def _type_name(self, name):
-        if isinstance(name, SemType):
+        if isinstance(name, EpicType):
             return name
         if name is None:
             return VOID
@@ -766,6 +737,153 @@ class SemanticAnalyzer:
 
     def _fail_global(self, message):
         raise SemanticError(f"Semantic error: {message}")
+
+
+def assert_typed_program(program):
+    adt_names = {typ.name for typ in getattr(program, "types", [])}
+
+    def fail(path):
+        raise SemanticError(f"Semantic error: internal typed AST missing resolved_type for {path}")
+
+    def require(node, path):
+        if getattr(node, "resolved_type", None) is None:
+            fail(path)
+
+    def expr(node, path):
+        require(node, path)
+        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode, VarNode, NewNode)):
+            return
+        if isinstance(node, FStringNode):
+            for idx, (kind, value) in enumerate(node.parts):
+                if kind == "expr":
+                    expr(value, f"{path}.parts[{idx}]")
+            return
+        if isinstance(node, CallNode):
+            for idx, arg in enumerate(node.args):
+                expr(arg, f"{path}.args[{idx}]")
+            return
+        if isinstance(node, BinaryNode):
+            expr(node.left, f"{path}.left")
+            expr(node.right, f"{path}.right")
+            return
+        if isinstance(node, UnaryNode):
+            expr(node.expr, f"{path}.expr")
+            return
+        if isinstance(node, FieldAccessNode):
+            expr(node.object, f"{path}.object")
+            return
+        if isinstance(node, SubscriptNode):
+            expr(node.base, f"{path}.base")
+            expr(node.index, f"{path}.index")
+            return
+        if isinstance(node, SliceNode):
+            expr(node.base, f"{path}.base")
+            if node.start is not None:
+                expr(node.start, f"{path}.start")
+            if node.end is not None:
+                expr(node.end, f"{path}.end")
+            return
+        if isinstance(node, NewArrayNode):
+            if node.count is not None:
+                expr(node.count, f"{path}.count")
+            return
+        if isinstance(node, StructInitNode):
+            for idx, (_, value) in enumerate(node.fields):
+                expr(value, f"{path}.fields[{idx}]")
+            return
+        if isinstance(node, ArrayLiteralNode):
+            for idx, value in enumerate(node.values):
+                expr(value, f"{path}.values[{idx}]")
+            return
+        fail(path)
+
+    def is_adt_pattern(node):
+        return (
+            isinstance(node, FieldAccessNode)
+            and isinstance(node.object, VarNode)
+            and node.object.name in adt_names
+        )
+
+    def block(node, path):
+        for idx, stmt in enumerate(node.stmts):
+            statement(stmt, f"{path}.stmts[{idx}]")
+
+    def statement(node, path):
+        if isinstance(node, ExprStmtNode):
+            expr(node.expr, f"{path}.expr")
+            return
+        if isinstance(node, LetNode):
+            require(node, path)
+            if node.value is not None:
+                expr(node.value, f"{path}.value")
+            return
+        if isinstance(node, AssignNode):
+            expr(node.value, f"{path}.value")
+            return
+        if isinstance(node, FieldSetNode):
+            expr(node.object, f"{path}.object")
+            expr(node.value, f"{path}.value")
+            return
+        if isinstance(node, SubscriptAssignNode):
+            expr(node.base, f"{path}.base")
+            expr(node.index, f"{path}.index")
+            expr(node.value, f"{path}.value")
+            return
+        if isinstance(node, AssignOpNode):
+            expr(node.target, f"{path}.target")
+            expr(node.value, f"{path}.value")
+            return
+        if isinstance(node, IfNode):
+            expr(node.cond, f"{path}.cond")
+            block(node.then_block, f"{path}.then")
+            if node.else_block is not None:
+                block(node.else_block, f"{path}.else")
+            return
+        if isinstance(node, WhileNode):
+            expr(node.cond, f"{path}.cond")
+            block(node.body, f"{path}.body")
+            return
+        if isinstance(node, ForRangeNode):
+            require(node, path)
+            expr(node.start, f"{path}.start")
+            expr(node.end, f"{path}.end")
+            block(node.body, f"{path}.body")
+            return
+        if isinstance(node, (BreakNode, ContinueNode)):
+            return
+        if isinstance(node, ReturnNode):
+            if node.expr is not None:
+                expr(node.expr, f"{path}.expr")
+            return
+        if isinstance(node, PanicNode):
+            expr(node.message, f"{path}.message")
+            return
+        if isinstance(node, AssertNode):
+            expr(node.cond, f"{path}.cond")
+            if node.message is not None:
+                expr(node.message, f"{path}.message")
+            return
+        if isinstance(node, MatchNode):
+            expr(node.expr, f"{path}.expr")
+            for idx, case in enumerate(node.cases):
+                if not case.is_else and not is_adt_pattern(case.pattern):
+                    expr(case.pattern, f"{path}.cases[{idx}].pattern")
+                block(case.body, f"{path}.cases[{idx}].body")
+            return
+        fail(path)
+
+    for idx, struct in enumerate(program.structs):
+        for field_idx, field in enumerate(struct.fields):
+            require(field, f"program.structs[{idx}].fields[{field_idx}]")
+    for type_idx, typ in enumerate(getattr(program, "types", [])):
+        for variant_idx, variant in enumerate(typ.variants):
+            for field_idx, field in enumerate(variant.fields):
+                require(field, f"program.types[{type_idx}].variants[{variant_idx}].fields[{field_idx}]")
+    for fn_idx, fn in enumerate(program.funcs):
+        require(fn, f"program.funcs[{fn_idx}]")
+        for param_idx, param in enumerate(fn.params):
+            require(param, f"program.funcs[{fn_idx}].params[{param_idx}]")
+        block(fn.body, f"program.funcs[{fn_idx}].body")
 
 
 def analyze_program(program):

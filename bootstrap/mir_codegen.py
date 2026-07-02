@@ -1,5 +1,6 @@
 """AST -> Epic MIR codegen for the initial machine-backend path."""
 
+import epic_types as et
 from ast_nodes import *
 from mir import (
     BOOL,
@@ -76,7 +77,7 @@ class MirCodegen:
     def emit_program(self, ast):
         self._compute_struct_layouts(ast)
         self.func_sigs = {
-            fn.name: MirSignature([self._type(p.type) for p in fn.params], self._type(fn.ret_type))
+            fn.name: MirSignature([self._type(p.resolved_type) for p in fn.params], self._type(fn.resolved_type))
             for fn in ast.funcs
         }
         for dll, name, params, ret in WINAPI_IMPORTS:
@@ -130,8 +131,8 @@ class MirCodegen:
     def _emit_function(self, ast_fn):
         self.fn = MirFunction(
             ast_fn.name,
-            [MirParam(p.name, self._type(p.type)) for p in ast_fn.params],
-            self._type(ast_fn.ret_type),
+            [MirParam(p.name, self._type(p.resolved_type)) for p in ast_fn.params],
+            self._type(ast_fn.resolved_type),
         )
         self.locals = {}
         self.local_types = {}
@@ -151,6 +152,8 @@ class MirCodegen:
         return self.fn
 
     def _type(self, typ):
+        if isinstance(typ, et.EpicType):
+            return self._epic_type(typ)
         if typ in (None, "void"):
             return VOID
         if typ in ("i64", "u64", "i32", "u32", "i8", "u8", "bool"):
@@ -170,6 +173,57 @@ class MirCodegen:
         if isinstance(typ, str) and typ.startswith("&") and typ[1:] in self.structs:
             return ptr_struct(typ[1:])
         raise MirCodegenError(f"machine MIR does not support type yet: {typ}")
+
+    def _epic_type(self, typ):
+        if typ == et.VOID:
+            return VOID
+        if typ == et.BOOL:
+            return BOOL
+        if typ in (et.I64, et.U64, et.I32, et.U32, et.I8, et.U8):
+            return I64
+        if typ == et.STR:
+            return ptr_str()
+        if typ.kind == "array":
+            elem = typ.elem
+            if elem in (et.I8, et.U8):
+                return ptr_arr_i8()
+            if elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
+                return ptr_arr_i64()
+            if elem == et.STR:
+                return ptr_arr_str()
+            if elem is not None and elem.kind == "named":
+                return ptr_arr_struct(elem.name)
+        if typ.kind == "map" and typ.elem == et.I64:
+            return ptr_map_str_i64()
+        if typ.kind == "named":
+            return ptr_struct(typ.name)
+        if typ.kind == "ptr":
+            return ptr(self._epic_pointee_type(typ.elem))
+        raise MirCodegenError(f"machine MIR does not support type yet: {typ}")
+
+    def _epic_pointee_type(self, typ):
+        if typ in (et.I8, et.U8):
+            return I8
+        if typ == et.BOOL:
+            return BOOL
+        if typ in (et.I64, et.U64, et.I32, et.U32):
+            return I64
+        if typ == et.STR:
+            return ptr_str()
+        if typ is not None and typ.kind == "named":
+            return ptr_struct(typ.name)
+        if typ is not None and typ.kind == "ptr":
+            return ptr(self._epic_pointee_type(typ.elem))
+        raise MirCodegenError(f"machine MIR does not support pointer type yet: {typ}")
+
+    def _resolved_type(self, node):
+        typ = getattr(node, "resolved_type", None)
+        if typ is None:
+            raise MirCodegenError(f"untyped AST node reached MIR codegen: {type(node).__name__}")
+        return typ
+
+    def _expr_mir_type(self, expr):
+        return self._type(self._resolved_type(expr))
 
     def _new_value(self, typ, hint="v"):
         self.value_counter += 1
@@ -261,7 +315,7 @@ class MirCodegen:
         if isinstance(stmt, ExprStmtNode):
             self._emit_expr(stmt.expr)
         elif isinstance(stmt, LetNode):
-            typ = self._infer_type(stmt.value) if stmt.var_type is None else self._type(stmt.var_type)
+            typ = self._type(stmt.resolved_type)
             addr = self._alloc_local(stmt.name, typ)
             value = self._emit_expr(stmt.value) if stmt.value is not None else self._zero_value(typ)
             self._inst("store", [value, ValueOperand(addr)])
@@ -391,19 +445,21 @@ class MirCodegen:
         fail_block = self._new_block("assert.fail")
         self.block.terminator = CondBr(cond, ok_block.name, fail_block.name)
         self.block = fail_block
-        message = stmt.message if stmt.message is not None else StringNode("assertion failed")
-        self._emit_call(CallNode("print", [StringNode(f"assert line {stmt.line}: ")]))
-        self._emit_call(CallNode("print", [message]))
-        self._emit_call(CallNode("println", []))
-        self._emit_call(CallNode("exit", [LiteralNode(1)]))
+        self._emit_print_text(f"assert line {stmt.line}: ")
+        if stmt.message is None:
+            self._emit_print_text("assertion failed")
+        else:
+            self._emit_print_expr(stmt.message)
+        self._emit_print_newline()
+        self._emit_exit_current_block()
         self.block.terminator = self._dummy_return()
         self.block = ok_block
 
     def _emit_panic(self, stmt):
-        self._emit_call(CallNode("print", [StringNode(f"panic line {stmt.line}: ")]))
-        self._emit_call(CallNode("print", [stmt.message]))
-        self._emit_call(CallNode("println", []))
-        self._emit_call(CallNode("exit", [LiteralNode(1)]))
+        self._emit_print_text(f"panic line {stmt.line}: ")
+        self._emit_print_expr(stmt.message)
+        self._emit_print_newline()
+        self._emit_exit_current_block()
         self.block.terminator = self._dummy_return()
 
     def _dummy_return(self):
@@ -413,7 +469,15 @@ class MirCodegen:
 
     def _emit_exit_current_block(self, code=1):
         self._inst("call", [ConstIntOperand(I64, code)], type=VOID, callee="ExitProcess")
-        self.block.terminator = self._dummy_return()
+
+    def _emit_print_text(self, text):
+        self._inst("call", [SymbolOperand(ptr_str(), self._string_label(text))], type=VOID, callee="print_str")
+
+    def _emit_print_expr(self, expr):
+        self._inst("call", [self._coerce_print_arg(expr)], type=VOID, callee="print_str")
+
+    def _emit_print_newline(self):
+        self._inst("call", [], type=VOID, callee="print_newline")
 
     def _emit_checked_int32_conversion(self, expr, target_name):
         value = self._emit_expr(expr)
@@ -439,6 +503,7 @@ class MirCodegen:
 
         self.block = fail_block
         self._emit_exit_current_block(1)
+        self.block.terminator = self._dummy_return()
 
         self.block = ok_block
         return value
@@ -517,7 +582,7 @@ class MirCodegen:
         if isinstance(expr, StringNode):
             return SymbolOperand(ptr_str(), self._string_label(expr.value))
         if isinstance(expr, FStringNode):
-            return self._emit_expr(self._fstring_expr(expr))
+            return self._emit_fstring(expr)
         if isinstance(expr, VarNode):
             if expr.name == "argv":
                 return SymbolOperand(ptr_arr_str(), "@argv")
@@ -603,26 +668,7 @@ class MirCodegen:
             self._inst("call", [arg], type=VOID, callee="ExitProcess")
             return ConstIntOperand(I64, 0)
         if name == "str":
-            static = self._static_repr(expr.args[0], repr_context=False)
-            if static is not None:
-                return SymbolOperand(ptr_str(), self._string_label(static))
-            if self._infer_type(expr.args[0]) == ptr_str():
-                return self._emit_expr(expr.args[0])
-            if self._infer_type(expr.args[0]) == BOOL:
-                arg = self._emit_expr(expr.args[0])
-                result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_bool")
-                return ValueOperand(result)
-            if self._infer_type(expr.args[0]) == ptr_arr_i8():
-                arg = self._emit_expr(expr.args[0])
-                result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_arr_i8")
-                return ValueOperand(result)
-            if self._infer_type(expr.args[0]) == ptr_map_str_i64():
-                arg = self._emit_expr(expr.args[0])
-                result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="map_repr")
-                return ValueOperand(result)
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_i64")
-            return ValueOperand(result)
+            return self._emit_str_conversion(expr.args[0])
         if name == "str_new":
             args = [self._emit_expr(arg) for arg in expr.args]
             result = self._inst("call", args, result_type=ptr_str(), type=ptr_str(), callee="str_new")
@@ -715,92 +761,7 @@ class MirCodegen:
         return ValueOperand(result) if result is not None else ConstIntOperand(I64, 0)
 
     def _infer_type(self, expr):
-        if isinstance(expr, BoolNode):
-            return BOOL
-        if isinstance(expr, CharNode):
-            return I64
-        if isinstance(expr, StringNode):
-            return ptr_str()
-        if isinstance(expr, FStringNode):
-            return ptr_str()
-        if isinstance(expr, VarNode):
-            if expr.name == "argv":
-                return ptr_arr_str()
-            return self.local_types.get(expr.name, I64)
-        if isinstance(expr, CallNode) and expr.name == "str":
-            return ptr_str()
-        if isinstance(expr, CallNode) and expr.name == "str_new":
-            return ptr_str()
-        if isinstance(expr, CallNode) and expr.name in ("str_slice", "str_replace_char"):
-            return ptr_str()
-        if isinstance(expr, CallNode) and expr.name == "str_trim":
-            return ptr_str()
-        if isinstance(expr, CallNode) and expr.name in ("str_starts_with", "str_find"):
-            return I64
-        if isinstance(expr, CallNode) and expr.name == "cstr":
-            return I64
-        if isinstance(expr, CallNode) and expr.name == "exit":
-            return VOID
-        if isinstance(expr, CallNode) and expr.name == "map_has":
-            return BOOL
-        if isinstance(expr, CallNode) and expr.name in ("i64", "u64", "i32", "u32"):
-            return I64
-        if isinstance(expr, CallNode) and expr.name == "u8":
-            return I64
-        if isinstance(expr, CallNode) and expr.name == "bool":
-            return BOOL
-        if isinstance(expr, CallNode) and expr.name in ("bytes", "read_file"):
-            return ptr_arr_i8()
-        if isinstance(expr, CallNode) and expr.name == "itoa":
-            return ptr_str()
-        if isinstance(expr, CallNode) and expr.name in self.func_sigs:
-            return self.func_sigs[expr.name].ret
-        if isinstance(expr, ArrayLiteralNode):
-            if expr.elem_type in ("u8", "i8"):
-                return ptr_arr_i8()
-            if expr.elem_type in ("i64", "u64", "i32", "u32"):
-                return ptr_arr_i64()
-        if isinstance(expr, NewArrayNode):
-            if expr.elem_type in ("u8", "i8"):
-                return ptr_arr_i8()
-            if expr.elem_type in ("i64", "u64", "i32", "u32"):
-                return ptr_arr_i64()
-            if expr.elem_type in self.structs:
-                return ptr_arr_struct(expr.elem_type)
-        if isinstance(expr, NewNode) and expr.struct_name == "map[str]i64":
-            return ptr_map_str_i64()
-        if isinstance(expr, SubscriptNode):
-            base_type = self._infer_type(expr.base)
-            if base_type == ptr_map_str_i64():
-                return I64
-            if base_type == ptr_str():
-                return I64
-            if base_type == ptr_arr_i64():
-                return I64
-            elem = self._array_struct_elem(base_type)
-            if elem is not None:
-                return ptr_struct(elem)
-            if base_type.kind == "ptr" and base_type.pointee is not None and base_type.pointee.kind == "ptr":
-                return base_type.pointee
-            if base_type == ptr(I8):
-                return I64
-            if base_type == ptr(I64):
-                return I64
-            return I64
-        if isinstance(expr, SliceNode):
-            return self._infer_type(expr.base)
-        if isinstance(expr, StructInitNode):
-            return ptr_struct(expr.type_name)
-        if isinstance(expr, FieldAccessNode):
-            base_type = self._infer_type(expr.object)
-            struct_name = self._ptr_struct_name(base_type)
-            if struct_name in self.structs:
-                return self.structs[struct_name]["fields"][expr.field]["type"]
-        if isinstance(expr, BinaryNode) and expr.op in ("==", "!=", "<", ">", "<=", ">="):
-            return BOOL
-        if isinstance(expr, BinaryNode) and expr.op == "+" and self._infer_type(expr.left) == ptr_str() and self._infer_type(expr.right) == ptr_str():
-            return ptr_str()
-        return I64
+        return self._expr_mir_type(expr)
 
     def _emit_subscript(self, expr):
         base = self._emit_expr(expr.base)
@@ -835,7 +796,7 @@ class MirCodegen:
         return ValueOperand(result)
 
     def _emit_array_literal(self, expr):
-        arr_type = self._type(expr.elem_type + "[]")
+        arr_type = self._type(expr.resolved_type)
         if arr_type == ptr_arr_i64():
             result = self._inst(
                 "call",
@@ -864,16 +825,15 @@ class MirCodegen:
 
     def _emit_new_array(self, expr):
         count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 4)
-        if expr.elem_type in ("u8", "i8"):
+        arr_type = self._type(expr.resolved_type)
+        if arr_type == ptr_arr_i8():
             result = self._inst("call", [count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
             return ValueOperand(result)
-        if expr.elem_type in ("i64", "u64", "i32", "u32"):
-            result_type = ptr_arr_i64()
-            result = self._inst("call", [count], result_type=result_type, type=ptr(), callee="__epic_arr_qword_new")
+        if arr_type == ptr_arr_i64():
+            result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__epic_arr_qword_new")
             return ValueOperand(result)
-        if expr.elem_type in self.structs:
-            result_type = ptr_arr_struct(expr.elem_type)
-            result = self._inst("call", [count], result_type=result_type, type=ptr(), callee="__epic_arr_qword_new")
+        if arr_type.kind == "ptr" and arr_type.pointee is not None and arr_type.pointee.kind == "struct":
+            result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__epic_arr_qword_new")
             return ValueOperand(result)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
@@ -948,21 +908,47 @@ class MirCodegen:
     def _coerce_print_arg(self, expr):
         if self._infer_type(expr) == ptr_str():
             return self._emit_expr(expr)
-        return self._emit_call(CallNode("str", [expr]))
+        return self._emit_str_conversion(expr)
 
-    def _fstring_expr(self, expr):
-        nodes = []
+    def _emit_str_conversion(self, expr):
+        static = self._static_repr(expr, repr_context=False)
+        if static is not None:
+            return SymbolOperand(ptr_str(), self._string_label(static))
+        typ = self._infer_type(expr)
+        if typ == ptr_str():
+            return self._emit_expr(expr)
+        arg = self._emit_expr(expr)
+        if typ == BOOL:
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_bool")
+            return ValueOperand(result)
+        if typ == ptr_arr_i8():
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_arr_i8")
+            return ValueOperand(result)
+        if typ == ptr_map_str_i64():
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="map_repr")
+            return ValueOperand(result)
+        result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_i64")
+        return ValueOperand(result)
+
+    def _emit_fstring(self, expr):
+        out = None
         for kind, value in expr.parts:
             if kind == "text":
                 if value:
-                    nodes.append(StringNode(value))
+                    piece = SymbolOperand(ptr_str(), self._string_label(value))
+                else:
+                    continue
             elif kind == "expr":
-                nodes.append(CallNode(name="str", args=[value]))
-        if not nodes:
-            return StringNode("")
-        out = nodes[0]
-        for node in nodes[1:]:
-            out = BinaryNode(op="+", left=out, right=node)
+                piece = self._emit_str_conversion(value)
+            else:
+                raise MirCodegenError(f"unsupported f-string part: {kind}")
+            if out is None:
+                out = piece
+            else:
+                result = self._inst("call", [out, piece], result_type=ptr_str(), type=ptr_str(), callee="str_cat")
+                out = ValueOperand(result)
+        if out is None:
+            return SymbolOperand(ptr_str(), self._string_label(""))
         return out
 
     def _static_repr(self, expr, repr_context):
@@ -1154,7 +1140,7 @@ class MirCodegen:
             fields = {}
             offset = 0
             for field in struct_node.fields:
-                fields[field.name] = {"type": self._type(field.type), "offset": offset}
+                fields[field.name] = {"type": self._type(field.resolved_type), "offset": offset}
                 offset += 8
             self.structs[struct_node.name] = {"fields": fields, "size": max(offset, 1)}
         for type_node in getattr(ast, "types", []):
@@ -1166,7 +1152,7 @@ class MirCodegen:
                     fields = {}
                     offset = 0
                     for field in variant.fields:
-                        fields[field.name] = {"type": self._type(field.type), "offset": offset}
+                        fields[field.name] = {"type": self._type(field.resolved_type), "offset": offset}
                         offset += 8
                     self.structs[payload_name] = {"fields": fields, "size": max(offset, 1)}
                 variants[variant.name] = {"tag": tag, "payload": payload_name}

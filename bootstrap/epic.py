@@ -133,7 +133,7 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
 
     print("[2/5] Semantic analysis")
     stage_start = _now()
-    analyze_program(ast)
+    ast = analyze_program(ast)
     _print_timing("sema", stage_start)
 
     print(f"[3/5] Compiling → {asm_path}")
