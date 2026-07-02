@@ -1,0 +1,14 @@
+# EXIT: 0
+# STDOUT: 47,1,65,2,-12
+fun main(): void {
+    let a = itoa(47)
+    let b = itoa(1)
+    let s = str(65)
+    let t = str(2)
+    let neg = itoa(0 - 12)
+
+    print(a + "," + b)
+    print("," + s + "," + t)
+    print("," + neg)
+    exit(0)
+}
