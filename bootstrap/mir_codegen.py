@@ -1,6 +1,7 @@
 """AST -> Epic MIR codegen for the initial machine-backend path."""
 
 import epic_types as et
+from sema import assert_typed_program
 from ast_nodes import *
 from mir import (
     BOOL,
@@ -154,7 +155,9 @@ class MirCodegen:
     def _type(self, typ):
         if isinstance(typ, et.EpicType):
             return self._epic_type(typ)
-        if typ in (None, "void"):
+        if typ is None:
+            raise MirCodegenError("missing resolved type")
+        if typ == "void":
             return VOID
         if typ in ("i64", "u64", "i32", "u32", "i8", "u8", "bool"):
             return BOOL if typ == "bool" else I64
@@ -1213,4 +1216,5 @@ def ptr_map_str_i64():
 
 
 def ast_to_mir(ast):
+    assert_typed_program(ast)
     return MirCodegen().emit_program(ast)

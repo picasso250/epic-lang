@@ -12,6 +12,7 @@ from mir import MirProgram, MirValue, Ret, ValueOperand, ConstIntOperand, ConstN
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from mir_codegen import ast_to_mir
 from parser import Parser
+import sema
 
 
 def build_smoke_program():
@@ -163,7 +164,7 @@ fun main(): i64 {
     return 0
 }
 """
-    program = ast_to_mir(Parser(lex(source)).parse_program())
+    program = ast_to_mir(sema.analyze_program(Parser(lex(source)).parse_program()))
     text = program.text()
     for op in (
         "struct.new",
