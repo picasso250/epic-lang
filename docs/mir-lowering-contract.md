@@ -106,7 +106,9 @@ slot 是负值：-8, -16, -24, ...
 aligned_frame = ((next_slot + 32 + 15) // 16) * 16
 ```
 
-额外 `+32` 是因为 Windows x64 ABI 要求 call 前 RSP 16 字节对齐，`push rbp` + `mov rbp, rsp` 后，`sub rsp, N` 的 N 必须保证 `(rbp - N) % 16 == 0`。
+**当前实现超额保留了 32 字节**。`_lower_call()` 已为每次 call 独立分配 shadow space（`sub rsp, 32 + extra`），函数 frame 里的 `+32` 不是 ABI shadow space 的等价物。
+
+> ⚠️ 这是一个 design debt。`+32` 的来源和历史作用尚不明确；不要将其解释为 Windows x64 ABI 的 shadow space 机制，也不要依赖它在函数 frame 中预留 caller shadow space 的行为。
 
 ### 3.3 Value slot vs address slot
 

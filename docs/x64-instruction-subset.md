@@ -218,7 +218,7 @@ ret
 
 ### 5.1 Instruction form contract
 
-以下规则是 `machine.py` 当前 encoder 的实际限制。**超出此合约的指令形式会在 encoding 时静默产生错误字节或崩溃**，因为当前 encoder 不做完整输入验证（`validate_x64_program` 只做部分检查）。
+以下规则是 `machine.py` 当前 encoder 的实际限制。**超出此合约的指令形式通常会被 `X64Validator` 拒绝或抛出 `MachineBackendError`**；但 validator 不是完整 x64 verifier，新增指令形态必须同时补 validator 和 encoder 测试。
 
 #### Register contract
 
@@ -241,7 +241,7 @@ ret
 | `mov [mem], dword` | ❌ 不支持 | 同上 |
 | `mov [rsp+disp], r64` | ✅ 支持 | 通过 `Mem("rsp", disp)` |
 | `mov [rbp+disp], r64` | ✅ 支持 | 通过 `Mem("rbp", disp)` |
-| `mov [reg+disp], r64` | ❌ 不支持 | 当前只有 `rsp` 和 `rbp` 两种 base 通过 lowering 产生；其他 reg 需改用 `Mem(base, disp)` 但不保证 encoder 支持 |
+| `mov [reg+disp], r64` | ✅ 支持 | base 需属于当前 REG64 集合（`rax`–`r11`） |
 
 #### Byte load/store contract
 
@@ -273,7 +273,7 @@ ret
 
 | 形式 | 状态 | 说明 |
 |------|------|------|
-| `[base+disp]` | ✅ | base 必须是 `rsp` 或 `rbp`（当前 lowering 只产生这两种） |
+| `[base+disp]` | ✅ | base 需属于当前 REG64 集合（`rax`–`r11`）；lowering 中 `rsp`/`rbp` 最常见，但 runtime helper 也使用 `rcx`、`rsi`、`rdi`、`r8`–`r11` 等 |
 | `[symbol]` | ✅ | RIP-relative symbol load/store |
 | `[base+index*scale+disp]` | ❌ | SIB 未实现 |
 | `[base]` | ✅ | disp=0 的 `Mem(base, 0)` |

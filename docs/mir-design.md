@@ -12,12 +12,13 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 
 | 方面 | 目标 MIR | 当前 Python prototype |
 |------|----------|----------------------|
-| 高层操作 | 禁止 `struct.new`、`field.load`、`field.store`、`array.push`、`adt.payload` | ✅ validator 已拒绝这些 op，但 `mir_codegen.py` 仍在产生部分 old-path 操作（如 `arr_i8_get` 等被 lower 为 MIR call 而非直接 op） |
-| Runtime helper | MIR helper 作为 `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
+| High-level MIR ops | 禁止 `struct.new`、`field.load`、`field.store`、`array.push`、`adt.payload` | ✅ validator 已拒绝这些 op；`mir_codegen.py` 当前也未再发这些 op |
+| Runtime helper call in MIR | 降到 MIR `call` + MIR helper function | ⚠️ 当前降到 MIR `call` + x64-backed runtime helper；helper 尚未是 `MirFunction` |
+| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
-| struct layout | 显式 `MirProgram.structs` 字段 | ⚠️ 通过 `program.structs` 动态挂载，不在 `MirProgram` dataclass 上显式声明 |
+| struct layout | 显式 typed `MirStruct` dataclass 字段 | ⚠️ 已在 `MirProgram.structs` 上，但 schema 是 loose dict，不是 typed dataclass |
 | symbol 拼写 | `@name` 统一规则 | ⚠️ `main`、`str_i64`、`ExitProcess` 混用，未统一到 `@` 前缀 |
-| 命名 | 语义名：`arr_i8_str`, `str_bytes` | ❌ 遗留名：`str_arr_i8`, `bytes_str` |
+| 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ❌ 遗留名：`str_i64`, `str_bool`, `str_arr_i8`, `bytes_str` |
 | `__epic_` 前缀 | 仅保留给真正 x64 primitive（`__epic_alloc`） | ❌ 错误地用于 MIR helper：`__epic_arr_i64_push` 等 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
 
