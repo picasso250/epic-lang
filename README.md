@@ -45,17 +45,23 @@ The check builds:
 
 ## Tests
 
-Run the current Python reference compiler against all annotated examples:
+Examples are learning-oriented positive programs. Real compiler tests live
+under `tests/`, organized by compiler module (matching `bootstrap/*.py`).
+
+Recommended commands:
 
 ```powershell
-python test_examples_py.py
+python tests/run.py               # Module-level test suite (MVP)
+python test_examples_py.py        # examples/ learning examples
+python test_mir.py                 # Legacy MIR tests (migrating to tests/mir/)
+python test_x64_layers.py          # Legacy x64 tests (migrating to tests/x64/)
+python test_lexer_dump_format.py   # Legacy lexer tests (migrating to tests/lexer/)
 ```
 
-Python machine-layer checks:
+Or use the batch script:
 
 ```powershell
-python test_mir.py
-python test_x64_layers.py
+./testall.ps1
 ```
 
 `link.py` is the default Python linker. `src/link.ep` is the Epic linker
