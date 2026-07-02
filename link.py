@@ -5,6 +5,11 @@ Handles REL32 for both imports and section-relative references.
 
 import struct, sys, os
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+from bootstrap.coff import build_coff_obj
+
 IMAGE_FILE_MACHINE_AMD64 = 0x8664
 IMAGE_SUBSYSTEM_WINDOWS_CUI = 3
 SECTION_ALIGN = 0x1000
@@ -42,8 +47,17 @@ def sym_name(sym, strtab):
 
 
 def link(obj_path, exe_path):
-    data = open(obj_path, 'rb').read()
+    with open(obj_path, 'rb') as f:
+        return link_coff_bytes(f.read(), exe_path)
 
+
+def link_blocks(exe_path, text, data, text_relocs, data_relocs, symbols):
+    obj = build_coff_obj(text, data, text_relocs, data_relocs, symbols)
+    return link_coff_bytes(obj, exe_path)
+
+
+def link_coff_bytes(obj_data, exe_path):
+    data = bytes(obj_data)
     # ── COFF header ──
     machine, nsects, _, symtab_off, nsyms, _, _ = struct.unpack_from('<HHIIIHH', data, 0)
 

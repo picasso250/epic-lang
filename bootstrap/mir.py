@@ -108,6 +108,10 @@ class ConstBoolOperand(MirOperand):
 class SymbolOperand(MirOperand):
     name: str
 
+    def __init__(self, type, name):
+        object.__setattr__(self, "type", type)
+        object.__setattr__(self, "name", name)
+
     def text(self):
         return self.name
 

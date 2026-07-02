@@ -32,6 +32,8 @@ REG8 = {
     "al": 0,
     "cl": 1,
     "dl": 2,
+    "r8b": 8,
+    "r9b": 9,
     "r10b": 10,
     "r11b": 11,
 }
@@ -40,6 +42,10 @@ JCC = {
     "jo": 0x80,
     "jz": 0x84,
     "jnz": 0x85,
+    "jl": 0x8C,
+    "jge": 0x8D,
+    "jle": 0x8E,
+    "jg": 0x8F,
     "jns": 0x89,
 }
 
@@ -129,7 +135,7 @@ class MachineObjectBuilder:
             self._emit_rsp_imm(0xEC if op == "sub" else 0xC4, operands[1].value)
         elif op == "call" and len(operands) == 1 and isinstance(operands[0], Symbol):
             self._emit_call(operands[0].name)
-        elif op in ("jmp", "jo", "jz", "jnz", "jns") and len(operands) == 1 and isinstance(operands[0], LabelRef):
+        elif op in ("jmp", "jo", "jz", "jnz", "jl", "jge", "jle", "jg", "jns") and len(operands) == 1 and isinstance(operands[0], LabelRef):
             self._emit_jump(op, operands[0].name)
         elif op == "cqo" and not operands:
             self.text.extend(b"\x48\x99")
@@ -141,17 +147,26 @@ class MachineObjectBuilder:
             self.text.extend(b"\x48\xf7\xd8")
         elif op == "cmp" and self._two_regs(operands):
             self._emit_cmp_reg_reg(operands[0].name, operands[1].name)
+        elif op == "cmp" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Imm):
+            self._emit_cmp_reg_imm(operands[0].name, operands[1].value)
         elif op in ("sete", "setne", "setg", "setl", "setge", "setle") and self._regs(operands, "al"):
             self._emit_setcc(op)
         elif op == "movzx" and self._regs(operands, "eax", "al"):
             self.text.extend(b"\x0f\xb6\xc0")
+        elif op == "movsx" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Mem):
+            mem = operands[1]
+            if mem.size != 1 or mem.symbol is not None:
+                raise MachineBackendError("movsx only supports byte base memory")
+            self._emit_movsx_reg_mem8(operands[0].name, mem.base.name, mem.disp)
         elif op == "test" and self._two_regs(operands):
             self._emit_test_reg_reg(operands[0].name)
-        elif op == "xor" and self._two_regs(operands):
+        elif op == "xor" and self._two_regs(operands) and operands[0].name == operands[1].name:
             self._emit_xor_reg_reg(operands[0].name)
+        elif op in ("shl", "sar", "shr") and self._regs(operands, "rax", "cl"):
+            self._emit_shift_rax_cl(op)
         elif op in ("inc", "dec") and len(operands) == 1 and isinstance(operands[0], Reg):
             self._emit_inc_dec(op, operands[0].name)
-        elif op in ("add", "sub") and self._two_regs(operands):
+        elif op in ("add", "sub", "and", "or", "xor") and self._two_regs(operands):
             self._emit_reg_reg_alu(op, operands[0].name, operands[1].name)
         elif op == "add" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Imm):
             self._emit_add_reg_imm(operands[0].name, operands[1].value)
@@ -176,8 +191,9 @@ class MachineObjectBuilder:
             self._emit_mov_reg_reg(dst.name, src.name)
         elif isinstance(dst, Reg) and isinstance(src, Mem):
             if src.symbol is not None:
-                raise MachineBackendError("symbol load is not implemented; use lea for addresses")
-            self._emit_mov_reg_mem(dst.name, src.base.name, src.disp)
+                self._emit_mov_reg_symbol(dst.name, src.symbol)
+            else:
+                self._emit_mov_reg_mem(dst.name, src.base.name, src.disp)
         elif isinstance(dst, Mem) and isinstance(src, Reg):
             if dst.symbol is not None:
                 if src.name in REG8:
@@ -228,6 +244,10 @@ class MachineObjectBuilder:
         if reg in REG32_MOV_IMM:
             self.text.append(REG32_MOV_IMM[reg])
             self.text.extend(struct.pack("<i", imm))
+        elif reg in REG64 and not (-2147483648 <= imm <= 2147483647):
+            self._rex(w=True, b=REG64[reg] >> 3)
+            self.text.append(0xB8 + (REG64[reg] & 7))
+            self.text.extend(struct.pack("<Q", imm & 0xFFFFFFFFFFFFFFFF))
         elif reg == "rax":
             self.text.extend(b"\x48\xc7\xc0")
             self.text.extend(struct.pack("<i", imm))
@@ -263,6 +283,15 @@ class MachineObjectBuilder:
         self.text.extend(b"\x00\x00\x00\x00")
         self.text_relocs.append((off, symbol))
 
+    def _emit_mov_reg_symbol(self, reg, symbol):
+        self._require_reg64(reg)
+        self._rex(w=True, r=REG64[reg] >> 3)
+        self.text.append(0x8B)
+        self.text.append(0x05 | ((REG64[reg] & 7) << 3))
+        off = len(self.text)
+        self.text.extend(b"\x00\x00\x00\x00")
+        self.text_relocs.append((off, symbol))
+
     def _emit_mov_reg_mem(self, dst, base, disp):
         self._require_reg64(dst)
         self._require_reg64(base)
@@ -294,6 +323,13 @@ class MachineObjectBuilder:
             self.text.append(0xC7)
             self._mem_modrm(0, base, disp)
             self.text.extend(struct.pack("<i", imm))
+
+    def _emit_movsx_reg_mem8(self, dst, base, disp):
+        self._require_reg64(dst)
+        self._require_reg64(base)
+        self._rex(w=True, r=REG64[dst] >> 3, b=REG64[base] >> 3)
+        self.text.extend(b"\x0f\xbe")
+        self._mem_modrm(REG64[dst], base, disp)
 
     def _emit_lea_symbol(self, dst, symbol):
         self._require_reg64(dst)
@@ -332,10 +368,16 @@ class MachineObjectBuilder:
     def _emit_reg_reg_alu(self, op, dst, src):
         self._require_reg64(dst)
         self._require_reg64(src)
-        opcode = 0x01 if op == "add" else 0x29
+        opcode = {"add": 0x01, "sub": 0x29, "and": 0x21, "or": 0x09, "xor": 0x31}[op]
         self._rex(w=True, r=REG64[src] >> 3, b=REG64[dst] >> 3)
         self.text.append(opcode)
         self._modrm(3, REG64[src], REG64[dst])
+
+    def _emit_shift_rax_cl(self, op):
+        ext = {"shl": 4, "shr": 5, "sar": 7}[op]
+        self._rex(w=True)
+        self.text.append(0xD3)
+        self._modrm(3, ext, REG64["rax"])
 
     def _emit_cmp_reg_reg(self, left, right):
         self._require_reg64(left)
@@ -343,6 +385,18 @@ class MachineObjectBuilder:
         self._rex(w=True, r=REG64[right] >> 3, b=REG64[left] >> 3)
         self.text.append(0x39)
         self._modrm(3, REG64[right], REG64[left])
+
+    def _emit_cmp_reg_imm(self, reg, imm):
+        self._require_reg64(reg)
+        self._rex(w=True, b=REG64[reg] >> 3)
+        if -128 <= imm <= 127:
+            self.text.append(0x83)
+            self._modrm(3, 7, REG64[reg])
+            self.text.append(imm & 0xFF)
+        else:
+            self.text.append(0x81)
+            self._modrm(3, 7, REG64[reg])
+            self.text.extend(struct.pack("<i", imm))
 
     def _emit_setcc(self, op):
         codes = {

@@ -11,6 +11,7 @@ from mir import I64, ConstIntOperand, MirBlock, MirFunction, MirInst, MirParam
 from mir import MirProgram, MirValue, Ret, ValueOperand
 from mir_lower import MirLower
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
+from x64_runtime import append_runtime_helpers, emit_startup_hook_call
 
 
 def build_x64_fixture():
@@ -102,6 +103,49 @@ add1.__return:
     assert lower.x64.text() == expected
 
 
+def test_startup_hook_call_golden():
+    program = X64Program()
+    program.section(".text")
+    emit_startup_hook_call(program)
+    expected = """section .text
+    sub rsp, 32
+    call __epic_runtime_start
+    add rsp, 32
+"""
+    assert program.text() == expected
+
+
+def test_runtime_start_helper_golden():
+    class StubLower:
+        def __init__(self):
+            self.x64 = X64Program()
+            self.helper_bodies_appended = False
+
+        def _emit_runtime_helpers(self):
+            self.helper_bodies_appended = True
+
+    lower = StubLower()
+    lower.x64.section(".text")
+    append_runtime_helpers(lower)
+    expected = """section .text
+__epic_runtime_start:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 32
+    call GetProcessHeap
+    add rsp, 32
+    mov qword [_heap], rax
+    sub rsp, 32
+    call argv_init
+    add rsp, 32
+    mov qword [_argv], rax
+    pop rbp
+    ret
+"""
+    assert lower.x64.text() == expected
+    assert lower.helper_bodies_appended
+
+
 def test_x64_to_machine_bytes_and_fixups_golden():
     builder = build_machine_state(build_x64_fixture())
 
@@ -125,10 +169,11 @@ def test_x64_to_machine_bytes_and_fixups_golden():
 def main():
     test_x64_pretty_print_golden()
     test_mir_function_to_x64_golden()
+    test_startup_hook_call_golden()
+    test_runtime_start_helper_golden()
     test_x64_to_machine_bytes_and_fixups_golden()
     print("PASS test_x64_layers")
 
 
 if __name__ == "__main__":
     main()
-

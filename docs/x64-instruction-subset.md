@@ -9,6 +9,7 @@ machine bytes -> COFF -> PE` 这条线建立可测试边界。
 - `bootstrap/mir.py`: typed MIR data model and validator。
 - `bootstrap/mir_codegen.py`: AST -> MIR。
 - `bootstrap/mir_lower.py`: MIR -> structured X64IR。
+- `bootstrap/x64_runtime.py`: runtime data, startup hook, and runtime append policy。
 - `bootstrap/x64.py`: X64IR data model and text pretty printer。
 - `bootstrap/machine.py`: X64IR -> machine bytes + COFF reloc records。
 - `bootstrap/coff.py`: minimal AMD64 COFF object writer。
@@ -30,6 +31,13 @@ AST
 
 `compile_files()` 仍会把 `X64Program.text()` 写到 `.asm` 文件，但这个文件在
 `--backend machine` 下只是 debug pretty print，不参与 obj 生成。
+
+Runtime emission is split from MIR lowering at the policy boundary:
+
+- `MirLower` lowers MIR into X64IR and emits a startup hook call for `main`。
+- `x64_runtime.py` emits runtime data and appends the current full runtime。
+- The current policy is still full runtime emission. Used-only emission is a
+  future policy, not a current requirement。
 
 ### 1.1 MIR
 
@@ -92,7 +100,11 @@ MIR lowering 当前固定面向 Windows x64：
 - 每次 call 前预留 32 字节 shadow space。
 - 返回值在 `rax`。
 - `main` 降成 PE entry symbol `_start`。
+- `main` prologue calls `__epic_runtime_start` to initialize runtime state。
 - `main` 的 `ret value` 降成 `ExitProcess(value)`，不走普通 `ret`。
+- Win32 `LPDWORD` output 参数只写 32 位。当前 helper 如果复用 8 字节栈槽
+  存放这类输出，必须在 call 前清零整个 qword，或者后续改成显式 32-bit
+  zero-extend load。
 - 非 `main` 函数使用 prologue / epilogue：
 
 ```text
@@ -271,13 +283,14 @@ the Epic implementation grows around them.
 
 ### 8.1 Runtime emission is too global
 
-`MirLower.lower()` always emits runtime data and all runtime helper bodies. This
-makes small lowering tests noisy, increases compile output, and prevents helper
-liveness from being visible.
+Runtime data and startup hook ownership now lives in `x64_runtime.py`, and
+`MirLower` calls `__epic_runtime_start` instead of inlining heap/argv
+initialization. The current remaining coupling is that helper body methods are
+still physically on `MirLower` and are invoked through the runtime policy module.
 
-Recommended next step: split runtime helpers into named X64Program fragments and
-include only helpers reachable from the lowered MIR plus mandatory startup
-helpers.
+Recommended next step: move helper body methods into `x64_runtime.py` as named
+fragments, then keep the current `full` policy while making `used_only` a later
+policy.
 
 ### 8.2 X64Program needs a validator
 
@@ -336,4 +349,3 @@ the Epic compiler supporting the machine path.
 
 Recommended next step: keep `test_bootstrap_fixed_point.py` marked as expected
 to fail on the machine path until `src/` has its own MIR/X64IR/machine emitter.
-

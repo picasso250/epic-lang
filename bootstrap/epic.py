@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import importlib.util
 import os
 import subprocess
 import sys
@@ -56,6 +57,13 @@ def _now():
 
 def _print_timing(label, start):
     print(f"  timing: {label}: {_now() - start:.3f}s", flush=True)
+
+
+def _link_with_python(obj_path, exe_path):
+    spec = importlib.util.spec_from_file_location("epic_link", LINK_PY)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.link(obj_path, exe_path)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -139,7 +147,7 @@ def _merge_programs(input_paths, main_path):
     return ProgramNode(funcs=funcs, structs=structs, types=types)
 
 
-def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, backend="asm"):
+def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, backend="machine"):
     total_start = _now()
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
@@ -179,10 +187,8 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, b
     print(f"[4/4] Linking (via {linker}) → {exe_path}")
     stage_start = _now()
     if linker == "py":
-        result = subprocess.run(
-            [sys.executable, LINK_PY, obj_path, "-o", exe_path],
-            capture_output=True, text=True,
-        )
+        _link_with_python(obj_path, exe_path)
+        result = subprocess.CompletedProcess([LINK_PY, obj_path, "-o", exe_path], 0, "", "")
     else:
         result = subprocess.run(
             [LLD_LINK, "/subsystem:console", "/timestamp:0", f"/entry:_start",
@@ -201,7 +207,7 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, b
     return exe_path
 
 
-def compile_file(input_path, linker="py", out_dir=BUILD_DIR, backend="asm"):
+def compile_file(input_path, linker="py", out_dir=BUILD_DIR, backend="machine"):
     return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir, backend=backend)
 
 
@@ -220,8 +226,8 @@ def parse_args(argv):
                         help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
-    parser.add_argument("--backend", choices=["asm", "machine"], default="asm",
-                        help="object backend to use (default: asm)")
+    parser.add_argument("--backend", choices=["asm", "machine"], default="machine",
+                        help="object backend to use (default: machine)")
     return parser.parse_args(argv)
 
 

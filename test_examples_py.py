@@ -52,7 +52,7 @@ def clean_test_paths(paths):
             os.remove(path)
 
 
-def run_test(ep_file, linker="lld-link", backend="asm"):
+def run_test(ep_file, linker="lld-link", backend="machine"):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
@@ -173,8 +173,8 @@ def main():
     parser.add_argument("example", nargs="?", help="exact example name or .ep path")
     parser.add_argument("--linker", choices=["lld", "py"], default="py",
                         help="Which linker to use (default: py)")
-    parser.add_argument("--backend", choices=["asm", "machine"], default="asm",
-                        help="Which object backend to use (default: asm)")
+    parser.add_argument("--backend", choices=["asm", "machine"], default="machine",
+                        help="Which object backend to use (default: machine)")
     args = parser.parse_args()
 
     ep_path = resolve_example(args.example)

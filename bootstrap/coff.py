@@ -26,8 +26,8 @@ def _coff_name(name, strings):
     return b"\x00\x00\x00\x00" + struct.pack("<I", off)
 
 
-def write_coff_obj(path, text, data, text_relocs, data_relocs, symbols):
-    """Write a two-section COFF object.
+def build_coff_obj(text, data, text_relocs, data_relocs, symbols):
+    """Build a two-section COFF object.
 
     symbols is a dict: name -> (section_number, value). section 0 means external.
     reloc entries are (section_offset, symbol_name).
@@ -107,7 +107,11 @@ def write_coff_obj(path, text, data, text_relocs, data_relocs, symbols):
     buf += symtab
     buf += strtab
 
-    with open(path, "wb") as f:
-        f.write(buf)
+    return bytes(buf)
 
+
+def write_coff_obj(path, text, data, text_relocs, data_relocs, symbols):
+    obj = build_coff_obj(text, data, text_relocs, data_relocs, symbols)
+    with open(path, "wb") as f:
+        f.write(obj)
 
