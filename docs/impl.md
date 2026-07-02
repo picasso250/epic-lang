@@ -7,9 +7,9 @@
 ```
 bootstrap/          Python reference compiler（Python 参考编译器）
 src/                Epic 自托管编译器源码
-runtime/            NASM 运行时辅助代码
+runtime/            旧 NASM backend 的运行时辅助代码
 examples/           示例程序和回归测试
-tools/              NASM、LLD-Link
+tools/              本地工具二进制；LLD-Link 可选，NASM 仅用于旧路径
 docs/               文档
 editors/            编辑器支持
 tree-sitter-epic/   Tree-sitter 语法
@@ -24,10 +24,25 @@ bootstrap/epic.py
 bootstrap/lexer.py
 bootstrap/parser.py
 bootstrap/ast_nodes.py
-bootstrap/codegen.py
+bootstrap/sema.py
+bootstrap/mir_codegen.py
+bootstrap/mir_lower.py
+bootstrap/machine.py
 ```
 
-驱动程序从仓库根目录读取源码，将构建输出写到 `build/` 下，附加 `runtime/` 中的运行时辅助代码，用 `tools/nasm.exe` 汇编，然后通过 `link.py`（Python 链接器）或 `tools/lld-link.exe` 链接。
+驱动程序从仓库根目录读取源码，将构建输出写到 `build/` 下，执行：
+
+```text
+parse/merge -> semantic analysis -> MIR -> X64IR -> machine obj -> link
+```
+
+`compile_files()` 仍会写一个 `.asm` 形式的 X64IR pretty print 作为调试输出，
+但 Python reference compiler 不再支持 `--backend asm`，也不再调用
+`tools/nasm.exe`。旧 Python asm 后端已归档到 tag
+`python-asm-archive-2026-07-02`，需要排查历史行为时从该 tag 对比。
+
+`src/` 下的 Epic-written compiler 仍属于旧 NASM-oriented 自举线；本轮 Python
+reference compiler 的 machine backend 先行，不同步维护 `src/`。
 
 ### 构造器简写 (Constructor Shorthand)
 
@@ -52,33 +67,30 @@ src/link.ep              # Epic 链接器（独立工具，不属于编译器不
 
 ## 验收检查 (Acceptance)
 
-核心验收检查：
+当前 Python reference compiler 验收检查：
 
 ```powershell
 python test_examples_py.py
-python test_bootstrap_fixed_point.py
+python test_mir.py
+python test_x64_layers.py
 ```
 
-Lexer/parser/codegen 自举检查：
-
-```powershell
-python test_lexer_bootstrap.py
-python test_parser_bootstrap.py
-python test_codegen_bootstrap.py
-```
+`test_*bootstrap*.py` 覆盖的是 Epic 自举线，不是当前去 NASM 化的 Python
+machine backend 验收入口。
 
 ## 工具链 (Toolchain)
 
-当前工具链路径：
+当前 Python reference compiler 工具链路径：
 
-- `tools/nasm.exe`
-- `tools/lld-link.exe`
 - `link.py`（Python PE 链接器，默认）
+- `tools/lld-link.exe`（可选）
 - Windows SDK 中的 `kernel32.lib` 和 `user32.lib`
 
 ## 运行时辅助代码 (Runtime Helpers)
 
-驱动程序在发射的程序汇编代码之后附加运行时汇编辅助代码：
+Python machine backend 的运行时片段在 `bootstrap/x64_runtime.py` 中以 X64IR
+形式发射。`runtime/*.asm` 保留给旧 Epic-written backend / 历史对照，不是
+当前 Python driver 的主路径。
 
 ```
 runtime/str_alloc.asm
@@ -103,6 +115,8 @@ runtime/write_file.asm
 |------------|-------------------|
 | `bool`     | `bool`            |
 | `u8`       | `u8`              |
+| `i32`      | 8 字节整数槽，值保持 32-bit signed 规范扩展 |
+| `u32`      | 8 字节整数槽，值保持 32-bit unsigned 规范扩展 |
 | `i64`      | `i64`             |
 | `u64`      | `u64`             |
 | `str`      | `&str`            |
@@ -152,7 +166,8 @@ ADT 值是指向 16 字节 header 对象的引用：
 
 ## 代码生成模型 (Codegen Model)
 
-后端发射 NASM x64 汇编，面向 Windows x64。
+Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
+面向 Windows x64。
 
 - 进程入口符号：`_start`
 - 调用遵循 Windows x64 ABI（最多 4 个寄存器参数）

@@ -14,41 +14,22 @@ import subprocess
 import sys
 import time
 
-from codegen import Emitter
 from machine import write_machine_obj
 from mir_codegen import ast_to_mir
 from mir_lower import lower_mir_to_x64
 from ast_nodes import ProgramNode
 from lexer import LexError, lex
 from parser import ParseError, Parser
+from sema import SemanticError, analyze_program
 
 # ── paths ────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 TOOLS_DIR = os.path.join(ROOT_DIR, "tools")
-NASM = os.path.join(TOOLS_DIR, "nasm.exe")
 LLD_LINK = os.path.join(TOOLS_DIR, "lld-link.exe")
 LINK_PY = os.path.join(ROOT_DIR, "link.py")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 BUILD_DIR = os.path.join(ROOT_DIR, "build")
-RUNTIME_DIR = os.path.join(ROOT_DIR, "runtime")
-RUNTIME_ASM_FILES = [
-    "str_alloc.asm",
-    "str_repr.asm",
-    "bytes.asm",
-    "str_cat.asm",
-    "str_slice.asm",
-    "str_replace_char.asm",
-    "str_starts_with.asm",
-    "str_find.asm",
-    "str_trim.asm",
-    "extend_i8.asm",
-    "itoa.asm",
-    "argv.asm",
-    "system.asm",
-    "read_file.asm",
-    "write_file.asm",
-]
 
 
 def _now():
@@ -91,13 +72,6 @@ def _parse_file(input_path):
     tokens = lex(source)
     parser = Parser(tokens)
     return parser.parse_program()
-
-
-def _emit_runtime_helpers(emitter):
-    for name in RUNTIME_ASM_FILES:
-        path = os.path.join(RUNTIME_DIR, name)
-        with open(path, "r", encoding="utf-8") as f:
-            emitter.emit(f.read().rstrip())
 
 
 def _merge_programs(input_paths, main_path):
@@ -147,44 +121,35 @@ def _merge_programs(input_paths, main_path):
     return ProgramNode(funcs=funcs, structs=structs, types=types)
 
 
-def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, backend="machine"):
+def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
     total_start = _now()
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
 
-    print(f"[1/4] Reading {len(input_paths)} file(s)")
+    print(f"[1/5] Reading {len(input_paths)} file(s)")
     stage_start = _now()
     ast = _merge_programs(input_paths, main_path)
     _print_timing("read+lex+parse+merge", stage_start)
 
-    print(f"[2/4] Compiling → {asm_path}")
+    print("[2/5] Semantic analysis")
     stage_start = _now()
-    if backend == "machine":
-        mir_program = ast_to_mir(ast)
-        machine_program = lower_mir_to_x64(mir_program)
-        with open(asm_path, "w", encoding="utf-8", newline="\n") as out:
-            out.write(machine_program.text())
-    else:
-        emitter = Emitter(asm_path)
-        emitter.emit_program(ast)
-        _emit_runtime_helpers(emitter)
-        emitter.close()
-    _print_timing("emit machine" if backend == "machine" else "emit asm", stage_start)
+    analyze_program(ast)
+    _print_timing("sema", stage_start)
 
-    print(f"[3/4] Assembling → {obj_path}")
+    print(f"[3/5] Compiling → {asm_path}")
     stage_start = _now()
-    if backend == "machine":
-        write_machine_obj(machine_program, obj_path)
-    else:
-        result = subprocess.run(
-            [NASM, "-f", "win64", asm_path, "-o", obj_path],
-            capture_output=True, text=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError("NASM error:\n" + result.stderr[:500])
+    mir_program = ast_to_mir(ast)
+    machine_program = lower_mir_to_x64(mir_program)
+    with open(asm_path, "w", encoding="utf-8", newline="\n") as out:
+        out.write(machine_program.text())
+    _print_timing("emit machine", stage_start)
+
+    print(f"[4/5] Assembling → {obj_path}")
+    stage_start = _now()
+    write_machine_obj(machine_program, obj_path)
     _print_timing("assemble", stage_start)
 
-    print(f"[4/4] Linking (via {linker}) → {exe_path}")
+    print(f"[5/5] Linking (via {linker}) → {exe_path}")
     stage_start = _now()
     if linker == "py":
         _link_with_python(obj_path, exe_path)
@@ -207,8 +172,8 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, b
     return exe_path
 
 
-def compile_file(input_path, linker="py", out_dir=BUILD_DIR, backend="machine"):
-    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir, backend=backend)
+def compile_file(input_path, linker="py", out_dir=BUILD_DIR):
+    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -226,8 +191,6 @@ def parse_args(argv):
                         help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
-    parser.add_argument("--backend", choices=["asm", "machine"], default="machine",
-                        help="object backend to use (default: machine)")
     return parser.parse_args(argv)
 
 
@@ -252,9 +215,8 @@ def main(argv=None):
             main_path=args.main or args.inputs[0],
             linker=args.linker,
             out_dir=args.out_dir,
-            backend=args.backend,
         )
-    except (LexError, ParseError) as e:
+    except (LexError, ParseError, SemanticError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     except RuntimeError as e:

@@ -1,0 +1,6 @@
+# EXIT: 1
+
+fun main(): i64 {
+    let x = u32(-1)
+    return x
+}

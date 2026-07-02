@@ -29,8 +29,9 @@ AST
   -> PE exe
 ```
 
-`compile_files()` 仍会把 `X64Program.text()` 写到 `.asm` 文件，但这个文件在
-`--backend machine` 下只是 debug pretty print，不参与 obj 生成。
+`compile_files()` 仍会把 `X64Program.text()` 写到 `.asm` 文件，但这个文件只是
+debug pretty print，不参与 obj 生成。Python reference compiler 已移除
+`--backend asm`，旧 Python asm 后端归档在 tag `python-asm-archive-2026-07-02`。
 
 Runtime emission is split from MIR lowering at the policy boundary:
 
@@ -273,7 +274,7 @@ Current files:
 - `test_mir.py`: MIR text and validation smoke test。
 - `test_x64_layers.py`: X64 pretty print, MIR-to-X64 function lowering, and
   X64-to-machine bytes/fixups。
-- `test_examples_py.py --backend machine`: executable-level acceptance。
+- `test_examples_py.py`: executable-level acceptance for the Python machine backend。
 
 The lower layers should stay small. Do not use full examples to test a single
 encoding rule; use a tiny X64Program with one or two labels and one relocation.

@@ -1,0 +1,66 @@
+# EXIT: 0
+# STDOUT: ok
+
+struct Pair32 {
+    a: i32
+    b: u32
+}
+
+fun ret_i32(x: i64): i32 {
+    return i32(x)
+}
+
+fun ret_u32(x: i64): u32 {
+    return u32(x)
+}
+
+fun takes_i64(x: i64): i64 {
+    return x
+}
+
+fun main(): i64 {
+    let lo: i32 = -2147483648
+    let hi: i32 = 2147483647
+    let zero: u32 = 0
+    let umax: u32 = 4294967295
+    let neg = i32(-1)
+    let wide = u32(4294967295)
+    let p = new Pair32 { a: neg, b: wide }
+    let xs = new i32[] { -1, 0, 2147483647 }
+    let ys = new u32[] { 0, 4294967295 }
+
+    if lo != -2147483648 {
+        return 1
+    }
+    if hi != 2147483647 {
+        return 2
+    }
+    if zero != 0 {
+        return 3
+    }
+    if umax != 4294967295 {
+        return 4
+    }
+    if p.a != -1 {
+        return 5
+    }
+    if p.b != 4294967295 {
+        return 6
+    }
+    if xs[0] != -1 {
+        return 7
+    }
+    if ys[1] != 4294967295 {
+        return 8
+    }
+    if ret_i32(7) != 7 {
+        return 9
+    }
+    if ret_u32(8) != takes_i64(8) {
+        return 10
+    }
+
+    os.Sleep(u32(0))
+    print("ok")
+    return 0
+}

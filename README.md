@@ -16,14 +16,14 @@ staged-bootstrap-archive-2026-06-30
 
 ## Layout
 
-- `bootstrap/`: Python lexer, parser, AST, codegen, and compiler driver.
+- `bootstrap/`: Python lexer, parser, semantic analyzer, MIR/X64 lowering, machine backend, and compiler driver.
 - `src/`: self-hosted compiler sources and `link.ep`.
-- `runtime/`: NASM runtime helpers appended by the compiler.
+- `runtime/`: NASM runtime helpers for the older Epic-written backend line.
 - `examples/`: annotated acceptance examples for the current language.
 - `docs/`: merged design and implementation notes, plus archived source notes.
 - `editors/`: editor integration assets.
 - `tree-sitter-epic/`: shared tree-sitter grammar support.
-- `tools/`: local ignored tool binaries such as `nasm.exe` and `lld-link.exe`.
+- `tools/`: local ignored tool binaries such as `lld-link.exe`; `nasm.exe` is only needed for older archived/self-hosted paths.
 - `build/`: local ignored build output.
 
 ## Bootstrap
@@ -51,15 +51,20 @@ Run the current Python reference compiler against all annotated examples:
 python test_examples_py.py
 ```
 
-Formatter and bootstrap checks:
+Python machine-layer checks:
 
 ```powershell
-python test_epicfmt.py
-python test_bootstrap_fixed_point.py
+python test_mir.py
+python test_x64_layers.py
 ```
 
 `link.py` is the default Python linker. `src/link.ep` is the Epic linker
 implementation and is tested separately.
+
+The old Python `--backend asm` path was archived at tag
+`python-asm-archive-2026-07-02` and removed from the active Python reference
+compiler. The Epic-written compiler under `src/` still belongs to the older
+NASM-oriented self-hosting line and is not the current Python machine backend.
 
 ## Development Rule
 

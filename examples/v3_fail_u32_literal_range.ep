@@ -1,0 +1,6 @@
+# COMPILE_FAIL: literal -1 out of range for u32
+
+fun main(): i64 {
+    let x: u32 = -1
+    return x
+}

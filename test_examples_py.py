@@ -23,6 +23,7 @@ def parse_annotations(source):
     stdout_lines = []
     argv = []
     clean_paths = []
+    compile_fail = None
     for line in source.split("\n"):
         line = line.strip()
         if m := re.match(r'#\s*EXIT:\s*(-?\d+)', line):
@@ -33,8 +34,10 @@ def parse_annotations(source):
             argv = shlex.split(m.group(1) or "")
         elif m := re.match(r'#\s*CLEAN:\s*(.+)$', line):
             clean_paths.extend(shlex.split(m.group(1)))
+        elif m := re.match(r'#\s*COMPILE_FAIL:\s*(.*)$', line):
+            compile_fail = m.group(1).strip() or ""
     stdout = "\n".join(stdout_lines) if stdout_lines else None
-    return exit_code, stdout, argv, clean_paths
+    return exit_code, stdout, argv, clean_paths, compile_fail
 
 
 def clean_test_paths(paths):
@@ -52,13 +55,13 @@ def clean_test_paths(paths):
             os.remove(path)
 
 
-def run_test(ep_file, linker="lld-link", backend="machine"):
+def run_test(ep_file, linker="lld-link"):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
-    exit_expected, stdout_expected, argv, clean_paths = parse_annotations(source)
+    exit_expected, stdout_expected, argv, clean_paths, compile_fail = parse_annotations(source)
     
-    if exit_expected is None and stdout_expected is None:
+    if exit_expected is None and stdout_expected is None and compile_fail is None:
         return True, "no annotations — skipped"
 
     try:
@@ -68,9 +71,16 @@ def run_test(ep_file, linker="lld-link", backend="machine"):
     
     # Compile
     result = subprocess.run(
-        [sys.executable, EPICC, ep_file, "--linker", linker, "--backend", backend],
+        [sys.executable, EPICC, ep_file, "--linker", linker],
         capture_output=True, text=True, cwd=SCRIPT_DIR, timeout=30,
     )
+    if compile_fail is not None:
+        output = result.stdout + result.stderr
+        if result.returncode == 0:
+            return False, "compile succeeded, expected failure"
+        if compile_fail and compile_fail not in output:
+            return False, f"compile failed, but expected {compile_fail!r} in:\n{output[:500]}"
+        return True, "compile failed as expected"
     if result.returncode != 0:
         return False, f"compile failed:\n{result.stderr[:500]}"
     
@@ -133,7 +143,7 @@ def resolve_example(arg):
     return path
 
 
-def run_all(linker, backend):
+def run_all(linker):
     examples = sorted(
         f for f in os.listdir(EXAMPLES_DIR) if f.endswith(".ep")
     )
@@ -149,7 +159,7 @@ def run_all(linker, backend):
     for ep_name in examples:
         ep_path = os.path.join(EXAMPLES_DIR, ep_name)
         try:
-            ok, detail = run_test(ep_path, linker=linker, backend=backend)
+            ok, detail = run_test(ep_path, linker=linker)
         except subprocess.TimeoutExpired:
             ok, detail = False, "TIMEOUT (compile >30s)"
         except Exception as e:
@@ -173,8 +183,6 @@ def main():
     parser.add_argument("example", nargs="?", help="exact example name or .ep path")
     parser.add_argument("--linker", choices=["lld", "py"], default="py",
                         help="Which linker to use (default: py)")
-    parser.add_argument("--backend", choices=["asm", "machine"], default="machine",
-                        help="Which object backend to use (default: machine)")
     args = parser.parse_args()
 
     ep_path = resolve_example(args.example)
@@ -183,7 +191,7 @@ def main():
     if ep_path is not None:
         # Single example mode
         try:
-            ok, detail = run_test(ep_path, linker=linker_val, backend=args.backend)
+            ok, detail = run_test(ep_path, linker=linker_val)
         except subprocess.TimeoutExpired:
             ok, detail = False, "TIMEOUT (compile >30s)"
         except Exception as e:
@@ -195,7 +203,7 @@ def main():
         print(f"  {status:5}  {name:20s}  {detail}")
         sys.exit(0 if ok else 1)
     else:
-        _, failed, _ = run_all(linker_val, args.backend)
+        _, failed, _ = run_all(linker_val)
         sys.exit(0 if failed == 0 else 1)
 
 

@@ -4,6 +4,11 @@
 
 MIR 的具体设计见 `docs/mir-design.md`。本文档只记录删除 NASM 的工程路线。
 
+状态更新：Python reference compiler 的 legacy `--backend asm` 已在
+`python-asm-archive-2026-07-02` 归档并从活动代码删除；当前 Python 主路径固定为
+`parse/merge -> sema -> MIR -> X64IR -> machine obj -> link`。`src/` 自举编译器仍在旧
+NASM-oriented 路径上，后续单独迁移。
+
 ## 判断
 
 当前固定点构建里，Python reference compiler 的前端和汇编文本生成不到 1 秒，`nasm.exe` 汇编单个约 1.2MB / 5.8 万行的 ASM 需要约 9 秒。最终 exe 只有约 254-269KB，说明问题不在最终二进制大小，而在“生成巨大文本汇编再解析”的中间形态。

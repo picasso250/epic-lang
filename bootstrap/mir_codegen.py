@@ -145,13 +145,13 @@ class MirCodegen:
     def _type(self, typ):
         if typ in (None, "void"):
             return VOID
-        if typ in ("i64", "u64", "i8", "u8", "bool"):
+        if typ in ("i64", "u64", "i32", "u32", "i8", "u8", "bool"):
             return BOOL if typ == "bool" else I64
         if typ == "&str":
             return ptr_str()
         if typ in ("u8[]", "i8[]", "&_arr_i8"):
             return ptr_arr_i8()
-        if typ in ("i64[]", "u64[]", "&_arr_i64"):
+        if typ in ("i64[]", "u64[]", "i32[]", "u32[]", "&_arr_i64"):
             return ptr_arr_i64()
         if typ in ("map[str]i64", "&_map_str_i64"):
             return ptr_map_str_i64()
@@ -403,6 +403,38 @@ class MirCodegen:
             return Ret()
         return Ret(ConstIntOperand(self.fn.return_type, 0))
 
+    def _emit_exit_current_block(self, code=1):
+        self._inst("call", [ConstIntOperand(I64, code)], type=VOID, callee="ExitProcess")
+        self.block.terminator = self._dummy_return()
+
+    def _emit_checked_int32_conversion(self, expr, target_name):
+        value = self._emit_expr(expr)
+        if target_name == "i32":
+            lo = -2147483648
+            hi = 2147483647
+        elif target_name == "u32":
+            lo = 0
+            hi = 4294967295
+        else:
+            raise MirCodegenError(f"unsupported checked conversion: {target_name}")
+
+        fail_block = self._new_block(f"{target_name}.range_fail")
+        upper_block = self._new_block(f"{target_name}.range_upper")
+        ok_block = self._new_block(f"{target_name}.range_ok")
+
+        low_bad = self._inst("icmp.lt", [value, ConstIntOperand(I64, lo)], result_type=BOOL)
+        self.block.terminator = CondBr(ValueOperand(low_bad), fail_block.name, upper_block.name)
+
+        self.block = upper_block
+        high_bad = self._inst("icmp.gt", [value, ConstIntOperand(I64, hi)], result_type=BOOL)
+        self.block.terminator = CondBr(ValueOperand(high_bad), fail_block.name, ok_block.name)
+
+        self.block = fail_block
+        self._emit_exit_current_block(1)
+
+        self.block = ok_block
+        return value
+
     def _emit_match(self, stmt):
         value = self._emit_expr(stmt.expr)
         match_addr = self._alloc_local(f"__match{self.value_counter}", value.type)
@@ -595,6 +627,8 @@ class MirCodegen:
             return ValueOperand(result)
         if name in ("i64", "u64", "u8", "bool"):
             return self._emit_expr(expr.args[0])
+        if name in ("i32", "u32"):
+            return self._emit_checked_int32_conversion(expr.args[0], name)
         if name == "bytes":
             arg = self._emit_expr(expr.args[0])
             result = self._inst("call", [arg], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="bytes_str")
@@ -682,7 +716,7 @@ class MirCodegen:
             return I64
         if isinstance(expr, CallNode) and expr.name == "map_has":
             return BOOL
-        if isinstance(expr, CallNode) and expr.name in ("i64", "u64"):
+        if isinstance(expr, CallNode) and expr.name in ("i64", "u64", "i32", "u32"):
             return I64
         if isinstance(expr, CallNode) and expr.name == "u8":
             return I64
@@ -697,12 +731,12 @@ class MirCodegen:
         if isinstance(expr, ArrayLiteralNode):
             if expr.elem_type in ("u8", "i8"):
                 return ptr_arr_i8()
-            if expr.elem_type in ("i64", "u64"):
+            if expr.elem_type in ("i64", "u64", "i32", "u32"):
                 return ptr_arr_i64()
         if isinstance(expr, NewArrayNode):
             if expr.elem_type in ("u8", "i8"):
                 return ptr_arr_i8()
-            if expr.elem_type in ("i64", "u64"):
+            if expr.elem_type in ("i64", "u64", "i32", "u32"):
                 return ptr_arr_i64()
             if expr.elem_type in self.structs:
                 return ptr_arr_struct(expr.elem_type)
@@ -806,7 +840,7 @@ class MirCodegen:
         if expr.elem_type in ("u8", "i8"):
             result = self._inst("call", [count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
             return ValueOperand(result)
-        if expr.elem_type in ("i64", "u64"):
+        if expr.elem_type in ("i64", "u64", "i32", "u32"):
             result_type = ptr_arr_i64()
             result = self._inst("call", [count], result_type=result_type, type=ptr(), callee="__epic_arr_qword_new")
             return ValueOperand(result)
@@ -920,6 +954,19 @@ class MirCodegen:
             return self._quote(expr.value) if repr_context else expr.value
         if isinstance(expr, CallNode) and expr.name in ("i64", "u64", "u8", "bool"):
             return self._static_repr(expr.args[0], repr_context)
+        if isinstance(expr, CallNode) and expr.name in ("i32", "u32"):
+            rendered = self._static_repr(expr.args[0], repr_context)
+            if rendered is None:
+                return None
+            try:
+                value = int(rendered)
+            except ValueError:
+                return None
+            if expr.name == "i32" and -2147483648 <= value <= 2147483647:
+                return rendered
+            if expr.name == "u32" and 0 <= value <= 4294967295:
+                return rendered
+            return None
         if isinstance(expr, BinaryNode):
             left = self._static_repr(expr.left, False)
             right = self._static_repr(expr.right, False)
@@ -939,7 +986,7 @@ class MirCodegen:
                 return None
             if expr.elem_type in ("u8", "i8") and not repr_context:
                 return "".join(chr(int(v)) for v in values)
-            elem = "bool" if expr.elem_type == "bool" else "str" if expr.elem_type == "str" else "i64" if expr.elem_type in ("i64", "u64") else expr.elem_type
+            elem = "bool" if expr.elem_type == "bool" else "str" if expr.elem_type == "str" else expr.elem_type
             return f"{elem}[]" + "{" + ", ".join(values) + "}"
         if isinstance(expr, StructInitNode):
             if expr.variant:

@@ -1,0 +1,6 @@
+# COMPILE_FAIL: literal 2147483648 out of range for i32
+
+fun main(): i64 {
+    let x: i32 = 2147483648
+    return x
+}

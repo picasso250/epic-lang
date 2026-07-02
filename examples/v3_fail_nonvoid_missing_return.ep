@@ -1,0 +1,7 @@
+# COMPILE_FAIL: function must return i64 on all paths
+
+fun main(): i64 {
+    if true {
+        return 1
+    }
+}

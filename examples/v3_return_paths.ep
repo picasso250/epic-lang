@@ -1,0 +1,24 @@
+# EXIT: 0
+
+fun choose(n: i64): i64 {
+    if n == 0 {
+        return 2
+    } else {
+        return 3
+    }
+}
+
+fun classify(n: i64): i64 {
+    match n {
+        0: {
+            return 5
+        }
+        else: {
+            return 7
+        }
+    }
+}
+
+fun main(): i64 {
+    return choose(0) + classify(1) - 9
+}

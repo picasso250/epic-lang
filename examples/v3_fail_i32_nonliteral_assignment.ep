@@ -1,0 +1,7 @@
+# COMPILE_FAIL: use i32(... ) for an explicit checked conversion
+
+fun main(): i64 {
+    let y = 1
+    let x: i32 = y
+    return x
+}
