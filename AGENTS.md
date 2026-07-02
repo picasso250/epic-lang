@@ -14,11 +14,11 @@
 - `epic-bootstrap.py` 是 `test_bootstrap_fixed_point.py` 的薄封装；当前 bootstrap 模型是 `Python reference compiler -> Epic compiler -> Epic compiler`。
 - 当前接受测试优先运行：
   - `python test_examples_py.py`
-  - `python test_bootstrap_fixed_point.py`
 - 不要为了新 feature 同步维护旧目录化版本；需要历史行为时看 tag 或旧提交。
 - `test_*.py` 是可直接运行的脚本测试，不是 pytest 测试；不要把 `python -m pytest` 当作支持入口。
 
 ## 现状
 
 - Python reference compiler ok `python test_examples_py.py`
-- 正在 eat dog food . test_lexer_bootstrap.py 通过，其他还未通过
+- 未来再 eat dog food ，现在先让py实现ok，正在去 nasm.exe 化
+- 我们现在战略性放弃ep自举，只攻py实现 `test_*bootstrap*.py` 一概不用跑。跑了也会失败。
