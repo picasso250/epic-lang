@@ -59,10 +59,19 @@
 
 ### Key boundary
 
-- **MIR helper** = x64 function that exists only because some MIR `call` references it. Future self-hosted compiler would emit these as MIR functions (lowered to x64 by generic lowering).
+**Current x64-backed runtime helper:**
+  X64 label/function emitted by `mir_lower` / `x64_runtime` because MIR references it.
+  MIR only declares the extern; the implementation lives in x64 asm generation.
+
+**Target MIR helper:**
+  `MirFunction` injected into `MirProgram` and lowered by the **normal MIR→X64 path**.
+  The helper's body is composed of standard MIR ops (`call`, `load`, `store`, `gep`, arithmetic, `br`, etc.) — it goes through the same lowering as user code.
+
 - **x64 primitive** = x64 function/data that requires Windows API knowledge or x64-specific setup. These stay in the x64 backend and are **not** MIR externs (they don't appear in the MIR program; they're injected only in x64 lower).
 
-Currently both categories are lumped together in `_emit_runtime_helpers()`.
+Currently the first category (x64-backed helpers) is the only category that exists. The target is to migrate as many as possible into the second category, leaving only true platform primitives as x64-specific.
+
+Both categories are currently lumped together in `_emit_runtime_helpers()`.
 
 ## Current State
 
