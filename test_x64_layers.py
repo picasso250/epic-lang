@@ -201,7 +201,7 @@ def test_runtime_start_helper_golden():
             self.x64 = X64Program()
             self.helper_bodies_appended = False
 
-        def _emit_runtime_helpers(self, skip_helpers=None):
+        def _emit_runtime_helpers(self):
             self.helper_bodies_appended = True
 
     lower = StubLower()

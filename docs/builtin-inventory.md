@@ -157,8 +157,9 @@ symbols used by the Python backend.
 | `new_arr_i8_empty` | allocate empty byte array with capacity |
 | `arr_i8_get` | bounds-checked byte array read |
 | `arr_i8_set` | bounds-checked byte array write |
+| `arr_i8_push` | append one byte to a byte array |
 
-These are currently injected by `bootstrap/mir_runtime_helpers.py`.
+These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
 
 ### x64-backed private helpers
 

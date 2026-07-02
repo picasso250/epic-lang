@@ -2,7 +2,9 @@
 
 ## Goal
 
-把 runtime helper 从「x64 lower 阶段无条件注入」逐步迁移到「MIR 层按需注入」。
+把 runtime helper 从「x64 lower 阶段无条件注入」逐步迁移到「MIR 层注入」。
+当前策略是全量注入所有已实现的 MIR helper，暂不维护 required-helper
+依赖图。
 
 ## Why
 
@@ -33,8 +35,8 @@ As of the current Python backend, runtime helpers are split into two implementat
 ### MIR-implemented helpers
 
 These helpers are emitted as normal `MirFunction`s by `bootstrap/mir_runtime_helpers.py`.
-`bootstrap/mir_codegen.py` tracks them through `required_mir_helpers`, then calls
-`inject_required_mir_helpers(program, required_mir_helpers)` after user functions are emitted.
+`bootstrap/mir_codegen.py` calls `inject_all_mir_helpers(program)` after user
+functions are emitted. This injects every implemented MIR helper.
 
 Implemented MIR helpers:
 
@@ -46,13 +48,14 @@ Implemented MIR helpers:
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_set` | `u8[]` subscript write | `bootstrap/mir_runtime_helpers.py` |
+| `arr_i8_push` | `push(u8[], value)` | `bootstrap/mir_runtime_helpers.py` |
 
 Injection rules:
 
-1. `mir_codegen.py` records required helper names in `required_mir_helpers`.
-2. `inject_required_mir_helpers()` removes matching `MirExtern`s.
-3. It appends deterministic `MirFunction` bodies using `_HELPER_ORDER`.
-4. The normal MIR validator then sees these helpers as ordinary functions.
+1. `inject_all_mir_helpers()` removes matching `MirExtern`s for every
+   implemented helper.
+2. It appends deterministic `MirFunction` bodies using `IMPLEMENTED_MIR_HELPERS`.
+3. The normal MIR validator then sees these helpers as ordinary functions.
 
 ### Still x64-backed helpers
 
@@ -67,7 +70,7 @@ Important x64-backed families include:
 | heap allocation primitive | `MirLower._emit_epic_alloc` |
 | qword array primitives | `MirLower._emit_epic_arr_qword_*` |
 | string helpers | `MirLower._emit_str_*` |
-| byte-array push/slice helpers | `MirLower._emit_arr_i8_push`, `MirLower._emit_arr_i8_slice` |
+| byte-array slice helper | `MirLower._emit_arr_i8_slice` |
 | i64-array helpers | `MirLower._emit_arr_i64_get`, `MirLower._emit_arr_i64_set` |
 | map helpers | `MirLower._emit_map_*` |
 | file/process helpers | `MirLower._emit_read_file`, `_emit_write_file`, `_emit_system_cmd` |
@@ -75,22 +78,22 @@ Important x64-backed families include:
 | printing helpers | `MirLower._emit_print_str`, `_emit_print_newline`, `_emit_putc` |
 | error helpers | `MirLower._emit_array_oob` |
 
-### Duplicate-emission guard
+### Duplicate-emission policy
 
-`MirLower.lower()` computes:
+Implemented MIR helpers are always present as `MirFunction`s, so their legacy
+x64 fallback bodies have been deleted. `MirLower.lower()` now simply appends the
+remaining full x64 runtime:
 
 ```python
-migrated_helpers = {fn.name for fn in self.program.functions}
-append_runtime_helpers(self, skip_helpers=migrated_helpers)
+append_runtime_helpers(self)
 ```
 
-This means that helpers already injected as MIR functions are skipped when appending
-legacy x64 helper bodies. The current bridge is therefore:
+The current bridge is therefore:
 
 ```text
 MIR helper present as MirFunction
   -> normal function lowering emits x64
-  -> same-named legacy x64 helper is skipped
+  -> no same-named legacy x64 helper exists
 ```
 
 ### Current boundary
@@ -99,9 +102,8 @@ The current ownership boundary is:
 
 | responsibility                                  | owner                    |
 | ----------------------------------------------- | ------------------------ |
-| Tracking required MIR helpers                   | `mir_codegen.py`         |
 | Building MIR helper bodies                      | `mir_runtime_helpers.py` |
-| Removing externs and injecting helper functions | `mir_runtime_helpers.py` |
+| Removing externs and injecting all implemented helper functions | `mir_runtime_helpers.py` |
 | Runtime data emission                           | `x64_runtime.py`         |
 | Startup hook call                               | `x64_runtime.py`         |
 | Runtime append policy                           | `x64_runtime.py`         |
@@ -218,9 +220,8 @@ def _emit_runtime_helpers(self):
     self._emit_epic_arr_qword_extend()
     self._emit_epic_arr_qword_get("__epic_arr_i64_get", "array_oob")
     self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
-    self._emit_bytes_str()
-    self._emit_str_arr_i8()
-    # … 35+ helpers, ALL unconditionally emitted
+    self._emit_arr_i8_slice()
+    # … remaining x64-backed helpers, ALL unconditionally emitted
 ```
 
 ### 3. `__epic_alloc` already works as MIR-callable extern

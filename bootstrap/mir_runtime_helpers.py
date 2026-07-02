@@ -2,8 +2,9 @@
 
 Each helper is a hand-coded MirFunction that replaces an x64-backed runtime
 helper.  They use existing MIR ops (call/gep/load/store/ret) and call existing
-x64 primitives (notably __epic_alloc).  The lowering pipeline emits them
-through the normal _lower_function path.
+x64 primitives (notably __epic_alloc).  The codegen pipeline injects all
+implemented helpers, and the lowering pipeline emits them through the normal
+_lower_function path.
 """
 
 from mir import (
@@ -472,31 +473,15 @@ _HELPER_ORDER = [
 ]
 
 
-def inject_required_mir_helpers(program: MirProgram, helper_names: set[str]) -> None:
-    """Inject MirFunction implementations for the given helper names.
+IMPLEMENTED_MIR_HELPERS = tuple(_HELPER_ORDER)
 
-    For each name in *helper_names*:
-      1. Remove any matching MirExtern from *program.externs* so the
-         validator does not see a duplicate symbol.
-      2. Build the MirFunction and append it to *program.functions*.
 
-    Injection order is deterministic (per _HELPER_ORDER).  Unknown names
-    raise RuntimeError immediately to avoid silent extern deletion.
-    """
-    if not helper_names:
-        return
-
-    implemented = helper_names & set(_HELPER_EMITTERS)
-    unknown = helper_names - set(_HELPER_EMITTERS)
-    if unknown:
-        raise RuntimeError(
-            f"no MIR emitter registered for helper(s): {sorted(unknown)}"
-        )
+def inject_all_mir_helpers(program: MirProgram) -> None:
+    """Inject every implemented MIR helper in deterministic order."""
+    implemented = set(IMPLEMENTED_MIR_HELPERS)
 
     # Remove matching externs so validate() doesn't see duplicate symbols.
     program.externs[:] = [e for e in program.externs if e.name not in implemented]
 
-    # Inject in deterministic order.
-    for name in _HELPER_ORDER:
-        if name in implemented:
-            program.functions.append(_HELPER_EMITTERS[name](program))
+    for name in IMPLEMENTED_MIR_HELPERS:
+        program.functions.append(_HELPER_EMITTERS[name](program))

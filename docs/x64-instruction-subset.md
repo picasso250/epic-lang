@@ -370,13 +370,13 @@ Runtime data, startup hook emission, and runtime append policy now live in
 `x64_runtime.py`.
 
 MIR helper bodies for `bytes_str`, `str_arr_i8`, `new_arr_i8`,
-`new_arr_i8_empty`, `arr_i8_get`, and `arr_i8_set` now live in
+`new_arr_i8_empty`, `arr_i8_get`, `arr_i8_set`, and `arr_i8_push` now live in
 `mir_runtime_helpers.py` and are injected as ordinary `MirFunction`s by
 `mir_codegen.py`.
 
 Most remaining x64-backed helper bodies still live on `MirLower` as `_emit_*`
-methods. `append_runtime_helpers()` passes `skip_helpers` so helpers already
-implemented as MIR functions are not emitted again as legacy x64 helper bodies.
+methods. Helpers implemented as MIR functions no longer have same-named legacy
+x64 fallback bodies.
 
 Recommended next step: migrate the remaining x64-backed helper families out of
 `MirLower` one family at a time, preferably into MIR helpers first. Only keep

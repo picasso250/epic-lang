@@ -11,6 +11,7 @@ from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirFunction, MirInst, MirP
 from mir import MirProgram, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from mir_codegen import ast_to_mir
+from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
 from parser import Parser
 import sema
 
@@ -183,69 +184,53 @@ fun main(): i64 {
 
 
 def test_mir_helper_injection():
-    """Verify MIR runtime helpers are injected correctly."""
+    """Verify all implemented MIR runtime helpers are always injected."""
 
-    def check(source, expect_injected, expect_extern):
+    def check(source):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
         prog = ast_to_mir(ast)
         injected = {fn.name for fn in prog.functions}
         externs = {ext.name for ext in prog.externs}
-        for name in expect_injected:
+        for name in IMPLEMENTED_MIR_HELPERS:
             assert name in injected, f"{name} should be injected as MirFunction, got injected={injected}"
             assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
-        for name in expect_extern:
-            assert name in externs, f"{name} should remain as extern"
+        return prog
 
-    # bytes(s) → bytes_str
     check(
         """fun main(): i64 {
     let b = bytes("AB")
     return 0
-}""",
-        expect_injected={"bytes_str"},
-        expect_extern={"str_arr_i8", "new_arr_i8", "new_arr_i8_empty", "arr_i8_get", "arr_i8_set"},
+}"""
     )
 
-    # str(u8[]) → str_arr_i8
     check(
         """fun main(): i64 {
     let a = new u8[] { 65 }
     println(str(a))
     return 0
-}""",
-        expect_injected={"str_arr_i8", "new_arr_i8", "arr_i8_set"},
-        expect_extern={"bytes_str", "new_arr_i8_empty", "arr_i8_get"},
+}"""
     )
 
-    # new u8[] literal → new_arr_i8 + arr_i8_set
     check(
         """fun main(): i64 {
     let a = new u8[] { 1, 2 }
     return 0
-}""",
-        expect_injected={"new_arr_i8", "arr_i8_set"},
-        expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty", "arr_i8_get"},
+}"""
     )
 
-    # b[i] → arr_i8_get
     check(
         """fun main(): i64 {
     let b = new u8[] { 1, 2 }
     return b[0]
-}""",
-        expect_injected={"new_arr_i8", "arr_i8_set", "arr_i8_get"},
-        expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty"},
+}"""
     )
 
-    # push(u8[], value) → arr_i8_push
     check(
         """fun main(): i64 {
     let b = new u8[] { 1, 2 }
     push(b, 3)
     return len(b)
-}""",
-        expect_injected={"new_arr_i8", "arr_i8_set", "arr_i8_push"},
-        expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty", "arr_i8_get"},
+}"""
     )
 
     # Deterministic order: running twice gives same injection list
@@ -257,9 +242,11 @@ def test_mir_helper_injection():
     ast = sema.analyze_program(Parser(lex(src)).parse_program())
     prog1 = ast_to_mir(ast)
     prog2 = ast_to_mir(ast)
-    order1 = [fn.name for fn in prog1.functions if fn.name != "main"]
-    order2 = [fn.name for fn in prog2.functions if fn.name != "main"]
+    helper_names = set(IMPLEMENTED_MIR_HELPERS)
+    order1 = [fn.name for fn in prog1.functions if fn.name in helper_names]
+    order2 = [fn.name for fn in prog2.functions if fn.name in helper_names]
     assert order1 == order2, f"helper order differs between runs: {order1} != {order2}"
+    assert order1 == list(IMPLEMENTED_MIR_HELPERS), f"unexpected helper order: {order1}"
 
 
 def main():
