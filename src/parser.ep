@@ -156,7 +156,7 @@ fun advance(p: Parser): Token {
 
 fun parse_error(line: i64, msg: str): i64 {
     println(f"Parse error line {line}: {msg}")
-    os.ExitProcess(1)
+    exit(1)
     return 1
 }
 
@@ -164,7 +164,7 @@ fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
     if same(t.kind, kind) == 0 {
         println(f"Parse error line {t.line}: Expected {kind}, got {t.kind}('{t.text}')")
-        os.ExitProcess(1)
+        exit(1)
     }
     return t
 }
@@ -1500,9 +1500,9 @@ fun dump_node(node: AstNode, depth: i64): i64 {
 fun main(): i64 {
     if len(argv) < 2 {
         println("usage: parser <file>")
-        os.ExitProcess(1)
+        exit(1)
     }
-    let src = read_file(argv[1])
+    let src = str(read_file(argv[1]))
     let tokens = lex(src)
     let p = make_parser(tokens)
     let ast = parse_program(p)
