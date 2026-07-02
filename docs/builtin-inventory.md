@@ -138,7 +138,26 @@ The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
 |----------|--------|----------|
 | `puti` | **Removed from docs examples.** No implementation exists or existed — was a legacy concept. | |
 | `putstr` | **Removed from public builtin surface.** Replaced by `print(s)`. | |
-| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. | |
+| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. Backend private label `putc` in `mir_lower.py` still exists as an implementation detail (direct WriteFile with `_putc_buf`), not referenced by any MIR call. | |
+
+---
+
+## Backend Private Helpers (not public builtins)
+
+The MIR lowerer (`bootstrap/mir_lower.py`) registers runtime helper labels that are
+not exposed as Epic language builtins:
+
+| Label | Implementation | Notes |
+|-------|---------------|-------|
+| `print_str` | WriteFile via GetStdHandle | Used by `print`/`putstr`; takes `ptr<str>` |
+| `print_newline` | WriteFile via GetStdHandle | Writes a single `\n` byte; used by `println` |
+| `putc` | WriteFile via GetStdHandle + `_putc_buf` | Was callee of `putc` builtin; currently unreferenced as MIR callee |
+| `_newline` | Data byte 0x0a | Shared by `print_newline` |
+| `_putc_buf` | Data byte 0 | Private to `putc` helper |
+
+These are implementation details of the X64 backend and should not be confused
+with Epic language builtins. Cleanup of unreferenced helpers (e.g., `putc` label)
+is a separate concern from the language surface.
 
 ---
 

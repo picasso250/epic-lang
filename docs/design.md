@@ -317,8 +317,8 @@ let source = str(read_file(path))
 
 | 内置函数                               | 含义                                        |
 |----------------------------------------|---------------------------------------------|
-| `print(s: str): void`                   | 写入字符串（无换行）                          |
-| `println(s: str): void`                 | 写入字符串并追加换行                          |
+| `print(x): void`                       | 写入 `x` 的字符串表示（无换行）              |
+| `println(x): void`                     | 写入 `x` 的字符串表示并追加换行              |
 | `itoa(n: i64): str`                    | 整数转堆分配字符串                          |
 | `str_new(bytes, len): str`             | 从底层缓冲区复制 `len` 个字节创建字符串     |
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
