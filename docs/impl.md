@@ -193,8 +193,8 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 | 内置函数           | 实现方式                                    |
 |--------------------|---------------------------------------------|
-| `putc`             | `WriteFile` 系统调用                        |
-| `putstr`           | 写入 `s.data` 共 `s.len` 个字节             |
+| `exit`             | `ExitProcess` 系统调用                      |
+| `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      |
 | `itoa`             | `_itoa` 运行时辅助函数                      |
 | `system`           | `_system` 运行时辅助函数                    |
 | `read_file`        | `_read_file` 运行时辅助函数，返回 `u8[]`    |

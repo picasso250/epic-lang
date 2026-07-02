@@ -5,18 +5,18 @@ def test_formats_basic_blocks():
     source = """fun main(): void {
 let x = 1
 if x {
-putc(65)
+println(65)
 } else {
-putc(66)
+println(66)
 }
 }
 """
     assert epicfmt.format_text(source) == """fun main(): void {
     let x = 1
     if x {
-        putc(65)
+        println(65)
     } else {
-        putc(66)
+        println(66)
     }
 }
 """
@@ -24,33 +24,33 @@ putc(66)
 
 def test_ignores_braces_in_literals_and_comments():
     source = """fun main(): void {
-putstr("{")
-putstr("}")
+println("{")
+println("}")
 # {
 if 1 {
-putc('}')
+println('}')
 }
 }
 """
     assert epicfmt.format_text(source) == """fun main(): void {
-    putstr("{")
-    putstr("}")
+    println("{")
+    println("}")
     # {
     if 1 {
-        putc('}')
+        println('}')
     }
 }
 """
 
 
 def test_preserves_blank_lines_and_trailing_text():
-    source = "fun main(): void {\n\nputc(65)    \n}\n"
-    assert epicfmt.format_text(source) == "fun main(): void {\n\n    putc(65)    \n}\n"
+    source = "fun main(): void {\n\nprintln(65)    \n}\n"
+    assert epicfmt.format_text(source) == "fun main(): void {\n\n    println(65)    \n}\n"
 
 
 def test_preserves_crlf_newlines():
-    source = "fun main(): void {\r\nputc(65)\r\n}\r\n"
-    assert epicfmt.format_text(source) == "fun main(): void {\r\n    putc(65)\r\n}\r\n"
+    source = "fun main(): void {\r\nprintln(65)\r\n}\r\n"
+    assert epicfmt.format_text(source) == "fun main(): void {\r\n    println(65)\r\n}\r\n"
 
 
 def test_preserves_existing_line_breaks():
@@ -90,9 +90,9 @@ println("x")
 
 
 def test_does_not_split_braces_in_literals_or_comments():
-    source = """fun main(): void { putstr("{ }") # } {
+    source = """fun main(): void { println("{ }") # } {
 }
 """
-    assert epicfmt.format_text(source) == """fun main(): void { putstr("{ }") # } {
+    assert epicfmt.format_text(source) == """fun main(): void { println("{ }") # } {
 }
 """

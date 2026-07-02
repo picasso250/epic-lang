@@ -113,7 +113,6 @@ class MirCodegen:
         self.program.externs.append(MirExtern("map_repr", MirSignature([ptr_map_str_i64()], ptr_str())))
         self.program.externs.append(MirExtern("print_str", MirSignature([ptr_str()], VOID)))
         self.program.externs.append(MirExtern("print_newline", MirSignature([], VOID)))
-        self.program.externs.append(MirExtern("putc", MirSignature([I64], VOID)))
         self.program.externs.append(MirExtern("__epic_alloc", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__epic_arr_qword_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__epic_arr_i64_push", MirSignature([ptr(), I64], VOID)))
@@ -591,14 +590,6 @@ class MirCodegen:
             if expr.args:
                 as_str = self._coerce_print_arg(expr.args[0])
                 self._inst("call", [as_str], type=VOID, callee="print_str")
-            return ConstIntOperand(I64, 0)
-        if name == "putstr":
-            arg = self._emit_expr(expr.args[0])
-            self._inst("call", [arg], type=VOID, callee="print_str")
-            return ConstIntOperand(I64, 0)
-        if name == "putc":
-            arg = self._emit_expr(expr.args[0])
-            self._inst("call", [arg], type=VOID, callee="putc")
             return ConstIntOperand(I64, 0)
         if name == "exit":
             arg = self._emit_expr(expr.args[0])

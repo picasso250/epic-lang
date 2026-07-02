@@ -407,13 +407,6 @@ class SemanticAnalyzer:
             if expr.args:
                 self._expr(expr.args[0])
             return ExprInfo(VOID)
-        if name == "putstr":
-            self._check_call_args(name, [STR], expr.args)
-            return ExprInfo(VOID)
-        if name == "putc":
-            self._check_arity(name, 1, expr.args)
-            self._expect_integer(self._expr(expr.args[0]), "putc argument")
-            return ExprInfo(VOID)
         if name == "exit":
             self._check_call_args(name, [I64], expr.args)
             return ExprInfo(VOID)

@@ -20,8 +20,6 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 |----------|---------|----------------|---------------------|------------|-------|
 | `print`  | ✓ (ln 401) | ✓ (ln 588) | ✗ | ✓ (ln 831) | Print with trailing newline — `println` handled same line |
 | `println` | ✓ (ln 401) | ✓ (ln 580) | ✗ | ✓ (ln 831) | |
-| `putstr` | ✓ (ln 407) | ✓ (ln 595) | ✗ | ✓ (ln 807) | Low-level string output, older sibling of `print` |
-| `putc`   | ✓ (ln 410) | ✓ (ln 599) | ✗ | ✓ (ln 792) | Low-level character output |
 | `exit`   | ✓ (ln 414) | ✓ (ln 603) | ✗ | ✗ | Terminate process; `n` args=`i64` |
 | `system` | ✓ (ln 465) | ✓ (ln 685) | ✗ | ✓ (ln 906) | Shell command, returns `i64` |
 
@@ -139,6 +137,8 @@ The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
 | Function | Status | Evidence |
 |----------|--------|----------|
 | `puti` | **Removed from docs examples.** No implementation exists or existed — was a legacy concept. | |
+| `putstr` | **Removed from public builtin surface.** Replaced by `print(s)`. | |
+| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. | |
 
 ---
 
@@ -157,7 +157,7 @@ str_replace_char str_starts_with str_find str_trim map_has
 **But does NOT reserve:**
 
 ```
-print println putstr putc exit system read_file write_file
+print println exit system read_file write_file
 itoa cstr i64 u64 i32 u32 u8 bool
 ```
 
