@@ -59,6 +59,7 @@ class MirCodegen:
         self.program.imports.append(MirImport("GetTickCount64", MirSignature([], I64), "kernel32.dll"))
         self.program.imports.append(MirImport("lstrlenA", MirSignature([ptr(I8)], I64), "kernel32.dll"))
         self.program.imports.append(MirImport("lstrcmpA", MirSignature([ptr(I8), ptr(I8)], I64), "kernel32.dll"))
+        self.program.imports.append(MirImport("GetStdHandle", MirSignature([I64], I64), "kernel32.dll"))
         self.program.imports.append(MirImport("GetProcessHeap", MirSignature([], I64), "kernel32.dll"))
         self.program.imports.append(MirImport("HeapAlloc", MirSignature([I64, I64, I64], I64), "kernel32.dll"))
         self.program.imports.append(MirImport("CreateFileA", MirSignature([ptr(I8), I64, I64, I64, I64, I64, I64], I64), "kernel32.dll"))

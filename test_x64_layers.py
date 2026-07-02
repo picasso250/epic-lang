@@ -11,6 +11,7 @@ from mir import I64, ConstIntOperand, MirBlock, MirFunction, MirInst, MirParam
 from mir import MirProgram, MirValue, Ret, ValueOperand
 from mir_lower import MirLower
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
+from x64 import X64ValidationError, validate_x64_program
 from x64_runtime import append_runtime_helpers, emit_startup_hook_call
 
 
@@ -40,6 +41,15 @@ def build_machine_state(program):
     builder._emit_program()
     builder._patch_internal_fixups()
     return builder
+
+
+def assert_x64_invalid(program, message):
+    try:
+        validate_x64_program(program)
+    except X64ValidationError as e:
+        assert message in str(e), str(e)
+        return
+    raise AssertionError("expected X64ValidationError")
 
 
 def test_x64_pretty_print_golden():
@@ -166,12 +176,32 @@ def test_x64_to_machine_bytes_and_fixups_golden():
     assert builder.text_relocs == [(27, "msg"), (35, "ExitProcess")]
 
 
+def test_x64_validator_rejects_bad_forms():
+    validate_x64_program(build_x64_fixture())
+
+    program = X64Program()
+    program.section(".text")
+    program.inst("test", R("rax"), R("rcx"))
+    assert_x64_invalid(program, "test requires identical operands")
+
+    program = X64Program()
+    program.section(".text")
+    program.inst("add", R("rax"), I(128))
+    assert_x64_invalid(program, "signed imm8")
+
+    program = X64Program()
+    program.section(".text")
+    program.inst("call", Symbol("Missing"))
+    assert_x64_invalid(program, "undefined symbol: Missing")
+
+
 def main():
     test_x64_pretty_print_golden()
     test_mir_function_to_x64_golden()
     test_startup_hook_call_golden()
     test_runtime_start_helper_golden()
     test_x64_to_machine_bytes_and_fixups_golden()
+    test_x64_validator_rejects_bad_forms()
     print("PASS test_x64_layers")
 
 

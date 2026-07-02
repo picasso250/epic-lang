@@ -1433,7 +1433,7 @@ class MirLower:
         x.inst("div", R("rcx"))
         x.inst("add", R("dl"), I(48))
         x.inst("dec", R("r10"))
-        x.inst("mov", M("r10"), R("dl"))
+        x.inst("mov", M("r10", 0, 1), R("dl"))
         x.inst("inc", R("r11"))
         x.inst("test", R("rax"), R("rax"))
         x.inst("jnz", LabelRef("str_i64.loop"))

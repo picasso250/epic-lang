@@ -5,6 +5,7 @@ import struct
 from coff import write_coff_obj
 from x64 import Imm, LabelRef, Mem, Reg, Symbol, X64DataBytes, X64DataZero
 from x64 import X64Extern, X64Global, X64Inst, X64Label, X64Section
+from x64 import validate_x64_program
 
 
 REG64 = {
@@ -56,6 +57,7 @@ class MachineBackendError(RuntimeError):
 
 class MachineObjectBuilder:
     def __init__(self, program):
+        validate_x64_program(program)
         self.program = program
         self.text = bytearray()
         self.data = bytearray()
@@ -158,7 +160,7 @@ class MachineObjectBuilder:
             if mem.size != 1 or mem.symbol is not None:
                 raise MachineBackendError("movsx only supports byte base memory")
             self._emit_movsx_reg_mem8(operands[0].name, mem.base.name, mem.disp)
-        elif op == "test" and self._two_regs(operands):
+        elif op == "test" and self._two_regs(operands) and operands[0].name == operands[1].name:
             self._emit_test_reg_reg(operands[0].name)
         elif op == "xor" and self._two_regs(operands) and operands[0].name == operands[1].name:
             self._emit_xor_reg_reg(operands[0].name)
@@ -410,6 +412,8 @@ class MachineObjectBuilder:
         self.text.extend(bytes([0x0F, codes[op], 0xC0]))
 
     def _emit_add_reg_imm(self, reg, imm):
+        if not -128 <= imm <= 127:
+            raise MachineBackendError(f"add immediate out of signed imm8 range: {imm}")
         if reg in REG8:
             self._rex(b=REG8[reg] >> 3)
             self.text.append(0x80)
