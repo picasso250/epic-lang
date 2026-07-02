@@ -17,13 +17,15 @@
   - `python test_examples_py.py`      # examples/ 正向学习示例
   - `python test_mir.py`              # 兼容旧入口，后续迁移到 tests/mir/
   - `python test_x64_layers.py`       # 兼容旧入口，后续迁移到 tests/x64/
-  - `python test_lexer_dump_format.py` # 兼容旧入口，后续迁移到 tests/lexer/
 - 不要运行：
   - `python -m pytest`（不是 pytest 体系）
   - `test_*bootstrap*.py`（bootstrap 自举测试战略性放弃）
 - `examples/` 只放正向、典型、适合初学者学习的示例程序，不放负向测试。
 - 负向测试放 `tests/<module>/fail/`。
 - typed AST 不单独建顶层测试目录；它属于 sema 输出契约，测试放 `tests/sema/`。
+- `tests/lexer/pass/all.ep` 是 lexer 规格样本，覆盖所有 token 种类。
+- `tests/lexer/pass/token_list.txt` 由 `bootstrap/lexer.py` 生成，人眼 review 后提交。
+  更新方式：`python tests/lexer/run.py --regen`
 - 不要为了新 feature 同步维护旧目录化版本；需要历史行为时看 tag 或旧提交。
 - `test_*.py` 是可直接运行的脚本测试，不是 pytest 测试；不要把 `python -m pytest` 当作支持入口。
 

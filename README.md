@@ -51,17 +51,10 @@ under `tests/`, organized by compiler module (matching `bootstrap/*.py`).
 Recommended commands:
 
 ```powershell
-python tests/run.py               # Module-level test suite (MVP)
+python tests/run.py               # Module-level test suite
 python test_examples_py.py        # examples/ learning examples
 python test_mir.py                 # Legacy MIR tests (migrating to tests/mir/)
 python test_x64_layers.py          # Legacy x64 tests (migrating to tests/x64/)
-python test_lexer_dump_format.py   # Legacy lexer tests (migrating to tests/lexer/)
-```
-
-Or use the batch script:
-
-```powershell
-./testall.ps1
 ```
 
 `link.py` is the default Python linker. `src/link.ep` is the Epic linker
