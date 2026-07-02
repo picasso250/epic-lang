@@ -307,11 +307,17 @@ class MirLower:
         self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
         if "bytes_str" not in skip_helpers:
             self._emit_bytes_str()
-        self._emit_str_arr_i8()
-        self._emit_new_arr_i8()
-        self._emit_new_arr_i8_empty()
-        self._emit_arr_i8_get()
-        self._emit_arr_i8_set()
+        if "str_arr_i8" not in skip_helpers:
+            self._emit_str_arr_i8()
+        if "new_arr_i8" not in skip_helpers:
+            self._emit_new_arr_i8()
+        if "new_arr_i8_empty" not in skip_helpers:
+            self._emit_new_arr_i8_empty()
+        if "arr_i8_get" not in skip_helpers:
+            self._emit_arr_i8_get()
+        if "arr_i8_set" not in skip_helpers:
+            self._emit_arr_i8_set()
+        self._emit_arr_i8_oob()
         self._emit_arr_i8_push()
         self._emit_arr_i8_slice()
         self._emit_arr_i64_get()
@@ -697,6 +703,9 @@ class MirLower:
         x.inst("add", R("rax"), R("rdx"))
         x.inst("mov", M("rax", 0, 1), R("r8b"))
         x.inst("ret")
+
+    def _emit_arr_i8_oob(self):
+        x = self.x64
         x.label("arr_i8_oob")
         x.inst("mov", R("rcx"), I(1))
         x.inst("sub", R("rsp"), I(32))

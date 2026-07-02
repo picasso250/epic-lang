@@ -356,6 +356,7 @@ class MirCodegen:
             index = self._emit_expr(stmt.index)
             value = self._emit_expr(stmt.value)
             if base.type == ptr_arr_i8():
+                self.required_mir_helpers.add("arr_i8_set")
                 self._inst("call", [base, index, value], type=VOID, callee="arr_i8_set")
             elif base.type == ptr_arr_i64():
                 self._inst("call", [base, index, value], type=VOID, callee="arr_i64_set")
@@ -799,6 +800,7 @@ class MirCodegen:
             addr = self._inst("gep", [base, index], result_type=ptr(I64), type=I64)
             result = self._inst("load", [ValueOperand(addr)], result_type=I64, type=I64)
             return ValueOperand(result)
+        self.required_mir_helpers.add("arr_i8_get")
         result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i8_get")
         return ValueOperand(result)
 
@@ -818,6 +820,7 @@ class MirCodegen:
             return arr
         if arr_type != ptr_arr_i8():
             raise MirCodegenError(f"unsupported array literal element type: {expr.elem_type}")
+        self.required_mir_helpers.add("new_arr_i8")
         result = self._inst(
             "call",
             [ConstIntOperand(I64, len(expr.values))],
@@ -827,6 +830,7 @@ class MirCodegen:
         )
         arr = ValueOperand(result)
         for idx, value in enumerate(expr.values):
+            self.required_mir_helpers.add("arr_i8_set")
             self._inst("call", [arr, ConstIntOperand(I64, idx), self._emit_expr(value)], type=VOID, callee="arr_i8_set")
         return arr
 
@@ -834,6 +838,7 @@ class MirCodegen:
         count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 4)
         arr_type = self._type(expr.resolved_type)
         if arr_type == ptr_arr_i8():
+            self.required_mir_helpers.add("new_arr_i8_empty")
             result = self._inst("call", [count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
             return ValueOperand(result)
         if arr_type == ptr_arr_i64():
@@ -929,6 +934,7 @@ class MirCodegen:
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_bool")
             return ValueOperand(result)
         if typ == ptr_arr_i8():
+            self.required_mir_helpers.add("str_arr_i8")
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_arr_i8")
             return ValueOperand(result)
         if typ == ptr_map_str_i64():
@@ -1072,6 +1078,7 @@ class MirCodegen:
         if typ == ptr_str():
             return SymbolOperand(ptr_str(), self._string_label(""))
         if typ == ptr_arr_i8():
+            self.required_mir_helpers.add("new_arr_i8_empty")
             result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
             return ValueOperand(result)
         if typ == ptr_arr_i64():
