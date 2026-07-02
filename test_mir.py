@@ -237,6 +237,17 @@ def test_mir_helper_injection():
         expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty"},
     )
 
+    # push(u8[], value) → arr_i8_push
+    check(
+        """fun main(): i64 {
+    let b = new u8[] { 1, 2 }
+    push(b, 3)
+    return len(b)
+}""",
+        expect_injected={"new_arr_i8", "arr_i8_set", "arr_i8_push"},
+        expect_extern={"bytes_str", "str_arr_i8", "new_arr_i8_empty", "arr_i8_get"},
+    )
+
     # Deterministic order: running twice gives same injection list
     src = """fun main(): i64 {
     let b = new u8[] { 65, 66 }

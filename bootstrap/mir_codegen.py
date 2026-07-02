@@ -737,6 +737,7 @@ class MirCodegen:
         if name == "push":
             args = [self._emit_expr(arg) for arg in expr.args]
             if args[0].type == ptr_arr_i8():
+                self.required_mir_helpers.add("arr_i8_push")
                 self._inst("call", args, type=VOID, callee="arr_i8_push")
             elif args[0].type == ptr_arr_i64():
                 self._inst("call", args, type=VOID, callee="__epic_arr_i64_push")

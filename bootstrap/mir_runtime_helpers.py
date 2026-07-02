@@ -341,6 +341,113 @@ def emit_arr_i8_set() -> MirFunction:
     return b.fn
 
 
+def emit_arr_i8_push() -> MirFunction:
+    """Push a byte value onto a u8[] array.
+
+    fn arr_i8_push(ptr<_arr_i8> %arr, i64 %val) -> void
+
+    Grows by doubling capacity when full, using __epic_alloc for new
+    backing storage.  Matches the old _emit_arr_i8_push x64 behaviour.
+    """
+    b = MirHelperBuilder(
+        "arr_i8_push",
+        [
+            MirParam("%arr", ptr(mir_struct("_arr_i8"))),
+            MirParam("%val", I64),
+        ],
+        VOID,
+    )
+    arr_val = ValueOperand(b.fn.params[0].value)
+    val_val = ValueOperand(b.fn.params[1].value)
+
+    # Load old_len (field 1) and old_cap (field 2)
+    len_addr = b.gep_field(arr_val, "_arr_i8", 1)
+    old_len = b.load(I64, len_addr)
+    cap_addr = b.gep_field(arr_val, "_arr_i8", 2)
+    old_cap = b.load(I64, cap_addr)
+
+    # Check if grow needed
+    need_grow = b.icmp("ge", old_len, old_cap)
+    grow_block = b.new_block("grow")
+    store_block = b.new_block("store")
+    b.entry.terminator = CondBr(ValueOperand(need_grow), grow_block.name, store_block.name)
+
+    # grow: allocate slots for grow results, dispatch zero vs double
+    b.entry = grow_block
+    new_cap_slot = b.alloca(I64)
+    new_data_slot = b.alloca(ptr())
+    i_slot = b.alloca(I64)
+
+    cap_zero = b.icmp("eq", old_cap, b.const_i64(0))
+    zero_block = b.new_block("grow_zero")
+    double_block = b.new_block("grow_double")
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, double_block.name)
+
+    # grow_zero: new_cap = 2
+    b.entry = zero_block
+    nc0 = b.const_i64(2)
+    b.store(nc0, ValueOperand(new_cap_slot))
+    nd0 = b.call("__epic_alloc", [nc0], ptr())
+    b.store(nd0, ValueOperand(new_data_slot))
+    copy_entry = b.new_block("copy_entry")
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
+
+    # grow_double: new_cap = old_cap * 2
+    b.entry = double_block
+    nc1 = b.binop("add", old_cap, old_cap)
+    b.store(nc1, ValueOperand(new_cap_slot))
+    nd1 = b.call("__epic_alloc", [nc1], ptr())
+    b.store(nd1, ValueOperand(new_data_slot))
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
+
+    # copy_entry: load data pointer, init copy loop
+    b.entry = copy_entry
+    old_data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
+    new_data = b.load(ptr(), ValueOperand(new_data_slot))
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    copy_check = b.new_block("copy_check")
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_check.name, copy_check.name)
+
+    # copy_check: loop condition i < old_len
+    b.entry = copy_check
+    i = b.load(I64, ValueOperand(i_slot))
+    cond = b.icmp("lt", i, old_len)
+    copy_body = b.new_block("copy_body")
+    swap_block = b.new_block("swap")
+    b.entry.terminator = CondBr(ValueOperand(cond), copy_body.name, swap_block.name)
+
+    # copy_body: copy one byte
+    b.entry = copy_body
+    old_byte_addr = b.gep(I8, old_data, [i])
+    old_byte = b.load(I8, old_byte_addr, result_type=I8)
+    new_byte_addr = b.gep(I8, new_data, [i])
+    b.store(ValueOperand(old_byte), new_byte_addr)
+    i_next = b.binop("add", i, b.const_i64(1))
+    b.store(i_next, ValueOperand(i_slot))
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_check.name, copy_check.name)
+
+    # swap: update arr.data and arr.cap
+    b.entry = swap_block
+    b.store(new_data, b.gep_field(arr_val, "_arr_i8", 0))
+    final_cap = b.load(I64, ValueOperand(new_cap_slot))
+    b.store(final_cap, b.gep_field(arr_val, "_arr_i8", 2))
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), store_block.name, store_block.name)
+
+    # store: write byte and update len
+    b.entry = store_block
+    trunc_slot = b.alloca(I64)
+    b.store(val_val, ValueOperand(trunc_slot))
+    byte_val = b.load(I8, ValueOperand(trunc_slot), result_type=I8)
+    data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
+    byte_addr = b.gep(I8, data, [old_len])
+    b.store(ValueOperand(byte_val), byte_addr)
+    new_len = b.binop("add", old_len, b.const_i64(1))
+    b.store(new_len, b.gep_field(arr_val, "_arr_i8", 1))
+    b.ret()
+
+    return b.fn
+
+
 # ── Injection ─────────────────────────────────────────────────────────────
 
 
@@ -351,6 +458,7 @@ _HELPER_EMITTERS = {
     "new_arr_i8_empty": lambda p: emit_new_arr_i8_empty(),
     "arr_i8_get": lambda p: emit_arr_i8_get(),
     "arr_i8_set": lambda p: emit_arr_i8_set(),
+    "arr_i8_push": lambda p: emit_arr_i8_push(),
 }
 
 _HELPER_ORDER = [
@@ -360,6 +468,7 @@ _HELPER_ORDER = [
     "new_arr_i8_empty",
     "arr_i8_get",
     "arr_i8_set",
+    "arr_i8_push",
 ]
 
 

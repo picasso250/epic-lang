@@ -318,7 +318,8 @@ class MirLower:
         if "arr_i8_set" not in skip_helpers:
             self._emit_arr_i8_set()
         self._emit_arr_i8_oob()
-        self._emit_arr_i8_push()
+        if "arr_i8_push" not in skip_helpers:
+            self._emit_arr_i8_push()
         self._emit_arr_i8_slice()
         self._emit_arr_i64_get()
         self._emit_arr_i64_set()
