@@ -138,7 +138,7 @@ The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
 
 | Function | Status | Evidence |
 |----------|--------|----------|
-| `puti` | **Not implemented** — mentioned only in `docs/design.md` and `docs/mir-design.md` (historical). No handler in any source file. | |
+| `puti` | **Removed from docs examples.** No implementation exists or existed — was a legacy concept. | |
 
 ---
 

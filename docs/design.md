@@ -199,7 +199,7 @@ ADT 匹配：
 
 ```epic
 match e {
-    Expr.IntLit { value: n }: { puti(n) }
+    Expr.IntLit { value: n }: { print(n) }
     Expr.Binary { op, left, right }: { putstr(op) }
     else: { panic "unknown expr" }
 }

@@ -443,7 +443,7 @@ ADT payload、array header、string header 都按同样规则处理：layout 由
 
 ```text
 %r: i64 = call i64 @foo(i64 %x, i64 %y)
-call void @puti(i64 %x)
+call void @print(i64 %x)
 %ok: bool = call bool @WriteFile(ptr %h, ptr %buf, i64 %len, ptr %written, ptr %ov)
 ```
 
