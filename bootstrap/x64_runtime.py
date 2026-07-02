@@ -47,14 +47,14 @@ def emit_startup_hook_call(x64):
     x64.inst("add", R("rsp"), I(32))
 
 
-def append_runtime_helpers(lower, policy=FULL_RUNTIME):
+def append_runtime_helpers(lower, policy=FULL_RUNTIME, skip_helpers=None):
     if policy != FULL_RUNTIME:
         raise RuntimeError(f"unsupported X64 runtime policy: {policy}")
     _emit_runtime_start(lower.x64)
     # The helper bodies still live on MirLower during this first split. The
     # ownership boundary is now explicit, so moving bodies into this module is a
     # mechanical follow-up instead of a semantic change.
-    lower._emit_runtime_helpers()
+    lower._emit_runtime_helpers(skip_helpers=skip_helpers)
 
 
 def _emit_runtime_start(x64):

@@ -31,6 +31,7 @@ from mir import (
     struct as mir_struct,
     validate,
 )
+from mir_runtime_helpers import inject_required_mir_helpers
 
 
 class MirCodegenError(RuntimeError):
@@ -74,6 +75,7 @@ class MirCodegen:
         self.structs = {}
         self.adts = {}
         self.loop_stack = []
+        self.required_mir_helpers = set()
 
     def emit_program(self, ast):
         self._compute_struct_layouts(ast)
@@ -126,6 +128,7 @@ class MirCodegen:
         self.program.globals.append(MirGlobal("@argv", ptr_arr_str(), None))
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
+        inject_required_mir_helpers(self.program, self.required_mir_helpers)
         validate(self.program)
         return self.program
 
@@ -696,6 +699,7 @@ class MirCodegen:
             return self._emit_checked_int32_conversion(expr.args[0], name)
         if name == "bytes":
             arg = self._emit_expr(expr.args[0])
+            self.required_mir_helpers.add("bytes_str")
             result = self._inst("call", [arg], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="bytes_str")
             return ValueOperand(result)
         if name == "read_file":

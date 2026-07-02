@@ -33,7 +33,8 @@ class MirLower:
         self.x64.section(".text")
         for fn in self.program.functions:
             self._lower_function(fn)
-        append_runtime_helpers(self)
+        migrated_helpers = {fn.name for fn in self.program.functions}
+        append_runtime_helpers(self, skip_helpers=migrated_helpers)
         return self.x64
 
     def _lower_function(self, fn):
@@ -295,7 +296,8 @@ class MirLower:
         self.x64.inst("add", R("rcx"), R("rcx"))
         self.x64.inst("add", R("rcx"), R("rcx"))
 
-    def _emit_runtime_helpers(self):
+    def _emit_runtime_helpers(self, skip_helpers=None):
+        skip_helpers = skip_helpers or set()
         self._emit_epic_alloc()
         self._emit_epic_arr_qword_new()
         self._emit_epic_arr_qword_push("__epic_arr_i64_push")
@@ -303,7 +305,8 @@ class MirLower:
         self._emit_epic_arr_qword_extend()
         self._emit_epic_arr_qword_get("__epic_arr_i64_get", "array_oob")
         self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
-        self._emit_bytes_str()
+        if "bytes_str" not in skip_helpers:
+            self._emit_bytes_str()
         self._emit_str_arr_i8()
         self._emit_new_arr_i8()
         self._emit_new_arr_i8_empty()
