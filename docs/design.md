@@ -153,39 +153,17 @@ let bs = new u8[] { 65, 66, 67 }
 
 分配一个动态数组，其 `len` 和 `cap` 等于元素个数。`new T[n]` 分配一个空数组，容量至少为 `n` 个元素。
 
-### ADT (代数数据类型, Algebraic Data Types) — 已从自举核心移除
+### ADT (代数数据类型, Algebraic Data Types) — 已移除
 
 > **⚠ 历史特性 (Historical)**  
-> ADT 不再是 Epic 自举核心的语言特性。详见 [`self-host-core.md`](self-host-core.md)。  
-> 以下保留为历史参考。
-
-```epic
-type Expr {
-    Empty
-    IntLit { value: i64 }
-    Binary { op: str; left: Expr; right: Expr }
-}
-```
-
-ADT 是引用类型。零值是第一个变体（variant），有效载荷归零。变体初始化使用具名花括号语法：
-
-```epic
-let e = new Expr.IntLit { value: 123 }
-let empty: Expr
-```
-
-构造器简写同样适用于 ADT 变体：
-
-```epic
-let e = new Expr.Empty              # new Expr.Empty {} 的简写
-let e2 = new Expr.Empty {}
-```
-
-`new AdtName` 不是 ADT 构造器；ADT 构造必须指定变体名称。
+> ADT（代数数据类型）已从 Epic 自举核心移除。详见 [`self-host-core.md`](self-host-core.md)。
+>
+> 移除内容包括：`type` 定义、变体初始化 `new A.V { ... }`、ADT match payload binding。
+> `match` 字面量分支保留。
 
 ### Match (模式匹配) — 仅保留字面量分支
 
-> **⚠ ADT match 已移除**：ADT 变体分支已随 ADT 一同移除。详见 [`self-host-core.md`](self-host-core.md)。
+> **⚠ ADT match 已移除**：ADT 变体分支已随 ADT 一同移除。匹配 payload binding 不再支持。详见 [`self-host-core.md`](self-host-core.md)。
 
 `match` 是一个语句。支持字面量分支。
 

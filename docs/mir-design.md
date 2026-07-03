@@ -12,7 +12,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 
 | 方面 | 目标 MIR | 当前 Python prototype |
 |------|----------|----------------------|
-| High-level MIR ops | 禁止 `struct.new`、`field.load`、`field.store`、`array.push`、`adt.payload` | ✅ validator 已拒绝这些 op；`mir_codegen.py` 当前也未再发这些 op |
+| High-level MIR ops | 禁止 `struct.new`、`field.load`、`field.store`、`array.push` | ✅ validator 已拒绝这些 op；`mir_codegen.py` 当前也未再发这些 op |
 | Runtime helper call in MIR | 降到 MIR `call` + MIR helper function | ⚠️ 当前降到 MIR `call` + x64-backed runtime helper；helper 尚未是 `MirFunction` |
 | Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
@@ -42,7 +42,7 @@ Epic MIR 是一个 LLVM-like 的中层 IR，核心形态包括：
 
 MIR 不应该只是“结构化 x64 汇编”。如果 MIR 太贴近 x64，那么 `if`、`while`、`+`、`-`、比较、短路逻辑都会过早降成寄存器和跳转，后续调试、优化、自举实现都会不舒服。
 
-MIR 也不应该保留 AST 级便捷语义。`struct.new`、`field.load`、`field.store`、`array.push`、`adt.payload` 这类 op 不能作为目标 MIR 合约；它们必须在 AST -> MIR 期间分解成 `call`、`gep`、`load`、`store`、branch 等低层操作，或者明确放进一个迁移期 HighMIR。
+MIR 也不应该保留 AST 级便捷语义。`struct.new`、`field.load`、`field.store`、`array.push` 这类 op 不能作为目标 MIR 合约；它们必须在 AST -> MIR 期间分解成 `call`、`gep`、`load`、`store`、branch 等低层操作，或者明确放进一个迁移期 HighMIR。
 
 MIR 也不追求完整 LLVM IR 兼容。第一版只实现 Epic 当前需要的最小集合。
 
@@ -159,7 +159,7 @@ struct Name
 - `bool` 是 Epic MIR 的逻辑布尔类型，文本不写作 `i1`。
 - `ptr` 是 opaque pointer，不携带 pointee type。
 - `array N x T` 主要用于 global string / static data 描述，也可作为 `gep` 的 source element type。
-- `struct Name` 用于结构体、字符串对象、map、ADT payload 等 layout 描述，也可作为 `gep` 的 source element type。
+- `struct Name` 用于结构体、字符串对象、map 等 layout 描述，也可作为 `gep` 的 source element type。
 - validator 不能依赖 pointer pointee type；需要检查 `load/store` 的访问类型、`gep` 的 source element type 和 index 合法性。
 
 第一版可以先只实际实现：
@@ -455,7 +455,7 @@ entry:
 %value: i64 = load i64, ptr %f1
 ```
 
-ADT payload、array header、string header 都按同样规则处理：layout 由 `struct` / `array` 类型描述，地址由 `gep` 计算，访问由 `load/store` 完成。复杂操作如 `array.push` 应 lowering 成显式控制流和内存操作，或者是普通 runtime call，例如 `call void @array_push_i64(ptr %arr, i64 %value)`。
+Array header、string header 都按同样规则处理：layout 由 `struct` / `array` 类型描述，地址由 `gep` 计算，访问由 `load/store` 完成。复杂操作如 `array.push` 应 lowering 成显式控制流和内存操作，或者是普通 runtime call，例如 `call void @array_push_i64(ptr %arr, i64 %value)`。
 
 ### 11.8 调用
 

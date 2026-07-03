@@ -152,7 +152,6 @@ ret
 | --- | --- |
 | `struct.new` | 使用 `_heap` + `HeapAlloc` 分配结构体大小。 |
 | `field.store` / `field.load` | 通过 `program.structs` 查字段偏移。 |
-| `adt.payload` | 从 ADT header 的 offset 8 取 payload pointer。 |
 | `array.new` | 分配 `{data, len, cap}` header 和 data buffer。 |
 | `array.push` | 内联 grow/copy/store。 |
 | `array.extend` | 内联 grow/copy 多元素。 |
@@ -161,7 +160,8 @@ ret
 | `ptr.i8.get` | 指针按字节读取并 sign-extend。 |
 | `ptr.i64.get` | 指针按 8 字节读取。 |
 
-这些 op 是当前实现债：它们能让 examples 先跑通，但不应固化为目标 MIR。
+注意：`adt.payload` 已随 ADT 一并移除，不再出现在当前 codegen 中。
+其余 op 是当前实现债：它们能让 examples 先跑通，但不应固化为目标 MIR。
 迁移方向是按 `docs/mir-design.md` 把它们分解成 `gep/load/store/call/branch`，
 或在必要时显式放进独立 HighMIR，而不是继续扩大 MIR validator 对这类便捷 op 的接受面。
 
@@ -408,9 +408,8 @@ object and let `write_machine_obj()` wrap it.
 ### 8.4 MIR still accepts prototype high-level ops
 
 The target MIR design no longer treats `struct.new`, `field.load`,
-`array.push`, and `adt.payload` as MIR ops. Current Python codegen still emits
-them, and the validator only checks the older core MIR subset. Unknown ops are
-effectively unchecked.
+`array.push` as MIR ops. `adt.payload` was removed along with the ADT
+feature and is no longer emitted. Remaining prototype ops still exist.
 
 Recommended next step: first align codegen with `docs/mir-design.md` by lowering
 aggregate allocation/access into `gep/load/store/call/branch`; then make the
@@ -422,7 +421,7 @@ validator reject unknown ops and reject the prototype-only high-level ops.
 contract from the MIR dataclass and will make the Epic port harder to keep in
 sync.
 
-Recommended next step: make struct and ADT layout metadata explicit fields on
+Recommended next step: make struct layout metadata explicit fields on
 `MirProgram`, matching `docs/mir-design.md`.
 
 ### 8.6 Symbol spelling is inconsistent

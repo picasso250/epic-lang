@@ -155,18 +155,12 @@ _arr_T = {
 
 用户结构体字段使用固定的 8 字节槽位。字段偏移为 `index * 8`。结构体大小为 `field_count * 8`。`u8` 和 `bool` 字段在其 8 字节槽位内加载/存储一个字节。
 
-### ADT (代数数据类型, Algebraic Data Types) — 已从自举核心移除
+### ADT (代数数据类型, Algebraic Data Types) — 已移除
 
 > **⚠ 历史特性 (Historical)**  
-> ADT 不再是 Epic 自举核心的语言特性。详见 [`self-host-core.md`](self-host-core.md)。  
-> 以下保留为历史参考。
-
-ADT 值是指向 16 字节 header 对象的引用：
-
-- header 槽位 0：数字标签（numeric tag，`i64`）
-- header 槽位 1：指向堆分配的有效载荷对象的指针
-
-有效载荷布局复用结构体字段布局规则。变体标签（variant tags）按声明顺序排列。ADT 零值是标签 `0` 加上第一个变体的零值有效载荷。
+> ADT 已从 Epic 自举核心移除。详见 [`self-host-core.md`](self-host-core.md)。
+>
+> 旧实现使用 16 字节 header（tag + payload pointer），已从 Python reference compiler 中清除。
 
 ## 代码生成模型 (Codegen Model)
 
@@ -182,9 +176,8 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 ### 降级说明 (Lowering Notes)
 
-- **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。`A.V { ... }` 语法是 ADT 遗留，不再作为当前语言特性。
+- **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
-- **ADT match 降级（历史）**：已随 ADT 一同移除。历史实现为：对检视表达式求值一次，加载 tag，对变体标签做线性比较/跳转链，从 header 槽位 1 加载 `data`，按布局偏移绑定有效载荷字段，发射分支代码块。
 - **Map 降级**：`map[str]T` 使用线性探测或基于动态数组的条目表。`m[key] = value` 插入或覆盖。不存在的键查找返回零值。`map_has` 区分是否缺失。
 
 ## 链接器 (Linker)

@@ -160,13 +160,16 @@ ADT is **not** part of the self-hosting core. The following are removed:
 
 **`match` for literal switch is kept** — see Retained.
 
-### ADT-Related Compiler Code Paths
+### ADT-Related Compiler Code Paths (removed or deferred)
 
-- `bootstrap/sema.py` — ADT type registration, variant checking
-- `bootstrap/mir_codegen.py` — ADT allocation, tag dispatch, payload lowering
-- `bootstrap/mir.py` — ADT-specific ops or validators
-- `src/parser.ep` — ADT parse rules (to be removed last)
-- `src/codegen.ep` — ADT codegen paths (to be removed last)
+**Python reference compiler (cleared):**
+- `bootstrap/sema.py` — ADT type registration, variant checking → **removed**
+- `bootstrap/mir_codegen.py` — ADT allocation, tag dispatch, payload lowering → **removed**
+- `bootstrap/mir.py` — ADT-specific ops or validators → **removed**
+
+**Self-hosted compiler (deferred):**
+- `src/parser.ep` — ADT parse rules
+- `src/codegen.ep` — ADT codegen paths
 
 ---
 
@@ -224,16 +227,16 @@ after ADT removal and naming unification.
 
 ## Migration Strategy
 
-### Phase 1: ADT Removal (immediate)
-1. Document decisions (this file)
-2. Mark ADT as removed in design docs
-3. Remove ADT examples
-4. Remove ADT from Python reference compiler
-5. Remove ADT from self-hosted compiler sources
-6. Purge remaining ADT references from active code
-7. Update remaining docs
+### Phase 1: ADT Removal (completed)
+- [x] 1. Document decisions (this file)
+- [x] 2. Mark ADT as removed in design docs
+- [x] 3. Remove ADT examples
+- [x] 4. Remove ADT from Python reference compiler
+- [x] 5. Make Python-only test entry explicit (`tests/run.py`)
+- [x] 6. Purge stale ADT docs
+- [_] Deferred: Remove ADT from self-hosted compiler sources (`src/*.ep`)
 
-### Phase 2: Naming Unification (after Phase 1)
+### Phase 2: Naming Unification (next)
 - `str_bool` → `bool_to_str`
 - `str_i64` → `i64_to_str`
 - `str_arr_i8` → `bytes_to_str`
