@@ -148,7 +148,7 @@ The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
 |----------|--------|----------|
 | `puti` | **Removed from docs examples.** No implementation exists or existed — was a legacy concept. | |
 | `putstr` | **Removed from public builtin surface.** Replaced by `print(s)`. | |
-| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. Backend private label `putc` in `mir_lower.py` still exists as an implementation detail (direct WriteFile with `_putc_buf`), not referenced by any MIR call. | |
+| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. Backend private label `__epx_putc` still exists as an x64-private implementation detail (direct WriteFile with `_putc_buf`), not referenced by any MIR call. | |
 
 ---
 

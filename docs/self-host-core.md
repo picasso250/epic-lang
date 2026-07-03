@@ -182,7 +182,7 @@ after ADT removal and naming unification.
 |-------|---------------|------------------|
 | `str` vs `u8[]` | `str` is kept; `u8[]` is core text truth | Long-term: unify text as `u8[]`; `str` becomes thin view or removed. Public str helper surface removed in Phase 0. |
 | `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
-| Helper naming | Current mixed convention | Unify to `bool_to_str`, `i64_to_str`, `arr_i8_push`, etc. |
+| Helper naming | `__ep_` / `__epx_` prefix split complete | Future: `arr` → `slice`, `i8` → `u8` |
 | `required_helpers` / lazy injection | Unconditional injection | Defer until helper naming is stable |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
 | `system` | Kept for now | May be removed from core |
