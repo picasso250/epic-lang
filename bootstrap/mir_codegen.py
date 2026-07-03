@@ -99,8 +99,7 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_read_file", MirSignature([ptr_str(), I64], ptr_arr_i8())))
         self.program.externs.append(MirExtern("__ep_write_file", MirSignature([ptr_str(), ptr_arr_i8(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_system_cmd", MirSignature([ptr_str(), I64], I64)))
-        self.program.externs.append(MirExtern("__ep_arr_i8_new", MirSignature([I64], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("__ep_arr_i8_new_empty", MirSignature([I64], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("__ep_arr_i8_alloc", MirSignature([I64, I64], ptr_arr_i8())))
         self.program.externs.append(MirExtern("__ep_arr_i8_get", MirSignature([ptr_arr_i8(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_arr_i8_set", MirSignature([ptr_arr_i8(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_arr_i8_push", MirSignature([ptr_arr_i8(), I64], VOID)))
@@ -771,10 +770,10 @@ class MirCodegen:
             raise MirCodegenError(f"unsupported array literal element type: {expr.elem_type}")
         result = self._inst(
             "call",
-            [ConstIntOperand(I64, len(expr.values))],
+            [ConstIntOperand(I64, len(expr.values)), ConstIntOperand(I64, len(expr.values))],
             result_type=ptr_arr_i8(),
             type=ptr_arr_i8(),
-            callee="__ep_arr_i8_new",
+            callee="__ep_arr_i8_alloc",
         )
         arr = ValueOperand(result)
         for idx, value in enumerate(expr.values):
@@ -785,7 +784,7 @@ class MirCodegen:
         count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 4)
         arr_type = self._type(expr.resolved_type)
         if arr_type == ptr_arr_i8():
-            result = self._inst("call", [count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_new_empty")
+            result = self._inst("call", [ConstIntOperand(I64, 0), count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_alloc")
             return ValueOperand(result)
         if arr_type == ptr_arr_i64():
             result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__epx_arr_qword_new")
@@ -986,7 +985,7 @@ class MirCodegen:
         if typ == ptr_str():
             return SymbolOperand(ptr_str(), self._string_label(""))
         if typ == ptr_arr_i8():
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_new_empty")
+            result = self._inst("call", [ConstIntOperand(I64, 0), ConstIntOperand(I64, 0)], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_alloc")
             return ValueOperand(result)
         if typ == ptr_arr_i64():
             result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i64(), type=ptr(), callee="__epx_arr_qword_new")

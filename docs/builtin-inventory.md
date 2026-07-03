@@ -172,8 +172,8 @@ symbols used by the Python backend.
 | `__ep_str_find` | find a substring within a string |
 | `__ep_str_replace_char` | copy string while replacing one byte value |
 | `__ep_str_trim` | trim leading/trailing ASCII whitespace |
-| `__ep_arr_i8_new` | allocate initialized-capacity byte array |
-| `__ep_arr_i8_new_empty` | allocate empty byte array with capacity |
+| `__ep_arr_i8_alloc` | allocate initialized-capacity byte array |
+| `__ep_arr_i8_alloc` | allocate empty byte array with capacity |
 | `__ep_arr_i8_get` | bounds-checked byte array read |
 | `__ep_arr_i8_set` | bounds-checked byte array write |
 | `__ep_arr_i8_push` | append one byte to a byte array |

@@ -117,8 +117,8 @@ These are unconditionally injected and considered part of the core runtime:
 - `__ep_str_find` — substring find
 - `__ep_str_replace_char` — char replacement copy
 - `__ep_str_trim` — trim whitespace
-- `__ep_arr_i8_new` — allocate initialized byte array
-- `__ep_arr_i8_new_empty` — allocate empty byte array
+- `__ep_arr_i8_alloc` — allocate initialized byte array
+- `__ep_arr_i8_alloc` — allocate empty byte array
 - `__ep_arr_i8_get` — bounds-checked byte read
 - `__ep_arr_i8_set` — bounds-checked byte write
 - `__ep_arr_i8_push` — byte append

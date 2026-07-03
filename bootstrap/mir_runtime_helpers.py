@@ -788,53 +788,28 @@ def emit___ep_str_trim() -> MirFunction:
     return b.fn
 
 
-def emit_new_arr_i8() -> MirFunction:
-    """Allocate header + data for a new u8[] of length n.
+def emit_arr_i8_alloc() -> MirFunction:
+    """Allocate header + data for u8[], with separate len and cap.
 
-    fn __ep_arr_i8_new(i64 %n) -> ptr<_arr_i8>
+    fn __ep_arr_i8_alloc(i64 %len, i64 %cap) -> ptr<_arr_i8>
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_new",
-        [MirParam("%n", I64)],
+        "__ep_arr_i8_alloc",
+        [MirParam("%len", I64), MirParam("%cap", I64)],
         ptr(mir_struct("_arr_i8")),
     )
-    n_val = ValueOperand(b.fn.params[0].value)
+    len_val = ValueOperand(b.fn.params[0].value)
+    cap_val = ValueOperand(b.fn.params[1].value)
 
     header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
-    data_raw = b.call("__epx_alloc", [n_val], ptr())
+    data_raw = b.call("__epx_alloc", [cap_val], ptr())
 
     # header.data = data
     b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_arr_i8", 0))
-    # header.len = n
-    b.store(n_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 1))
-    # header.cap = n
-    b.store(n_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 2))
-
-    b.ret(ValueOperand(header_raw))
-    return b.fn
-
-
-def emit_new_arr_i8_empty() -> MirFunction:
-    """Allocate header + data, len=0, cap=n.
-
-    fn __ep_arr_i8_new_empty(i64 %n) -> ptr<_arr_i8>
-    """
-    b = MirHelperBuilder(
-        "__ep_arr_i8_new_empty",
-        [MirParam("%n", I64)],
-        ptr(mir_struct("_arr_i8")),
-    )
-    n_val = ValueOperand(b.fn.params[0].value)
-
-    header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
-    data_raw = b.call("__epx_alloc", [n_val], ptr())
-
-    # header.data = data
-    b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_arr_i8", 0))
-    # header.len = 0
-    b.store(b.const_i64(0), b.gep_field(ValueOperand(header_raw), "_arr_i8", 1))
-    # header.cap = n
-    b.store(n_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 2))
+    # header.len = len
+    b.store(len_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 1))
+    # header.cap = cap
+    b.store(cap_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 2))
 
     b.ret(ValueOperand(header_raw))
     return b.fn
@@ -1183,7 +1158,7 @@ def emit_arr_i8_slice() -> MirFunction:
 
     b.entry = alloc_block
     slice_len = b.binop("sub", end_val, start_val)
-    result_arr = b.call("__ep_arr_i8_new", [slice_len], ptr(mir_struct("_arr_i8")))
+    result_arr = b.call("__ep_arr_i8_alloc", [slice_len, slice_len], ptr(mir_struct("_arr_i8")))
     i_slot = b.alloca(I64)
     b.store(b.const_i64(0), ValueOperand(i_slot))
     src_data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
@@ -1272,8 +1247,7 @@ _HELPER_EMITTERS = {
     "__ep_str_find": lambda p: emit___ep_str_find(),
     "__ep_str_replace_char": lambda p: emit___ep_str_replace_char(),
     "__ep_str_trim": lambda p: emit___ep_str_trim(),
-    "__ep_arr_i8_new": lambda p: emit_new_arr_i8(),
-    "__ep_arr_i8_new_empty": lambda p: emit_new_arr_i8_empty(),
+    "__ep_arr_i8_alloc": lambda p: emit_arr_i8_alloc(),
     "__ep_arr_i8_get": lambda p: emit_arr_i8_get(),
     "__ep_arr_i64_get": lambda p: emit_arr_i64_get(),
     "__ep_arr_i64_set": lambda p: emit_arr_i64_set(),
@@ -1295,8 +1269,7 @@ _HELPER_ORDER = [
     "__ep_str_find",
     "__ep_str_replace_char",
     "__ep_str_trim",
-    "__ep_arr_i8_new",
-    "__ep_arr_i8_new_empty",
+    "__ep_arr_i8_alloc",
     "__ep_arr_i8_get",
     "__ep_arr_i64_get",
     "__ep_arr_i64_set",
