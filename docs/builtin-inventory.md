@@ -154,6 +154,7 @@ symbols used by the Python backend.
 | `bytes_str` | convert `str` to `_arr_i8` |
 | `str_arr_i8` | view/convert `_arr_i8` as `str` |
 | `str_eq` | compare two strings for equality |
+| `str_starts_with` | test whether a string starts with a prefix |
 | `new_arr_i8` | allocate initialized-capacity byte array |
 | `new_arr_i8_empty` | allocate empty byte array with capacity |
 | `arr_i8_get` | bounds-checked byte array read |

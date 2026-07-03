@@ -258,6 +258,67 @@ def emit_str_eq() -> MirFunction:
     return b.fn
 
 
+def emit_str_starts_with() -> MirFunction:
+    """Return 1 if s starts with prefix, otherwise 0.
+
+    fn str_starts_with(ptr<str> %s, ptr<str> %prefix) -> i64
+    """
+    b = MirHelperBuilder(
+        "str_starts_with",
+        [
+            MirParam("%s", ptr(mir_struct("str"))),
+            MirParam("%prefix", ptr(mir_struct("str"))),
+        ],
+        I64,
+    )
+    s_val = ValueOperand(b.fn.params[0].value)
+    prefix_val = ValueOperand(b.fn.params[1].value)
+
+    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
+    prefix_len = b.load(I64, b.gep_field(prefix_val, "str", 1))
+    long_enough = b.icmp("ge", s_len, prefix_len)
+    loop_init = b.new_block("loop_init")
+    false_block = b.new_block("false")
+    b.entry.terminator = CondBr(ValueOperand(long_enough), loop_init.name, false_block.name)
+
+    b.entry = loop_init
+    s_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
+    prefix_data = b.load(ptr(), b.gep_field(prefix_val, "str", 0))
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_checking = b.icmp("lt", i, prefix_len)
+    loop_body = b.new_block("loop_body")
+    true_block = b.new_block("true")
+    b.entry.terminator = CondBr(ValueOperand(keep_checking), loop_body.name, true_block.name)
+
+    b.entry = loop_body
+    s_byte_addr = b.gep(I8, s_data, [i])
+    s_byte = b.load(I8, s_byte_addr, result_type=I8)
+    prefix_byte_addr = b.gep(I8, prefix_data, [i])
+    prefix_byte = b.load(I8, prefix_byte_addr, result_type=I8)
+    bytes_eq = b.icmp("eq", s_byte, prefix_byte)
+    loop_next = b.new_block("loop_next")
+    b.entry.terminator = CondBr(ValueOperand(bytes_eq), loop_next.name, false_block.name)
+
+    b.entry = loop_next
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = true_block
+    b.ret(b.const_i64(1))
+
+    b.entry = false_block
+    b.ret(b.const_i64(0))
+
+    return b.fn
+
+
 def emit_new_arr_i8() -> MirFunction:
     """Allocate header + data for a new u8[] of length n.
 
@@ -639,6 +700,7 @@ _HELPER_EMITTERS = {
     "bytes_str": emit_bytes_str,
     "str_arr_i8": lambda p: emit_str_arr_i8(),
     "str_eq": lambda p: emit_str_eq(),
+    "str_starts_with": lambda p: emit_str_starts_with(),
     "new_arr_i8": lambda p: emit_new_arr_i8(),
     "new_arr_i8_empty": lambda p: emit_new_arr_i8_empty(),
     "arr_i8_get": lambda p: emit_arr_i8_get(),
@@ -652,6 +714,7 @@ _HELPER_ORDER = [
     "bytes_str",
     "str_arr_i8",
     "str_eq",
+    "str_starts_with",
     "new_arr_i8",
     "new_arr_i8_empty",
     "arr_i8_get",
