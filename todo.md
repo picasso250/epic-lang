@@ -7,9 +7,11 @@
 - ✅ ADT 文档残留已清除
 -   `src/*.ep` 自举线含 ADT 残留 —— **战略放弃，暂不处理**
 
-## ✅ Str Surface Contraction（全部完成）
+## ✅ Str Surface Contraction（已全部完成，含 review fix）
 
 ### Commit A：Define zero-copy str/bytes surface（文档定案）
+- [x] 文档定案（design.md, self-host-core.md, builtin-inventory.md, impl.md）
+- [x] 确认 str 只读表面语义 + shared buffer 警告
 
 - [x] `docs/design.md` — 更新 str 类型描述、删除 public str builtin 列表、删除 `str + str`、zero-copy cast 语义、shared buffer 文档
 - [x] `docs/self-host-core.md` — 更新决策模型、builtin 表、migration strategy（Phase 0）
