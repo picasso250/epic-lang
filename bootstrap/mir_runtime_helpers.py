@@ -20,11 +20,13 @@ from mir import (
     ConstNullOperand,
     MirBlock,
     MirFunction,
+    MirGlobal,
     MirInst,
     MirParam,
     MirProgram,
     MirValue,
     Ret,
+    SymbolOperand,
     ValueOperand,
     ptr,
     struct as mir_struct,
@@ -197,6 +199,30 @@ def emit_str_arr_i8() -> MirFunction:
         ptr(mir_struct("str")),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
+    return b.fn
+
+
+def emit_str_bool() -> MirFunction:
+    """Return the static runtime string for a bool value.
+
+    fn str_bool(bool %value) -> ptr<str>
+    """
+    b = MirHelperBuilder(
+        "str_bool",
+        [MirParam("%value", BOOL)],
+        ptr(mir_struct("str")),
+    )
+    value = ValueOperand(b.fn.params[0].value)
+    true_block = b.new_block("true")
+    false_block = b.new_block("false")
+    b.entry.terminator = CondBr(value, true_block.name, false_block.name)
+
+    b.entry = true_block
+    b.ret(SymbolOperand(ptr(mir_struct("str")), "@str.runtime.bool.true"))
+
+    b.entry = false_block
+    b.ret(SymbolOperand(ptr(mir_struct("str")), "@str.runtime.bool.false"))
+
     return b.fn
 
 
@@ -996,6 +1022,7 @@ def emit_extend_i8() -> MirFunction:
 _HELPER_EMITTERS = {
     "bytes_str": emit_bytes_str,
     "str_arr_i8": lambda p: emit_str_arr_i8(),
+    "str_bool": lambda p: emit_str_bool(),
     "str_eq": lambda p: emit_str_eq(),
     "str_cat": lambda p: emit_str_cat(),
     "str_slice": lambda p: emit_str_slice(),
@@ -1014,6 +1041,7 @@ _HELPER_EMITTERS = {
 _HELPER_ORDER = [
     "bytes_str",
     "str_arr_i8",
+    "str_bool",
     "str_eq",
     "str_cat",
     "str_slice",
@@ -1033,12 +1061,24 @@ _HELPER_ORDER = [
 IMPLEMENTED_MIR_HELPERS = tuple(_HELPER_ORDER)
 
 
+_RUNTIME_STRING_GLOBALS = (
+    ("@str.runtime.bool.true", "true"),
+    ("@str.runtime.bool.false", "false"),
+)
+
+
 def inject_all_mir_helpers(program: MirProgram) -> None:
     """Inject every implemented MIR helper in deterministic order."""
     implemented = set(IMPLEMENTED_MIR_HELPERS)
 
     # Remove matching externs so validate() doesn't see duplicate symbols.
     program.externs[:] = [e for e in program.externs if e.name not in implemented]
+
+    global_names = {g.name for g in program.globals}
+    for name, text in _RUNTIME_STRING_GLOBALS:
+        if name not in global_names:
+            program.globals.append(MirGlobal(name, ptr(mir_struct("str")), text))
+            global_names.add(name)
 
     for name in IMPLEMENTED_MIR_HELPERS:
         program.functions.append(_HELPER_EMITTERS[name](program))

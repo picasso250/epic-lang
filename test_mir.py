@@ -189,6 +189,7 @@ def test_mir_helper_injection():
     assert "arr_i8_slice" in IMPLEMENTED_MIR_HELPERS
     assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
     assert "str_eq" in IMPLEMENTED_MIR_HELPERS
+    assert "str_bool" in IMPLEMENTED_MIR_HELPERS
     assert "str_cat" in IMPLEMENTED_MIR_HELPERS
     assert "str_slice" in IMPLEMENTED_MIR_HELPERS
     assert "str_starts_with" in IMPLEMENTED_MIR_HELPERS
@@ -200,6 +201,9 @@ def test_mir_helper_injection():
         prog = ast_to_mir(ast)
         injected = {fn.name for fn in prog.functions}
         externs = {ext.name for ext in prog.externs}
+        global_names = [glob.name for glob in prog.globals]
+        assert global_names.count("@str.runtime.bool.true") == 1
+        assert global_names.count("@str.runtime.bool.false") == 1
         for name in IMPLEMENTED_MIR_HELPERS:
             assert name in injected, f"{name} should be injected as MirFunction, got injected={injected}"
             assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
@@ -264,6 +268,14 @@ def test_mir_helper_injection():
     if "epic" == "epic" {
         return 1
     }
+    return 0
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    println(str(true))
+    println(str(false))
     return 0
 }"""
     )

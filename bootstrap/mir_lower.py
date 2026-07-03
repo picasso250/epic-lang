@@ -318,7 +318,6 @@ class MirLower:
         self._emit_str_replace_char()
         self._emit_str_trim()
         self._emit_str_i64()
-        self._emit_str_bool()
         self._emit_print_str()
         self._emit_print_newline()
         self._emit_putc()
@@ -1269,18 +1268,6 @@ class MirLower:
         x.inst("pop", R("rbp"))
         x.inst("ret")
 
-    def _emit_str_bool(self):
-        x = self.x64
-        x.label("str_bool")
-        x.inst("test", R("rcx"), R("rcx"))
-        x.inst("jnz", LabelRef("str_bool.true"))
-        x.inst("lea", R("r11"), MS("_bool_false_data"))
-        x.inst("lea", R("rax"), MS("_bool_false_header"))
-        x.inst("mov", M("rax"), R("r11"))
-        x.inst("mov", R("r11"), I(5))
-        x.inst("mov", M("rax", 8), R("r11"))
-        x.inst("ret")
-
     def _emit_str_replace_char(self):
         x = self.x64
         x.label("str_replace_char")
@@ -1397,14 +1384,6 @@ class MirLower:
         x.inst("add", R("rsp"), I(64))
         x.inst("pop", R("rbp"))
         x.inst("ret")
-        x.label("str_bool.true")
-        x.inst("lea", R("r11"), MS("_bool_true_data"))
-        x.inst("lea", R("rax"), MS("_bool_true_header"))
-        x.inst("mov", M("rax"), R("r11"))
-        x.inst("mov", R("r11"), I(4))
-        x.inst("mov", M("rax", 8), R("r11"))
-        x.inst("ret")
-
     def _emit_print_str(self):
         x = self.x64
         x.label("print_str")

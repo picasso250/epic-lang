@@ -16,10 +16,6 @@ def emit_runtime_data(x64, program):
     x64.data_zero("_putc_buf", 1)
     x64.data_bytes("_cstr_panic_prefix", list(b"panic line "))
     x64.data_bytes("_cstr_panic_suffix", list(b": invalid cstr"))
-    x64.data_bytes("_bool_true_data", [116, 114, 117, 101, 0])
-    x64.data_zero("_bool_true_header", 16)
-    x64.data_bytes("_bool_false_data", [102, 97, 108, 115, 101, 0])
-    x64.data_zero("_bool_false_header", 16)
     for name, text in {
         "_map_repr_prefix": 'map[str]i64{',
         "_map_repr_close": '}',
