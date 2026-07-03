@@ -152,31 +152,31 @@ class MirHelperBuilder:
 # ── Helper emitters ───────────────────────────────────────────────────────
 
 
-def emit_bytes_str() -> MirFunction:
-    """Identity cast: str and _arr_i8 now have identical layout {data, len, cap}.
+def emit_bytes_slice_u8() -> MirFunction:
+    """Identity cast: str and _slice_u8 now have identical layout {data, len, cap}.
 
-    fn __ep_arr_i8_from_str(%s: ptr<str>) -> ptr<_arr_i8> {
+    fn __ep_slice_u8_from_str(%s: ptr<str>) -> ptr<_slice_u8> {
         entry:
-            ret %s   ; reinterpret same pointer as ptr<_arr_i8>
+            ret %s   ; reinterpret same pointer as ptr<_slice_u8>
         }
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_from_str",
+        "__ep_slice_u8_from_str",
         [MirParam("%s", ptr(mir_struct("str")))],
-        ptr(mir_struct("_arr_i8")),
+        ptr(mir_struct("_slice_u8")),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
     return b.fn
 
 
-def emit_str_arr_i8() -> MirFunction:
-    """Identity: returns the input ptr<_arr_i8> as ptr<str>.
+def emit_str_slice_u8() -> MirFunction:
+    """Identity: returns the input ptr<_slice_u8> as ptr<str>.
 
     x64: mov rax, rcx; ret
     """
     b = MirHelperBuilder(
-        "__ep_str_from_arr_i8",
-        [MirParam("%input", ptr(mir_struct("_arr_i8")))],
+        "__ep_str_from_slice_u8",
+        [MirParam("%input", ptr(mir_struct("_slice_u8")))],
         ptr(mir_struct("str")),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
@@ -788,15 +788,15 @@ def emit___ep_str_trim() -> MirFunction:
     return b.fn
 
 
-def emit_arr_i8_alloc() -> MirFunction:
+def emit_slice_u8_alloc() -> MirFunction:
     """Allocate header + data for u8[], with separate len and cap.
 
-    fn __ep_arr_i8_alloc(i64 %len, i64 %cap) -> ptr<_arr_i8>
+    fn __ep_slice_u8_alloc(i64 %len, i64 %cap) -> ptr<_slice_u8>
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_alloc",
+        "__ep_slice_u8_alloc",
         [MirParam("%len", I64), MirParam("%cap", I64)],
-        ptr(mir_struct("_arr_i8")),
+        ptr(mir_struct("_slice_u8")),
     )
     len_val = ValueOperand(b.fn.params[0].value)
     cap_val = ValueOperand(b.fn.params[1].value)
@@ -805,31 +805,31 @@ def emit_arr_i8_alloc() -> MirFunction:
     data_raw = b.call("__epx_alloc", [cap_val], ptr())
 
     # header.data = data
-    b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_arr_i8", 0))
+    b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_slice_u8", 0))
     # header.len = len
-    b.store(len_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 1))
+    b.store(len_val, b.gep_field(ValueOperand(header_raw), "_slice_u8", 1))
     # header.cap = cap
-    b.store(cap_val, b.gep_field(ValueOperand(header_raw), "_arr_i8", 2))
+    b.store(cap_val, b.gep_field(ValueOperand(header_raw), "_slice_u8", 2))
 
     b.ret(ValueOperand(header_raw))
     return b.fn
 
 
-def emit_arr_i8_get() -> MirFunction:
+def emit_slice_u8_get() -> MirFunction:
     """Bounds-checked byte read from u8[].
 
-    fn __ep_arr_i8_get(ptr<_arr_i8> %arr, i64 %idx) -> i64
+    fn __ep_slice_u8_get(ptr<_slice_u8> %arr, i64 %idx) -> i64
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_get",
-        [MirParam("%arr", ptr(mir_struct("_arr_i8"))), MirParam("%idx", I64)],
+        "__ep_slice_u8_get",
+        [MirParam("%arr", ptr(mir_struct("_slice_u8"))), MirParam("%idx", I64)],
         I64,
     )
     arr_val = ValueOperand(b.fn.params[0].value)
     idx_val = ValueOperand(b.fn.params[1].value)
 
     # Load arr.len
-    len_addr = b.gep_field(arr_val, "_arr_i8", 1)
+    len_addr = b.gep_field(arr_val, "_slice_u8", 1)
     arr_len = b.load(I64, len_addr)
 
     # Check idx >= 0
@@ -846,7 +846,7 @@ def emit_arr_i8_get() -> MirFunction:
 
     # ok: load byte
     b.entry = ok_block
-    data_addr = b.gep_field(arr_val, "_arr_i8", 0)
+    data_addr = b.gep_field(arr_val, "_slice_u8", 0)
     data = b.load(ptr(), data_addr)
     byte_addr = b.gep(I8, data, [idx_val])
     result = b.load(I8, byte_addr, result_type=I64)
@@ -860,21 +860,21 @@ def emit_arr_i8_get() -> MirFunction:
     return b.fn
 
 
-def emit_arr_i64_get() -> MirFunction:
+def emit_slice_i64_get() -> MirFunction:
     """Bounds-checked qword read from i64[].
 
-    fn __ep_arr_i64_get(ptr<_arr_i64> %arr, i64 %idx) -> i64
+    fn __ep_slice_i64_get(ptr<_slice_i64> %arr, i64 %idx) -> i64
     """
     b = MirHelperBuilder(
-        "__ep_arr_i64_get",
-        [MirParam("%arr", ptr(mir_struct("_arr_i64"))), MirParam("%idx", I64)],
+        "__ep_slice_i64_get",
+        [MirParam("%arr", ptr(mir_struct("_slice_i64"))), MirParam("%idx", I64)],
         I64,
     )
     arr_val = ValueOperand(b.fn.params[0].value)
     idx_val = ValueOperand(b.fn.params[1].value)
 
     # Load arr.len
-    len_addr = b.gep_field(arr_val, "_arr_i64", 1)
+    len_addr = b.gep_field(arr_val, "_slice_i64", 1)
     arr_len = b.load(I64, len_addr)
 
     # Check idx >= 0
@@ -891,7 +891,7 @@ def emit_arr_i64_get() -> MirFunction:
 
     # ok: load qword
     b.entry = ok_block
-    data_addr = b.gep_field(arr_val, "_arr_i64", 0)
+    data_addr = b.gep_field(arr_val, "_slice_i64", 0)
     data = b.load(ptr(), data_addr)
     elem_addr = b.gep(I64, data, [idx_val])
     result = b.load(I64, elem_addr)
@@ -905,15 +905,15 @@ def emit_arr_i64_get() -> MirFunction:
     return b.fn
 
 
-def emit_arr_i64_set() -> MirFunction:
+def emit_slice_i64_set() -> MirFunction:
     """Bounds-checked qword write to i64[].
 
-    fn __ep_arr_i64_set(ptr<_arr_i64> %arr, i64 %idx, i64 %val) -> void
+    fn __ep_slice_i64_set(ptr<_slice_i64> %arr, i64 %idx, i64 %val) -> void
     """
     b = MirHelperBuilder(
-        "__ep_arr_i64_set",
+        "__ep_slice_i64_set",
         [
-            MirParam("%arr", ptr(mir_struct("_arr_i64"))),
+            MirParam("%arr", ptr(mir_struct("_slice_i64"))),
             MirParam("%idx", I64),
             MirParam("%val", I64),
         ],
@@ -924,7 +924,7 @@ def emit_arr_i64_set() -> MirFunction:
     val_val = ValueOperand(b.fn.params[2].value)
 
     # Load arr.len
-    len_addr = b.gep_field(arr_val, "_arr_i64", 1)
+    len_addr = b.gep_field(arr_val, "_slice_i64", 1)
     arr_len = b.load(I64, len_addr)
 
     # Check idx >= 0
@@ -941,7 +941,7 @@ def emit_arr_i64_set() -> MirFunction:
 
     # ok: store qword
     b.entry = ok_block
-    data_addr = b.gep_field(arr_val, "_arr_i64", 0)
+    data_addr = b.gep_field(arr_val, "_slice_i64", 0)
     data = b.load(ptr(), data_addr)
     elem_addr = b.gep(I64, data, [idx_val])
     b.store(val_val, elem_addr)
@@ -955,15 +955,15 @@ def emit_arr_i64_set() -> MirFunction:
     return b.fn
 
 
-def emit_arr_i8_set() -> MirFunction:
+def emit_slice_u8_set() -> MirFunction:
     """Bounds-checked byte write to u8[].
 
-    fn __ep_arr_i8_set(ptr<_arr_i8> %arr, i64 %idx, i64 %val) -> void
+    fn __ep_slice_u8_set(ptr<_slice_u8> %arr, i64 %idx, i64 %val) -> void
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_set",
+        "__ep_slice_u8_set",
         [
-            MirParam("%arr", ptr(mir_struct("_arr_i8"))),
+            MirParam("%arr", ptr(mir_struct("_slice_u8"))),
             MirParam("%idx", I64),
             MirParam("%val", I64),
         ],
@@ -974,7 +974,7 @@ def emit_arr_i8_set() -> MirFunction:
     val_val = ValueOperand(b.fn.params[2].value)
 
     # Load arr.len
-    len_addr = b.gep_field(arr_val, "_arr_i8", 1)
+    len_addr = b.gep_field(arr_val, "_slice_u8", 1)
     arr_len = b.load(I64, len_addr)
 
     # Check idx >= 0
@@ -995,7 +995,7 @@ def emit_arr_i8_set() -> MirFunction:
     b.store(val_val, ValueOperand(trunc_slot))
     byte_val = b.load(I8, ValueOperand(trunc_slot), result_type=I8)
 
-    data_addr = b.gep_field(arr_val, "_arr_i8", 0)
+    data_addr = b.gep_field(arr_val, "_slice_u8", 0)
     data = b.load(ptr(), data_addr)
     byte_addr = b.gep(I8, data, [idx_val])
     b.store(ValueOperand(byte_val), byte_addr)
@@ -1009,18 +1009,18 @@ def emit_arr_i8_set() -> MirFunction:
     return b.fn
 
 
-def emit_arr_i8_push() -> MirFunction:
+def emit_slice_u8_push() -> MirFunction:
     """Push a byte value onto a u8[] array.
 
-    fn __ep_arr_i8_push(ptr<_arr_i8> %arr, i64 %val) -> void
+    fn __ep_slice_u8_push(ptr<_slice_u8> %arr, i64 %val) -> void
 
     Grows by doubling capacity when full, using __epx_alloc for new
-    backing storage.  Matches the old _emit_arr_i8_push x64 behaviour.
+    backing storage.  Matches the old _emit_slice_u8_push x64 behaviour.
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_push",
+        "__ep_slice_u8_push",
         [
-            MirParam("%arr", ptr(mir_struct("_arr_i8"))),
+            MirParam("%arr", ptr(mir_struct("_slice_u8"))),
             MirParam("%val", I64),
         ],
         VOID,
@@ -1029,9 +1029,9 @@ def emit_arr_i8_push() -> MirFunction:
     val_val = ValueOperand(b.fn.params[1].value)
 
     # Load old_len (field 1) and old_cap (field 2)
-    len_addr = b.gep_field(arr_val, "_arr_i8", 1)
+    len_addr = b.gep_field(arr_val, "_slice_u8", 1)
     old_len = b.load(I64, len_addr)
-    cap_addr = b.gep_field(arr_val, "_arr_i8", 2)
+    cap_addr = b.gep_field(arr_val, "_slice_u8", 2)
     old_cap = b.load(I64, cap_addr)
 
     # Check if grow needed
@@ -1070,7 +1070,7 @@ def emit_arr_i8_push() -> MirFunction:
 
     # copy_entry: load data pointer, init copy loop
     b.entry = copy_entry
-    old_data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
+    old_data = b.load(ptr(), b.gep_field(arr_val, "_slice_u8", 0))
     new_data = b.load(ptr(), ValueOperand(new_data_slot))
     b.store(b.const_i64(0), ValueOperand(i_slot))
     copy_check = b.new_block("copy_check")
@@ -1096,9 +1096,9 @@ def emit_arr_i8_push() -> MirFunction:
 
     # swap: update arr.data and arr.cap
     b.entry = swap_block
-    b.store(new_data, b.gep_field(arr_val, "_arr_i8", 0))
+    b.store(new_data, b.gep_field(arr_val, "_slice_u8", 0))
     final_cap = b.load(I64, ValueOperand(new_cap_slot))
-    b.store(final_cap, b.gep_field(arr_val, "_arr_i8", 2))
+    b.store(final_cap, b.gep_field(arr_val, "_slice_u8", 2))
     b.entry.terminator = CondBr(ValueOperand(cap_zero), store_block.name, store_block.name)
 
     # store: write byte and update len
@@ -1106,37 +1106,37 @@ def emit_arr_i8_push() -> MirFunction:
     trunc_slot = b.alloca(I64)
     b.store(val_val, ValueOperand(trunc_slot))
     byte_val = b.load(I8, ValueOperand(trunc_slot), result_type=I8)
-    data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
+    data = b.load(ptr(), b.gep_field(arr_val, "_slice_u8", 0))
     byte_addr = b.gep(I8, data, [old_len])
     b.store(ValueOperand(byte_val), byte_addr)
     new_len = b.binop("add", old_len, b.const_i64(1))
-    b.store(new_len, b.gep_field(arr_val, "_arr_i8", 1))
+    b.store(new_len, b.gep_field(arr_val, "_slice_u8", 1))
     b.ret()
 
     return b.fn
 
 
-def emit_arr_i8_slice() -> MirFunction:
+def emit_slice_u8_slice() -> MirFunction:
     """Copy a half-open u8[] slice [start:end].
 
-    fn __ep_arr_i8_slice(ptr<_arr_i8> %arr, i64 %start, i64 %end) -> ptr<_arr_i8>
+    fn __ep_slice_u8_slice(ptr<_slice_u8> %arr, i64 %start, i64 %end) -> ptr<_slice_u8>
 
     Bounds failures exit with code 1, matching the old x64 helper.
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_slice",
+        "__ep_slice_u8_slice",
         [
-            MirParam("%arr", ptr(mir_struct("_arr_i8"))),
+            MirParam("%arr", ptr(mir_struct("_slice_u8"))),
             MirParam("%start", I64),
             MirParam("%end", I64),
         ],
-        ptr(mir_struct("_arr_i8")),
+        ptr(mir_struct("_slice_u8")),
     )
     arr_val = ValueOperand(b.fn.params[0].value)
     start_val = ValueOperand(b.fn.params[1].value)
     end_val = ValueOperand(b.fn.params[2].value)
 
-    arr_len = b.load(I64, b.gep_field(arr_val, "_arr_i8", 1))
+    arr_len = b.load(I64, b.gep_field(arr_val, "_slice_u8", 1))
 
     start_ok = b.icmp("ge", start_val, b.const_i64(0))
     check_order = b.new_block("check_order")
@@ -1158,12 +1158,12 @@ def emit_arr_i8_slice() -> MirFunction:
 
     b.entry = alloc_block
     slice_len = b.binop("sub", end_val, start_val)
-    result_arr = b.call("__ep_arr_i8_alloc", [slice_len, slice_len], ptr(mir_struct("_arr_i8")))
+    result_arr = b.call("__ep_slice_u8_alloc", [slice_len, slice_len], ptr(mir_struct("_slice_u8")))
     i_slot = b.alloca(I64)
     b.store(b.const_i64(0), ValueOperand(i_slot))
-    src_data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
+    src_data = b.load(ptr(), b.gep_field(arr_val, "_slice_u8", 0))
     src_start = b.gep(I8, src_data, [start_val])
-    dst_data = b.load(ptr(), b.gep_field(ValueOperand(result_arr), "_arr_i8", 0))
+    dst_data = b.load(ptr(), b.gep_field(ValueOperand(result_arr), "_slice_u8", 0))
     b.br(copy_check)
 
     b.entry = copy_check
@@ -1190,23 +1190,23 @@ def emit_arr_i8_slice() -> MirFunction:
     return b.fn
 
 
-def emit_extend_i8() -> MirFunction:
+def emit_extend_slice_u8() -> MirFunction:
     """Append src bytes into dst, snapshotting src.len before the loop.
 
-    fn __ep_arr_i8_extend(ptr<_arr_i8> %dst, ptr<_arr_i8> %src) -> void
+    fn __ep_slice_u8_extend(ptr<_slice_u8> %dst, ptr<_slice_u8> %src) -> void
     """
     b = MirHelperBuilder(
-        "__ep_arr_i8_extend",
+        "__ep_slice_u8_extend",
         [
-            MirParam("%dst", ptr(mir_struct("_arr_i8"))),
-            MirParam("%src", ptr(mir_struct("_arr_i8"))),
+            MirParam("%dst", ptr(mir_struct("_slice_u8"))),
+            MirParam("%src", ptr(mir_struct("_slice_u8"))),
         ],
         VOID,
     )
     dst_val = ValueOperand(b.fn.params[0].value)
     src_val = ValueOperand(b.fn.params[1].value)
 
-    src_len = b.load(I64, b.gep_field(src_val, "_arr_i8", 1))
+    src_len = b.load(I64, b.gep_field(src_val, "_slice_u8", 1))
     i_slot = b.alloca(I64)
     b.store(b.const_i64(0), ValueOperand(i_slot))
     loop_check = b.new_block("loop_check")
@@ -1220,8 +1220,8 @@ def emit_extend_i8() -> MirFunction:
     b.entry.terminator = CondBr(ValueOperand(keep_copying), loop_body.name, done.name)
 
     b.entry = loop_body
-    byte = b.call("__ep_arr_i8_get", [src_val, i], I64)
-    b.call("__ep_arr_i8_push", [dst_val, ValueOperand(byte)], VOID)
+    byte = b.call("__ep_slice_u8_get", [src_val, i], I64)
+    b.call("__ep_slice_u8_push", [dst_val, ValueOperand(byte)], VOID)
     next_i = b.binop("add", i, b.const_i64(1))
     b.store(next_i, ValueOperand(i_slot))
     b.br(loop_check)
@@ -1236,8 +1236,8 @@ def emit_extend_i8() -> MirFunction:
 
 
 _HELPER_EMITTERS = {
-    "__ep_arr_i8_from_str": lambda p: emit_bytes_str(),
-    "__ep_str_from_arr_i8": lambda p: emit_str_arr_i8(),
+    "__ep_slice_u8_from_str": lambda p: emit_bytes_slice_u8(),
+    "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
     "__ep_str_from_bool": lambda p: emit_str_bool(),
     "__ep_str_eq": lambda p: emit___ep_str_eq(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
@@ -1247,19 +1247,19 @@ _HELPER_EMITTERS = {
     "__ep_str_find": lambda p: emit___ep_str_find(),
     "__ep_str_replace_char": lambda p: emit___ep_str_replace_char(),
     "__ep_str_trim": lambda p: emit___ep_str_trim(),
-    "__ep_arr_i8_alloc": lambda p: emit_arr_i8_alloc(),
-    "__ep_arr_i8_get": lambda p: emit_arr_i8_get(),
-    "__ep_arr_i64_get": lambda p: emit_arr_i64_get(),
-    "__ep_arr_i64_set": lambda p: emit_arr_i64_set(),
-    "__ep_arr_i8_set": lambda p: emit_arr_i8_set(),
-    "__ep_arr_i8_push": lambda p: emit_arr_i8_push(),
-    "__ep_arr_i8_slice": lambda p: emit_arr_i8_slice(),
-    "__ep_arr_i8_extend": lambda p: emit_extend_i8(),
+    "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
+    "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
+    "__ep_slice_i64_get": lambda p: emit_slice_i64_get(),
+    "__ep_slice_i64_set": lambda p: emit_slice_i64_set(),
+    "__ep_slice_u8_set": lambda p: emit_slice_u8_set(),
+    "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
+    "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
+    "__ep_slice_u8_extend": lambda p: emit_extend_slice_u8(),
 }
 
 _HELPER_ORDER = [
-    "__ep_arr_i8_from_str",
-    "__ep_str_from_arr_i8",
+    "__ep_slice_u8_from_str",
+    "__ep_str_from_slice_u8",
     "__ep_str_from_bool",
     "__ep_str_eq",
     "__ep_str_cat",
@@ -1269,14 +1269,14 @@ _HELPER_ORDER = [
     "__ep_str_find",
     "__ep_str_replace_char",
     "__ep_str_trim",
-    "__ep_arr_i8_alloc",
-    "__ep_arr_i8_get",
-    "__ep_arr_i64_get",
-    "__ep_arr_i64_set",
-    "__ep_arr_i8_set",
-    "__ep_arr_i8_push",
-    "__ep_arr_i8_slice",
-    "__ep_arr_i8_extend",
+    "__ep_slice_u8_alloc",
+    "__ep_slice_u8_get",
+    "__ep_slice_i64_get",
+    "__ep_slice_i64_set",
+    "__ep_slice_u8_set",
+    "__ep_slice_u8_push",
+    "__ep_slice_u8_slice",
+    "__ep_slice_u8_extend",
 ]
 
 

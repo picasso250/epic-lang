@@ -121,8 +121,8 @@ runtime/write_file.asm
 | `u64`      | `u64`             |
 | `str`      | `&str`            |
 | `Token`    | `&Token`          |
-| `u8[]`     | `&_arr_u8`        |
-| `Token[]`  | `&_arr_Token`     |
+| `u8[]`     | `&_slice_u8`        |
+| `Token[]`  | `&_slice_Token`     |
 
 用户程序不编写指针类型。`&T` 和 `&&T` 仅属于 codegen 内部类型。
 
@@ -150,7 +150,7 @@ str = {
 ### 动态数组 (Dynamic Array)
 
 ```
-_arr_T = {
+_slice_T = {
     data,
     len: i64,
     cap: i64,

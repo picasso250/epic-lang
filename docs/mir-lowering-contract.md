@@ -375,10 +375,10 @@ ret
 `append_runtime_helpers()` 在当前实现下无条件发射所有 helper：
 
 - `__epx_alloc` (x64 primitive)
-- `__epx_arr_qword_new` (array header allocation)
-- `__epx_arr_i64_push` / `__epx_arr_ptr_push`
-- `__epx_arr_qword_extend`
-- `__epx_arr_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
+- `__epx_slice_qword_new` (array header allocation)
+- `__epx_slice_i64_push` / `__epx_slice_ptr_push`
+- `__epx_slice_qword_extend`
+- `__epx_slice_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
 - x64 primitives and still-x64 helpers:
 - `__ep_map_str_i64_new` / `__ep_map_str_i64_get` / `__ep_map_str_i64_set` / `__ep_map_str_i64_has` / `__ep_map_str_i64_repr`
 - `cstr` (`__ep_cstr`)
@@ -387,11 +387,11 @@ ret
 - `__ep_str_from_i64`
 - `__ep_print_str` / `__ep_print_newline`
 - `__epx_putc`
-- `__epx_array_oob`
+- `__epx_slice_oob`
 
-MIR-implemented helpers such as `__ep_arr_i8_from_str`, `__ep_str_from_arr_i8`, `__ep_str_from_bool`,
+MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_str_from_bool`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`, `__ep_str_replace_char`, `__ep_str_trim`, `__ep_str_get`,
-`__ep_str_starts_with`, `__ep_str_find`, `__ep_arr_i8_new`, `__ep_arr_i8_*`, and `__ep_arr_i8_extend` are
+`__ep_str_starts_with`, `__ep_str_find`, `__ep_slice_u8_new`, `__ep_slice_u8_*`, and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
 longer have same-named x64 fallback bodies. Remaining x64 labels and function
 bodies are hand-written in `mir_lower.py` `_emit_*()` methods.

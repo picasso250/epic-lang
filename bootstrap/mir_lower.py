@@ -297,11 +297,11 @@ class MirLower:
 
     def _emit_runtime_helpers(self):
         self._emit_epic_alloc()
-        self._emit_epic_arr_qword_new()
-        self._emit_epic_arr_qword_push("__epx_arr_i64_push")
-        self._emit_epic_arr_qword_push("__epx_arr_ptr_push")
-        self._emit_epic_arr_qword_extend()
-        self._emit_epic_arr_qword_get("__epx_arr_ptr_get", "__epx_array_oob")
+        self._emit_epic_slice_qword_new()
+        self._emit_epic_slice_qword_push("__epx_slice_i64_push")
+        self._emit_epic_slice_qword_push("__epx_slice_ptr_push")
+        self._emit_epic_slice_qword_extend()
+        self._emit_epic_slice_qword_get("__epx_slice_ptr_get", "__epx_slice_oob")
         self._emit_map_new()
         self._emit_map_get()
         self._emit_map_set()
@@ -316,7 +316,7 @@ class MirLower:
         self._emit_print_str()
         self._emit_print_newline()
         self._emit_putc()
-        self._emit_array_oob()
+        self._emit_slice_oob()
 
     def _data_label(self, name):
         return name.replace("@", "_").replace(".", "_") + "_data"
@@ -338,9 +338,9 @@ class MirLower:
         x.inst("pop", R("rbp"))
         x.inst("ret")
 
-    def _emit_epic_arr_qword_new(self):
+    def _emit_epic_slice_qword_new(self):
         x = self.x64
-        x.label("__epx_arr_qword_new")
+        x.label("__epx_slice_qword_new")
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("sub", R("rsp"), I(64))
@@ -371,7 +371,7 @@ class MirLower:
         x.inst("pop", R("rbp"))
         x.inst("ret")
 
-    def _emit_epic_arr_qword_push(self, label):
+    def _emit_epic_slice_qword_push(self, label):
         x = self.x64
         grow = f"{label}.grow"
         store = f"{label}.store"
@@ -443,9 +443,9 @@ class MirLower:
         x.inst("pop", R("rbp"))
         x.inst("ret")
 
-    def _emit_epic_arr_qword_extend(self):
+    def _emit_epic_slice_qword_extend(self):
         x = self.x64
-        label = "__epx_arr_qword_extend"
+        label = "__epx_slice_qword_extend"
         grow = f"{label}.grow"
         have_cap = f"{label}.have_cap"
         cap_loop = f"{label}.cap_loop"
@@ -541,7 +541,7 @@ class MirLower:
         x.inst("pop", R("rbp"))
         x.inst("ret")
 
-    def _emit_epic_arr_qword_get(self, label, oob_label):
+    def _emit_epic_slice_qword_get(self, label, oob_label):
         x = self.x64
         x.label(label)
         x.inst("cmp", R("rdx"), I(0))
@@ -979,7 +979,7 @@ class MirLower:
         x.label("__ep_read_file.empty")
         x.inst("mov", R("rcx"), I(0))
         x.inst("mov", R("rdx"), I(0))
-        x.inst("call", Symbol("__ep_arr_i8_alloc"))
+        x.inst("call", Symbol("__ep_slice_u8_alloc"))
         x.label("__ep_read_file.done")
         x.inst("add", R("rsp"), I(112))
         x.inst("pop", R("rbp"))
@@ -1284,9 +1284,9 @@ class MirLower:
         x.inst("pop", R("rbp"))
         x.inst("ret")
 
-    def _emit_array_oob(self):
+    def _emit_slice_oob(self):
         x = self.x64
-        x.label("__epx_array_oob")
+        x.label("__epx_slice_oob")
         x.inst("mov", R("rcx"), I(1))
         x.inst("sub", R("rsp"), I(32))
         x.inst("call", Symbol("ExitProcess"))
