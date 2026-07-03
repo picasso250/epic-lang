@@ -7,6 +7,7 @@
 
 ## 开发流程
 
+- 开发之前先读 docs/ 中的相关文档
 - 旧目录化 bootstrap 链保存在 git 历史和 tag `staged-bootstrap-archive-2026-06-30`，只作为历史锚点。
 - 当前仓库根目录就是当前语言实现的项目根。
 - `bootstrap/` 是当前语言的 Python reference compiler。
