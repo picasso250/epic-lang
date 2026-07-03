@@ -102,7 +102,7 @@ MIR lowering 当前固定面向 Windows x64：
 - 每次 call 前预留 32 字节 shadow space。
 - 返回值在 `rax`。
 - `main` 降成 PE entry symbol `_start`。
-- `main` prologue calls `__epic_runtime_start` to initialize runtime state。
+- `main` prologue calls `__epx_runtime_start` to initialize runtime state。
 - `main` 的 `ret value` 降成 `ExitProcess(value)`，不走普通 `ret`。
 - Win32 `LPDWORD` output 参数只写 32 位。当前 helper 如果复用 8 字节栈槽
   存放这类输出，必须在 call 前清零整个 qword，或者后续改成显式 32-bit

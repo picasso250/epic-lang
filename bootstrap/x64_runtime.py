@@ -39,7 +39,7 @@ def emit_runtime_data(x64, program):
 
 def emit_startup_hook_call(x64):
     x64.inst("sub", R("rsp"), I(32))
-    x64.inst("call", Symbol("__epic_runtime_start"))
+    x64.inst("call", Symbol("__epx_runtime_start"))
     x64.inst("add", R("rsp"), I(32))
 
 
@@ -54,7 +54,7 @@ def append_runtime_helpers(lower, policy=FULL_RUNTIME):
 
 
 def _emit_runtime_start(x64):
-    x64.label("__epic_runtime_start")
+    x64.label("__epx_runtime_start")
     x64.inst("push", R("rbp"))
     x64.inst("mov", R("rbp"), R("rsp"))
     x64.inst("sub", R("rsp"), I(32))

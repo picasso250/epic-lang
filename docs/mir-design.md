@@ -19,7 +19,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ⚠️ 已在 `MirProgram.structs` 上，但 schema 是 loose dict，不是 typed dataclass |
 | symbol 拼写 | `@name` 统一规则 | ⚠️ `main`、`str_i64`、`ExitProcess` 混用，未统一到 `@` 前缀 |
 | 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ❌ 遗留名：`str_i64`, `str_bool`, `str_arr_i8`, `bytes_str` |
-| `__epic_` 前缀 | 仅保留给真正 x64 primitive（`__epic_alloc`） | ❌ 错误地用于 MIR helper：`__epic_arr_i64_push` 等 |
+| 前缀分层 | `__epx_` = x64 primitive（`__epx_alloc`），`__ep_` = compiler-internal MIR helper（`__ep_str_eq`） | ✅ 已分离 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
 
 > **使用本文档时请注意**：所有 code block 中的 MIR 示例是 target 格式，不代表当前 `mir_codegen.py` 的实际输出。当前实现的实际 MIR 行为通过 `docs/x64-instruction-subset.md`（lowering 后的 X64IR 合约）和 `docs/mir-lowering-contract.md`（lowering 规则）描述。

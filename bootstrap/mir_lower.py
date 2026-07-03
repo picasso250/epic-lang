@@ -298,10 +298,10 @@ class MirLower:
     def _emit_runtime_helpers(self):
         self._emit_epic_alloc()
         self._emit_epic_arr_qword_new()
-        self._emit_epic_arr_qword_push("__epic_arr_i64_push")
-        self._emit_epic_arr_qword_push("__epic_arr_ptr_push")
+        self._emit_epic_arr_qword_push("__epx_arr_i64_push")
+        self._emit_epic_arr_qword_push("__epx_arr_ptr_push")
         self._emit_epic_arr_qword_extend()
-        self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
+        self._emit_epic_arr_qword_get("__epx_arr_ptr_get", "array_oob")
         self._emit_map_new()
         self._emit_map_get()
         self._emit_map_set()
@@ -326,7 +326,7 @@ class MirLower:
 
     def _emit_epic_alloc(self):
         x = self.x64
-        x.label("__epic_alloc")
+        x.label("__epx_alloc")
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("mov", R("r8"), R("rcx"))
@@ -340,7 +340,7 @@ class MirLower:
 
     def _emit_epic_arr_qword_new(self):
         x = self.x64
-        x.label("__epic_arr_qword_new")
+        x.label("__epx_arr_qword_new")
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("sub", R("rsp"), I(64))
@@ -445,7 +445,7 @@ class MirLower:
 
     def _emit_epic_arr_qword_extend(self):
         x = self.x64
-        label = "__epic_arr_qword_extend"
+        label = "__epx_arr_qword_extend"
         grow = f"{label}.grow"
         have_cap = f"{label}.have_cap"
         cap_loop = f"{label}.cap_loop"
@@ -782,7 +782,7 @@ class MirLower:
         self.x64.inst("mov", R("rcx"), M("rbp", dst_slot))
         self._runtime_string("rdx", name)
         self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("__epic_str_cat"))
+        self.x64.inst("call", Symbol("__ep_str_cat"))
         self.x64.inst("add", R("rsp"), I(32))
         self.x64.inst("mov", M("rbp", dst_slot), R("rax"))
 
@@ -790,48 +790,48 @@ class MirLower:
         self.x64.inst("mov", R("rcx"), M("rbp", dst_slot))
         self.x64.inst("mov", R("rdx"), M("rbp", src_slot))
         self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("__epic_str_cat"))
+        self.x64.inst("call", Symbol("__ep_str_cat"))
         self.x64.inst("add", R("rsp"), I(32))
         self.x64.inst("mov", M("rbp", dst_slot), R("rax"))
 
     def _emit_cstr(self):
         x = self.x64
-        x.label("__epic_cstr")
+        x.label("__ep_cstr")
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("sub", R("rsp"), I(96))
         x.inst("mov", M("rbp", -8), R("rcx"))
         x.inst("mov", M("rbp", -16), R("rdx"))
         x.inst("test", R("rcx"), R("rcx"))
-        x.inst("jz", LabelRef("__epic_cstr.fail"))
+        x.inst("jz", LabelRef("__ep_cstr.fail"))
         x.inst("mov", R("r8"), M("rcx"))
         x.inst("test", R("r8"), R("r8"))
-        x.inst("jz", LabelRef("__epic_cstr.fail"))
+        x.inst("jz", LabelRef("__ep_cstr.fail"))
         x.inst("mov", R("r9"), M("rcx", 8))
         x.inst("cmp", R("r9"), I(0))
-        x.inst("jl", LabelRef("__epic_cstr.fail"))
+        x.inst("jl", LabelRef("__ep_cstr.fail"))
         x.inst("mov", R("r10"), I(0))
-        x.label("__epic_cstr.loop")
+        x.label("__ep_cstr.loop")
         x.inst("cmp", R("r10"), R("r9"))
-        x.inst("jge", LabelRef("__epic_cstr.tail"))
+        x.inst("jge", LabelRef("__ep_cstr.tail"))
         x.inst("mov", R("r11"), R("r8"))
         x.inst("add", R("r11"), R("r10"))
         x.inst("movsx", R("rax"), M("r11", 0, 1))
         x.inst("test", R("rax"), R("rax"))
-        x.inst("jz", LabelRef("__epic_cstr.fail"))
+        x.inst("jz", LabelRef("__ep_cstr.fail"))
         x.inst("add", R("r10"), I(1))
-        x.inst("jmp", LabelRef("__epic_cstr.loop"))
-        x.label("__epic_cstr.tail")
+        x.inst("jmp", LabelRef("__ep_cstr.loop"))
+        x.label("__ep_cstr.tail")
         x.inst("mov", R("r11"), R("r8"))
         x.inst("add", R("r11"), R("r9"))
         x.inst("movsx", R("rax"), M("r11", 0, 1))
         x.inst("test", R("rax"), R("rax"))
-        x.inst("jnz", LabelRef("__epic_cstr.fail"))
+        x.inst("jnz", LabelRef("__ep_cstr.fail"))
         x.inst("mov", R("rax"), R("r8"))
         x.inst("add", R("rsp"), I(96))
         x.inst("pop", R("rbp"))
         x.inst("ret")
-        x.label("__epic_cstr.fail")
+        x.label("__ep_cstr.fail")
         x.inst("mov", R("rcx"), I(-11))
         x.inst("call", Symbol("GetStdHandle"))
         x.inst("mov", M("rbp", -24), R("rax"))
@@ -868,7 +868,7 @@ class MirLower:
         x.inst("sub", R("rsp"), I(96))
         x.inst("mov", M("rbp", -56), R("rdx"))
         x.inst("mov", R("rdx"), R("r8"))
-        x.inst("call", Symbol("__epic_cstr"))
+        x.inst("call", Symbol("__ep_cstr"))
         x.inst("mov", M("rbp", -8), R("rax"))
         x.inst("mov", R("rdx"), M("rbp", -56))
         x.inst("mov", R("rax"), M("rdx"))
@@ -917,7 +917,7 @@ class MirLower:
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("sub", R("rsp"), I(112))
-        x.inst("call", Symbol("__epic_cstr"))
+        x.inst("call", Symbol("__ep_cstr"))
         x.inst("mov", M("rbp", -8), R("rax"))
         x.inst("mov", R("rcx"), M("rbp", -8))
         x.inst("mov", R("rdx"), I(0x80000000))
@@ -990,7 +990,7 @@ class MirLower:
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("sub", R("rsp"), I(272))
-        x.inst("call", Symbol("__epic_cstr"))
+        x.inst("call", Symbol("__ep_cstr"))
         x.inst("mov", M("rbp", -16), R("rax"))
         x.inst("mov", R("rax"), I(0))
         x.inst("mov", M("rbp", -8), R("rax"))

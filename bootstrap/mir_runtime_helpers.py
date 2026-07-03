@@ -2,7 +2,7 @@
 
 Each helper is a hand-coded MirFunction that replaces an x64-backed runtime
 helper.  They use existing MIR ops (call/gep/load/store/ret) and call existing
-x64 primitives (notably __epic_alloc).  The codegen pipeline injects all
+x64 primitives (notably __epx_alloc).  The codegen pipeline injects all
 implemented helpers, and the lowering pipeline emits them through the normal
 _lower_function path.
 """
@@ -207,13 +207,13 @@ def emit_str_bool() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_eq() -> MirFunction:
+def emit___ep_str_eq() -> MirFunction:
     """Compare two strings for byte-for-byte equality.
 
-    fn __epic_str_eq(ptr<str> %left, ptr<str> %right) -> bool
+    fn __ep_str_eq(ptr<str> %left, ptr<str> %right) -> bool
     """
     b = MirHelperBuilder(
-        "__epic_str_eq",
+        "__ep_str_eq",
         [
             MirParam("%left", ptr(mir_struct("str"))),
             MirParam("%right", ptr(mir_struct("str"))),
@@ -268,13 +268,13 @@ def emit___epic_str_eq() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_cat() -> MirFunction:
+def emit___ep_str_cat() -> MirFunction:
     """Concatenate two strings into a newly allocated str.
 
-    fn __epic_str_cat(ptr<str> %left, ptr<str> %right) -> ptr<str>
+    fn __ep_str_cat(ptr<str> %left, ptr<str> %right) -> ptr<str>
     """
     b = MirHelperBuilder(
-        "__epic_str_cat",
+        "__ep_str_cat",
         [
             MirParam("%left", ptr(mir_struct("str"))),
             MirParam("%right", ptr(mir_struct("str"))),
@@ -288,9 +288,9 @@ def emit___epic_str_cat() -> MirFunction:
     right_len = b.load(I64, b.gep_field(right_val, "str", 1))
     result_len = b.binop("add", left_len, right_len)
 
-    result_str = b.call("__epic_alloc", [b.const_i64(24)], ptr())
+    result_str = b.call("__epx_alloc", [b.const_i64(24)], ptr())
     data_len = b.binop("add", result_len, b.const_i64(1))
-    result_data = b.call("__epic_alloc", [data_len], ptr())
+    result_data = b.call("__epx_alloc", [data_len], ptr())
     b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
     b.store(result_len, b.gep_field(ValueOperand(result_str), "str", 1))
     b.store(result_len, b.gep_field(ValueOperand(result_str), "str", 2))
@@ -348,15 +348,15 @@ def emit___epic_str_cat() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_slice() -> MirFunction:
+def emit___ep_str_slice() -> MirFunction:
     """Copy a half-open string slice [start:end].
 
-    fn __epic_str_slice(ptr<str> %s, i64 %start, i64 %end) -> ptr<str>
+    fn __ep_str_slice(ptr<str> %s, i64 %start, i64 %end) -> ptr<str>
 
     Bounds failures exit with code 1, matching migrated string/array helpers.
     """
     b = MirHelperBuilder(
-        "__epic_str_slice",
+        "__ep_str_slice",
         [
             MirParam("%s", ptr(mir_struct("str"))),
             MirParam("%start", I64),
@@ -390,9 +390,9 @@ def emit___epic_str_slice() -> MirFunction:
 
     b.entry = alloc_block
     slice_len = b.binop("sub", end_val, start_val)
-    result_str = b.call("__epic_alloc", [b.const_i64(24)], ptr())
+    result_str = b.call("__epx_alloc", [b.const_i64(24)], ptr())
     data_len = b.binop("add", slice_len, b.const_i64(1))
-    result_data = b.call("__epic_alloc", [data_len], ptr())
+    result_data = b.call("__epx_alloc", [data_len], ptr())
     b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
     b.store(slice_len, b.gep_field(ValueOperand(result_str), "str", 1))
     b.store(slice_len, b.gep_field(ValueOperand(result_str), "str", 2))
@@ -428,13 +428,13 @@ def emit___epic_str_slice() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_starts_with() -> MirFunction:
+def emit___ep_str_starts_with() -> MirFunction:
     """Return 1 if s starts with prefix, otherwise 0.
 
-    fn __epic_str_starts_with(ptr<str> %s, ptr<str> %prefix) -> i64
+    fn __ep_str_starts_with(ptr<str> %s, ptr<str> %prefix) -> i64
     """
     b = MirHelperBuilder(
-        "__epic_str_starts_with",
+        "__ep_str_starts_with",
         [
             MirParam("%s", ptr(mir_struct("str"))),
             MirParam("%prefix", ptr(mir_struct("str"))),
@@ -489,13 +489,13 @@ def emit___epic_str_starts_with() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_get() -> MirFunction:
+def emit___ep_str_get() -> MirFunction:
     """Bounds-checked byte read from str.
 
-    fn __epic_str_get(ptr<str> %s, i64 %idx) -> i64
+    fn __ep_str_get(ptr<str> %s, i64 %idx) -> i64
     """
     b = MirHelperBuilder(
-        "__epic_str_get",
+        "__ep_str_get",
         [MirParam("%s", ptr(mir_struct("str"))), MirParam("%idx", I64)],
         I64,
     )
@@ -527,15 +527,15 @@ def emit___epic_str_get() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_find() -> MirFunction:
+def emit___ep_str_find() -> MirFunction:
     """Find the first occurrence of needle in s.
 
     Empty needle returns 0. Missing needle returns -1.
 
-    fn __epic_str_find(ptr<str> %s, ptr<str> %needle) -> i64
+    fn __ep_str_find(ptr<str> %s, ptr<str> %needle) -> i64
     """
     b = MirHelperBuilder(
-        "__epic_str_find",
+        "__ep_str_find",
         [
             MirParam("%s", ptr(mir_struct("str"))),
             MirParam("%needle", ptr(mir_struct("str"))),
@@ -625,13 +625,13 @@ def emit___epic_str_find() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_replace_char() -> MirFunction:
+def emit___ep_str_replace_char() -> MirFunction:
     """Return a copy of s with byte old replaced by byte new.
 
-    fn __epic_str_replace_char(ptr<str> %s, i64 %old, i64 %new) -> ptr<str>
+    fn __ep_str_replace_char(ptr<str> %s, i64 %old, i64 %new) -> ptr<str>
     """
     b = MirHelperBuilder(
-        "__epic_str_replace_char",
+        "__ep_str_replace_char",
         [
             MirParam("%s", ptr(mir_struct("str"))),
             MirParam("%old", I64),
@@ -644,9 +644,9 @@ def emit___epic_str_replace_char() -> MirFunction:
     new_val = ValueOperand(b.fn.params[2].value)
 
     s_len = b.load(I64, b.gep_field(s_val, "str", 1))
-    result_str = b.call("__epic_alloc", [b.const_i64(24)], ptr())
+    result_str = b.call("__epx_alloc", [b.const_i64(24)], ptr())
     data_len = b.binop("add", s_len, b.const_i64(1))
-    result_data = b.call("__epic_alloc", [data_len], ptr())
+    result_data = b.call("__epx_alloc", [data_len], ptr())
     b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
     b.store(s_len, b.gep_field(ValueOperand(result_str), "str", 1))
     b.store(s_len, b.gep_field(ValueOperand(result_str), "str", 2))
@@ -698,10 +698,10 @@ def emit___epic_str_replace_char() -> MirFunction:
     return b.fn
 
 
-def emit___epic_str_trim() -> MirFunction:
-    """Trim ASCII whitespace from both ends, then return __epic_str_slice(s, start, end)."""
+def emit___ep_str_trim() -> MirFunction:
+    """Trim ASCII whitespace from both ends, then return __ep_str_slice(s, start, end)."""
     b = MirHelperBuilder(
-        "__epic_str_trim",
+        "__ep_str_trim",
         [MirParam("%s", ptr(mir_struct("str")))],
         ptr(mir_struct("str")),
     )
@@ -782,7 +782,7 @@ def emit___epic_str_trim() -> MirFunction:
     b.entry = slice_block
     start = b.load(I64, ValueOperand(start_slot))
     end = b.load(I64, ValueOperand(end_slot))
-    result = b.call("__epic_str_slice", [s_val, ValueOperand(start), ValueOperand(end)], ptr(mir_struct("str")))
+    result = b.call("__ep_str_slice", [s_val, ValueOperand(start), ValueOperand(end)], ptr(mir_struct("str")))
     b.ret(ValueOperand(result))
 
     return b.fn
@@ -800,8 +800,8 @@ def emit_new_arr_i8() -> MirFunction:
     )
     n_val = ValueOperand(b.fn.params[0].value)
 
-    header_raw = b.call("__epic_alloc", [b.const_i64(24)], ptr())
-    data_raw = b.call("__epic_alloc", [n_val], ptr())
+    header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
+    data_raw = b.call("__epx_alloc", [n_val], ptr())
 
     # header.data = data
     b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_arr_i8", 0))
@@ -826,8 +826,8 @@ def emit_new_arr_i8_empty() -> MirFunction:
     )
     n_val = ValueOperand(b.fn.params[0].value)
 
-    header_raw = b.call("__epic_alloc", [b.const_i64(24)], ptr())
-    data_raw = b.call("__epic_alloc", [n_val], ptr())
+    header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
+    data_raw = b.call("__epx_alloc", [n_val], ptr())
 
     # header.data = data
     b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_arr_i8", 0))
@@ -1039,7 +1039,7 @@ def emit_arr_i8_push() -> MirFunction:
 
     fn arr_i8_push(ptr<_arr_i8> %arr, i64 %val) -> void
 
-    Grows by doubling capacity when full, using __epic_alloc for new
+    Grows by doubling capacity when full, using __epx_alloc for new
     backing storage.  Matches the old _emit_arr_i8_push x64 behaviour.
     """
     b = MirHelperBuilder(
@@ -1080,7 +1080,7 @@ def emit_arr_i8_push() -> MirFunction:
     b.entry = zero_block
     nc0 = b.const_i64(2)
     b.store(nc0, ValueOperand(new_cap_slot))
-    nd0 = b.call("__epic_alloc", [nc0], ptr())
+    nd0 = b.call("__epx_alloc", [nc0], ptr())
     b.store(nd0, ValueOperand(new_data_slot))
     copy_entry = b.new_block("copy_entry")
     b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
@@ -1089,7 +1089,7 @@ def emit_arr_i8_push() -> MirFunction:
     b.entry = double_block
     nc1 = b.binop("add", old_cap, old_cap)
     b.store(nc1, ValueOperand(new_cap_slot))
-    nd1 = b.call("__epic_alloc", [nc1], ptr())
+    nd1 = b.call("__epx_alloc", [nc1], ptr())
     b.store(nd1, ValueOperand(new_data_slot))
     b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
 
@@ -1264,14 +1264,14 @@ _HELPER_EMITTERS = {
     "bytes_str": lambda p: emit_bytes_str(),
     "str_arr_i8": lambda p: emit_str_arr_i8(),
     "str_bool": lambda p: emit_str_bool(),
-    "__epic_str_eq": lambda p: emit___epic_str_eq(),
-    "__epic_str_cat": lambda p: emit___epic_str_cat(),
-    "__epic_str_slice": lambda p: emit___epic_str_slice(),
-    "__epic_str_starts_with": lambda p: emit___epic_str_starts_with(),
-    "__epic_str_get": lambda p: emit___epic_str_get(),
-    "__epic_str_find": lambda p: emit___epic_str_find(),
-    "__epic_str_replace_char": lambda p: emit___epic_str_replace_char(),
-    "__epic_str_trim": lambda p: emit___epic_str_trim(),
+    "__ep_str_eq": lambda p: emit___ep_str_eq(),
+    "__ep_str_cat": lambda p: emit___ep_str_cat(),
+    "__ep_str_slice": lambda p: emit___ep_str_slice(),
+    "__ep_str_starts_with": lambda p: emit___ep_str_starts_with(),
+    "__ep_str_get": lambda p: emit___ep_str_get(),
+    "__ep_str_find": lambda p: emit___ep_str_find(),
+    "__ep_str_replace_char": lambda p: emit___ep_str_replace_char(),
+    "__ep_str_trim": lambda p: emit___ep_str_trim(),
     "new_arr_i8": lambda p: emit_new_arr_i8(),
     "new_arr_i8_empty": lambda p: emit_new_arr_i8_empty(),
     "arr_i8_get": lambda p: emit_arr_i8_get(),
@@ -1287,14 +1287,14 @@ _HELPER_ORDER = [
     "bytes_str",
     "str_arr_i8",
     "str_bool",
-    "__epic_str_eq",
-    "__epic_str_cat",
-    "__epic_str_slice",
-    "__epic_str_starts_with",
-    "__epic_str_get",
-    "__epic_str_find",
-    "__epic_str_replace_char",
-    "__epic_str_trim",
+    "__ep_str_eq",
+    "__ep_str_cat",
+    "__ep_str_slice",
+    "__ep_str_starts_with",
+    "__ep_str_get",
+    "__ep_str_find",
+    "__ep_str_replace_char",
+    "__ep_str_trim",
     "new_arr_i8",
     "new_arr_i8_empty",
     "arr_i8_get",

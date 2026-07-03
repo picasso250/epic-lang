@@ -211,7 +211,10 @@ after ADT removal and naming unification.
 - `match` literal switch only
 - Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend`
 - String builtins (retained): `len(s)` / `s[i]` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; `str(bytes)` / `bytes(s)` as zero-copy cast; `cstr` as escape hatch
-- String builtins (removed from public surface): `str_new` / `itoa` / `str_slice` / `str_starts_with` / `str_find` / `str_trim` / `str_replace_char` / `str_cat` / `str_get` — internal helpers retained
+- String builtins (removed from public surface):
+  - `str_new` — removed entirely; use `str(bytes)`
+  - `itoa` — removed entirely; use `str(n)`
+  - `str_slice`, `str_starts_with`, `str_find`, `str_trim`, `str_replace_char`, `str_cat`, `str_get` — removed from public surface; internal helpers retained
 - `system` kept for now
 - `os.*` WinAPI calls
 - `argv` global
@@ -253,11 +256,11 @@ after ADT removal and naming unification.
 - `str_arr_i8` → `bytes_to_str`
 - `bytes_str` → `str_to_bytes`
 - `str_new` → `raw_to_str`
-- `__epic_cstr` → `str_cstr`
-- `__epic_arr_i64_push` → `arr_i64_push`
-- `__epic_arr_ptr_push` → `arr_ptr_push`
-- `__epic_arr_qword_extend` → `qword_extend`
-- `__epic_arr_ptr_get` → `arr_ptr_get`
+- `__ep_cstr` → `str_cstr`
+- `__epx_arr_i64_push` → `arr_i64_push`
+- `__epx_arr_ptr_push` → `arr_ptr_push`
+- `__epx_arr_qword_extend` → `qword_extend`
+- `__epx_arr_ptr_get` → `arr_ptr_get`
 
 ### Phase 3: `str` → `u8[]` Convergence (after Phase 2)
 - Document byte-buffer-first text model

@@ -48,11 +48,11 @@ mov  rbp, rsp
 sub  rsp, aligned_frame   # 仅当 frame > 0
 ```
 
-对 `main`：prologue 后插入 `__epic_runtime_start` 调用（初始化 `_heap` 和 `_argv`）：
+对 `main`：prologue 后插入 `__epx_runtime_start` 调用（初始化 `_heap` 和 `_argv`）：
 
 ```
 sub  rsp, 32
-call __epic_runtime_start
+call __epx_runtime_start
 add  rsp, 32
 ```
 
@@ -298,7 +298,7 @@ if inst.result is not None:
 - 用户函数名（如 `main`、`foo`）
 - WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
 - Runtime helper 名（如 `str_i64`、`print_str`）
-- `__epic_alloc`
+- `__epx_alloc`
 
 ### 6.2 Frame alignment
 
@@ -353,7 +353,7 @@ jmp  LabelRef(fn_name.else_target)
 
 ### 8.2 Startup hook
 
-`__epic_runtime_start` 在 `main` 的 prologue 中被调用：
+`__epx_runtime_start` 在 `main` 的 prologue 中被调用：
 
 ```
 push  rbp
@@ -374,14 +374,14 @@ ret
 
 `append_runtime_helpers()` 在当前实现下无条件发射所有 helper：
 
-- `__epic_alloc` (x64 primitive)
-- `__epic_arr_qword_new` (array header allocation)
-- `__epic_arr_i64_push` / `__epic_arr_ptr_push`
-- `__epic_arr_qword_extend`
-- `__epic_arr_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
+- `__epx_alloc` (x64 primitive)
+- `__epx_arr_qword_new` (array header allocation)
+- `__epx_arr_i64_push` / `__epx_arr_ptr_push`
+- `__epx_arr_qword_extend`
+- `__epx_arr_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
 - x64 primitives and still-x64 helpers:
 - `map_new` / `map_get` / `map_set` / `map_has` / `map_repr`
-- `cstr` (`__epic_cstr`)
+- `cstr` (`__ep_cstr`)
 - `write_file` / `read_file` / `system_cmd`
 - `argv_init`
 - `str_i64`

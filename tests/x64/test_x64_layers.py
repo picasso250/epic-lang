@@ -124,7 +124,7 @@ def test_target_mir_memory_ops_to_x64_golden():
         [
             MirInst("gep", [ConstNullOperand(), ConstIntOperand(I64, 1)], result=size_ptr, type=mir_struct("Pair")),
             MirInst("ptrtoint", [ValueOperand(size_ptr)], result=size, type=I64),
-            MirInst("call", [ValueOperand(size)], result=obj, type=ptr(), callee="__epic_alloc"),
+            MirInst("call", [ValueOperand(size)], result=obj, type=ptr(), callee="__epx_alloc"),
             MirInst(
                 "gep",
                 [ValueOperand(obj), ConstIntOperand(I64, 0), ConstIntOperand(I32, 1)],
@@ -138,7 +138,7 @@ def test_target_mir_memory_ops_to_x64_golden():
     )
     fn = MirFunction("pair_field", [], I64, [block])
     program = MirProgram(
-        externs=[MirExtern("__epic_alloc", MirSignature([I64], ptr()))],
+        externs=[MirExtern("__epx_alloc", MirSignature([I64], ptr()))],
         functions=[fn],
         structs={"Pair": {"fields": {"left": {"type": I64, "offset": 0}, "right": {"type": I64, "offset": 8}}, "size": 16}},
     )
@@ -160,7 +160,7 @@ pair_field.entry:
     mov qword [rbp-16], rax
     mov rcx, qword [rbp-16]
     sub rsp, 32
-    call __epic_alloc
+    call __epx_alloc
     add rsp, 32
     mov qword [rbp-24], rax
     mov rax, qword [rbp-24]
@@ -189,7 +189,7 @@ def test_startup_hook_call_golden():
     emit_startup_hook_call(program)
     expected = """section .text
     sub rsp, 32
-    call __epic_runtime_start
+    call __epx_runtime_start
     add rsp, 32
 """
     assert program.text() == expected
@@ -208,7 +208,7 @@ def test_runtime_start_helper_golden():
     lower.x64.section(".text")
     append_runtime_helpers(lower)
     expected = """section .text
-__epic_runtime_start:
+__epx_runtime_start:
     push rbp
     mov rbp, rsp
     sub rsp, 32

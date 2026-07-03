@@ -31,7 +31,10 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 ## String / Byte Conversion
 
 **Public surface status**: `str_new`, `itoa`, `str_slice`, `str_replace_char`, `str_starts_with`, `str_find`, `str_trim` are **removed from public surface**.
-They still exist as compiler-internal helpers (used for lowering `s[i]`, `s[start:end]`, etc.).
+
+- `str_new` — removed entirely; use `str(bytes)`
+- `itoa` — removed entirely; use `str(n)` (internal helper `str_i64` retained)
+- `str_slice`, `str_starts_with`, `str_find`, `str_trim`, `str_replace_char`, `str_cat`, `str_get` — removed from public surface, but retained as compiler-internal helpers (used for lowering `s[i]`, `s[start:end]`, `==`/`!=`, etc.)
 `str`, `bytes`, `cstr` remain public.
 
 | Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
