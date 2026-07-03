@@ -195,6 +195,8 @@ def test_mir_helper_injection():
     assert "str_starts_with" in IMPLEMENTED_MIR_HELPERS
     assert "str_get" in IMPLEMENTED_MIR_HELPERS
     assert "str_find" in IMPLEMENTED_MIR_HELPERS
+    assert "str_replace_char" in IMPLEMENTED_MIR_HELPERS
+    assert "str_trim" in IMPLEMENTED_MIR_HELPERS
 
     def check(source):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
@@ -311,6 +313,20 @@ def test_mir_helper_injection():
     check(
         """fun main(): i64 {
     return str_find("epic-lang", "lang")
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    let s = str_replace_char("epic-lang", '-', '_')
+    return len(s)
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    let s = str_trim(" \\t epic-lang \\n ")
+    return len(s)
 }"""
     )
 

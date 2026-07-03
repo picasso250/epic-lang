@@ -44,12 +44,15 @@ Implemented MIR helpers:
 |---|---|---|
 | `bytes_str` | `bytes(str)` conversion | `bootstrap/mir_runtime_helpers.py` |
 | `str_arr_i8` | `str(u8[])` conversion | `bootstrap/mir_runtime_helpers.py` |
+| `str_bool` | `str(bool)` conversion | `bootstrap/mir_runtime_helpers.py` |
 | `str_eq` | string equality | `bootstrap/mir_runtime_helpers.py` |
 | `str_cat` | string concatenation | `bootstrap/mir_runtime_helpers.py` |
 | `str_slice` | string slice copy | `bootstrap/mir_runtime_helpers.py` |
 | `str_starts_with` | string prefix check | `bootstrap/mir_runtime_helpers.py` |
 | `str_get` | string subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `str_find` | substring search | `bootstrap/mir_runtime_helpers.py` |
+| `str_replace_char` | character replacement copy | `bootstrap/mir_runtime_helpers.py` |
+| `str_trim` | ASCII whitespace trim | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
@@ -63,7 +66,9 @@ Injection rules:
 1. `inject_all_mir_helpers()` removes matching `MirExtern`s for every
    implemented helper.
 2. It appends deterministic `MirFunction` bodies using `IMPLEMENTED_MIR_HELPERS`.
-3. The normal MIR validator then sees these helpers as ordinary functions.
+3. Runtime string globals such as `@str.runtime.bool.true` and
+   `@str.runtime.bool.false` are injected idempotently before helper functions.
+4. The normal MIR validator then sees these helpers as ordinary functions.
 
 ### Still x64-backed helpers
 
@@ -77,7 +82,7 @@ Important x64-backed families include:
 |---|---|
 | heap allocation primitive | `MirLower._emit_epic_alloc` |
 | qword array primitives | `MirLower._emit_epic_arr_qword_*` |
-| string helpers | `MirLower._emit_str_*` |
+| remaining string helpers (`str_i64`) | `MirLower._emit_str_i64` |
 | i64-array helpers | `MirLower._emit_arr_i64_get`, `MirLower._emit_arr_i64_set` |
 | map helpers | `MirLower._emit_map_*` |
 | file/process helpers | `MirLower._emit_read_file`, `_emit_write_file`, `_emit_system_cmd` |

@@ -370,10 +370,11 @@ Runtime data, startup hook emission, and runtime append policy now live in
 `x64_runtime.py`.
 
 MIR helper bodies for `bytes_str`, `str_arr_i8`, `str_eq`, `str_cat`,
-`str_slice`, `str_starts_with`, `str_get`, `str_find`, `new_arr_i8`,
-`new_arr_i8_empty`, `arr_i8_get`, `arr_i8_set`, `arr_i8_push`, and
-`arr_i8_slice` now live in `mir_runtime_helpers.py` and are injected as
-ordinary `MirFunction`s by `mir_codegen.py`.
+`str_slice`, `str_starts_with`, `str_get`, `str_find`, `str_bool`,
+`str_replace_char`, `str_trim`, `new_arr_i8`, `new_arr_i8_empty`,
+`arr_i8_get`, `arr_i8_set`, `arr_i8_push`, `arr_i8_slice`, and `extend_i8`
+now live in `mir_runtime_helpers.py` and are injected as ordinary
+`MirFunction`s by `mir_codegen.py`.
 
 Most remaining x64-backed helper bodies still live on `MirLower` as `_emit_*`
 methods. Helpers implemented as MIR functions no longer have same-named legacy

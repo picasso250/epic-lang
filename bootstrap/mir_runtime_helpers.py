@@ -642,6 +642,168 @@ def emit_str_find() -> MirFunction:
     return b.fn
 
 
+def emit_str_replace_char() -> MirFunction:
+    """Return a copy of s with byte old replaced by byte new.
+
+    fn str_replace_char(ptr<str> %s, i64 %old, i64 %new) -> ptr<str>
+    """
+    b = MirHelperBuilder(
+        "str_replace_char",
+        [
+            MirParam("%s", ptr(mir_struct("str"))),
+            MirParam("%old", I64),
+            MirParam("%new", I64),
+        ],
+        ptr(mir_struct("str")),
+    )
+    s_val = ValueOperand(b.fn.params[0].value)
+    old_val = ValueOperand(b.fn.params[1].value)
+    new_val = ValueOperand(b.fn.params[2].value)
+
+    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
+    result_str = b.call("__epic_alloc", [b.const_i64(16)], ptr())
+    data_len = b.binop("add", s_len, b.const_i64(1))
+    result_data = b.call("__epic_alloc", [data_len], ptr())
+    b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
+    b.store(s_len, b.gep_field(ValueOperand(result_str), "str", 1))
+    src_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
+    trunc_slot = b.alloca(I64)
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    use_new = b.new_block("use_new")
+    use_original = b.new_block("use_original")
+    store_block = b.new_block("store")
+    done = b.new_block("done")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_copying = b.icmp("lt", i, s_len)
+    b.entry.terminator = CondBr(ValueOperand(keep_copying), loop_body.name, done.name)
+
+    b.entry = loop_body
+    src_addr = b.gep(I8, src_data, [i])
+    byte = b.load(I8, src_addr, result_type=I64)
+    is_old = b.icmp("eq", byte, old_val)
+    b.entry.terminator = CondBr(ValueOperand(is_old), use_new.name, use_original.name)
+
+    b.entry = use_new
+    b.store(new_val, ValueOperand(trunc_slot))
+    b.br(store_block)
+
+    b.entry = use_original
+    b.store(ValueOperand(byte), ValueOperand(trunc_slot))
+    b.br(store_block)
+
+    b.entry = store_block
+    out_byte = b.load(I8, ValueOperand(trunc_slot), result_type=I8)
+    dst_addr = b.gep(I8, ValueOperand(result_data), [i])
+    b.store(ValueOperand(out_byte), dst_addr)
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = done
+    nul_addr = b.gep(I8, ValueOperand(result_data), [s_len])
+    b.store(b.const_i8(0), nul_addr)
+    b.ret(ValueOperand(result_str))
+
+    return b.fn
+
+
+def emit_str_trim() -> MirFunction:
+    """Trim ASCII whitespace from both ends, then return str_slice(s, start, end)."""
+    b = MirHelperBuilder(
+        "str_trim",
+        [MirParam("%s", ptr(mir_struct("str")))],
+        ptr(mir_struct("str")),
+    )
+    s_val = ValueOperand(b.fn.params[0].value)
+
+    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
+    s_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
+    start_slot = b.alloca(I64)
+    end_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(start_slot))
+    b.store(s_len, ValueOperand(end_slot))
+
+    left_check = b.new_block("left_check")
+    left_load = b.new_block("left_load")
+    left_inc = b.new_block("left_inc")
+    left_range_low = b.new_block("left_range_low")
+    left_range_high = b.new_block("left_range_high")
+    right_check = b.new_block("right_check")
+    b.br(left_check)
+
+    b.entry = left_check
+    start = b.load(I64, ValueOperand(start_slot))
+    end = b.load(I64, ValueOperand(end_slot))
+    has_left = b.icmp("lt", start, end)
+    b.entry.terminator = CondBr(ValueOperand(has_left), left_load.name, right_check.name)
+
+    b.entry = left_load
+    byte_addr = b.gep(I8, s_data, [start])
+    byte = b.load(I8, byte_addr, result_type=I64)
+    is_space = b.icmp("eq", byte, b.const_i64(32))
+    b.entry.terminator = CondBr(ValueOperand(is_space), left_inc.name, left_range_low.name)
+
+    b.entry = left_range_low
+    ge_tab = b.icmp("ge", byte, b.const_i64(9))
+    b.entry.terminator = CondBr(ValueOperand(ge_tab), left_range_high.name, right_check.name)
+
+    b.entry = left_range_high
+    le_cr = b.icmp("le", byte, b.const_i64(13))
+    b.entry.terminator = CondBr(ValueOperand(le_cr), left_inc.name, right_check.name)
+
+    b.entry = left_inc
+    next_start = b.binop("add", start, b.const_i64(1))
+    b.store(next_start, ValueOperand(start_slot))
+    b.br(left_check)
+
+    right_load = b.new_block("right_load")
+    right_dec = b.new_block("right_dec")
+    right_range_low = b.new_block("right_range_low")
+    right_range_high = b.new_block("right_range_high")
+    slice_block = b.new_block("slice")
+
+    b.entry = right_check
+    start = b.load(I64, ValueOperand(start_slot))
+    end = b.load(I64, ValueOperand(end_slot))
+    has_right = b.icmp("lt", start, end)
+    b.entry.terminator = CondBr(ValueOperand(has_right), right_load.name, slice_block.name)
+
+    b.entry = right_load
+    last = b.binop("sub", end, b.const_i64(1))
+    byte_addr = b.gep(I8, s_data, [last])
+    byte = b.load(I8, byte_addr, result_type=I64)
+    is_space = b.icmp("eq", byte, b.const_i64(32))
+    b.entry.terminator = CondBr(ValueOperand(is_space), right_dec.name, right_range_low.name)
+
+    b.entry = right_range_low
+    ge_tab = b.icmp("ge", byte, b.const_i64(9))
+    b.entry.terminator = CondBr(ValueOperand(ge_tab), right_range_high.name, slice_block.name)
+
+    b.entry = right_range_high
+    le_cr = b.icmp("le", byte, b.const_i64(13))
+    b.entry.terminator = CondBr(ValueOperand(le_cr), right_dec.name, slice_block.name)
+
+    b.entry = right_dec
+    next_end = b.binop("sub", end, b.const_i64(1))
+    b.store(next_end, ValueOperand(end_slot))
+    b.br(right_check)
+
+    b.entry = slice_block
+    start = b.load(I64, ValueOperand(start_slot))
+    end = b.load(I64, ValueOperand(end_slot))
+    result = b.call("str_slice", [s_val, ValueOperand(start), ValueOperand(end)], ptr(mir_struct("str")))
+    b.ret(ValueOperand(result))
+
+    return b.fn
+
+
 def emit_new_arr_i8() -> MirFunction:
     """Allocate header + data for a new u8[] of length n.
 
@@ -1029,6 +1191,8 @@ _HELPER_EMITTERS = {
     "str_starts_with": lambda p: emit_str_starts_with(),
     "str_get": lambda p: emit_str_get(),
     "str_find": lambda p: emit_str_find(),
+    "str_replace_char": lambda p: emit_str_replace_char(),
+    "str_trim": lambda p: emit_str_trim(),
     "new_arr_i8": lambda p: emit_new_arr_i8(),
     "new_arr_i8_empty": lambda p: emit_new_arr_i8_empty(),
     "arr_i8_get": lambda p: emit_arr_i8_get(),
@@ -1048,6 +1212,8 @@ _HELPER_ORDER = [
     "str_starts_with",
     "str_get",
     "str_find",
+    "str_replace_char",
+    "str_trim",
     "new_arr_i8",
     "new_arr_i8_empty",
     "arr_i8_get",

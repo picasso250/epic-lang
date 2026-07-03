@@ -153,12 +153,15 @@ symbols used by the Python backend.
 |---|---|
 | `bytes_str` | convert `str` to `_arr_i8` |
 | `str_arr_i8` | view/convert `_arr_i8` as `str` |
+| `str_bool` | convert `bool` to a static runtime string |
 | `str_eq` | compare two strings for equality |
 | `str_cat` | concatenate two strings |
 | `str_slice` | copy a half-open string slice |
 | `str_starts_with` | test whether a string starts with a prefix |
 | `str_get` | bounds-checked string byte read |
 | `str_find` | find a substring within a string |
+| `str_replace_char` | copy string while replacing one byte value |
+| `str_trim` | trim leading/trailing ASCII whitespace |
 | `new_arr_i8` | allocate initialized-capacity byte array |
 | `new_arr_i8_empty` | allocate empty byte array with capacity |
 | `arr_i8_get` | bounds-checked byte array read |
@@ -172,7 +175,7 @@ These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.p
 ### x64-backed private helpers
 
 Most other private helpers are still emitted as x64 helper bodies from
-`bootstrap/mir_lower.py`. This includes remaining string helpers, map helpers,
+`bootstrap/mir_lower.py`. This includes `str_i64`, map helpers,
 file/process helpers, argv setup, printing helpers, and several array helpers.
 
 These should be treated as backend implementation details, not language builtins.

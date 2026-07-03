@@ -346,7 +346,8 @@ jmp  LabelRef(fn_name.else_target)
 - `_putc_buf: byte 0`
 - `_cstr_panic_prefix: "panic line "`
 - `_cstr_panic_suffix: ": invalid cstr"`
-- `_bool_true_data` / `_bool_false_data` — 预制的 bool 字符串 header 和数据
+- runtime string globals injected by MIR helpers, such as
+  `@str.runtime.bool.true` / `@str.runtime.bool.false`
 - map repr 辅助字符串（`_map_repr_prefix` 等）
 - 每个程序全局 string 的 `data_label` 和 `header_label`
 
@@ -378,17 +379,22 @@ ret
 - `__epic_arr_i64_push` / `__epic_arr_ptr_push`
 - `__epic_arr_qword_extend`
 - `__epic_arr_i64_get` / `__epic_arr_ptr_get`
-- `bytes_str` / `str_arr_i8` / `new_arr_i8` / `new_arr_i8_empty` / `arr_i8_*` / `extend_i8`
+- x64 primitives and still-x64 helpers:
 - `map_new` / `map_get` / `map_set` / `map_has` / `map_repr`
 - `cstr` (`__epic_cstr`)
 - `write_file` / `read_file` / `system_cmd`
 - `argv_init`
-- `str_cat` / `str_eq` / `str_slice` / `str_replace_char` / `str_get` / `str_starts_with` / `str_find` / `str_trim` / `str_i64` / `str_bool`
+- `str_i64`
 - `print_str` / `print_newline`
 - `putc`
 - `array_oob`
 
-这些函数的 x64 标签和函数体全部手写在 `mir_lower.py` 的 `_emit_*()` 方法中。
+MIR-implemented helpers such as `bytes_str`, `str_arr_i8`, `str_bool`,
+`str_cat`, `str_eq`, `str_slice`, `str_replace_char`, `str_trim`, `str_get`,
+`str_starts_with`, `str_find`, `new_arr_i8`, `arr_i8_*`, and `extend_i8` are
+ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
+longer have same-named x64 fallback bodies. Remaining x64 labels and function
+bodies are hand-written in `mir_lower.py` `_emit_*()` methods.
 
 **迁移计划**：详见 `docs/mir-runtime-helper-plan.md`。
 
