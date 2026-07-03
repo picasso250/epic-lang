@@ -258,10 +258,8 @@ after ADT removal and naming unification.
 - `__ep_str_from_slice_u8` → `bytes_to_str` (future)
 - `__ep_slice_u8_from_str` → `str_to_bytes` (future)
 - `__ep_cstr` → `str_cstr`
-- `__epx_slice_i64_push` → `arr_i64_push`
-- `__epx_slice_ptr_push` → `arr_ptr_push`
-- ~~`__epx_slice_qword_extend` → `qword_extend`~~ (removed)
-- `__epx_slice_ptr_get` → `arr_ptr_get`
+- `__ep_slice_i64_new` / `__ep_slice_i64_get` / `__ep_slice_i64_set` / `__ep_slice_i64_push` → `arr_i64_*`
+- `__ep_slice_ptr_new` / `__ep_slice_ptr_get` / `__ep_slice_ptr_set` / `__ep_slice_ptr_push` → `arr_ptr_*`
 
 ### Phase 3: `str` → `u8[]` Convergence (after Phase 2)
 - Document byte-buffer-first text model

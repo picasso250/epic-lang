@@ -104,8 +104,14 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_slice_u8_set", MirSignature([ptr_slice_u8(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_push", MirSignature([ptr_slice_u8(), I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_slice", MirSignature([ptr_slice_u8(), I64, I64], ptr_slice_u8())))
-        self.program.externs.append(MirExtern("__ep_slice_i64_get", MirSignature([ptr_slice_i64(), I64], I64)))
-        self.program.externs.append(MirExtern("__ep_slice_i64_set", MirSignature([ptr_slice_i64(), I64, I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_i64_new", MirSignature([I64], ptr())))
+        self.program.externs.append(MirExtern("__ep_slice_i64_get", MirSignature([ptr(), I64], I64)))
+        self.program.externs.append(MirExtern("__ep_slice_i64_set", MirSignature([ptr(), I64, I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_i64_push", MirSignature([ptr(), I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_ptr_new", MirSignature([I64], ptr())))
+        self.program.externs.append(MirExtern("__ep_slice_ptr_get", MirSignature([ptr(), I64], ptr())))
+        self.program.externs.append(MirExtern("__ep_slice_ptr_set", MirSignature([ptr(), I64, ptr()], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_ptr_push", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr_slice_u8(), ptr_slice_u8()], VOID)))
         self.program.externs.append(MirExtern("__ep_map_str_i64_new", MirSignature([], ptr_map_str_i64())))
         self.program.externs.append(MirExtern("__ep_map_str_i64_get", MirSignature([ptr_map_str_i64(), ptr_str()], I64)))
@@ -115,10 +121,6 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr_str()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
-        self.program.externs.append(MirExtern("__epx_slice_qword_new", MirSignature([I64], ptr())))
-        self.program.externs.append(MirExtern("__epx_slice_i64_push", MirSignature([ptr(), I64], VOID)))
-        self.program.externs.append(MirExtern("__epx_slice_ptr_push", MirSignature([ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__epx_slice_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.globals.append(MirGlobal("@argv", ptr_slice_str(), None))
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
@@ -687,9 +689,9 @@ class MirCodegen:
             if args[0].type == ptr_slice_u8():
                 self._inst("call", args, type=VOID, callee="__ep_slice_u8_push")
             elif args[0].type == ptr_slice_i64():
-                self._inst("call", args, type=VOID, callee="__epx_slice_i64_push")
+                self._inst("call", args, type=VOID, callee="__ep_slice_i64_push")
             else:
-                self._inst("call", args, type=VOID, callee="__epx_slice_ptr_push")
+                self._inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
             return ConstIntOperand(I64, 0)
         if name in ("len", "cap"):
             base = self._emit_expr(expr.args[0])
@@ -733,7 +735,7 @@ class MirCodegen:
         elem = self._array_struct_elem(base.type)
         if elem is not None:
             result_type = ptr_struct(elem)
-            result = self._inst("call", [base, index], result_type=result_type, type=ptr(), callee="__epx_slice_ptr_get")
+            result = self._inst("call", [base, index], result_type=result_type, type=ptr(), callee="__ep_slice_ptr_get")
             return ValueOperand(result)
         if base.type.kind == "ptr" and base.type.pointee is not None and base.type.pointee.kind == "ptr":
             addr = self._inst("gep", [base, index], result_type=ptr(base.type.pointee), type=ptr())
@@ -758,11 +760,11 @@ class MirCodegen:
                 [ConstIntOperand(I64, len(expr.values))],
                 result_type=arr_type,
                 type=ptr(),
-                callee="__epx_slice_qword_new",
+                callee="__ep_slice_i64_new",
             )
             arr = ValueOperand(result)
             for value in expr.values:
-                self._inst("call", [arr, self._emit_expr(value)], type=VOID, callee="__epx_slice_i64_push")
+                self._inst("call", [arr, self._emit_expr(value)], type=VOID, callee="__ep_slice_i64_push")
             return arr
         if arr_type != ptr_slice_u8():
             raise MirCodegenError(f"unsupported array literal element type: {expr.elem_type}")
@@ -785,10 +787,10 @@ class MirCodegen:
             result = self._inst("call", [ConstIntOperand(I64, 0), count], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_alloc")
             return ValueOperand(result)
         if arr_type == ptr_slice_i64():
-            result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__epx_slice_qword_new")
+            result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_i64_new")
             return ValueOperand(result)
         if arr_type.kind == "ptr" and arr_type.pointee is not None and arr_type.pointee.kind == "struct":
-            result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__epx_slice_qword_new")
+            result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_ptr_new")
             return ValueOperand(result)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
@@ -980,7 +982,7 @@ class MirCodegen:
             result = self._inst("call", [ConstIntOperand(I64, 0), ConstIntOperand(I64, 0)], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_alloc")
             return ValueOperand(result)
         if typ == ptr_slice_i64():
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_slice_i64(), type=ptr(), callee="__epx_slice_qword_new")
+            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_slice_i64(), type=ptr(), callee="__ep_slice_i64_new")
             return ValueOperand(result)
         if typ == ptr_map_str_i64():
             result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="__ep_map_str_i64_new")

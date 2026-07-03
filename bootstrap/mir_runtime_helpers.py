@@ -872,62 +872,93 @@ def emit_slice_u8_get() -> MirFunction:
     return b.fn
 
 
-def emit_slice_i64_get() -> MirFunction:
-    """Bounds-checked qword read from i64[].
+def emit_slice_word_new(name: str) -> MirFunction:
+    """Allocate a word-sized slice header.
 
-    fn __ep_slice_i64_get(ptr<_slice_i64> %arr, i64 %idx) -> i64
+    fn {name}(i64 %cap) -> ptr
     """
     b = MirHelperBuilder(
-        "__ep_slice_i64_get",
-        [MirParam("%arr", ptr(mir_struct("_slice_i64"))), MirParam("%idx", I64)],
-        I64,
+        name,
+        [MirParam("%cap", I64)],
+        ptr(),
+    )
+    cap_val = ValueOperand(b.fn.params[0].value)
+
+    header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
+    cap_zero = b.icmp("eq", cap_val, b.const_i64(0))
+    zero_block = b.new_block("data_zero")
+    alloc_block = b.new_block("data_alloc")
+    init_block = b.new_block("init")
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, alloc_block.name)
+
+    b.entry = zero_block
+    b.store(ConstNullOperand(), b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(0)]))
+    b.br(init_block)
+
+    b.entry = alloc_block
+    bytes_len = b.binop("add", cap_val, cap_val)
+    bytes_len = b.binop("add", ValueOperand(bytes_len), ValueOperand(bytes_len))
+    bytes_len = b.binop("add", ValueOperand(bytes_len), ValueOperand(bytes_len))
+    data_raw = b.call("__epx_alloc", [ValueOperand(bytes_len)], ptr())
+    b.store(data_raw, b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(0)]))
+    b.br(init_block)
+
+    b.entry = init_block
+    b.store(b.const_i64(0), b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(1)]))
+    b.store(cap_val, b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(2)]))
+    b.ret(ValueOperand(header_raw))
+
+    return b.fn
+
+
+def emit_slice_word_get(name: str, elem_type) -> MirFunction:
+    """Bounds-checked read from a word-sized slice."""
+    b = MirHelperBuilder(
+        name,
+        [MirParam("%arr", ptr()), MirParam("%idx", I64)],
+        elem_type,
     )
     arr_val = ValueOperand(b.fn.params[0].value)
     idx_val = ValueOperand(b.fn.params[1].value)
 
-    # Load arr.len
-    len_addr = b.gep_field(arr_val, "_slice_i64", 1)
+    len_addr = b.gep(ptr(), arr_val, [b.const_i64(1)])
     arr_len = b.load(I64, len_addr)
 
-    # Check idx >= 0
     ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
     b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
-    # check_high: idx < arr.len
     b.entry = check_block
     lt_len = b.icmp("lt", idx_val, arr_len)
     b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
-    # ok: load qword
     b.entry = ok_block
-    data_addr = b.gep_field(arr_val, "_slice_i64", 0)
+    data_addr = b.gep(ptr(), arr_val, [b.const_i64(0)])
     data = b.load(ptr(), data_addr)
-    elem_addr = b.gep(I64, data, [idx_val])
-    result = b.load(I64, elem_addr)
+    elem_addr = b.gep(ptr(), data, [idx_val])
+    result = b.load(elem_type, elem_addr)
     b.ret(ValueOperand(result))
 
-    # fail: exit(1)
     b.entry = fail_block
     b.call("ExitProcess", [b.const_i64(1)], VOID)
-    b.ret(b.const_i64(0))  # dummy, unreachable
+    if elem_type.kind == "ptr":
+        b.ret(ConstNullOperand())
+    else:
+        b.ret(b.const_i64(0))
 
     return b.fn
 
 
-def emit_slice_i64_set() -> MirFunction:
-    """Bounds-checked qword write to i64[].
-
-    fn __ep_slice_i64_set(ptr<_slice_i64> %arr, i64 %idx, i64 %val) -> void
-    """
+def emit_slice_word_set(name: str, elem_type) -> MirFunction:
+    """Bounds-checked write to a word-sized slice."""
     b = MirHelperBuilder(
-        "__ep_slice_i64_set",
+        name,
         [
-            MirParam("%arr", ptr(mir_struct("_slice_i64"))),
+            MirParam("%arr", ptr()),
             MirParam("%idx", I64),
-            MirParam("%val", I64),
+            MirParam("%val", elem_type),
         ],
         VOID,
     )
@@ -935,34 +966,121 @@ def emit_slice_i64_set() -> MirFunction:
     idx_val = ValueOperand(b.fn.params[1].value)
     val_val = ValueOperand(b.fn.params[2].value)
 
-    # Load arr.len
-    len_addr = b.gep_field(arr_val, "_slice_i64", 1)
+    len_addr = b.gep(ptr(), arr_val, [b.const_i64(1)])
     arr_len = b.load(I64, len_addr)
 
-    # Check idx >= 0
     ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
     b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
-    # check_high: idx < arr.len
     b.entry = check_block
     lt_len = b.icmp("lt", idx_val, arr_len)
     b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
-    # ok: store qword
     b.entry = ok_block
-    data_addr = b.gep_field(arr_val, "_slice_i64", 0)
+    data_addr = b.gep(ptr(), arr_val, [b.const_i64(0)])
     data = b.load(ptr(), data_addr)
-    elem_addr = b.gep(I64, data, [idx_val])
+    elem_addr = b.gep(ptr(), data, [idx_val])
     b.store(val_val, elem_addr)
     b.ret()
 
-    # fail: exit(1)
     b.entry = fail_block
     b.call("ExitProcess", [b.const_i64(1)], VOID)
-    b.ret()  # dummy, unreachable
+    b.ret()
+
+    return b.fn
+
+
+def emit_slice_word_push(name: str, elem_type) -> MirFunction:
+    """Push one word-sized element, growing from zero capacity to four."""
+    b = MirHelperBuilder(
+        name,
+        [
+            MirParam("%arr", ptr()),
+            MirParam("%val", elem_type),
+        ],
+        VOID,
+    )
+    arr_val = ValueOperand(b.fn.params[0].value)
+    val_val = ValueOperand(b.fn.params[1].value)
+
+    len_addr = b.gep(ptr(), arr_val, [b.const_i64(1)])
+    old_len = b.load(I64, len_addr)
+    cap_addr = b.gep(ptr(), arr_val, [b.const_i64(2)])
+    old_cap = b.load(I64, cap_addr)
+
+    need_grow = b.icmp("ge", old_len, old_cap)
+    grow_block = b.new_block("grow")
+    store_block = b.new_block("store")
+    b.entry.terminator = CondBr(ValueOperand(need_grow), grow_block.name, store_block.name)
+
+    b.entry = grow_block
+    new_cap_slot = b.alloca(I64)
+    new_data_slot = b.alloca(ptr())
+    i_slot = b.alloca(I64)
+
+    cap_zero = b.icmp("eq", old_cap, b.const_i64(0))
+    zero_block = b.new_block("grow_zero")
+    double_block = b.new_block("grow_double")
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, double_block.name)
+
+    b.entry = zero_block
+    nc0 = b.const_i64(4)
+    b.store(nc0, ValueOperand(new_cap_slot))
+    bytes0 = b.const_i64(32)
+    nd0 = b.call("__epx_alloc", [bytes0], ptr())
+    b.store(nd0, ValueOperand(new_data_slot))
+    copy_entry = b.new_block("copy_entry")
+    b.br(copy_entry)
+
+    b.entry = double_block
+    nc1 = b.binop("add", old_cap, old_cap)
+    b.store(nc1, ValueOperand(new_cap_slot))
+    bytes1 = b.binop("add", ValueOperand(nc1), ValueOperand(nc1))
+    bytes1 = b.binop("add", ValueOperand(bytes1), ValueOperand(bytes1))
+    bytes1 = b.binop("add", ValueOperand(bytes1), ValueOperand(bytes1))
+    nd1 = b.call("__epx_alloc", [ValueOperand(bytes1)], ptr())
+    b.store(nd1, ValueOperand(new_data_slot))
+    b.br(copy_entry)
+
+    b.entry = copy_entry
+    old_data = b.load(ptr(), b.gep(ptr(), arr_val, [b.const_i64(0)]))
+    new_data = b.load(ptr(), ValueOperand(new_data_slot))
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    copy_check = b.new_block("copy_check")
+    b.br(copy_check)
+
+    b.entry = copy_check
+    i = b.load(I64, ValueOperand(i_slot))
+    cond = b.icmp("lt", i, old_len)
+    copy_body = b.new_block("copy_body")
+    swap_block = b.new_block("swap")
+    b.entry.terminator = CondBr(ValueOperand(cond), copy_body.name, swap_block.name)
+
+    b.entry = copy_body
+    old_elem_addr = b.gep(ptr(), old_data, [i])
+    old_elem = b.load(elem_type, old_elem_addr)
+    new_elem_addr = b.gep(ptr(), new_data, [i])
+    b.store(ValueOperand(old_elem), new_elem_addr)
+    i_next = b.binop("add", i, b.const_i64(1))
+    b.store(i_next, ValueOperand(i_slot))
+    b.br(copy_check)
+
+    b.entry = swap_block
+    b.store(new_data, b.gep(ptr(), arr_val, [b.const_i64(0)]))
+    final_cap = b.load(I64, ValueOperand(new_cap_slot))
+    b.store(final_cap, cap_addr)
+    b.br(store_block)
+
+    b.entry = store_block
+    data = b.load(ptr(), b.gep(ptr(), arr_val, [b.const_i64(0)]))
+    elem_addr = b.gep(ptr(), data, [old_len])
+    b.store(val_val, elem_addr)
+    new_len = b.binop("add", old_len, b.const_i64(1))
+    b.store(new_len, len_addr)
+    b.ret()
 
     return b.fn
 
@@ -1261,8 +1379,14 @@ _HELPER_EMITTERS = {
     "__ep_str_trim": lambda p: emit___ep_str_trim(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
     "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
-    "__ep_slice_i64_get": lambda p: emit_slice_i64_get(),
-    "__ep_slice_i64_set": lambda p: emit_slice_i64_set(),
+    "__ep_slice_i64_new": lambda p: emit_slice_word_new("__ep_slice_i64_new"),
+    "__ep_slice_i64_get": lambda p: emit_slice_word_get("__ep_slice_i64_get", I64),
+    "__ep_slice_i64_set": lambda p: emit_slice_word_set("__ep_slice_i64_set", I64),
+    "__ep_slice_i64_push": lambda p: emit_slice_word_push("__ep_slice_i64_push", I64),
+    "__ep_slice_ptr_new": lambda p: emit_slice_word_new("__ep_slice_ptr_new"),
+    "__ep_slice_ptr_get": lambda p: emit_slice_word_get("__ep_slice_ptr_get", ptr()),
+    "__ep_slice_ptr_set": lambda p: emit_slice_word_set("__ep_slice_ptr_set", ptr()),
+    "__ep_slice_ptr_push": lambda p: emit_slice_word_push("__ep_slice_ptr_push", ptr()),
     "__ep_slice_u8_set": lambda p: emit_slice_u8_set(),
     "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
     "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
@@ -1283,8 +1407,14 @@ _HELPER_ORDER = [
     "__ep_str_trim",
     "__ep_slice_u8_alloc",
     "__ep_slice_u8_get",
+    "__ep_slice_i64_new",
     "__ep_slice_i64_get",
     "__ep_slice_i64_set",
+    "__ep_slice_i64_push",
+    "__ep_slice_ptr_new",
+    "__ep_slice_ptr_get",
+    "__ep_slice_ptr_set",
+    "__ep_slice_ptr_push",
     "__ep_slice_u8_set",
     "__ep_slice_u8_push",
     "__ep_slice_u8_slice",

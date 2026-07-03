@@ -170,8 +170,14 @@ def test_mir_helper_injection():
     """Verify all implemented MIR runtime helpers are always injected."""
 
     assert "__ep_slice_u8_slice" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_slice_i64_new" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_slice_i64_get" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_slice_i64_set" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_slice_i64_push" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_slice_ptr_new" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_slice_ptr_get" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_slice_ptr_set" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_slice_ptr_push" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_slice_u8_extend" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_eq" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_from_bool" in IMPLEMENTED_MIR_HELPERS
@@ -195,6 +201,12 @@ def test_mir_helper_injection():
         f"expected call i64 __ep_slice_i64_get, got:\n{text_i64}"
     assert "__epic_slice_i64_get" not in text_i64, \
         f"unexpected __epic_slice_i64_get:\n{text_i64}"
+    old_qword_new = "__epx_slice_" + "qword_new"
+    old_i64_push = "__epx_slice_" + "i64_push"
+    assert old_qword_new not in text_i64, \
+        f"unexpected {old_qword_new}:\n{text_i64}"
+    assert old_i64_push not in text_i64, \
+        f"unexpected {old_i64_push}:\n{text_i64}"
 
     # i64[] writes use __ep_slice_i64_set
     src_i64_set = """fun main(): i64 {
