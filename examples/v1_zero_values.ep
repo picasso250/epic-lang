@@ -9,7 +9,7 @@ struct Box {
 fun main(): void {
     let s: str
     let xs: u8[]
-    let b: Box
+    let b = new Box
     println(len(s))
     println(len(xs))
     push(xs, 'X')

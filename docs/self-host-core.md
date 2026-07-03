@@ -187,7 +187,7 @@ after ADT removal and naming unification.
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
 | `system` | Kept for now | May be removed from core |
 | `map` | Kept for now | May be removed from core |
-| `itoa` | Kept for now | May be replaced by generic int-to-string |
+| `itoa` | Removed from public surface | Use `str(n)` |
 | `cstr` | Kept for now | May be removed when WinAPI interop is redesigned |
 
 ---
@@ -206,7 +206,8 @@ after ADT removal and naming unification.
 - `new T[] { ... }` array literal
 - `new T[n]` array allocation
 - `let` binding with optional type annotation
-- Zero-value initialization
+- Zero-value initialization for built-in types (i64, bool, str, T[])
+- **Struct requires explicit `new`**; `let b: Box` is a compile error
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend`

@@ -84,12 +84,12 @@ fun main(): void {
 ```epic
 let b: u8 = 1
 let ok: bool
-let token: Token
+let xs: u8[]
 ```
 
 当右侧明显确定类型时，应省略注解。
 
-不带初始化器的 `let x: T` 创建零值。对标量类型为零或 `false`。对 `str`、数组、结构体，变量持有一个非空的描述符，其字段被归零；当 `.len` 为 `0` 时，`.data` 可能为 `0`。
+不带初始化器的 `let x: T` 创建零值。对标量类型为 `0` 或 `false`。对 `str`、数组、map，创建对应的空值。结构体是 heap-only reference type，不允许 `let x: Struct` 这种无初始化声明；必须显式写 `new Struct` 或 `new Struct { ... }`。
 
 ### 运算符 (Operators)
 
@@ -128,6 +128,13 @@ let token: Token
 
 ### 结构体初始化 (Struct Initialization)
 
+结构体是 heap-only reference type。**局部变量不允许无初始化的结构体声明**：
+
+```epic
+let p: Pos         # 编译错误！必须用 new
+let p = new Pos    # 合法，所有字段归零
+```
+
 ```epic
 struct Pos { line: i64; col: i64 }
 let p = new Pos { line: 3, col: 9 }
@@ -136,11 +143,6 @@ let z = new Pos {}              # 所有字段为零
 ```
 
 `new Ctor` 是 `new Ctor {}` 的简写。对于结构体，`Ctor` 是结构体名称。省略的字段被初始化为零值。
-
-```epic
-let b = new Box
-let b2 = new Box {}
-```
 
 字段按名称指定。顺序无关。未知字段或重复字段是编译错误。
 

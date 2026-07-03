@@ -185,6 +185,8 @@ class SemanticAnalyzer:
                 self._fail(f"let {stmt.name} cannot infer void")
         elif target == VOID:
             self._fail(f"let {stmt.name} cannot have type void")
+        if value is None and target is not None and target.kind == "named":
+            self._fail(f"let {stmt.name}: struct variable requires explicit initialization, use `new`")
         if value is not None:
             self._check_assign(target, value, f"let {stmt.name}")
         stmt.resolved_type = target

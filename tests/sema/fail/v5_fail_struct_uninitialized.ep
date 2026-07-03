@@ -1,0 +1,8 @@
+# COMPILE_FAIL: struct variable requires explicit initialization
+struct Box {
+    value: i64
+}
+
+fun main(): void {
+    let b: Box
+}
