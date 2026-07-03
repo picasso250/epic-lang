@@ -126,7 +126,6 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_map_str_str_set", MirSignature([ptr_map_str_str(), ptr_str(), ptr_str()], VOID)))
         self.program.externs.append(MirExtern("__ep_map_str_str_has", MirSignature([ptr_map_str_str(), ptr_str()], BOOL)))
         self.program.externs.append(MirExtern("__ep_map_str_str_del", MirSignature([ptr_map_str_str(), ptr_str()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_i64_repr", MirSignature([ptr_map_str_i64()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr_str()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
@@ -965,9 +964,6 @@ class MirCodegen:
             return ValueOperand(result)
         if typ == ptr_slice_u8():
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_slice_u8")
-            return ValueOperand(result)
-        if typ == ptr_map_str_i64():
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_map_str_i64_repr")
             return ValueOperand(result)
         result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_i64")
         return ValueOperand(result)

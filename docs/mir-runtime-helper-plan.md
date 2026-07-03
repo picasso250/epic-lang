@@ -14,7 +14,7 @@
 2. `mir_lower.lower()` → `append_runtime_helpers()` → `_emit_runtime_helpers()` **无条件生成全部 x64 标签、全部 x64 helper 函数体**，不管用户代码是否调用。
 
 这意味着：
-- **编译所有程序都携带了全套 helper**。`print("hello")` 也会生成 `__epic_arr_ptr_push`、`map_repr`、`str_find` 等无关代码。
+- **编译所有程序都携带了全套 helper**。`print("hello")` 也会生成 `__epic_arr_ptr_push`、`str_find` 等无关代码。
 - **MIR 层对 x64 层有隐式依赖**：MIR 只是记录了 extern 声明，真正有没有实现要到 x64 lower 阶段才确定。
 - **未来自举编译器要通过自身编译器 .ep 源码生成这些 helper**，但目前全部在 Python x64 汇编器里手写，迁移路径不清晰。
 

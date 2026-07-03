@@ -306,7 +306,6 @@ class MirLower:
 
     def _emit_runtime_helpers(self):
         self._emit_epic_alloc()
-        self._emit_map_repr()
         self._emit_cstr()
         self._emit_write_file()
         self._emit_read_file()
@@ -338,99 +337,6 @@ class MirLower:
         x.inst("add", R("rsp"), I(32))
         x.inst("pop", R("rbp"))
         x.inst("ret")
-
-    def _map_entry_addr(self, index_reg="r9"):
-        x = self.x64
-        x.inst("mov", R("rax"), R(index_reg))
-        x.inst("add", R("rax"), R("rax"))
-        x.inst("add", R("rax"), R("rax"))
-        x.inst("add", R("rax"), R("rax"))
-        x.inst("mov", R("r10"), R(index_reg))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("rax"), R("r10"))
-        x.inst("mov", R("r11"), M("rbp", -8))
-        x.inst("mov", R("r11"), M("r11"))
-        x.inst("add", R("r11"), R("rax"))
-
-    def _emit_map_repr(self):
-        x = self.x64
-        x.label("__ep_map_str_i64_repr")
-        x.inst("push", R("rbp"))
-        x.inst("mov", R("rbp"), R("rsp"))
-        x.inst("sub", R("rsp"), I(96))
-        x.inst("mov", M("rbp", -8), R("rcx"))
-        self._runtime_string("rax", "_map_repr_prefix")
-        x.inst("mov", M("rbp", -16), R("rax"))
-        x.inst("mov", M("rbp", -24), I(0))
-        x.label("__ep_map_str_i64_repr.loop")
-        x.inst("mov", R("rcx"), M("rbp", -8))
-        x.inst("mov", R("rdx"), M("rcx", 8))
-        x.inst("mov", R("r9"), M("rbp", -24))
-        x.inst("cmp", R("r9"), R("rdx"))
-        x.inst("jge", LabelRef("__ep_map_str_i64_repr.close"))
-        x.inst("test", R("r9"), R("r9"))
-        x.inst("jz", LabelRef("__ep_map_str_i64_repr.entry"))
-        self._append_runtime_string(-16, "_map_repr_sep")
-        x.label("__ep_map_str_i64_repr.entry")
-        x.inst("mov", R("r9"), M("rbp", -24))
-        self._map_entry_addr("r9")
-        x.inst("mov", R("rax"), M("r11"))
-        x.inst("mov", M("rbp", -32), R("rax"))
-        x.inst("mov", R("rax"), M("r11", 8))
-        x.inst("mov", M("rbp", -40), R("rax"))
-        self._append_runtime_string(-16, "_map_repr_quote")
-        self._append_reg_string(-16, "qword", -32)
-        self._append_runtime_string(-16, "_map_repr_quote")
-        self._append_runtime_string(-16, "_map_repr_colon")
-        x.inst("mov", R("rcx"), M("rbp", -40))
-        x.inst("sub", R("rsp"), I(32))
-        x.inst("call", Symbol("__ep_str_from_i64"))
-        x.inst("add", R("rsp"), I(32))
-        x.inst("mov", M("rbp", -48), R("rax"))
-        self._append_reg_string(-16, "qword", -48)
-        x.inst("mov", R("rax"), M("rbp", -24))
-        x.inst("add", R("rax"), I(1))
-        x.inst("mov", M("rbp", -24), R("rax"))
-        x.inst("jmp", LabelRef("__ep_map_str_i64_repr.loop"))
-        x.label("__ep_map_str_i64_repr.close")
-        self._append_runtime_string(-16, "_map_repr_close")
-        x.inst("mov", R("rax"), M("rbp", -16))
-        x.inst("add", R("rsp"), I(96))
-        x.inst("pop", R("rbp"))
-        x.inst("ret")
-
-    def _runtime_string(self, reg, name):
-        self.x64.inst("lea", R("r11"), MS(f"{name}_data"))
-        self.x64.inst("lea", R(reg), MS(f"{name}_header"))
-        self.x64.inst("mov", M(reg), R("r11"))
-        length = {
-            "_map_repr_prefix": 12,
-            "_map_repr_close": 1,
-            "_map_repr_sep": 2,
-            "_map_repr_colon": 2,
-            "_map_repr_quote": 1,
-        }[name]
-        self.x64.inst("mov", R("r11"), I(length))
-        self.x64.inst("mov", M(reg, 8), R("r11"))
-
-    def _append_runtime_string(self, dst_slot, name):
-        self.x64.inst("mov", R("rcx"), M("rbp", dst_slot))
-        self._runtime_string("rdx", name)
-        self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("__ep_str_cat"))
-        self.x64.inst("add", R("rsp"), I(32))
-        self.x64.inst("mov", M("rbp", dst_slot), R("rax"))
-
-    def _append_reg_string(self, dst_slot, _unused, src_slot):
-        self.x64.inst("mov", R("rcx"), M("rbp", dst_slot))
-        self.x64.inst("mov", R("rdx"), M("rbp", src_slot))
-        self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("__ep_str_cat"))
-        self.x64.inst("add", R("rsp"), I(32))
-        self.x64.inst("mov", M("rbp", dst_slot), R("rax"))
 
     def _emit_cstr(self):
         x = self.x64

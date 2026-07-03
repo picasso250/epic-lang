@@ -1,0 +1,5 @@
+# COMPILE_FAIL: str does not support map repr
+fun main(): void {
+    let m = new map[str]i64
+    println(str(m))
+}

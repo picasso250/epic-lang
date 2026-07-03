@@ -253,7 +253,7 @@ class SemanticAnalyzer:
         if isinstance(expr, FStringNode):
             for kind, value in expr.parts:
                 if kind == "expr":
-                    self._expr(value)
+                    self._reject_map_repr(self._expr(value), "f-string expression")
             return ExprInfo(STR)
         if isinstance(expr, VarNode):
             return ExprInfo(self._lookup(expr.name))
@@ -340,7 +340,7 @@ class SemanticAnalyzer:
             if len(expr.args) > 1:
                 self._fail(f"{name} expects at most one argument")
             if expr.args:
-                self._expr(expr.args[0])
+                self._reject_map_repr(self._expr(expr.args[0]), name)
             return ExprInfo(VOID)
         if name == "exit":
             self._check_call_args(name, [I64], expr.args)
@@ -350,6 +350,7 @@ class SemanticAnalyzer:
             arg = self._expr(expr.args[0])
             if arg.type == VOID:
                 self._fail("str argument cannot be void")
+            self._reject_map_repr(arg, "str")
             return ExprInfo(STR)
         if name == "cstr":
             self._check_call_args(name, [STR], expr.args)
@@ -521,6 +522,10 @@ class SemanticAnalyzer:
         if name in self.struct_names:
             return NAMED(name)
         self._fail_global(f"unknown type {name}")
+
+    def _reject_map_repr(self, info, context):
+        if info.type.kind == "map":
+            self._fail(f"{context} does not support map repr; use map_has/map_del/subscript explicitly")
 
     def _check_call_args(self, name, params, args):
         if len(params) != len(args):

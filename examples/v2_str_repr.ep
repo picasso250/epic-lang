@@ -15,7 +15,6 @@
 # STDOUT: Bytes{data: u8[]{65, 66}}
 # STDOUT: hello Val{val: 3}
 # STDOUT: Val{val: 3}
-# STDOUT: map[str]i64{"a": 1, "b": 2}
 
 struct Val {
     val: i64
@@ -48,11 +47,5 @@ fun main(): i64 {
     println(f"hello {new Val { val: 3 }}")
     println(new Val { val: 3 })
 
-    # TODO: map repr currently follows internal iteration order. Stabilize
-    # this after hash/layout semantics are settled.
-    let m = new map[str]i64
-    m["a"] = 1
-    m["b"] = 2
-    println(str(m))
     return 0
 }

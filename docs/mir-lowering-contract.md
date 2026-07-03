@@ -348,7 +348,6 @@ jmp  LabelRef(fn_name.else_target)
 - `_cstr_panic_suffix: ": invalid cstr"`
 - runtime string globals injected by MIR helpers, such as
   `@str.runtime.bool.true` / `@str.runtime.bool.false`
-- map repr 辅助字符串（`_map_repr_prefix` 等）
 - 每个程序全局 string 的 `data_label` 和 `header_label`
 
 ### 8.2 Startup hook
@@ -376,7 +375,6 @@ ret
 
 - `__epx_alloc` (x64 primitive)
 - x64 primitives and still-x64 helpers:
-- `__ep_map_str_i64_new` / `__ep_map_str_i64_get` / `__ep_map_str_i64_set` / `__ep_map_str_i64_has` / `__ep_map_str_i64_repr`
 - `cstr` (`__ep_cstr`)
 - `__ep_write_file` / `__ep_read_file` / `__ep_system_cmd`
 - `__epx_argv_init`
