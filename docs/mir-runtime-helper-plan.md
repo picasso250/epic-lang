@@ -46,6 +46,8 @@ Implemented MIR helpers:
 | `str_arr_i8` | `str(u8[])` conversion | `bootstrap/mir_runtime_helpers.py` |
 | `str_eq` | string equality | `bootstrap/mir_runtime_helpers.py` |
 | `str_starts_with` | string prefix check | `bootstrap/mir_runtime_helpers.py` |
+| `str_get` | string subscript read | `bootstrap/mir_runtime_helpers.py` |
+| `str_find` | substring search | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
