@@ -17,8 +17,8 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ⚠️ 已在 `MirProgram.structs` 上，但 schema 是 loose dict，不是 typed dataclass |
-| symbol 拼写 | `@name` 统一规则 | ⚠️ `main`、`str_i64`、`ExitProcess` 混用，未统一到 `@` 前缀 |
-| 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ❌ 遗留名：`str_i64`, `str_bool`, `str_arr_i8`, `bytes_str` |
+| symbol 拼写 | `@name` 统一规则 | ⚠️ `main`、`__ep_str_from_i64`、`ExitProcess` 混用，未统一到 `@` 前缀 |
+| 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ✅ 前缀已分层 `__ep_*`/`__epx_*`，语义名留待后续 commit |
 | 前缀分层 | `__epx_` = x64 primitive（`__epx_alloc`），`__ep_` = compiler-internal MIR helper（`__ep_str_eq`） | ✅ 已分离 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
 

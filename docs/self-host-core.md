@@ -106,26 +106,26 @@ required_helpers: defer; unconditional injection stays for now
 
 These are unconditionally injected and considered part of the core runtime:
 
-- `bytes_str` — str to `_arr_i8`
-- `str_arr_i8` — `_arr_i8` to str
-- `str_bool` — bool to static string
-- `str_eq` — string equality
-- `str_cat` — string concatenation
-- `str_slice` — string slice copy
-- `str_starts_with` — prefix test
-- `str_get` — bounds-checked byte read
-- `str_find` — substring find
-- `str_replace_char` — char replacement copy
-- `str_trim` — trim whitespace
-- `new_arr_i8` — allocate initialized byte array
-- `new_arr_i8_empty` — allocate empty byte array
-- `arr_i8_get` — bounds-checked byte read
-- `arr_i8_set` — bounds-checked byte write
-- `arr_i8_push` — byte append
-- `arr_i8_slice` — byte array slice copy
-- `arr_i64_get` — bounds-checked i64 array read
-- `arr_i64_set` — bounds-checked i64 array write
-- `extend_i8` — byte array append
+- `__ep_arr_i8_from_str` — str to `_arr_i8`
+- `__ep_str_from_arr_i8` — `_arr_i8` to str
+- `__ep_str_from_bool` — bool to static string
+- `__ep_str_eq` — string equality
+- `__ep_str_cat` — string concatenation
+- `__ep_str_slice` — string slice copy
+- `__ep_str_starts_with` — prefix test
+- `__ep_str_get` — bounds-checked byte read
+- `__ep_str_find` — substring find
+- `__ep_str_replace_char` — char replacement copy
+- `__ep_str_trim` — trim whitespace
+- `__ep_arr_i8_new` — allocate initialized byte array
+- `__ep_arr_i8_new_empty` — allocate empty byte array
+- `__ep_arr_i8_get` — bounds-checked byte read
+- `__ep_arr_i8_set` — bounds-checked byte write
+- `__ep_arr_i8_push` — byte append
+- `__ep_arr_i8_slice` — byte array slice copy
+- `__ep_arr_i64_get` — bounds-checked i64 array read
+- `__ep_arr_i64_set` — bounds-checked i64 array write
+- `__ep_arr_i8_extend` — byte array append
 
 ### Map
 
@@ -250,12 +250,11 @@ after ADT removal and naming unification.
 - [x] 6. Purge stale ADT docs
 - [_] Deferred: Remove ADT from self-hosted compiler sources (`src/*.ep`)
 
-### Phase 2: Naming Unification (next)
-- `str_bool` → `bool_to_str`
-- `str_i64` → `i64_to_str`
-- `str_arr_i8` → `bytes_to_str`
-- `bytes_str` → `str_to_bytes`
-- `str_new` → `raw_to_str`
+### Phase 2: Naming Unification (prefix-only, completed)
+- `__ep_str_from_bool` → `bool_to_str` (future)
+- `__ep_str_from_i64` → `i64_to_str` (future)
+- `__ep_str_from_arr_i8` → `bytes_to_str` (future)
+- `__ep_arr_i8_from_str` → `str_to_bytes` (future)
 - `__ep_cstr` → `str_cstr`
 - `__epx_arr_i64_push` → `arr_i64_push`
 - `__epx_arr_ptr_push` → `arr_ptr_push`

@@ -297,7 +297,7 @@ if inst.result is not None:
 
 - 用户函数名（如 `main`、`foo`）
 - WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
-- Runtime helper 名（如 `str_i64`、`print_str`）
+- Runtime helper 名（如 `__ep_str_from_i64`、`__ep_print_str`）
 - `__epx_alloc`
 
 ### 6.2 Frame alignment
@@ -363,7 +363,7 @@ call  GetProcessHeap
 add   rsp, 32
 mov   [_heap], rax
 sub   rsp, 32
-call  argv_init
+call __epx_argv_init
 add   rsp, 32
 mov   [_argv], rax
 pop   rbp
@@ -380,18 +380,18 @@ ret
 - `__epx_arr_qword_extend`
 - `__epx_arr_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
 - x64 primitives and still-x64 helpers:
-- `map_new` / `map_get` / `map_set` / `map_has` / `map_repr`
+- `__ep_map_str_i64_new` / `__ep_map_str_i64_get` / `__ep_map_str_i64_set` / `__ep_map_str_i64_has` / `__ep_map_str_i64_repr`
 - `cstr` (`__ep_cstr`)
-- `write_file` / `read_file` / `system_cmd`
-- `argv_init`
-- `str_i64`
-- `print_str` / `print_newline`
-- `putc`
-- `array_oob`
+- `__ep_write_file` / `__ep_read_file` / `__ep_system_cmd`
+- `__epx_argv_init`
+- `__ep_str_from_i64`
+- `__ep_print_str` / `__ep_print_newline`
+- `__epx_putc`
+- `__epx_array_oob`
 
-MIR-implemented helpers such as `bytes_str`, `str_arr_i8`, `str_bool`,
-`str_cat`, `str_eq`, `str_slice`, `str_replace_char`, `str_trim`, `str_get`,
-`str_starts_with`, `str_find`, `new_arr_i8`, `arr_i8_*`, and `extend_i8` are
+MIR-implemented helpers such as `__ep_arr_i8_from_str`, `__ep_str_from_arr_i8`, `__ep_str_from_bool`,
+`__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`, `__ep_str_replace_char`, `__ep_str_trim`, `__ep_str_get`,
+`__ep_str_starts_with`, `__ep_str_find`, `__ep_arr_i8_new`, `__ep_arr_i8_*`, and `__ep_arr_i8_extend` are
 ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
 longer have same-named x64 fallback bodies. Remaining x64 labels and function
 bodies are hand-written in `mir_lower.py` `_emit_*()` methods.
@@ -402,7 +402,7 @@ bodies are hand-written in `mir_lower.py` `_emit_*()` methods.
 
 ### 9.1 Unused helpers
 
-`putc` 和 `_putc_buf` 被发射但未被任何 MIR call 引用。
+`__epx_putc` 和 `_putc_buf` 被发射但未被任何 MIR call 引用。
 
 ### 9.2 No register allocation
 

@@ -155,13 +155,13 @@ class MirHelperBuilder:
 def emit_bytes_str() -> MirFunction:
     """Identity cast: str and _arr_i8 now have identical layout {data, len, cap}.
 
-    fn bytes_str(%s: ptr<str>) -> ptr<_arr_i8> {
+    fn __ep_arr_i8_from_str(%s: ptr<str>) -> ptr<_arr_i8> {
         entry:
             ret %s   ; reinterpret same pointer as ptr<_arr_i8>
         }
     """
     b = MirHelperBuilder(
-        "bytes_str",
+        "__ep_arr_i8_from_str",
         [MirParam("%s", ptr(mir_struct("str")))],
         ptr(mir_struct("_arr_i8")),
     )
@@ -175,7 +175,7 @@ def emit_str_arr_i8() -> MirFunction:
     x64: mov rax, rcx; ret
     """
     b = MirHelperBuilder(
-        "str_arr_i8",
+        "__ep_str_from_arr_i8",
         [MirParam("%input", ptr(mir_struct("_arr_i8")))],
         ptr(mir_struct("str")),
     )
@@ -186,10 +186,10 @@ def emit_str_arr_i8() -> MirFunction:
 def emit_str_bool() -> MirFunction:
     """Return the static runtime string for a bool value.
 
-    fn str_bool(bool %value) -> ptr<str>
+    fn __ep_str_from_bool(bool %value) -> ptr<str>
     """
     b = MirHelperBuilder(
-        "str_bool",
+        "__ep_str_from_bool",
         [MirParam("%value", BOOL)],
         ptr(mir_struct("str")),
     )
@@ -791,10 +791,10 @@ def emit___ep_str_trim() -> MirFunction:
 def emit_new_arr_i8() -> MirFunction:
     """Allocate header + data for a new u8[] of length n.
 
-    fn new_arr_i8(i64 %n) -> ptr<_arr_i8>
+    fn __ep_arr_i8_new(i64 %n) -> ptr<_arr_i8>
     """
     b = MirHelperBuilder(
-        "new_arr_i8",
+        "__ep_arr_i8_new",
         [MirParam("%n", I64)],
         ptr(mir_struct("_arr_i8")),
     )
@@ -817,10 +817,10 @@ def emit_new_arr_i8() -> MirFunction:
 def emit_new_arr_i8_empty() -> MirFunction:
     """Allocate header + data, len=0, cap=n.
 
-    fn new_arr_i8_empty(i64 %n) -> ptr<_arr_i8>
+    fn __ep_arr_i8_new_empty(i64 %n) -> ptr<_arr_i8>
     """
     b = MirHelperBuilder(
-        "new_arr_i8_empty",
+        "__ep_arr_i8_new_empty",
         [MirParam("%n", I64)],
         ptr(mir_struct("_arr_i8")),
     )
@@ -843,10 +843,10 @@ def emit_new_arr_i8_empty() -> MirFunction:
 def emit_arr_i8_get() -> MirFunction:
     """Bounds-checked byte read from u8[].
 
-    fn arr_i8_get(ptr<_arr_i8> %arr, i64 %idx) -> i64
+    fn __ep_arr_i8_get(ptr<_arr_i8> %arr, i64 %idx) -> i64
     """
     b = MirHelperBuilder(
-        "arr_i8_get",
+        "__ep_arr_i8_get",
         [MirParam("%arr", ptr(mir_struct("_arr_i8"))), MirParam("%idx", I64)],
         I64,
     )
@@ -888,10 +888,10 @@ def emit_arr_i8_get() -> MirFunction:
 def emit_arr_i64_get() -> MirFunction:
     """Bounds-checked qword read from i64[].
 
-    fn arr_i64_get(ptr<_arr_i64> %arr, i64 %idx) -> i64
+    fn __ep_arr_i64_get(ptr<_arr_i64> %arr, i64 %idx) -> i64
     """
     b = MirHelperBuilder(
-        "arr_i64_get",
+        "__ep_arr_i64_get",
         [MirParam("%arr", ptr(mir_struct("_arr_i64"))), MirParam("%idx", I64)],
         I64,
     )
@@ -933,10 +933,10 @@ def emit_arr_i64_get() -> MirFunction:
 def emit_arr_i64_set() -> MirFunction:
     """Bounds-checked qword write to i64[].
 
-    fn arr_i64_set(ptr<_arr_i64> %arr, i64 %idx, i64 %val) -> void
+    fn __ep_arr_i64_set(ptr<_arr_i64> %arr, i64 %idx, i64 %val) -> void
     """
     b = MirHelperBuilder(
-        "arr_i64_set",
+        "__ep_arr_i64_set",
         [
             MirParam("%arr", ptr(mir_struct("_arr_i64"))),
             MirParam("%idx", I64),
@@ -983,10 +983,10 @@ def emit_arr_i64_set() -> MirFunction:
 def emit_arr_i8_set() -> MirFunction:
     """Bounds-checked byte write to u8[].
 
-    fn arr_i8_set(ptr<_arr_i8> %arr, i64 %idx, i64 %val) -> void
+    fn __ep_arr_i8_set(ptr<_arr_i8> %arr, i64 %idx, i64 %val) -> void
     """
     b = MirHelperBuilder(
-        "arr_i8_set",
+        "__ep_arr_i8_set",
         [
             MirParam("%arr", ptr(mir_struct("_arr_i8"))),
             MirParam("%idx", I64),
@@ -1037,13 +1037,13 @@ def emit_arr_i8_set() -> MirFunction:
 def emit_arr_i8_push() -> MirFunction:
     """Push a byte value onto a u8[] array.
 
-    fn arr_i8_push(ptr<_arr_i8> %arr, i64 %val) -> void
+    fn __ep_arr_i8_push(ptr<_arr_i8> %arr, i64 %val) -> void
 
     Grows by doubling capacity when full, using __epx_alloc for new
     backing storage.  Matches the old _emit_arr_i8_push x64 behaviour.
     """
     b = MirHelperBuilder(
-        "arr_i8_push",
+        "__ep_arr_i8_push",
         [
             MirParam("%arr", ptr(mir_struct("_arr_i8"))),
             MirParam("%val", I64),
@@ -1144,12 +1144,12 @@ def emit_arr_i8_push() -> MirFunction:
 def emit_arr_i8_slice() -> MirFunction:
     """Copy a half-open u8[] slice [start:end].
 
-    fn arr_i8_slice(ptr<_arr_i8> %arr, i64 %start, i64 %end) -> ptr<_arr_i8>
+    fn __ep_arr_i8_slice(ptr<_arr_i8> %arr, i64 %start, i64 %end) -> ptr<_arr_i8>
 
     Bounds failures exit with code 1, matching the old x64 helper.
     """
     b = MirHelperBuilder(
-        "arr_i8_slice",
+        "__ep_arr_i8_slice",
         [
             MirParam("%arr", ptr(mir_struct("_arr_i8"))),
             MirParam("%start", I64),
@@ -1183,7 +1183,7 @@ def emit_arr_i8_slice() -> MirFunction:
 
     b.entry = alloc_block
     slice_len = b.binop("sub", end_val, start_val)
-    result_arr = b.call("new_arr_i8", [slice_len], ptr(mir_struct("_arr_i8")))
+    result_arr = b.call("__ep_arr_i8_new", [slice_len], ptr(mir_struct("_arr_i8")))
     i_slot = b.alloca(I64)
     b.store(b.const_i64(0), ValueOperand(i_slot))
     src_data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
@@ -1218,10 +1218,10 @@ def emit_arr_i8_slice() -> MirFunction:
 def emit_extend_i8() -> MirFunction:
     """Append src bytes into dst, snapshotting src.len before the loop.
 
-    fn extend_i8(ptr<_arr_i8> %dst, ptr<_arr_i8> %src) -> void
+    fn __ep_arr_i8_extend(ptr<_arr_i8> %dst, ptr<_arr_i8> %src) -> void
     """
     b = MirHelperBuilder(
-        "extend_i8",
+        "__ep_arr_i8_extend",
         [
             MirParam("%dst", ptr(mir_struct("_arr_i8"))),
             MirParam("%src", ptr(mir_struct("_arr_i8"))),
@@ -1245,8 +1245,8 @@ def emit_extend_i8() -> MirFunction:
     b.entry.terminator = CondBr(ValueOperand(keep_copying), loop_body.name, done.name)
 
     b.entry = loop_body
-    byte = b.call("arr_i8_get", [src_val, i], I64)
-    b.call("arr_i8_push", [dst_val, ValueOperand(byte)], VOID)
+    byte = b.call("__ep_arr_i8_get", [src_val, i], I64)
+    b.call("__ep_arr_i8_push", [dst_val, ValueOperand(byte)], VOID)
     next_i = b.binop("add", i, b.const_i64(1))
     b.store(next_i, ValueOperand(i_slot))
     b.br(loop_check)
@@ -1261,9 +1261,9 @@ def emit_extend_i8() -> MirFunction:
 
 
 _HELPER_EMITTERS = {
-    "bytes_str": lambda p: emit_bytes_str(),
-    "str_arr_i8": lambda p: emit_str_arr_i8(),
-    "str_bool": lambda p: emit_str_bool(),
+    "__ep_arr_i8_from_str": lambda p: emit_bytes_str(),
+    "__ep_str_from_arr_i8": lambda p: emit_str_arr_i8(),
+    "__ep_str_from_bool": lambda p: emit_str_bool(),
     "__ep_str_eq": lambda p: emit___ep_str_eq(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_str_slice": lambda p: emit___ep_str_slice(),
@@ -1272,21 +1272,21 @@ _HELPER_EMITTERS = {
     "__ep_str_find": lambda p: emit___ep_str_find(),
     "__ep_str_replace_char": lambda p: emit___ep_str_replace_char(),
     "__ep_str_trim": lambda p: emit___ep_str_trim(),
-    "new_arr_i8": lambda p: emit_new_arr_i8(),
-    "new_arr_i8_empty": lambda p: emit_new_arr_i8_empty(),
-    "arr_i8_get": lambda p: emit_arr_i8_get(),
-    "arr_i64_get": lambda p: emit_arr_i64_get(),
-    "arr_i64_set": lambda p: emit_arr_i64_set(),
-    "arr_i8_set": lambda p: emit_arr_i8_set(),
-    "arr_i8_push": lambda p: emit_arr_i8_push(),
-    "arr_i8_slice": lambda p: emit_arr_i8_slice(),
-    "extend_i8": lambda p: emit_extend_i8(),
+    "__ep_arr_i8_new": lambda p: emit_new_arr_i8(),
+    "__ep_arr_i8_new_empty": lambda p: emit_new_arr_i8_empty(),
+    "__ep_arr_i8_get": lambda p: emit_arr_i8_get(),
+    "__ep_arr_i64_get": lambda p: emit_arr_i64_get(),
+    "__ep_arr_i64_set": lambda p: emit_arr_i64_set(),
+    "__ep_arr_i8_set": lambda p: emit_arr_i8_set(),
+    "__ep_arr_i8_push": lambda p: emit_arr_i8_push(),
+    "__ep_arr_i8_slice": lambda p: emit_arr_i8_slice(),
+    "__ep_arr_i8_extend": lambda p: emit_extend_i8(),
 }
 
 _HELPER_ORDER = [
-    "bytes_str",
-    "str_arr_i8",
-    "str_bool",
+    "__ep_arr_i8_from_str",
+    "__ep_str_from_arr_i8",
+    "__ep_str_from_bool",
     "__ep_str_eq",
     "__ep_str_cat",
     "__ep_str_slice",
@@ -1295,15 +1295,15 @@ _HELPER_ORDER = [
     "__ep_str_find",
     "__ep_str_replace_char",
     "__ep_str_trim",
-    "new_arr_i8",
-    "new_arr_i8_empty",
-    "arr_i8_get",
-    "arr_i64_get",
-    "arr_i64_set",
-    "arr_i8_set",
-    "arr_i8_push",
-    "arr_i8_slice",
-    "extend_i8",
+    "__ep_arr_i8_new",
+    "__ep_arr_i8_new_empty",
+    "__ep_arr_i8_get",
+    "__ep_arr_i64_get",
+    "__ep_arr_i64_set",
+    "__ep_arr_i8_set",
+    "__ep_arr_i8_push",
+    "__ep_arr_i8_slice",
+    "__ep_arr_i8_extend",
 ]
 
 

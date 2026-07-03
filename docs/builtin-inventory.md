@@ -161,36 +161,37 @@ symbols used by the Python backend.
 
 | helper | purpose |
 |---|---|
-| `bytes_str` | convert `str` to `_arr_i8` |
-| `str_arr_i8` | view/convert `_arr_i8` as `str` |
-| `str_bool` | convert `bool` to a static runtime string |
-| `str_eq` | compare two strings for equality |
-| `str_cat` | concatenate two strings |
-| `str_slice` | copy a half-open string slice |
-| `str_starts_with` | test whether a string starts with a prefix |
-| `str_get` | bounds-checked string byte read |
-| `str_find` | find a substring within a string |
-| `str_replace_char` | copy string while replacing one byte value |
-| `str_trim` | trim leading/trailing ASCII whitespace |
-| `new_arr_i8` | allocate initialized-capacity byte array |
-| `new_arr_i8_empty` | allocate empty byte array with capacity |
-| `arr_i8_get` | bounds-checked byte array read |
-| `arr_i8_set` | bounds-checked byte array write |
-| `arr_i8_push` | append one byte to a byte array |
-| `arr_i8_slice` | copy a half-open byte-array slice |
-| `extend_i8` | append one byte array into another |
+| `__ep_arr_i8_from_str` | convert `str` to `_arr_i8` |
+| `__ep_str_from_arr_i8` | view/convert `_arr_i8` as `str` |
+| `__ep_str_from_bool` | convert `bool` to a static runtime string |
+| `__ep_str_eq` | compare two strings for equality |
+| `__ep_str_cat` | concatenate two strings |
+| `__ep_str_slice` | copy a half-open string slice |
+| `__ep_str_starts_with` | test whether a string starts with a prefix |
+| `__ep_str_get` | bounds-checked string byte read |
+| `__ep_str_find` | find a substring within a string |
+| `__ep_str_replace_char` | copy string while replacing one byte value |
+| `__ep_str_trim` | trim leading/trailing ASCII whitespace |
+| `__ep_arr_i8_new` | allocate initialized-capacity byte array |
+| `__ep_arr_i8_new_empty` | allocate empty byte array with capacity |
+| `__ep_arr_i8_get` | bounds-checked byte array read |
+| `__ep_arr_i8_set` | bounds-checked byte array write |
+| `__ep_arr_i8_push` | append one byte to a byte array |
+| `__ep_arr_i8_slice` | copy a half-open byte-array slice |
+| `__ep_arr_i8_extend` | append one byte array into another |
 
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
 
-> `str_slice`, `str_starts_with`, `str_find`, `str_replace_char`, `str_trim`, `str_cat`, `str_get`
+> `__ep_str_slice`, `__ep_str_starts_with`, `__ep_str_find`, `__ep_str_replace_char`, `__ep_str_trim`, `__ep_str_cat`, `__ep_str_get`
 > in the list above are **internal helpers** — they remain for lowering `s[i]`, `s[start:end]`, `==`, `!=`
 > but are no longer callable by user code as public builtins.
 
 ### x64-backed private helpers
 
 Most other private helpers are still emitted as x64 helper bodies from
-`bootstrap/mir_lower.py`. This includes `str_i64`, map helpers,
-file/process helpers, argv setup, printing helpers, and several array helpers.
+`bootstrap/mir_lower.py`. This includes `__ep_str_from_i64`, `__ep_map_str_i64_*`,
+`__ep_read_file`, `__ep_write_file`, `__ep_system_cmd`, `__epx_argv_init`,
+`__ep_print_str`, `__ep_print_newline`, and `__epx_putc`.
 
 These should be treated as backend implementation details, not language builtins.
 

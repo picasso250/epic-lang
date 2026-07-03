@@ -62,7 +62,7 @@ def _emit_runtime_start(x64):
     x64.inst("add", R("rsp"), I(32))
     x64.inst("mov", MS("_heap"), R("rax"))
     x64.inst("sub", R("rsp"), I(32))
-    x64.inst("call", Symbol("argv_init"))
+    x64.inst("call", Symbol("__epx_argv_init"))
     x64.inst("add", R("rsp"), I(32))
     x64.inst("mov", MS("_argv"), R("rax"))
     x64.inst("pop", R("rbp"))

@@ -83,9 +83,9 @@ class MirCodegen:
         }
         for dll, name, params, ret in WINAPI_IMPORTS:
             self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
-        self.program.externs.append(MirExtern("str_i64", MirSignature([I64], ptr_str())))
-        self.program.externs.append(MirExtern("str_bool", MirSignature([BOOL], ptr_str())))
-        self.program.externs.append(MirExtern("str_arr_i8", MirSignature([ptr_arr_i8()], ptr_str())))
+        self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr_str())))
+        self.program.externs.append(MirExtern("__ep_str_from_bool", MirSignature([BOOL], ptr_str())))
+        self.program.externs.append(MirExtern("__ep_str_from_arr_i8", MirSignature([ptr_arr_i8()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_eq", MirSignature([ptr_str(), ptr_str()], BOOL)))
         self.program.externs.append(MirExtern("__ep_str_slice", MirSignature([ptr_str(), I64, I64], ptr_str())))
@@ -94,27 +94,27 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_str_starts_with", MirSignature([ptr_str(), ptr_str()], I64)))
         self.program.externs.append(MirExtern("__ep_str_find", MirSignature([ptr_str(), ptr_str()], I64)))
         self.program.externs.append(MirExtern("__ep_str_trim", MirSignature([ptr_str()], ptr_str())))
-        self.program.externs.append(MirExtern("bytes_str", MirSignature([ptr_str()], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("__ep_arr_i8_from_str", MirSignature([ptr_str()], ptr_arr_i8())))
         self.program.externs.append(MirExtern("__ep_cstr", MirSignature([ptr_str(), I64], I64)))
-        self.program.externs.append(MirExtern("read_file", MirSignature([ptr_str(), I64], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("write_file", MirSignature([ptr_str(), ptr_arr_i8(), I64], I64)))
-        self.program.externs.append(MirExtern("system_cmd", MirSignature([ptr_str(), I64], I64)))
-        self.program.externs.append(MirExtern("new_arr_i8", MirSignature([I64], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("new_arr_i8_empty", MirSignature([I64], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("arr_i8_get", MirSignature([ptr_arr_i8(), I64], I64)))
-        self.program.externs.append(MirExtern("arr_i8_set", MirSignature([ptr_arr_i8(), I64, I64], VOID)))
-        self.program.externs.append(MirExtern("arr_i8_push", MirSignature([ptr_arr_i8(), I64], VOID)))
-        self.program.externs.append(MirExtern("arr_i8_slice", MirSignature([ptr_arr_i8(), I64, I64], ptr_arr_i8())))
-        self.program.externs.append(MirExtern("arr_i64_get", MirSignature([ptr_arr_i64(), I64], I64)))
-        self.program.externs.append(MirExtern("arr_i64_set", MirSignature([ptr_arr_i64(), I64, I64], VOID)))
-        self.program.externs.append(MirExtern("extend_i8", MirSignature([ptr_arr_i8(), ptr_arr_i8()], VOID)))
-        self.program.externs.append(MirExtern("map_new", MirSignature([], ptr_map_str_i64())))
-        self.program.externs.append(MirExtern("map_get", MirSignature([ptr_map_str_i64(), ptr_str()], I64)))
-        self.program.externs.append(MirExtern("map_set", MirSignature([ptr_map_str_i64(), ptr_str(), I64], VOID)))
-        self.program.externs.append(MirExtern("map_has", MirSignature([ptr_map_str_i64(), ptr_str()], BOOL)))
-        self.program.externs.append(MirExtern("map_repr", MirSignature([ptr_map_str_i64()], ptr_str())))
-        self.program.externs.append(MirExtern("print_str", MirSignature([ptr_str()], VOID)))
-        self.program.externs.append(MirExtern("print_newline", MirSignature([], VOID)))
+        self.program.externs.append(MirExtern("__ep_read_file", MirSignature([ptr_str(), I64], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("__ep_write_file", MirSignature([ptr_str(), ptr_arr_i8(), I64], I64)))
+        self.program.externs.append(MirExtern("__ep_system_cmd", MirSignature([ptr_str(), I64], I64)))
+        self.program.externs.append(MirExtern("__ep_arr_i8_new", MirSignature([I64], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("__ep_arr_i8_new_empty", MirSignature([I64], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("__ep_arr_i8_get", MirSignature([ptr_arr_i8(), I64], I64)))
+        self.program.externs.append(MirExtern("__ep_arr_i8_set", MirSignature([ptr_arr_i8(), I64, I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_arr_i8_push", MirSignature([ptr_arr_i8(), I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_arr_i8_slice", MirSignature([ptr_arr_i8(), I64, I64], ptr_arr_i8())))
+        self.program.externs.append(MirExtern("__ep_arr_i64_get", MirSignature([ptr_arr_i64(), I64], I64)))
+        self.program.externs.append(MirExtern("__ep_arr_i64_set", MirSignature([ptr_arr_i64(), I64, I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_arr_i8_extend", MirSignature([ptr_arr_i8(), ptr_arr_i8()], VOID)))
+        self.program.externs.append(MirExtern("__ep_map_str_i64_new", MirSignature([], ptr_map_str_i64())))
+        self.program.externs.append(MirExtern("__ep_map_str_i64_get", MirSignature([ptr_map_str_i64(), ptr_str()], I64)))
+        self.program.externs.append(MirExtern("__ep_map_str_i64_set", MirSignature([ptr_map_str_i64(), ptr_str(), I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_map_str_i64_has", MirSignature([ptr_map_str_i64(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_i64_repr", MirSignature([ptr_map_str_i64()], ptr_str())))
+        self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr_str()], VOID)))
+        self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__epx_arr_qword_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__epx_arr_i64_push", MirSignature([ptr(), I64], VOID)))
@@ -352,11 +352,11 @@ class MirCodegen:
             index = self._emit_expr(stmt.index)
             value = self._emit_expr(stmt.value)
             if base.type == ptr_arr_i8():
-                self._inst("call", [base, index, value], type=VOID, callee="arr_i8_set")
+                self._inst("call", [base, index, value], type=VOID, callee="__ep_arr_i8_set")
             elif base.type == ptr_arr_i64():
-                self._inst("call", [base, index, value], type=VOID, callee="arr_i64_set")
+                self._inst("call", [base, index, value], type=VOID, callee="__ep_arr_i64_set")
             elif base.type == ptr_map_str_i64():
-                self._inst("call", [base, index, value], type=VOID, callee="map_set")
+                self._inst("call", [base, index, value], type=VOID, callee="__ep_map_str_i64_set")
             else:
                 raise MirCodegenError("subscript assignment only supports primitive arrays in machine MIR so far")
         elif isinstance(stmt, AssignOpNode):
@@ -473,13 +473,13 @@ class MirCodegen:
         self._inst("call", [ConstIntOperand(I64, code)], type=VOID, callee="ExitProcess")
 
     def _emit_print_text(self, text):
-        self._inst("call", [SymbolOperand(ptr_str(), self._string_label(text))], type=VOID, callee="print_str")
+        self._inst("call", [SymbolOperand(ptr_str(), self._string_label(text))], type=VOID, callee="__ep_print_str")
 
     def _emit_print_expr(self, expr):
-        self._inst("call", [self._coerce_print_arg(expr)], type=VOID, callee="print_str")
+        self._inst("call", [self._coerce_print_arg(expr)], type=VOID, callee="__ep_print_str")
 
     def _emit_print_newline(self):
-        self._inst("call", [], type=VOID, callee="print_newline")
+        self._inst("call", [], type=VOID, callee="__ep_print_newline")
 
     def _emit_checked_int32_conversion(self, expr, target_name):
         value = self._emit_expr(expr)
@@ -631,15 +631,15 @@ class MirCodegen:
                 raise MirCodegenError("println expects at most one argument in machine MIR")
             if expr.args:
                 as_str = self._coerce_print_arg(expr.args[0])
-                self._inst("call", [as_str], type=VOID, callee="print_str")
-            self._inst("call", [], type=VOID, callee="print_newline")
+                self._inst("call", [as_str], type=VOID, callee="__ep_print_str")
+            self._inst("call", [], type=VOID, callee="__ep_print_newline")
             return ConstIntOperand(I64, 0)
         if name == "print":
             if len(expr.args) > 1:
                 raise MirCodegenError("print expects at most one argument in machine MIR")
             if expr.args:
                 as_str = self._coerce_print_arg(expr.args[0])
-                self._inst("call", [as_str], type=VOID, callee="print_str")
+                self._inst("call", [as_str], type=VOID, callee="__ep_print_str")
             return ConstIntOperand(I64, 0)
         if name == "exit":
             arg = self._emit_expr(expr.args[0])
@@ -663,7 +663,7 @@ class MirCodegen:
             return self._emit_checked_int32_conversion(expr.args[0], name)
         if name == "bytes":
             arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="bytes_str")
+            result = self._inst("call", [arg], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_from_str")
             return ValueOperand(result)
         if name == "read_file":
             arg = self._emit_expr(expr.args[0])
@@ -672,22 +672,22 @@ class MirCodegen:
                 [arg, ConstIntOperand(I64, expr.line)],
                 result_type=ptr_arr_i8(),
                 type=ptr_arr_i8(),
-                callee="read_file",
+                callee="__ep_read_file",
             )
             return ValueOperand(result)
         if name == "write_file":
             args = [self._emit_expr(arg) for arg in expr.args]
             args.append(ConstIntOperand(I64, expr.line))
-            result = self._inst("call", args, result_type=I64, type=I64, callee="write_file")
+            result = self._inst("call", args, result_type=I64, type=I64, callee="__ep_write_file")
             return ValueOperand(result)
         if name == "system":
             arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="system_cmd")
+            result = self._inst("call", [arg, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_system_cmd")
             return ValueOperand(result)
         if name == "push":
             args = [self._emit_expr(arg) for arg in expr.args]
             if args[0].type == ptr_arr_i8():
-                self._inst("call", args, type=VOID, callee="arr_i8_push")
+                self._inst("call", args, type=VOID, callee="__ep_arr_i8_push")
             elif args[0].type == ptr_arr_i64():
                 self._inst("call", args, type=VOID, callee="__epx_arr_i64_push")
             else:
@@ -702,13 +702,13 @@ class MirCodegen:
         if name == "extend":
             args = [self._emit_expr(arg) for arg in expr.args]
             if args[0].type == ptr_arr_i8():
-                self._inst("call", args, type=VOID, callee="extend_i8")
+                self._inst("call", args, type=VOID, callee="__ep_arr_i8_extend")
             else:
                 self._inst("call", args, type=VOID, callee="__epx_arr_qword_extend")
             return ConstIntOperand(I64, 0)
         if name == "map_has":
             args = [self._emit_expr(arg) for arg in expr.args]
-            result = self._inst("call", args, result_type=BOOL, type=BOOL, callee="map_has")
+            result = self._inst("call", args, result_type=BOOL, type=BOOL, callee="__ep_map_str_i64_has")
             return ValueOperand(result)
         if name not in self.func_sigs:
             raise MirCodegenError(f"unsupported call: {name}")
@@ -725,13 +725,13 @@ class MirCodegen:
         base = self._emit_expr(expr.base)
         index = self._emit_expr(expr.index)
         if base.type == ptr_map_str_i64():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="map_get")
+            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_map_str_i64_get")
             return ValueOperand(result)
         if base.type == ptr_str():
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_str_get")
             return ValueOperand(result)
         if base.type == ptr_arr_i64():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i64_get")
+            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_arr_i64_get")
             return ValueOperand(result)
         elem = self._array_struct_elem(base.type)
         if elem is not None:
@@ -750,7 +750,7 @@ class MirCodegen:
             addr = self._inst("gep", [base, index], result_type=ptr(I64), type=I64)
             result = self._inst("load", [ValueOperand(addr)], result_type=I64, type=I64)
             return ValueOperand(result)
-        result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i8_get")
+        result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_arr_i8_get")
         return ValueOperand(result)
 
     def _emit_array_literal(self, expr):
@@ -774,18 +774,18 @@ class MirCodegen:
             [ConstIntOperand(I64, len(expr.values))],
             result_type=ptr_arr_i8(),
             type=ptr_arr_i8(),
-            callee="new_arr_i8",
+            callee="__ep_arr_i8_new",
         )
         arr = ValueOperand(result)
         for idx, value in enumerate(expr.values):
-            self._inst("call", [arr, ConstIntOperand(I64, idx), self._emit_expr(value)], type=VOID, callee="arr_i8_set")
+            self._inst("call", [arr, ConstIntOperand(I64, idx), self._emit_expr(value)], type=VOID, callee="__ep_arr_i8_set")
         return arr
 
     def _emit_new_array(self, expr):
         count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 4)
         arr_type = self._type(expr.resolved_type)
         if arr_type == ptr_arr_i8():
-            result = self._inst("call", [count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
+            result = self._inst("call", [count], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_new_empty")
             return ValueOperand(result)
         if arr_type == ptr_arr_i64():
             result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__epx_arr_qword_new")
@@ -797,7 +797,7 @@ class MirCodegen:
 
     def _emit_new(self, expr):
         if expr.struct_name == "map[str]i64":
-            result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="map_new")
+            result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="__ep_map_str_i64_new")
             return ValueOperand(result)
         if expr.struct_name in self.structs:
             return self._alloc_struct(expr.struct_name)
@@ -817,7 +817,7 @@ class MirCodegen:
             result = self._inst("call", [base, start, end], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_slice")
             return ValueOperand(result)
         if base.type == ptr_arr_i8():
-            result = self._inst("call", [base, start, end], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="arr_i8_slice")
+            result = self._inst("call", [base, start, end], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_slice")
             return ValueOperand(result)
         raise MirCodegenError("slice only supports str and u8[] in machine MIR so far")
 
@@ -861,15 +861,15 @@ class MirCodegen:
             return self._emit_expr(expr)
         arg = self._emit_expr(expr)
         if typ == BOOL:
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_bool")
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_bool")
             return ValueOperand(result)
         if typ == ptr_arr_i8():
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_arr_i8")
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_arr_i8")
             return ValueOperand(result)
         if typ == ptr_map_str_i64():
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="map_repr")
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_map_str_i64_repr")
             return ValueOperand(result)
-        result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_i64")
+        result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_i64")
         return ValueOperand(result)
 
     def _emit_fstring(self, expr):
@@ -986,13 +986,13 @@ class MirCodegen:
         if typ == ptr_str():
             return SymbolOperand(ptr_str(), self._string_label(""))
         if typ == ptr_arr_i8():
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="new_arr_i8_empty")
+            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="__ep_arr_i8_new_empty")
             return ValueOperand(result)
         if typ == ptr_arr_i64():
             result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_arr_i64(), type=ptr(), callee="__epx_arr_qword_new")
             return ValueOperand(result)
         if typ == ptr_map_str_i64():
-            result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="map_new")
+            result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="__ep_map_str_i64_new")
             return ValueOperand(result)
         if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct" and typ.pointee.name in self.structs and not typ.pointee.name.startswith("_arr_"):
             return self._alloc_struct(typ.pointee.name)

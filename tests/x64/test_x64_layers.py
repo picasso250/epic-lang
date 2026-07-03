@@ -216,7 +216,7 @@ __epx_runtime_start:
     add rsp, 32
     mov qword [_heap], rax
     sub rsp, 32
-    call argv_init
+    call __epx_argv_init
     add rsp, 32
     mov qword [_argv], rax
     pop rbp
