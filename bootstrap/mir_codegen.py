@@ -607,9 +607,6 @@ class MirCodegen:
         op_map = {"+": "add", "-": "sub", "*": "mul", "/": "div", "%": "mod", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
         bool_map = {"&&": "and", "||": "or"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
-        if expr.op == "+" and left.type == ptr_str() and right.type == ptr_str():
-            result = self._inst("call", [left, right], result_type=ptr_str(), type=ptr_str(), callee="str_cat")
-            return ValueOperand(result)
         if expr.op in ("==", "!=") and left.type == ptr_str() and right.type == ptr_str():
             result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="str_eq")
             value = ValueOperand(result)

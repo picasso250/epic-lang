@@ -1308,14 +1308,6 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     emit_expr(e, expr.right)
     let tmp = temp_save_rax(e)
     emit_expr(e, expr.left)
-    if expr.op == "+" && left_type.kind == "str" && right_type.kind == "str" {
-        emit_mov(e, "rcx", "rax")
-        emit_stack_load(e, "rdx", tmp)
-        emit_inst(e, "sub rsp, 32")
-        emit_call_inst(e, "_str_cat")
-        emit_inst(e, "add rsp, 32")
-        return 0
-    }
     if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
         emit_mov(e, "rcx", "[rax]")
         emit_stack_load(e, "rax", tmp)
@@ -2323,10 +2315,7 @@ fun validate_assign_op_type(lhs_type: TypeInfo, rhs_type: TypeInfo, op: str): i6
         die("compound assignment does not support bool")
     }
     if lhs_type.kind == "str" {
-        if op == "+" && rhs_type.kind == "str" {
-            return 0
-        }
-        die("str compound assignment only supports +=")
+        die("str compound assignment is removed; use u8[] + extend")
     }
     if lhs_type.kind == "array" {
         die("array compound assignment is not supported")
@@ -2343,12 +2332,7 @@ fun validate_assign_op_type(lhs_type: TypeInfo, rhs_type: TypeInfo, op: str): i6
 
 fun emit_assign_op_calc(e: EmitterState, op: str, lhs_type: TypeInfo, rhs_slot: i64): i64 {
     if lhs_type.kind == "str" {
-        emit_mov(e, "rcx", "rax")
-        emit_stack_load(e, "rdx", rhs_slot)
-        emit_inst(e, "sub rsp, 32")
-        emit_call_inst(e, "_str_cat")
-        emit_inst(e, "add rsp, 32")
-        return 0
+        die("str compound assignment is removed; should be rejected by validate_assign_op_type")
     }
     emit_stack_load(e, "rcx", rhs_slot)
     if op == "+" {

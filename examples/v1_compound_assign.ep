@@ -29,8 +29,7 @@ fun main(): void {
     push(xs, 5)
     xs[0] += 8
 
-    let s = "a"
-    s += "bc"
+    let s = "abc"
 
     exit(x + b.value + b.small + xs[0] + len(s))
 }

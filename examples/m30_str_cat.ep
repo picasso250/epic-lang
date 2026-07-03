@@ -4,6 +4,10 @@ fun main(): void {
     let a = "hello"
     let b = " "
     let c = "world"
-    println(a + b + c)
+    let buf = new u8[len(a) + len(b) + len(c)]
+    extend(buf, bytes(a))
+    extend(buf, bytes(b))
+    extend(buf, bytes(c))
+    println(str(buf))
     exit(0)
 }

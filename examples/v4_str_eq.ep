@@ -1,5 +1,5 @@
 # EXIT: 0
-# STDOUT: slice cat ne-true ne-false nul
+# STDOUT: slice ne-true ne-false nul
 fun main(): void {
     let s = "xabcx"
     let sliced = s[1:4]
@@ -7,12 +7,6 @@ fun main(): void {
         print("slice ")
     } else {
         print("bad-slice ")
-    }
-
-    if ("a" + "bc") == "abc" {
-        print("cat ")
-    } else {
-        print("bad-cat ")
     }
 
     if sliced != "abd" {

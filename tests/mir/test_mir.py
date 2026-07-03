@@ -294,13 +294,6 @@ def test_mir_helper_injection():
 
     check(
         """fun main(): i64 {
-    let s = "epic" + "-lang"
-    return len(s)
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
     let s = "epic-lang"
     let t = s[5:9]
     return len(t)

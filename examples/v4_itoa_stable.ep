@@ -7,8 +7,22 @@ fun main(): void {
     let t = str(2)
     let neg = itoa(0 - 12)
 
-    print(a + "," + b)
-    print("," + s + "," + t)
-    print("," + neg)
+    let buf1 = new u8[0]
+    extend(buf1, bytes(a))
+    push(buf1, ',')
+    extend(buf1, bytes(b))
+    print(str(buf1))
+
+    let buf2 = new u8[0]
+    push(buf2, ',')
+    extend(buf2, bytes(s))
+    push(buf2, ',')
+    extend(buf2, bytes(t))
+    print(str(buf2))
+
+    let buf3 = new u8[0]
+    push(buf3, ',')
+    extend(buf3, bytes(neg))
+    print(str(buf3))
     exit(0)
 }
