@@ -91,13 +91,6 @@ fun make_parser(tokens: Token[]): Parser {
     return p
 }
 
-fun same(a: str, b: str): i64 {
-    if a == b {
-        return 1
-    }
-    return 0
-}
-
 fun is_upper_name(name: str): i64 {
     if len(name) == 0 {
         return 0
@@ -118,7 +111,7 @@ fun peek(p: Parser): Token {
 
 fun peek_kind(p: Parser, kind: str): i64 {
     let t = peek(p)
-    if same(t.kind, kind) == 1 {
+    if t.kind == kind {
         return 1
     }
     return 0
@@ -127,7 +120,7 @@ fun peek_kind(p: Parser, kind: str): i64 {
 fun peek_offset_kind(p: Parser, offset: i64, kind: str): i64 {
     let idx = p.pos + offset
     if idx < len(p.tokens) {
-        if same(p.tokens[idx].kind, kind) == 1 {
+        if p.tokens[idx].kind == kind {
             return 1
         }
     }
@@ -139,10 +132,10 @@ fun peek_empty_braces(p: Parser): i64 {
         return 0
     }
     let i = p.pos + 1
-    while i < len(p.tokens) && same(p.tokens[i].kind, "NEWLINE") == 1 {
+    while i < len(p.tokens) && p.tokens[i].kind == "NEWLINE" {
         i += 1
     }
-    if i < len(p.tokens) && same(p.tokens[i].kind, "RBRACE") == 1 {
+    if i < len(p.tokens) && p.tokens[i].kind == "RBRACE" {
         return 1
     }
     return 0
@@ -162,7 +155,7 @@ fun parse_error(line: i64, msg: str): i64 {
 
 fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
-    if same(t.kind, kind) == 0 {
+    if t.kind != kind {
         println(f"Parse error line {t.line}: Expected {kind}, got {t.kind}('{t.text}')")
         exit(1)
     }
@@ -196,7 +189,7 @@ fun expect_stmt_end(p: Parser): i64 {
 
 fun parse_type(p: Parser): str {
     let t = advance(p)
-    if same(t.kind, "ID") == 0 {
+    if t.kind != "ID" {
         parse_error(t.line, "Expected type")
     }
     if t.text == "map" {
@@ -381,11 +374,11 @@ fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     i += 1
     while i < len(p.tokens) && depth > 0 {
         let kind = p.tokens[i].kind
-        if same(kind, "LBRACKET") == 1 {
+        if kind == "LBRACKET" {
             depth += 1
         }
         else {
-            if same(kind, "RBRACKET") == 1 {
+            if kind == "RBRACKET" {
                 depth -= 1
             }
         }
@@ -401,13 +394,13 @@ fun is_assignment(p: Parser): i64 {
     let i = p.pos + 1
     while i < len(p.tokens) {
         let kind = p.tokens[i].kind
-        if same(kind, "DOT") == 1 {
-            if i + 1 >= len(p.tokens) || same(p.tokens[i + 1].kind, "ID") == 0 {
+        if kind == "DOT" {
+            if i + 1 >= len(p.tokens) || p.tokens[i + 1].kind != "ID" {
                 return 0
             }
             i += 2
         } else {
-            if same(kind, "LBRACKET") == 1 {
+            if kind == "LBRACKET" {
                 i = skip_balanced_brackets(p, i)
             } else {
                 if is_assignment_op_kind(kind) == 1 {
@@ -483,20 +476,20 @@ fun parse_assign_stmt(p: Parser): AstNode {
         node.line = name.line
         return node
     }
-    if same(lhs.kind, "Var") == 1 {
+    if lhs.kind == "Var" {
         let node = ast_node("Assign")
         node.name = lhs.name
         node.value_expr = value
         return node
     }
-    if same(lhs.kind, "FieldAccess") == 1 {
+    if lhs.kind == "FieldAccess" {
         let node = ast_node("FieldSet")
         node.object = lhs.object
         node.name = lhs.name
         node.value_expr = value
         return node
     }
-    if same(lhs.kind, "Subscript") == 1 {
+    if lhs.kind == "Subscript" {
         let node = ast_node("SubscriptAssign")
         node.base = lhs.base
         node.index = lhs.index
@@ -783,120 +776,120 @@ fun parse_expr_stmt(p: Parser): AstNode {
 }
 
 fun is_expr_first(kind: str): i64 {
-    if same(kind, "NUMBER") == 1 {
+    if kind == "NUMBER" {
         return 1
     }
-    if same(kind, "CHAR") == 1 {
+    if kind == "CHAR" {
         return 1
     }
-    if same(kind, "STRING") == 1 {
+    if kind == "STRING" {
         return 1
     }
-    if same(kind, "FSTRING") == 1 {
+    if kind == "FSTRING" {
         return 1
     }
-    if same(kind, "TRUE") == 1 {
+    if kind == "TRUE" {
         return 1
     }
-    if same(kind, "FALSE") == 1 {
+    if kind == "FALSE" {
         return 1
     }
-    if same(kind, "ID") == 1 {
+    if kind == "ID" {
         return 1
     }
-    if same(kind, "NEW") == 1 {
+    if kind == "NEW" {
         return 1
     }
-    if same(kind, "LPAREN") == 1 {
+    if kind == "LPAREN" {
         return 1
     }
-    if same(kind, "BANG") == 1 {
+    if kind == "BANG" {
         return 1
     }
-    if same(kind, "MINUS") == 1 {
+    if kind == "MINUS" {
         return 1
     }
-    if same(kind, "TILDE") == 1 {
+    if kind == "TILDE" {
         return 1
     }
     return 0
 }
 
 fun is_assignment_op_kind(kind: str): i64 {
-    if same(kind, "ASSIGN") == 1 {
+    if kind == "ASSIGN" {
         return 1
     }
-    if same(kind, "PLUS_ASSIGN") == 1 {
+    if kind == "PLUS_ASSIGN" {
         return 1
     }
-    if same(kind, "MINUS_ASSIGN") == 1 {
+    if kind == "MINUS_ASSIGN" {
         return 1
     }
-    if same(kind, "STAR_ASSIGN") == 1 {
+    if kind == "STAR_ASSIGN" {
         return 1
     }
-    if same(kind, "SLASH_ASSIGN") == 1 {
+    if kind == "SLASH_ASSIGN" {
         return 1
     }
-    if same(kind, "PERCENT_ASSIGN") == 1 {
+    if kind == "PERCENT_ASSIGN" {
         return 1
     }
-    if same(kind, "SHL_ASSIGN") == 1 {
+    if kind == "SHL_ASSIGN" {
         return 1
     }
-    if same(kind, "SHR_ASSIGN") == 1 {
+    if kind == "SHR_ASSIGN" {
         return 1
     }
-    if same(kind, "USHR_ASSIGN") == 1 {
+    if kind == "USHR_ASSIGN" {
         return 1
     }
-    if same(kind, "AMP_ASSIGN") == 1 {
+    if kind == "AMP_ASSIGN" {
         return 1
     }
-    if same(kind, "PIPE_ASSIGN") == 1 {
+    if kind == "PIPE_ASSIGN" {
         return 1
     }
-    if same(kind, "CARET_ASSIGN") == 1 {
+    if kind == "CARET_ASSIGN" {
         return 1
     }
     return 0
 }
 
 fun assignment_op_from_kind(kind: str): str {
-    if same(kind, "ASSIGN") == 1 {
+    if kind == "ASSIGN" {
         return "="
     }
-    if same(kind, "PLUS_ASSIGN") == 1 {
+    if kind == "PLUS_ASSIGN" {
         return "+"
     }
-    if same(kind, "MINUS_ASSIGN") == 1 {
+    if kind == "MINUS_ASSIGN" {
         return "-"
     }
-    if same(kind, "STAR_ASSIGN") == 1 {
+    if kind == "STAR_ASSIGN" {
         return "*"
     }
-    if same(kind, "SLASH_ASSIGN") == 1 {
+    if kind == "SLASH_ASSIGN" {
         return "/"
     }
-    if same(kind, "PERCENT_ASSIGN") == 1 {
+    if kind == "PERCENT_ASSIGN" {
         return "%"
     }
-    if same(kind, "SHL_ASSIGN") == 1 {
+    if kind == "SHL_ASSIGN" {
         return "<<"
     }
-    if same(kind, "SHR_ASSIGN") == 1 {
+    if kind == "SHR_ASSIGN" {
         return ">>"
     }
-    if same(kind, "USHR_ASSIGN") == 1 {
+    if kind == "USHR_ASSIGN" {
         return ">>>"
     }
-    if same(kind, "AMP_ASSIGN") == 1 {
+    if kind == "AMP_ASSIGN" {
         return "&"
     }
-    if same(kind, "PIPE_ASSIGN") == 1 {
+    if kind == "PIPE_ASSIGN" {
         return "|"
     }
-    if same(kind, "CARET_ASSIGN") == 1 {
+    if kind == "CARET_ASSIGN" {
         return "^"
     }
     return ""
@@ -904,37 +897,37 @@ fun assignment_op_from_kind(kind: str): str {
 
 fun parse_stmt(p: Parser): AstNode {
     let t = peek(p)
-    if same(t.kind, "RETURN") == 1 {
+    if t.kind == "RETURN" {
         return parse_return_stmt(p)
     }
-    if same(t.kind, "LET") == 1 {
+    if t.kind == "LET" {
         return parse_let_stmt(p)
     }
-    if same(t.kind, "IF") == 1 {
+    if t.kind == "IF" {
         return parse_if_stmt(p)
     }
-    if same(t.kind, "WHILE") == 1 {
+    if t.kind == "WHILE" {
         return parse_while_stmt(p)
     }
-    if same(t.kind, "FOR") == 1 {
+    if t.kind == "FOR" {
         return parse_for_stmt(p)
     }
-    if same(t.kind, "BREAK") == 1 {
+    if t.kind == "BREAK" {
         return parse_break_stmt(p)
     }
-    if same(t.kind, "CONTINUE") == 1 {
+    if t.kind == "CONTINUE" {
         return parse_continue_stmt(p)
     }
-    if same(t.kind, "PANIC") == 1 {
+    if t.kind == "PANIC" {
         return parse_panic_stmt(p)
     }
-    if same(t.kind, "ASSERT") == 1 {
+    if t.kind == "ASSERT" {
         return parse_assert_stmt(p)
     }
-    if same(t.kind, "MATCH") == 1 {
+    if t.kind == "MATCH" {
         return parse_match_stmt(p)
     }
-    if same(t.kind, "ID") == 1 {
+    if t.kind == "ID" {
         if is_assignment(p) == 1 {
             return parse_assign_stmt(p)
         }
@@ -947,67 +940,67 @@ fun parse_stmt(p: Parser): AstNode {
 }
 
 fun op_text(kind: str): str {
-    if same(kind, "PLUS") == 1 {
+    if kind == "PLUS" {
         return "+"
     }
-    if same(kind, "MINUS") == 1 {
+    if kind == "MINUS" {
         return "-"
     }
-    if same(kind, "STAR") == 1 {
+    if kind == "STAR" {
         return "*"
     }
-    if same(kind, "SLASH") == 1 {
+    if kind == "SLASH" {
         return "/"
     }
-    if same(kind, "PERCENT") == 1 {
+    if kind == "PERCENT" {
         return "%"
     }
-    if same(kind, "EQEQ") == 1 {
+    if kind == "EQEQ" {
         return "=="
     }
-    if same(kind, "NEQ") == 1 {
+    if kind == "NEQ" {
         return "!="
     }
-    if same(kind, "LT") == 1 {
+    if kind == "LT" {
         return "<"
     }
-    if same(kind, "GT") == 1 {
+    if kind == "GT" {
         return ">"
     }
-    if same(kind, "LTE") == 1 {
+    if kind == "LTE" {
         return "<="
     }
-    if same(kind, "GTE") == 1 {
+    if kind == "GTE" {
         return ">="
     }
-    if same(kind, "AND") == 1 {
+    if kind == "AND" {
         return "&&"
     }
-    if same(kind, "OR") == 1 {
+    if kind == "OR" {
         return "||"
     }
-    if same(kind, "AMPERSAND") == 1 {
+    if kind == "AMPERSAND" {
         return "&"
     }
-    if same(kind, "PIPE") == 1 {
+    if kind == "PIPE" {
         return "|"
     }
-    if same(kind, "CARET") == 1 {
+    if kind == "CARET" {
         return "^"
     }
-    if same(kind, "SHL") == 1 {
+    if kind == "SHL" {
         return "<<"
     }
-    if same(kind, "SHR") == 1 {
+    if kind == "SHR" {
         return ">>"
     }
-    if same(kind, "USHR") == 1 {
+    if kind == "USHR" {
         return ">>>"
     }
-    if same(kind, "BANG") == 1 {
+    if kind == "BANG" {
         return "!"
     }
-    if same(kind, "TILDE") == 1 {
+    if kind == "TILDE" {
         return "~"
     }
     return ""
@@ -1201,7 +1194,7 @@ fun parse_primary(p: Parser): AstNode {
                 count = parse_expr(p)
             }
             expect(p, "RBRACKET")
-            if same(count.kind, "") == 1 && peek_kind(p, "LBRACE") == 1 {
+            if count.kind == "" && peek_kind(p, "LBRACE") == 1 {
                 return parse_array_literal(p, t)
             }
             let n = ast_node("NewArray")
@@ -1415,25 +1408,25 @@ fun dump_list(nodes: AstNode[], depth: i64): i64 {
 }
 
 fun dump_node(node: AstNode, depth: i64): i64 {
-    if same(node.kind, "") == 1 {
+    if node.kind == "" {
         return 0
     }
-    if same(node.kind, "Match") == 1 {
+    if node.kind == "Match" {
         indent(depth)
         println("Match")
         dump_node(node.expr, depth + 1)
         dump_list(node.fields, depth + 1)
-        if same(node.else_block.kind, "") == 0 {
+        if node.else_block.kind != "" {
             indent(depth + 1)
             println("MatchCase")
             dump_node(node.else_block, depth + 2)
         }
         return 0
     }
-    if same(node.kind, "MatchCase") == 1 {
+    if node.kind == "MatchCase" {
         indent(depth)
         println("MatchCase")
-        if same(node.name, "") == 0 {
+        if node.name != "" {
             indent(depth + 1)
             println(f"FieldAccess {node.type_name}")
             indent(depth + 2)
@@ -1447,19 +1440,19 @@ fun dump_node(node: AstNode, depth: i64): i64 {
     }
     indent(depth)
     print(node.kind)
-    if same(node.name, "") == 0 {
+    if node.name != "" {
         print(f" {node.name}")
     }
-    if same(node.type_name, "") == 0 {
+    if node.type_name != "" {
         print(f" : {node.type_name}")
     }
-    if same(node.op, "") == 0 {
+    if node.op != "" {
         print(f" {node.op}")
     }
-    if same(node.kind, "String") == 1 {
+    if node.kind == "String" {
         print(f" {node.value}")
     } else {
-        if same(node.value, "") == 0 {
+        if node.value != "" {
             print(f" {node.value}")
         }
     }
