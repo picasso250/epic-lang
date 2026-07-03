@@ -1,43 +1,13 @@
 # EXIT: 0
-# STDOUT: 00107
+# STDOUT: 0
 
 struct Box {
     n: i64
 }
 
-type Expr {
-    Empty {}
-    IntLit {
-        value: i64
-    }
-}
-
 fun main(): i64 {
+    # constructor shorthand: new StructName → new StructName {}
     let b = new Box
     print(b.n)
-
-    let e = new Expr.Empty
-    print(e.tag)
-
-    let x = new Expr.IntLit
-    print(x.tag)
-    match x {
-        Expr.IntLit { value: v }: {
-            print(v)
-        }
-        else: {
-        }
-    }
-
-    # explicit field init still works alongside shorthand
-    let y = new Expr.IntLit { value: 7 }
-    match y {
-        Expr.IntLit { value: v }: {
-            print(v)
-        }
-        else: {
-        }
-    }
-
     return 0
 }

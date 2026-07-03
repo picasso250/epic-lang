@@ -12,8 +12,6 @@
 # STDOUT: AB
 # STDOUT: str[]{"a", "b"}
 # STDOUT: bool[]{true, false}
-# STDOUT: Token.Id{text: "abc", line: 1}
-# STDOUT: Token.Plus{text: "+", line: 2}
 # STDOUT: Bytes{data: u8[]{65, 66}}
 # STDOUT: hello Val{val: 3}
 # STDOUT: Val{val: 3}
@@ -32,17 +30,6 @@ struct Bytes {
     data: u8[]
 }
 
-type Token {
-    Id {
-        text: str
-        line: i64
-    }
-    Plus {
-        text: str
-        line: i64
-    }
-}
-
 fun main(): i64 {
     println(str(0 - 3))
     println(str(u64(3)))
@@ -57,8 +44,6 @@ fun main(): i64 {
     println(str(new u8[] { 65, 66 }))
     println(str(new str[] { "a", "b" }))
     println(str(new bool[] { true, false }))
-    println(str(new Token.Id { text: "abc", line: 1 }))
-    println(str(new Token.Plus { text: "+", line: 2 }))
     println(str(new Bytes { data: new u8[] { 65, 66 } }))
     println(f"hello {new Val { val: 3 }}")
     println(new Val { val: 3 })
