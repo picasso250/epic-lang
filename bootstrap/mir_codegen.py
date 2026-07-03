@@ -700,10 +700,9 @@ class MirCodegen:
             return self._load_field(base, struct_name, name, result_type=I64)
         if name == "extend":
             args = [self._emit_expr(arg) for arg in expr.args]
-            if args[0].type == ptr_slice_u8():
-                self._inst("call", args, type=VOID, callee="__ep_slice_u8_extend")
-            else:
-                self._inst("call", args, type=VOID, callee="__epx_slice_qword_extend")
+            if args[0].type != ptr_slice_u8():
+                raise MirCodegenError("extend only supports u8[]")
+            self._inst("call", args, type=VOID, callee="__ep_slice_u8_extend")
             return ConstIntOperand(I64, 0)
         if name == "map_has":
             args = [self._emit_expr(arg) for arg in expr.args]

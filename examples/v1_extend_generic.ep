@@ -8,7 +8,10 @@ fun main(): void {
     let xs = new i64[1]
     push(xs, 1)
     push(xs, 2)
-    extend(xs, xs)
+    let old_len = len(xs)
+    for i in 0:old_len {
+        push(xs, xs[i])
+    }
     print(xs[0] + xs[1] + xs[2] + xs[3])
 
     let b1 = new Box {}
@@ -19,7 +22,10 @@ fun main(): void {
     let right = new Box[1]
     push(left, b1)
     push(right, b2)
-    extend(left, right)
+    let right_len = len(right)
+    for i in 0:right_len {
+        push(left, right[i])
+    }
     print(left[0].value + left[1].value)
     exit(0)
 }

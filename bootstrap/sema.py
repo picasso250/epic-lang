@@ -389,8 +389,10 @@ class SemanticAnalyzer:
             self._check_arity(name, 2, expr.args)
             dst = self._expr(expr.args[0])
             src = self._expr(expr.args[1])
-            if dst.type.kind != "array" or src.type.kind != "array" or dst.type.elem != src.type.elem:
-                self._fail(f"extend expected matching arrays, got {dst.type} and {src.type}")
+            if dst.type.kind != "array" or dst.type.elem != U8:
+                self._fail("extend only supports u8[]")
+            if src.type.kind != "array" or src.type.elem != U8:
+                self._fail("extend only supports u8[]")
             return ExprInfo(VOID)
         if name == "len":
             self._check_arity(name, 1, expr.args)

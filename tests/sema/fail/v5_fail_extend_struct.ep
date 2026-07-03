@@ -1,0 +1,10 @@
+# COMPILE_FAIL: extend only supports u8[]
+struct Box {
+    value: i64
+}
+
+fun main(): void {
+    let a = new Box[1]
+    let b = new Box[1]
+    extend(a, b)
+}

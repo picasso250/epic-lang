@@ -1,0 +1,6 @@
+# COMPILE_FAIL: extend only supports u8[]
+fun main(): void {
+    let a = new i64[1]
+    let b = new i64[1]
+    extend(a, b)
+}

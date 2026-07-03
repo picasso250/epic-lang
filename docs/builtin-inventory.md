@@ -59,7 +59,7 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 | `len`    | ✓ (ln 482) | ✓ (auto handled) | ✓ (ln 299) | ✓ (ln 1011) | `str` and `array` |
 | `cap`    | ✓ (ln 488) | ✓ (auto handled) | ✓ (ln 302) | ✓ (ln 1023) | `array` only |
 | `push`   | ✓ (ln 468) | ✓ (ln 700) | ✓ (ln 305) | ✓ (ln 1056) | Array append |
-| `extend` | ✓ (ln 475) | ✓ (ln 707) | ✓ (ln 308) | ✓ (ln 1134) | Array extend |
+| `extend` | ✓ (ln 475) | ✓ (ln 707) | ✓ (ln 308) | ✓ (ln 1134) | u8[] only; use for + push for other types |
 
 ---
 

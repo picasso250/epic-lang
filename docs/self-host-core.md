@@ -88,7 +88,7 @@ required_helpers: defer; unconditional injection stays for now
 | `exit`        | Terminate process |
 | `len`/`cap`   | Length and capacity |
 | `push`        | Array append |
-| `extend`      | Array extend |
+| `extend`      | u8[] only; use for + push for other types |
 | `str(bytes)`  | `u8[]` to `str` (kept for now) |
 | `bytes(s)`    | `str` to `u8[]` (kept for now) |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |

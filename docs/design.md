@@ -218,7 +218,7 @@ let ok = map_has(ids, "main")
 | `new T[]`             | 空数组，默认容量                                  |
 | `new T[n]`            | 空数组，容量至少为 `n`                            |
 | `push(a, x)`          | 追加并扩容                                        |
-| `extend(dst, src)`    | 将一个数组的所有元素追加到另一个数组               |
+| `extend(dst: u8[], src: u8[])`    | 将一个字节数组的所有字节追加到另一个字节数组；其他类型使用 `for + push`               |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
 | `cap(a)`              | 当前容量（推荐）                                  |
@@ -323,7 +323,7 @@ let source = str(read_file(path))
 | `str_replace_char`     | 自己写 `u8[]` 扫描                          |
 | `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
 | `push(a: T[], x: T): void`             | 追加到动态数组                              |
-| `extend(dst: T[], src: T[]): void`     | 追加所有元素                                |
+| `extend(dst: u8[], src: u8[]): void`     | 仅支持 u8[]；其他数组需要追加多个元素时使用 for + push                                |
 
 `cstr` 要求 `s.data != 0`、`s.len >= 0`、`s[0:len(s)]` 不含 `0`，并且 `s.data[s.len] == 0`。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
 
