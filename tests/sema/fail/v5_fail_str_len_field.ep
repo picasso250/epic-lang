@@ -1,0 +1,6 @@
+# COMPILE_FAIL: unknown field str.len
+
+fun main(): void {
+    let s = "abc"
+    let n = s.len
+}

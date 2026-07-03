@@ -1,5 +1,5 @@
 # EXIT: 66
 fun main(): void {
     let s = "ABC"
-    exit(s.data[1])
+    exit(s[1])
 }

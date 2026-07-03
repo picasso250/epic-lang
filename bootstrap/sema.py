@@ -474,16 +474,8 @@ class SemanticAnalyzer:
 
     def _field_type(self, base_type, field):
         if base_type == STR:
-            if field == "data":
-                return PTR(U8)
-            if field == "len":
-                return I64
             self._fail(f"unknown field str.{field}")
         if base_type.kind == "array":
-            if field == "data":
-                return PTR(base_type.elem)
-            if field in ("len", "cap"):
-                return I64
             self._fail(f"unknown field {base_type}.{field}")
         if base_type.kind == "named":
             fields = self.struct_fields.get(base_type.name)

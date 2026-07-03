@@ -1,0 +1,6 @@
+# COMPILE_FAIL: unknown field str.data
+
+fun main(): void {
+    let s = "abc"
+    let p = s.data
+}

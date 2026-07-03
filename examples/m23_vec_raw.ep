@@ -13,7 +13,7 @@ fun main(): void {
 
     push(points, p)
 
-    let p2 = points.data[0]
+    let p2 = points[0]
     let result = p2.x + p2.y
     exit(result)
 }

@@ -1,0 +1,6 @@
+# COMPILE_FAIL: unknown field i64[].len
+
+fun main(): void {
+    let xs = new i64[]
+    let n = xs.len
+}

@@ -8,5 +8,5 @@ fun main(): void {
     push(xs, 20)
     println(len(s))
     println(len(xs))
-    exit(len(s) + len(xs) + cap(xs) + xs.data[1])
+    exit(len(s) + len(xs) + cap(xs) + xs[1])
 }

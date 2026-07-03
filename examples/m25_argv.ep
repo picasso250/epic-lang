@@ -2,10 +2,10 @@
 # EXIT: 0
 # STDOUT: hello
 fun main(): void {
-    if argv.len < 2 {
+    if len(argv) < 2 {
         println("missing")
         exit(1)
     }
-    println(argv.data[1])
+    println(argv[1])
     exit(0)
 }

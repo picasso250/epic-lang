@@ -44,7 +44,7 @@ python epic.py --main main.ep main.ep lib.ep
 
 | 名称   | 类型     | 含义                                                        |
 |--------|----------|-------------------------------------------------------------|
-| `argv` | `str[]`  | 命令行参数，`argv.data[0]` 是可执行文件名                   |
+| `argv` | `str[]`  | 命令行参数，`argv[0]` 是可执行文件名                   |
 
 ## 函数 (Functions)
 
@@ -202,7 +202,7 @@ let ok = map_has(ids, "main")
 
 ### 字符串布局 (String Layout)
 
-`str` 带长度信息且以 NUL 结尾，以便与 Win32 互操作。`s.len` 计数字节数，不包含尾部 NUL。`s.data` 和 `s.len` 是底层字段；新代码应使用 `len()` 和切片语法。
+`str` 带长度信息且以 NUL 结尾，以便与 Win32 互操作。`len(s)` 计数字节数，不包含尾部 NUL。字符串布局字段不是 public surface。
 
 > ⚠ `str` 表面只读，但当前实现**不阻止** `s[i] = v` 或 `s[i] += v` 通过 sema。这是有意为之的实现简化。
 > 正确做法是：`let b = bytes(s); b[i] = v`。未来自举编译器版本会用更严格的类型检查挡住直接值写入。
@@ -215,14 +215,13 @@ let ok = map_has(ids, "main")
 
 | 表达式                | 含义                                              |
 |-----------------------|---------------------------------------------------|
-| `new T[]`             | 空数组，默认容量                                  |
+| `new T[]`             | 空数组，容量为 0                                  |
 | `new T[n]`            | 空数组，容量至少为 `n`                            |
 | `push(a, x)`          | 追加并扩容                                        |
 | `extend(dst: u8[], src: u8[])`    | 将一个字节数组的所有字节追加到另一个字节数组；其他类型使用 `for + push`               |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
 | `cap(a)`              | 当前容量（推荐）                                  |
-| `a.data[i]`           | 底层 unchecked 元素访问，普通代码不推荐            |
 
 ### 索引与切片 (Indexing and Slices)
 
@@ -256,29 +255,23 @@ let d = s[0:len(s)]
 
 `cap(str)` 非法。
 
-### 底层接口与过时写法
-
-Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 bootstrap 代码。普通应用代码不应优先使用这些接口。
+### 过时写法
 
 | 场景 | 推荐写法 | 底层/过时写法 |
 |------|----------|---------------|
-| 数组索引 | `a[i]` | `a.data[i]` |
-| 字符串索引 | `s[i]` | `s.data[i]` |
-| 长度 | `len(x)` | `x.len` |
-| 容量 | `cap(a)` | `a.cap` |
+| 数组索引 | `a[i]` | `a.data[i]`（已从 public surface 删除） |
+| 字符串索引 | `s[i]` | `s.data[i]`（已从 public surface 删除） |
+| 长度 | `len(x)` | `x.len`（已从 public surface 删除） |
+| 容量 | `cap(a)` | `a.cap`（已从 public surface 删除） |
 | 切片 | `s[start:end]` / `bytes[start:end]`（必须显式写出 start 和 end；仅支持 str 和 u8[]） | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
 | 字符串相等 | `s1 == s2` | 无 public 替代（`str_eq` 已从 public surface 删除） |
 
-> `a.data[i]` 是底层 unchecked 访问，仅适合明确需要绕过边界检查或处理 runtime layout 的代码。新代码默认使用 `a[i]`。
->
-> `s.data`、`s.len`、`a.data`、`a.len`、`a.cap` 暂时仍是可访问字段，但属于 layout 暴露，不应作为普通代码风格。
->
 **三档分类**：
 
 1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
-2. **底层接口** — compiler / runtime / linker / bootstrap 可用，但也不推荐使用，普通代码绝不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_slice(s, start, end)`。
-3. **历史写法** — 仍可解析/运行，但新代码不应写；未来可删除。（当前尚无明确归入此类的语法。）
+2. **底层接口** — compiler / runtime 内部 helper 和 MIR helper 可使用布局；Epic 源码不可直接访问 `data/len/cap` layout 字段。
+3. **历史写法** — 旧的 `a.data`、`s.data`、`x.len`、`a.cap` 字段访问已删除。
 
 ## 文件 IO（面向字节, byte-oriented）
 
@@ -327,7 +320,7 @@ let source = str(read_file(path))
 | `push(a: T[], x: T): void`             | 追加到动态数组                              |
 | `extend(dst: u8[], src: u8[]): void`     | 仅支持 u8[]；其他数组需要追加多个元素时使用 for + push                                |
 
-`cstr` 要求 `s.data != 0`、`s.len >= 0`、`s[0:len(s)]` 不含 `0`，并且 `s.data[s.len] == 0`。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
+`cstr` 要求字符串内部数据指针非空、`len(s) >= 0`、`s[0:len(s)]` 不含 `0`，并且内部数据在 `len(s)` 位置以 `0` 结尾。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
 
 `os.*` 名称保留给编译器暴露的系统调用。WinAPI 调用使用 `os.<dll>.<Function>(...)`，DLL 段目前只支持 `kernel32` 和 `user32`，函数必须在编译器白名单内。FFI 参数统一按 `i64` 传递；C 字符串参数必须显式写 `cstr(...)`：
 
