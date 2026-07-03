@@ -4,7 +4,7 @@
 
 ## 方向 (Direction)
 
-Epic 是一门面向 Windows x64 的小型 C-like 系统语言（systems language）。它的设计围绕：**全程序编译 (whole-program compilation)**、函数和结构体边界上的显式类型、字符串/结构体/动态数组/ADT 的堆分配引用值，以及一个用 Epic 编写的自举编译器 (self-hosted compiler)。
+Epic 是一门面向 Windows x64 的小型 C-like 系统语言（systems language）。它的设计围绕：**全程序编译 (whole-program compilation)**、函数和结构体边界上的显式类型、字符串/结构体/动态数组的堆分配引用值，以及一个用 Epic 编写的自举编译器 (self-hosted compiler)。
 
 本实现不保留向前兼容性。语言变化时，编译器源码随当前设计一起演进。
 
@@ -33,12 +33,12 @@ python epic.py --main main.ep main.ep lib.ep
 | `i64`   | 有符号 64 位整数                        |
 | `u64`   | 无符号 64 位整数                        |
 | `str`   | 不可变字节字符串描述符 (immutable byte string descriptor) |
-| `Name`  | 堆分配的结构体或 ADT 引用               |
+| `Name`  | 堆分配的结构体引用               |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
 | `map[str]T` | 堆分配的映射表（str 键）           |
 | `void`  | 仅用于函数返回类型                      |
 
-`str`、用户结构体、ADT、动态数组和映射表具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。
+`str`、用户结构体、动态数组和映射表具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。
 
 ### 内置全局变量 (Built-in Globals)
 
@@ -89,7 +89,7 @@ let token: Token
 
 当右侧明显确定类型时，应省略注解。
 
-不带初始化器的 `let x: T` 创建零值。对标量类型为零或 `false`。对 `str`、数组、结构体和 ADT，变量持有一个非空的描述符，其字段被归零；当 `.len` 为 `0` 时，`.data` 可能为 `0`。
+不带初始化器的 `let x: T` 创建零值。对标量类型为零或 `false`。对 `str`、数组、结构体，变量持有一个非空的描述符，其字段被归零；当 `.len` 为 `0` 时，`.data` 可能为 `0`。
 
 ### 运算符 (Operators)
 
@@ -153,7 +153,11 @@ let bs = new u8[] { 65, 66, 67 }
 
 分配一个动态数组，其 `len` 和 `cap` 等于元素个数。`new T[n]` 分配一个空数组，容量至少为 `n` 个元素。
 
-### ADT (代数数据类型, Algebraic Data Types)
+### ADT (代数数据类型, Algebraic Data Types) — 已从自举核心移除
+
+> **⚠ 历史特性 (Historical)**  
+> ADT 不再是 Epic 自举核心的语言特性。详见 [`self-host-core.md`](self-host-core.md)。  
+> 以下保留为历史参考。
 
 ```epic
 type Expr {
@@ -179,9 +183,11 @@ let e2 = new Expr.Empty {}
 
 `new AdtName` 不是 ADT 构造器；ADT 构造必须指定变体名称。
 
-### Match (模式匹配)
+### Match (模式匹配) — 仅保留字面量分支
 
-`match` 是一个语句。支持字面量分支和 ADT 变体分支。
+> **⚠ ADT match 已移除**：ADT 变体分支已随 ADT 一同移除。详见 [`self-host-core.md`](self-host-core.md)。
+
+`match` 是一个语句。支持字面量分支。
 
 基本类型匹配：
 
@@ -195,22 +201,10 @@ match n {
 
 支持的检视类型：`i64`、`u64`、`u8`、`bool`、`str`。
 
-ADT 匹配：
-
-```epic
-match e {
-    Expr.IntLit { value: n }: { print(n) }
-    Expr.Binary { op, left, right }: { print(op) }
-    else: { panic "unknown expr" }
-}
-```
-
 规则：
 - 每个分支在模式和主体之间使用冒号。
 - `else` 可选，必须置于最后（如果存在）。
 - 没有 fallthrough（向下穿透）。
-- ADT 有效载荷模式按名称绑定字段（`{ value: n }` 或 `{ value }`）。
-- 未知或重复的有效载荷绑定是编译错误。
 - 不进行穷尽性检查 — 缺失的分支会产生运行时 panic。
 
 ### Map (映射表)
