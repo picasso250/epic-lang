@@ -372,7 +372,7 @@ Runtime data, startup hook emission, and runtime append policy now live in
 
 MIR helper bodies for `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_str_eq`, `__ep_str_cat`,
 `__ep_str_slice`, `__ep_str_starts_with`, `__ep_str_get`, `__ep_str_find`, `__ep_str_from_bool`,
-`__ep_str_replace_char`, `__ep_slice_u8_alloc`, `__ep_slice_u8_alloc`,
+`__ep_slice_u8_alloc`, `__ep_slice_u8_alloc`,
 `__ep_slice_u8_get`, `__ep_slice_u8_set`, `__ep_slice_u8_push`, `__ep_slice_u8_slice`, and `__ep_slice_u8_extend`
 now live in `mir_runtime_helpers.py` and are injected as ordinary
 `MirFunction`s by `mir_codegen.py`.

@@ -1,0 +1,5 @@
+# COMPILE_FAIL: unknown function str_replace_char
+
+fun main(): void {
+    let s = str_replace_char("a/b", '/', '_')
+}

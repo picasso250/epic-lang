@@ -98,7 +98,7 @@ required_helpers: defer; unconditional injection stays for now
 | `str_starts_with` | Removed from public surface |
 | `str_find`    | Removed from public surface |
 | `str_trim`    | Removed entirely; write byte scanning in Epic |
-| `str_replace_char` | Removed from public surface |
+| `str_replace_char` | Removed entirely; write byte scanning in Epic |
 | `system`      | Shell command (kept for now) |
 | `map_has`     | Map lookup (kept for now) |
 
@@ -115,7 +115,6 @@ These are unconditionally injected and considered part of the core runtime:
 - `__ep_str_starts_with` — prefix test
 - `__ep_str_get` — bounds-checked byte read
 - `__ep_str_find` — substring find
-- `__ep_str_replace_char` — char replacement copy
 - `__ep_slice_u8_alloc` — allocate initialized byte array
 - `__ep_slice_u8_alloc` — allocate empty byte array
 - `__ep_slice_u8_get` — bounds-checked byte read
@@ -215,8 +214,8 @@ after ADT removal and naming unification.
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`
   - `itoa` — removed entirely; use `str(n)`
-  - `str_slice`, `str_starts_with`, `str_find`, `str_replace_char`, `str_cat`, `str_get` — removed from public surface; internal helpers retained where syntax lowering still needs them
-  - `str_trim` — removed entirely; write byte scanning in Epic
+  - `str_slice`, `str_starts_with`, `str_find`, `str_cat`, `str_get` — removed from public surface; internal helpers retained where syntax lowering still needs them
+  - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
 - `system` kept for now
 - `os.*` WinAPI calls
 - `argv` global

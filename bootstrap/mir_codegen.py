@@ -89,7 +89,6 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_eq", MirSignature([ptr_str(), ptr_str()], BOOL)))
         self.program.externs.append(MirExtern("__ep_str_slice", MirSignature([ptr_str(), I64, I64], ptr_str())))
-        self.program.externs.append(MirExtern("__ep_str_replace_char", MirSignature([ptr_str(), I64, I64], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_get", MirSignature([ptr_str(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_str_starts_with", MirSignature([ptr_str(), ptr_str()], I64)))
         self.program.externs.append(MirExtern("__ep_str_find", MirSignature([ptr_str(), ptr_str()], I64)))

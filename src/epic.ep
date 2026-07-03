@@ -95,9 +95,21 @@ fun merge_inputs(out: AstNode): i64 {
     return 0
 }
 
+fun replace_char(s: str, old: i64, new: i64): str {
+    let out = new u8[]
+    for i in 0:len(s) {
+        let c = s[i]
+        if c == old {
+            c = new
+        }
+        push(out, c)
+    }
+    return str(out)
+}
+
 fun output_base(main_path: str): str {
-    let safe1 = str_replace_char(main_path, '/', '_')
-    let safe2 = str_replace_char(safe1, 92, '_')
+    let safe1 = replace_char(main_path, '/', '_')
+    let safe2 = replace_char(safe1, 92, '_')
     return "build/epic/" + safe2
 }
 

@@ -190,6 +190,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
 | `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
+| `str_replace_char` | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `push`             | 由 codegen 为动态数组发射                   | 公开 |
 | `extend`           | 字节数组用 `__ep_slice_u8_extend`；其他类型用复制循环 | 公开 |

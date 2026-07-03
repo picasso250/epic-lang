@@ -186,7 +186,7 @@ def test_mir_helper_injection():
     assert "__ep_str_starts_with" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_get" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_find" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_replace_char" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_str_replace_char" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_trim" not in IMPLEMENTED_MIR_HELPERS
 
     # i64[] reads use __ep_slice_i64_get, not __epic_slice_i64_get

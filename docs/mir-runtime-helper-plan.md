@@ -51,7 +51,6 @@ Implemented MIR helpers:
 | `str_starts_with` | string prefix check | `bootstrap/mir_runtime_helpers.py` |
 | `str_get` | string subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `str_find` | substring search | `bootstrap/mir_runtime_helpers.py` |
-| `str_replace_char` | character replacement copy | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
@@ -361,7 +360,6 @@ Rename map (Phase 2):
 | `str_cat` | unchanged | already correct |
 | `str_eq` | unchanged | already correct |
 | `str_slice` | unchanged | already correct |
-| `str_replace_char` | unchanged | already correct |
 | `str_get` | unchanged | already correct |
 | `str_starts_with` | unchanged | already correct |
 | `str_find` | unchanged | already correct |
@@ -450,7 +448,7 @@ This can be done **helper-by-helper** to keep commits small. A single helper mig
 ```
 Commit 1: mir_runtime_helpers.py structure + str_cat as MIR helper
 Commit 2: str_slice as MIR helper
-Commit 3: str_replace_char, str_starts_with, str_find as MIR helpers
+Commit 3: str_starts_with, str_find as MIR helpers
 …
 ```
 
