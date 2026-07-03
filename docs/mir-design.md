@@ -8,7 +8,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 > 这是 MIR 内部表示，与 Epic 语言的 public type 无关。Epic 语言 public surface 只暴露 `u8` 作为 byte 类型，不提供 signed `i8`。
 > MIR 的 `I8` 当前仍保留此名，后续可能重命名为 `BYTE` 或 `U8`。
 
-对应路线见 `docs/remove-nasm-plan.md`。
+当前 MIR 与 machine backend 的实现合约见 `docs/x64-instruction-subset.md`。
 
 ## Target vs Current Implementation
 
