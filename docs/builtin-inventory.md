@@ -154,6 +154,8 @@ symbols used by the Python backend.
 | `bytes_str` | convert `str` to `_arr_i8` |
 | `str_arr_i8` | view/convert `_arr_i8` as `str` |
 | `str_eq` | compare two strings for equality |
+| `str_cat` | concatenate two strings |
+| `str_slice` | copy a half-open string slice |
 | `str_starts_with` | test whether a string starts with a prefix |
 | `str_get` | bounds-checked string byte read |
 | `str_find` | find a substring within a string |

@@ -369,7 +369,8 @@ the Epic implementation grows around them.
 Runtime data, startup hook emission, and runtime append policy now live in
 `x64_runtime.py`.
 
-MIR helper bodies for `bytes_str`, `str_arr_i8`, `new_arr_i8`,
+MIR helper bodies for `bytes_str`, `str_arr_i8`, `str_eq`, `str_cat`,
+`str_slice`, `str_starts_with`, `str_get`, `str_find`, `new_arr_i8`,
 `new_arr_i8_empty`, `arr_i8_get`, `arr_i8_set`, `arr_i8_push`, and
 `arr_i8_slice` now live in `mir_runtime_helpers.py` and are injected as
 ordinary `MirFunction`s by `mir_codegen.py`.

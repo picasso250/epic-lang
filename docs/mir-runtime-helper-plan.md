@@ -45,6 +45,8 @@ Implemented MIR helpers:
 | `bytes_str` | `bytes(str)` conversion | `bootstrap/mir_runtime_helpers.py` |
 | `str_arr_i8` | `str(u8[])` conversion | `bootstrap/mir_runtime_helpers.py` |
 | `str_eq` | string equality | `bootstrap/mir_runtime_helpers.py` |
+| `str_cat` | string concatenation | `bootstrap/mir_runtime_helpers.py` |
+| `str_slice` | string slice copy | `bootstrap/mir_runtime_helpers.py` |
 | `str_starts_with` | string prefix check | `bootstrap/mir_runtime_helpers.py` |
 | `str_get` | string subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `str_find` | substring search | `bootstrap/mir_runtime_helpers.py` |

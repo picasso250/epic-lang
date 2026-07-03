@@ -189,6 +189,8 @@ def test_mir_helper_injection():
     assert "arr_i8_slice" in IMPLEMENTED_MIR_HELPERS
     assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
     assert "str_eq" in IMPLEMENTED_MIR_HELPERS
+    assert "str_cat" in IMPLEMENTED_MIR_HELPERS
+    assert "str_slice" in IMPLEMENTED_MIR_HELPERS
     assert "str_starts_with" in IMPLEMENTED_MIR_HELPERS
     assert "str_get" in IMPLEMENTED_MIR_HELPERS
     assert "str_find" in IMPLEMENTED_MIR_HELPERS
@@ -263,6 +265,21 @@ def test_mir_helper_injection():
         return 1
     }
     return 0
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    let s = "epic" + "-lang"
+    return len(s)
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    let s = "epic-lang"
+    let t = s[5:9]
+    return len(t)
 }"""
     )
 

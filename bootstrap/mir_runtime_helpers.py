@@ -67,6 +67,9 @@ class MirHelperBuilder:
     def const_i32(self, n):
         return ConstIntOperand(I32, n)
 
+    def const_i8(self, n):
+        return ConstIntOperand(I8, n)
+
     def call(self, callee, args, ret_type):
         """Append a call and return the result value (or None if void)."""
         result = self.value(ret_type, "call") if ret_type != VOID else None
@@ -254,6 +257,164 @@ def emit_str_eq() -> MirFunction:
 
     b.entry = false_block
     b.ret(ConstBoolOperand(False))
+
+    return b.fn
+
+
+def emit_str_cat() -> MirFunction:
+    """Concatenate two strings into a newly allocated str.
+
+    fn str_cat(ptr<str> %left, ptr<str> %right) -> ptr<str>
+    """
+    b = MirHelperBuilder(
+        "str_cat",
+        [
+            MirParam("%left", ptr(mir_struct("str"))),
+            MirParam("%right", ptr(mir_struct("str"))),
+        ],
+        ptr(mir_struct("str")),
+    )
+    left_val = ValueOperand(b.fn.params[0].value)
+    right_val = ValueOperand(b.fn.params[1].value)
+
+    left_len = b.load(I64, b.gep_field(left_val, "str", 1))
+    right_len = b.load(I64, b.gep_field(right_val, "str", 1))
+    result_len = b.binop("add", left_len, right_len)
+
+    result_str = b.call("__epic_alloc", [b.const_i64(16)], ptr())
+    data_len = b.binop("add", result_len, b.const_i64(1))
+    result_data = b.call("__epic_alloc", [data_len], ptr())
+    b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
+    b.store(result_len, b.gep_field(ValueOperand(result_str), "str", 1))
+
+    left_data = b.load(ptr(), b.gep_field(left_val, "str", 0))
+    right_data = b.load(ptr(), b.gep_field(right_val, "str", 0))
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    left_check = b.new_block("left_check")
+    left_body = b.new_block("left_body")
+    right_init = b.new_block("right_init")
+    right_check = b.new_block("right_check")
+    right_body = b.new_block("right_body")
+    done = b.new_block("done")
+    b.br(left_check)
+
+    b.entry = left_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_left = b.icmp("lt", i, left_len)
+    b.entry.terminator = CondBr(ValueOperand(keep_left), left_body.name, right_init.name)
+
+    b.entry = left_body
+    src_addr = b.gep(I8, left_data, [i])
+    byte = b.load(I8, src_addr, result_type=I8)
+    dst_addr = b.gep(I8, ValueOperand(result_data), [i])
+    b.store(ValueOperand(byte), dst_addr)
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(left_check)
+
+    b.entry = right_init
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    b.br(right_check)
+
+    b.entry = right_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_right = b.icmp("lt", i, right_len)
+    b.entry.terminator = CondBr(ValueOperand(keep_right), right_body.name, done.name)
+
+    b.entry = right_body
+    src_addr = b.gep(I8, right_data, [i])
+    byte = b.load(I8, src_addr, result_type=I8)
+    dst_index = b.binop("add", left_len, i)
+    dst_addr = b.gep(I8, ValueOperand(result_data), [dst_index])
+    b.store(ValueOperand(byte), dst_addr)
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(right_check)
+
+    b.entry = done
+    nul_addr = b.gep(I8, ValueOperand(result_data), [result_len])
+    b.store(b.const_i8(0), nul_addr)
+    b.ret(ValueOperand(result_str))
+
+    return b.fn
+
+
+def emit_str_slice() -> MirFunction:
+    """Copy a half-open string slice [start:end].
+
+    fn str_slice(ptr<str> %s, i64 %start, i64 %end) -> ptr<str>
+
+    Bounds failures exit with code 1, matching migrated string/array helpers.
+    """
+    b = MirHelperBuilder(
+        "str_slice",
+        [
+            MirParam("%s", ptr(mir_struct("str"))),
+            MirParam("%start", I64),
+            MirParam("%end", I64),
+        ],
+        ptr(mir_struct("str")),
+    )
+    s_val = ValueOperand(b.fn.params[0].value)
+    start_val = ValueOperand(b.fn.params[1].value)
+    end_val = ValueOperand(b.fn.params[2].value)
+
+    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
+
+    start_ok = b.icmp("ge", start_val, b.const_i64(0))
+    check_order = b.new_block("check_order")
+    check_len = b.new_block("check_len")
+    alloc_block = b.new_block("alloc")
+    copy_check = b.new_block("copy_check")
+    copy_body = b.new_block("copy_body")
+    done = b.new_block("done")
+    fail = b.new_block("fail")
+    b.entry.terminator = CondBr(ValueOperand(start_ok), check_order.name, fail.name)
+
+    b.entry = check_order
+    order_ok = b.icmp("ge", end_val, start_val)
+    b.entry.terminator = CondBr(ValueOperand(order_ok), check_len.name, fail.name)
+
+    b.entry = check_len
+    len_ok = b.icmp("ge", s_len, end_val)
+    b.entry.terminator = CondBr(ValueOperand(len_ok), alloc_block.name, fail.name)
+
+    b.entry = alloc_block
+    slice_len = b.binop("sub", end_val, start_val)
+    result_str = b.call("__epic_alloc", [b.const_i64(16)], ptr())
+    data_len = b.binop("add", slice_len, b.const_i64(1))
+    result_data = b.call("__epic_alloc", [data_len], ptr())
+    b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
+    b.store(slice_len, b.gep_field(ValueOperand(result_str), "str", 1))
+    src_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
+    src_start = b.gep(I8, src_data, [start_val])
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    b.br(copy_check)
+
+    b.entry = copy_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_copying = b.icmp("lt", i, slice_len)
+    b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, done.name)
+
+    b.entry = copy_body
+    src_addr = b.gep(I8, src_start, [i])
+    byte = b.load(I8, src_addr, result_type=I8)
+    dst_addr = b.gep(I8, ValueOperand(result_data), [i])
+    b.store(ValueOperand(byte), dst_addr)
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(copy_check)
+
+    b.entry = done
+    nul_addr = b.gep(I8, ValueOperand(result_data), [slice_len])
+    b.store(b.const_i8(0), nul_addr)
+    b.ret(ValueOperand(result_str))
+
+    b.entry = fail
+    b.call("ExitProcess", [b.const_i64(1)], VOID)
+    b.ret(ConstNullOperand())
 
     return b.fn
 
@@ -836,6 +997,8 @@ _HELPER_EMITTERS = {
     "bytes_str": emit_bytes_str,
     "str_arr_i8": lambda p: emit_str_arr_i8(),
     "str_eq": lambda p: emit_str_eq(),
+    "str_cat": lambda p: emit_str_cat(),
+    "str_slice": lambda p: emit_str_slice(),
     "str_starts_with": lambda p: emit_str_starts_with(),
     "str_get": lambda p: emit_str_get(),
     "str_find": lambda p: emit_str_find(),
@@ -852,6 +1015,8 @@ _HELPER_ORDER = [
     "bytes_str",
     "str_arr_i8",
     "str_eq",
+    "str_cat",
+    "str_slice",
     "str_starts_with",
     "str_get",
     "str_find",
