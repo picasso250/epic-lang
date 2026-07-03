@@ -199,6 +199,19 @@ def test_mir_helper_injection():
     assert "str_replace_char" in IMPLEMENTED_MIR_HELPERS
     assert "str_trim" in IMPLEMENTED_MIR_HELPERS
 
+    # i64[] reads use arr_i64_get, not __epic_arr_i64_get
+    src_i64 = """fun main(): i64 {
+    let xs = new i64[] { 10, 20 }
+    return xs[1]
+}"""
+    ast_i64 = sema.analyze_program(Parser(lex(src_i64)).parse_program())
+    prog_i64 = ast_to_mir(ast_i64)
+    text_i64 = prog_i64.text()
+    assert "call i64 arr_i64_get" in text_i64, \
+        f"expected call i64 arr_i64_get, got:\n{text_i64}"
+    assert "__epic_arr_i64_get" not in text_i64, \
+        f"unexpected __epic_arr_i64_get:\n{text_i64}"
+
     def check(source):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
         prog = ast_to_mir(ast)

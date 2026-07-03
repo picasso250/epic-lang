@@ -122,7 +122,6 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__epic_arr_i64_push", MirSignature([ptr(), I64], VOID)))
         self.program.externs.append(MirExtern("__epic_arr_ptr_push", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__epic_arr_qword_extend", MirSignature([ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__epic_arr_i64_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__epic_arr_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.globals.append(MirGlobal("@argv", ptr_arr_str(), None))
         for fn in ast.funcs:
@@ -778,7 +777,7 @@ class MirCodegen:
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="str_get")
             return ValueOperand(result)
         if base.type == ptr_arr_i64():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__epic_arr_i64_get")
+            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i64_get")
             return ValueOperand(result)
         elem = self._array_struct_elem(base.type)
         if elem is not None:

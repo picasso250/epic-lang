@@ -301,7 +301,6 @@ class MirLower:
         self._emit_epic_arr_qword_push("__epic_arr_i64_push")
         self._emit_epic_arr_qword_push("__epic_arr_ptr_push")
         self._emit_epic_arr_qword_extend()
-        self._emit_epic_arr_qword_get("__epic_arr_i64_get", "array_oob")
         self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
         self._emit_arr_i64_set()
         self._emit_map_new()
