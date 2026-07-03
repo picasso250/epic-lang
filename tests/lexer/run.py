@@ -2,13 +2,14 @@
 """
 tests/lexer/run.py — Formal lexer test runner.
 
-Default mode: golden (frozen) check of Python lexer against token_list.txt.
+Default mode: golden (frozen) check of Python lexer against token_list.txt,
+then self-hosted comparison.
 
-Optional self-hosted comparison (requires self-hosted compiler to build):
-  python tests/lexer/run.py --self-hosted
-
-Self-hosted mode builds src/lexer.ep, then compares its output with the
+Self-hosted comparison builds src/lexer.ep, then compares its output with the
 Python lexer oracle on src/lexer.ep, all.ep, and examples/*.ep.
+
+Skip self-hosted comparison:
+  python tests/lexer/run.py --no-self-hosted
 
 Regenerate token_list.txt from Python lexer oracle:
   python tests/lexer/run.py --regen
@@ -150,8 +151,8 @@ def main():
     parser = argparse.ArgumentParser(description="Epic lexer test runner")
     parser.add_argument("--regen", action="store_true",
                         help="Regenerate golden token_list.txt from Python lexer")
-    parser.add_argument("--self-hosted", action="store_true",
-                        help="Also compare Python lexer against self-hosted lexer.exe")
+    parser.add_argument("--no-self-hosted", action="store_true",
+                        help="Skip self-hosted lexer.exe comparison")
     args = parser.parse_args()
 
     if args.regen:
@@ -164,9 +165,9 @@ def main():
     if not golden_ok:
         sys.exit(1)
 
-    # --- Self-hosted lexer comparison (opt-in) ---
-    if args.self_hosted:
-        print("--- self-hosted lexer comparison (opt-in) ---")
+    # --- Self-hosted lexer comparison ---
+    if not args.no_self_hosted:
+        print("--- self-hosted lexer comparison ---")
         try:
             lexer_exe = ensure_bootstrap_lexer()
         except (RuntimeError, subprocess.TimeoutExpired) as e:
