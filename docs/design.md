@@ -294,6 +294,8 @@ bytes(s: str): u8[]
 let source = str(read_file(path))
 ```
 
+源码换行是语言/工具链契约的一部分：Epic source 接受 LF (`\n`) 和 CRLF (`\r\n`)。lexer 将 CR (`\r`) 当作普通空白跳过，只在 LF (`\n`) 上产生一个 `NEWLINE` token 并递增行号。因此 CRLF 与 LF 的 token 流等价；单独的 CR 不作为换行格式支持。
+
 ## 其他内置函数 (Other Builtins)
 
 | 内置函数                               | 含义                                        |

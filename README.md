@@ -26,16 +26,15 @@ staged-bootstrap-archive-2026-06-30
 - `tools/`: local ignored tool binaries such as `lld-link.exe`; `nasm.exe` is only needed for older archived/self-hosted paths.
 - `build/`: local ignored build output.
 
-## Bootstrapping (inactive)
+## Bootstrapping
 
-The self-hosted compiler under `src/` is a separate, older line. The fixed-point
-bootstrap chain (`python test_bootstrap_fixed_point.py`) is strategically
-abandoned — the `src/*.ep` sources still contain ADT syntax that the current
-Python parser no longer accepts.
+The Python reference compiler under `bootstrap/` is the oracle for the current
+language. The Epic-written compiler under `src/` is being restored module by
+module on top of that current language.
 
-Active development targets the Python reference compiler (`bootstrap/`).
-Self-hosted sources are preserved for future bootstrapping but are not part of
-the current testing pipeline.
+The old fixed-point bootstrap chain (`python test_bootstrap_fixed_point.py`) is
+not the active entry point. Current self-hosting work is covered by module tests
+such as the self-hosted lexer and parser comparisons under `tests/`.
 
 ## Tests
 
@@ -45,7 +44,7 @@ under `tests/`, organized by compiler module (matching `bootstrap/*.py`).
 All Python reference compiler tests:
 
 ```powershell
-python tests/run.py               # Module-level test suite (Python-only, all green)
+python tests/run.py               # Module-level test suite
 python test_examples_py.py        # examples/ learning examples
 ```
 
@@ -54,20 +53,18 @@ Module-specific tests:
 ```powershell
 python tests/mir/run.py            # MIR tests
 python tests/x64/run.py            # X64 backend tests
-python tests/lexer/run.py          # Lexer golden check (skip self-hosted by default)
-python tests/lexer/run.py --self-hosted  # Also compare against self-hosted lexer.exe
+python tests/lexer/run.py          # Lexer golden check + self-hosted comparison
+python tests/lexer/run.py --no-self-hosted  # Skip self-hosted lexer.exe comparison
+python tests/parser/run.py         # Parser Python/self-hosted dump comparison
 ```
-
-The self-hosted compiler (`src/*.ep`) is a separate, inactive line and is not
-required for Python reference compiler tests.
 
 `link.py` is the default Python linker. `src/link.ep` is the Epic linker
 implementation and is tested separately.
 
 The old Python `--backend asm` path was archived at tag
 `python-asm-archive-2026-07-02` and removed from the active Python reference
-compiler. The Epic-written compiler under `src/` still belongs to the older
-NASM-oriented self-hosting line and is not the current Python machine backend.
+compiler. The Epic-written compiler under `src/` is being moved toward the current
+language and backend model incrementally.
 
 ## Development Rule
 

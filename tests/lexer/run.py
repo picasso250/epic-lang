@@ -6,7 +6,8 @@ Default mode: golden (frozen) check of Python lexer against token_list.txt,
 then self-hosted comparison.
 
 Self-hosted comparison builds src/lexer.ep, then compares its output with the
-Python lexer oracle on src/lexer.ep, all.ep, and examples/*.ep.
+Python lexer oracle on src/lexer.ep, all.ep, a dynamic CRLF sample, and
+examples/*.ep.
 
 Skip self-hosted comparison:
   python tests/lexer/run.py --no-self-hosted
@@ -33,12 +34,24 @@ from lexer import dump_tokens, lex
 
 ALL_EP = os.path.join(SCRIPT_DIR, "pass", "all.ep")
 TOKEN_LIST = os.path.join(SCRIPT_DIR, "pass", "token_list.txt")
+CRLF_SAMPLE_LF = """# line ending contract
+fun main(): i64 {
+    # comment before CRLF
+    let x = 1
+    println(f"x={x}")
+    return x - 1
+}
+"""
+
+
+def python_lexer_dump_source(source: str) -> str:
+    return dump_tokens(lex(source))
 
 
 def python_lexer_dump(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         source = f.read()
-    return dump_tokens(lex(source))
+    return python_lexer_dump_source(source)
 
 
 def read_golden() -> str:
@@ -76,6 +89,37 @@ def check_golden() -> bool:
         if not mismatch:
             print(f"  FAIL  expected {len(exp_lines)} lines, got {len(act_lines)}")
         return False
+
+
+def check_python_line_endings() -> bool:
+    """LF and CRLF source text must produce the same token dump."""
+    lf_dump = python_lexer_dump_source(CRLF_SAMPLE_LF)
+    crlf_source = CRLF_SAMPLE_LF.replace("\n", "\r\n")
+    crlf_dump = python_lexer_dump_source(crlf_source)
+    if crlf_dump == lf_dump:
+        print("  PASS  Python lexer LF/CRLF equivalence")
+        return True
+
+    print("  FAIL  Python lexer LF/CRLF equivalence")
+    exp_lines = lf_dump.splitlines()
+    act_lines = crlf_dump.splitlines()
+    for i in range(min(len(exp_lines), len(act_lines))):
+        if exp_lines[i] != act_lines[i]:
+            print(f"    line {i+1}")
+            print(f"    expected: {exp_lines[i]!r}")
+            print(f"    actual:   {act_lines[i]!r}")
+            break
+    else:
+        print(f"    expected {len(exp_lines)} lines, got {len(act_lines)}")
+    return False
+
+
+def write_crlf_sample() -> str:
+    path = os.path.join(ROOT_DIR, "build", "tests", "lexer_crlf.ep")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(CRLF_SAMPLE_LF.replace("\n", "\r\n").encode("utf-8"))
+    return path
 
 
 def ensure_bootstrap_lexer() -> str:
@@ -165,6 +209,11 @@ def main():
     if not golden_ok:
         sys.exit(1)
 
+    print("--- line ending check ---")
+    line_ending_ok = check_python_line_endings()
+    if not line_ending_ok:
+        sys.exit(1)
+
     # --- Self-hosted lexer comparison ---
     if not args.no_self_hosted:
         print("--- self-hosted lexer comparison ---")
@@ -181,6 +230,11 @@ def main():
 
         all_ok = check_self_hosted_lexer(
             lexer_exe, ALL_EP, "all.ep"
+        ) and all_ok
+
+        crlf_path = write_crlf_sample()
+        all_ok = check_self_hosted_lexer(
+            lexer_exe, crlf_path, "dynamic CRLF sample"
         ) and all_ok
 
         # Compare on all examples/*.ep
