@@ -281,7 +281,6 @@ class MirProgram:
     globals: list[MirGlobal] = field(default_factory=list)
     functions: list[MirFunction] = field(default_factory=list)
     structs: dict = field(default_factory=dict)
-    adts: dict = field(default_factory=dict)
 
     def text(self):
         parts = []
@@ -308,7 +307,6 @@ class MirValidator:
         "ptr.index.load",
         "ptr.i8.get",
         "ptr.i64.get",
-        "adt.payload",
     }
 
     def __init__(self, program):

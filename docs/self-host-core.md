@@ -123,6 +123,8 @@ These are unconditionally injected and considered part of the core runtime:
 - `arr_i8_set` — bounds-checked byte write
 - `arr_i8_push` — byte append
 - `arr_i8_slice` — byte array slice copy
+- `arr_i64_get` — bounds-checked i64 array read
+- `arr_i64_set` — bounds-checked i64 array write
 - `extend_i8` — byte array append
 
 ### Map
@@ -187,7 +189,7 @@ after ADT removal and naming unification.
 
 ---
 
-## Langauge Feature Inventory
+## Language Feature Inventory
 
 ### Features retained in core
 
@@ -226,11 +228,10 @@ after ADT removal and naming unification.
 1. Document decisions (this file)
 2. Mark ADT as removed in design docs
 3. Remove ADT examples
-4. Add ADT compile-fail tests
-5. Reject ADT in sema
-6. Remove ADT MIR codegen paths
-7. Remove ADT parser support
-8. Update remaining docs
+4. Remove ADT from Python reference compiler
+5. Remove ADT from self-hosted compiler sources
+6. Purge remaining ADT references from active code
+7. Update remaining docs
 
 ### Phase 2: Naming Unification (after Phase 1)
 - `str_bool` → `bool_to_str`

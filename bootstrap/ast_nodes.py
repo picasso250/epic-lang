@@ -269,7 +269,6 @@ class NewArrayNode(ASTNode):
 class StructInitNode(ASTNode):
     type_name: str
     fields: list
-    variant: str = ""
     resolved_type: Optional[EpicType] = None
 
 
@@ -280,13 +279,4 @@ class ArrayLiteralNode(ASTNode):
     resolved_type: Optional[EpicType] = None
 
 
-@dataclass
-class TypeVariant(ASTNode):
-    name: str
-    fields: list
 
-
-@dataclass
-class TypeDefNode(ASTNode):
-    name: str
-    variants: list

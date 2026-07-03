@@ -53,9 +53,7 @@ class SemanticAnalyzer:
     def __init__(self, program):
         self.program = program
         self.struct_names = {s.name for s in program.structs}
-        self.adt_names = {t.name for t in getattr(program, "types", [])}
         self.struct_fields = {}
-        self.adt_variants = {}
         self.func_sigs = {}
         self.locals = {}
         self.fn_name = None
@@ -78,20 +76,6 @@ class SemanticAnalyzer:
                 field.resolved_type = self._type_name(field.type)
                 fields[field.name] = field.resolved_type
             self.struct_fields[struct.name] = fields
-
-        for typ in getattr(self.program, "types", []):
-            variants = {}
-            for variant in typ.variants:
-                if variant.name in variants:
-                    self._fail_global(f"duplicate variant {typ.name}.{variant.name}")
-                fields = {}
-                for field in variant.fields:
-                    if field.name in fields:
-                        self._fail_global(f"duplicate field {typ.name}.{variant.name}.{field.name}")
-                    field.resolved_type = self._type_name(field.type)
-                    fields[field.name] = field.resolved_type
-                variants[variant.name] = fields
-            self.adt_variants[typ.name] = variants
 
     def _build_functions(self):
         for fn in self.program.funcs:
@@ -242,27 +226,9 @@ class SemanticAnalyzer:
             self._analyze_match_case(scrutinee.type, case)
 
     def _analyze_match_case(self, scrutinee_type, case):
-        if self._is_adt_pattern(case.pattern):
-            type_name = case.pattern.object.name
-            variant = case.pattern.field
-            if scrutinee_type != NAMED(type_name):
-                self._fail(f"match pattern expected {scrutinee_type}, got {type_name}.{variant}")
-            variants = self.adt_variants.get(type_name)
-            if variants is None or variant not in variants:
-                self._fail(f"unknown ADT variant {type_name}.{variant}")
-            fields = variants[variant]
-            seen = set()
-            for field, bind_name in case.bindings:
-                if field in seen:
-                    self._fail(f"duplicate match binding {type_name}.{variant}.{field}")
-                seen.add(field)
-                if field not in fields:
-                    self._fail(f"unknown match binding {type_name}.{variant}.{field}")
-                self.locals[bind_name] = fields[field]
-        else:
-            if case.bindings:
-                self._fail("match bindings require an ADT variant pattern")
-            self._check_assign(scrutinee_type, self._expr(case.pattern), "match pattern")
+        if case.bindings:
+            self._fail("match bindings require an ADT variant pattern (ADT removed)")
+        self._check_assign(scrutinee_type, self._expr(case.pattern), "match pattern")
         self._analyze_block(case.body)
 
     def _expr(self, expr):
@@ -478,17 +444,7 @@ class SemanticAnalyzer:
         return ExprInfo(ret)
 
     def _struct_init_expr(self, expr):
-        if expr.variant:
-            if expr.type_name not in self.adt_variants:
-                self._fail(f"unknown ADT {expr.type_name}")
-            variants = self.adt_variants[expr.type_name]
-            if expr.variant not in variants:
-                self._fail(f"unknown ADT variant {expr.type_name}.{expr.variant}")
-            self._check_named_fields(variants[expr.variant], expr.fields, f"{expr.type_name}.{expr.variant}")
-            return ExprInfo(NAMED(expr.type_name))
         if expr.type_name not in self.struct_fields:
-            if expr.type_name in self.adt_variants:
-                self._fail(f"ADT construction requires a variant: {expr.type_name}")
             self._fail(f"unknown struct {expr.type_name}")
         self._check_named_fields(self.struct_fields[expr.type_name], expr.fields, expr.type_name)
         return ExprInfo(NAMED(expr.type_name))
@@ -498,8 +454,6 @@ class SemanticAnalyzer:
         if typ.kind == "map":
             return ExprInfo(typ)
         if typ.kind != "named" or typ.name not in self.struct_fields:
-            if typ.kind == "named" and typ.name in self.adt_variants:
-                self._fail(f"ADT construction requires a variant: {typ.name}")
             self._fail(f"new expected struct or map, got {typ}")
         return ExprInfo(typ)
 
@@ -551,12 +505,6 @@ class SemanticAnalyzer:
                 return I64
             self._fail(f"unknown field {base_type}.{field}")
         if base_type.kind == "named":
-            if base_type.name in self.adt_variants:
-                if field == "tag":
-                    return I64
-                if field == "data":
-                    return PTR(I64)
-                self._fail(f"unknown field {base_type.name}.{field}")
             fields = self.struct_fields.get(base_type.name)
             if fields is None:
                 self._fail(f"field access expected struct, got {base_type}")
@@ -595,7 +543,7 @@ class SemanticAnalyzer:
             return VOID
         if name == "str":
             return STR
-        if name in self.struct_names or name in self.adt_names:
+        if name in self.struct_names:
             return NAMED(name)
         self._fail_global(f"unknown type {name}")
 
@@ -683,13 +631,6 @@ class SemanticAnalyzer:
             return True
         return expr.namespace == "os" and expr.dll == "kernel32" and expr.name == "ExitProcess"
 
-    def _is_adt_pattern(self, pattern):
-        return (
-            isinstance(pattern, FieldAccessNode)
-            and isinstance(pattern.object, VarNode)
-            and pattern.object.name in self.adt_variants
-        )
-
     def _is_integer(self, typ):
         return typ.kind in self.INT_RANGES
 
@@ -740,7 +681,6 @@ class SemanticAnalyzer:
 
 
 def assert_typed_program(program):
-    adt_names = {typ.name for typ in getattr(program, "types", [])}
 
     def fail(path):
         raise SemanticError(f"Semantic error: internal typed AST missing resolved_type for {path}")
@@ -796,13 +736,6 @@ def assert_typed_program(program):
                 expr(value, f"{path}.values[{idx}]")
             return
         fail(path)
-
-    def is_adt_pattern(node):
-        return (
-            isinstance(node, FieldAccessNode)
-            and isinstance(node.object, VarNode)
-            and node.object.name in adt_names
-        )
 
     def block(node, path):
         for idx, stmt in enumerate(node.stmts):
@@ -866,7 +799,7 @@ def assert_typed_program(program):
         if isinstance(node, MatchNode):
             expr(node.expr, f"{path}.expr")
             for idx, case in enumerate(node.cases):
-                if not case.is_else and not is_adt_pattern(case.pattern):
+                if not case.is_else:
                     expr(case.pattern, f"{path}.cases[{idx}].pattern")
                 block(case.body, f"{path}.cases[{idx}].body")
             return
@@ -875,10 +808,7 @@ def assert_typed_program(program):
     for idx, struct in enumerate(program.structs):
         for field_idx, field in enumerate(struct.fields):
             require(field, f"program.structs[{idx}].fields[{field_idx}]")
-    for type_idx, typ in enumerate(getattr(program, "types", [])):
-        for variant_idx, variant in enumerate(typ.variants):
-            for field_idx, field in enumerate(variant.fields):
-                require(field, f"program.types[{type_idx}].variants[{variant_idx}].fields[{field_idx}]")
+
     for fn_idx, fn in enumerate(program.funcs):
         require(fn, f"program.funcs[{fn_idx}]")
         for param_idx, param in enumerate(fn.params):

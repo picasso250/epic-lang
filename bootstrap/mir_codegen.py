@@ -73,7 +73,6 @@ class MirCodegen:
         self.strings = {}
         self.string_counter = 0
         self.structs = {}
-        self.adts = {}
         self.loop_stack = []
 
     def emit_program(self, ast):
@@ -549,13 +548,6 @@ class MirCodegen:
     def _emit_match_check(self, stmt, match_addr, case, case_block, next_block):
         scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_addr.type.pointee, type=match_addr.type.pointee)
         scrut_op = ValueOperand(scrut)
-        if isinstance(case.pattern, FieldAccessNode) and isinstance(case.pattern.object, VarNode):
-            adt_name = case.pattern.object.name
-            tag = self.adts[adt_name][case.pattern.field]["tag"]
-            tag_value = self._load_field(scrut_op, adt_name, "tag").value
-            cond = self._inst("icmp.eq", [ValueOperand(tag_value), ConstIntOperand(I64, tag)], result_type=BOOL)
-            self.block.terminator = CondBr(ValueOperand(cond), case_block.name, next_block.name)
-            return
         pat = self._emit_expr(case.pattern)
         cond = self._inst("icmp.eq", [scrut_op, pat], result_type=BOOL)
         self.block.terminator = CondBr(ValueOperand(cond), case_block.name, next_block.name)
@@ -563,20 +555,6 @@ class MirCodegen:
     def _emit_match_bindings(self, match_addr, case):
         if not case.bindings:
             return
-        if not (isinstance(case.pattern, FieldAccessNode) and isinstance(case.pattern.object, VarNode)):
-            return
-        adt_name = case.pattern.object.name
-        variant = case.pattern.field
-        payload_name = self.adts[adt_name][variant]["payload"]
-        if payload_name is None:
-            return
-        scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_addr.type.pointee, type=match_addr.type.pointee)
-        payload = self._load_field(ValueOperand(scrut), adt_name, "data", result_type=ptr_struct(payload_name))
-        for field, bind_name in case.bindings:
-            field_type = self.structs[payload_name]["fields"][field]["type"]
-            loaded = self._load_field(payload, payload_name, field, result_type=field_type).value
-            addr = self._alloc_local(bind_name, field_type)
-            self._inst("store", [ValueOperand(loaded), ValueOperand(addr)])
 
     def _emit_expr(self, expr):
         if isinstance(expr, (LiteralNode, CharNode)):
@@ -868,28 +846,12 @@ class MirCodegen:
         raise MirCodegenError("slice only supports str and u8[] in machine MIR so far")
 
     def _emit_struct_init(self, expr):
-        if expr.variant:
-            return self._emit_adt_init(expr)
         if expr.type_name not in self.structs:
             raise MirCodegenError(f"unknown struct: {expr.type_name}")
         obj = self._alloc_struct(expr.type_name)
         for field, value_expr in expr.fields:
             self._store_field(obj, expr.type_name, field, self._emit_expr(value_expr))
         return obj
-
-    def _emit_adt_init(self, expr):
-        if expr.type_name not in self.adts or expr.variant not in self.adts[expr.type_name]:
-            raise MirCodegenError(f"unknown ADT variant: {expr.type_name}.{expr.variant}")
-        info = self.adts[expr.type_name][expr.variant]
-        header = self._alloc_struct(expr.type_name)
-        self._store_field(header, expr.type_name, "tag", ConstIntOperand(I64, info["tag"]))
-        payload_name = info["payload"]
-        if payload_name is not None:
-            payload = self._alloc_struct(payload_name)
-            self._store_field(header, expr.type_name, "data", payload)
-            for field, value_expr in expr.fields:
-                self._store_field(payload, payload_name, field, self._emit_expr(value_expr))
-        return header
 
     def _emit_field_access(self, expr):
         base = self._emit_expr(expr.object)
@@ -1001,8 +963,6 @@ class MirCodegen:
             elem = "bool" if expr.elem_type == "bool" else "str" if expr.elem_type == "str" else expr.elem_type
             return f"{elem}[]" + "{" + ", ".join(values) + "}"
         if isinstance(expr, StructInitNode):
-            if expr.variant:
-                return self._static_adt_repr(expr)
             if expr.type_name not in self.structs:
                 return None
             supplied = dict(expr.fields)
@@ -1031,21 +991,6 @@ class MirCodegen:
                     out.append(rendered)
             return "".join(out)
         return None
-
-    def _static_adt_repr(self, expr):
-        if expr.type_name not in self.adts or expr.variant not in self.adts[expr.type_name]:
-            return None
-        payload_name = self.adts[expr.type_name][expr.variant]["payload"]
-        supplied = dict(expr.fields)
-        parts = []
-        if payload_name is not None:
-            for name, info in self.structs[payload_name]["fields"].items():
-                value = supplied.get(name)
-                rendered = self._zero_repr(info["type"]) if value is None else self._static_repr(value, True)
-                if rendered is None:
-                    return None
-                parts.append(f"{name}: {rendered}")
-        return f"{expr.type_name}.{expr.variant}" + "{" + ", ".join(parts) + "}"
 
     def _zero_repr(self, typ):
         if typ == I64:
@@ -1147,20 +1092,6 @@ class MirCodegen:
                 fields[field.name] = {"type": self._type(field.resolved_type), "offset": offset}
                 offset += 8
             self.structs[struct_node.name] = {"fields": fields, "size": max(offset, 1)}
-        for type_node in getattr(ast, "types", []):
-            variants = {}
-            for tag, variant in enumerate(type_node.variants):
-                payload_name = None
-                if variant.fields:
-                    payload_name = f"{type_node.name}_{variant.name}"
-                    fields = {}
-                    offset = 0
-                    for field in variant.fields:
-                        fields[field.name] = {"type": self._type(field.resolved_type), "offset": offset}
-                        offset += 8
-                    self.structs[payload_name] = {"fields": fields, "size": max(offset, 1)}
-                variants[variant.name] = {"tag": tag, "payload": payload_name}
-            self.adts[type_node.name] = variants
         for struct_name in list(self.structs):
             self.structs[f"_arr_{struct_name}"] = {
                 "fields": {
@@ -1171,7 +1102,6 @@ class MirCodegen:
                 "size": 24,
             }
         self.program.structs = self.structs
-        self.program.adts = self.adts
 
 
 def ptr_str():

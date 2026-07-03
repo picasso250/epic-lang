@@ -59,13 +59,11 @@ class Parser:
         structs = []
         types = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "STRUCT", "TYPE"):
+        while self.peek()[0] in ("FUN", "STRUCT"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
-            elif self.peek_kind("STRUCT"):
-                structs.append(self.parse_struct_def())
             else:
-                types.append(self.parse_type_def())
+                structs.append(self.parse_struct_def())
             self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
@@ -88,29 +86,6 @@ class Parser:
             fields.append(StructField(name=fname[1], type=ftype))
         self.expect("RBRACE")
         return StructDefNode(name=name[1], fields=fields)
-
-    def parse_type_def(self):
-        self.expect("TYPE")
-        name = self.expect("ID")
-        self.expect("LBRACE")
-        self.skip_newlines()
-        variants = []
-        while not self.peek_kind("RBRACE"):
-            vname = self.expect("ID")
-            fields = []
-            if self.check("LBRACE"):
-                self.skip_newlines()
-                while not self.peek_kind("RBRACE"):
-                    fname = self.expect("ID")
-                    self.expect("COLON")
-                    ftype = self.parse_type()
-                    self.expect_stmt_end()
-                    fields.append(StructField(name=fname[1], type=ftype))
-                self.expect("RBRACE")
-            variants.append(TypeVariant(name=vname[1], fields=fields))
-            self.skip_newlines()
-        self.expect("RBRACE")
-        return TypeDefNode(name=name[1], variants=variants)
 
     def parse_fn_def(self):
         self.expect("FUN")
@@ -368,33 +343,10 @@ class Parser:
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
             else:
-                bindings = []
-                if (
-                    self.peek_kind("ID")
-                    and self.pos + 2 < len(self.tokens)
-                    and self.tokens[self.pos + 1][0] == "DOT"
-                    and self.tokens[self.pos + 2][0] == "ID"
-                ):
-                    type_name = self.advance()[1]
-                    self.expect("DOT")
-                    variant = self.expect("ID")[1]
-                    pattern = FieldAccessNode(object=VarNode(type_name), field=variant)
-                else:
-                    pattern = self.parse_expr()
-                if isinstance(pattern, FieldAccessNode) and self.check("LBRACE"):
-                    if not self.peek_kind("RBRACE"):
-                        while True:
-                            field = self.expect("ID")
-                            bind_name = field[1]
-                            if self.check("COLON"):
-                                bind_name = self.expect("ID")[1]
-                            bindings.append((field[1], bind_name))
-                            if not self.check("COMMA"):
-                                break
-                    self.expect("RBRACE")
+                pattern = self.parse_expr()
                 self.expect("COLON")
                 body = self.parse_block()
-                cases.append(MatchCase(pattern=pattern, bindings=bindings, body=body))
+                cases.append(MatchCase(pattern=pattern, bindings=[], body=body))
             self.skip_newlines()
         self.expect("RBRACE")
         return MatchNode(expr=expr, cases=cases)
@@ -521,11 +473,6 @@ class Parser:
                 if count is None and self.check("LBRACE"):
                     return ArrayLiteralNode(elem_type=name, values=self.parse_brace_values())
                 return NewArrayNode(elem_type=name, count=count)
-            if self.check("DOT"):
-                variant = self.expect("ID")
-                if self.check("LBRACE"):
-                    return StructInitNode(type_name=name, variant=variant[1], fields=self.parse_named_fields_after_lbrace())
-                return StructInitNode(type_name=name, variant=variant[1], fields=[])
             if self.check("LBRACE"):
                 return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
             return StructInitNode(type_name=name, fields=[])

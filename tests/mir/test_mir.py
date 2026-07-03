@@ -142,27 +142,11 @@ struct Point {
     y: i64
 }
 
-type Expr {
-    Empty
-    IntLit {
-        value: i64
-    }
-}
-
 fun main(): i64 {
     let p = new Point { y: 2, x: 1 }
     let xs = new i64[] { 4 }
     push(xs, 5)
-    let e = new Expr.IntLit { value: p.x }
-    match e {
-        Expr.IntLit { value: n }: {
-            return xs[0] + n
-        }
-        else: {
-            return 0
-        }
-    }
-    return 0
+    return xs[0]
 }
 """
     program = ast_to_mir(sema.analyze_program(Parser(lex(source)).parse_program()))
@@ -178,7 +162,6 @@ fun main(): i64 {
         "ptr.index.load",
         "ptr.i8.get",
         "ptr.i64.get",
-        "adt.payload",
     ):
         assert op not in text
 
