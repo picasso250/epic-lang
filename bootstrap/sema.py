@@ -268,8 +268,6 @@ class SemanticAnalyzer:
         if isinstance(expr, SubscriptNode):
             return ExprInfo(self._subscript_type(expr.base, expr.index))
         if isinstance(expr, SliceNode):
-            if expr.start is None or expr.end is None:
-                self._fail("slice requires explicit start and end")
             base = self._expr(expr.base)
             if base.type != STR and not (base.type.kind == "array" and base.type.elem == U8):
                 self._fail("slice only supports str and u8[]")

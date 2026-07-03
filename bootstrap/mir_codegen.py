@@ -802,8 +802,6 @@ class MirCodegen:
 
     def _emit_slice(self, expr):
         base = self._emit_expr(expr.base)
-        if expr.start is None or expr.end is None:
-            raise MirCodegenError("slice requires explicit start and end")
         start = self._emit_expr(expr.start)
         end = self._emit_expr(expr.end)
         if base.type == ptr_str():

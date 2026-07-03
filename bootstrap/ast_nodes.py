@@ -246,8 +246,8 @@ class SubscriptNode(ASTNode):
 @dataclass
 class SliceNode(ASTNode):
     base: ASTNode
-    start: Optional[ASTNode]
-    end: Optional[ASTNode]
+    start: ASTNode
+    end: ASTNode
     resolved_type: Optional[EpicType] = None
 
 
