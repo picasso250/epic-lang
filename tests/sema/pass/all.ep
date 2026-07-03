@@ -1,0 +1,124 @@
+# Semantic analysis surface contract sample.
+# This file must pass Python sema and produce a stable typed AST dump.
+
+struct Point {
+    x: i64
+    y: i64
+    label: str
+}
+
+struct Holder {
+    point: Point
+    bytes: u8[]
+    count: i64
+}
+
+fun add(a: i64, b: i64): i64 {
+    return a + b
+}
+
+fun make_point(x: i64, y: i64, label: str): Point {
+    return new Point { x: x, y: y, label: label }
+}
+
+fun use_scalars(): i64 {
+    let a = 1
+    let b: i64 = 2
+    let c: u64 = 3
+    let d: i32 = 4
+    let e: u32 = 5
+    let byte: u8 = 'A'
+    let ok: bool = true
+    let no: bool = false
+    let converted_i32 = i32(a)
+    let converted_u32 = u32(b)
+    let converted_u8 = u8(65)
+    let converted_bool = bool(a)
+    let sum = a + b * 3 - 4 / 2 + 5 % 2
+    let shifted = (sum << 1) >> 1 >>> 1
+    let bits = ~shifted & 255 | 16 ^ 3
+    let cmp = sum == shifted || sum != bits && sum < bits || sum <= bits && bits > 0 || bits >= 0
+    let logic = ok && !no || converted_bool
+    if logic {
+        return add(sum, bits)
+    }
+    return i64(byte)
+}
+
+fun use_arrays_and_strings(): i64 {
+    let text = "hello"
+    let bs = bytes(text)
+    let again = str(bs)
+    let first: u8 = text[0]
+    let b0: u8 = bs[0]
+    let sub = text[0:2]
+    let bsub = bs[0:2]
+    let xs = new i64[] { 1, 2, 3 }
+    let ys = new u8[4]
+    let zs = new u8[]
+    push(xs, 4)
+    push(zs, first)
+    extend(zs, bs)
+    let n = len(xs)
+    let c = cap(xs)
+    xs[0] = add(xs[1], xs[2])
+    xs[1] += 1
+    println(f"{again} {sub} {bsub} {b0}")
+    return n + c + xs[0]
+}
+
+fun use_structs_and_maps(): i64 {
+    let p = make_point(1, 2, "p")
+    let q = new Point
+    let h = new Holder { point: p, bytes: bytes("abc"), count: 3 }
+    q.x = p.x
+    q.y = h.point.y
+    q.label = str(h.bytes)
+    let m = new map[str]i64
+    m["one"] = 1
+    m["two"] = add(m["one"], 1)
+    let has_one = map_has(m, "one")
+    let removed = map_del(m, "missing")
+    if has_one && !removed {
+        return m["two"] + h.count
+    }
+    return 0
+}
+
+fun use_control(limit: i64): i64 {
+    let total = 0
+    for i in 0:limit {
+        if i == 2 {
+            continue
+        }
+        if i == 5 {
+            break
+        }
+        total += i
+    }
+    while total < 10 {
+        total += 1
+    }
+    match total {
+        0: {
+            return 0
+        }
+        10: {
+            return total
+        }
+        else: {
+            return total + 1
+        }
+    }
+}
+
+fun main(): void {
+    let a = use_scalars()
+    let b = use_arrays_and_strings()
+    let c = use_structs_and_maps()
+    let d = use_control(8)
+    assert a >= 0, "a"
+    assert b >= 0
+    println(str(a + b + c + d))
+    return
+}

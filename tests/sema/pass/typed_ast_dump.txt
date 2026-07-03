@@ -1,0 +1,371 @@
+Program
+  StructDef Point
+    StructField x : i64
+    StructField y : i64
+    StructField label : str
+  StructDef Holder
+    StructField point : Point
+    StructField bytes : u8[]
+    StructField count : i64
+  FunDef add : i64
+    Param a : i64
+    Param b : i64
+    Block
+      Return
+        Binary + : i64
+          Var a : i64
+          Var b : i64
+  FunDef make_point : Point
+    Param x : i64
+    Param y : i64
+    Param label : str
+    Block
+      Return
+        StructInit Point : Point
+          InitField x
+            Var x : i64
+          InitField y
+            Var y : i64
+          InitField label
+            Var label : str
+  FunDef use_scalars : i64
+    Block
+      Let a : i64
+        Literal 1 : i64
+      Let b : i64
+        Literal 2 : i64
+      Let c : u64
+        Literal 3 : i64
+      Let d : i32
+        Literal 4 : i64
+      Let e : u32
+        Literal 5 : i64
+      Let byte : u8
+        Char 65 : u8
+      Let ok : bool
+        Bool 1 : bool
+      Let no : bool
+        Bool 0 : bool
+      Let converted_i32 : i32
+        Call i32 : i32
+          Var a : i64
+      Let converted_u32 : u32
+        Call u32 : u32
+          Var b : i64
+      Let converted_u8 : u8
+        Call u8 : u8
+          Literal 65 : i64
+      Let converted_bool : bool
+        Call bool : bool
+          Var a : i64
+      Let sum : i64
+        Binary + : i64
+          Binary - : i64
+            Binary + : i64
+              Var a : i64
+              Binary * : i64
+                Var b : i64
+                Literal 3 : i64
+            Binary / : i64
+              Literal 4 : i64
+              Literal 2 : i64
+          Binary % : i64
+            Literal 5 : i64
+            Literal 2 : i64
+      Let shifted : i64
+        Binary >>> : i64
+          Binary >> : i64
+            Binary << : i64
+              Var sum : i64
+              Literal 1 : i64
+            Literal 1 : i64
+          Literal 1 : i64
+      Let bits : i64
+        Binary | : i64
+          Binary & : i64
+            Unary ~ : i64
+              Var shifted : i64
+            Literal 255 : i64
+          Binary ^ : i64
+            Literal 16 : i64
+            Literal 3 : i64
+      Let cmp : bool
+        Binary || : bool
+          Binary || : bool
+            Binary || : bool
+              Binary == : bool
+                Var sum : i64
+                Var shifted : i64
+              Binary && : bool
+                Binary != : bool
+                  Var sum : i64
+                  Var bits : i64
+                Binary < : bool
+                  Var sum : i64
+                  Var bits : i64
+            Binary && : bool
+              Binary <= : bool
+                Var sum : i64
+                Var bits : i64
+              Binary > : bool
+                Var bits : i64
+                Literal 0 : i64
+          Binary >= : bool
+            Var bits : i64
+            Literal 0 : i64
+      Let logic : bool
+        Binary || : bool
+          Binary && : bool
+            Var ok : bool
+            Unary ! : bool
+              Var no : bool
+          Var converted_bool : bool
+      If
+        Block
+          Return
+            Call add : i64
+              Var sum : i64
+              Var bits : i64
+        Var logic : bool
+      Return
+        Call i64 : i64
+          Var byte : u8
+  FunDef use_arrays_and_strings : i64
+    Block
+      Let text : str
+        String hello : str
+      Let bs : u8[]
+        Call bytes : u8[]
+          Var text : str
+      Let again : str
+        Call str : str
+          Var bs : u8[]
+      Let first : u8
+        Subscript : u8
+          Var text : str
+          Literal 0 : i64
+      Let b0 : u8
+        Subscript : u8
+          Var bs : u8[]
+          Literal 0 : i64
+      Let sub : str
+        Slice : str
+          Var text : str
+          Literal 0 : i64
+          Literal 2 : i64
+      Let bsub : u8[]
+        Slice : u8[]
+          Var bs : u8[]
+          Literal 0 : i64
+          Literal 2 : i64
+      Let xs : i64[]
+        ArrayLiteral : i64 : i64[]
+          Literal 1 : i64
+          Literal 2 : i64
+          Literal 3 : i64
+      Let ys : u8[]
+        NewArray : u8 : u8[]
+          Literal 4 : i64
+      Let zs : u8[]
+        NewArray : u8 : u8[]
+      ExprStmt
+        Call push : void
+          Var xs : i64[]
+          Literal 4 : i64
+      ExprStmt
+        Call push : void
+          Var zs : u8[]
+          Var first : u8
+      ExprStmt
+        Call extend : void
+          Var zs : u8[]
+          Var bs : u8[]
+      Let n : i64
+        Call len : i64
+          Var xs : i64[]
+      Let c : i64
+        Call cap : i64
+          Var xs : i64[]
+      SubscriptAssign
+        Call add : i64
+          Subscript : i64
+            Var xs : i64[]
+            Literal 1 : i64
+          Subscript : i64
+            Var xs : i64[]
+            Literal 2 : i64
+        Var xs : i64[]
+        Literal 0 : i64
+      AssignOp +
+        Subscript : i64
+          Var xs : i64[]
+          Literal 1 : i64
+        Literal 1 : i64
+      ExprStmt
+        Call println : void
+          FString : str
+            Var again : str
+            FStringText  
+            Var sub : str
+            FStringText  
+            Var bsub : u8[]
+            FStringText  
+            Var b0 : u8
+      Return
+        Binary + : i64
+          Binary + : i64
+            Var n : i64
+            Var c : i64
+          Subscript : i64
+            Var xs : i64[]
+            Literal 0 : i64
+  FunDef use_structs_and_maps : i64
+    Block
+      Let p : Point
+        Call make_point : Point
+          Literal 1 : i64
+          Literal 2 : i64
+          String p : str
+      Let q : Point
+        StructInit Point : Point
+      Let h : Holder
+        StructInit Holder : Holder
+          InitField point
+            Var p : Point
+          InitField bytes
+            Call bytes : u8[]
+              String abc : str
+          InitField count
+            Literal 3 : i64
+      FieldSet x
+        FieldAccess x : i64
+          Var p : Point
+        Var q : Point
+      FieldSet y
+        FieldAccess y : i64
+          FieldAccess point : Point
+            Var h : Holder
+        Var q : Point
+      FieldSet label
+        Call str : str
+          FieldAccess bytes : u8[]
+            Var h : Holder
+        Var q : Point
+      Let m : map[str]i64
+        New map[str]i64 : map[str]i64
+      SubscriptAssign
+        Literal 1 : i64
+        Var m : map[str]i64
+        String one : str
+      SubscriptAssign
+        Call add : i64
+          Subscript : i64
+            Var m : map[str]i64
+            String one : str
+          Literal 1 : i64
+        Var m : map[str]i64
+        String two : str
+      Let has_one : bool
+        Call map_has : bool
+          Var m : map[str]i64
+          String one : str
+      Let removed : bool
+        Call map_del : bool
+          Var m : map[str]i64
+          String missing : str
+      If
+        Block
+          Return
+            Binary + : i64
+              Subscript : i64
+                Var m : map[str]i64
+                String two : str
+              FieldAccess count : i64
+                Var h : Holder
+        Binary && : bool
+          Var has_one : bool
+          Unary ! : bool
+            Var removed : bool
+      Return
+        Literal 0 : i64
+  FunDef use_control : i64
+    Param limit : i64
+    Block
+      Let total : i64
+        Literal 0 : i64
+      For i : i64
+        Block
+          If
+            Block
+              Continue
+            Binary == : bool
+              Var i : i64
+              Literal 2 : i64
+          If
+            Block
+              Break
+            Binary == : bool
+              Var i : i64
+              Literal 5 : i64
+          AssignOp +
+            Var total : i64
+            Var i : i64
+        Literal 0 : i64
+        Var limit : i64
+      While
+        Block
+          AssignOp +
+            Var total : i64
+            Literal 1 : i64
+        Binary < : bool
+          Var total : i64
+          Literal 10 : i64
+      Match
+        Var total : i64
+        MatchCase
+          Literal 0 : i64
+          Block
+            Return
+              Literal 0 : i64
+        MatchCase
+          Literal 10 : i64
+          Block
+            Return
+              Var total : i64
+        MatchCase
+          Block
+            Return
+              Binary + : i64
+                Var total : i64
+                Literal 1 : i64
+  FunDef main : void
+    Block
+      Let a : i64
+        Call use_scalars : i64
+      Let b : i64
+        Call use_arrays_and_strings : i64
+      Let c : i64
+        Call use_structs_and_maps : i64
+      Let d : i64
+        Call use_control : i64
+          Literal 8 : i64
+      Assert
+        Binary >= : bool
+          Var a : i64
+          Literal 0 : i64
+        String a : str
+      Assert
+        Binary >= : bool
+          Var b : i64
+          Literal 0 : i64
+      ExprStmt
+        Call println : void
+          Call str : str
+            Binary + : i64
+              Binary + : i64
+                Binary + : i64
+                  Var a : i64
+                  Var b : i64
+                Var c : i64
+              Var d : i64
+      Return
