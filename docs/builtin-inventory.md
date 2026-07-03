@@ -34,7 +34,8 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 
 - `str_new` — removed entirely; use `str(bytes)`
 - `itoa` — removed entirely; use `str(n)` (internal helper `str_i64` retained)
-- `str_slice`, `str_starts_with`, `str_find`, `str_trim`, `str_replace_char`, `str_cat`, `str_get` — removed from public surface, but retained as compiler-internal helpers (used for lowering `s[i]`, `s[start:end]`, `==`/`!=`, etc.)
+- `str_slice`, `str_starts_with`, `str_find`, `str_replace_char`, `str_cat`, `str_get` — removed from public surface, but retained as compiler-internal helpers where syntax lowering still needs them
+- `str_trim` — removed entirely; write byte scanning in Epic
 `str`, `bytes`, `cstr` remain public.
 
 | Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
@@ -48,7 +49,7 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 | `str_replace_char` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 323) | ✓ (ln 950) | 🚫 Public surface removed |
 | `str_starts_with` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 326) | ✓ (ln 960) | 🚫 Public surface removed |
 | `str_find` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 329) | ✓ (ln 969) | 🚫 Public surface removed |
-| `str_trim` | ✓ (ln 458) | ✓ (ln 677) | ✓ (ln 332) | ✓ (ln 978) | 🚫 Public surface removed |
+| `str_trim` | 🚫 Removed entirely | 🚫 Removed entirely | 🚫 Removed entirely | 🚫 Removed entirely | Write byte scanning in Epic |
 
 ---
 
@@ -171,7 +172,6 @@ symbols used by the Python backend.
 | `__ep_str_get` | bounds-checked string byte read |
 | `__ep_str_find` | find a substring within a string |
 | `__ep_str_replace_char` | copy string while replacing one byte value |
-| `__ep_str_trim` | trim leading/trailing ASCII whitespace |
 | `__ep_slice_u8_alloc` | allocate initialized-capacity byte array |
 | `__ep_slice_u8_alloc` | allocate empty byte array with capacity |
 | `__ep_slice_u8_get` | bounds-checked byte array read |
@@ -182,7 +182,7 @@ symbols used by the Python backend.
 
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
 
-> `__ep_str_slice`, `__ep_str_starts_with`, `__ep_str_find`, `__ep_str_replace_char`, `__ep_str_trim`, `__ep_str_cat`, `__ep_str_get`
+> `__ep_str_slice`, `__ep_str_starts_with`, `__ep_str_find`, `__ep_str_replace_char`, `__ep_str_cat`, `__ep_str_get`
 > in the list above are **internal helpers** — they remain for lowering `s[i]`, `s[start:end]`, `==`, `!=`
 > but are no longer callable by user code as public builtins.
 
@@ -206,7 +206,7 @@ user code from redefining them:
 
 ```
 len cap push extend bytes str str_new str_slice
-str_replace_char str_starts_with str_find str_trim map_has
+str_replace_char str_starts_with str_find map_has
 ```
 
 **But does NOT reserve:**

@@ -698,96 +698,6 @@ def emit___ep_str_replace_char() -> MirFunction:
     return b.fn
 
 
-def emit___ep_str_trim() -> MirFunction:
-    """Trim ASCII whitespace from both ends, then return __ep_str_slice(s, start, end)."""
-    b = MirHelperBuilder(
-        "__ep_str_trim",
-        [MirParam("%s", ptr(mir_struct("str")))],
-        ptr(mir_struct("str")),
-    )
-    s_val = ValueOperand(b.fn.params[0].value)
-
-    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
-    s_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
-    start_slot = b.alloca(I64)
-    end_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(start_slot))
-    b.store(s_len, ValueOperand(end_slot))
-
-    left_check = b.new_block("left_check")
-    left_load = b.new_block("left_load")
-    left_inc = b.new_block("left_inc")
-    left_range_low = b.new_block("left_range_low")
-    left_range_high = b.new_block("left_range_high")
-    right_check = b.new_block("right_check")
-    b.br(left_check)
-
-    b.entry = left_check
-    start = b.load(I64, ValueOperand(start_slot))
-    end = b.load(I64, ValueOperand(end_slot))
-    has_left = b.icmp("lt", start, end)
-    b.entry.terminator = CondBr(ValueOperand(has_left), left_load.name, right_check.name)
-
-    b.entry = left_load
-    byte_addr = b.gep(I8, s_data, [start])
-    byte = b.load(I8, byte_addr, result_type=I64)
-    is_space = b.icmp("eq", byte, b.const_i64(32))
-    b.entry.terminator = CondBr(ValueOperand(is_space), left_inc.name, left_range_low.name)
-
-    b.entry = left_range_low
-    ge_tab = b.icmp("ge", byte, b.const_i64(9))
-    b.entry.terminator = CondBr(ValueOperand(ge_tab), left_range_high.name, right_check.name)
-
-    b.entry = left_range_high
-    le_cr = b.icmp("le", byte, b.const_i64(13))
-    b.entry.terminator = CondBr(ValueOperand(le_cr), left_inc.name, right_check.name)
-
-    b.entry = left_inc
-    next_start = b.binop("add", start, b.const_i64(1))
-    b.store(next_start, ValueOperand(start_slot))
-    b.br(left_check)
-
-    right_load = b.new_block("right_load")
-    right_dec = b.new_block("right_dec")
-    right_range_low = b.new_block("right_range_low")
-    right_range_high = b.new_block("right_range_high")
-    slice_block = b.new_block("slice")
-
-    b.entry = right_check
-    start = b.load(I64, ValueOperand(start_slot))
-    end = b.load(I64, ValueOperand(end_slot))
-    has_right = b.icmp("lt", start, end)
-    b.entry.terminator = CondBr(ValueOperand(has_right), right_load.name, slice_block.name)
-
-    b.entry = right_load
-    last = b.binop("sub", end, b.const_i64(1))
-    byte_addr = b.gep(I8, s_data, [last])
-    byte = b.load(I8, byte_addr, result_type=I64)
-    is_space = b.icmp("eq", byte, b.const_i64(32))
-    b.entry.terminator = CondBr(ValueOperand(is_space), right_dec.name, right_range_low.name)
-
-    b.entry = right_range_low
-    ge_tab = b.icmp("ge", byte, b.const_i64(9))
-    b.entry.terminator = CondBr(ValueOperand(ge_tab), right_range_high.name, slice_block.name)
-
-    b.entry = right_range_high
-    le_cr = b.icmp("le", byte, b.const_i64(13))
-    b.entry.terminator = CondBr(ValueOperand(le_cr), right_dec.name, slice_block.name)
-
-    b.entry = right_dec
-    next_end = b.binop("sub", end, b.const_i64(1))
-    b.store(next_end, ValueOperand(end_slot))
-    b.br(right_check)
-
-    b.entry = slice_block
-    start = b.load(I64, ValueOperand(start_slot))
-    end = b.load(I64, ValueOperand(end_slot))
-    result = b.call("__ep_str_slice", [s_val, ValueOperand(start), ValueOperand(end)], ptr(mir_struct("str")))
-    b.ret(ValueOperand(result))
-
-    return b.fn
-
-
 def emit_slice_u8_alloc() -> MirFunction:
     """Allocate header + data for u8[], with separate len and cap.
 
@@ -1376,7 +1286,6 @@ _HELPER_EMITTERS = {
     "__ep_str_get": lambda p: emit___ep_str_get(),
     "__ep_str_find": lambda p: emit___ep_str_find(),
     "__ep_str_replace_char": lambda p: emit___ep_str_replace_char(),
-    "__ep_str_trim": lambda p: emit___ep_str_trim(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
     "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
     "__ep_slice_i64_new": lambda p: emit_slice_word_new("__ep_slice_i64_new"),
@@ -1404,7 +1313,6 @@ _HELPER_ORDER = [
     "__ep_str_get",
     "__ep_str_find",
     "__ep_str_replace_char",
-    "__ep_str_trim",
     "__ep_slice_u8_alloc",
     "__ep_slice_u8_get",
     "__ep_slice_i64_new",

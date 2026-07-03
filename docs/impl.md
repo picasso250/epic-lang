@@ -7,9 +7,8 @@
 ```
 bootstrap/          Python reference compiler（Python 参考编译器）
 src/                Epic 自托管编译器源码
-runtime/            旧 NASM backend 的运行时辅助代码
 examples/           示例程序和回归测试
-tools/              本地工具二进制；LLD-Link 可选，NASM 仅用于旧路径
+tools/              本地工具二进制；LLD-Link 可选
 docs/               文档
 editors/            编辑器支持
 tree-sitter-epic/   Tree-sitter 语法
@@ -63,7 +62,7 @@ src/link.ep              # Epic 链接器（独立工具，不属于编译器不
 
 ### Codegen 拆分
 
-`codegen_support.ep` 拥有共享的 codegen 数据结构、底层汇编输出辅助函数、运行时辅助代码发射以及类型辅助函数。`codegen.ep` 拥有 AST 收集、布局、表达式发射、语句发射、函数发射和程序发射。这种拆分利用了现有的全程序多文件编译模型。
+`codegen_support.ep` 拥有共享的 codegen 数据结构、底层汇编输出辅助函数以及类型辅助函数。`codegen.ep` 拥有 AST 收集、布局、表达式发射、语句发射、函数发射和程序发射。这种拆分利用了现有的全程序多文件编译模型。
 
 ## 验收检查 (Acceptance)
 
@@ -88,26 +87,8 @@ machine backend 验收入口。
 
 ## 运行时辅助代码 (Runtime Helpers)
 
-Python machine backend 的运行时片段在 `bootstrap/x64_runtime.py` 中以 X64IR
-形式发射。`runtime/*.asm` 保留给旧 Epic-written backend / 历史对照，不是
-当前 Python driver 的主路径。
-
-```
-runtime/str_alloc.asm
-runtime/bytes.asm
-runtime/str_cat.asm
-runtime/str_slice.asm
-runtime/str_replace_char.asm
-runtime/str_starts_with.asm
-runtime/str_find.asm
-runtime/str_trim.asm
-runtime/extend_i8.asm
-runtime/itoa.asm
-runtime/argv.asm
-runtime/system.asm
-runtime/read_file.asm
-runtime/write_file.asm
-```
+Python machine backend 的运行时片段在 `bootstrap/x64_runtime.py` 和
+`bootstrap/mir_runtime_helpers.py` 中发射。旧 `runtime/*.asm` 路线已删除。
 
 ## 类型降级 (Type Lowering)
 
@@ -200,20 +181,19 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `itoa`             | `_itoa` 运行时辅助函数                      | 公开 |
-| `system`           | `_system` 运行时辅助函数                    | 公开 |
-| `read_file`        | `_read_file` 运行时辅助函数，返回 `u8[]`    | 公开 |
-| `write_file`       | 通过 `_write_file` 写入 `u8[]` 有效载荷     | 公开 |
-| `str` (`u8[]`)     | `_str_alloc` 运行时辅助函数（zero-copy）     | 公开 |
-| `bytes`            | `_bytes` 运行时辅助函数（zero-copy）         | 公开 |
-| `str_new`          | `_str_alloc` 运行时辅助函数                 | 公开（escape hatch） |
-| `str_slice`        | `_str_slice` 运行时辅助函数                 | 🚫 已从 public surface 删除，internal helper |
-| `str_starts_with`  | `_str_starts_with` 运行时辅助函数           | 🚫 已从 public surface 删除 |
-| `str_find`         | `_str_find` 运行时辅助函数                  | 🚫 已从 public surface 删除 |
-| `str_trim`         | `_str_trim` 运行时辅助函数                  | 🚫 已从 public surface 删除 |
+| `str(n)`           | `__ep_str_from_i64` / `__ep_str_from_bool` 等 helper | 公开 |
+| `system`           | `__ep_system_cmd` helper                    | 公开 |
+| `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |
+| `write_file`       | `__ep_write_file` helper                    | 公开 |
+| `str` (`u8[]`)     | zero-copy layout reinterpret                | 公开 |
+| `bytes`            | zero-copy layout reinterpret                | 公开 |
+| `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
+| `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
+| `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
+| `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `push`             | 由 codegen 为动态数组发射                   | 公开 |
-| `extend`           | 字节数组用 `_extend_i8`；其他类型用复制循环 | 公开 |
+| `extend`           | 字节数组用 `__ep_slice_u8_extend`；其他类型用复制循环 | 公开 |
 | `len` / `cap`      | 直接内联发射                                | 公开 |
-| 切片语法           | 字符串用 `_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
+| 切片语法           | 字符串用 `__ep_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
 
 小端加载/存储辅助函数不属于内置函数。`link.ep` 和示例使用 `u8[]`、`u64`、带检查的索引和位运算将其实现为普通的 Epic 函数。

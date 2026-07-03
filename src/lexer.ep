@@ -222,6 +222,28 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
     return str(buf)
 }
 
+fun is_ascii_space(c: i64): i64 {
+    if c == 32 {
+        return 1
+    }
+    if c >= 9 && c <= 13 {
+        return 1
+    }
+    return 0
+}
+
+fun trim_ascii(s: str): str {
+    let start = 0
+    let end = len(s)
+    while start < end && is_ascii_space(s[start]) == 1 {
+        start += 1
+    }
+    while start < end && is_ascii_space(s[end - 1]) == 1 {
+        end -= 1
+    }
+    return s[start:end]
+}
+
 fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
     let n = len(src)
     let p = src.data
@@ -348,7 +370,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
                         }
                         let expr_start = pos + 1
                         let expr_end = scan_fstring_expr_end(src, expr_start, line)
-                        let expr = str_trim(str_slice(src, expr_start, expr_end))
+                        let expr = trim_ascii(src[expr_start:expr_end])
                         if len(expr) == 0 {
                             println("empty f-string expression")
                             exit(1)

@@ -52,7 +52,6 @@ Implemented MIR helpers:
 | `str_get` | string subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `str_find` | substring search | `bootstrap/mir_runtime_helpers.py` |
 | `str_replace_char` | character replacement copy | `bootstrap/mir_runtime_helpers.py` |
-| `str_trim` | ASCII whitespace trim | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
@@ -366,7 +365,6 @@ Rename map (Phase 2):
 | `str_get` | unchanged | already correct |
 | `str_starts_with` | unchanged | already correct |
 | `str_find` | unchanged | already correct |
-| `str_trim` | unchanged | already correct |
 | `__epic_cstr` | `str_cstr` | MIR helper, not x64 primitive |
 | `new_arr_i8` | unchanged | already correct |
 | `new_arr_i8_empty` | unchanged | already correct |

@@ -327,28 +327,7 @@ fun align16(n: i64): i64 {
     return ((n + 15) / 16) * 16
 }
 
-fun emit_runtime(e: EmitterState, path: str): i64 {
-    let s = read_file(path)
-    out_s(e, s)
-    out_nl(e)
-    return 0
-}
-
 fun emit_runtime_helpers(e: EmitterState): i64 {
-    emit_runtime(e, "runtime/str_alloc.asm")
-    emit_runtime(e, "runtime/bytes.asm")
-    emit_runtime(e, "runtime/str_cat.asm")
-    emit_runtime(e, "runtime/str_slice.asm")
-    emit_runtime(e, "runtime/str_replace_char.asm")
-    emit_runtime(e, "runtime/str_starts_with.asm")
-    emit_runtime(e, "runtime/str_find.asm")
-    emit_runtime(e, "runtime/str_trim.asm")
-    emit_runtime(e, "runtime/extend_i8.asm")
-    emit_runtime(e, "runtime/itoa.asm")
-    emit_runtime(e, "runtime/argv.asm")
-    emit_runtime(e, "runtime/system.asm")
-    emit_runtime(e, "runtime/read_file.asm")
-    emit_runtime(e, "runtime/write_file.asm")
     return 0
 }
 
