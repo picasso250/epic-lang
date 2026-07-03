@@ -157,7 +157,7 @@ ret
 | `array.extend` | 内联 grow/copy 多元素。 |
 | `array.index.load` | 带 bounds check 的 8 字节元素读取。 |
 | `ptr.index.load` | 指针按 8 字节元素读取。 |
-| `ptr.i8.get` | 指针按字节读取并 sign-extend。 |
+| `ptr.i8.get` | 指针按字节读取并 zero-extend。 |
 | `ptr.i64.get` | 指针按 8 字节读取。 |
 
 注意：`adt.payload` 已随 ADT 一并移除，不再出现在当前 codegen 中。
@@ -233,7 +233,7 @@ ret
 
 | 形式 | 状态 | 说明 |
 |------|------|------|
-| `mov al, byte [mem]` | ❌ 不支持 | `movsx rax, byte [mem]` 代替 |
+| `mov al, byte [mem]` | ❌ 不支持 | `movzx rax, byte [mem]` 代替（零扩展），或 `movsx rax, byte [mem]`（符号扩展） |
 | `mov byte [mem], imm` | ✅ 支持 | 需 `Mem(size=1)` |
 | `mov qword [mem], imm` | ✅ 支持 | 需 `Mem(size=8)` |
 | `mov r64, byte [mem]` | ❌ 不支持 | 使用 `movsx r64, byte [mem]` |
@@ -253,7 +253,7 @@ ret
 | byte load (zero-extend) | `movzx r64, byte [mem]` |
 | byte store (8-bit reg) | `mov byte [mem], al/dl/r8b/r9b/r10b/r11b` |
 | byte store (immediate) | `mov byte [mem], imm8` |
-| byte load (sign-extend) | `movsx r64, byte [mem]` (kept for internal helpers) |
+| byte load (sign-extend) | `movsx r64, byte [mem]` (internal helpers only) |
 
 #### ALU contract
 
@@ -261,7 +261,7 @@ ret
 |------|------|------|
 | `add/sub/and/or/xor r64, r64` | ✅ | 二地址运算 |
 | `add/sub r64, imm8` | ✅ | 仅有 `add` 支持 imm8；`sub` 当前未直接使用此形式 |
-| `add r8, imm8` | ✅ | lowering 中 `i8` 加法使用 |
+| `add r8, imm8` | ✅ | byte arithmetic |
 | `cmp r64, r64` | ✅ | |
 | `cmp r64, imm32/imm8` | ✅ | imm32 和 imm8 均支持 |
 | `test r64, r64` | ✅ | 当前合约只允许两个 operand 相同寄存器 |

@@ -4,6 +4,10 @@
 
 MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“生成结构化 IR，再 lowering 到 LowMIR/X64MIR，最后输出 ASM pretty print 或机器码”。
 
+> **关于 MIR 内部的 `I8` 类型**：本文多处示例使用 `i8` 作为 MIR 底层 byte storage type。
+> 这是 MIR 内部表示，与 Epic 语言的 public type 无关。Epic 语言 public surface 只暴露 `u8` 作为 byte 类型，不提供 signed `i8`。
+> MIR 的 `I8` 当前仍保留此名，后续可能重命名为 `BYTE` 或 `U8`。
+
 对应路线见 `docs/remove-nasm-plan.md`。
 
 ## Target vs Current Implementation
