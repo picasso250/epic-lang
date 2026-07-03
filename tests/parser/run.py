@@ -4,6 +4,7 @@ tests/parser/run.py - Compare the self-hosted parser against the Python
 parser on examples/*.ep.
 """
 
+import argparse
 import difflib
 import os
 import subprocess
@@ -20,6 +21,9 @@ from parser import Parser
 
 EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
 EXAMPLES_DIR = os.path.join(ROOT_DIR, "examples")
+PARSER_PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
+ALL_EP = os.path.join(PARSER_PASS_DIR, "all.ep")
+AST_DUMP = os.path.join(PARSER_PASS_DIR, "ast_dump.txt")
 UTIL_EP = os.path.join(ROOT_DIR, "src", "util.ep")
 LEXER_EP = os.path.join(ROOT_DIR, "src", "lexer.ep")
 PARSER_EP = os.path.join(ROOT_DIR, "src", "parser.ep")
@@ -213,6 +217,37 @@ def python_parser_dump(path):
     return python_parser_dump_source(source)
 
 
+def read_golden():
+    with open(AST_DUMP, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def check_golden():
+    if not os.path.isfile(ALL_EP):
+        print(f"  FAIL   missing parser fixture: {ALL_EP}")
+        return False
+    if not os.path.isfile(AST_DUMP):
+        print(f"  FAIL   missing parser golden: {AST_DUMP}")
+        return False
+
+    expected = read_golden()
+    actual = python_parser_dump(ALL_EP)
+    if actual == expected:
+        print("  PASS   parser/pass/all.ep matches ast_dump.txt")
+        return True
+
+    print("  FAIL   parser/pass/all.ep matches ast_dump.txt")
+    print_diff(expected, actual, "golden/ast_dump.txt", "python/parser/pass/all.ep")
+    return False
+
+
+def regen_golden():
+    os.makedirs(PARSER_PASS_DIR, exist_ok=True)
+    with open(AST_DUMP, "w", encoding="utf-8", newline="\n") as f:
+        f.write(python_parser_dump(ALL_EP))
+    print(f"Regenerated {os.path.relpath(AST_DUMP, ROOT_DIR)}")
+
+
 def ensure_bootstrap_parser():
     result = subprocess.run(
         [sys.executable, EPICC, "--main", PARSER_EP, UTIL_EP, LEXER_EP, PARSER_EP],
@@ -268,17 +303,37 @@ def print_diff(expected, actual, expected_label, actual_label):
         print(diff_line)
 
 
-def main():
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Parser oracle and self-hosted comparison tests")
+    parser.add_argument("--regen", action="store_true", help="regenerate tests/parser/pass/ast_dump.txt")
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.regen:
+        regen_golden()
+        return 0
+
     ensure_bootstrap_parser()
     examples = sorted(
         os.path.join(EXAMPLES_DIR, name)
         for name in os.listdir(EXAMPLES_DIR)
         if name.endswith(".ep")
     )
+    parser_pass = sorted(
+        os.path.join(PARSER_PASS_DIR, name)
+        for name in os.listdir(PARSER_PASS_DIR)
+        if name.endswith(".ep")
+    )
 
     failed = 0
-    print(f"Comparing parser dumps for {len(examples)} examples...\n")
-    for path in examples:
+    print("Checking parser golden...\n")
+    if not check_golden():
+        failed += 1
+
+    print(f"\nComparing parser dumps for {len(examples)} examples and {len(parser_pass)} parser pass sample(s)...\n")
+    for path in [*examples, *parser_pass]:
         rel = os.path.relpath(path, ROOT_DIR)
         expected = python_parser_dump(path)
         actual = bootstrap_parser_dump(path)
@@ -312,7 +367,7 @@ def main():
         print("  FAIL   dynamic CRLF sample")
         print_diff(expected, actual, "python/dynamic CRLF sample", "bootstrap/dynamic CRLF sample")
 
-    total = len(examples) + len(SELF_HOSTED_PARSER_SOURCES) + 1
+    total = 1 + len(examples) + len(parser_pass) + len(SELF_HOSTED_PARSER_SOURCES) + 1
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

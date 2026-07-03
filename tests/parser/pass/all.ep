@@ -1,0 +1,138 @@
+# Parser surface contract sample.
+# This file is parser-only: it should parse and dump consistently in Python and Epic,
+# but it is not intended to pass sema/codegen.
+
+struct Point {
+    x: i64
+    y: i64
+    name: str
+}
+
+struct Box {
+    point: Point
+    bytes: u8[]
+    flags: map[str]bool
+}
+
+fun helper(a: i64, b: i64, c: i64, d: i64): i64 {
+    return a + b * c - d
+}
+
+fun statements_and_control(flag: bool): void {
+    let inferred = 1
+    let typed: i64 = 2
+    let empty: u8[]
+    let mapping: map[str]i64 = new map[str]i64
+    let p = new Point
+    let p2 = new Point {}
+    let p3 = new Point { x: 1, y: 2, name: "origin" }
+    let xs = new i64[] { 1, 2, 3 }
+    let ys = new i64[10]
+    let bs = new u8[]
+    let text = "hello"
+    let ch = 'a'
+    let interpolated = f"point {p3.name} {typed + inferred}"
+
+    p.x = typed
+    p.name = text
+    xs[0] = helper(1, 2, 3, 4)
+    xs[1] += 1
+    xs[1] -= 1
+    xs[1] *= 2
+    xs[1] /= 2
+    xs[1] %= 2
+    xs[1] <<= 1
+    xs[1] >>= 1
+    xs[1] >>>= 1
+    xs[1] &= 255
+    xs[1] |= 1
+    xs[1] ^= 3
+
+    let first = xs[0]
+    let middle = xs[1:2]
+    let field_read = p3.name
+
+    if flag {
+        println("yes")
+    } else if typed > 1 {
+        println("maybe")
+    } else {
+        println("no")
+    }
+
+    while typed < 10 {
+        typed += 1
+        if typed == 5 {
+            continue
+        }
+        if typed == 8 {
+            break
+        }
+    }
+
+    for i in 0:len(xs) {
+        println(str(i))
+    }
+
+    match typed {
+        0: {
+            println("zero")
+        }
+        1: {
+            println("one")
+        }
+        else: {
+            println("many")
+        }
+    }
+
+    match ch {
+        'a': {
+            println("a")
+        }
+        else: {
+            println("other")
+        }
+    }
+
+    match text {
+        "hello": {
+            println("hello")
+        }
+        else: {
+            println("text")
+        }
+    }
+
+    match flag {
+        true: {
+            println("true")
+        }
+        false: {
+            println("false")
+        }
+    }
+
+    assert typed >= 0, "typed should be non-negative"
+    assert flag || typed != 0
+    panic "parser-only panic statement"
+    return
+}
+
+fun expressions(): i64 {
+    let a = 1 + 2 * 3 / 4 % 5
+    let b = (a - 1) << 2 >> 1 >>> 1
+    let c = ~b & 255 | 16 ^ 3
+    let d = !false && true || false
+    let e = a == b || a != c && a < b || a <= c && a > 0 || a >= 0
+    let f = -a
+    let g = helper(a, b, c, f)
+    helper(g, 1, 2, 3)
+    return g
+}
+
+fun main(): void {
+    statements_and_control(true)
+    expressions()
+    return
+}
