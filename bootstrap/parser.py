@@ -533,17 +533,16 @@ class Parser:
                     else:
                         node = FieldAccessNode(object=node, field=field[1])
                 elif self.check("LBRACKET"):
-                    start = None
-                    if not self.peek_kind("COLON") and not self.peek_kind("RBRACKET"):
-                        start = self.parse_expr()
                     if self.check("COLON"):
-                        end = None
-                        if not self.peek_kind("RBRACKET"):
-                            end = self.parse_expr()
+                        raise ParseError("slice requires explicit start and end")
+                    index = self.parse_expr()
+                    if self.check("COLON"):
+                        if self.peek_kind("RBRACKET"):
+                            raise ParseError("slice requires explicit start and end")
+                        end = self.parse_expr()
                         self.expect("RBRACKET")
-                        node = SliceNode(base=node, start=start, end=end)
+                        node = SliceNode(base=node, start=index, end=end)
                         continue
-                    index = start
                     self.expect("RBRACKET")
                     node = SubscriptNode(base=node, index=index)
                 else:

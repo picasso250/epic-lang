@@ -1,0 +1,5 @@
+# COMPILE_FAIL: slice requires explicit start and end
+fun main(): void {
+    let s = "hello"
+    let x = s[:2]
+}

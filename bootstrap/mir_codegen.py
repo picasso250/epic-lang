@@ -804,14 +804,10 @@ class MirCodegen:
 
     def _emit_slice(self, expr):
         base = self._emit_expr(expr.base)
-        start = self._emit_expr(expr.start) if expr.start is not None else ConstIntOperand(I64, 0)
-        if expr.end is not None:
-            end = self._emit_expr(expr.end)
-        else:
-            struct_name = self._ptr_struct_name(base.type)
-            if struct_name is None:
-                raise MirCodegenError("slice base must be an aggregate pointer")
-            end = self._load_field(base, struct_name, "len", result_type=I64)
+        if expr.start is None or expr.end is None:
+            raise MirCodegenError("slice requires explicit start and end")
+        start = self._emit_expr(expr.start)
+        end = self._emit_expr(expr.end)
         if base.type == ptr_str():
             result = self._inst("call", [base, start, end], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_slice")
             return ValueOperand(result)

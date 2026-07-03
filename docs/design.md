@@ -234,12 +234,12 @@ let ok = map_has(ids, "main")
 
 ```epic
 let a = s[start:end]
-let b = s[start:]
-let c = s[:end]
-let d = s[:]
+let b = s[start:len(s)]
+let c = s[0:end]
+let d = s[0:len(s)]
 ```
 
-- 省略 `start` = `0`，省略 `end` = `.len`
+- 切片必须显式写出 start 和 end；端点省略语法暂不支持。
 - `start < 0` 或 `end < 0` 会退出
 - `start > end` 或 `end > len` 会退出
 - 成功的切片会分配并复制
@@ -264,7 +264,7 @@ Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 
 | 字符串索引 | `s[i]` | `s.data[i]` |
 | 长度 | `len(x)` | `x.len` |
 | 容量 | `cap(a)` | `a.cap` |
-| 切片 | `s[start:end]` / `a[start:end]` | 无 public 替代（`str_slice` 已从 public surface 删除） |
+| 切片 | `s[start:end]` / `a[start:end]`（必须显式写出 start 和 end） | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
 | 字符串相等 | `s1 == s2` | 无 public 替代（`str_eq` 已从 public surface 删除） |
 

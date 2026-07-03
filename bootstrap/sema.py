@@ -268,13 +268,13 @@ class SemanticAnalyzer:
         if isinstance(expr, SubscriptNode):
             return ExprInfo(self._subscript_type(expr.base, expr.index))
         if isinstance(expr, SliceNode):
+            if expr.start is None or expr.end is None:
+                self._fail("slice requires explicit start and end")
             base = self._expr(expr.base)
             if base.type != STR and base.type.kind != "array":
                 self._fail(f"slice expected str or array, got {base.type}")
-            if expr.start is not None:
-                self._expect_integer(self._expr(expr.start), "slice start")
-            if expr.end is not None:
-                self._expect_integer(self._expr(expr.end), "slice end")
+            self._expect_integer(self._expr(expr.start), "slice start")
+            self._expect_integer(self._expr(expr.end), "slice end")
             return ExprInfo(base.type)
         if isinstance(expr, NewArrayNode):
             elem = self._type_name(expr.elem_type)
