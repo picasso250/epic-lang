@@ -271,8 +271,8 @@ class SemanticAnalyzer:
             if expr.start is None or expr.end is None:
                 self._fail("slice requires explicit start and end")
             base = self._expr(expr.base)
-            if base.type != STR and base.type.kind != "array":
-                self._fail(f"slice expected str or array, got {base.type}")
+            if base.type != STR and not (base.type.kind == "array" and base.type.elem == U8):
+                self._fail("slice only supports str and u8[]")
             self._expect_integer(self._expr(expr.start), "slice start")
             self._expect_integer(self._expr(expr.end), "slice end")
             return ExprInfo(base.type)

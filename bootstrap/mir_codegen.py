@@ -812,7 +812,7 @@ class MirCodegen:
         if base.type == ptr_slice_u8():
             result = self._inst("call", [base, start, end], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_slice")
             return ValueOperand(result)
-        raise MirCodegenError("slice only supports str and u8[] in machine MIR so far")
+        raise MirCodegenError("slice only supports str and u8[]")
 
     def _emit_struct_init(self, expr):
         if expr.type_name not in self.structs:

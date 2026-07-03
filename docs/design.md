@@ -231,6 +231,8 @@ let ok = map_has(ids, "main")
 切片语法（复制语义，半开区间 `[start, end)`）：
 
 > 注意：`s[i]`、`s[start:end]`、`==` / `!=` 是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_get` / `str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
+>
+> 切片当前仅支持 str 和 u8[]；其他数组需要复制部分元素时使用 for + push。
 
 ```epic
 let a = s[start:end]
@@ -264,7 +266,7 @@ Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 
 | 字符串索引 | `s[i]` | `s.data[i]` |
 | 长度 | `len(x)` | `x.len` |
 | 容量 | `cap(a)` | `a.cap` |
-| 切片 | `s[start:end]` / `a[start:end]`（必须显式写出 start 和 end） | 无 public 替代（`str_slice` 已从 public surface 删除） |
+| 切片 | `s[start:end]` / `bytes[start:end]`（必须显式写出 start 和 end；仅支持 str 和 u8[]） | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
 | 字符串相等 | `s1 == s2` | 无 public 替代（`str_eq` 已从 public surface 删除） |
 
@@ -274,7 +276,7 @@ Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 
 >
 **三档分类**：
 
-1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`a[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
+1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
 2. **底层接口** — compiler / runtime / linker / bootstrap 可用，但也不推荐使用，普通代码绝不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_slice(s, start, end)`。
 3. **历史写法** — 仍可解析/运行，但新代码不应写；未来可删除。（当前尚无明确归入此类的语法。）
 
