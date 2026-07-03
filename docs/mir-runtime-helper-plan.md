@@ -50,6 +50,7 @@ Implemented MIR helpers:
 | `arr_i8_set` | `u8[]` subscript write | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_push` | `push(u8[], value)` | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_slice` | `u8[]` slice copy | `bootstrap/mir_runtime_helpers.py` |
+| `extend_i8` | `extend(u8[], u8[])` | `bootstrap/mir_runtime_helpers.py` |
 
 Injection rules:
 
@@ -111,6 +112,11 @@ The current ownership boundary is:
 
 The next migration step should move one helper family at a time from x64-backed
 `MirLower._emit_*` methods into MIR helper implementations.
+
+Latest migration note: `extend_i8` now uses a small MIR loop that snapshots
+`src.len`, calls `arr_i8_get`, then calls `arr_i8_push`. This intentionally
+prioritizes code clarity over the previous specialized copy path; the current
+`extend(xs, xs)` behaviour is preserved by the length snapshot.
 
 ## Layering
 

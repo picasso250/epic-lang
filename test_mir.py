@@ -187,6 +187,7 @@ def test_mir_helper_injection():
     """Verify all implemented MIR runtime helpers are always injected."""
 
     assert "arr_i8_slice" in IMPLEMENTED_MIR_HELPERS
+    assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
 
     def check(source):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
@@ -240,6 +241,15 @@ def test_mir_helper_injection():
     let b = new u8[] { 1, 2, 3 }
     let c = b[1:3]
     return len(c)
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    let a = new u8[] { 1, 2 }
+    let b = new u8[] { 3, 4 }
+    extend(a, b)
+    return len(a)
 }"""
     )
 

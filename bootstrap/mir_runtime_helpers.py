@@ -528,6 +528,48 @@ def emit_arr_i8_slice() -> MirFunction:
     return b.fn
 
 
+def emit_extend_i8() -> MirFunction:
+    """Append src bytes into dst, snapshotting src.len before the loop.
+
+    fn extend_i8(ptr<_arr_i8> %dst, ptr<_arr_i8> %src) -> void
+    """
+    b = MirHelperBuilder(
+        "extend_i8",
+        [
+            MirParam("%dst", ptr(mir_struct("_arr_i8"))),
+            MirParam("%src", ptr(mir_struct("_arr_i8"))),
+        ],
+        VOID,
+    )
+    dst_val = ValueOperand(b.fn.params[0].value)
+    src_val = ValueOperand(b.fn.params[1].value)
+
+    src_len = b.load(I64, b.gep_field(src_val, "_arr_i8", 1))
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    done = b.new_block("done")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_copying = b.icmp("lt", i, src_len)
+    b.entry.terminator = CondBr(ValueOperand(keep_copying), loop_body.name, done.name)
+
+    b.entry = loop_body
+    byte = b.call("arr_i8_get", [src_val, i], I64)
+    b.call("arr_i8_push", [dst_val, ValueOperand(byte)], VOID)
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = done
+    b.ret()
+
+    return b.fn
+
+
 # ── Injection ─────────────────────────────────────────────────────────────
 
 
@@ -540,6 +582,7 @@ _HELPER_EMITTERS = {
     "arr_i8_set": lambda p: emit_arr_i8_set(),
     "arr_i8_push": lambda p: emit_arr_i8_push(),
     "arr_i8_slice": lambda p: emit_arr_i8_slice(),
+    "extend_i8": lambda p: emit_extend_i8(),
 }
 
 _HELPER_ORDER = [
@@ -551,6 +594,7 @@ _HELPER_ORDER = [
     "arr_i8_set",
     "arr_i8_push",
     "arr_i8_slice",
+    "extend_i8",
 ]
 
 
