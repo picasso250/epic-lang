@@ -901,6 +901,51 @@ def emit_arr_i8_get() -> MirFunction:
     return b.fn
 
 
+def emit_arr_i64_get() -> MirFunction:
+    """Bounds-checked qword read from i64[].
+
+    fn arr_i64_get(ptr<_arr_i64> %arr, i64 %idx) -> i64
+    """
+    b = MirHelperBuilder(
+        "arr_i64_get",
+        [MirParam("%arr", ptr(mir_struct("_arr_i64"))), MirParam("%idx", I64)],
+        I64,
+    )
+    arr_val = ValueOperand(b.fn.params[0].value)
+    idx_val = ValueOperand(b.fn.params[1].value)
+
+    # Load arr.len
+    len_addr = b.gep_field(arr_val, "_arr_i64", 1)
+    arr_len = b.load(I64, len_addr)
+
+    # Check idx >= 0
+    ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
+    check_block = b.new_block("check_high")
+    ok_block = b.new_block("ok")
+    fail_block = b.new_block("fail")
+    b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
+
+    # check_high: idx < arr.len
+    b.entry = check_block
+    lt_len = b.icmp("lt", idx_val, arr_len)
+    b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
+
+    # ok: load qword
+    b.entry = ok_block
+    data_addr = b.gep_field(arr_val, "_arr_i64", 0)
+    data = b.load(ptr(), data_addr)
+    elem_addr = b.gep(I64, data, [idx_val])
+    result = b.load(I64, elem_addr)
+    b.ret(ValueOperand(result))
+
+    # fail: exit(1)
+    b.entry = fail_block
+    b.call("ExitProcess", [b.const_i64(1)], VOID)
+    b.ret(b.const_i64(0))  # dummy, unreachable
+
+    return b.fn
+
+
 def emit_arr_i8_set() -> MirFunction:
     """Bounds-checked byte write to u8[].
 
@@ -1196,6 +1241,7 @@ _HELPER_EMITTERS = {
     "new_arr_i8": lambda p: emit_new_arr_i8(),
     "new_arr_i8_empty": lambda p: emit_new_arr_i8_empty(),
     "arr_i8_get": lambda p: emit_arr_i8_get(),
+    "arr_i64_get": lambda p: emit_arr_i64_get(),
     "arr_i8_set": lambda p: emit_arr_i8_set(),
     "arr_i8_push": lambda p: emit_arr_i8_push(),
     "arr_i8_slice": lambda p: emit_arr_i8_slice(),
@@ -1217,6 +1263,7 @@ _HELPER_ORDER = [
     "new_arr_i8",
     "new_arr_i8_empty",
     "arr_i8_get",
+    "arr_i64_get",
     "arr_i8_set",
     "arr_i8_push",
     "arr_i8_slice",

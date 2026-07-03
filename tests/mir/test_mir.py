@@ -187,6 +187,7 @@ def test_mir_helper_injection():
     """Verify all implemented MIR runtime helpers are always injected."""
 
     assert "arr_i8_slice" in IMPLEMENTED_MIR_HELPERS
+    assert "arr_i64_get" in IMPLEMENTED_MIR_HELPERS
     assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
     assert "str_eq" in IMPLEMENTED_MIR_HELPERS
     assert "str_bool" in IMPLEMENTED_MIR_HELPERS
