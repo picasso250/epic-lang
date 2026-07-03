@@ -1,0 +1,9 @@
+# EXIT: 1
+struct S {
+    xs: i64[]
+}
+
+fun main(): void {
+    let s = new S {}
+    println(len(s.xs))
+}

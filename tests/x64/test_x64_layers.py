@@ -164,13 +164,19 @@ pair_field.entry:
     add rsp, 32
     mov qword [rbp-24], rax
     mov rax, qword [rbp-24]
+    test rax, rax
+    jz __epx_null_deref
     mov rcx, 8
     add rax, rcx
     mov qword [rbp-32], rax
     mov rax, 42
     mov rcx, qword [rbp-32]
+    test rcx, rcx
+    jz __epx_null_deref
     mov qword [rcx], rax
     mov rax, qword [rbp-32]
+    test rax, rax
+    jz __epx_null_deref
     mov rax, qword [rax]
     mov qword [rbp-40], rax
     mov rax, qword [rbp-40]

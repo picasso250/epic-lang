@@ -94,10 +94,12 @@ class MirLower:
             value, addr = inst.operands
             self._load_operand("rax", value)
             self._load_operand("rcx", addr)
+            self._trap_if_zero("rcx")
             self.x64.inst("mov", M("rcx", 0, 1 if value.type == I8 else 8), R("al") if value.type == I8 else R("rax"))
             return
         if inst.op == "load":
             self._load_operand("rax", inst.operands[0])
+            self._trap_if_zero("rax")
             if inst.type == I8:
                 self.x64.inst("movzx", R("rax"), M("rax", 0, 1))
             else:
@@ -224,13 +226,20 @@ class MirLower:
     def _store_result(self, value, reg):
         self.x64.inst("mov", M("rbp", self.value_slots[value.name]), R(reg))
 
+    def _trap_if_zero(self, reg):
+        self.x64.inst("test", R(reg), R(reg))
+        self.x64.inst("jz", LabelRef("__epx_null_deref"))
+
     def _addr_slot(self, operand):
         if not isinstance(operand, ValueOperand) or operand.value.name not in self.addr_slots:
             raise MirLowerError("only alloca addresses are supported in first MIR lowering")
         return self.addr_slots[operand.value.name]
 
     def _lower_gep(self, inst):
-        self._load_operand("rax", inst.operands[0])
+        base = inst.operands[0]
+        self._load_operand("rax", base)
+        if not isinstance(base, ConstNullOperand):
+            self._trap_if_zero("rax")
         source = inst.type
         indices = inst.operands[1:]
         if source.kind == "struct":
@@ -316,6 +325,7 @@ class MirLower:
         self._emit_print_newline()
         self._emit_putc()
         self._emit_slice_oob()
+        self._emit_null_deref()
 
     def _data_label(self, name):
         return name.replace("@", "_").replace(".", "_") + "_data"
@@ -381,6 +391,8 @@ class MirLower:
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
         x.inst("sub", R("rsp"), I(96))
+        x.inst("test", R("rcx"), R("rcx"))
+        x.inst("jz", LabelRef("__epx_null_deref"))
         x.inst("mov", M("rbp", -8), R("rcx"))
         x.inst("mov", M("rbp", -16), R("rdx"))
         x.inst("mov", R("rax"), M("rcx", 8))
@@ -445,6 +457,8 @@ class MirLower:
     def _emit_epic_slice_qword_get(self, label, oob_label):
         x = self.x64
         x.label(label)
+        x.inst("test", R("rcx"), R("rcx"))
+        x.inst("jz", LabelRef("__epx_null_deref"))
         x.inst("cmp", R("rdx"), I(0))
         x.inst("jl", LabelRef(oob_label))
         x.inst("mov", R("r8"), M("rcx", 8))
@@ -1188,6 +1202,13 @@ class MirLower:
     def _emit_slice_oob(self):
         x = self.x64
         x.label("__epx_slice_oob")
+        x.inst("mov", R("rcx"), I(1))
+        x.inst("sub", R("rsp"), I(32))
+        x.inst("call", Symbol("ExitProcess"))
+
+    def _emit_null_deref(self):
+        x = self.x64
+        x.label("__epx_null_deref")
         x.inst("mov", R("rcx"), I(1))
         x.inst("sub", R("rsp"), I(32))
         x.inst("call", Symbol("ExitProcess"))
