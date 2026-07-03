@@ -118,7 +118,6 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__epx_slice_qword_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__epx_slice_i64_push", MirSignature([ptr(), I64], VOID)))
         self.program.externs.append(MirExtern("__epx_slice_ptr_push", MirSignature([ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__epx_slice_qword_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__epx_slice_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.globals.append(MirGlobal("@argv", ptr_slice_str(), None))
         for fn in ast.funcs:

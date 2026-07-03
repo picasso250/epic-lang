@@ -377,8 +377,8 @@ ret
 - `__epx_alloc` (x64 primitive)
 - `__epx_slice_qword_new` (array header allocation)
 - `__epx_slice_i64_push` / `__epx_slice_ptr_push`
-- `__epx_slice_qword_extend`
 - `__epx_slice_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
+- ~~`__epx_slice_qword_extend`~~ (removed)
 - x64 primitives and still-x64 helpers:
 - `__ep_map_str_i64_new` / `__ep_map_str_i64_get` / `__ep_map_str_i64_set` / `__ep_map_str_i64_has` / `__ep_map_str_i64_repr`
 - `cstr` (`__ep_cstr`)

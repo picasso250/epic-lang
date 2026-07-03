@@ -380,7 +380,7 @@ Rename map (Phase 2):
 | `__epic_arr_qword_new` | `qword_new` | MIR helper, not x64 primitive |
 | `__epic_arr_i64_push` | `arr_i64_push` | MIR helper, not x64 primitive |
 | `__epic_arr_ptr_push` | `arr_ptr_push` | MIR helper, not x64 primitive |
-| `__epic_arr_qword_extend` | `qword_extend` | MIR helper, not x64 primitive |
+| `__epic_arr_qword_extend` | ~~`qword_extend`~~ (removed) | MIR helper, not x64 primitive |
 | `__epic_arr_i64_get` | `arr_i64_get` | MIR helper, not x64 primitive |
 | `__epic_arr_ptr_get` | `arr_ptr_get` | MIR helper, not x64 primitive |
 

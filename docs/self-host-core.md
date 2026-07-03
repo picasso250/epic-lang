@@ -260,7 +260,7 @@ after ADT removal and naming unification.
 - `__ep_cstr` → `str_cstr`
 - `__epx_slice_i64_push` → `arr_i64_push`
 - `__epx_slice_ptr_push` → `arr_ptr_push`
-- `__epx_slice_qword_extend` → `qword_extend`
+- ~~`__epx_slice_qword_extend` → `qword_extend`~~ (removed)
 - `__epx_slice_ptr_get` → `arr_ptr_get`
 
 ### Phase 3: `str` → `u8[]` Convergence (after Phase 2)
