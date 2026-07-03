@@ -1,0 +1,4 @@
+# COMPILE_FAIL: unknown function itoa
+fun main(): void {
+    let s = itoa(1)
+}

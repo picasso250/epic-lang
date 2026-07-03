@@ -1,11 +1,11 @@
 # EXIT: 0
 # STDOUT: 47,1,65,2,-12
 fun main(): void {
-    let a = itoa(47)
-    let b = itoa(1)
+    let a = str(47)
+    let b = str(1)
     let s = str(65)
     let t = str(2)
-    let neg = itoa(0 - 12)
+    let neg = str(0 - 12)
 
     let buf1 = new u8[0]
     extend(buf1, bytes(a))

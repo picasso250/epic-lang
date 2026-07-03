@@ -1,0 +1,4 @@
+# COMPILE_FAIL: unknown function str_new
+fun main(): void {
+    let s = str_new(0, 0)
+}

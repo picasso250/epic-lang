@@ -84,7 +84,6 @@ class MirCodegen:
         for dll, name, params, ret in WINAPI_IMPORTS:
             self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
         self.program.externs.append(MirExtern("str_i64", MirSignature([I64], ptr_str())))
-        self.program.externs.append(MirExtern("str_new", MirSignature([I64, I64], ptr_str())))
         self.program.externs.append(MirExtern("str_bool", MirSignature([BOOL], ptr_str())))
         self.program.externs.append(MirExtern("str_arr_i8", MirSignature([ptr_arr_i8()], ptr_str())))
         self.program.externs.append(MirExtern("__epic_str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
@@ -648,10 +647,6 @@ class MirCodegen:
             return ConstIntOperand(I64, 0)
         if name == "str":
             return self._emit_str_conversion(expr.args[0])
-        if name == "str_new":
-            args = [self._emit_expr(arg) for arg in expr.args]
-            result = self._inst("call", args, result_type=ptr_str(), type=ptr_str(), callee="str_new")
-            return ValueOperand(result)
         if name == "cstr":
             arg = self._emit_expr(expr.args[0])
             result = self._inst(
@@ -661,10 +656,6 @@ class MirCodegen:
                 type=I64,
                 callee="__epic_cstr",
             )
-            return ValueOperand(result)
-        if name == "itoa":
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="str_i64")
             return ValueOperand(result)
         if name in ("i64", "u64", "u8", "bool"):
             return self._emit_expr(expr.args[0])

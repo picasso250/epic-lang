@@ -12,9 +12,7 @@ BUILTIN_FUNCTIONS = frozenset({
 
     "str",
     "cstr",
-    "itoa",
     "bytes",
-    "str_new",
 
     "len",
     "cap",

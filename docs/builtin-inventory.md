@@ -30,17 +30,17 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 
 ## String / Byte Conversion
 
-**Public surface status**: `str_slice`, `str_replace_char`, `str_starts_with`, `str_find`, `str_trim` are **removed from public surface**.
+**Public surface status**: `str_new`, `itoa`, `str_slice`, `str_replace_char`, `str_starts_with`, `str_find`, `str_trim` are **removed from public surface**.
 They still exist as compiler-internal helpers (used for lowering `s[i]`, `s[start:end]`, etc.).
-`str`, `bytes`, `str_new`, `cstr`, `itoa` remain public.
+`str`, `bytes`, `cstr` remain public.
 
 | Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
-| `str`      | ✓ (ln 417) | ✓ (ln 607) | ✓ (ln 314) | ✓ (ln 921) | Multi-type to string |
-| `cstr`     | ✓ (ln 423) | ✓ (ln 632) | ✗ | ✗ | String to C-style (null-terminated); WinAPI interop |
-| `itoa`     | ✓ (ln 461) | ✓ (ln 642) | ✗ | ✓ (ln 863) | Integer to ASCII string, legacy |
-| `bytes`    | ✓ (ln 436) | ✓ (ln 650) | ✓ (ln 311) | ✓ (ln 934) | String → `u8[]` |
-| `str_new`  | ✓ (ln 445) | ✓ (ln 628) | ✓ (ln 317) | ✓ (ln 914) | `str_new(ptr, len)` — raw pointer slice |
+| `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Multi-type to string |
+| `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to C-style (null-terminated); WinAPI interop |
+| `bytes`    | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | String → `u8[]` |
+| `str_new`  | 🚫 Public surface removed; `str(bytes)` is the recommended path |
+| `itoa`     | 🚫 Public surface removed; `str(n)` is the recommended path |
 | `str_slice` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 320) | ✓ (ln 940) | 🚫 Public surface removed; internal helper only |
 | `str_replace_char` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 323) | ✓ (ln 950) | 🚫 Public surface removed |
 | `str_starts_with` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 326) | ✓ (ln 960) | 🚫 Public surface removed |

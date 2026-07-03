@@ -263,19 +263,17 @@ Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 
 | 长度 | `len(x)` | `x.len` |
 | 容量 | `cap(a)` | `a.cap` |
 | 切片 | `s[start:end]` / `a[start:end]` | 无 public 替代（`str_slice` 已从 public surface 删除） |
-| 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)` |
+| 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
 | 字符串相等 | `s1 == s2` | 无 public 替代（`str_eq` 已从 public surface 删除） |
 
 > `a.data[i]` 是底层 unchecked 访问，仅适合明确需要绕过边界检查或处理 runtime layout 的代码。新代码默认使用 `a[i]`。
 >
 > `s.data`、`s.len`、`a.data`、`a.len`、`a.cap` 暂时仍是可访问字段，但属于 layout 暴露，不应作为普通代码风格。
 >
-> `str_new(ptr, len)` 接受任意 `ptr`（指针）+ `len`，不能完全被 `str(u8[])` 替代；它在底层代码中保留为合法 escape hatch。
-
 **三档分类**：
 
 1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`a[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
-2. **底层接口** — compiler / runtime / linker / bootstrap 可用，但也不推荐使用，普通代码绝不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_new(ptr, len)`、`str_slice(s, start, end)`。
+2. **底层接口** — compiler / runtime / linker / bootstrap 可用，但也不推荐使用，普通代码绝不推荐：`a.data[i]`、`s.data`、`s.len`、`a.len`、`a.cap`、`str_slice(s, start, end)`。
 3. **历史写法** — 仍可解析/运行，但新代码不应写；未来可删除。（当前尚无明确归入此类的语法。）
 
 ## 文件 IO（面向字节, byte-oriented）
@@ -305,8 +303,6 @@ let source = str(read_file(path))
 |----------------------------------------|---------------------------------------------|
 | `print(x): void`                       | 写入 `x` 的字符串表示（无换行）              |
 | `println(x): void`                     | 写入 `x` 的字符串表示并追加换行              |
-| `itoa(n: i64): str`                    | 整数转堆分配字符串                          |
-| `str_new(bytes, len): str`             | 从底层缓冲区复制 `len` 个字节创建字符串     |
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
 | `system(cmd: str): i64`                | 执行命令，返回退出码                        |
 
@@ -314,6 +310,8 @@ let source = str(read_file(path))
 
 | 删除的 public builtin   | 替代方案                                    |
 |------------------------|---------------------------------------------|
+| `itoa(n)`              | `str(n)`                                    |
+| `str_new(ptr, len)`    | `str(bytes)`                                |
 | `str_get(s, i)`        | `s[i]`（语法）                              |
 | `str_slice(s, start, end)` | `s[start:end]`（语法）                   |
 | `str_eq(s1, s2)`       | `s1 == s2`（语法）                          |

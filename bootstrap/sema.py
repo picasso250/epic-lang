@@ -374,17 +374,6 @@ class SemanticAnalyzer:
         if name == "write_file":
             self._check_call_args(name, [STR, ARRAY(U8)], expr.args)
             return ExprInfo(I64)
-        if name == "str_new":
-            self._check_arity(name, 2, expr.args)
-            data = self._expr(expr.args[0])
-            if data.type.kind != "ptr" and not self._is_integer(data.type):
-                self._fail(f"str_new data expected pointer or integer, got {data.type}")
-            self._expect_integer(self._expr(expr.args[1]), "str_new length")
-            return ExprInfo(STR)
-        if name == "itoa":
-            self._check_arity(name, 1, expr.args)
-            self._expect_integer(self._expr(expr.args[0]), "itoa argument")
-            return ExprInfo(STR)
         if name == "system":
             self._check_call_args(name, [STR], expr.args)
             return ExprInfo(I64)

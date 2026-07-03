@@ -89,11 +89,11 @@ required_helpers: defer; unconditional injection stays for now
 | `len`/`cap`   | Length and capacity |
 | `push`        | Array append |
 | `extend`      | Array extend |
-| `itoa`        | Integer to string (kept for now) |
 | `str(bytes)`  | `u8[]` to `str` (kept for now) |
 | `bytes(s)`    | `str` to `u8[]` (kept for now) |
-| `str_new`     | Raw pointer + len (kept as escape hatch) |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |
+| `str_new`     | 🚫 Removed from public surface; use `str(bytes)` |
+| `itoa`        | 🚫 Removed from public surface; use `str(n)` |
 | `str_slice`   | Removed from public surface; internal helper only |
 | `str_starts_with` | Removed from public surface |
 | `str_find`    | Removed from public surface |
@@ -210,8 +210,8 @@ after ADT removal and naming unification.
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend`
-- String builtins (retained): `len(s)` / `s[i]` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; `str(bytes)` / `bytes(s)` as zero-copy cast; `str_new` / `cstr` / `itoa` as escape hatch
-- String builtins (removed from public surface): `str_slice` / `str_starts_with` / `str_find` / `str_trim` / `str_replace_char` / `str_cat` / `str_get` — internal helpers retained
+- String builtins (retained): `len(s)` / `s[i]` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; `str(bytes)` / `bytes(s)` as zero-copy cast; `cstr` as escape hatch
+- String builtins (removed from public surface): `str_new` / `itoa` / `str_slice` / `str_starts_with` / `str_find` / `str_trim` / `str_replace_char` / `str_cat` / `str_get` — internal helpers retained
 - `system` kept for now
 - `os.*` WinAPI calls
 - `argv` global
