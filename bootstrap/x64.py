@@ -296,7 +296,7 @@ class X64Validator:
         elif inst.op in SETCC:
             self._require_regs(idx, inst, "al")
         elif inst.op == "movzx":
-            self._require_regs(idx, inst, "eax", "al")
+            self._validate_movzx(inst, idx)
         elif inst.op == "movsx":
             self._validate_movsx(inst, idx)
         elif inst.op == "test":
@@ -368,6 +368,15 @@ class X64Validator:
             self._require_i32(operands[1].value, idx, "cmp immediate")
             return
         self.errors.append(f"item {idx}: cmp needs r64,r64 or r64,imm32")
+
+    def _validate_movzx(self, inst, idx):
+        operands = inst.operands
+        if len(operands) == 2 and self._is_reg64(operands[0]) and isinstance(operands[1], Mem):
+            mem = operands[1]
+            if mem.size != 1 or mem.symbol is not None:
+                self.errors.append(f"item {idx}: movzx source must be byte base memory")
+            return
+        self._require_regs(idx, inst, "eax", "al")
 
     def _validate_movsx(self, inst, idx):
         operands = inst.operands

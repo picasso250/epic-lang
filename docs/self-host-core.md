@@ -182,12 +182,13 @@ after ADT removal and naming unification.
 |-------|---------------|------------------|
 | `str` vs `u8[]` | `str` is kept; `u8[]` is core text truth | Long-term: unify text as `u8[]`; `str` becomes thin view or removed. Public str helper surface removed in Phase 0. |
 | `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
-| Helper naming | `__ep_` / `__epx_` prefix split complete | Future: `arr` → `slice`, `i8` → `u8` |
+| Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
 | `required_helpers` / lazy injection | Unconditional injection | Defer until helper naming is stable |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
 | `system` | Kept for now | May be removed from core |
 | `map` | Kept for now | May be removed from core |
 | `itoa` | Removed from public surface | Use `str(n)` |
+| `i8` public type | Removed | `u8` is Epic's only byte type; byte loads zero-extend to 0..255 |
 | `cstr` | Kept for now | May be removed when WinAPI interop is redesigned |
 
 ---

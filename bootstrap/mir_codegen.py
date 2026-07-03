@@ -157,11 +157,11 @@ class MirCodegen:
             raise MirCodegenError("missing resolved type")
         if typ == "void":
             return VOID
-        if typ in ("i64", "u64", "i32", "u32", "i8", "u8", "bool"):
+        if typ in ("i64", "u64", "i32", "u32", "u8", "bool"):
             return BOOL if typ == "bool" else I64
         if typ == "&str":
             return ptr_str()
-        if typ in ("u8[]", "i8[]", "&_slice_u8"):
+        if typ in ("u8[]", "&_slice_u8"):
             return ptr_slice_u8()
         if typ in ("i64[]", "u64[]", "i32[]", "u32[]", "&_slice_i64"):
             return ptr_slice_i64()
@@ -933,7 +933,7 @@ class MirCodegen:
             values = [self._static_repr(v, True) for v in expr.values]
             if any(v is None for v in values):
                 return None
-            if expr.elem_type in ("u8", "i8") and not repr_context:
+            if expr.elem_type == "u8" and not repr_context:
                 return "".join(chr(int(v)) for v in values)
             elem = "bool" if expr.elem_type == "bool" else "str" if expr.elem_type == "str" else expr.elem_type
             return f"{elem}[]" + "{" + ", ".join(values) + "}"

@@ -1,0 +1,4 @@
+# COMPILE_FAIL: unknown type i8
+fun main(): void {
+    let x: i8 = 1
+}

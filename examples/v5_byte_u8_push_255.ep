@@ -1,0 +1,7 @@
+# EXIT: 0
+# STDOUT: 255
+fun main(): void {
+    let b = new u8[1]
+    push(b, 255)
+    println(b[0])
+}

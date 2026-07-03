@@ -167,12 +167,12 @@ mov byte [rcx], al                # i8 (value.type == I8)
 
 ```
 _load_operand("rax", operand)     # 加载地址到 rax
-movsx rax, byte [rax]             # i8 (sign-extend)
+movzx rax, byte [rax]             # i8 (zero-extend, byte load)
 mov   rax, qword [rax]            # 其他类型
 _store_result(inst.result, "rax")
 ```
 
-**当前重要行为**：i8 load 有符号扩展（`movsx`），而非零扩展（`movzx`）。所有 `i8` 类型在 MIR 中做有符号语义处理。
+**重要语义**：u8 是 Epic 的 byte 类型。8-bit load 零扩展到 i64，结果范围 0..255。Epic 不暴露 signed i8。MIR 内部 `I8` 名暂留，但行为已改为零扩展。
 
 ### 5.4 Arithmetic
 

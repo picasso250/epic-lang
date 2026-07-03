@@ -21,7 +21,6 @@ class ExprInfo:
 
 class SemanticAnalyzer:
     INT_RANGES = {
-        "i8": (-128, 127),
         "u8": (0, 255),
         "i32": (-2147483648, 2147483647),
         "u32": (0, 4294967295),
@@ -515,8 +514,6 @@ class SemanticAnalyzer:
             return I32
         if name == "u32":
             return U32
-        if name == "i8":
-            return I8
         if name == "u8":
             return U8
         if name == "bool":

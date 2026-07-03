@@ -153,6 +153,11 @@ class MachineObjectBuilder:
             self._emit_cmp_reg_imm(operands[0].name, operands[1].value)
         elif op in ("sete", "setne", "setg", "setl", "setge", "setle") and self._regs(operands, "al"):
             self._emit_setcc(op)
+        elif op == "movzx" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Mem):
+            mem = operands[1]
+            if mem.size != 1 or mem.symbol is not None:
+                raise MachineBackendError("movzx only supports byte base memory")
+            self._emit_movzx_reg_mem8(operands[0].name, mem.base.name, mem.disp)
         elif op == "movzx" and self._regs(operands, "eax", "al"):
             self.text.extend(b"\x0f\xb6\xc0")
         elif op == "movsx" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Mem):
@@ -331,6 +336,13 @@ class MachineObjectBuilder:
         self._require_reg64(base)
         self._rex(w=True, r=REG64[dst] >> 3, b=REG64[base] >> 3)
         self.text.extend(b"\x0f\xbe")
+        self._mem_modrm(REG64[dst], base, disp)
+
+    def _emit_movzx_reg_mem8(self, dst, base, disp):
+        self._require_reg64(dst)
+        self._require_reg64(base)
+        self._rex(w=True, r=REG64[dst] >> 3, b=REG64[base] >> 3)
+        self.text.extend(b"\x0f\xb6")
         self._mem_modrm(REG64[dst], base, disp)
 
     def _emit_lea_symbol(self, dst, symbol):

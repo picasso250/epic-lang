@@ -192,6 +192,7 @@ ret
 | `sete/setne/setg/setl/setge/setle` | target `al` |
 | `movzx` | `movzx eax, al` |
 | `movsx` | `movsx r64, byte [r64+disp]` |
+| `movzx` | `movzx r64, byte [r64+disp]` (also `movzx eax, al` for setcc) |
 | `test` | intended contract: `test r64, same r64` |
 | `xor` | `xor r64, r64` |
 | `shl/sar/shr` | `op rax, cl` |
@@ -236,7 +237,7 @@ ret
 | `mov byte [mem], imm` | ✅ 支持 | 需 `Mem(size=1)` |
 | `mov qword [mem], imm` | ✅ 支持 | 需 `Mem(size=8)` |
 | `mov r64, byte [mem]` | ❌ 不支持 | 使用 `movsx r64, byte [mem]` |
-| `movzx r64, byte [mem]` | ❌ 不支持 | 零扩展 load 需拆成 `movsx` + `and` 或直接用 `movzx eax, al` |
+| `movzx r64, byte [mem]` | ✅ 新增 | 零扩展 byte load；`0F B6 /r` + REX.W |
 | `mov r64, dword [mem]` | ❌ 不支持 | 当前只有 qword 和 byte 两种 size |
 | `mov [mem], dword` | ❌ 不支持 | 同上 |
 | `mov [rsp+disp], r64` | ✅ 支持 | 通过 `Mem("rsp", disp)` |
@@ -249,10 +250,10 @@ ret
 
 | 操作 | 支持形式 |
 |------|----------|
-| byte load (sign-extend) | `movsx r64, byte [mem]` |
+| byte load (zero-extend) | `movzx r64, byte [mem]` |
 | byte store (8-bit reg) | `mov byte [mem], al/dl/r8b/r9b/r10b/r11b` |
 | byte store (immediate) | `mov byte [mem], imm8` |
-| byte load (zero-extend) | ❌ 无直接形式；需 `movsx` 后自己 mask，或走 `movzx eax, al` 链条 |
+| byte load (sign-extend) | `movsx r64, byte [mem]` (kept for internal helpers) |
 
 #### ALU contract
 
