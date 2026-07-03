@@ -1199,6 +1199,292 @@ def emit_extend_slice_u8() -> MirFunction:
     return b.fn
 
 
+# ── Map helpers ────────────────────────────────────────────────────────────
+
+
+def emit_map_str_word_new(name: str, map_type) -> MirFunction:
+    """Allocate an empty map header with no backing entries.
+
+    The backing entry array is allocated lazily by set.  The header layout is
+    {entries, len, cap}.  Entries are three word-sized slots: {key, value,
+    occupied}.
+    """
+    b = MirHelperBuilder(name, [], map_type)
+    header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
+    header = ValueOperand(header_raw)
+    b.store(ConstNullOperand(), b.gep(ptr(), header, [b.const_i64(0)]))
+    b.store(b.const_i64(0), b.gep(ptr(), header, [b.const_i64(1)]))
+    b.store(b.const_i64(0), b.gep(ptr(), header, [b.const_i64(2)]))
+    b.ret(header)
+    return b.fn
+
+
+def _map_entry_word_index(b: MirHelperBuilder, index):
+    twice = b.binop("add", index, index)
+    return b.binop("add", ValueOperand(twice), index)
+
+
+def _map_entry_addr(b: MirHelperBuilder, data, index):
+    word_index = _map_entry_word_index(b, index)
+    return b.gep(ptr(), data, [ValueOperand(word_index)])
+
+
+def _map_zero_operand(value_type):
+    if value_type.kind == "ptr":
+        return ConstNullOperand()
+    if value_type == BOOL:
+        return ConstBoolOperand(False)
+    return ConstIntOperand(value_type, 0)
+
+
+def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
+    """Lookup a str key in a word-valued map, returning value zero on miss."""
+    b = MirHelperBuilder(
+        name,
+        [MirParam("%map", map_type), MirParam("%key", ptr(mir_struct("str")))],
+        value_type,
+    )
+    map_val = ValueOperand(b.fn.params[0].value)
+    key_val = ValueOperand(b.fn.params[1].value)
+
+    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
+    map_len = b.load(I64, len_addr)
+    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
+    data = b.load(ptr(), data_addr)
+
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    key_check = b.new_block("key_check")
+    found = b.new_block("found")
+    next_block = b.new_block("next")
+    miss = b.new_block("miss")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(map_len))
+    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, miss.name)
+
+    b.entry = loop_body
+    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
+    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
+    occ = b.load(I64, ValueOperand(occ_addr))
+    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
+    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+
+    b.entry = key_check
+    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
+    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
+    b.entry.terminator = CondBr(ValueOperand(keys_equal), found.name, next_block.name)
+
+    b.entry = found
+    value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
+    result = b.load(value_type, ValueOperand(value_addr))
+    b.ret(ValueOperand(result))
+
+    b.entry = next_block
+    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
+    b.store(ValueOperand(next_i), ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = miss
+    b.ret(_map_zero_operand(value_type))
+    return b.fn
+
+
+def emit_map_str_word_has(name: str, map_type) -> MirFunction:
+    """Return true when a key exists in a str-keyed map."""
+    b = MirHelperBuilder(
+        name,
+        [MirParam("%map", map_type), MirParam("%key", ptr(mir_struct("str")))],
+        BOOL,
+    )
+    map_val = ValueOperand(b.fn.params[0].value)
+    key_val = ValueOperand(b.fn.params[1].value)
+
+    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
+    map_len = b.load(I64, len_addr)
+    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
+    data = b.load(ptr(), data_addr)
+
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    key_check = b.new_block("key_check")
+    yes = b.new_block("yes")
+    next_block = b.new_block("next")
+    no = b.new_block("no")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(map_len))
+    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, no.name)
+
+    b.entry = loop_body
+    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
+    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
+    occ = b.load(I64, ValueOperand(occ_addr))
+    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
+    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+
+    b.entry = key_check
+    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
+    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
+    b.entry.terminator = CondBr(ValueOperand(keys_equal), yes.name, next_block.name)
+
+    b.entry = yes
+    b.ret(ConstBoolOperand(True))
+
+    b.entry = next_block
+    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
+    b.store(ValueOperand(next_i), ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = no
+    b.ret(ConstBoolOperand(False))
+    return b.fn
+
+
+def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
+    """Insert or update a key/value entry in a str-keyed word map."""
+    b = MirHelperBuilder(
+        name,
+        [
+            MirParam("%map", map_type),
+            MirParam("%key", ptr(mir_struct("str"))),
+            MirParam("%val", value_type),
+        ],
+        VOID,
+    )
+    map_val = ValueOperand(b.fn.params[0].value)
+    key_val = ValueOperand(b.fn.params[1].value)
+    val_val = ValueOperand(b.fn.params[2].value)
+
+    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
+    old_len = b.load(I64, len_addr)
+    cap_addr = b.gep(ptr(), map_val, [b.const_i64(2)])
+    old_cap = b.load(I64, cap_addr)
+    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
+    old_data = b.load(ptr(), data_addr)
+
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    key_check = b.new_block("key_check")
+    update = b.new_block("update")
+    next_block = b.new_block("next")
+    grow_check = b.new_block("grow_check")
+    grow = b.new_block("grow")
+    grow_zero = b.new_block("grow_zero")
+    grow_double = b.new_block("grow_double")
+    copy_init = b.new_block("copy_init")
+    copy_check = b.new_block("copy_check")
+    copy_body = b.new_block("copy_body")
+    swap = b.new_block("swap")
+    insert = b.new_block("insert")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(old_len))
+    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, grow_check.name)
+
+    b.entry = loop_body
+    entry = _map_entry_addr(b, ValueOperand(old_data), ValueOperand(i))
+    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
+    occ = b.load(I64, ValueOperand(occ_addr))
+    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
+    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+
+    b.entry = key_check
+    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
+    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
+    b.entry.terminator = CondBr(ValueOperand(keys_equal), update.name, next_block.name)
+
+    b.entry = update
+    update_value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
+    b.store(val_val, ValueOperand(update_value_addr))
+    b.ret()
+
+    b.entry = next_block
+    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
+    b.store(ValueOperand(next_i), ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = grow_check
+    need_grow = b.icmp("ge", ValueOperand(old_len), ValueOperand(old_cap))
+    b.entry.terminator = CondBr(ValueOperand(need_grow), grow.name, insert.name)
+
+    b.entry = grow
+    new_cap_slot = b.alloca(I64)
+    new_data_slot = b.alloca(ptr())
+    copy_i_slot = b.alloca(I64)
+    cap_zero = b.icmp("eq", ValueOperand(old_cap), b.const_i64(0))
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), grow_zero.name, grow_double.name)
+
+    b.entry = grow_zero
+    b.store(b.const_i64(4), ValueOperand(new_cap_slot))
+    b.br(copy_init)
+
+    b.entry = grow_double
+    doubled = b.binop("add", ValueOperand(old_cap), ValueOperand(old_cap))
+    b.store(ValueOperand(doubled), ValueOperand(new_cap_slot))
+    b.br(copy_init)
+
+    b.entry = copy_init
+    new_cap = b.load(I64, ValueOperand(new_cap_slot))
+    bytes_count = b.binop("mul", ValueOperand(new_cap), b.const_i64(24))
+    new_data = b.call("__epx_alloc", [ValueOperand(bytes_count)], ptr())
+    b.store(ValueOperand(new_data), ValueOperand(new_data_slot))
+    b.store(b.const_i64(0), ValueOperand(copy_i_slot))
+    b.br(copy_check)
+
+    b.entry = copy_check
+    copy_i = b.load(I64, ValueOperand(copy_i_slot))
+    total_words = b.binop("mul", ValueOperand(old_len), b.const_i64(3))
+    keep_copying = b.icmp("lt", ValueOperand(copy_i), ValueOperand(total_words))
+    b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, swap.name)
+
+    b.entry = copy_body
+    old_word_addr = b.gep(ptr(), ValueOperand(old_data), [ValueOperand(copy_i)])
+    old_word = b.load(I64, ValueOperand(old_word_addr))
+    new_data_for_copy = b.load(ptr(), ValueOperand(new_data_slot))
+    new_word_addr = b.gep(ptr(), ValueOperand(new_data_for_copy), [ValueOperand(copy_i)])
+    b.store(ValueOperand(old_word), ValueOperand(new_word_addr))
+    copy_next = b.binop("add", ValueOperand(copy_i), b.const_i64(1))
+    b.store(ValueOperand(copy_next), ValueOperand(copy_i_slot))
+    b.br(copy_check)
+
+    b.entry = swap
+    final_data = b.load(ptr(), ValueOperand(new_data_slot))
+    b.store(ValueOperand(final_data), ValueOperand(data_addr))
+    final_cap = b.load(I64, ValueOperand(new_cap_slot))
+    b.store(ValueOperand(final_cap), ValueOperand(cap_addr))
+    b.br(insert)
+
+    b.entry = insert
+    data = b.load(ptr(), ValueOperand(data_addr))
+    new_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(old_len))
+    new_key_addr = b.gep(ptr(), ValueOperand(new_entry), [b.const_i64(0)])
+    b.store(key_val, ValueOperand(new_key_addr))
+    new_value_addr = b.gep(ptr(), ValueOperand(new_entry), [b.const_i64(1)])
+    b.store(val_val, ValueOperand(new_value_addr))
+    new_occ_addr = b.gep(ptr(), ValueOperand(new_entry), [b.const_i64(2)])
+    b.store(b.const_i64(1), ValueOperand(new_occ_addr))
+    new_len = b.binop("add", ValueOperand(old_len), b.const_i64(1))
+    b.store(ValueOperand(new_len), ValueOperand(len_addr))
+    b.ret()
+    return b.fn
+
+
 # ── Injection ─────────────────────────────────────────────────────────────
 
 
@@ -1226,6 +1512,10 @@ _HELPER_EMITTERS = {
     "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
     "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
     "__ep_slice_u8_extend": lambda p: emit_extend_slice_u8(),
+    "__ep_map_str_i64_new": lambda p: emit_map_str_word_new("__ep_map_str_i64_new", ptr(mir_struct("_map_str_i64"))),
+    "__ep_map_str_i64_get": lambda p: emit_map_str_word_get("__ep_map_str_i64_get", ptr(mir_struct("_map_str_i64")), I64),
+    "__ep_map_str_i64_set": lambda p: emit_map_str_word_set("__ep_map_str_i64_set", ptr(mir_struct("_map_str_i64")), I64),
+    "__ep_map_str_i64_has": lambda p: emit_map_str_word_has("__ep_map_str_i64_has", ptr(mir_struct("_map_str_i64"))),
 }
 
 _HELPER_ORDER = [
@@ -1252,6 +1542,10 @@ _HELPER_ORDER = [
     "__ep_slice_u8_push",
     "__ep_slice_u8_slice",
     "__ep_slice_u8_extend",
+    "__ep_map_str_i64_new",
+    "__ep_map_str_i64_get",
+    "__ep_map_str_i64_set",
+    "__ep_map_str_i64_has",
 ]
 
 
