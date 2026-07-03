@@ -32,9 +32,17 @@ The Python reference compiler under `bootstrap/` is the oracle for the current
 language. The Epic-written compiler under `src/` is being restored module by
 module on top of that current language.
 
+The default self-hosting path is lockstep and unoptimized: Python and Epic
+implementations should produce matching dumps at each compiler stage before the
+Epic side is allowed to grow an optimized mode. Optimizations belong behind an
+explicit future optimization flag and must not pollute the default oracle path.
+
 The old fixed-point bootstrap chain (`python test_bootstrap_fixed_point.py`) is
 not the active entry point. Current self-hosting work is covered by module tests
-such as the self-hosted lexer and parser comparisons under `tests/`.
+such as the self-hosted lexer and parser comparisons under `tests/`. Parser
+self-hosting checks intentionally cover examples plus stable compiler sources
+(`src/lexer.ep` and `src/parser.ep`), not every in-progress `src/*.ep` file, to
+avoid unrelated backend development noise.
 
 ## Tests
 

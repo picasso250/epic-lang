@@ -342,6 +342,12 @@ let r = os.user32.MessageBoxA(0, cstr("hi"), cstr("Epic"), u32(0))
 Python reference compiler -> Epic compiler -> Epic compiler
 ```
 
-Python reference compiler 位于 `bootstrap/`。自托管的 Epic compiler 位于 `src/`。不动点测试（`test_bootstrap_fixed_point.py`）验证反复由 Epic 构建的编译器在字节级别保持一致。
+Python reference compiler 位于 `bootstrap/`，是当前语言和默认编译管线的 oracle。自托管的 Epic compiler 位于 `src/`，第一目标不是优化，而是在默认模式下逐阶段复现 Python reference compiler 的行为。
+
+默认自举管线是 lockstep、未优化的：lexer、parser、MIR、X64IR、object 等阶段应优先支持 Python/Epic 对拍。只要默认管线仍在追平阶段，Python reference compiler 不承担优化主线，Epic compiler 也不在默认路径中引入优化。
+
+未来优化只属于显式优化模式（例如 `-O` / `--release`）。优化后的中间结果允许和 Python oracle 不同，但必须保留优化前 dump，使默认 oracle 对拍仍然可用。
+
+当前不动点测试（`test_bootstrap_fixed_point.py`）不是活跃入口；活跃自举工作以模块级对拍测试推进。parser 对拍覆盖 examples 以及稳定自举源码（当前为 `src/lexer.ep` 和 `src/parser.ep`），不把正在快速开发的后端源码强行纳入 parser smoke 集，以免无关开发造成噪音。
 
 分阶段的 v0/v1/v2 目录链是历史遗留。Git 标签保留了该链路；它不再是当前维护源码布局的一部分。

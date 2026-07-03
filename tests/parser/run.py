@@ -24,6 +24,7 @@ UTIL_EP = os.path.join(ROOT_DIR, "src", "util.ep")
 LEXER_EP = os.path.join(ROOT_DIR, "src", "lexer.ep")
 PARSER_EP = os.path.join(ROOT_DIR, "src", "parser.ep")
 PARSER_EXE = os.path.join(ROOT_DIR, "build", "src", "parser.exe")
+SELF_HOSTED_PARSER_SOURCES = [LEXER_EP, PARSER_EP]
 CRLF_SAMPLE_LF = """# parser line ending contract\nfun main(): i64 {\n    # comment before CRLF\n    let x = 1\n    if x == 1 {\n        return 0\n    }\n    return 1\n}\n"""
 
 
@@ -289,6 +290,18 @@ def main():
         print(f"  FAIL   {rel}")
         print_diff(expected, actual, f"python/{rel}", f"bootstrap/{rel}")
 
+    for path in SELF_HOSTED_PARSER_SOURCES:
+        rel = os.path.relpath(path, ROOT_DIR)
+        expected = python_parser_dump(path)
+        actual = bootstrap_parser_dump(path)
+        if actual == expected:
+            print(f"  PASS   {rel}")
+            continue
+
+        failed += 1
+        print(f"  FAIL   {rel}")
+        print_diff(expected, actual, f"python/{rel}", f"bootstrap/{rel}")
+
     crlf_path = write_crlf_sample()
     expected = python_parser_dump_source(CRLF_SAMPLE_LF.replace("\n", "\r\n"))
     actual = bootstrap_parser_dump(crlf_path)
@@ -299,7 +312,8 @@ def main():
         print("  FAIL   dynamic CRLF sample")
         print_diff(expected, actual, "python/dynamic CRLF sample", "bootstrap/dynamic CRLF sample")
 
-    print(f"\n{len(examples) + 1 - failed} passed, {failed} failed")
+    total = len(examples) + len(SELF_HOSTED_PARSER_SOURCES) + 1
+    print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 
 
