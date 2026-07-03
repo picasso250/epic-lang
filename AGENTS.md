@@ -27,6 +27,5 @@
 
 ## 现状
 
-- Python reference compiler 主线健康：`python tests/run.py` 全绿。
-- `python test_examples_py.py` 全绿（62 passed）。
+- `python test_examples_py.py` 全绿。
 - 正在自举
