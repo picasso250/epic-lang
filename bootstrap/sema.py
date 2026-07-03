@@ -381,15 +381,6 @@ class SemanticAnalyzer:
                 self._fail(f"str_new data expected pointer or integer, got {data.type}")
             self._expect_integer(self._expr(expr.args[1]), "str_new length")
             return ExprInfo(STR)
-        if name in ("str_slice", "str_replace_char"):
-            self._check_call_args(name, [STR, I64, I64], expr.args)
-            return ExprInfo(STR)
-        if name in ("str_starts_with", "str_find"):
-            self._check_call_args(name, [STR, STR], expr.args)
-            return ExprInfo(I64)
-        if name == "str_trim":
-            self._check_call_args(name, [STR], expr.args)
-            return ExprInfo(STR)
         if name == "itoa":
             self._check_arity(name, 1, expr.args)
             self._expect_integer(self._expr(expr.args[0]), "itoa argument")

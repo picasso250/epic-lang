@@ -2,9 +2,15 @@
 # STDOUT: epic_lang
 fun main(): void {
     let s = "xxepic/langyy"
-    let mid = str_slice(s, 2, 11)
-    let out = str_replace_char(mid, '/', '_')
-    let empty = str_slice(s, 0, 0)
-    println(out + empty)
+    let mid = s[2:11]
+    let bs = bytes(mid)
+    let i = 0
+    while i < len(bs) {
+        if bs[i] == '/' {
+            bs[i] = '_'
+        }
+        i = i + 1
+    }
+    println(str(bs))
     exit(0)
 }

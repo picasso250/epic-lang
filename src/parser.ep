@@ -318,21 +318,7 @@ fun parse_fn_def(p: Parser): AstNode {
     if name.text == "str_new" {
         parse_error(name.line, "reserved builtin function name")
     }
-    if name.text == "str_slice" {
-        parse_error(name.line, "reserved builtin function name")
-    }
-    if name.text == "str_replace_char" {
-        parse_error(name.line, "reserved builtin function name")
-    }
-    if name.text == "str_starts_with" {
-        parse_error(name.line, "reserved builtin function name")
-    }
-    if name.text == "str_find" {
-        parse_error(name.line, "reserved builtin function name")
-    }
-    if name.text == "str_trim" {
-        parse_error(name.line, "reserved builtin function name")
-    }
+
     if name.text == "map_has" {
         parse_error(name.line, "reserved builtin function name")
     }

@@ -1,7 +1,8 @@
 # EXIT: 0
 # STDOUT: slice cat ne-true ne-false nul
 fun main(): void {
-    let sliced = str_slice("xabcx", 1, 4)
+    let s = "xabcx"
+    let sliced = s[1:4]
     if sliced == "abc" {
         print("slice ")
     } else {
@@ -26,7 +27,8 @@ fun main(): void {
         print("ne-false ")
     }
 
-    let with_nul = str_slice("xA\0Bx", 1, 4)
+    let s2 = "xA\0Bx"
+    let with_nul = s2[1:4]
     if with_nul == "A\0B" {
         print("nul")
     } else {

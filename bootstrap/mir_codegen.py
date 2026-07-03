@@ -692,18 +692,6 @@ class MirCodegen:
             args.append(ConstIntOperand(I64, expr.line))
             result = self._inst("call", args, result_type=I64, type=I64, callee="write_file")
             return ValueOperand(result)
-        if name in ("str_slice", "str_replace_char"):
-            args = [self._emit_expr(arg) for arg in expr.args]
-            result = self._inst("call", args, result_type=ptr_str(), type=ptr_str(), callee=name)
-            return ValueOperand(result)
-        if name in ("str_starts_with", "str_find"):
-            args = [self._emit_expr(arg) for arg in expr.args]
-            result = self._inst("call", args, result_type=I64, type=I64, callee=name)
-            return ValueOperand(result)
-        if name == "str_trim":
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee=name)
-            return ValueOperand(result)
         if name == "system":
             arg = self._emit_expr(expr.args[0])
             result = self._inst("call", [arg, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="system_cmd")

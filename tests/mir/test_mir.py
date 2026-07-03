@@ -309,34 +309,8 @@ def test_mir_helper_injection():
 
     check(
         """fun main(): i64 {
-    return str_starts_with("epic-lang", "epic")
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
     let s = "epic"
     return s[1]
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    return str_find("epic-lang", "lang")
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let s = str_replace_char("epic-lang", '-', '_')
-    return len(s)
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let s = str_trim(" \\t epic-lang \\n ")
-    return len(s)
 }"""
     )
 
