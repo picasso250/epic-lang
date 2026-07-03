@@ -44,6 +44,7 @@ Implemented MIR helpers:
 |---|---|---|
 | `bytes_str` | `bytes(str)` conversion | `bootstrap/mir_runtime_helpers.py` |
 | `str_arr_i8` | `str(u8[])` conversion | `bootstrap/mir_runtime_helpers.py` |
+| `str_eq` | string equality | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
@@ -117,6 +118,9 @@ Latest migration note: `extend_i8` now uses a small MIR loop that snapshots
 `src.len`, calls `arr_i8_get`, then calls `arr_i8_push`. This intentionally
 prioritizes code clarity over the previous specialized copy path; the current
 `extend(xs, xs)` behaviour is preserved by the length snapshot.
+
+`str_eq` is now a MIR helper as well. It compares string lengths first, then
+loads and compares one byte at a time with no allocation and no WinAPI calls.
 
 ## Layering
 

@@ -188,6 +188,7 @@ def test_mir_helper_injection():
 
     assert "arr_i8_slice" in IMPLEMENTED_MIR_HELPERS
     assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
+    assert "str_eq" in IMPLEMENTED_MIR_HELPERS
 
     def check(source):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
@@ -250,6 +251,15 @@ def test_mir_helper_injection():
     let b = new u8[] { 3, 4 }
     extend(a, b)
     return len(a)
+}"""
+    )
+
+    check(
+        """fun main(): i64 {
+    if "epic" == "epic" {
+        return 1
+    }
+    return 0
 }"""
     )
 
