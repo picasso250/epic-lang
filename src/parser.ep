@@ -1116,16 +1116,16 @@ fun parse_array_literal(p: Parser, name: Token): AstNode {
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[4]
     for i in 0:len(parts) {
-        match parts[i] {
-            FStringPart.Text { text, dump_text }: {
-                if len(text) > 0 {
-                    let n = ast_node("FStringText")
-                    n.value = text
-                    push(out, n)
-                }
+        let part = parts[i]
+        if part.kind == "text" {
+            if len(part.text) > 0 {
+                let n = ast_node("FStringText")
+                n.value = part.text
+                push(out, n)
             }
-            FStringPart.Expr { text, dump_text }: {
-                let tokens = lex(text)
+        } else {
+            if part.kind == "expr" {
+                let tokens = lex(part.text)
                 let p = make_parser(tokens)
                 let expr = parse_expr(p)
                 if peek_kind(p, "EOF") == 0 {
@@ -1133,6 +1133,8 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
                     parse_error(line, "Unexpected token in f-string expression")
                 }
                 push(out, expr)
+            } else {
+                parse_error(line, "Expected f-string part")
             }
         }
     }
@@ -1241,14 +1243,10 @@ fun parse_primary(p: Parser): AstNode {
     if peek_kind(p, "FSTRING") == 1 {
         let t = advance(p)
         let n = ast_node("FString")
-        match t.data {
-            TokenData.FString { parts }: {
-                n.fields = parse_fstring_parts(parts, t.line)
-            }
-            else: {
-                parse_error(t.line, "Expected f-string parts")
-            }
+        if t.kind != "FSTRING" {
+            parse_error(t.line, "Expected f-string parts")
         }
+        n.fields = parse_fstring_parts(t.fstring_parts, t.line)
         return n
     }
     if peek_kind(p, "TRUE") == 1 {

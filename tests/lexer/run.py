@@ -7,6 +7,9 @@ Default mode: golden (frozen) check of Python lexer against token_list.txt.
 Optional self-hosted comparison (requires self-hosted compiler to build):
   python tests/lexer/run.py --self-hosted
 
+Self-hosted mode builds src/lexer.ep, then compares its output with the
+Python lexer oracle on src/lexer.ep, all.ep, and examples/*.ep.
+
 Regenerate token_list.txt from Python lexer oracle:
   python tests/lexer/run.py --regen
 
@@ -170,10 +173,14 @@ def main():
             print(f"  FAIL  self-hosted lexer build: {e}")
             sys.exit(1)
 
-        # Compare on all.ep
+        lexer_ep = os.path.join(ROOT_DIR, "src", "lexer.ep")
+        all_ok = check_self_hosted_lexer(
+            lexer_exe, lexer_ep, "src/lexer.ep"
+        )
+
         all_ok = check_self_hosted_lexer(
             lexer_exe, ALL_EP, "all.ep"
-        )
+        ) and all_ok
 
         # Compare on all examples/*.ep
         examples_dir = os.path.join(ROOT_DIR, "examples")

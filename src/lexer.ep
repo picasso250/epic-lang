@@ -1,76 +1,71 @@
 #
 
+struct FStringPart {
+    kind: str
+    text: str
+    dump_text: str
+}
+
 struct Token {
     kind: str
     text: str
     dump_text: str
     line: i64
-    data: TokenData
-}
-
-type TokenData {
-    Plain
-    FString {
-        parts: FStringPart[]
-    }
-}
-
-type FStringPart {
-    Text {
-        text: str
-        dump_text: str
-    }
-    Expr {
-        text: str
-        dump_text: str
-    }
+    fstring_parts: FStringPart[]
 }
 
 # ── Token ───────────────────────────────────────────────────────────────
 
-fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
+fun make_token(kind: str, text: str, dump_text: str, line: i64): Token {
     let t = new Token {}
     t.kind = kind
     t.text = text
-    t.dump_text = text
+    t.dump_text = dump_text
     t.line = line
-    t.data = new TokenData.Plain
+    t.fstring_parts = new FStringPart[]
+    return t
+}
+
+fun make_fstring_token(parts: FStringPart[], line: i64): Token {
+    let t = make_token("FSTRING", "", "", line)
+    t.fstring_parts = parts
+    return t
+}
+
+fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
+    let t = make_token(kind, text, text, line)
     push(tokens, t)
     return 0
 }
 
 fun push_newline_token(tokens: Token[], line: i64): i64 {
-    let t = new Token {}
-    t.kind = "NEWLINE"
-    t.text = "\n"
-    t.dump_text = "\\n"
-    t.line = line
-    t.data = new TokenData.Plain
+    let t = make_token("NEWLINE", "\n", "\\n", line)
     push(tokens, t)
     return 0
 }
 
 fun push_string_token(tokens: Token[], text: str, dump_text: str, line: i64): i64 {
-    let t = new Token {}
-    t.kind = "STRING"
-    t.text = text
-    t.dump_text = dump_text
-    t.line = line
-    t.data = new TokenData.Plain
+    let t = make_token("STRING", text, dump_text, line)
     push(tokens, t)
     return 0
 }
 
 fun push_fstring_text(parts: FStringPart[], text: str, dump_text: str): i64 {
     if len(text) > 0 {
-        let p = new FStringPart.Text { text: text, dump_text: dump_text }
+        let p = new FStringPart {}
+        p.kind = "text"
+        p.text = text
+        p.dump_text = dump_text
         push(parts, p)
     }
     return 0
 }
 
 fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
-    let p = new FStringPart.Expr { text: text, dump_text: text }
+    let p = new FStringPart {}
+    p.kind = "expr"
+    p.text = text
+    p.dump_text = text
     push(parts, p)
     return 0
 }
@@ -101,70 +96,69 @@ fun is_digit(c: i64): i64 {
 
 fun keyword_kind(text: str): str {
     let n = len(text)
-    let p = text.data
     if n == 2 {
-        if p[0] == 105 && p[1] == 102 {
+        if text[0] == 105 && text[1] == 102 {
             return "IF"
         }
-        if p[0] == 105 && p[1] == 110 {
+        if text[0] == 105 && text[1] == 110 {
             return "IN"
         }
     }
     if n == 3 {
-        if p[0] == 102 && p[1] == 117 && p[2] == 110 {
+        if text[0] == 102 && text[1] == 117 && text[2] == 110 {
             return "FUN"
         }
-        if p[0] == 102 && p[1] == 111 && p[2] == 114 {
+        if text[0] == 102 && text[1] == 111 && text[2] == 114 {
             return "FOR"
         }
-        if p[0] == 110 && p[1] == 101 && p[2] == 119 {
+        if text[0] == 110 && text[1] == 101 && text[2] == 119 {
             return "NEW"
         }
-        if p[0] == 108 && p[1] == 101 && p[2] == 116 {
+        if text[0] == 108 && text[1] == 101 && text[2] == 116 {
             return "LET"
         }
     }
     if n == 4 {
-        if p[0] == 101 && p[1] == 108 && p[2] == 115 && p[3] == 101 {
+        if text[0] == 101 && text[1] == 108 && text[2] == 115 && text[3] == 101 {
             return "ELSE"
         }
-        if p[0] == 116 && p[1] == 121 && p[2] == 112 && p[3] == 101 {
+        if text[0] == 116 && text[1] == 121 && text[2] == 112 && text[3] == 101 {
             return "TYPE"
         }
-        if p[0] == 116 && p[1] == 114 && p[2] == 117 && p[3] == 101 {
+        if text[0] == 116 && text[1] == 114 && text[2] == 117 && text[3] == 101 {
             return "TRUE"
         }
     }
     if n == 5 {
-        if p[0] == 119 && p[1] == 104 && p[2] == 105 && p[3] == 108 && p[4] == 101 {
+        if text[0] == 119 && text[1] == 104 && text[2] == 105 && text[3] == 108 && text[4] == 101 {
             return "WHILE"
         }
-        if p[0] == 98 && p[1] == 114 && p[2] == 101 && p[3] == 97 && p[4] == 107 {
+        if text[0] == 98 && text[1] == 114 && text[2] == 101 && text[3] == 97 && text[4] == 107 {
             return "BREAK"
         }
-        if p[0] == 112 && p[1] == 97 && p[2] == 110 && p[3] == 105 && p[4] == 99 {
+        if text[0] == 112 && text[1] == 97 && text[2] == 110 && text[3] == 105 && text[4] == 99 {
             return "PANIC"
         }
-        if p[0] == 109 && p[1] == 97 && p[2] == 116 && p[3] == 99 && p[4] == 104 {
+        if text[0] == 109 && text[1] == 97 && text[2] == 116 && text[3] == 99 && text[4] == 104 {
             return "MATCH"
         }
-        if p[0] == 102 && p[1] == 97 && p[2] == 108 && p[3] == 115 && p[4] == 101 {
+        if text[0] == 102 && text[1] == 97 && text[2] == 108 && text[3] == 115 && text[4] == 101 {
             return "FALSE"
         }
     }
     if n == 6 {
-        if p[0] == 114 && p[1] == 101 && p[2] == 116 && p[3] == 117 && p[4] == 114 && p[5] == 110 {
+        if text[0] == 114 && text[1] == 101 && text[2] == 116 && text[3] == 117 && text[4] == 114 && text[5] == 110 {
             return "RETURN"
         }
-        if p[0] == 97 && p[1] == 115 && p[2] == 115 && p[3] == 101 && p[4] == 114 && p[5] == 116 {
+        if text[0] == 97 && text[1] == 115 && text[2] == 115 && text[3] == 101 && text[4] == 114 && text[5] == 116 {
             return "ASSERT"
         }
-        if p[0] == 115 && p[1] == 116 && p[2] == 114 && p[3] == 117 && p[4] == 99 && p[5] == 116 {
+        if text[0] == 115 && text[1] == 116 && text[2] == 114 && text[3] == 117 && text[4] == 99 && text[5] == 116 {
             return "STRUCT"
         }
     }
     if n == 8 {
-        if p[0] == 99 && p[1] == 111 && p[2] == 110 && p[3] == 116 && p[4] == 105 && p[5] == 110 && p[6] == 117 && p[7] == 101 {
+        if text[0] == 99 && text[1] == 111 && text[2] == 110 && text[3] == 116 && text[4] == 105 && text[5] == 110 && text[6] == 117 && text[7] == 101 {
             return "CONTINUE"
         }
     }
@@ -199,11 +193,10 @@ fun decode_escape(e: i64): i64 {
 }
 
 fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
-    let p = src.data
     let buf = new u8[]
     let pos = start
     while pos < end {
-        let c = p[pos]
+        let c = src[pos]
         if c == 10 || c == 13 {
             println("unterminated string")
             exit(1)
@@ -214,12 +207,19 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
                 println("bad escape")
                 exit(1)
             }
-            c = decode_escape(p[pos])
+            c = decode_escape(src[pos])
         }
         push(buf, c)
         pos += 1
     }
     return str(buf)
+}
+
+fun char_at(src: str, pos: i64): i64 {
+    if pos < 0 || pos >= len(src) {
+        return 0
+    }
+    return src[pos]
 }
 
 fun is_ascii_space(c: i64): i64 {
@@ -246,12 +246,11 @@ fun trim_ascii(s: str): str {
 
 fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
     let n = len(src)
-    let p = src.data
     let parens = 0
     let brackets = 0
     let braces = 0
     while pos < n {
-        let c = p[pos]
+        let c = src[pos]
         if c == 10 || c == 13 {
             println("unterminated f-string expression")
             exit(1)
@@ -261,7 +260,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             pos += 1
             let found = 0
             while found == 0 && pos < n {
-                let q = p[pos]
+                let q = src[pos]
                 if q == 10 || q == 13 {
                     println("unterminated string in f-string expression")
                     exit(1)
@@ -330,13 +329,12 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
 
 fun scan_fstring(src: str, start: i64, line: i64): Token {
     let n = len(src)
-    let p = src.data
-    let parts = new FStringPart[4]
+    let parts = new FStringPart[]
     let pos = start + 2
     let segment_start = pos
 
     while pos < n {
-        let ch = p[pos]
+        let ch = src[pos]
         if ch == 10 || ch == 13 {
             println("unterminated f-string literal")
             exit(1)
@@ -347,16 +345,10 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
             if ch == 34 {
                 if pos > segment_start {
                     let text = decode_escaped_range(src, segment_start, pos, line)
-                    let dump_text = str_slice(src, segment_start, pos)
+                    let dump_text = src[segment_start:pos]
                     push_fstring_text(parts, text, dump_text)
                 }
-                let t = new Token {}
-                t.kind = "FSTRING"
-                t.text = ""
-                t.dump_text = ""
-                t.line = line
-                t.data = new TokenData.FString { parts: parts }
-                return t
+                return make_fstring_token(parts, line)
             } else {
                 if ch == 125 {
                     println("unexpected '}' in f-string literal")
@@ -365,7 +357,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
                     if ch == 123 {
                         if pos > segment_start {
                             let text = decode_escaped_range(src, segment_start, pos, line)
-                            let dump_text = str_slice(src, segment_start, pos)
+                            let dump_text = src[segment_start:pos]
                             push_fstring_text(parts, text, dump_text)
                         }
                         let expr_start = pos + 1
@@ -399,11 +391,10 @@ fun lex(src: str): Token[] {
     let n = len(src)
     let pos = 0
     let line = 1
-    let p = src.data
 
 
     while pos < n {
-        let ch = p[pos]
+        let ch = src[pos]
         let consumed = 0
 
         # ── whitespace ──
@@ -421,28 +412,28 @@ fun lex(src: str): Token[] {
         # ── comment # ──
         if consumed == 0 && ch == 35 {
             pos += 1
-            while pos < n && p[pos] != 10 {
+            while pos < n && src[pos] != 10 {
                 pos += 1
             }
             consumed = 1
         }
 
         # ── f-string literal ──
-        if consumed == 0 && ch == 102 && pos + 1 < n && p[pos + 1] == 34 {
+        if consumed == 0 && ch == 102 && char_at(src, pos + 1) == 34 {
             let t = scan_fstring(src, pos, line)
             pos += 2
-            while pos < n && p[pos] != 34 {
-                if p[pos] == 92 {
+            while pos < n && src[pos] != 34 {
+                if src[pos] == 92 {
                     pos += 2
                 } else {
-                    if p[pos] == 123 {
+                    if src[pos] == 123 {
                         pos = scan_fstring_expr_end(src, pos + 1, line) + 1
                     } else {
                         pos += 1
                     }
                 }
             }
-            if pos < n && p[pos] == 34 {
+            if pos < n && src[pos] == 34 {
                 pos += 1
             }
             push(tokens, t)
@@ -457,10 +448,10 @@ fun lex(src: str): Token[] {
             let buf = new u8[]
             let scanning = 1
             while scanning == 1 && pos < n {
-                if p[pos] == 34 {
+                if src[pos] == 34 {
                     scanning = 0
                 } else {
-                    let c = p[pos]
+                    let c = src[pos]
                     if c == 10 || c == 13 {
                         println("unterminated string")
                         exit(1)
@@ -471,7 +462,7 @@ fun lex(src: str): Token[] {
                             println("bad escape")
                             exit(1)
                         }
-                        let e = p[pos]
+                        let e = src[pos]
                         c = decode_escape(e)
                     }
                     push(buf, c)
@@ -483,7 +474,7 @@ fun lex(src: str): Token[] {
                 exit(1)
             }
             let text = str(buf)
-            let dump_text = str_slice(src, content_start, pos)
+            let dump_text = src[content_start:pos]
             pos += 1
             push_string_token(tokens, text, dump_text, start_line)
             consumed = 1
@@ -493,19 +484,19 @@ fun lex(src: str): Token[] {
         if consumed == 0 && ch == 39 {
             let start_line = line
             pos += 1
-            let ch_val = p[pos] + 0
+            let ch_val = src[pos] + 0
             if ch_val == 92 {
                 pos += 1
-                let e = p[pos]
+                let e = src[pos]
                 ch_val = decode_escape(e)
             }
             pos += 1
-            if pos >= n || p[pos] != 39 {
+            if pos >= n || src[pos] != 39 {
                 println("bad char")
                 exit(1)
             }
             pos += 1
-            push_token(tokens, "CHAR", itoa(ch_val), start_line)
+            push_token(tokens, "CHAR", str(ch_val), start_line)
             consumed = 1
         }
 
@@ -513,10 +504,10 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_digit(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_digit(p[pos]) == 1 {
+            while pos < n && is_digit(src[pos]) == 1 {
                 pos += 1
             }
-            let text = str_slice(src, start, pos)
+            let text = src[start:pos]
             push_token(tokens, "NUMBER", text, start_line)
             consumed = 1
         }
@@ -525,10 +516,10 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_alpha(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_alnum(p[pos]) == 1 {
+            while pos < n && is_alnum(src[pos]) == 1 {
                 pos += 1
             }
-            let text = str_slice(src, start, pos)
+            let text = src[start:pos]
             let kind = keyword_kind(text)
             push_token(tokens, kind, text, start_line)
             consumed = 1
@@ -536,7 +527,7 @@ fun lex(src: str): Token[] {
 
         # ── multi-char operators ──
         if consumed == 0 && ch == 61 {
-            if p[pos + 1] == 61 {
+            if char_at(src, pos + 1) == 61 {
                 push_token(tokens, "EQEQ", "==", line)
                 pos += 2
             } else {
@@ -545,33 +536,33 @@ fun lex(src: str): Token[] {
             }
             consumed = 1
         }
-        if consumed == 0 && ch == 43 && p[pos + 1] == 61 {
+        if consumed == 0 && ch == 43 && char_at(src, pos + 1) == 61 {
             push_token(tokens, "PLUS_ASSIGN", "+=", line)
             pos += 2
             consumed = 1
         }
-        if consumed == 0 && ch == 42 && p[pos + 1] == 61 {
+        if consumed == 0 && ch == 42 && char_at(src, pos + 1) == 61 {
             push_token(tokens, "STAR_ASSIGN", "*=", line)
             pos += 2
             consumed = 1
         }
-        if consumed == 0 && ch == 47 && p[pos + 1] == 61 {
+        if consumed == 0 && ch == 47 && char_at(src, pos + 1) == 61 {
             push_token(tokens, "SLASH_ASSIGN", "/=", line)
             pos += 2
             consumed = 1
         }
-        if consumed == 0 && ch == 37 && p[pos + 1] == 61 {
+        if consumed == 0 && ch == 37 && char_at(src, pos + 1) == 61 {
             push_token(tokens, "PERCENT_ASSIGN", "%=", line)
             pos += 2
             consumed = 1
         }
-        if consumed == 0 && ch == 94 && p[pos + 1] == 61 {
+        if consumed == 0 && ch == 94 && char_at(src, pos + 1) == 61 {
             push_token(tokens, "CARET_ASSIGN", "^=", line)
             pos += 2
             consumed = 1
         }
         if consumed == 0 && ch == 33 {
-            if p[pos + 1] == 61 {
+            if char_at(src, pos + 1) == 61 {
                 push_token(tokens, "NEQ", "!=", line)
                 pos += 2
             } else {
@@ -581,15 +572,15 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 60 {
-            if p[pos + 1] == 60 && p[pos + 2] == 61 {
+            if char_at(src, pos + 1) == 60 && char_at(src, pos + 2) == 61 {
                 push_token(tokens, "SHL_ASSIGN", "<<=", line)
                 pos += 3
             } else {
-                if p[pos + 1] == 60 {
+                if char_at(src, pos + 1) == 60 {
                     push_token(tokens, "SHL", "<<", line)
                     pos += 2
                 } else {
-                    if p[pos + 1] == 61 {
+                    if char_at(src, pos + 1) == 61 {
                         push_token(tokens, "LTE", "<=", line)
                         pos += 2
                     } else {
@@ -601,23 +592,23 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 62 {
-            if p[pos + 1] == 62 && p[pos + 2] == 62 && p[pos + 3] == 61 {
+            if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 62 && char_at(src, pos + 3) == 61 {
                 push_token(tokens, "USHR_ASSIGN", ">>>=", line)
                 pos += 4
             } else {
-                if p[pos + 1] == 62 && p[pos + 2] == 62 {
+                if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 62 {
                     push_token(tokens, "USHR", ">>>", line)
                     pos += 3
                 } else {
-                    if p[pos + 1] == 62 && p[pos + 2] == 61 {
+                    if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 61 {
                         push_token(tokens, "SHR_ASSIGN", ">>=", line)
                         pos += 3
                     } else {
-                        if p[pos + 1] == 62 {
+                        if char_at(src, pos + 1) == 62 {
                             push_token(tokens, "SHR", ">>", line)
                             pos += 2
                         } else {
-                            if p[pos + 1] == 61 {
+                            if char_at(src, pos + 1) == 61 {
                                 push_token(tokens, "GTE", ">=", line)
                                 pos += 2
                             } else {
@@ -631,11 +622,11 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 38 {
-            if p[pos + 1] == 61 {
+            if char_at(src, pos + 1) == 61 {
                 push_token(tokens, "AMP_ASSIGN", "&=", line)
                 pos += 2
             } else {
-                if p[pos + 1] == 38 {
+                if char_at(src, pos + 1) == 38 {
                     push_token(tokens, "AND", "&&", line)
                     pos += 2
                 } else {
@@ -646,11 +637,11 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 124 {
-            if p[pos + 1] == 61 {
+            if char_at(src, pos + 1) == 61 {
                 push_token(tokens, "PIPE_ASSIGN", "|=", line)
                 pos += 2
             } else {
-                if p[pos + 1] == 124 {
+                if char_at(src, pos + 1) == 124 {
                     push_token(tokens, "OR", "||", line)
                     pos += 2
                 } else {
@@ -661,11 +652,11 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 45 {
-            if p[pos + 1] == 61 {
+            if char_at(src, pos + 1) == 61 {
                 push_token(tokens, "MINUS_ASSIGN", "-=", line)
                 pos += 2
             } else {
-                if p[pos + 1] == 62 {
+                if char_at(src, pos + 1) == 62 {
                     push_token(tokens, "ARROW", "->", line)
                     pos += 2
                 } else {
@@ -776,24 +767,21 @@ fun dump_line(line: i64, kind: str, dump_text: str): i64 {
 fun dump_tokens(tokens: Token[]): i64 {
     for i in 0:len(tokens) {
         let t = tokens[i]
-        match t.data {
-            TokenData.FString { parts }: {
-                dump_line(t.line, "FSTRING_BEGIN", "")
-                for j in 0:len(parts) {
-                    match parts[j] {
-                        FStringPart.Text { text, dump_text }: {
-                            dump_line(t.line, "FSTRING_TEXT", dump_text)
-                        }
-                        FStringPart.Expr { text, dump_text }: {
-                            dump_line(t.line, "FSTRING_EXPR", dump_text)
-                        }
+        if t.kind == "FSTRING" {
+            dump_line(t.line, "FSTRING_BEGIN", "")
+            for j in 0:len(t.fstring_parts) {
+                let part = t.fstring_parts[j]
+                if part.kind == "text" {
+                    dump_line(t.line, "FSTRING_TEXT", part.dump_text)
+                } else {
+                    if part.kind == "expr" {
+                        dump_line(t.line, "FSTRING_EXPR", part.dump_text)
                     }
                 }
-                dump_line(t.line, "FSTRING_END", "")
             }
-            else: {
-                dump_line(t.line, t.kind, t.dump_text)
-            }
+            dump_line(t.line, "FSTRING_END", "")
+        } else {
+            dump_line(t.line, t.kind, t.dump_text)
         }
     }
     return 0
