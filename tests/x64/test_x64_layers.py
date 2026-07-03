@@ -4,7 +4,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
 from machine import MachineObjectBuilder
 from mir import I32, I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirFunction, MirInst, MirParam
