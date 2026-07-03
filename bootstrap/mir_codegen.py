@@ -115,6 +115,17 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_map_str_i64_get", MirSignature([ptr_map_str_i64(), ptr_str()], I64)))
         self.program.externs.append(MirExtern("__ep_map_str_i64_set", MirSignature([ptr_map_str_i64(), ptr_str(), I64], VOID)))
         self.program.externs.append(MirExtern("__ep_map_str_i64_has", MirSignature([ptr_map_str_i64(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_i64_del", MirSignature([ptr_map_str_i64(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_bool_new", MirSignature([], ptr_map_str_bool())))
+        self.program.externs.append(MirExtern("__ep_map_str_bool_get", MirSignature([ptr_map_str_bool(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_bool_set", MirSignature([ptr_map_str_bool(), ptr_str(), BOOL], VOID)))
+        self.program.externs.append(MirExtern("__ep_map_str_bool_has", MirSignature([ptr_map_str_bool(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_bool_del", MirSignature([ptr_map_str_bool(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_str_new", MirSignature([], ptr_map_str_str())))
+        self.program.externs.append(MirExtern("__ep_map_str_str_get", MirSignature([ptr_map_str_str(), ptr_str()], ptr_str())))
+        self.program.externs.append(MirExtern("__ep_map_str_str_set", MirSignature([ptr_map_str_str(), ptr_str(), ptr_str()], VOID)))
+        self.program.externs.append(MirExtern("__ep_map_str_str_has", MirSignature([ptr_map_str_str(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_str_del", MirSignature([ptr_map_str_str(), ptr_str()], BOOL)))
         self.program.externs.append(MirExtern("__ep_map_str_i64_repr", MirSignature([ptr_map_str_i64()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr_str()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
@@ -166,6 +177,10 @@ class MirCodegen:
             return ptr_slice_i64()
         if typ in ("map[str]i64", "&_map_str_i64"):
             return ptr_map_str_i64()
+        if typ in ("map[str]bool", "&_map_str_bool"):
+            return ptr_map_str_bool()
+        if typ in ("map[str]str", "&_map_str_str"):
+            return ptr_map_str_str()
         if isinstance(typ, str) and typ.endswith("[]") and typ[:-2] in self.structs:
             return ptr_slice_struct(typ[:-2])
         if typ in self.structs:
@@ -193,8 +208,13 @@ class MirCodegen:
                 return ptr_slice_str()
             if elem is not None and elem.kind == "named":
                 return ptr_slice_struct(elem.name)
-        if typ.kind == "map" and typ.elem == et.I64:
-            return ptr_map_str_i64()
+        if typ.kind == "map":
+            if typ.elem == et.I64:
+                return ptr_map_str_i64()
+            if typ.elem == et.BOOL:
+                return ptr_map_str_bool()
+            if typ.elem == et.STR:
+                return ptr_map_str_str()
         if typ.kind == "named":
             return ptr_struct(typ.name)
         if typ.kind == "ptr":
@@ -305,6 +325,32 @@ class MirCodegen:
         elem = struct_name[len("_slice_"):]
         return elem if elem in self.structs else None
 
+    def _map_suffix(self, typ):
+        struct_name = self._ptr_struct_name(typ)
+        if struct_name == "_map_str_i64":
+            return "i64"
+        if struct_name == "_map_str_bool":
+            return "bool"
+        if struct_name == "_map_str_str":
+            return "str"
+        return None
+
+    def _map_value_type(self, typ):
+        suffix = self._map_suffix(typ)
+        if suffix == "i64":
+            return I64
+        if suffix == "bool":
+            return BOOL
+        if suffix == "str":
+            return ptr_str()
+        return None
+
+    def _map_helper(self, typ, op):
+        suffix = self._map_suffix(typ)
+        if suffix is None:
+            return None
+        return f"__ep_map_str_{suffix}_{op}"
+
     def _emit_block(self, block):
         for stmt in block.stmts:
             if self.block.terminator is not None:
@@ -353,10 +399,11 @@ class MirCodegen:
                 self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_u8_set")
             elif base.type == ptr_slice_i64():
                 self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_i64_set")
-            elif base.type == ptr_map_str_i64():
-                self._inst("call", [base, index, value], type=VOID, callee="__ep_map_str_i64_set")
             else:
-                raise MirCodegenError("subscript assignment only supports primitive arrays in machine MIR so far")
+                callee = self._map_helper(base.type, "set")
+                if callee is None:
+                    raise MirCodegenError("subscript assignment only supports primitive arrays and maps in machine MIR so far")
+                self._inst("call", [base, index, value], type=VOID, callee=callee)
         elif isinstance(stmt, AssignOpNode):
             value = BinaryNode(op=stmt.op, left=stmt.target, right=stmt.value)
             if isinstance(stmt.target, VarNode):
@@ -732,9 +779,13 @@ class MirCodegen:
                 raise MirCodegenError("extend only supports u8[]")
             self._inst("call", args, type=VOID, callee="__ep_slice_u8_extend")
             return ConstIntOperand(I64, 0)
-        if name == "map_has":
+        if name in ("map_has", "map_del"):
             args = [self._emit_expr(arg) for arg in expr.args]
-            result = self._inst("call", args, result_type=BOOL, type=BOOL, callee="__ep_map_str_i64_has")
+            op = "has" if name == "map_has" else "del"
+            callee = self._map_helper(args[0].type, op)
+            if callee is None:
+                raise MirCodegenError(f"{name} expects map")
+            result = self._inst("call", args, result_type=BOOL, type=BOOL, callee=callee)
             return ValueOperand(result)
         if name not in self.func_sigs:
             raise MirCodegenError(f"unsupported call: {name}")
@@ -750,8 +801,9 @@ class MirCodegen:
     def _emit_subscript(self, expr):
         base = self._emit_expr(expr.base)
         index = self._emit_expr(expr.index)
-        if base.type == ptr_map_str_i64():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_map_str_i64_get")
+        map_value_type = self._map_value_type(base.type)
+        if map_value_type is not None:
+            result = self._inst("call", [base, index], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base.type, "get"))
             return ValueOperand(result)
         if base.type == ptr_str():
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_str_get")
@@ -822,8 +874,9 @@ class MirCodegen:
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
     def _emit_new(self, expr):
-        if expr.struct_name == "map[str]i64":
-            result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="__ep_map_str_i64_new")
+        if expr.struct_name.startswith("map[str]"):
+            result_type = self._type(expr.struct_name)
+            result = self._inst("call", [], result_type=result_type, type=result_type, callee=self._map_helper(result_type, "new"))
             return ValueOperand(result)
         if expr.struct_name in self.structs:
             return self._alloc_struct(expr.struct_name)
@@ -1011,8 +1064,9 @@ class MirCodegen:
         if typ == ptr_slice_i64():
             result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_slice_i64(), type=ptr(), callee="__ep_slice_i64_new")
             return ValueOperand(result)
-        if typ == ptr_map_str_i64():
-            result = self._inst("call", [], result_type=ptr_map_str_i64(), type=ptr_map_str_i64(), callee="__ep_map_str_i64_new")
+        map_new = self._map_helper(typ, "new")
+        if map_new is not None:
+            result = self._inst("call", [], result_type=typ, type=typ, callee=map_new)
             return ValueOperand(result)
         if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct" and typ.pointee.name in self.structs and not typ.pointee.name.startswith("_slice_"):
             return self._alloc_struct(typ.pointee.name)
@@ -1060,14 +1114,15 @@ class MirCodegen:
             },
             "size": 24,
         }
-        self.structs["_map_str_i64"] = {
-            "fields": {
-                "entries": {"type": ptr(I64), "offset": 0},
-                "len": {"type": I64, "offset": 8},
-                "cap": {"type": I64, "offset": 16},
-            },
-            "size": 24,
-        }
+        for map_struct in ("_map_str_i64", "_map_str_bool", "_map_str_str"):
+            self.structs[map_struct] = {
+                "fields": {
+                    "entries": {"type": ptr(I64), "offset": 0},
+                    "len": {"type": I64, "offset": 8},
+                    "cap": {"type": I64, "offset": 16},
+                },
+                "size": 24,
+            }
         for struct_node in ast.structs:
             self.structs[struct_node.name] = {"fields": {}, "size": 0}
         for struct_node in ast.structs:
@@ -1129,6 +1184,18 @@ def ptr_map_str_i64():
     from mir import struct
 
     return ptr(struct("_map_str_i64"))
+
+
+def ptr_map_str_bool():
+    from mir import struct
+
+    return ptr(struct("_map_str_bool"))
+
+
+def ptr_map_str_str():
+    from mir import struct
+
+    return ptr(struct("_map_str_str"))
 
 
 def ast_to_mir(ast):

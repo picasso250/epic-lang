@@ -404,8 +404,12 @@ class SemanticAnalyzer:
             if arg.type.kind != "array":
                 self._fail(f"cap expected array, got {arg.type}")
             return ExprInfo(I64)
-        if name == "map_has":
-            self._check_call_args(name, [MAP(I64), STR], expr.args)
+        if name in ("map_has", "map_del"):
+            self._check_arity(name, 2, expr.args)
+            map_arg = self._expr(expr.args[0])
+            if map_arg.type.kind != "map":
+                self._fail(f"{name} expects map")
+            self._check_assign(STR, self._expr(expr.args[1]), f"{name} key")
             return ExprInfo(BOOL)
 
         if name not in self.func_sigs:
@@ -495,8 +499,8 @@ class SemanticAnalyzer:
             return ARRAY(self._type_name(name[:-2]))
         if name.startswith("map[str]"):
             value = self._type_name(name[len("map[str]"):])
-            if value != I64:
-                self._fail_global(f"only map[str]i64 is supported, got {name}")
+            if value not in (I64, BOOL, STR):
+                self._fail_global(f"only map[str]i64, map[str]bool, and map[str]str are supported, got {name}")
             return MAP(value)
         if name == "i64":
             return I64

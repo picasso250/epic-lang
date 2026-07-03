@@ -1231,7 +1231,7 @@ def _map_entry_addr(b: MirHelperBuilder, data, index):
 
 def _map_zero_operand(value_type):
     if value_type.kind == "ptr":
-        return ConstNullOperand()
+        return SymbolOperand(ptr(mir_struct("str")), "@str.runtime.empty")
     if value_type == BOOL:
         return ConstBoolOperand(False)
     return ConstIntOperand(value_type, 0)
@@ -1485,6 +1485,95 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     return b.fn
 
 
+
+def emit_map_str_word_del(name: str, map_type) -> MirFunction:
+    """Delete a key from a str-keyed word map using swap-delete."""
+    b = MirHelperBuilder(
+        name,
+        [MirParam("%map", map_type), MirParam("%key", ptr(mir_struct("str")))],
+        BOOL,
+    )
+    map_val = ValueOperand(b.fn.params[0].value)
+    key_val = ValueOperand(b.fn.params[1].value)
+
+    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
+    old_len = b.load(I64, len_addr)
+    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
+    data = b.load(ptr(), data_addr)
+
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    key_check = b.new_block("key_check")
+    found = b.new_block("found")
+    copy_last = b.new_block("copy_last")
+    clear_last = b.new_block("clear_last")
+    next_block = b.new_block("next")
+    no = b.new_block("no")
+    b.br(loop_check)
+
+    b.entry = loop_check
+    i = b.load(I64, ValueOperand(i_slot))
+    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(old_len))
+    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, no.name)
+
+    b.entry = loop_body
+    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
+    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
+    occ = b.load(I64, ValueOperand(occ_addr))
+    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
+    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+
+    b.entry = key_check
+    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
+    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
+    b.entry.terminator = CondBr(ValueOperand(keys_equal), found.name, next_block.name)
+
+    b.entry = found
+    last_index = b.binop("sub", ValueOperand(old_len), b.const_i64(1))
+    same_entry = b.icmp("eq", ValueOperand(i), ValueOperand(last_index))
+    b.entry.terminator = CondBr(ValueOperand(same_entry), clear_last.name, copy_last.name)
+
+    b.entry = copy_last
+    last_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
+    # Copy key/value/occupied as raw words so i64/bool/str variants share code.
+    last_key_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(0)])
+    last_key_word = b.load(I64, ValueOperand(last_key_addr))
+    cur_key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
+    b.store(ValueOperand(last_key_word), ValueOperand(cur_key_addr))
+    last_value_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(1)])
+    last_value_word = b.load(I64, ValueOperand(last_value_addr))
+    cur_value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
+    b.store(ValueOperand(last_value_word), ValueOperand(cur_value_addr))
+    last_occ_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(2)])
+    last_occ_word = b.load(I64, ValueOperand(last_occ_addr))
+    cur_occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
+    b.store(ValueOperand(last_occ_word), ValueOperand(cur_occ_addr))
+    b.br(clear_last)
+
+    b.entry = clear_last
+    last_entry_for_clear = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
+    clear_key_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(0)])
+    b.store(b.const_i64(0), ValueOperand(clear_key_addr))
+    clear_value_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(1)])
+    b.store(b.const_i64(0), ValueOperand(clear_value_addr))
+    clear_occ_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(2)])
+    b.store(b.const_i64(0), ValueOperand(clear_occ_addr))
+    b.store(ValueOperand(last_index), ValueOperand(len_addr))
+    b.ret(ConstBoolOperand(True))
+
+    b.entry = next_block
+    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
+    b.store(ValueOperand(next_i), ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.entry = no
+    b.ret(ConstBoolOperand(False))
+    return b.fn
+
+
 # ── Injection ─────────────────────────────────────────────────────────────
 
 
@@ -1516,6 +1605,17 @@ _HELPER_EMITTERS = {
     "__ep_map_str_i64_get": lambda p: emit_map_str_word_get("__ep_map_str_i64_get", ptr(mir_struct("_map_str_i64")), I64),
     "__ep_map_str_i64_set": lambda p: emit_map_str_word_set("__ep_map_str_i64_set", ptr(mir_struct("_map_str_i64")), I64),
     "__ep_map_str_i64_has": lambda p: emit_map_str_word_has("__ep_map_str_i64_has", ptr(mir_struct("_map_str_i64"))),
+    "__ep_map_str_i64_del": lambda p: emit_map_str_word_del("__ep_map_str_i64_del", ptr(mir_struct("_map_str_i64"))),
+    "__ep_map_str_bool_new": lambda p: emit_map_str_word_new("__ep_map_str_bool_new", ptr(mir_struct("_map_str_bool"))),
+    "__ep_map_str_bool_get": lambda p: emit_map_str_word_get("__ep_map_str_bool_get", ptr(mir_struct("_map_str_bool")), BOOL),
+    "__ep_map_str_bool_set": lambda p: emit_map_str_word_set("__ep_map_str_bool_set", ptr(mir_struct("_map_str_bool")), BOOL),
+    "__ep_map_str_bool_has": lambda p: emit_map_str_word_has("__ep_map_str_bool_has", ptr(mir_struct("_map_str_bool"))),
+    "__ep_map_str_bool_del": lambda p: emit_map_str_word_del("__ep_map_str_bool_del", ptr(mir_struct("_map_str_bool"))),
+    "__ep_map_str_str_new": lambda p: emit_map_str_word_new("__ep_map_str_str_new", ptr(mir_struct("_map_str_str"))),
+    "__ep_map_str_str_get": lambda p: emit_map_str_word_get("__ep_map_str_str_get", ptr(mir_struct("_map_str_str")), ptr(mir_struct("str"))),
+    "__ep_map_str_str_set": lambda p: emit_map_str_word_set("__ep_map_str_str_set", ptr(mir_struct("_map_str_str")), ptr(mir_struct("str"))),
+    "__ep_map_str_str_has": lambda p: emit_map_str_word_has("__ep_map_str_str_has", ptr(mir_struct("_map_str_str"))),
+    "__ep_map_str_str_del": lambda p: emit_map_str_word_del("__ep_map_str_str_del", ptr(mir_struct("_map_str_str"))),
 }
 
 _HELPER_ORDER = [
@@ -1546,6 +1646,17 @@ _HELPER_ORDER = [
     "__ep_map_str_i64_get",
     "__ep_map_str_i64_set",
     "__ep_map_str_i64_has",
+    "__ep_map_str_i64_del",
+    "__ep_map_str_bool_new",
+    "__ep_map_str_bool_get",
+    "__ep_map_str_bool_set",
+    "__ep_map_str_bool_has",
+    "__ep_map_str_bool_del",
+    "__ep_map_str_str_new",
+    "__ep_map_str_str_get",
+    "__ep_map_str_str_set",
+    "__ep_map_str_str_has",
+    "__ep_map_str_str_del",
 ]
 
 
@@ -1555,6 +1666,7 @@ IMPLEMENTED_MIR_HELPERS = tuple(_HELPER_ORDER)
 _RUNTIME_STRING_GLOBALS = (
     ("@str.runtime.bool.true", "true"),
     ("@str.runtime.bool.false", "false"),
+    ("@str.runtime.empty", ""),
 )
 
 
