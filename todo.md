@@ -7,9 +7,9 @@
 - ✅ ADT 文档残留已清除
 -   `src/*.ep` 自举线含 ADT 残留 —— **战略放弃，暂不处理**
 
-## Commit A（已完成，文档定案）
+## ✅ Str Surface Contraction（全部完成）
 
-**Define zero-copy str/bytes surface**
+### Commit A：Define zero-copy str/bytes surface（文档定案）
 
 - [x] `docs/design.md` — 更新 str 类型描述、删除 public str builtin 列表、删除 `str + str`、zero-copy cast 语义、shared buffer 文档
 - [x] `docs/self-host-core.md` — 更新决策模型、builtin 表、migration strategy（Phase 0）
@@ -17,24 +17,33 @@
 - [x] `docs/impl.md` — 更新 lowering 表、string layout 说明
 - [x] `todo.md` — 记录 commit 范围与后续 plan
 
-## 后续 Commits
-
 ### Commit B：sema 删除 public str helper 调用
 
-删除用户可调用：`str_get`、`str_slice`、`str_find`、`str_starts_with`、`str_trim`、`str_replace_char`、`str_cat`、`str_eq`。
-保留 compiler internal lowering。
-examples 中直接调用这些 builtin 的改为 `bytes(...)` + `u8[]` helper 或直接删除该 example。
+- [x] `bootstrap/sema.py` — 删除 str_slice/str_replace_char/str_starts_with/str_find/str_trim handler
+- [x] `bootstrap/mir_codegen.py` — 删除对应 codegen dispatch
+- [x] `src/codegen.ep` — 删除 type checking + emit blocks
+- [x] `src/parser.ep` — 删除 reserved name checks
+- [x] `tests/mir/test_mir.py` — 删除 4 个 test case
+- [x] `examples/v1_str_helpers.ep` — 删除
+- [x] `examples/m31_str_tools.ep` — 重写为 u8[] byte ops
+- [x] `examples/v4_str_eq.ep` — str_slice → s[start:end]
 
 ### Commit C：删除 `str + str`
 
-sema 拒绝 `str + str`。
-MIR codegen 删除对应 lowering。
-examples 中 concat 示例改为 `u8[]` + `extend` 写法。
+- [x] `bootstrap/sema.py` — str + str 和 str += str → fail 含错误信息
+- [x] `bootstrap/mir_codegen.py` — 删除 str_cat lowering
+- [x] `src/codegen.ep` — 删除 binary `+` 和 `+=` 的 codegen
+- [x] `tests/mir/test_mir.py` — 删除 concat test case
+- [x] `examples/m30_str_cat.ep` — 重写为 u8[] + extend
+- [x] `examples/v4_str_eq.ep` — 删除 concat 测试片段
+- [x] `examples/v4_itoa_stable.ep` — 重写为 u8[] + extend + push
+- [x] `examples/v1_compound_assign.ep` — s += "bc" → let s = "abc"
 
 ### Commit D：确认 zero-copy `str(bytes)` / `bytes(str)`
 
-如果当前实现已经 zero-copy，加正向测试锁定行为。
-测试包括修改 `bytes(str)` 结果后原 `str` 可见。
+- [x] 确认 `str_arr_i8` 是 identity（纯指针重解释）
+- [x] 确认 `bytes_str` 分配新 descriptor 但共享 data 指针
+- [x] `examples/v5_zero_copy_str_bytes.ep` — 正向测试：修改 bytes(str) 后原 str 可见
 
 ---
 
