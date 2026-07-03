@@ -1,0 +1,835 @@
+#
+# Epic self-hosted semantic typed dump MVP.
+#
+# First milestone: type-check tests/sema/pass/all.ep and emit the same typed AST
+# dump as the Python oracle. This intentionally uses string type names as the
+# first TypeInfo representation; MIR-facing typed structures come later.
+#
+
+struct SemaState {
+    struct_fields: map[str]str
+    funcs_ret: map[str]str
+    funcs_params: map[str]str
+    locals: map[str]str
+    current_fn: str
+    current_ret: str
+    loop_depth: i64
+}
+
+fun sema_die(msg: str): void {
+    println(f"Sema error: {msg}")
+    exit(1)
+}
+
+fun sema_starts_with(s: str, prefix: str): bool {
+    if len(s) < len(prefix) {
+        return false
+    }
+    return s[0:len(prefix)] == prefix
+}
+
+fun sema_ends_with(s: str, suffix: str): bool {
+    if len(s) < len(suffix) {
+        return false
+    }
+    return s[len(s) - len(suffix):len(s)] == suffix
+}
+
+fun sema_array_elem(t: str): str {
+    if sema_ends_with(t, "[]") == false {
+        sema_die("expected array type")
+    }
+    return t[0:len(t) - 2]
+}
+
+fun sema_map_value(t: str): str {
+    if sema_starts_with(t, "map[str]") == false {
+        sema_die("expected map type")
+    }
+    return t[8:len(t)]
+}
+
+fun sema_is_int(t: str): bool {
+    return t == "i64" || t == "u64" || t == "i32" || t == "u32" || t == "u8"
+}
+
+fun sema_is_array(t: str): bool {
+    return sema_ends_with(t, "[]")
+}
+
+fun sema_is_map(t: str): bool {
+    return sema_starts_with(t, "map[str]")
+}
+
+fun sema_key2(a: str, b: str): str {
+    let out = new u8[]
+    extend(out, bytes(a))
+    push(out, 46)
+    extend(out, bytes(b))
+    return str(out)
+}
+
+fun sema_type_name(name: str): str {
+    if name == "" {
+        return "void"
+    }
+    return name
+}
+
+fun sema_assignable(target: str, value: str): bool {
+    if target == value {
+        return true
+    }
+    if sema_is_int(target) && sema_is_int(value) {
+        return true
+    }
+    return false
+}
+
+fun sema_expect_assign(target: str, value: str, context: str): void {
+    if sema_assignable(target, value) == false {
+        println(f"Sema error: {context} expected {target}, got {value}")
+        exit(1)
+    }
+}
+
+fun sema_expect_bool(t: str, context: str): void {
+    if t != "bool" {
+        println(f"Sema error: {context} expected bool, got {t}")
+        exit(1)
+    }
+}
+
+fun sema_expect_int(t: str, context: str): void {
+    if sema_is_int(t) == false {
+        println(f"Sema error: {context} expected integer, got {t}")
+        exit(1)
+    }
+}
+
+fun sema_lookup(st: SemaState, name: str): str {
+    if map_has(st.locals, name) == false {
+        println(f"Sema error: undefined variable {name}")
+        exit(1)
+    }
+    return st.locals[name]
+}
+
+fun sema_field_type(st: SemaState, base_type: str, field: str): str {
+    let key = sema_key2(base_type, field)
+    if map_has(st.struct_fields, key) == false {
+        println(f"Sema error: unknown field {key}")
+        exit(1)
+    }
+    return st.struct_fields[key]
+}
+
+fun sema_build_types(st: SemaState, ast: AstNode): void {
+    for i in 0:len(ast.structs) {
+        let s = ast.structs[i]
+        for j in 0:len(s.fields) {
+            let f = s.fields[j]
+            st.struct_fields[sema_key2(s.name, f.name)] = sema_type_name(f.type_name)
+        }
+    }
+}
+
+fun sema_build_funcs(st: SemaState, ast: AstNode): void {
+    for i in 0:len(ast.funcs) {
+        let f = ast.funcs[i]
+        st.funcs_ret[f.name] = sema_type_name(f.type_name)
+        for j in 0:len(f.params) {
+            let p = f.params[j]
+            st.funcs_params[sema_key2(f.name, p.name)] = sema_type_name(p.type_name)
+        }
+    }
+}
+
+fun sema_reset_locals(st: SemaState): void {
+    st.locals = new map[str]str
+    st.locals["argv"] = "str[]"
+}
+
+fun sema_expr_type(st: SemaState, node: AstNode): str {
+    if node.kind == "Literal" {
+        return "i64"
+    }
+    if node.kind == "Char" {
+        return "u8"
+    }
+    if node.kind == "Bool" {
+        return "bool"
+    }
+    if node.kind == "String" {
+        return "str"
+    }
+    if node.kind == "FString" {
+        for i in 0:len(node.fields) {
+            let part = node.fields[i]
+            if part.kind != "FStringText" {
+                sema_expr_type(st, part)
+            }
+        }
+        return "str"
+    }
+    if node.kind == "Var" {
+        return sema_lookup(st, node.name)
+    }
+    if node.kind == "Unary" {
+        let inner = sema_expr_type(st, node.expr)
+        if node.op == "!" {
+            sema_expect_bool(inner, "unary !")
+            return "bool"
+        }
+        sema_expect_int(inner, "unary")
+        return "i64"
+    }
+    if node.kind == "Binary" {
+        let left = sema_expr_type(st, node.left)
+        let right = sema_expr_type(st, node.right)
+        if node.op == "&&" || node.op == "||" {
+            sema_expect_bool(left, node.op)
+            sema_expect_bool(right, node.op)
+            return "bool"
+        }
+        if node.op == "==" || node.op == "!=" || node.op == "<" || node.op == ">" || node.op == "<=" || node.op == ">=" {
+            if sema_is_int(left) && sema_is_int(right) {
+                return "bool"
+            }
+            sema_expect_assign(left, right, "comparison")
+            return "bool"
+        }
+        sema_expect_int(left, "binary left")
+        sema_expect_int(right, "binary right")
+        if left == "u64" || right == "u64" {
+            return "u64"
+        }
+        return "i64"
+    }
+    if node.kind == "Call" {
+        return sema_call_type(st, node)
+    }
+    if node.kind == "FieldAccess" {
+        let obj = sema_expr_type(st, node.object)
+        return sema_field_type(st, obj, node.name)
+    }
+    if node.kind == "Subscript" {
+        let base = sema_expr_type(st, node.base)
+        if sema_is_map(base) {
+            sema_expect_assign("str", sema_expr_type(st, node.index), "map key")
+            return sema_map_value(base)
+        }
+        sema_expect_int(sema_expr_type(st, node.index), "subscript index")
+        if base == "str" {
+            return "u8"
+        }
+        if sema_is_array(base) {
+            return sema_array_elem(base)
+        }
+        sema_die("subscript expected array, str, or map")
+    }
+    if node.kind == "Slice" {
+        let base = sema_expr_type(st, node.base)
+        sema_expect_int(sema_expr_type(st, node.start), "slice start")
+        sema_expect_int(sema_expr_type(st, node.end), "slice end")
+        return base
+    }
+    if node.kind == "NewArray" {
+        if node.count.kind != "" {
+            sema_expect_int(sema_expr_type(st, node.count), "array length")
+        }
+        return str_cat2(node.type_name, "[]")
+    }
+    if node.kind == "ArrayLiteral" {
+        let elem = sema_type_name(node.type_name)
+        for i in 0:len(node.args) {
+            sema_expect_assign(elem, sema_expr_type(st, node.args[i]), "array literal element")
+        }
+        return str_cat2(elem, "[]")
+    }
+    if node.kind == "StructInit" {
+        for i in 0:len(node.fields) {
+            let f = node.fields[i]
+            let ft = sema_field_type(st, node.name, f.name)
+            sema_expect_assign(ft, sema_expr_type(st, f.value_expr), "struct field")
+        }
+        return node.name
+    }
+    if node.kind == "New" {
+        return node.name
+    }
+    println(f"Sema error: unsupported expr {node.kind}")
+    exit(1)
+    return ""
+}
+
+fun sema_call_type(st: SemaState, node: AstNode): str {
+    if node.name == "print" || node.name == "println" {
+        if len(node.args) > 0 {
+            sema_expr_type(st, node.args[0])
+        }
+        return "void"
+    }
+    if node.name == "str" {
+        sema_expr_type(st, node.args[0])
+        return "str"
+    }
+    if node.name == "bytes" {
+        sema_expect_assign("str", sema_expr_type(st, node.args[0]), "bytes argument")
+        return "u8[]"
+    }
+    if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "u8" {
+        sema_expect_int(sema_expr_type(st, node.args[0]), "integer conversion")
+        return node.name
+    }
+    if node.name == "bool" {
+        let t = sema_expr_type(st, node.args[0])
+        if t != "bool" {
+            sema_expect_int(t, "bool conversion")
+        }
+        return "bool"
+    }
+    if node.name == "len" {
+        sema_expr_type(st, node.args[0])
+        return "i64"
+    }
+    if node.name == "cap" {
+        sema_expr_type(st, node.args[0])
+        return "i64"
+    }
+    if node.name == "push" {
+        let arr = sema_expr_type(st, node.args[0])
+        sema_expect_assign(sema_array_elem(arr), sema_expr_type(st, node.args[1]), "push value")
+        return "void"
+    }
+    if node.name == "extend" {
+        sema_expect_assign("u8[]", sema_expr_type(st, node.args[0]), "extend dst")
+        sema_expect_assign("u8[]", sema_expr_type(st, node.args[1]), "extend src")
+        return "void"
+    }
+    if node.name == "map_has" || node.name == "map_del" {
+        let mt = sema_expr_type(st, node.args[0])
+        if sema_is_map(mt) == false {
+            sema_die("map builtin expects map")
+        }
+        sema_expect_assign("str", sema_expr_type(st, node.args[1]), "map key")
+        return "bool"
+    }
+    if map_has(st.funcs_ret, node.name) == false {
+        println(f"Sema error: unknown function {node.name}")
+        exit(1)
+    }
+    for i in 0:len(node.args) {
+        sema_expr_type(st, node.args[i])
+    }
+    return st.funcs_ret[node.name]
+}
+
+fun sema_lvalue_type(st: SemaState, node: AstNode): str {
+    if node.kind == "Var" {
+        return sema_lookup(st, node.name)
+    }
+    if node.kind == "FieldAccess" {
+        return sema_expr_type(st, node)
+    }
+    if node.kind == "Subscript" {
+        return sema_expr_type(st, node)
+    }
+    sema_die("unsupported assignment target")
+    return ""
+}
+
+fun sema_stmt(st: SemaState, node: AstNode): void {
+    if node.kind == "Let" {
+        let target = sema_type_name(node.type_name)
+        if node.value_expr.kind != "" {
+            let val = sema_expr_type(st, node.value_expr)
+            if target == "void" {
+                target = val
+            } else {
+                sema_expect_assign(target, val, "let")
+            }
+        }
+        st.locals[node.name] = target
+        return
+    }
+    if node.kind == "Assign" {
+        let target = sema_lookup(st, node.name)
+        sema_expect_assign(target, sema_expr_type(st, node.value_expr), "assign")
+        return
+    }
+    if node.kind == "FieldSet" {
+        let obj = sema_expr_type(st, node.object)
+        let target = sema_field_type(st, obj, node.name)
+        sema_expect_assign(target, sema_expr_type(st, node.value_expr), "field set")
+        return
+    }
+    if node.kind == "SubscriptAssign" {
+        let target = sema_expr_type(st, node.base)
+        if sema_is_map(target) {
+            sema_expect_assign("str", sema_expr_type(st, node.index), "map key")
+            target = sema_map_value(target)
+        } else {
+            sema_expect_int(sema_expr_type(st, node.index), "subscript index")
+            if target == "str" {
+                target = "u8"
+            } else {
+                if sema_is_array(target) {
+                    target = sema_array_elem(target)
+                }
+            }
+        }
+        sema_expect_assign(target, sema_expr_type(st, node.value_expr), "subscript assign")
+        return
+    }
+    if node.kind == "AssignOp" {
+        let target = sema_lvalue_type(st, node.expr)
+        sema_expect_int(target, "compound target")
+        sema_expect_int(sema_expr_type(st, node.value_expr), "compound value")
+        return
+    }
+    if node.kind == "ExprStmt" {
+        sema_expr_type(st, node.expr)
+        return
+    }
+    if node.kind == "Return" {
+        if node.expr.kind != "" {
+            sema_expect_assign(st.current_ret, sema_expr_type(st, node.expr), "return")
+        }
+        return
+    }
+    if node.kind == "If" {
+        sema_expect_bool(sema_expr_type(st, node.expr), "if condition")
+        sema_block(st, node.then_block)
+        if node.else_block.kind != "" {
+            sema_block(st, node.else_block)
+        }
+        return
+    }
+    if node.kind == "While" {
+        sema_expect_bool(sema_expr_type(st, node.expr), "while condition")
+        st.loop_depth += 1
+        sema_block(st, node.body)
+        st.loop_depth -= 1
+        return
+    }
+    if node.kind == "For" {
+        sema_expect_int(sema_expr_type(st, node.start), "for start")
+        sema_expect_int(sema_expr_type(st, node.end), "for end")
+        st.locals[node.name] = "i64"
+        st.loop_depth += 1
+        sema_block(st, node.body)
+        st.loop_depth -= 1
+        return
+    }
+    if node.kind == "Break" || node.kind == "Continue" {
+        return
+    }
+    if node.kind == "Assert" {
+        sema_expect_bool(sema_expr_type(st, node.expr), "assert condition")
+        if node.value_expr.kind != "" {
+            sema_expr_type(st, node.value_expr)
+        }
+        return
+    }
+    if node.kind == "Panic" {
+        sema_expr_type(st, node.expr)
+        return
+    }
+    if node.kind == "Match" {
+        let scrutinee = sema_expr_type(st, node.expr)
+        for i in 0:len(node.fields) {
+            let c = node.fields[i]
+            sema_expect_assign(scrutinee, sema_expr_type(st, c.expr), "match pattern")
+            sema_block(st, c.body)
+        }
+        if node.else_block.kind != "" {
+            sema_block(st, node.else_block)
+        }
+        return
+    }
+    println(f"Sema error: unsupported stmt {node.kind}")
+    exit(1)
+}
+
+fun sema_block(st: SemaState, block: AstNode): void {
+    for i in 0:len(block.stmts) {
+        sema_stmt(st, block.stmts[i])
+    }
+}
+
+fun sema_program(st: SemaState, ast: AstNode): void {
+    sema_build_types(st, ast)
+    sema_build_funcs(st, ast)
+    for i in 0:len(ast.funcs) {
+        let f = ast.funcs[i]
+        sema_reset_locals(st)
+        st.current_fn = f.name
+        st.current_ret = sema_type_name(f.type_name)
+        for j in 0:len(f.params) {
+            let p = f.params[j]
+            st.locals[p.name] = sema_type_name(p.type_name)
+        }
+        sema_block(st, f.body)
+    }
+}
+
+fun sema_indent(n: i64): void {
+    for i in 0:n {
+        print("  ")
+    }
+}
+
+fun sema_print_type(t: str): void {
+    if t != "" {
+        print(" : ")
+        print(t)
+    }
+}
+
+fun sema_dump_expr(st: SemaState, node: AstNode, depth: i64): void {
+    sema_dump_node(st, node, depth)
+}
+
+fun sema_dump_list(st: SemaState, nodes: AstNode[], depth: i64): void {
+    for i in 0:len(nodes) {
+        sema_dump_node(st, nodes[i], depth)
+    }
+}
+
+fun sema_dump_node(st: SemaState, node: AstNode, depth: i64): void {
+    if node.kind == "" {
+        return
+    }
+    if node.kind == "Program" {
+        sema_indent(depth)
+        println("Program")
+        sema_dump_list(st, node.structs, depth + 1)
+        sema_dump_list(st, node.funcs, depth + 1)
+        return
+    }
+    if node.kind == "StructDef" {
+        sema_indent(depth)
+        print("StructDef ")
+        println(node.name)
+        sema_dump_list(st, node.fields, depth + 1)
+        return
+    }
+    if node.kind == "StructField" {
+        sema_indent(depth)
+        print("StructField ")
+        print(node.name)
+        sema_print_type(sema_type_name(node.type_name))
+        println("")
+        return
+    }
+    if node.kind == "FunDef" {
+        sema_indent(depth)
+        print("FunDef ")
+        print(node.name)
+        sema_print_type(sema_type_name(node.type_name))
+        println("")
+        sema_reset_locals(st)
+        st.current_ret = sema_type_name(node.type_name)
+        for i in 0:len(node.params) {
+            st.locals[node.params[i].name] = sema_type_name(node.params[i].type_name)
+            sema_dump_node(st, node.params[i], depth + 1)
+        }
+        sema_dump_node(st, node.body, depth + 1)
+        return
+    }
+    if node.kind == "Param" {
+        sema_indent(depth)
+        print("Param ")
+        print(node.name)
+        sema_print_type(sema_type_name(node.type_name))
+        println("")
+        return
+    }
+    if node.kind == "Block" {
+        sema_indent(depth)
+        println("Block")
+        sema_dump_list(st, node.stmts, depth + 1)
+        return
+    }
+    if node.kind == "Let" {
+        let t = sema_type_name(node.type_name)
+        if node.value_expr.kind != "" {
+            let val = sema_expr_type(st, node.value_expr)
+            if t == "void" {
+                t = val
+            }
+        }
+        st.locals[node.name] = t
+        sema_indent(depth)
+        print("Let ")
+        print(node.name)
+        sema_print_type(t)
+        println("")
+        if node.value_expr.kind != "" {
+            sema_dump_node(st, node.value_expr, depth + 1)
+        }
+        return
+    }
+    if node.kind == "Return" {
+        sema_indent(depth)
+        println("Return")
+        sema_dump_node(st, node.expr, depth + 1)
+        return
+    }
+    if node.kind == "Assign" {
+        sema_indent(depth)
+        print("Assign ")
+        println(node.name)
+        sema_dump_node(st, node.value_expr, depth + 1)
+        return
+    }
+    if node.kind == "AssignOp" {
+        sema_indent(depth)
+        print("AssignOp ")
+        println(node.op)
+        sema_dump_node(st, node.expr, depth + 1)
+        sema_dump_node(st, node.value_expr, depth + 1)
+        return
+    }
+    if node.kind == "FieldSet" {
+        sema_indent(depth)
+        print("FieldSet ")
+        println(node.name)
+        sema_dump_node(st, node.value_expr, depth + 1)
+        sema_dump_node(st, node.object, depth + 1)
+        return
+    }
+    if node.kind == "SubscriptAssign" {
+        sema_indent(depth)
+        println("SubscriptAssign")
+        sema_dump_node(st, node.value_expr, depth + 1)
+        sema_dump_node(st, node.base, depth + 1)
+        sema_dump_node(st, node.index, depth + 1)
+        return
+    }
+    if node.kind == "If" {
+        sema_indent(depth)
+        println("If")
+        sema_dump_node(st, node.then_block, depth + 1)
+        sema_dump_node(st, node.else_block, depth + 1)
+        sema_dump_node(st, node.expr, depth + 1)
+        return
+    }
+    if node.kind == "While" {
+        sema_indent(depth)
+        println("While")
+        sema_dump_node(st, node.body, depth + 1)
+        sema_dump_node(st, node.expr, depth + 1)
+        return
+    }
+    if node.kind == "For" {
+        st.locals[node.name] = "i64"
+        sema_indent(depth)
+        print("For ")
+        print(node.name)
+        sema_print_type("i64")
+        println("")
+        sema_dump_node(st, node.body, depth + 1)
+        sema_dump_node(st, node.start, depth + 1)
+        sema_dump_node(st, node.end, depth + 1)
+        return
+    }
+    if node.kind == "Break" || node.kind == "Continue" {
+        sema_indent(depth)
+        println(node.kind)
+        return
+    }
+    if node.kind == "Assert" {
+        sema_indent(depth)
+        println("Assert")
+        sema_dump_node(st, node.expr, depth + 1)
+        sema_dump_node(st, node.value_expr, depth + 1)
+        return
+    }
+    if node.kind == "Panic" {
+        sema_indent(depth)
+        println("Panic")
+        sema_dump_node(st, node.expr, depth + 1)
+        return
+    }
+    if node.kind == "Match" {
+        sema_indent(depth)
+        println("Match")
+        sema_dump_node(st, node.expr, depth + 1)
+        sema_dump_list(st, node.fields, depth + 1)
+        if node.else_block.kind != "" {
+            sema_indent(depth + 1)
+            println("MatchCase")
+            sema_dump_node(st, node.else_block, depth + 2)
+        }
+        return
+    }
+    if node.kind == "MatchCase" {
+        sema_indent(depth)
+        println("MatchCase")
+        sema_dump_node(st, node.expr, depth + 1)
+        sema_dump_node(st, node.body, depth + 1)
+        return
+    }
+    if node.kind == "ExprStmt" {
+        sema_indent(depth)
+        println("ExprStmt")
+        sema_dump_node(st, node.expr, depth + 1)
+        return
+    }
+    if node.kind == "FStringText" {
+        sema_indent(depth)
+        print("FStringText ")
+        println(node.value)
+        return
+    }
+
+    # Expressions.
+    let t = sema_expr_type(st, node)
+    sema_indent(depth)
+    if node.kind == "Literal" || node.kind == "Char" || node.kind == "Bool" || node.kind == "String" {
+        print(node.kind)
+        print(" ")
+        print(node.value)
+        sema_print_type(t)
+        println("")
+        return
+    }
+    if node.kind == "FString" {
+        sema_print_expr_head(node.kind, "", t)
+        sema_dump_list(st, node.fields, depth + 1)
+        return
+    }
+    if node.kind == "Var" {
+        print("Var ")
+        print(node.name)
+        sema_print_type(t)
+        println("")
+        return
+    }
+    if node.kind == "Call" {
+        print("Call ")
+        print(node.name)
+        sema_print_type(t)
+        println("")
+        sema_dump_list(st, node.args, depth + 1)
+        return
+    }
+    if node.kind == "Binary" {
+        print("Binary ")
+        print(node.op)
+        sema_print_type(t)
+        println("")
+        sema_dump_node(st, node.left, depth + 1)
+        sema_dump_node(st, node.right, depth + 1)
+        return
+    }
+    if node.kind == "Unary" {
+        print("Unary ")
+        print(node.op)
+        sema_print_type(t)
+        println("")
+        sema_dump_node(st, node.expr, depth + 1)
+        return
+    }
+    if node.kind == "FieldAccess" {
+        print("FieldAccess ")
+        print(node.name)
+        sema_print_type(t)
+        println("")
+        sema_dump_node(st, node.object, depth + 1)
+        return
+    }
+    if node.kind == "Subscript" {
+        print("Subscript")
+        sema_print_type(t)
+        println("")
+        sema_dump_node(st, node.base, depth + 1)
+        sema_dump_node(st, node.index, depth + 1)
+        return
+    }
+    if node.kind == "Slice" {
+        print("Slice")
+        sema_print_type(t)
+        println("")
+        sema_dump_node(st, node.base, depth + 1)
+        sema_dump_node(st, node.start, depth + 1)
+        sema_dump_node(st, node.end, depth + 1)
+        return
+    }
+    if node.kind == "New" {
+        print("New ")
+        print(node.name)
+        sema_print_type(t)
+        println("")
+        return
+    }
+    if node.kind == "NewArray" {
+        print("NewArray : ")
+        print(node.type_name)
+        sema_print_type(t)
+        println("")
+        sema_dump_node(st, node.count, depth + 1)
+        return
+    }
+    if node.kind == "ArrayLiteral" {
+        print("ArrayLiteral : ")
+        print(node.type_name)
+        sema_print_type(t)
+        println("")
+        sema_dump_list(st, node.args, depth + 1)
+        return
+    }
+    if node.kind == "StructInit" {
+        print("StructInit ")
+        print(node.name)
+        sema_print_type(t)
+        println("")
+        for i in 0:len(node.fields) {
+            let f = node.fields[i]
+            sema_indent(depth + 1)
+            print("InitField ")
+            println(f.name)
+            sema_dump_node(st, f.value_expr, depth + 2)
+        }
+        return
+    }
+    println(node.kind)
+}
+
+fun sema_print_expr_head(kind: str, extra: str, t: str): void {
+    print(kind)
+    if extra != "" {
+        print(" ")
+        print(extra)
+    }
+    sema_print_type(t)
+    println("")
+}
+
+fun make_sema_state(): SemaState {
+    let st = new SemaState
+    st.struct_fields = new map[str]str
+    st.funcs_ret = new map[str]str
+    st.funcs_params = new map[str]str
+    st.locals = new map[str]str
+    st.current_fn = ""
+    st.current_ret = "void"
+    st.loop_depth = 0
+    return st
+}
+
+fun main(): void {
+    if len(argv) < 2 {
+        println("usage: sema <file>")
+        exit(1)
+    }
+    let src = str(read_file(argv[1]))
+    let tokens = lex(src)
+    let p = make_parser(tokens)
+    let ast = parse_program(p)
+    let st = make_sema_state()
+    sema_program(st, ast)
+    sema_dump_node(st, ast, 0)
+}

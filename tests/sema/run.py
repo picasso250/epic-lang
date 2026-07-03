@@ -20,6 +20,12 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
+UTIL_EP = os.path.join(ROOT_DIR, "src", "util.ep")
+LEXER_EP = os.path.join(ROOT_DIR, "src", "lexer.ep")
+PARSER_EP = os.path.join(ROOT_DIR, "src", "parser.ep")
+SEMA_EP = os.path.join(ROOT_DIR, "src", "sema.ep")
+SEMA_BUILD_DIR = os.path.join(ROOT_DIR, "build", "sema-bootstrap")
+SEMA_EXE = os.path.join(SEMA_BUILD_DIR, "src", "sema.exe")
 
 FAIL_DIR = os.path.join(SCRIPT_DIR, "fail")
 PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
@@ -252,6 +258,55 @@ def run_pass_tests():
     return 0, 1, 0
 
 
+def ensure_self_hosted_sema():
+    os.makedirs(SEMA_BUILD_DIR, exist_ok=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            EPICC,
+            "--main",
+            SEMA_EP,
+            UTIL_EP,
+            LEXER_EP,
+            PARSER_EP,
+            SEMA_EP,
+            "--out-dir",
+            SEMA_BUILD_DIR,
+        ],
+        cwd=ROOT_DIR,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        raise RuntimeError("failed to compile src/sema.ep:\n" + result.stdout[-2000:] + result.stderr[-2000:])
+    if not os.path.isfile(SEMA_EXE):
+        raise RuntimeError(f"expected sema.exe at {SEMA_EXE}")
+
+
+def run_self_hosted_pass_tests():
+    ensure_self_hosted_sema()
+    expected = python_sema_dump(ALL_EP)
+    result = subprocess.run(
+        [SEMA_EXE, ALL_EP],
+        cwd=ROOT_DIR,
+        capture_output=True,
+    )
+    actual = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
+    if result.returncode != 0:
+        print("  FAIL  self-hosted sema pass/all.ep failed")
+        print((actual + stderr)[-2000:])
+        return 0, 1, 0
+    if actual == expected:
+        print("  PASS  self-hosted sema pass/all.ep")
+        return 1, 0, 0
+    print("  FAIL  self-hosted sema pass/all.ep")
+    print_diff(expected, actual, "python/sema/pass/all.ep", "self-hosted/sema/pass/all.ep")
+    return 0, 1, 0
+
+
 def run_fail_tests():
     if not os.path.isdir(FAIL_DIR):
         return 0, 0, 0
@@ -319,6 +374,11 @@ def main(argv=None):
     total_skipped = 0
 
     p, f, s = run_pass_tests()
+    total_passed += p
+    total_failed += f
+    total_skipped += s
+
+    p, f, s = run_self_hosted_pass_tests()
     total_passed += p
     total_failed += f
     total_skipped += s
