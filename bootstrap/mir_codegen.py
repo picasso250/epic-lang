@@ -599,10 +599,12 @@ class MirCodegen:
         raise MirCodegenError(f"machine MIR does not support expr yet: {type(expr).__name__}")
 
     def _emit_binary(self, expr):
+        if expr.op in ("&&", "||"):
+            return self._emit_short_circuit(expr)
+
         left = self._emit_expr(expr.left)
         right = self._emit_expr(expr.right)
         op_map = {"+": "add", "-": "sub", "*": "mul", "/": "div", "%": "mod", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
-        bool_map = {"&&": "and", "||": "or"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
         if expr.op in ("==", "!=") and left.type == ptr_str() and right.type == ptr_str():
             result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
@@ -612,11 +614,38 @@ class MirCodegen:
             return value
         if expr.op in op_map:
             return ValueOperand(self._inst(op_map[expr.op], [left, right], result_type=I64))
-        if expr.op in bool_map:
-            return ValueOperand(self._inst(bool_map[expr.op], [left, right], result_type=BOOL))
         if expr.op in cmp_map:
             return ValueOperand(self._inst(f"icmp.{cmp_map[expr.op]}", [left, right], result_type=BOOL))
         raise MirCodegenError(f"unsupported binary op: {expr.op}")
+
+    def _emit_short_circuit(self, expr):
+        result_addr = self._new_value(ptr(BOOL), "logic.addr")
+        self.block.instructions.append(MirInst("alloca", result=result_addr, type=BOOL))
+
+        left = self._emit_expr(expr.left)
+        rhs_block = self._new_block("logic.rhs")
+        short_block = self._new_block("logic.short")
+        end_block = self._new_block("logic.end")
+
+        if expr.op == "&&":
+            self.block.terminator = CondBr(left, rhs_block.name, short_block.name)
+            short_value = ConstBoolOperand(False)
+        else:
+            self.block.terminator = CondBr(left, short_block.name, rhs_block.name)
+            short_value = ConstBoolOperand(True)
+
+        self.block = short_block
+        self._inst("store", [short_value, ValueOperand(result_addr)])
+        self.block.terminator = Br(end_block.name)
+
+        self.block = rhs_block
+        right = self._emit_expr(expr.right)
+        self._inst("store", [right, ValueOperand(result_addr)])
+        self.block.terminator = Br(end_block.name)
+
+        self.block = end_block
+        result = self._inst("load", [ValueOperand(result_addr)], result_type=BOOL, type=BOOL)
+        return ValueOperand(result)
 
     def _emit_call(self, expr):
         name = expr.name

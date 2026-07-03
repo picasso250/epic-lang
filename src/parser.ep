@@ -207,14 +207,15 @@ fun parse_type(p: Parser): str {
         }
         expect(p, "RBRACKET")
         let value_type = parse_type(p)
-        return "map[str]" + value_type
+        return str_cat2("map[str]", value_type)
     }
-    let typ = t.text
+    let buf = make_str_buf()
+    str_buf_extend(buf, t.text)
     while check(p, "LBRACKET") == 1 {
         expect(p, "RBRACKET")
-        typ += "[]"
+        str_buf_extend(buf, "[]")
     }
-    return typ
+    return str_buf_finish(buf)
 }
 
 fun parse_params(p: Parser): AstNode[] {
@@ -1149,11 +1150,15 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
             let field = expect(p, "ID")
             if check(p, "LPAREN") == 1 {
                 let n = ast_node("Call")
-                if current.kind == "Var" && current.name == "os" {
+                if current.kind == "FieldAccess" && current.object.kind == "Var" && current.object.name == "os" {
                     n.name = field.text
                     n.type_name = "os"
                 } else {
-                    parse_error(field.line, "method calls are only supported for os.*")
+                    if current.kind == "Var" && current.name == "os" {
+                        parse_error(field.line, "WinAPI calls use os.<dll>.<Function>(...)")
+                    } else {
+                        parse_error(field.line, "method calls are only supported for os.<dll>.*")
+                    }
                 }
                 n.args = parse_args(p)
                 expect(p, "RPAREN")
@@ -1187,7 +1192,7 @@ fun parse_primary(p: Parser): AstNode {
             }
             expect(p, "RBRACKET")
             let n = ast_node("New")
-            n.name = "map[str]" + parse_type(p)
+            n.name = str_cat2("map[str]", parse_type(p))
             return n
         }
         if check(p, "LBRACKET") == 1 {
