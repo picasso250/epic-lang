@@ -140,6 +140,8 @@ _slice_T = {
 
 基本类型数组存储基本类型的值。结构体和 `str` 数组存储引用。
 
+`str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示尚未 materialize 的空容器。字段访问或其他容器使用点会插入 ensure：如果槽为 `0`，就写入一个空 header。slice/map header 的 backing storage 仍然懒分配：`push` 或 map set 首次写入时再分配 `data` / `entries`。
+
 ### 结构体 (Struct)
 
 用户结构体字段使用固定的 8 字节槽位。字段偏移为 `index * 8`。结构体大小为 `field_count * 8`。`u8` 和 `bool` 字段在其 8 字节槽位内加载/存储一个字节。
@@ -167,7 +169,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
-- **Map 降级**：`map[str]T` 使用线性探测或基于动态数组的条目表。`m[key] = value` 插入或覆盖。不存在的键查找返回零值。`map_has` 区分是否缺失。
+- **Map 降级**：Python reference compiler 将 `map[str]i64`、`map[str]bool`、`map[str]str` 降级为 str-keyed word map。entry 为 `{key, value, occupied}` 三个 word，key 比较调用 `__ep_str_eq`。`m[key] = value` 插入或覆盖，满时扩容。不存在的键查找返回值类型零值。`map_has` 区分是否缺失，`map_del` 使用 swap-delete 并返回是否删除成功。
 
 ## 链接器 (Linker)
 

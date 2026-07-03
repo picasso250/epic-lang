@@ -306,8 +306,7 @@ class MirCodegen:
     def _load_field(self, base, struct_name, field, result_type=None):
         field_type = result_type or self.structs[struct_name]["fields"][field]["type"]
         addr = self._field_addr(base, struct_name, field, result_type=field_type)
-        value = self._inst("load", [addr], result_type=field_type, type=field_type)
-        return ValueOperand(value)
+        return self._ensure_container_slot(addr, field_type)
 
     def _store_field(self, base, struct_name, field, value):
         addr = self._field_addr(base, struct_name, field)
@@ -350,6 +349,34 @@ class MirCodegen:
         if suffix is None:
             return None
         return f"__ep_map_str_{suffix}_{op}"
+
+    def _is_slice_type(self, typ):
+        struct_name = self._ptr_struct_name(typ)
+        return struct_name is not None and struct_name.startswith("_slice_")
+
+    def _is_zero_container_type(self, typ):
+        return typ == ptr_str() or self._is_slice_type(typ) or self._map_suffix(typ) is not None
+
+    def _ensure_container_slot(self, addr, typ):
+        if not self._is_zero_container_type(typ):
+            value = self._inst("load", [addr], result_type=typ, type=typ)
+            return ValueOperand(value)
+
+        current = self._inst("load", [addr], result_type=typ, type=typ)
+        current_int = self._inst("ptrtoint", [ValueOperand(current)], result_type=I64, type=I64)
+        is_null = self._inst("icmp.eq", [ValueOperand(current_int), ConstIntOperand(I64, 0)], result_type=BOOL)
+        init_block = self._new_block("container.init")
+        done_block = self._new_block("container.done")
+        self.block.terminator = CondBr(ValueOperand(is_null), init_block.name, done_block.name)
+
+        self.block = init_block
+        empty = self._zero_value(typ)
+        self._inst("store", [empty, addr])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = done_block
+        ensured = self._inst("load", [addr], result_type=typ, type=typ)
+        return ValueOperand(ensured)
 
     def _emit_block(self, block):
         for stmt in block.stmts:

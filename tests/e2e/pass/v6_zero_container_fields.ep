@@ -1,0 +1,42 @@
+# EXIT: 0
+# STDOUT: ok
+
+struct S {
+    xs: i64[]
+    flags: map[str]bool
+    names: map[str]str
+}
+
+fun add_one(xs: i64[]): void {
+    push(xs, 1)
+}
+
+fun set_flag(flags: map[str]bool): void {
+    flags["from_fn"] = true
+}
+
+fun main(): i64 {
+    let s = new S {}
+    assert(len(s.xs) == 0)
+    assert(cap(s.xs) == 0)
+    push(s.xs, 7)
+    add_one(s.xs)
+    assert(len(s.xs) == 2)
+    assert(s.xs[0] == 7)
+    assert(s.xs[1] == 1)
+
+    assert(map_has(s.flags, "x") == false)
+    s.flags["x"] = true
+    set_flag(s.flags)
+    assert(s.flags["x"] == true)
+    assert(s.flags["from_fn"] == true)
+
+    assert(s.names["missing"] == "")
+    s.names["a"] = "alpha"
+    assert(s.names["a"] == "alpha")
+    assert(map_del(s.names, "a"))
+    assert(s.names["a"] == "")
+
+    println("ok")
+    return 0
+}

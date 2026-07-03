@@ -128,7 +128,9 @@ These are unconditionally injected and considered part of the core runtime:
 ### Map
 
 `map[str]T` is retained but not a priority feature. Lookup of non-existent keys
-returns zero value.
+returns zero value. The Python reference compiler currently supports
+`map[str]i64`, `map[str]bool`, and `map[str]str`, plus `map_has` and
+`map_del`.
 
 ### OS Namespace
 
@@ -205,11 +207,12 @@ after ADT removal and naming unification.
 - `new T[] { ... }` array literal
 - `new T[n]` array allocation
 - `let` binding with optional type annotation
-- Zero-value initialization for built-in types (i64, bool, str, T[])
+- Zero-value initialization for built-in types (i64, bool, str, T[], map[str]T)
+- Zero-value containers may be internally represented by a `0` slot and lazily materialized by compiler-inserted ensure code
 - **Struct requires explicit `new`**; `let b: Box` is a compile error
 - Slice syntax `s[start:end]`
 - `match` literal switch only
-- Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend`
+- Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend` / `map_has` / `map_del`
 - String builtins (retained): `len(s)` / `s[i]` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; `str(bytes)` / `bytes(s)` as zero-copy cast; `cstr` as escape hatch
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`
