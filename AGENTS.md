@@ -12,15 +12,14 @@
 - `bootstrap/` 是当前语言的 Python reference compiler。
 - `src/` 是当前 Epic 自举编译器源码和 Epic 工具源码。
 - `runtime/`、`examples/`、`docs/`、`editors/`、`tree-sitter-epic/` 都服务当前语言实现。
-- `epic-bootstrap.py` 是 `test_bootstrap_fixed_point.py` 的薄封装；当前 bootstrap 模型是 `Python reference compiler -> Epic compiler -> Epic compiler`。
 - 当前测试入口（按推荐顺序）：
-  - `python tests/run.py`             # 模块级测试体系
+  - `python tests/run.py`             # 模块级测试体系（Python-only 全部绿）
   - `python test_examples_py.py`      # examples/ 正向学习示例
   - `python tests/mir/run.py`          # MIR 测试
   - `python tests/x64/run.py`          # X64 后端测试
+- 自举测试链（`epic-bootstrap.py` / `test_bootstrap_fixed_point.py` / `test_*bootstrap*.py`）战略性放弃，不跑。
 - 不要运行：
   - `python -m pytest`（不是 pytest 体系）
-  - `test_*bootstrap*.py`（bootstrap 自举测试战略性放弃）
 - `examples/` 只放正向、典型、适合初学者学习的示例程序，不放负向测试。
 - 负向测试放 `tests/<module>/fail/`。
 - typed AST 不单独建顶层测试目录；它属于 sema 输出契约，测试放 `tests/sema/`。
@@ -32,6 +31,8 @@
 
 ## 现状
 
-- Python reference compiler ok `python test_examples_py.py`
-- 未来再 eat dog food ，现在先让py实现ok，正在去 nasm.exe 化
-- 我们现在战略性放弃ep自举，只攻py实现 `test_*bootstrap*.py` 一概不用跑。跑了也会失败。
+- Python reference compiler 主线健康：`python tests/run.py` 全绿。
+- `python test_examples_py.py` 全绿（62 passed）。
+- 自举线（`src/*.ep`）含 ADT 残留，因弃用自举暂不处理。
+- 正在去 `nasm.exe` 化，当前 Python 后端走 PE machine backend + coff linker。
+- 自举测试（`test_*bootstrap*.py`）一概不跑。

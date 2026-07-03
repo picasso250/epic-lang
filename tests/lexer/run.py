@@ -2,12 +2,13 @@
 """
 tests/lexer/run.py — Formal lexer test runner.
 
-Two modes:
-  Normal: frozen golden check + optional self-hosted lexer comparison.
-    python tests/lexer/run.py
+Default mode: golden (frozen) check of Python lexer against token_list.txt.
 
-  Regen: regenerate token_list.txt from Python lexer oracle.
-    python tests/lexer/run.py --regen
+Optional self-hosted comparison (requires self-hosted compiler to build):
+  python tests/lexer/run.py --self-hosted
+
+Regenerate token_list.txt from Python lexer oracle:
+  python tests/lexer/run.py --regen
 
 Golden spec:
   tests/lexer/pass/all.ep     — comprehensive lexer fixture (all token kinds)
@@ -146,8 +147,8 @@ def main():
     parser = argparse.ArgumentParser(description="Epic lexer test runner")
     parser.add_argument("--regen", action="store_true",
                         help="Regenerate golden token_list.txt from Python lexer")
-    parser.add_argument("--skip-self-hosted", action="store_true",
-                        help="Skip self-hosted lexer comparison")
+    parser.add_argument("--self-hosted", action="store_true",
+                        help="Also compare Python lexer against self-hosted lexer.exe")
     args = parser.parse_args()
 
     if args.regen:
@@ -160,9 +161,9 @@ def main():
     if not golden_ok:
         sys.exit(1)
 
-    # --- Self-hosted lexer comparison ---
-    if not args.skip_self_hosted:
-        print("--- self-hosted lexer comparison ---")
+    # --- Self-hosted lexer comparison (opt-in) ---
+    if args.self_hosted:
+        print("--- self-hosted lexer comparison (opt-in) ---")
         try:
             lexer_exe = ensure_bootstrap_lexer()
         except (RuntimeError, subprocess.TimeoutExpired) as e:
