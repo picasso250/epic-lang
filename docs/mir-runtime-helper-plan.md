@@ -83,7 +83,7 @@ Important x64-backed families include:
 | heap allocation primitive | `MirLower._emit_epic_alloc` |
 | qword array primitives | `MirLower._emit_epic_arr_qword_*` |
 | remaining string helpers (`str_i64`) | `MirLower._emit_str_i64` |
-| i64-array helpers | `MirLower._emit_arr_i64_get`, `MirLower._emit_arr_i64_set` |
+| i64-array helpers | `MirLower._emit_arr_i64_set` (`arr_i64_get` is now a MIR helper) |
 | map helpers | `MirLower._emit_map_*` |
 | file/process helpers | `MirLower._emit_read_file`, `_emit_write_file`, `_emit_system_cmd` |
 | argv helper | `MirLower._emit_argv_init` |

@@ -302,7 +302,6 @@ class MirLower:
         self._emit_epic_arr_qword_push("__epic_arr_ptr_push")
         self._emit_epic_arr_qword_extend()
         self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
-        self._emit_arr_i64_set()
         self._emit_map_new()
         self._emit_map_get()
         self._emit_map_set()
@@ -558,27 +557,6 @@ class MirLower:
         x.inst("add", R("rax"), R("r8"))
         x.inst("mov", R("rax"), M("rax"))
         x.inst("ret")
-
-    def _emit_arr_i64_set(self):
-        x = self.x64
-        x.label("arr_i64_set")
-        x.inst("cmp", R("rdx"), I(0))
-        x.inst("jl", LabelRef("arr_i64_oob"))
-        x.inst("mov", R("r10"), M("rcx", 8))
-        x.inst("cmp", R("rdx"), R("r10"))
-        x.inst("jge", LabelRef("arr_i64_oob"))
-        x.inst("mov", R("rax"), M("rcx"))
-        x.inst("mov", R("r10"), R("rdx"))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("r10"), R("r10"))
-        x.inst("add", R("rax"), R("r10"))
-        x.inst("mov", M("rax"), R("r8"))
-        x.inst("ret")
-        x.label("arr_i64_oob")
-        x.inst("mov", R("rcx"), I(1))
-        x.inst("sub", R("rsp"), I(32))
-        x.inst("call", Symbol("ExitProcess"))
 
     def _map_entry_addr(self, index_reg="r9"):
         x = self.x64

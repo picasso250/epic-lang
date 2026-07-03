@@ -378,7 +378,7 @@ ret
 - `__epic_arr_qword_new` (array header allocation)
 - `__epic_arr_i64_push` / `__epic_arr_ptr_push`
 - `__epic_arr_qword_extend`
-- `__epic_arr_i64_get` / `__epic_arr_ptr_get`
+- `__epic_arr_ptr_get` (x64-backed; `arr_i64_get` is now a MIR helper)
 - x64 primitives and still-x64 helpers:
 - `map_new` / `map_get` / `map_set` / `map_has` / `map_repr`
 - `cstr` (`__epic_cstr`)

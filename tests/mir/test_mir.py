@@ -188,6 +188,7 @@ def test_mir_helper_injection():
 
     assert "arr_i8_slice" in IMPLEMENTED_MIR_HELPERS
     assert "arr_i64_get" in IMPLEMENTED_MIR_HELPERS
+    assert "arr_i64_set" in IMPLEMENTED_MIR_HELPERS
     assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
     assert "str_eq" in IMPLEMENTED_MIR_HELPERS
     assert "str_bool" in IMPLEMENTED_MIR_HELPERS
@@ -211,6 +212,18 @@ def test_mir_helper_injection():
         f"expected call i64 arr_i64_get, got:\n{text_i64}"
     assert "__epic_arr_i64_get" not in text_i64, \
         f"unexpected __epic_arr_i64_get:\n{text_i64}"
+
+    # i64[] writes use arr_i64_set
+    src_i64_set = """fun main(): i64 {
+    let xs = new i64[] { 10, 20 }
+    xs[0] = 99
+    return xs[0]
+}"""
+    ast_i64_set = sema.analyze_program(Parser(lex(src_i64_set)).parse_program())
+    prog_i64_set = ast_to_mir(ast_i64_set)
+    text_i64_set = prog_i64_set.text()
+    assert "call void arr_i64_set" in text_i64_set, \
+        f"expected call void arr_i64_set, got:\n{text_i64_set}"
 
     def check(source):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
