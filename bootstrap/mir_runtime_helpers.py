@@ -13,8 +13,10 @@ from mir import (
     I64,
     I8,
     VOID,
+    Br,
     CondBr,
     ConstIntOperand,
+    ConstNullOperand,
     MirBlock,
     MirFunction,
     MirInst,
@@ -136,6 +138,9 @@ class MirHelperBuilder:
             self.entry.terminator = Ret(value)
         else:
             self.entry.terminator = Ret()
+
+    def br(self, target):
+        self.entry.terminator = Br(target.name if isinstance(target, MirBlock) else target)
 
 
 # ── Helper emitters ───────────────────────────────────────────────────────
@@ -449,6 +454,80 @@ def emit_arr_i8_push() -> MirFunction:
     return b.fn
 
 
+def emit_arr_i8_slice() -> MirFunction:
+    """Copy a half-open u8[] slice [start:end].
+
+    fn arr_i8_slice(ptr<_arr_i8> %arr, i64 %start, i64 %end) -> ptr<_arr_i8>
+
+    Bounds failures exit with code 1, matching the old x64 helper.
+    """
+    b = MirHelperBuilder(
+        "arr_i8_slice",
+        [
+            MirParam("%arr", ptr(mir_struct("_arr_i8"))),
+            MirParam("%start", I64),
+            MirParam("%end", I64),
+        ],
+        ptr(mir_struct("_arr_i8")),
+    )
+    arr_val = ValueOperand(b.fn.params[0].value)
+    start_val = ValueOperand(b.fn.params[1].value)
+    end_val = ValueOperand(b.fn.params[2].value)
+
+    arr_len = b.load(I64, b.gep_field(arr_val, "_arr_i8", 1))
+
+    start_ok = b.icmp("ge", start_val, b.const_i64(0))
+    check_order = b.new_block("check_order")
+    check_len = b.new_block("check_len")
+    alloc_block = b.new_block("alloc")
+    copy_check = b.new_block("copy_check")
+    copy_body = b.new_block("copy_body")
+    done_block = b.new_block("done")
+    fail_block = b.new_block("fail")
+    b.entry.terminator = CondBr(ValueOperand(start_ok), check_order.name, fail_block.name)
+
+    b.entry = check_order
+    order_ok = b.icmp("ge", end_val, start_val)
+    b.entry.terminator = CondBr(ValueOperand(order_ok), check_len.name, fail_block.name)
+
+    b.entry = check_len
+    len_ok = b.icmp("ge", arr_len, end_val)
+    b.entry.terminator = CondBr(ValueOperand(len_ok), alloc_block.name, fail_block.name)
+
+    b.entry = alloc_block
+    slice_len = b.binop("sub", end_val, start_val)
+    result_arr = b.call("new_arr_i8", [slice_len], ptr(mir_struct("_arr_i8")))
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    src_data = b.load(ptr(), b.gep_field(arr_val, "_arr_i8", 0))
+    src_start = b.gep(I8, src_data, [start_val])
+    dst_data = b.load(ptr(), b.gep_field(ValueOperand(result_arr), "_arr_i8", 0))
+    b.br(copy_check)
+
+    b.entry = copy_check
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_copying = b.icmp("lt", i, slice_len)
+    b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, done_block.name)
+
+    b.entry = copy_body
+    src_byte_addr = b.gep(I8, src_start, [i])
+    byte = b.load(I8, src_byte_addr, result_type=I8)
+    dst_byte_addr = b.gep(I8, dst_data, [i])
+    b.store(ValueOperand(byte), dst_byte_addr)
+    next_i = b.binop("add", i, b.const_i64(1))
+    b.store(next_i, ValueOperand(i_slot))
+    b.br(copy_check)
+
+    b.entry = done_block
+    b.ret(ValueOperand(result_arr))
+
+    b.entry = fail_block
+    b.call("ExitProcess", [b.const_i64(1)], VOID)
+    b.ret(ConstNullOperand())
+
+    return b.fn
+
+
 # ── Injection ─────────────────────────────────────────────────────────────
 
 
@@ -460,6 +539,7 @@ _HELPER_EMITTERS = {
     "arr_i8_get": lambda p: emit_arr_i8_get(),
     "arr_i8_set": lambda p: emit_arr_i8_set(),
     "arr_i8_push": lambda p: emit_arr_i8_push(),
+    "arr_i8_slice": lambda p: emit_arr_i8_slice(),
 }
 
 _HELPER_ORDER = [
@@ -470,6 +550,7 @@ _HELPER_ORDER = [
     "arr_i8_get",
     "arr_i8_set",
     "arr_i8_push",
+    "arr_i8_slice",
 ]
 
 

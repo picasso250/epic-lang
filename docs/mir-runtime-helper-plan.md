@@ -49,6 +49,7 @@ Implemented MIR helpers:
 | `arr_i8_get` | `u8[]` subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_set` | `u8[]` subscript write | `bootstrap/mir_runtime_helpers.py` |
 | `arr_i8_push` | `push(u8[], value)` | `bootstrap/mir_runtime_helpers.py` |
+| `arr_i8_slice` | `u8[]` slice copy | `bootstrap/mir_runtime_helpers.py` |
 
 Injection rules:
 
@@ -70,7 +71,6 @@ Important x64-backed families include:
 | heap allocation primitive | `MirLower._emit_epic_alloc` |
 | qword array primitives | `MirLower._emit_epic_arr_qword_*` |
 | string helpers | `MirLower._emit_str_*` |
-| byte-array slice helper | `MirLower._emit_arr_i8_slice` |
 | i64-array helpers | `MirLower._emit_arr_i64_get`, `MirLower._emit_arr_i64_set` |
 | map helpers | `MirLower._emit_map_*` |
 | file/process helpers | `MirLower._emit_read_file`, `_emit_write_file`, `_emit_system_cmd` |
@@ -220,7 +220,6 @@ def _emit_runtime_helpers(self):
     self._emit_epic_arr_qword_extend()
     self._emit_epic_arr_qword_get("__epic_arr_i64_get", "array_oob")
     self._emit_epic_arr_qword_get("__epic_arr_ptr_get", "array_oob")
-    self._emit_arr_i8_slice()
     # … remaining x64-backed helpers, ALL unconditionally emitted
 ```
 

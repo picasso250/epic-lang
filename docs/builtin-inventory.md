@@ -158,6 +158,7 @@ symbols used by the Python backend.
 | `arr_i8_get` | bounds-checked byte array read |
 | `arr_i8_set` | bounds-checked byte array write |
 | `arr_i8_push` | append one byte to a byte array |
+| `arr_i8_slice` | copy a half-open byte-array slice |
 
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
 
