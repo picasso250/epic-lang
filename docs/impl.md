@@ -143,6 +143,10 @@ str = {
 > 语言不承诺 string literal 物理不可变：相同内容的字面量可能共享同一 buffer，
 > 修改 `bytes(s)` 的结果对所有共享 view 可见。
 
+> ⚠ 当前 sema 不阻止 `s[i] = v` 或 `s[i] += v`。这不是去噪规则，而是实现简化。
+> `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节），
+> 所以 `str(bytes)` 和 `bytes(str)` 都是 identity cast。
+
 ### 动态数组 (Dynamic Array)
 
 ```

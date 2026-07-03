@@ -15,11 +15,6 @@ BUILTIN_FUNCTIONS = frozenset({
     "itoa",
     "bytes",
     "str_new",
-    "str_slice",
-    "str_replace_char",
-    "str_starts_with",
-    "str_find",
-    "str_trim",
 
     "len",
     "cap",

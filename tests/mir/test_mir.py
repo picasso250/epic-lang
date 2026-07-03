@@ -173,15 +173,15 @@ def test_mir_helper_injection():
     assert "arr_i64_get" in IMPLEMENTED_MIR_HELPERS
     assert "arr_i64_set" in IMPLEMENTED_MIR_HELPERS
     assert "extend_i8" in IMPLEMENTED_MIR_HELPERS
-    assert "str_eq" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_eq" in IMPLEMENTED_MIR_HELPERS
     assert "str_bool" in IMPLEMENTED_MIR_HELPERS
-    assert "str_cat" in IMPLEMENTED_MIR_HELPERS
-    assert "str_slice" in IMPLEMENTED_MIR_HELPERS
-    assert "str_starts_with" in IMPLEMENTED_MIR_HELPERS
-    assert "str_get" in IMPLEMENTED_MIR_HELPERS
-    assert "str_find" in IMPLEMENTED_MIR_HELPERS
-    assert "str_replace_char" in IMPLEMENTED_MIR_HELPERS
-    assert "str_trim" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_cat" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_slice" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_starts_with" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_get" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_find" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_replace_char" in IMPLEMENTED_MIR_HELPERS
+    assert "__epic_str_trim" in IMPLEMENTED_MIR_HELPERS
 
     # i64[] reads use arr_i64_get, not __epic_arr_i64_get
     src_i64 = """fun main(): i64 {

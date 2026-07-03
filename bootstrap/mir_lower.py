@@ -782,7 +782,7 @@ class MirLower:
         self.x64.inst("mov", R("rcx"), M("rbp", dst_slot))
         self._runtime_string("rdx", name)
         self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("str_cat"))
+        self.x64.inst("call", Symbol("__epic_str_cat"))
         self.x64.inst("add", R("rsp"), I(32))
         self.x64.inst("mov", M("rbp", dst_slot), R("rax"))
 
@@ -790,7 +790,7 @@ class MirLower:
         self.x64.inst("mov", R("rcx"), M("rbp", dst_slot))
         self.x64.inst("mov", R("rdx"), M("rbp", src_slot))
         self.x64.inst("sub", R("rsp"), I(32))
-        self.x64.inst("call", Symbol("str_cat"))
+        self.x64.inst("call", Symbol("__epic_str_cat"))
         self.x64.inst("add", R("rsp"), I(32))
         self.x64.inst("mov", M("rbp", dst_slot), R("rax"))
 

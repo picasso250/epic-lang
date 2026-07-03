@@ -87,14 +87,14 @@ class MirCodegen:
         self.program.externs.append(MirExtern("str_new", MirSignature([I64, I64], ptr_str())))
         self.program.externs.append(MirExtern("str_bool", MirSignature([BOOL], ptr_str())))
         self.program.externs.append(MirExtern("str_arr_i8", MirSignature([ptr_arr_i8()], ptr_str())))
-        self.program.externs.append(MirExtern("str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
-        self.program.externs.append(MirExtern("str_eq", MirSignature([ptr_str(), ptr_str()], BOOL)))
-        self.program.externs.append(MirExtern("str_slice", MirSignature([ptr_str(), I64, I64], ptr_str())))
-        self.program.externs.append(MirExtern("str_replace_char", MirSignature([ptr_str(), I64, I64], ptr_str())))
-        self.program.externs.append(MirExtern("str_get", MirSignature([ptr_str(), I64], I64)))
-        self.program.externs.append(MirExtern("str_starts_with", MirSignature([ptr_str(), ptr_str()], I64)))
-        self.program.externs.append(MirExtern("str_find", MirSignature([ptr_str(), ptr_str()], I64)))
-        self.program.externs.append(MirExtern("str_trim", MirSignature([ptr_str()], ptr_str())))
+        self.program.externs.append(MirExtern("__epic_str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
+        self.program.externs.append(MirExtern("__epic_str_eq", MirSignature([ptr_str(), ptr_str()], BOOL)))
+        self.program.externs.append(MirExtern("__epic_str_slice", MirSignature([ptr_str(), I64, I64], ptr_str())))
+        self.program.externs.append(MirExtern("__epic_str_replace_char", MirSignature([ptr_str(), I64, I64], ptr_str())))
+        self.program.externs.append(MirExtern("__epic_str_get", MirSignature([ptr_str(), I64], I64)))
+        self.program.externs.append(MirExtern("__epic_str_starts_with", MirSignature([ptr_str(), ptr_str()], I64)))
+        self.program.externs.append(MirExtern("__epic_str_find", MirSignature([ptr_str(), ptr_str()], I64)))
+        self.program.externs.append(MirExtern("__epic_str_trim", MirSignature([ptr_str()], ptr_str())))
         self.program.externs.append(MirExtern("bytes_str", MirSignature([ptr_str()], ptr_arr_i8())))
         self.program.externs.append(MirExtern("__epic_cstr", MirSignature([ptr_str(), I64], I64)))
         self.program.externs.append(MirExtern("read_file", MirSignature([ptr_str(), I64], ptr_arr_i8())))
@@ -608,7 +608,7 @@ class MirCodegen:
         bool_map = {"&&": "and", "||": "or"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
         if expr.op in ("==", "!=") and left.type == ptr_str() and right.type == ptr_str():
-            result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="str_eq")
+            result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="__epic_str_eq")
             value = ValueOperand(result)
             if expr.op == "!=":
                 value = ValueOperand(self._inst("not", [value], result_type=BOOL))
@@ -737,7 +737,7 @@ class MirCodegen:
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="map_get")
             return ValueOperand(result)
         if base.type == ptr_str():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="str_get")
+            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__epic_str_get")
             return ValueOperand(result)
         if base.type == ptr_arr_i64():
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="arr_i64_get")
@@ -823,7 +823,7 @@ class MirCodegen:
                 raise MirCodegenError("slice base must be an aggregate pointer")
             end = self._load_field(base, struct_name, "len", result_type=I64)
         if base.type == ptr_str():
-            result = self._inst("call", [base, start, end], result_type=ptr_str(), type=ptr_str(), callee="str_slice")
+            result = self._inst("call", [base, start, end], result_type=ptr_str(), type=ptr_str(), callee="__epic_str_slice")
             return ValueOperand(result)
         if base.type == ptr_arr_i8():
             result = self._inst("call", [base, start, end], result_type=ptr_arr_i8(), type=ptr_arr_i8(), callee="arr_i8_slice")
@@ -896,7 +896,7 @@ class MirCodegen:
             if out is None:
                 out = piece
             else:
-                result = self._inst("call", [out, piece], result_type=ptr_str(), type=ptr_str(), callee="str_cat")
+                result = self._inst("call", [out, piece], result_type=ptr_str(), type=ptr_str(), callee="__epic_str_cat")
                 out = ValueOperand(result)
         if out is None:
             return SymbolOperand(ptr_str(), self._string_label(""))
@@ -1021,8 +1021,9 @@ class MirCodegen:
             "fields": {
                 "data": {"type": ptr(I8), "offset": 0},
                 "len": {"type": I64, "offset": 8},
+                "cap": {"type": I64, "offset": 16},
             },
-            "size": 16,
+            "size": 24,
         }
         self.structs["_arr_i8"] = {
             "fields": {

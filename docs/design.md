@@ -202,6 +202,11 @@ let ok = map_has(ids, "main")
 
 `str` 带长度信息且以 NUL 结尾，以便与 Win32 互操作。`s.len` 计数字节数，不包含尾部 NUL。`s.data` 和 `s.len` 是底层字段；新代码应使用 `len()` 和切片语法。
 
+> ⚠ `str` 表面只读，但当前实现**不阻止** `s[i] = v` 或 `s[i] += v` 通过 sema。这是有意为之的实现简化。
+> 正确做法是：`let b = bytes(s); b[i] = v`。未来自举编译器版本会用更严格的类型检查挡住直接值写入。
+> 当前 Python reference compiler 依赖 `str` layout 与 `u8[]` 完全一致（{data, len, cap} 均为 24 字节），
+> 使得 `str(bytes)` 和 `bytes(str)` 都是 identity cast，零分配零复制。
+
 ### 动态数组 (Dynamic Arrays)
 
 `T[]` 是堆分配的引用值。

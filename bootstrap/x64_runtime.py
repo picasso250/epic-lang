@@ -24,7 +24,7 @@ def emit_runtime_data(x64, program):
         "_map_repr_quote": '"',
     }.items():
         x64.data_bytes(f"{name}_data", list(text.encode("ascii")) + [0])
-        x64.data_zero(f"{name}_header", 16)
+        x64.data_zero(f"{name}_header", 24)
     for glob in program.globals:
         if glob.name == "@argv":
             continue
@@ -33,7 +33,7 @@ def emit_runtime_data(x64, program):
         values = list(glob.init.encode("ascii")) + [0]
         string_globals[glob.name] = (header_label, data_label, len(glob.init))
         x64.data_bytes(data_label, values)
-        x64.data_zero(header_label, 16)
+        x64.data_zero(header_label, 24)
     return string_globals
 
 
