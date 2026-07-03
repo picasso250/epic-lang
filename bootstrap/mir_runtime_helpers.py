@@ -802,10 +802,22 @@ def emit_slice_u8_alloc() -> MirFunction:
     cap_val = ValueOperand(b.fn.params[1].value)
 
     header_raw = b.call("__epx_alloc", [b.const_i64(24)], ptr())
-    data_raw = b.call("__epx_alloc", [cap_val], ptr())
+    cap_zero = b.icmp("eq", cap_val, b.const_i64(0))
+    zero_block = b.new_block("data_zero")
+    alloc_block = b.new_block("data_alloc")
+    init_block = b.new_block("init")
+    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, alloc_block.name)
 
-    # header.data = data
+    b.entry = zero_block
+    b.store(ConstNullOperand(), b.gep_field(ValueOperand(header_raw), "_slice_u8", 0))
+    b.entry.terminator = Br(init_block.name)
+
+    b.entry = alloc_block
+    data_raw = b.call("__epx_alloc", [cap_val], ptr())
     b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_slice_u8", 0))
+    b.entry.terminator = Br(init_block.name)
+
+    b.entry = init_block
     # header.len = len
     b.store(len_val, b.gep_field(ValueOperand(header_raw), "_slice_u8", 1))
     # header.cap = cap
@@ -1051,9 +1063,9 @@ def emit_slice_u8_push() -> MirFunction:
     double_block = b.new_block("grow_double")
     b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, double_block.name)
 
-    # grow_zero: new_cap = 2
+    # grow_zero: new_cap = 4
     b.entry = zero_block
-    nc0 = b.const_i64(2)
+    nc0 = b.const_i64(4)
     b.store(nc0, ValueOperand(new_cap_slot))
     nd0 = b.call("__epx_alloc", [nc0], ptr())
     b.store(nd0, ValueOperand(new_data_slot))

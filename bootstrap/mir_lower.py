@@ -349,6 +349,8 @@ class MirLower:
 
     def _emit_epic_slice_qword_new(self):
         x = self.x64
+        data_zero = "__epx_slice_qword_new.data_zero"
+        data_done = "__epx_slice_qword_new.data_done"
         x.label("__epx_slice_qword_new")
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
@@ -365,11 +367,17 @@ class MirLower:
         x.inst("add", R("r8"), R("r8"))
         x.inst("add", R("r8"), R("r8"))
         x.inst("add", R("r8"), R("r8"))
+        x.inst("test", R("r8"), R("r8"))
+        x.inst("jz", LabelRef(data_zero))
         x.inst("mov", R("rcx"), MS("_heap"))
         x.inst("mov", R("rdx"), I(8))
         x.inst("sub", R("rsp"), I(32))
         x.inst("call", Symbol("HeapAlloc"))
         x.inst("add", R("rsp"), I(32))
+        x.inst("jmp", LabelRef(data_done))
+        x.label(data_zero)
+        x.inst("xor", R("rax"), R("rax"))
+        x.label(data_done)
         x.inst("mov", R("rcx"), M("rbp", -16))
         x.inst("mov", M("rcx"), R("rax"))
         x.inst("mov", M("rcx", 8), I(0))
@@ -387,6 +395,7 @@ class MirLower:
         copy_loop = f"{label}.copy"
         copy_done = f"{label}.copy_done"
         cap_nonzero = f"{label}.cap_nonzero"
+        cap_ready = f"{label}.cap_ready"
         x.label(label)
         x.inst("push", R("rbp"))
         x.inst("mov", R("rbp"), R("rsp"))
@@ -404,9 +413,11 @@ class MirLower:
         x.label(grow)
         x.inst("test", R("rdx"), R("rdx"))
         x.inst("jnz", LabelRef(cap_nonzero))
-        x.inst("mov", R("rdx"), I(2))
+        x.inst("mov", R("rdx"), I(4))
+        x.inst("jmp", LabelRef(cap_ready))
         x.label(cap_nonzero)
         x.inst("add", R("rdx"), R("rdx"))
+        x.label(cap_ready)
         x.inst("mov", M("rbp", -32), R("rdx"))
         x.inst("mov", R("r8"), R("rdx"))
         x.inst("add", R("r8"), R("r8"))

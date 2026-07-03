@@ -779,7 +779,7 @@ class MirCodegen:
         return arr
 
     def _emit_new_array(self, expr):
-        count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 4)
+        count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 0)
         arr_type = self._type(expr.resolved_type)
         if arr_type == ptr_slice_u8():
             result = self._inst("call", [ConstIntOperand(I64, 0), count], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_alloc")

@@ -1,0 +1,52 @@
+# EXIT: 0
+# STDOUT: 47,1,65,2,-12
+struct Pair {
+    value: i64
+}
+
+fun main(): void {
+    let a = str(47)
+    let b = str(1)
+    let s = str(65)
+    let t = str(2)
+    let neg = str(0 - 12)
+
+    let buf1 = new u8[]
+    assert(len(buf1) == 0)
+    assert(cap(buf1) == 0)
+    extend(buf1, bytes(a))
+    assert(cap(buf1) == 4)
+    push(buf1, ',')
+    extend(buf1, bytes(b))
+    print(str(buf1))
+
+    let buf2 = new u8[]
+    push(buf2, ',')
+    extend(buf2, bytes(s))
+    push(buf2, ',')
+    extend(buf2, bytes(t))
+    print(str(buf2))
+
+    let buf3 = new u8[]
+    push(buf3, ',')
+    extend(buf3, bytes(neg))
+    print(str(buf3))
+
+    let nums = new i64[]
+    assert(len(nums) == 0)
+    assert(cap(nums) == 0)
+    push(nums, 40)
+    assert(cap(nums) == 4)
+    push(nums, 2)
+    assert(nums[0] + nums[1] == 42)
+
+    let pairs = new Pair[]
+    assert(len(pairs) == 0)
+    assert(cap(pairs) == 0)
+    let p = new Pair {}
+    p.value = 7
+    push(pairs, p)
+    assert(cap(pairs) == 4)
+    assert(pairs[0].value == 7)
+    exit(0)
+}
