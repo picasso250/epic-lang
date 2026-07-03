@@ -32,7 +32,7 @@ python epic.py --main main.ep main.ep lib.ep
 | `u32`   | 无符号 32 位整数，当前实现使用 8 字节槽存储 |
 | `i64`   | 有符号 64 位整数                        |
 | `u64`   | 无符号 64 位整数                        |
-| `str`   | 不可变字节字符串描述符 (immutable byte string descriptor) |
+| `str`   | 字符串描述符（只读表面；下层 u8[] buffer 通过 bytes() 可变） |
 | `Name`  | 堆分配的结构体引用               |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
 | `map[str]T` | 堆分配的映射表（str 键）           |
@@ -113,7 +113,7 @@ let token: Token
 
 ### 复合赋值 (Compound Assignment)
 
-支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。`str += str` 执行字符串拼接。
+支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。（`str += str` 已删除。使用 `u8[]` + `extend` + `str(bytes)` 显式拼接。）
 
 ### 控制流 (Control Flow)
 
@@ -223,6 +223,8 @@ let ok = map_has(ids, "main")
 
 切片语法（复制语义，半开区间 `[start, end)`）：
 
+> 注意：`s[i]`、`s[start:end]`、`==` / `!=` 是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_get` / `str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
+
 ```epic
 let a = s[start:end]
 let b = s[start:]
@@ -255,8 +257,9 @@ Epic 保留一批底层接口，主要服务于 compiler、runtime、linker 和 
 | 字符串索引 | `s[i]` | `s.data[i]` |
 | 长度 | `len(x)` | `x.len` |
 | 容量 | `cap(a)` | `a.cap` |
-| 切片 | `s[start:end]` / `a[start:end]` | `str_slice(s, start, end)` |
+| 切片 | `s[start:end]` / `a[start:end]` | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)` |
+| 字符串相等 | `s1 == s2` | 无 public 替代（`str_eq` 已从 public surface 删除） |
 
 > `a.data[i]` 是底层 unchecked 访问，仅适合明确需要绕过边界检查或处理 runtime layout 的代码。新代码默认使用 `a[i]`。
 >
@@ -279,7 +282,13 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 复制整个数组长度并追加尾部 NUL。常规源码加载方式：
+`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 视为 `str` view，不分配不复制。`bytes(str)` 同理。
+
+`str(bytes)` + `bytes(str)` 是对偶 cast，MIR 不需要知道。
+
+> ⚠ 修改 `bytes(str)` 返回的 `u8[]` 会修改原 `str` 的底层 buffer。如果多个 `str` 共享同一 buffer（例如相同内容的字面量），修改对所有 view 可见。语言不承诺 string literal 物理不可变。
+
+常规源码加载方式：
 
 ```epic
 let source = str(read_file(path))
@@ -294,10 +303,20 @@ let source = str(read_file(path))
 | `itoa(n: i64): str`                    | 整数转堆分配字符串                          |
 | `str_new(bytes, len): str`             | 从底层缓冲区复制 `len` 个字节创建字符串     |
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
-| `str_starts_with(s, prefix): i64`      | 若 `s` 以 `prefix` 开头则为真               |
-| `str_find(s, needle): i64`             | 第一个字节的索引，或 `-1`                   |
-| `str_trim(s): str`                     | 去除前导/尾随 ASCII 空白字符                |
 | `system(cmd: str): i64`                | 执行命令，返回退出码                        |
+
+以下 builtin 已从 public surface 删除，作为 compiler-internal helper 保留：
+
+| 删除的 public builtin   | 替代方案                                    |
+|------------------------|---------------------------------------------|
+| `str_get(s, i)`        | `s[i]`（语法）                              |
+| `str_slice(s, start, end)` | `s[start:end]`（语法）                   |
+| `str_eq(s1, s2)`       | `s1 == s2`（语法）                          |
+| `str_find`             | 自己写 `u8[]` 扫描                          |
+| `str_starts_with`      | 自己写 `u8[]` 扫描                          |
+| `str_trim`             | 自己写 `u8[]` 扫描                          |
+| `str_replace_char`     | 自己写 `u8[]` 扫描                          |
+| `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
 | `push(a: T[], x: T): void`             | 追加到动态数组                              |
 | `extend(dst: T[], src: T[]): void`     | 追加所有元素                                |
 

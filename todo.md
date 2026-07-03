@@ -7,7 +7,38 @@
 - ✅ ADT 文档残留已清除
 -   `src/*.ep` 自举线含 ADT 残留 —— **战略放弃，暂不处理**
 
-## 下一步
+## Commit A（已完成，文档定案）
+
+**Define zero-copy str/bytes surface**
+
+- [x] `docs/design.md` — 更新 str 类型描述、删除 public str builtin 列表、删除 `str + str`、zero-copy cast 语义、shared buffer 文档
+- [x] `docs/self-host-core.md` — 更新决策模型、builtin 表、migration strategy（Phase 0）
+- [x] `docs/builtin-inventory.md` — 标记 str_* 为已删除 public surface
+- [x] `docs/impl.md` — 更新 lowering 表、string layout 说明
+- [x] `todo.md` — 记录 commit 范围与后续 plan
+
+## 后续 Commits
+
+### Commit B：sema 删除 public str helper 调用
+
+删除用户可调用：`str_get`、`str_slice`、`str_find`、`str_starts_with`、`str_trim`、`str_replace_char`、`str_cat`、`str_eq`。
+保留 compiler internal lowering。
+examples 中直接调用这些 builtin 的改为 `bytes(...)` + `u8[]` helper 或直接删除该 example。
+
+### Commit C：删除 `str + str`
+
+sema 拒绝 `str + str`。
+MIR codegen 删除对应 lowering。
+examples 中 concat 示例改为 `u8[]` + `extend` 写法。
+
+### Commit D：确认 zero-copy `str(bytes)` / `bytes(str)`
+
+如果当前实现已经 zero-copy，加正向测试锁定行为。
+测试包括修改 `bytes(str)` 结果后原 `str` 可见。
+
+---
+
+## 下一步（远期）
 
 ### 优先级 1：Helper 命名统一（Phase 2 of self-host-core.md）
 

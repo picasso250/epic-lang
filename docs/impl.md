@@ -139,6 +139,10 @@ str = {
 
 字符串字面量被深拷贝到堆存储中，末尾附加一个 NUL 字节。`len` 不包含 NUL。空字符串在 `len = 0` 时可能 `data = 0`。
 
+> `str` 表面只读，但底层 buffer 可通过 `bytes()` 以 `u8[]` view 修改。
+> 语言不承诺 string literal 物理不可变：相同内容的字面量可能共享同一 buffer，
+> 修改 `bytes(s)` 的结果对所有共享 view 可见。
+
 ### 动态数组 (Dynamic Array)
 
 ```
@@ -188,24 +192,24 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 ## 内置函数降级 (Builtin Lowering)
 
-| 内置函数           | 实现方式                                    |
-|--------------------|---------------------------------------------|
-| `exit`             | `ExitProcess` 系统调用                      |
-| `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      |
-| `itoa`             | `_itoa` 运行时辅助函数                      |
-| `system`           | `_system` 运行时辅助函数                    |
-| `read_file`        | `_read_file` 运行时辅助函数，返回 `u8[]`    |
-| `write_file`       | 通过 `_write_file` 写入 `u8[]` 有效载荷     |
-| `str` (`u8[]`)     | `_str_alloc` 运行时辅助函数                 |
-| `bytes`            | `_bytes` 运行时辅助函数                     |
-| `str_new`          | `_str_alloc` 运行时辅助函数                 |
-| `str_slice`        | `_str_slice` 运行时辅助函数                 |
-| `str_starts_with`  | `_str_starts_with` 运行时辅助函数           |
-| `str_find`         | `_str_find` 运行时辅助函数                  |
-| `str_trim`         | `_str_trim` 运行时辅助函数                  |
-| `push`             | 由 codegen 为动态数组发射                   |
-| `extend`           | 字节数组用 `_extend_i8`；其他类型用复制循环 |
-| `len` / `cap`      | 直接内联发射                                |
-| 切片语法           | 字符串用 `_str_slice`；数组用复制循环        |
+| 内置函数           | 实现方式                                    | 公开状态 |
+|--------------------|---------------------------------------------|----------|
+| `exit`             | `ExitProcess` 系统调用                      | 公开 |
+| `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
+| `itoa`             | `_itoa` 运行时辅助函数                      | 公开 |
+| `system`           | `_system` 运行时辅助函数                    | 公开 |
+| `read_file`        | `_read_file` 运行时辅助函数，返回 `u8[]`    | 公开 |
+| `write_file`       | 通过 `_write_file` 写入 `u8[]` 有效载荷     | 公开 |
+| `str` (`u8[]`)     | `_str_alloc` 运行时辅助函数（zero-copy）     | 公开 |
+| `bytes`            | `_bytes` 运行时辅助函数（zero-copy）         | 公开 |
+| `str_new`          | `_str_alloc` 运行时辅助函数                 | 公开（escape hatch） |
+| `str_slice`        | `_str_slice` 运行时辅助函数                 | 🚫 已从 public surface 删除，internal helper |
+| `str_starts_with`  | `_str_starts_with` 运行时辅助函数           | 🚫 已从 public surface 删除 |
+| `str_find`         | `_str_find` 运行时辅助函数                  | 🚫 已从 public surface 删除 |
+| `str_trim`         | `_str_trim` 运行时辅助函数                  | 🚫 已从 public surface 删除 |
+| `push`             | 由 codegen 为动态数组发射                   | 公开 |
+| `extend`           | 字节数组用 `_extend_i8`；其他类型用复制循环 | 公开 |
+| `len` / `cap`      | 直接内联发射                                | 公开 |
+| 切片语法           | 字符串用 `_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
 
 小端加载/存储辅助函数不属于内置函数。`link.ep` 和示例使用 `u8[]`、`u64`、带检查的索引和位运算将其实现为普通的 Epic 函数。

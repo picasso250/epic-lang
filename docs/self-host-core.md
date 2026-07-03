@@ -16,7 +16,7 @@ or **deferred** for later decision.
 ```
 ADT:            remove (not in core)
 match:          keep literal switch only; remove ADT match
-str:            defer; keep for now, u8[] is the long-term truth
+str:            public surface contracted (see below); zero-copy str/bytes
 naming:         unify, but only after ADT removal
 required_helpers: defer; unconditional injection stays for now
 ```
@@ -94,11 +94,11 @@ required_helpers: defer; unconditional injection stays for now
 | `bytes(s)`    | `str` to `u8[]` (kept for now) |
 | `str_new`     | Raw pointer + len (kept as escape hatch) |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |
-| `str_slice`   | String slice (kept for now) |
-| `str_starts_with` | (kept for now) |
-| `str_find`    | (kept for now) |
-| `str_trim`    | (kept for now) |
-| `str_replace_char` | (kept for now) |
+| `str_slice`   | Removed from public surface; internal helper only |
+| `str_starts_with` | Removed from public surface |
+| `str_find`    | Removed from public surface |
+| `str_trim`    | Removed from public surface |
+| `str_replace_char` | Removed from public surface |
 | `system`      | Shell command (kept for now) |
 | `map_has`     | Map lookup (kept for now) |
 
@@ -180,8 +180,8 @@ after ADT removal and naming unification.
 
 | Topic | Current Status | Future Direction |
 |-------|---------------|------------------|
-| `str` vs `u8[]` | `str` is kept; `u8[]` is file I/O truth | Long-term: unify text as `u8[]`; `str` becomes thin wrapper or removed |
-| `str` helpers (`str_slice`, `str_find`, etc.) | Kept for now | Migrate to byte-oriented helpers (`bytes_find`, `bytes_slice`) then remove `str_*` public surface |
+| `str` vs `u8[]` | `str` is kept; `u8[]` is core text truth | Long-term: unify text as `u8[]`; `str` becomes thin view or removed. Public str helper surface removed in Phase 0. |
+| `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
 | Helper naming | Current mixed convention | Unify to `bool_to_str`, `i64_to_str`, `arr_i8_push`, etc. |
 | `required_helpers` / lazy injection | Unconditional injection | Defer until helper naming is stable |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
@@ -210,7 +210,9 @@ after ADT removal and naming unification.
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend`
-- String builtins (deferred removal): `str` / `bytes` / `str_new` / `str_slice` / `str_starts_with` / `str_find` / `str_trim` / `str_replace_char` / `itoa` / `cstr` / `system`
+- String builtins (retained): `len(s)` / `s[i]` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; `str(bytes)` / `bytes(s)` as zero-copy cast; `str_new` / `cstr` / `itoa` as escape hatch
+- String builtins (removed from public surface): `str_slice` / `str_starts_with` / `str_find` / `str_trim` / `str_replace_char` / `str_cat` / `str_get` — internal helpers retained
+- `system` kept for now
 - `os.*` WinAPI calls
 - `argv` global
 - `assert` / `panic`
@@ -226,6 +228,15 @@ after ADT removal and naming unification.
 ---
 
 ## Migration Strategy
+
+### Phase 0: Str Surface Contraction (this commit)
+- [x] 1. Document zero-copy str/bytes semantics
+- [x] 2. Remove public str helper builtins from docs
+- [x] 3. Document internal helper policy
+- [x] 4. Document literal sharing / shared buffer semantics
+- [_] 5. (Next commit) Remove public str helper from sema
+- [_] 6. (Next commit) Remove `str + str` from sema
+- [_] 7. (Next commit) Add zero-copy behavior test
 
 ### Phase 1: ADT Removal (completed)
 - [x] 1. Document decisions (this file)
@@ -252,7 +263,8 @@ after ADT removal and naming unification.
 - Document byte-buffer-first text model
 - Add byte-oriented helpers alongside str helpers
 - Migrate compiler source to `u8[]`
-- Remove public `str` helper surface last
+- Public `str` helper surface already removed in Phase 0;
+  remaining task is to migrate compiler internals
 
 ---
 

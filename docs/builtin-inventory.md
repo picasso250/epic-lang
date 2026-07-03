@@ -3,7 +3,10 @@
 Current snapshot of functions handled specially by the Epic compiler pipeline
 (bootstrap Python reference compiler + self-hosted Epic compiler).
 
-> This document records the **status quo** — no judgment, no removal.
+> **2026-07-03 update**: Some `str_*` builtins have been removed from public surface.
+> See [design.md](design.md) for the current public string surface.
+> This document records the **status quo** of the compiler codebase — internal helpers
+> still exist even after public removal.
 > `bootstrap/epic_builtins.py` now records the Python-side builtin inventory,
 > but it is not wired into parser, sema, or codegen yet.
 > Four source files define the builtin surface:
@@ -27,6 +30,10 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 
 ## String / Byte Conversion
 
+**Public surface status**: `str_slice`, `str_replace_char`, `str_starts_with`, `str_find`, `str_trim` are **removed from public surface**.
+They still exist as compiler-internal helpers (used for lowering `s[i]`, `s[start:end]`, etc.).
+`str`, `bytes`, `str_new`, `cstr`, `itoa` remain public.
+
 | Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `str`      | ✓ (ln 417) | ✓ (ln 607) | ✓ (ln 314) | ✓ (ln 921) | Multi-type to string |
@@ -34,11 +41,11 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 | `itoa`     | ✓ (ln 461) | ✓ (ln 642) | ✗ | ✓ (ln 863) | Integer to ASCII string, legacy |
 | `bytes`    | ✓ (ln 436) | ✓ (ln 650) | ✓ (ln 311) | ✓ (ln 934) | String → `u8[]` |
 | `str_new`  | ✓ (ln 445) | ✓ (ln 628) | ✓ (ln 317) | ✓ (ln 914) | `str_new(ptr, len)` — raw pointer slice |
-| `str_slice` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 320) | ✓ (ln 940) | `str_slice(s, start, end)` |
-| `str_replace_char` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 323) | ✓ (ln 950) | |
-| `str_starts_with` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 326) | ✓ (ln 960) | |
-| `str_find` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 329) | ✓ (ln 969) | |
-| `str_trim` | ✓ (ln 458) | ✓ (ln 677) | ✓ (ln 332) | ✓ (ln 978) | |
+| `str_slice` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 320) | ✓ (ln 940) | 🚫 Public surface removed; internal helper only |
+| `str_replace_char` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 323) | ✓ (ln 950) | 🚫 Public surface removed |
+| `str_starts_with` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 326) | ✓ (ln 960) | 🚫 Public surface removed |
+| `str_find` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 329) | ✓ (ln 969) | 🚫 Public surface removed |
+| `str_trim` | ✓ (ln 458) | ✓ (ln 677) | ✓ (ln 332) | ✓ (ln 978) | 🚫 Public surface removed |
 
 ---
 
@@ -171,6 +178,10 @@ symbols used by the Python backend.
 | `extend_i8` | append one byte array into another |
 
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
+
+> `str_slice`, `str_starts_with`, `str_find`, `str_replace_char`, `str_trim`, `str_cat`, `str_get`
+> in the list above are **internal helpers** — they remain for lowering `s[i]`, `s[start:end]`, `==`, `!=`
+> but are no longer callable by user code as public builtins.
 
 ### x64-backed private helpers
 
