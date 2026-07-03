@@ -13,8 +13,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 def main():
     test_file = os.path.join(SCRIPT_DIR, "test_mir.py")
     if not os.path.isfile(test_file):
-        print("  SKIP  test_mir.py not found")
-        return
+        print("  FAIL  test_mir.py not found")
+        sys.exit(1)
 
     result = subprocess.run(
         [sys.executable, test_file],

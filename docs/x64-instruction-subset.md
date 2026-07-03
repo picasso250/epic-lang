@@ -351,8 +351,8 @@ Layered golden tests should lock each boundary separately:
 
 Current files:
 
-- `test_mir.py`: MIR text and validation smoke test。
-- `test_x64_layers.py`: X64 pretty print, MIR-to-X64 function lowering, and
+- `tests/mir/test_mir.py`: MIR text and validation smoke test。
+- `tests/x64/test_x64_layers.py`: X64 pretty print, MIR-to-X64 function lowering, and
   X64-to-machine bytes/fixups。
 - `test_examples_py.py`: executable-level acceptance for the Python machine backend。
 

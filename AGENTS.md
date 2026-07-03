@@ -16,8 +16,8 @@
 - 当前测试入口（按推荐顺序）：
   - `python tests/run.py`             # 模块级测试体系
   - `python test_examples_py.py`      # examples/ 正向学习示例
-  - `python test_mir.py`              # 兼容旧入口，后续迁移到 tests/mir/
-  - `python test_x64_layers.py`       # 兼容旧入口，后续迁移到 tests/x64/
+  - `python tests/mir/run.py`          # MIR 测试
+  - `python tests/x64/run.py`          # X64 后端测试
 - 不要运行：
   - `python -m pytest`（不是 pytest 体系）
   - `test_*bootstrap*.py`（bootstrap 自举测试战略性放弃）

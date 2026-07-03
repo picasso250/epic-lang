@@ -53,8 +53,8 @@ Recommended commands:
 ```powershell
 python tests/run.py               # Module-level test suite
 python test_examples_py.py        # examples/ learning examples
-python test_mir.py                 # Legacy MIR tests (migrating to tests/mir/)
-python test_x64_layers.py          # Legacy x64 tests (migrating to tests/x64/)
+python tests/mir/run.py            # MIR tests
+python tests/x64/run.py            # X64 backend tests
 ```
 
 `link.py` is the default Python linker. `src/link.ep` is the Epic linker

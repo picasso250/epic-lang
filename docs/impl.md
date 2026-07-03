@@ -71,8 +71,8 @@ src/link.ep              # Epic 链接器（独立工具，不属于编译器不
 
 ```powershell
 python test_examples_py.py
-python test_mir.py
-python test_x64_layers.py
+python tests/mir/run.py
+python tests/x64/run.py
 ```
 
 `test_*bootstrap*.py` 覆盖的是 Epic 自举线，不是当前去 NASM 化的 Python
