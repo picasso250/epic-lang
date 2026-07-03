@@ -1,0 +1,15 @@
+# EXIT: 0
+# STDOUT: Outer{inner: 0}
+
+struct Inner {
+    x: i64
+}
+
+struct Outer {
+    inner: Inner
+}
+
+fun main(): i64 {
+    println(str(new Outer {}))
+    return 0
+}

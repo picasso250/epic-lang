@@ -20,7 +20,6 @@ class ASTNode:
 class ProgramNode(ASTNode):
     funcs: list      # list[FunDefNode]
     structs: list    # list[StructDefNode]
-    types: list = field(default_factory=list)
 
 
 @dataclass

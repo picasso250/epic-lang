@@ -227,7 +227,7 @@ class SemanticAnalyzer:
 
     def _analyze_match_case(self, scrutinee_type, case):
         if case.bindings:
-            self._fail("match bindings require an ADT variant pattern (ADT removed)")
+            self._fail("match bindings are not supported")
         self._check_assign(scrutinee_type, self._expr(case.pattern), "match pattern")
         self._analyze_block(case.body)
 

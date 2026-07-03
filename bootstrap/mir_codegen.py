@@ -1001,10 +1001,6 @@ class MirCodegen:
             return self._quote("")
         if typ == ptr_arr_i8():
             return "u8[]{}"
-        if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct":
-            name = typ.pointee.name
-            if name in self.adts:
-                return f"{name}.Empty" + "{}"
         return "0"
 
     def _quote(self, text):
@@ -1075,14 +1071,6 @@ class MirCodegen:
             },
             "size": 24,
         }
-        for type_node in getattr(ast, "types", []):
-            self.structs[type_node.name] = {
-                "fields": {
-                    "tag": {"type": I64, "offset": 0},
-                    "data": {"type": ptr(I64), "offset": 8},
-                },
-                "size": 16,
-            }
         for struct_node in ast.structs:
             self.structs[struct_node.name] = {"fields": {}, "size": 0}
         for struct_node in ast.structs:

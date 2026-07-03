@@ -57,7 +57,6 @@ class Parser:
     def parse_program(self):
         funcs = []
         structs = []
-        types = []
         self.skip_newlines()
         while self.peek()[0] in ("FUN", "STRUCT"):
             if self.peek_kind("FUN"):
@@ -68,7 +67,7 @@ class Parser:
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return ProgramNode(funcs=funcs, structs=structs, types=types)
+        return ProgramNode(funcs=funcs, structs=structs)
 
     # ── fun definition ─────────────────────────────────────────────────
 
