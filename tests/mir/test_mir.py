@@ -185,7 +185,7 @@ def test_mir_helper_injection():
     assert "__ep_str_cat" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_slice" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_starts_with" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_get" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_str_get" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_find" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_replace_char" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_trim" not in IMPLEMENTED_MIR_HELPERS
@@ -310,13 +310,6 @@ def test_mir_helper_injection():
     let s = "epic-lang"
     let t = s[5:9]
     return len(t)
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let s = "epic"
-    return s[1]
 }"""
     )
 

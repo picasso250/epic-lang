@@ -6,8 +6,10 @@ fun __ep_str_eq(left: str, right: str): bool {
     if left_len != len(right) {
         return false
     }
+    let left_bytes = bytes(left)
+    let right_bytes = bytes(right)
     for i in 0:left_len {
-        if left[i] != right[i] {
+        if left_bytes[i] != right_bytes[i] {
             return false
         }
     }

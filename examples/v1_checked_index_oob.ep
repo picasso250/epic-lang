@@ -1,6 +1,6 @@
 # EXIT: 1
 fun main(): void {
-    let s = "A"
-    let x = s[1]
+    let xs = new u8[] { 'A' }
+    let x = xs[1]
     exit(0)
 }

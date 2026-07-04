@@ -34,7 +34,7 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 
 - `str_new` — removed entirely; use `str(bytes)`
 - `itoa` — removed entirely; use `str(n)` (internal helper `str_i64` retained)
-- `str_slice`, `str_starts_with`, `str_find`, `str_cat`, `str_get` — removed from public surface, but retained as compiler-internal helpers where syntax lowering still needs them
+- `str_slice`, `str_cat` — removed from public surface, but retained as compiler-internal helpers where syntax lowering still needs them
 - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
 `str`, `bytes`, `cstr` remain public.
 
@@ -171,7 +171,6 @@ symbols used by the Python backend.
 | `__ep_str_cat` | concatenate two strings |
 | `__ep_str_slice` | copy a half-open string slice |
 | `__ep_str_starts_with` | test whether a string starts with a prefix |
-| `__ep_str_get` | bounds-checked string byte read |
 | `__ep_str_find` | find a substring within a string |
 | `__ep_slice_u8_alloc` | allocate initialized-capacity byte array |
 | `__ep_slice_u8_alloc` | allocate empty byte array with capacity |
@@ -183,7 +182,7 @@ symbols used by the Python backend.
 
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
 
-> `__ep_str_slice`, `__ep_str_starts_with`, `__ep_str_find`, `__ep_str_cat`, `__ep_str_get`
+> `__ep_str_slice`, `__ep_str_cat`
 > in the list above are **internal helpers** — they remain for lowering `s[i]`, `s[start:end]`, `==`, `!=`
 > but are no longer callable by user code as public builtins.
 

@@ -398,12 +398,12 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     }
     sema_expect_int(st, index_expr, "subscript index")
     if base == "str" {
-        return "u8"
+        sema_die("str subscript is removed; use bytes(s)[i]")
     }
     if sema_is_array(base) {
         return sema_array_elem(base)
     }
-    sema_die(f"subscript expected array, str, map, or pointer, got {base}")
+    sema_die(f"subscript expected array, map, or pointer, got {base}")
     return ""
 }
 

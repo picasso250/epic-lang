@@ -49,7 +49,6 @@ Implemented MIR helpers:
 | `str_cat` | string concatenation | `bootstrap/mir_runtime_helpers.py` |
 | `str_slice` | string slice copy | `bootstrap/mir_runtime_helpers.py` |
 | `str_starts_with` | string prefix check | `bootstrap/mir_runtime_helpers.py` |
-| `str_get` | string subscript read | `bootstrap/mir_runtime_helpers.py` |
 | `str_find` | substring search | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8` | `new u8[] { ... }` | `bootstrap/mir_runtime_helpers.py` |
 | `new_arr_i8_empty` | `new u8[](n)` / empty-capacity byte arrays | `bootstrap/mir_runtime_helpers.py` |
@@ -360,7 +359,6 @@ Rename map (Phase 2):
 | `str_cat` | unchanged | already correct |
 | `str_eq` | unchanged | already correct |
 | `str_slice` | unchanged | already correct |
-| `str_get` | unchanged | already correct |
 | `str_starts_with` | unchanged | already correct |
 | `str_find` | unchanged | already correct |
 | `__epic_cstr` | `str_cstr` | MIR helper, not x64 primitive |

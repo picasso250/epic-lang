@@ -234,7 +234,7 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 
 切片语法（复制语义，半开区间 `[start, end)`）：
 
-> 注意：`s[i]`、`s[start:end]`、`==` / `!=` 是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_get` / `str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
+> 注意：`s[i]` 已删除；按字节读取字符串必须显式写 `bytes(s)[i]`。`s[start:end]`、`==` / `!=` 仍是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
 >
 > 切片当前仅支持 str 和 u8[]；其他数组需要复制部分元素时使用 for + push。
 
@@ -319,7 +319,7 @@ let source = str(read_file(path))
 |------------------------|---------------------------------------------|
 | `itoa(n)`              | `str(n)`                                    |
 | `str_new(ptr, len)`    | `str(bytes)`                                |
-| `str_get(s, i)`        | `s[i]`（语法）                              |
+| `str_get(s, i)`        | 已删除；使用 `bytes(s)[i]`                  |
 | `str_slice(s, start, end)` | `s[start:end]`（语法）                   |
 | `str_eq(s1, s2)`       | `s1 == s2`（语法）                          |
 | `str_find`             | 自己写 `u8[]` 扫描；未来可提供 `s.find(...)` 方法 |

@@ -103,7 +103,8 @@ fun is_upper_name(name: str): i64 {
     if len(name) == 0 {
         return 0
     }
-    let c = name[0]
+    let bs = bytes(name)
+    let c = bs[0]
     if c >= 65 && c <= 90 {
         return 1
     }

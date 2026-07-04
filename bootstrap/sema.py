@@ -477,12 +477,12 @@ class SemanticAnalyzer:
             return base.type.elem
         self._expect_integer(self._expr(index_expr), "subscript index")
         if base.type == STR:
-            return U8
+            self._fail("str subscript is removed; use bytes(s)[i]")
         if base.type.kind == "array":
             return base.type.elem
         if base.type.kind == "ptr":
             return base.type.elem
-        self._fail(f"subscript expected array, str, map, or pointer, got {base.type}")
+        self._fail(f"subscript expected array, map, or pointer, got {base.type}")
 
     def _field_type(self, base_type, field):
         if base_type == STR:

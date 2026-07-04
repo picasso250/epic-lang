@@ -1,5 +1,6 @@
 # EXIT: 66
 fun main(): void {
     let s = "ABC"
-    exit(s[1])
+    let bs = bytes(s)
+    exit(bs[1])
 }

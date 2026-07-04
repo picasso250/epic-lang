@@ -142,7 +142,7 @@ Program
           Var bs : u8[]
       Let first : u8
         Subscript : u8
-          Var text : str
+          Var bs : u8[]
           Literal 0 : i64
       Let b0 : u8
         Subscript : u8

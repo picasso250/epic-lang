@@ -265,44 +265,6 @@ def emit___ep_str_cat() -> MirFunction:
 
 
 
-def emit___ep_str_get() -> MirFunction:
-    """Bounds-checked byte read from str.
-
-    fn __ep_str_get(ptr<str> %s, i64 %idx) -> i64
-    """
-    b = MirHelperBuilder(
-        "__ep_str_get",
-        [MirParam("%s", ptr(mir_struct("str"))), MirParam("%idx", I64)],
-        I64,
-    )
-    s_val = ValueOperand(b.fn.params[0].value)
-    idx_val = ValueOperand(b.fn.params[1].value)
-
-    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
-
-    ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
-    check_block = b.new_block("check_high")
-    ok_block = b.new_block("ok")
-    fail_block = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
-
-    b.entry = check_block
-    lt_len = b.icmp("lt", idx_val, s_len)
-    b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
-
-    b.entry = ok_block
-    data = b.load(ptr(), b.gep_field(s_val, "str", 0))
-    byte_addr = b.gep(I8, data, [idx_val])
-    result = b.load(I8, byte_addr, result_type=I64)
-    b.ret(ValueOperand(result))
-
-    b.entry = fail_block
-    b.call("ExitProcess", [b.const_i64(1)], VOID)
-    b.ret(b.const_i64(0))  # dummy, unreachable
-
-    return b.fn
-
-
 
 def emit_slice_u8_alloc() -> MirFunction:
     """Allocate header + data for u8[], with separate len and cap.
@@ -1260,7 +1222,6 @@ _HELPER_EMITTERS = {
     "__ep_slice_u8_from_str": lambda p: emit_bytes_slice_u8(),
     "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
-    "__ep_str_get": lambda p: emit___ep_str_get(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
     "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
     "__ep_slice_i64_new": lambda p: emit_slice_word_new("__ep_slice_i64_new"),
@@ -1296,7 +1257,6 @@ _HELPER_ORDER = [
     "__ep_slice_u8_from_str",
     "__ep_str_from_slice_u8",
     "__ep_str_cat",
-    "__ep_str_get",
     "__ep_slice_u8_alloc",
     "__ep_slice_u8_get",
     "__ep_slice_i64_new",

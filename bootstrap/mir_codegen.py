@@ -93,7 +93,6 @@ class MirCodegen:
             self.program.externs.append(MirExtern("__ep_str_eq", MirSignature([ptr_str(), ptr_str()], BOOL)))
         if "__ep_str_slice" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_slice", MirSignature([ptr_str(), I64, I64], ptr_str())))
-        self.program.externs.append(MirExtern("__ep_str_get", MirSignature([ptr_str(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_from_str", MirSignature([ptr_str()], ptr_slice_u8())))
         self.program.externs.append(MirExtern("__ep_cstr", MirSignature([ptr_str(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_read_file", MirSignature([ptr_str(), I64], ptr_slice_u8())))
@@ -833,9 +832,6 @@ class MirCodegen:
         map_value_type = self._map_value_type(base.type)
         if map_value_type is not None:
             result = self._inst("call", [base, index], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base.type, "get"))
-            return ValueOperand(result)
-        if base.type == ptr_str():
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_str_get")
             return ValueOperand(result)
         if base.type == ptr_slice_i64():
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_slice_i64_get")

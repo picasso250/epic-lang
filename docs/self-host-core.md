@@ -114,7 +114,6 @@ These are unconditionally injected and considered part of the core runtime:
 - `__ep_str_cat` — string concatenation
 - `__ep_str_slice` — string slice copy
 - `__ep_str_starts_with` — prefix test
-- `__ep_str_get` — bounds-checked byte read
 - `__ep_str_find` — substring find
 - `__ep_slice_u8_alloc` — allocate initialized byte array
 - `__ep_slice_u8_alloc` — allocate empty byte array
@@ -218,7 +217,7 @@ after ADT removal and naming unification.
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`
   - `itoa` — removed entirely; use `str(n)`
-  - `str_slice`, `str_starts_with`, `str_find`, `str_cat`, `str_get` — removed from public surface; internal helpers retained where syntax lowering still needs them
+  - `str_slice`, `str_cat` — removed from public surface; internal helpers retained where syntax lowering still needs them
   - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
 - `system` kept for now
 - `os.*` WinAPI calls
