@@ -1,0 +1,7 @@
+fun classify(n: i64): i64 {
+    match n {
+        0: { return 10 }
+        1: { return 20 }
+        else: { return }
+    }
+}

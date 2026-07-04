@@ -49,6 +49,8 @@ class Parser:
         if self.check("NEWLINE"):
             self.skip_newlines()
             return
+        if self.peek_kind("RBRACE"):
+            return
         t = self.peek()
         raise ParseError("Expected end of line", t[2])
 
@@ -221,7 +223,7 @@ class Parser:
         line = self.peek()[2]
         self.expect("RETURN")
         expr = None
-        if not self.peek_kind("NEWLINE"):
+        if not self.peek_kind("NEWLINE") and not self.peek_kind("RBRACE"):
             expr = self.parse_expr()
         self.expect_stmt_end()
         return ReturnNode(expr=expr, line=line)
