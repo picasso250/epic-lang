@@ -243,7 +243,7 @@ after ADT removal and naming unification.
 - [x] 4. Document literal sharing / shared buffer semantics
 - [_] 5. (Next commit) Remove public str helper from sema
 - [_] 6. (Next commit) Remove `str + str` from sema
-- [_] 7. (Next commit) Add zero-copy behavior test
+- [x] 7. Add zero-copy behavior test (`examples/v5_zero_copy_str_bytes.ep`)
 
 ### Phase 1: ADT Removal (completed)
 - [x] 1. Document decisions (this file)
@@ -271,12 +271,24 @@ Older names such as `str_bool`, `str_i64`, `str_arr_i8`, `bytes_str`, and
 `__epic_arr_*` have been removed from implementation code. The old Phase 2
 plan to rename helpers to bare names is obsolete.
 
-### Phase 3: `str` → `u8[]` Convergence (after Phase 2)
-- Document byte-buffer-first text model
-- Add byte-oriented helpers alongside str helpers
-- Migrate compiler source to `u8[]`
-- Public `str` helper surface already removed in Phase 0;
-  remaining task is to migrate compiler internals
+### Phase 3: `str` → `u8[]` Convergence (public surface completed; self-hosted source cleanup remains)
+
+Completed:
+- The byte-buffer-first text model is documented.
+- `read_file` / `write_file` use `u8[]` as the data carrier.
+- `str(u8[])` and `bytes(str)` are zero-copy identity casts.
+- The zero-copy shared-buffer behavior is covered by `examples/v5_zero_copy_str_bytes.ep`.
+- Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
+  `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.
+- `extend` is byte-oriented and only supports `u8[]`.
+
+Remaining:
+- Some `src/*.ep` self-hosted compiler code still calls old helpers such as
+  `itoa`, `str_find`, and `str_new`. These should migrate to `str(n)`,
+  explicit `u8[]` byte scanning, and `str(bytes)`.
+
+Conclusion: Phase 3 is complete for the public language surface, docs, and tests;
+it is not fully complete until the self-hosted compiler source stops using the old helpers.
 
 ---
 

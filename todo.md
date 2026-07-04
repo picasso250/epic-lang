@@ -1,7 +1,7 @@
 ## 当前 Status
 
 - ✅ Python reference compiler 主线健康：`python tests/run.py` 全绿（10/10 模块）
-- ✅ `python test_examples_py.py` 全绿（62 passed）
+- ✅ `python test_examples_py.py` 全绿（64 passed）
 - ✅ ADT 已从 Python reference compiler 移除
 - ✅ `self-hosted` lexer 比较变为 opt-in（`--self-hosted`）
 - ✅ ADT 文档残留已清除
@@ -84,9 +84,19 @@
 
 结论：不要标成完成；下一步应优先迁移 `__ep_str_from_i64`，再考虑 `__ep_cstr` / file / argv / print 这类更贴近平台 ABI 的 helper。
 
-### 优先级 3：str → u8[] 收敛（Phase 3 of self-host-core.md）
+### 优先级 3：str → u8[] 收敛（公共表面已完成，self-hosted 源码残留待清）
 
-- 文档层先标记方向
-- 逐步加 byte-oriented helper
-- 最后移除 str helper public surface
+已完成：
 
+- 文档层已定案 byte-buffer-first text model
+- public str helper surface 已收缩：`str_new` / `itoa` / `str_find` / `str_starts_with` / `str_replace_char` / `str_trim` 不再作为公开内置使用
+- `read_file` / `write_file` 已以 `u8[]` 为数据载体
+- `str(u8[])` / `bytes(str)` 已是 zero-copy identity cast，并有 `examples/v5_zero_copy_str_bytes.ep` 覆盖共享 buffer 行为
+- `extend` 已收敛为仅支持 `u8[]`
+
+仍未完成：
+
+- `src/*.ep` 自举源码仍有旧 helper 调用残留：`itoa`、`str_find`、`str_new`
+- 下一步应把这些调用改成 `str(n)`、`u8[]` byte scanning、`str(bytes)` 等当前表面语义
+
+结论：Phase 3 的语言/文档/测试表面基本完成；不能标成全完成，因为 self-hosted compiler 源码迁移还没清完。
