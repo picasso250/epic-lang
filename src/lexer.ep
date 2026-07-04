@@ -95,76 +95,62 @@ fun is_digit(c: i64): i64 {
 }
 
 fun keyword_kind(text: str): str {
-    let n = len(text)
-    if n == 2 {
-        if text[0] == 105 && text[1] == 102 {
-            return "IF"
-        }
-        if text[0] == 105 && text[1] == 110 {
-            return "IN"
-        }
+    if text == "if" {
+        return "IF"
     }
-    if n == 3 {
-        if text[0] == 102 && text[1] == 117 && text[2] == 110 {
-            return "FUN"
-        }
-        if text[0] == 102 && text[1] == 111 && text[2] == 114 {
-            return "FOR"
-        }
-        if text[0] == 110 && text[1] == 101 && text[2] == 119 {
-            return "NEW"
-        }
-        if text[0] == 108 && text[1] == 101 && text[2] == 116 {
-            return "LET"
-        }
+    if text == "in" {
+        return "IN"
     }
-    if n == 4 {
-        if text[0] == 101 && text[1] == 108 && text[2] == 115 && text[3] == 101 {
-            return "ELSE"
-        }
-        if text[0] == 116 && text[1] == 121 && text[2] == 112 && text[3] == 101 {
-            return "TYPE"
-        }
-        if text[0] == 116 && text[1] == 114 && text[2] == 117 && text[3] == 101 {
-            return "TRUE"
-        }
+    if text == "fun" {
+        return "FUN"
     }
-    if n == 5 {
-        if text[0] == 119 && text[1] == 104 && text[2] == 105 && text[3] == 108 && text[4] == 101 {
-            return "WHILE"
-        }
-        if text[0] == 98 && text[1] == 114 && text[2] == 101 && text[3] == 97 && text[4] == 107 {
-            return "BREAK"
-        }
-        if text[0] == 112 && text[1] == 97 && text[2] == 110 && text[3] == 105 && text[4] == 99 {
-            return "PANIC"
-        }
-        if text[0] == 109 && text[1] == 97 && text[2] == 116 && text[3] == 99 && text[4] == 104 {
-            return "MATCH"
-        }
-        if text[0] == 102 && text[1] == 97 && text[2] == 108 && text[3] == 115 && text[4] == 101 {
-            return "FALSE"
-        }
+    if text == "for" {
+        return "FOR"
     }
-    if n == 6 {
-        if text[0] == 114 && text[1] == 101 && text[2] == 116 && text[3] == 117 && text[4] == 114 && text[5] == 110 {
-            return "RETURN"
-        }
-        if text[0] == 97 && text[1] == 115 && text[2] == 115 && text[3] == 101 && text[4] == 114 && text[5] == 116 {
-            return "ASSERT"
-        }
-        if text[0] == 115 && text[1] == 116 && text[2] == 114 && text[3] == 117 && text[4] == 99 && text[5] == 116 {
-            return "STRUCT"
-        }
+    if text == "new" {
+        return "NEW"
     }
-    if n == 8 {
-        if text[0] == 99 && text[1] == 111 && text[2] == 110 && text[3] == 116 && text[4] == 105 && text[5] == 110 && text[6] == 117 && text[7] == 101 {
-            return "CONTINUE"
-        }
+    if text == "let" {
+        return "LET"
+    }
+    if text == "else" {
+        return "ELSE"
+    }
+    if text == "type" {
+        return "TYPE"
+    }
+    if text == "true" {
+        return "TRUE"
+    }
+    if text == "while" {
+        return "WHILE"
+    }
+    if text == "break" {
+        return "BREAK"
+    }
+    if text == "panic" {
+        return "PANIC"
+    }
+    if text == "match" {
+        return "MATCH"
+    }
+    if text == "false" {
+        return "FALSE"
+    }
+    if text == "return" {
+        return "RETURN"
+    }
+    if text == "assert" {
+        return "ASSERT"
+    }
+    if text == "struct" {
+        return "STRUCT"
+    }
+    if text == "continue" {
+        return "CONTINUE"
     }
     return "ID"
 }
-
 fun decode_escape(e: i64): i64 {
     if e == 110 {
         return 10
@@ -193,10 +179,11 @@ fun decode_escape(e: i64): i64 {
 }
 
 fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
+    let src_bytes = bytes(src)
     let buf = new u8[]
     let pos = start
     while pos < end {
-        let c = src[pos]
+        let c = src_bytes[pos]
         if c == 10 || c == 13 {
             println("unterminated string")
             exit(1)
@@ -207,7 +194,7 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
                 println("bad escape")
                 exit(1)
             }
-            c = decode_escape(src[pos])
+            c = decode_escape(src_bytes[pos])
         }
         push(buf, c)
         pos += 1
@@ -219,7 +206,8 @@ fun char_at(src: str, pos: i64): i64 {
     if pos < 0 || pos >= len(src) {
         return 0
     }
-    return src[pos]
+    let src_bytes = bytes(src)
+    return src_bytes[pos]
 }
 
 fun is_ascii_space(c: i64): i64 {
@@ -233,24 +221,26 @@ fun is_ascii_space(c: i64): i64 {
 }
 
 fun trim_ascii(s: str): str {
+    let s_bytes = bytes(s)
     let start = 0
     let end = len(s)
-    while start < end && is_ascii_space(s[start]) == 1 {
+    while start < end && is_ascii_space(s_bytes[start]) == 1 {
         start += 1
     }
-    while start < end && is_ascii_space(s[end - 1]) == 1 {
+    while start < end && is_ascii_space(s_bytes[end - 1]) == 1 {
         end -= 1
     }
     return s[start:end]
 }
 
 fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
+    let src_bytes = bytes(src)
     let n = len(src)
     let parens = 0
     let brackets = 0
     let braces = 0
     while pos < n {
-        let c = src[pos]
+        let c = src_bytes[pos]
         if c == 10 || c == 13 {
             println("unterminated f-string expression")
             exit(1)
@@ -260,7 +250,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             pos += 1
             let found = 0
             while found == 0 && pos < n {
-                let q = src[pos]
+                let q = src_bytes[pos]
                 if q == 10 || q == 13 {
                     println("unterminated string in f-string expression")
                     exit(1)
@@ -328,13 +318,14 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
 }
 
 fun scan_fstring(src: str, start: i64, line: i64): Token {
+    let src_bytes = bytes(src)
     let n = len(src)
     let parts = new FStringPart[]
     let pos = start + 2
     let segment_start = pos
 
     while pos < n {
-        let ch = src[pos]
+        let ch = src_bytes[pos]
         if ch == 10 || ch == 13 {
             println("unterminated f-string literal")
             exit(1)
@@ -387,6 +378,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
 # ── Lexer ───────────────────────────────────────────────────────────────
 
 fun lex(src: str): Token[] {
+    let src_bytes = bytes(src)
     let tokens = new Token[4096]
     let n = len(src)
     let pos = 0
@@ -394,7 +386,7 @@ fun lex(src: str): Token[] {
 
 
     while pos < n {
-        let ch = src[pos]
+        let ch = src_bytes[pos]
         let consumed = 0
 
         # ── whitespace ──
@@ -412,7 +404,7 @@ fun lex(src: str): Token[] {
         # ── comment # ──
         if consumed == 0 && ch == 35 {
             pos += 1
-            while pos < n && src[pos] != 10 {
+            while pos < n && src_bytes[pos] != 10 {
                 pos += 1
             }
             consumed = 1
@@ -422,18 +414,18 @@ fun lex(src: str): Token[] {
         if consumed == 0 && ch == 102 && char_at(src, pos + 1) == 34 {
             let t = scan_fstring(src, pos, line)
             pos += 2
-            while pos < n && src[pos] != 34 {
-                if src[pos] == 92 {
+            while pos < n && src_bytes[pos] != 34 {
+                if src_bytes[pos] == 92 {
                     pos += 2
                 } else {
-                    if src[pos] == 123 {
+                    if src_bytes[pos] == 123 {
                         pos = scan_fstring_expr_end(src, pos + 1, line) + 1
                     } else {
                         pos += 1
                     }
                 }
             }
-            if pos < n && src[pos] == 34 {
+            if pos < n && src_bytes[pos] == 34 {
                 pos += 1
             }
             push(tokens, t)
@@ -448,10 +440,10 @@ fun lex(src: str): Token[] {
             let buf = new u8[]
             let scanning = 1
             while scanning == 1 && pos < n {
-                if src[pos] == 34 {
+                if src_bytes[pos] == 34 {
                     scanning = 0
                 } else {
-                    let c = src[pos]
+                    let c = src_bytes[pos]
                     if c == 10 || c == 13 {
                         println("unterminated string")
                         exit(1)
@@ -462,7 +454,7 @@ fun lex(src: str): Token[] {
                             println("bad escape")
                             exit(1)
                         }
-                        let e = src[pos]
+                        let e = src_bytes[pos]
                         c = decode_escape(e)
                     }
                     push(buf, c)
@@ -484,14 +476,14 @@ fun lex(src: str): Token[] {
         if consumed == 0 && ch == 39 {
             let start_line = line
             pos += 1
-            let ch_val = src[pos] + 0
+            let ch_val = src_bytes[pos] + 0
             if ch_val == 92 {
                 pos += 1
-                let e = src[pos]
+                let e = src_bytes[pos]
                 ch_val = decode_escape(e)
             }
             pos += 1
-            if pos >= n || src[pos] != 39 {
+            if pos >= n || src_bytes[pos] != 39 {
                 println("bad char")
                 exit(1)
             }
@@ -504,7 +496,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_digit(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_digit(src[pos]) == 1 {
+            while pos < n && is_digit(src_bytes[pos]) == 1 {
                 pos += 1
             }
             let text = src[start:pos]
@@ -516,7 +508,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_alpha(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_alnum(src[pos]) == 1 {
+            while pos < n && is_alnum(src_bytes[pos]) == 1 {
                 pos += 1
             }
             let text = src[start:pos]

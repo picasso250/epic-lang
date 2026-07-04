@@ -96,9 +96,10 @@ fun merge_inputs(out: AstNode): i64 {
 }
 
 fun replace_char(s: str, old: i64, new: i64): str {
+    let bs = bytes(s)
     let out = new u8[]
-    for i in 0:len(s) {
-        let c = s[i]
+    for i in 0:len(bs) {
+        let c = bs[i]
         if c == old {
             c = new
         }

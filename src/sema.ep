@@ -163,9 +163,10 @@ fun sema_digit_value(c: u8): i64 {
 }
 
 fun sema_parse_i64(s: str): i64 {
+    let bs = bytes(s)
     let n = 0
-    for i in 0:len(s) {
-        n = n * 10 + sema_digit_value(s[i])
+    for i in 0:len(bs) {
+        n = n * 10 + sema_digit_value(bs[i])
     }
     return n
 }
