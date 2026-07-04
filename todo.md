@@ -75,10 +75,4 @@
 - 逐步加 byte-oriented helper
 - 最后移除 str helper public surface
 
-## 已归档
-
-- ADT 已从自举核心移除（`self-host-core.md` 定案）
-- 自举测试 `test_*bootstrap*.py` 战略性放弃
-- `bootstrap.py` bootstrap 链不再维护
-- Python asm backend 归档在 tag `python-asm-archive-2026-07-02`
-- 旧目录化 v0/v1/v2 代码保存在 tag `staged-bootstrap-archive-2026-06-30`
+看起来当前 parser 对 match case 的 body 不接受同一行 { return ... } 
