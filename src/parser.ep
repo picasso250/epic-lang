@@ -110,6 +110,11 @@ fun is_upper_name(name: str): i64 {
     return 0
 }
 
+fun parser_is_reserved_func(name: str): bool {
+    let reserved = new map[str]bool { "len": true, "cap": true, "push": true, "extend": true, "bytes": true, "str": true, "str_new": true, "map_has": true }
+    return map_has(reserved, name)
+}
+
 fun peek(p: Parser): Token {
     if p.pos < len(p.tokens) {
         return p.tokens[p.pos]
@@ -260,29 +265,7 @@ fun parse_struct_def(p: Parser): AstNode {
 fun parse_fn_def(p: Parser): AstNode {
     expect(p, "FUN")
     let name = expect(p, "ID")
-    if name.text == "len" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-    if name.text == "cap" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-    if name.text == "push" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-    if name.text == "extend" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-    if name.text == "bytes" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-    if name.text == "str" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-    if name.text == "str_new" {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
-    }
-
-    if name.text == "map_has" {
+    if parser_is_reserved_func(name.text) {
         parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     expect(p, "LPAREN")
