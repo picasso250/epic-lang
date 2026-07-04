@@ -117,16 +117,6 @@ fun peek_kind(p: Parser, kind: str): i64 {
     return 0
 }
 
-fun peek_offset_kind(p: Parser, offset: i64, kind: str): i64 {
-    let idx = p.pos + offset
-    if idx < len(p.tokens) {
-        if p.tokens[idx].kind == kind {
-            return 1
-        }
-    }
-    return 0
-}
-
 fun peek_empty_braces(p: Parser): i64 {
     if peek_kind(p, "LBRACE") == 0 {
         return 0
@@ -256,38 +246,6 @@ fun parse_struct_def(p: Parser): AstNode {
     return node
 }
 
-fun parse_type_def(p: Parser): AstNode {
-    expect(p, "TYPE")
-    let name = expect(p, "ID")
-    let node = ast_node("TypeDef")
-    node.name = name.text
-    expect(p, "LBRACE")
-    skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
-        let vname = expect(p, "ID")
-        let variant = ast_node("VariantDef")
-        variant.name = vname.text
-        if check(p, "LBRACE") == 1 {
-            skip_newlines(p)
-            while peek_kind(p, "RBRACE") == 0 {
-                let fname = expect(p, "ID")
-                expect(p, "COLON")
-                let ftype = parse_type(p)
-                expect_stmt_end(p)
-                let field = ast_node("StructField")
-                field.name = fname.text
-                field.type_name = ftype
-                push(variant.fields, field)
-            }
-            expect(p, "RBRACE")
-        }
-        push(node.fields, variant)
-        skip_newlines(p)
-    }
-    expect(p, "RBRACE")
-    return node
-}
-
 fun parse_fn_def(p: Parser): AstNode {
     expect(p, "FUN")
     let name = expect(p, "ID")
@@ -334,15 +292,11 @@ fun parse_fn_def(p: Parser): AstNode {
 fun parse_program(p: Parser): AstNode {
     let node = ast_node("Program")
     skip_newlines(p)
-    while peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 || peek_kind(p, "TYPE") == 1 {
+    while peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
-            if peek_kind(p, "STRUCT") == 1 {
-                push(node.structs, parse_struct_def(p))
-            } else {
-                push(node.structs, parse_type_def(p))
-            }
+            push(node.structs, parse_struct_def(p))
         }
         skip_newlines(p)
     }
@@ -647,37 +601,6 @@ fun parse_match_literal(p: Parser): AstNode {
 }
 
 
-fun parse_match_payload_bindings(p: Parser, node: AstNode): i64 {
-    expect(p, "LBRACE")
-    skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
-        let field_name = expect(p, "ID")
-        let binding = ast_node("MatchBinding")
-        binding.name = field_name.text
-        binding.type_name = field_name.text
-        binding.line = field_name.line
-        if check(p, "COLON") == 1 {
-            let local_name = expect(p, "ID")
-            binding.type_name = local_name.text
-        }
-        push(node.args, binding)
-        if check(p, "COMMA") == 1 {
-            skip_newlines(p)
-        } else {
-            if peek_kind(p, "NEWLINE") == 1 {
-                skip_newlines(p)
-            } else {
-                if peek_kind(p, "RBRACE") == 0 {
-                    let t = peek(p)
-                    parse_error(t.line, "Expected comma or newline in match pattern")
-                }
-            }
-        }
-    }
-    expect(p, "RBRACE")
-    return 0
-}
-
 fun parse_match_stmt(p: Parser): AstNode {
     let t = expect(p, "MATCH")
     let node = ast_node("Match")
@@ -699,22 +622,9 @@ fun parse_match_stmt(p: Parser): AstNode {
             let c = ast_node("MatchCase")
             let first = peek(p)
             c.line = first.line
-            if peek_kind(p, "ID") == 1 && peek_offset_kind(p, 1, "DOT") == 1 {
-                let type_name = expect(p, "ID")
-                expect(p, "DOT")
-                let variant_name = expect(p, "ID")
-                c.name = type_name.text
-                c.type_name = variant_name.text
-                if peek_kind(p, "LBRACE") == 1 {
-                    parse_match_payload_bindings(p, c)
-                }
-                expect(p, "COLON")
-                c.body = parse_block(p)
-            } else {
-                c.expr = parse_match_literal(p)
-                expect(p, "COLON")
-                c.body = parse_block(p)
-            }
+            c.expr = parse_match_literal(p)
+            expect(p, "COLON")
+            c.body = parse_block(p)
             push(node.fields, c)
         }
         skip_newlines(p)
@@ -1075,14 +985,6 @@ fun parse_named_init_fields(p: Parser, node: AstNode): AstNode {
     return node
 }
 
-fun parse_variant_init(p: Parser, type_name: str, variant_name: Token): AstNode {
-    let node = ast_node("VariantInit")
-    node.name = variant_name.text
-    node.type_name = type_name
-    node.line = variant_name.line
-    return parse_named_init_fields(p, node)
-}
-
 fun parse_array_literal(p: Parser, name: Token): AstNode {
     let node = ast_node("ArrayLiteral")
     node.type_name = name.text
@@ -1200,17 +1102,6 @@ fun parse_primary(p: Parser): AstNode {
             let n = ast_node("NewArray")
             n.type_name = t.text
             n.count = count
-            return n
-        }
-        if check(p, "DOT") == 1 {
-            let variant = expect(p, "ID")
-            let n = ast_node("VariantInit")
-            n.name = variant.text
-            n.type_name = t.text
-            n.line = variant.line
-            if peek_kind(p, "LBRACE") == 1 {
-                return parse_named_init_fields(p, n)
-            }
             return n
         }
         if peek_kind(p, "LBRACE") == 1 {
@@ -1426,15 +1317,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
     if node.kind == "MatchCase" {
         indent(depth)
         println("MatchCase")
-        if node.name != "" {
-            indent(depth + 1)
-            println(f"FieldAccess {node.type_name}")
-            indent(depth + 2)
-            println(f"Var {node.name}")
-        } else {
-            dump_node(node.expr, depth + 1)
-        }
-        dump_list(node.args, depth + 1)
+        dump_node(node.expr, depth + 1)
         dump_node(node.body, depth + 1)
         return 0
     }
