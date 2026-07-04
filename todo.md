@@ -5,7 +5,6 @@
 - ✅ ADT 已从 Python reference compiler 移除
 - ✅ `self-hosted` lexer 比较变为 opt-in（`--self-hosted`）
 - ✅ ADT 文档残留已清除
--   `src/*.ep` 自举线含 ADT 残留 —— **战略放弃，暂不处理**
 
 ## ✅ Str Surface Contraction（已全部完成，含 review fix）
 
@@ -51,26 +50,43 @@
 
 ## 下一步（远期）
 
-### 优先级 1：Helper 命名统一（Phase 2 of self-host-core.md）
+### 优先级 1：Helper 命名统一（已收敛，旧 Phase 2 计划废弃）
 
-| 旧名 | 新名 |
-|------|------|
-| `str_bool` | `bool_to_str` |
-| `str_i64` | `i64_to_str` |
-| `str_arr_i8` | `bytes_to_str` |
-| `bytes_str` | `str_to_bytes` |
-| `__epic_arr_i64_push` | `arr_i64_push` |
-| `__epic_arr_ptr_push` | `arr_ptr_push` |
-| `__epic_arr_qword_extend` | `qword_extend` |
-| `__epic_arr_ptr_get` | `arr_ptr_get` |
+结论：不再把 helper 改成裸语义名 `bool_to_str` / `i64_to_str` / `arr_ptr_push`。
+当前采用内部 ABI 命名：
 
-### 优先级 2：MIR helper 迁移（从 x64 backend → MIR functions）
+| 语义 | 当前内部 helper |
+|------|----------------|
+| bool → str | `__ep_str_from_bool` |
+| i64 → str | `__ep_str_from_i64` |
+| u8[] → str | `__ep_str_from_slice_u8` |
+| str → u8[] | `__ep_slice_u8_from_str` |
+| i64[] push | `__ep_slice_i64_push` |
+| ptr[] push | `__ep_slice_ptr_push` |
+| ptr[] get | `__ep_slice_ptr_get` |
 
-- `str_new`, `cstr`, `itoa`, `str_cat` 等仍在 `mir_lower._emit_*()` 中
-- 逐步迁移到 `mir_runtime_helpers.py` 中的 `MirFunction`
+旧计划中的 `str_bool` / `str_i64` / `str_arr_i8` / `bytes_str` / `__epic_arr_*` 已从实现层移除；旧目标名 `bool_to_str` / `i64_to_str` / `arr_ptr_*` 不再采用。
+
+### 优先级 2：MIR helper 迁移（部分完成，剩余为底层 runtime glue）
+
+语言层 helper 大多已迁移到 `bootstrap/mir_runtime_helpers.py`，并通过 `MirFunction` 注入：
+
+- str/bytes：`__ep_str_from_bool`、`__ep_str_from_slice_u8`、`__ep_slice_u8_from_str`、`__ep_str_eq`、`__ep_str_cat`、`__ep_str_slice`、`__ep_str_get`、`__ep_str_find`
+- slice：`__ep_slice_u8_*`、`__ep_slice_i64_*`、`__ep_slice_ptr_*`
+- map：`__ep_map_str_i64_*`、`__ep_map_str_bool_*`、`__ep_map_str_str_*`
+
+仍由 `bootstrap/mir_lower.py` 直接发 x64 的是底层 runtime/OS glue：
+
+- allocation / process args：`__epx_alloc`、`__epx_argv_init`
+- OS-facing helpers：`__ep_cstr`、`__ep_read_file`、`__ep_write_file`、`__ep_system_cmd`
+- printing / traps：`__ep_print_str`、`__ep_print_newline`、`__epx_putc`、`__epx_slice_oob`、`__epx_null_deref`
+- numeric formatting：`__ep_str_from_i64`
+
+结论：不要标成完成；下一步应优先迁移 `__ep_str_from_i64`，再考虑 `__ep_cstr` / file / argv / print 这类更贴近平台 ABI 的 helper。
 
 ### 优先级 3：str → u8[] 收敛（Phase 3 of self-host-core.md）
 
 - 文档层先标记方向
 - 逐步加 byte-oriented helper
 - 最后移除 str helper public surface
+

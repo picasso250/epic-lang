@@ -254,14 +254,22 @@ after ADT removal and naming unification.
 - [x] 6. Purge stale ADT docs
 - [_] Deferred: Remove ADT from self-hosted compiler sources (`src/*.ep`)
 
-### Phase 2: Naming Unification (prefix-only, completed)
-- `__ep_str_from_bool` → `bool_to_str` (future)
-- `__ep_str_from_i64` → `i64_to_str` (future)
-- `__ep_str_from_slice_u8` → `bytes_to_str` (future)
-- `__ep_slice_u8_from_str` → `str_to_bytes` (future)
-- `__ep_cstr` → `str_cstr`
-- `__ep_slice_i64_new` / `__ep_slice_i64_get` / `__ep_slice_i64_set` / `__ep_slice_i64_push` → `arr_i64_*`
-- `__ep_slice_ptr_new` / `__ep_slice_ptr_get` / `__ep_slice_ptr_set` / `__ep_slice_ptr_push` → `arr_ptr_*`
+### Phase 2: Naming Unification (completed)
+Decision: keep internal ABI names with the `__ep_*` / `__epx_*` prefixes.
+Do not rename helpers to public-looking bare names such as `bool_to_str`,
+`i64_to_str`, `bytes_to_str`, `str_to_bytes`, or `arr_ptr_push`.
+
+Current direction names:
+- `__ep_str_from_bool` — bool → str
+- `__ep_str_from_i64` — i64 → str
+- `__ep_str_from_slice_u8` — u8[] → str
+- `__ep_slice_u8_from_str` — str → u8[]
+- `__ep_slice_i64_*` — i64[] operations
+- `__ep_slice_ptr_*` — pointer slice operations
+
+Older names such as `str_bool`, `str_i64`, `str_arr_i8`, `bytes_str`, and
+`__epic_arr_*` have been removed from implementation code. The old Phase 2
+plan to rename helpers to bare names is obsolete.
 
 ### Phase 3: `str` → `u8[]` Convergence (after Phase 2)
 - Document byte-buffer-first text model
