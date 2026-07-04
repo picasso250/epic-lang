@@ -9,6 +9,8 @@ struct AstNode {
     type_name: str
     op: str
     value: str
+    dll: str
+    resolved_type: str
     line: i64
 
     funcs: AstNode[]
@@ -54,6 +56,8 @@ fun ast_node(kind: str): AstNode {
     n.type_name = ""
     n.op = ""
     n.value = ""
+    n.dll = ""
+    n.resolved_type = ""
     n.line = 0
     n.funcs = new AstNode[0]
     n.structs = new AstNode[0]
@@ -250,29 +254,29 @@ fun parse_fn_def(p: Parser): AstNode {
     expect(p, "FUN")
     let name = expect(p, "ID")
     if name.text == "len" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     if name.text == "cap" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     if name.text == "push" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     if name.text == "extend" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     if name.text == "bytes" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     if name.text == "str" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     if name.text == "str_new" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
 
     if name.text == "map_has" {
-        parse_error(name.line, "reserved builtin function name")
+        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
     }
     expect(p, "LPAREN")
     let params = parse_params(p)
@@ -1044,6 +1048,7 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
                 if current.kind == "FieldAccess" && current.object.kind == "Var" && current.object.name == "os" {
                     n.name = field.text
                     n.type_name = "os"
+                    n.dll = current.name
                 } else {
                     if current.kind == "Var" && current.name == "os" {
                         parse_error(field.line, "WinAPI calls use os.<dll>.<Function>(...)")

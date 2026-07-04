@@ -357,6 +357,60 @@ def run_fail_tests():
     return passed, failed, skipped
 
 
+def run_self_hosted_fail_tests():
+    if not os.path.isdir(FAIL_DIR):
+        return 0, 0, 0
+
+    ensure_self_hosted_sema()
+
+    passed = 0
+    failed = 0
+    skipped = 0
+
+    for ep_name in sorted(os.listdir(FAIL_DIR)):
+        if not ep_name.endswith(".ep"):
+            continue
+
+        ep_path = os.path.join(FAIL_DIR, ep_name)
+
+        with open(ep_path, "r", encoding="utf-8") as f:
+            source = f.read()
+
+        m = re.search(r'#\s*COMPILE_FAIL:\s*(.*)$', source, re.MULTILINE)
+        if not m:
+            print(f"  SKIP  self-hosted {ep_name:18s}  no # COMPILE_FAIL annotation")
+            skipped += 1
+            continue
+
+        expected_text = m.group(1).strip()
+
+        result = subprocess.run(
+            [SEMA_EXE, ep_path],
+            capture_output=True,
+            cwd=ROOT_DIR,
+            timeout=30,
+        )
+
+        output = (
+            result.stdout.decode("utf-8", errors="replace")
+            + result.stderr.decode("utf-8", errors="replace")
+        )
+        if result.returncode == 0:
+            print(f"  FAIL  self-hosted {ep_name:18s}  sema succeeded, expected failure")
+            failed += 1
+            continue
+
+        if expected_text and expected_text not in output:
+            print(f"  FAIL  self-hosted {ep_name:18s}  expected {expected_text!r} not in:\n{output[:500]}")
+            failed += 1
+            continue
+
+        passed += 1
+        print(f"  PASS  self-hosted {ep_name:18s}")
+
+    return passed, failed, skipped
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Sema typed AST golden and fail tests")
     parser.add_argument("--regen", action="store_true", help="regenerate tests/sema/pass/typed_ast_dump.txt")
@@ -384,6 +438,11 @@ def main(argv=None):
     total_skipped += s
 
     p, f, s = run_fail_tests()
+    total_passed += p
+    total_failed += f
+    total_skipped += s
+
+    p, f, s = run_self_hosted_fail_tests()
     total_passed += p
     total_failed += f
     total_skipped += s
