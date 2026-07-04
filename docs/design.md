@@ -291,6 +291,9 @@ bytes(s: str): u8[]
 
 `str(bytes)` + `bytes(str)` 是对偶 cast，MIR 不需要知道。
 
+`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是 bytes view/cast；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])`、`str(bool[])`、`str(map)` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
+
+
 > ⚠ 修改 `bytes(str)` 返回的 `u8[]` 会修改原 `str` 的底层 buffer。如果多个 `str` 共享同一 buffer（例如相同内容的字面量），修改对所有 view 可见。语言不承诺 string literal 物理不可变。
 
 常规源码加载方式：
@@ -305,8 +308,8 @@ let source = str(read_file(path))
 
 | 内置函数                               | 含义                                        |
 |----------------------------------------|---------------------------------------------|
-| `print(x): void`                       | 写入 `x` 的字符串表示（无换行）              |
-| `println(x): void`                     | 写入 `x` 的字符串表示并追加换行              |
+| `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
+| `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
 | `system(cmd: str): i64`                | 执行命令，返回退出码                        |
 

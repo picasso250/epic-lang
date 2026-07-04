@@ -1,0 +1,11 @@
+# COMPILE_FAIL: f-string expression expected str, integer, bool, or u8[], got Val
+
+struct Val {
+    val: i64
+}
+
+fun main(): i64 {
+    println(f"value {new Val { val: 3 }}")
+    return 0
+}
+

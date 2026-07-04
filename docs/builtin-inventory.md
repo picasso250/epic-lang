@@ -66,6 +66,8 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 
 ## Type Conversion (constructors)
 
+`str(x)` public surface is intentionally narrow: `str`, integer types, `bool`, and `u8[]` only. `str(u8[])` is a zero-copy bytes-to-string view. Struct, map, and non-`u8[]` array repr is not supported, and f-string interpolation follows the same rule.
+
 These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 
 | Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |

@@ -9,28 +9,7 @@
 # STDOUT: false
 # STDOUT: abc
 # STDOUT: 65
-# STDOUT: Val{val: 3}
-# STDOUT: User{name: "Ada", age: 0}
-# STDOUT: i64[]{1, 2, 3}
 # STDOUT: AB
-# STDOUT: str[]{"a", "b"}
-# STDOUT: bool[]{true, false}
-# STDOUT: Bytes{data: u8[]{65, 66}}
-# STDOUT: hello Val{val: 3}
-# STDOUT: Val{val: 3}
-
-struct Val {
-    val: i64
-}
-
-struct User {
-    name: str
-    age: i64
-}
-
-struct Bytes {
-    data: u8[]
-}
 
 fun show_u64(x: u64): void {
     println(str(x))
@@ -47,15 +26,7 @@ fun main(): i64 {
     println(str(false))
     println(str("abc"))
     println(str('A'))
-    println(str(new Val { val: 3 }))
-    println(str(new User { name: "Ada" }))
-    println(str(new i64[] { 1, 2, 3 }))
     println(str(new u8[] { 65, 66 }))
-    println(str(new str[] { "a", "b" }))
-    println(str(new bool[] { true, false }))
-    println(str(new Bytes { data: new u8[] { 65, 66 } }))
-    println(f"hello {new Val { val: 3 }}")
-    println(str(new Val { val: 3 }))
 
     return 0
 }

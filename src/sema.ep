@@ -316,10 +316,14 @@ fun sema_expect_int(st: SemaState, node: AstNode, context: str): str {
     return t
 }
 
-fun sema_reject_map_repr(info_type: str, context: str): void {
-    if sema_is_map(info_type) {
-        sema_die(f"{context} does not support map repr; use map_has/map_del/subscript explicitly")
+fun sema_check_str_convertible(info_type: str, context: str): void {
+    if info_type == "str" || sema_is_int(info_type) || info_type == "bool" || info_type == "u8[]" {
+        return
     }
+    if info_type == "void" {
+        sema_die(f"{context} argument cannot be void")
+    }
+    sema_die(f"{context} expected str, integer, bool, or u8[], got {info_type}")
 }
 
 fun sema_check_arity(name: str, expected: i64, args: AstNode[]): void {
@@ -419,7 +423,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         for i in 0:len(node.fields) {
             let part = node.fields[i]
             if part.kind != "FStringText" {
-                sema_reject_map_repr(sema_expr_type(st, part), "f-string expression")
+                sema_check_str_convertible(sema_expr_type(st, part), "f-string expression")
             }
         }
         return sema_set_type(node, "str")
@@ -648,11 +652,7 @@ fun sema_call_type(st: SemaState, node: AstNode): str {
     }
     if node.name == "str" {
         sema_check_arity("str", 1, node.args)
-        let arg = sema_expr_type(st, node.args[0])
-        if arg == "void" {
-            sema_die("str argument cannot be void")
-        }
-        sema_reject_map_repr(arg, "str")
+        sema_check_str_convertible(sema_expr_type(st, node.args[0]), "str")
         return "str"
     }
     if node.name == "cstr" {

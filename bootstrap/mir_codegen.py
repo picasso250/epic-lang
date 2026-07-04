@@ -957,9 +957,6 @@ class MirCodegen:
         return self._emit_str_conversion(expr)
 
     def _emit_str_conversion(self, expr):
-        static = self._static_repr(expr, repr_context=False)
-        if static is not None:
-            return SymbolOperand(ptr_str(), self._string_label(static))
         source_type = self._resolved_type(expr)
         typ = self._infer_type(expr)
         if typ == ptr_str():
@@ -997,95 +994,6 @@ class MirCodegen:
         if out is None:
             return SymbolOperand(ptr_str(), self._string_label(""))
         return out
-
-    def _static_repr(self, expr, repr_context):
-        if isinstance(expr, LiteralNode):
-            return str(expr.value)
-        if isinstance(expr, CharNode):
-            return str(expr.value)
-        if isinstance(expr, BoolNode):
-            return "true" if expr.value else "false"
-        if isinstance(expr, StringNode):
-            return self._quote(expr.value) if repr_context else expr.value
-        if isinstance(expr, CallNode) and expr.name in ("i64", "u64", "u8", "bool"):
-            return self._static_repr(expr.args[0], repr_context)
-        if isinstance(expr, CallNode) and expr.name in ("i32", "u32"):
-            rendered = self._static_repr(expr.args[0], repr_context)
-            if rendered is None:
-                return None
-            try:
-                value = int(rendered)
-            except ValueError:
-                return None
-            if expr.name == "i32" and -2147483648 <= value <= 2147483647:
-                return rendered
-            if expr.name == "u32" and 0 <= value <= 4294967295:
-                return rendered
-            return None
-        if isinstance(expr, BinaryNode):
-            left = self._static_repr(expr.left, False)
-            right = self._static_repr(expr.right, False)
-            if left is not None and right is not None:
-                try:
-                    lv = int(left)
-                    rv = int(right)
-                    if expr.op == "+":
-                        return str(lv + rv)
-                    if expr.op == "-":
-                        return str(lv - rv)
-                except ValueError:
-                    pass
-        if isinstance(expr, ArrayLiteralNode):
-            values = [self._static_repr(v, True) for v in expr.values]
-            if any(v is None for v in values):
-                return None
-            if expr.elem_type == "u8" and not repr_context:
-                return "".join(chr(int(v)) for v in values)
-            elem = "bool" if expr.elem_type == "bool" else "str" if expr.elem_type == "str" else expr.elem_type
-            return f"{elem}[]" + "{" + ", ".join(values) + "}"
-        if isinstance(expr, StructInitNode):
-            if expr.type_name not in self.structs:
-                return None
-            supplied = dict(expr.fields)
-            parts = []
-            for name, info in self.structs[expr.type_name]["fields"].items():
-                if name.startswith("_"):
-                    continue
-                value = supplied.get(name)
-                if value is None:
-                    rendered = self._zero_repr(info["type"])
-                else:
-                    rendered = self._static_repr(value, True)
-                if rendered is None:
-                    return None
-                parts.append(f"{name}: {rendered}")
-            return f"{expr.type_name}" + "{" + ", ".join(parts) + "}"
-        if isinstance(expr, FStringNode):
-            out = []
-            for kind, value in expr.parts:
-                if kind == "text":
-                    out.append(value)
-                else:
-                    rendered = self._static_repr(value, False)
-                    if rendered is None:
-                        return None
-                    out.append(rendered)
-            return "".join(out)
-        return None
-
-    def _zero_repr(self, typ):
-        if typ == I64:
-            return "0"
-        if typ == BOOL:
-            return "false"
-        if typ == ptr_str():
-            return self._quote("")
-        if typ == ptr_slice_u8():
-            return "u8[]{}"
-        return "0"
-
-    def _quote(self, text):
-        return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + '"'
 
     def _zero_value(self, typ):
         if typ == ptr_str():

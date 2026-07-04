@@ -253,7 +253,7 @@ class SemanticAnalyzer:
         if isinstance(expr, FStringNode):
             for kind, value in expr.parts:
                 if kind == "expr":
-                    self._reject_map_repr(self._expr(value), "f-string expression")
+                    self._check_str_convertible(self._expr(value), "f-string expression")
             return ExprInfo(STR)
         if isinstance(expr, VarNode):
             return ExprInfo(self._lookup(expr.name))
@@ -356,10 +356,7 @@ class SemanticAnalyzer:
             return ExprInfo(VOID)
         if name == "str":
             self._check_arity(name, 1, expr.args)
-            arg = self._expr(expr.args[0])
-            if arg.type == VOID:
-                self._fail("str argument cannot be void")
-            self._reject_map_repr(arg, "str")
+            self._check_str_convertible(self._expr(expr.args[0]), "str")
             return ExprInfo(STR)
         if name == "cstr":
             self._check_call_args(name, [STR], expr.args)
@@ -533,9 +530,12 @@ class SemanticAnalyzer:
             return NAMED(name)
         self._fail_global(f"unknown type {name}")
 
-    def _reject_map_repr(self, info, context):
-        if info.type.kind == "map":
-            self._fail(f"{context} does not support map repr; use map_has/map_del/subscript explicitly")
+    def _check_str_convertible(self, info, context):
+        if info.type == STR or self._is_integer(info.type) or info.type == BOOL or info.type == ARRAY(U8):
+            return
+        if info.type == VOID:
+            self._fail(f"{context} argument cannot be void")
+        self._fail(f"{context} expected str, integer, bool, or u8[], got {info.type}")
 
     def _check_call_args(self, name, params, args):
         if len(params) != len(args):

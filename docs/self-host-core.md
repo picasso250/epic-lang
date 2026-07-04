@@ -89,8 +89,9 @@ required_helpers: defer; unconditional injection stays for now
 | `len`/`cap`   | Length and capacity |
 | `push`        | Array append |
 | `extend`      | u8[] only; use for + push for other types |
-| `str(bytes)`  | `u8[]` to `str` (kept for now) |
-| `bytes(s)`    | `str` to `u8[]` (kept for now) |
+| `str(x)`      | only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
+| `str(bytes)`  | `u8[]` to `str` zero-copy view |
+| `bytes(s)`    | `str` to `u8[]` zero-copy view |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |
 | `str_new`     | 🚫 Removed from public surface; use `str(bytes)` |
 | `itoa`        | 🚫 Removed from public surface; use `str(n)` |
@@ -277,7 +278,7 @@ plan to rename helpers to bare names is obsolete.
 Completed:
 - The byte-buffer-first text model is documented.
 - `read_file` / `write_file` use `u8[]` as the data carrier.
-- `str(u8[])` and `bytes(str)` are zero-copy identity casts.
+- `str(u8[])` and `bytes(str)` are zero-copy identity casts. `str(struct)`, `str(map)`, and `str(T[])` for non-`u8` arrays are not supported; f-string interpolation uses the same convertibility rule as `str(expr)`.
 - The zero-copy shared-buffer behavior is covered by `examples/v5_zero_copy_str_bytes.ep`.
 - Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
   `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.

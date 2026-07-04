@@ -1,0 +1,6 @@
+# COMPILE_FAIL: str expected str, integer, bool, or u8[], got i64[]
+
+fun main(): i64 {
+    println(str(new i64[] { 1, 2, 3 }))
+    return 0
+}
