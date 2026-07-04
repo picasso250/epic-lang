@@ -36,11 +36,11 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 - `itoa` — removed entirely; use `str(n)` (internal helper `str_i64` retained)
 - `str_slice`, `str_cat` — removed from public surface, but retained as compiler-internal helpers where syntax lowering still needs them
 - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
-`str`, `bytes`, `cstr` remain public.
+`str`, `bytes`, and `cstr` remain public during the alias transition, but `str` is now documented as a temporary `u8[]`-layout view rather than the future UTF-8 string design.
 
 | Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
-| `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Multi-type to string |
+| `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Transitional formatting/view operation; `u8[]` is the text truth |
 | `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to C-style (null-terminated); WinAPI interop |
 | `bytes`    | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | String → `u8[]` |
 | `str_new`  | 🚫 Public surface removed; `str(bytes)` is the recommended path |
@@ -66,7 +66,7 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 
 ## Type Conversion (constructors)
 
-`str(x)` public surface is intentionally narrow: `str`, integer types, `bool`, and `u8[]` only. `str(u8[])` is a zero-copy bytes-to-string view. Struct, map, and non-`u8[]` array repr is not supported, and f-string interpolation follows the same rule.
+`str(x)` public surface is intentionally narrow: `str`, integer types, `bool`, and `u8[]` only. `str(u8[])` is a zero-copy byte-slice view, not UTF-8 validation or allocation. Struct, map, and non-`u8[]` array repr is not supported, and f-string interpolation follows the same rule.
 
 These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 
@@ -170,8 +170,6 @@ symbols used by the Python backend.
 | `__ep_str_eq` | compare two strings for equality |
 | `__ep_str_cat` | concatenate two strings |
 | `__ep_str_slice` | copy a half-open string slice |
-| `__ep_str_starts_with` | test whether a string starts with a prefix |
-| `__ep_str_find` | find a substring within a string |
 | `__ep_slice_u8_alloc` | allocate initialized-capacity byte array |
 | `__ep_slice_u8_alloc` | allocate empty byte array with capacity |
 | `__ep_slice_u8_get` | bounds-checked byte array read |
@@ -183,7 +181,7 @@ symbols used by the Python backend.
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`.
 
 > `__ep_str_slice`, `__ep_str_cat`
-> in the list above are **internal helpers** — they remain for lowering `s[i]`, `s[start:end]`, `==`, `!=`
+> in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `==`, `!=`
 > but are no longer callable by user code as public builtins.
 
 ### x64-backed private helpers

@@ -385,7 +385,7 @@ ret
 
 MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_str_from_bool`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
-`__ep_str_starts_with`, `__ep_str_find`, `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
+`__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
 longer have same-named x64 fallback bodies. Remaining x64 labels and function

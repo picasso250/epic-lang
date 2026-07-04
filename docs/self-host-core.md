@@ -16,7 +16,7 @@ or **deferred** for later decision.
 ```
 ADT:            remove (not in core)
 match:          keep literal switch only; remove ADT match
-str:            public surface contracted (see below); zero-copy str/bytes
+str:            temporary u8[]-layout alias; public surface contracted
 naming:         unify, but only after ADT removal
 required_helpers: defer; unconditional injection stays for now
 ```
@@ -42,7 +42,7 @@ required_helpers: defer; unconditional injection stays for now
 |----------|-------|
 | `struct` | Heap-allocated reference; named fields, 8-byte slot layout |
 | `T[]`    | Heap-allocated dynamic array descriptor |
-| `str`    | Kept for now; see Deferred |
+| `str`    | Temporary compatibility alias over the `u8[]` layout; see Deferred and `str-u8-alias-plan.md` |
 
 ### Control Flow
 
@@ -68,7 +68,7 @@ required_helpers: defer; unconditional injection stays for now
 |---------|-------|
 | Integer literals | Type-adaptive |
 | `true`/`false` | Bool literals |
-| String literals | Produce `str` (temporary) |
+| String literals | Produce `str` for now; migration target is byte-buffer-first text |
 | Char literals | Produce `u8` |
 | Arithmetic | `+` `-` `*` `/` `%` checked |
 | Comparison | `==` `!=` `<` `<=` `>` `>=` |
@@ -82,16 +82,16 @@ required_helpers: defer; unconditional injection stays for now
 
 | Builtin      | Notes |
 |--------------|-------|
-| `print`/`println` | String output |
+| `print`/`println` | Text/byte-buffer output; currently accepts `str` |
 | `read_file`   | Returns `u8[]` |
 | `write_file`  | Writes `u8[]`, returns `i64` |
 | `exit`        | Terminate process |
 | `len`/`cap`   | Length and capacity |
 | `push`        | Array append |
 | `extend`      | u8[] only; use for + push for other types |
-| `str(x)`      | only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
-| `str(bytes)`  | `u8[]` to `str` zero-copy view |
-| `bytes(s)`    | `str` to `u8[]` zero-copy view |
+| `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
+| `str(bytes)`  | `u8[]` to temporary `str` view; zero-copy identity cast |
+| `bytes(s)`    | temporary `str` view to `u8[]`; zero-copy identity cast |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |
 | `str_new`     | 🚫 Removed from public surface; use `str(bytes)` |
 | `itoa`        | 🚫 Removed from public surface; use `str(n)` |
@@ -113,8 +113,6 @@ These are unconditionally injected and considered part of the core runtime:
 - `__ep_str_eq` — string equality
 - `__ep_str_cat` — string concatenation
 - `__ep_str_slice` — string slice copy
-- `__ep_str_starts_with` — prefix test
-- `__ep_str_find` — substring find
 - `__ep_slice_u8_alloc` — allocate initialized byte array
 - `__ep_slice_u8_alloc` — allocate empty byte array
 - `__ep_slice_u8_get` — bounds-checked byte read
@@ -180,7 +178,7 @@ after ADT removal and naming unification.
 
 | Topic | Current Status | Future Direction |
 |-------|---------------|------------------|
-| `str` vs `u8[]` | `str` is kept; `u8[]` is core text truth | Long-term: unify text as `u8[]`; `str` becomes thin view or removed. Public str helper surface removed in Phase 0. |
+| `str` vs `u8[]` | `u8[]` is the current text truth; `str` is a temporary compatibility alias over the same layout | Continue collapsing `str` toward `u8[]`; future UTF-8 `str` is a separate later design. See `str-u8-alias-plan.md`. |
 | `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
 | Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
 | `required_helpers` / lazy injection | Unconditional injection | Defer until helper naming is stable |
@@ -198,7 +196,7 @@ after ADT removal and naming unification.
 ### Features retained in core
 
 - `i64` / `u64` / `i32` / `u32` / `u8` / `bool`
-- `str` (temporary, see Deferred)
+- `str` (temporary `u8[]`-layout alias, see Deferred)
 - `struct`
 - `T[]` (dynamic array)
 - `map[str]T` (kept for now)
@@ -213,7 +211,7 @@ after ADT removal and naming unification.
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend` / `map_has` / `map_del`
-- String builtins (retained): `len(s)` / `s[i]` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; `str(bytes)` / `bytes(s)` as zero-copy cast; `cstr` as escape hatch
+- String/byte-view builtins (retained temporarily): `len(s)` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; byte indexing goes through `bytes(s)[i]`; `str(bytes)` / `bytes(s)` are zero-copy identity casts; `cstr` remains an escape hatch
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`
   - `itoa` — removed entirely; use `str(n)`
@@ -241,8 +239,8 @@ after ADT removal and naming unification.
 - [x] 2. Remove public str helper builtins from docs
 - [x] 3. Document internal helper policy
 - [x] 4. Document literal sharing / shared buffer semantics
-- [_] 5. (Next commit) Remove public str helper from sema
-- [_] 6. (Next commit) Remove `str + str` from sema
+- [x] 5. Remove public str helper from sema
+- [x] 6. Remove `str + str` from sema
 - [x] 7. Add zero-copy behavior test (`examples/v5_zero_copy_str_bytes.ep`)
 
 ### Phase 1: ADT Removal (completed)
@@ -272,7 +270,7 @@ Older names such as `str_bool`, `str_i64`, `str_arr_i8`, `bytes_str`, and
 `__epic_arr_*` have been removed from implementation code. The old Phase 2
 plan to rename helpers to bare names is obsolete.
 
-### Phase 3: `str` → `u8[]` Convergence (public surface completed; self-hosted source cleanup remains)
+### Phase 3: `str` → `u8[]` Convergence (active)
 
 Completed:
 - The byte-buffer-first text model is documented.
@@ -284,12 +282,11 @@ Completed:
 - `extend` is byte-oriented and only supports `u8[]`.
 
 Remaining:
-- Some `src/*.ep` self-hosted compiler code still calls old helpers such as
+- Some `src/*.ep` self-hosted compiler code may still call old helpers such as
   `itoa`, `str_find`, and `str_new`. These should migrate to `str(n)`,
   explicit `u8[]` byte scanning, and `str(bytes)`.
 
-Conclusion: Phase 3 is complete for the public language surface, docs, and tests;
-it is not fully complete until the self-hosted compiler source stops using the old helpers.
+Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to make `str` a temporary `u8[]`-layout alias first, then remove the temporary spelling after public APIs, runtime ABI, maps, argv, and self-hosted sources no longer depend on it. See [`str-u8-alias-plan.md`](str-u8-alias-plan.md).
 
 ---
 
@@ -299,4 +296,5 @@ it is not fully complete until the self-hosted compiler source stops using the o
 - [`impl.md`](impl.md) — Epic implementation notes (will be updated)
 - [`builtin-inventory.md`](builtin-inventory.md) — Full builtin function inventory
 - [`mir-runtime-helper-plan.md`](mir-runtime-helper-plan.md) — MIR helper migration plan
+- [`str-u8-alias-plan.md`](str-u8-alias-plan.md) — staged `str` to `u8[]` alias plan
 - [`todo.md`](../todo.md) — Project todo

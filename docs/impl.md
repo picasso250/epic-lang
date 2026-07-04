@@ -100,7 +100,7 @@ Python machine backend 的运行时片段在 `bootstrap/x64_runtime.py` 和
 | `u32`      | 8 字节整数槽，值保持 32-bit unsigned 规范扩展 |
 | `i64`      | `i64`             |
 | `u64`      | `u64`             |
-| `str`      | `&str`            |
+| `str`      | `&str` today; migration target is the same representation as `&_slice_u8` |
 | `Token`    | `&Token`          |
 | `u8[]`     | `&_slice_u8`        |
 | `Token[]`  | `&_slice_Token`     |
@@ -109,22 +109,27 @@ Python machine backend 的运行时片段在 `bootstrap/x64_runtime.py` 和
 
 ## 运行时布局 (Runtime Layouts)
 
-### 字符串 (String)
+### 临时 `str` view / byte-slice alias
 
 ```
 str = {
     data: &u8,
     len: i64,
+    cap: i64,
+}
+
+_slice_u8 = {
+    data: &u8,
+    len: i64,
+    cap: i64,
 }
 ```
 
-字符串字面量被深拷贝到堆存储中，末尾附加一个 NUL 字节。`len` 不包含 NUL。空字符串在 `len = 0` 时可能 `data = 0`。
+当前实现把 `str` 当作 `u8[]` 布局上的临时 view。字符串字面量被深拷贝到堆存储中，末尾附加一个 NUL 字节。`len` 不包含 NUL；`cap` 至少覆盖 `len + 1` 的 NUL 结尾存储。空字符串在 `len = 0` 时可能 `data = 0`。
 
-> `str` 表面只读，但底层 buffer 可通过 `bytes()` 以 `u8[]` view 修改。
+> `str` 不是当前阶段的 UTF-8 字符串设计，只是 byte-slice-backed text view。
 > 语言不承诺 string literal 物理不可变：相同内容的字面量可能共享同一 buffer，
 > 修改 `bytes(s)` 的结果对所有共享 view 可见。
-
-> ⚠ 当前 sema 不阻止 `s[i] = v` 或 `s[i] += v`。这不是去噪规则，而是实现简化。
 > `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节），
 > 所以 `str(bytes)` 和 `bytes(str)` 都是 identity cast。
 
@@ -183,11 +188,11 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、map、非 `u8[]` array 不支持 | 公开 |
+| `str(x)`           | 过渡期 formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、map、非 `u8[]` array 不支持 | 公开但准备收缩 |
 | `system`           | `__ep_system_cmd` helper                    | 公开 |
 | `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |
 | `write_file`       | `__ep_write_file` helper                    | 公开 |
-| `str` (`u8[]`)     | zero-copy layout reinterpret                | 公开 |
+| `str` (`u8[]`)     | zero-copy layout reinterpret；alias 迁移路径 | 公开但准备收缩 |
 | `bytes`            | zero-copy layout reinterpret                | 公开 |
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |

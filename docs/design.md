@@ -32,7 +32,7 @@ python epic.py --main main.ep main.ep lib.ep
 | `u32`   | 无符号 32 位整数，当前实现使用 8 字节槽存储 |
 | `i64`   | 有符号 64 位整数                        |
 | `u64`   | 无符号 64 位整数                        |
-| `str`   | 字符串描述符（只读表面；下层 u8[] buffer 通过 bytes() 可变） |
+| `str`   | 当前阶段的临时文本 view；运行时布局与 `u8[]` 相同，未来 UTF-8 字符串另行设计 |
 | `Name`  | 堆分配的结构体引用               |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
 | `map[str]T` | 堆分配的映射表（str 键）           |
@@ -74,7 +74,7 @@ fun main(): void {
 - 整数字面量在可表示时会适配目标类型。负数不会被适配为无符号类型。
 - `i32` 字面量范围为 `-2147483648..2147483647`；`u32` 字面量范围为 `0..4294967295`。
 - `true` 和 `false` 是 `bool` 字面量。
-- 字符串字面量产生 `str` 值。支持的转义：`\n \r \t \\ \" \' \0`。仅支持 ASCII。
+- 字符串字面量当前产生临时 `str` view。它不是未来 UTF-8 字符串设计；当前只表示字节序列。支持的转义：`\n \r \t \\ \" \' \0`。仅支持 ASCII。
 - 字符字面量产生 `u8`。支持的转义同字符串。
 
 ### Let 声明 (Let Declarations)
@@ -181,7 +181,7 @@ match n {
 }
 ```
 
-支持的检视类型：`i64`、`u64`、`u8`、`bool`、`str`。
+支持的检视类型：`i64`、`u64`、`u8`、`bool`、临时 `str` view。
 
 规则：
 - 每个分支在模式和主体之间使用冒号。
@@ -205,14 +205,15 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 
 ## 字符串与数组 (Strings and Arrays)
 
-### 字符串布局 (String Layout)
+### 临时 `str` view 与 `u8[]` alias 方向
 
-`str` 带长度信息且以 NUL 结尾，以便与 Win32 互操作。`len(s)` 计数字节数，不包含尾部 NUL。字符串布局字段不是 public surface。
+当前阶段 `u8[]` 是文本/字节缓冲的真实模型。`str` 只是过渡期兼容名称：运行时 header 与 `u8[]` 相同，均为 `{data, len, cap}`。它不做 UTF-8 校验，不提供 Unicode 字符语义，也不承诺不可变。未来如果恢复 UTF-8-aware `str`，会作为新的语言设计重新引入。
 
-> ⚠ `str` 表面只读，但当前实现**不阻止** `s[i] = v` 或 `s[i] += v` 通过 sema。这是有意为之的实现简化。
-> 正确做法是：`let b = bytes(s); b[i] = v`。未来自举编译器版本会用更严格的类型检查挡住直接值写入。
+字符串字面量当前仍产生 `str` view，以减少自举编译器迁移噪音。`len(s)` 计数字节数，不包含尾部 NUL。字符串布局字段不是 public surface。详见 [`str-u8-alias-plan.md`](str-u8-alias-plan.md)。
+
 > 当前 Python reference compiler 依赖 `str` layout 与 `u8[]` 完全一致（{data, len, cap} 均为 24 字节），
 > 使得 `str(bytes)` 和 `bytes(str)` 都是 identity cast，零分配零复制。
+> 按字节读取或修改必须显式转成 byte view：`let b = bytes(s); b[i] = v`。
 
 ### 动态数组 (Dynamic Arrays)
 
@@ -230,7 +231,7 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 
 ### 索引与切片 (Indexing and Slices)
 
-索引带边界检查。对字符串使用 `s[i]` 返回 `u8`。
+索引带边界检查。`str` 的直接下标已删除；按字节访问必须写 `bytes(s)[i]`。
 
 切片语法（复制语义，半开区间 `[start, end)`）：
 
@@ -265,7 +266,7 @@ let d = s[0:len(s)]
 | 场景 | 推荐写法 | 底层/过时写法 |
 |------|----------|---------------|
 | 数组索引 | `a[i]` | `a.data[i]`（已从 public surface 删除） |
-| 字符串索引 | `s[i]` | `s.data[i]`（已从 public surface 删除） |
+| 字符串字节索引 | `bytes(s)[i]` | `s[i]` 和 `s.data[i]`（已从 public surface 删除） |
 | 长度 | `len(x)` | `x.len`（已从 public surface 删除） |
 | 容量 | `cap(a)` | `a.cap`（已从 public surface 删除） |
 | 切片 | `s[start:end]` / `bytes[start:end]`（必须显式写出 start 和 end；仅支持 str 和 u8[]） | 无 public 替代（`str_slice` 已从 public surface 删除） |
@@ -274,7 +275,7 @@ let d = s[0:len(s)]
 
 **三档分类**：
 
-1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
+1. **推荐语法** — 普通代码应使用：`a[i]`、`bytes(s)[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
 2. **底层接口** — compiler / runtime 内部 helper 和 MIR helper 可使用布局；Epic 源码不可直接访问 `data/len/cap` layout 字段。
 3. **历史写法** — 旧的 `a.data`、`s.data`、`x.len`、`a.cap` 字段访问已删除。
 
@@ -287,9 +288,9 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 视为 `str` view，不分配不复制。`bytes(str)` 同理。
+`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 视为临时 `str` view，不分配不复制。`bytes(str)` 同理。
 
-`str(bytes)` + `bytes(str)` 是对偶 cast，MIR 不需要知道。
+`str(bytes)` + `bytes(str)` 是过渡期对偶 cast。迁移目标是让 MIR 和 public API 越来越少关心 `str` 这个独立名字。
 
 `str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是 bytes view/cast；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])`、`str(bool[])`、`str(map)` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
 
