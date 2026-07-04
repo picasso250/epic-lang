@@ -604,14 +604,19 @@ class Parser:
 
     def parse_map_entries_after_lbrace(self):
         entries = []
-        if not self.peek_kind("RBRACE"):
-            while True:
-                key = self.parse_expr()
-                self.expect("COLON")
-                value = self.parse_expr()
-                entries.append((key, value))
-                if not self.check("COMMA"):
-                    break
+        self.skip_newlines()
+        while not self.peek_kind("RBRACE"):
+            key = self.parse_expr()
+            self.expect("COLON")
+            value = self.parse_expr()
+            entries.append((key, value))
+            if self.check("COMMA"):
+                self.skip_newlines()
+            elif self.peek_kind("NEWLINE"):
+                self.skip_newlines()
+            elif not self.peek_kind("RBRACE"):
+                t = self.peek()
+                raise ParseError("Expected comma or newline in map initializer", t[2])
         self.expect("RBRACE")
         return entries
 
