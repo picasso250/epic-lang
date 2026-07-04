@@ -18,7 +18,7 @@ from machine import write_machine_obj
 from mir_codegen import ast_to_mir
 from mir_lower import lower_mir_to_x64
 from ast_nodes import ProgramNode
-from lexer import LexError, lex
+from lexer import LexError, dump_tokens, lex
 from parser import ParseError, Parser, dump_ast_text
 from sema import SemanticError, analyze_program, dump_typed_ast_text
 
@@ -168,6 +168,17 @@ def compile_file(input_path, linker="py", out_dir=BUILD_DIR):
     return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
 
 
+def dump_token_files(input_paths):
+    for i, input_path in enumerate(input_paths):
+        if len(input_paths) > 1:
+            if i > 0:
+                print()
+            print(f"== {input_path} ==")
+        with open(input_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        print(dump_tokens(lex(source)), end="")
+
+
 def dump_ast_files(input_paths):
     for i, input_path in enumerate(input_paths):
         if len(input_paths) > 1:
@@ -199,6 +210,8 @@ def parse_args(argv):
                         help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
+    parser.add_argument("--dump-tokens", action="store_true",
+                        help="print lexer token dump and exit")
     parser.add_argument("--dump-ast", action="store_true",
                         help="print parsed AST and exit")
     parser.add_argument("--dump-typed-ast", action="store_true",
@@ -217,17 +230,20 @@ def main(argv=None):
         if not os.path.exists(args.main):
             print(f"Error: file not found: {args.main}", file=sys.stderr)
             return 1
-    elif len(args.inputs) > 1 and args.dump_ast:
+    elif len(args.inputs) > 1 and (args.dump_tokens or args.dump_ast):
         pass
     elif len(args.inputs) > 1 and not args.main:
         print("Error: --main is required when compiling multiple files", file=sys.stderr)
         return 1
 
     try:
-        if args.dump_ast and args.dump_typed_ast:
-            print("Error: choose only one of --dump-ast or --dump-typed-ast", file=sys.stderr)
+        dump_modes = [args.dump_tokens, args.dump_ast, args.dump_typed_ast]
+        if sum(1 for mode in dump_modes if mode) > 1:
+            print("Error: choose only one dump mode", file=sys.stderr)
             return 1
-        if args.dump_ast:
+        if args.dump_tokens:
+            dump_token_files(args.inputs)
+        elif args.dump_ast:
             dump_ast_files(args.inputs)
         elif args.dump_typed_ast:
             dump_typed_ast_files(args.inputs, args.main or args.inputs[0])

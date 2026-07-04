@@ -91,6 +91,39 @@ def check_golden() -> bool:
         return False
 
 
+def check_cli_dump_tokens() -> bool:
+    expected = read_golden()
+    epicc = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
+    result = subprocess.run(
+        [sys.executable, epicc, ALL_EP, "--dump-tokens"],
+        cwd=ROOT_DIR,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    actual = result.stdout
+    if result.returncode != 0:
+        print("  FAIL  epic.py --dump-tokens failed")
+        print((result.stdout + result.stderr)[-2000:])
+        return False
+    if actual == expected:
+        print("  PASS  epic.py --dump-tokens matches token_list.txt")
+        return True
+
+    exp_lines = expected.splitlines()
+    act_lines = actual.splitlines()
+    for i in range(min(len(exp_lines), len(act_lines))):
+        if exp_lines[i] != act_lines[i]:
+            print(f"  FAIL  epic.py --dump-tokens line {i+1}")
+            print(f"    expected: {exp_lines[i]!r}")
+            print(f"    actual:   {act_lines[i]!r}")
+            break
+    else:
+        print(f"  FAIL  epic.py --dump-tokens expected {len(exp_lines)} lines, got {len(act_lines)}")
+    return False
+
+
 def check_python_line_endings() -> bool:
     """LF and CRLF source text must produce the same token dump."""
     lf_dump = python_lexer_dump_source(CRLF_SAMPLE_LF)
@@ -212,6 +245,11 @@ def main():
     print("--- line ending check ---")
     line_ending_ok = check_python_line_endings()
     if not line_ending_ok:
+        sys.exit(1)
+
+    print("--- CLI dump check ---")
+    cli_dump_ok = check_cli_dump_tokens()
+    if not cli_dump_ok:
         sys.exit(1)
 
     # --- Self-hosted lexer comparison ---
