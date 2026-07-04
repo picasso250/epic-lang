@@ -306,7 +306,30 @@ class MirCodegen:
     def _load_field(self, base, struct_name, field, result_type=None):
         field_type = result_type or self.structs[struct_name]["fields"][field]["type"]
         addr = self._field_addr(base, struct_name, field, result_type=field_type)
-        return self._ensure_container_slot(addr, field_type)
+        value = self._inst("load", [addr], result_type=field_type, type=field_type)
+        return ValueOperand(value)
+
+    def _load_len_cap_nullable(self, base, struct_name, field):
+        result_addr = self._alloc_local(f"__{field}.result{self.value_counter}", I64)
+        base_int = self._inst("ptrtoint", [base], result_type=I64, type=I64)
+        is_null = self._inst("icmp.eq", [ValueOperand(base_int), ConstIntOperand(I64, 0)], result_type=BOOL)
+        null_block = self._new_block(f"{field}.null")
+        load_block = self._new_block(f"{field}.load")
+        done_block = self._new_block(f"{field}.done")
+        self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, load_block.name)
+
+        self.block = null_block
+        self._inst("store", [ConstIntOperand(I64, 0), ValueOperand(result_addr)])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = load_block
+        value = self._load_field(base, struct_name, field, result_type=I64)
+        self._inst("store", [value, ValueOperand(result_addr)])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = done_block
+        result = self._inst("load", [ValueOperand(result_addr)], result_type=I64, type=I64)
+        return ValueOperand(result)
 
     def _store_field(self, base, struct_name, field, value):
         addr = self._field_addr(base, struct_name, field)
@@ -406,10 +429,9 @@ class MirCodegen:
     def _is_zero_container_type(self, typ):
         return typ == ptr_str() or self._is_slice_type(typ) or self._map_suffix(typ) is not None
 
-    def _ensure_container_slot(self, addr, typ):
+    def _materialize_container_slot(self, addr, typ):
         if not self._is_zero_container_type(typ):
-            value = self._inst("load", [addr], result_type=typ, type=typ)
-            return ValueOperand(value)
+            raise MirCodegenError(f"cannot materialize non-container type {typ}")
 
         current = self._inst("load", [addr], result_type=typ, type=typ)
         current_int = self._inst("ptrtoint", [ValueOperand(current)], result_type=I64, type=I64)
@@ -419,13 +441,79 @@ class MirCodegen:
         self.block.terminator = CondBr(ValueOperand(is_null), init_block.name, done_block.name)
 
         self.block = init_block
-        empty = self._zero_value(typ)
+        empty = self._materialized_empty_container(typ)
         self._inst("store", [empty, addr])
         self.block.terminator = Br(done_block.name)
 
         self.block = done_block
         ensured = self._inst("load", [addr], result_type=typ, type=typ)
         return ValueOperand(ensured)
+
+    def _container_lvalue_addr(self, expr):
+        if isinstance(expr, VarNode):
+            if expr.name not in self.locals:
+                raise MirCodegenError(f"undefined variable: {expr.name}")
+            return ValueOperand(self.locals[expr.name])
+        if isinstance(expr, FieldAccessNode):
+            base_type = self._infer_type(expr.object)
+            base = self._emit_expr(expr.object)
+            struct_name = self._layout_struct_name(base_type)
+            if struct_name is None:
+                raise MirCodegenError("container field base must be a struct pointer")
+            field_type = self.structs[struct_name]["fields"][expr.field]["type"]
+            return self._field_addr(base, struct_name, expr.field, result_type=field_type)
+        raise MirCodegenError("container mutation target must be a variable or field")
+
+    def _materialize_container_expr(self, expr):
+        typ = self._expr_mir_type(expr)
+        addr = self._container_lvalue_addr(expr)
+        return self._materialize_container_slot(addr, typ)
+
+    def _emit_map_read_nullable(self, base, index, base_type):
+        value_type = self._map_value_type(base_type)
+        result_addr = self._alloc_local(f"__map.get.result{self.value_counter}", value_type)
+        base_int = self._inst("ptrtoint", [base], result_type=I64, type=I64)
+        is_null = self._inst("icmp.eq", [ValueOperand(base_int), ConstIntOperand(I64, 0)], result_type=BOOL)
+        null_block = self._new_block("map.get.null")
+        load_block = self._new_block("map.get.load")
+        done_block = self._new_block("map.get.done")
+        self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, load_block.name)
+
+        self.block = null_block
+        zero = self._materialized_empty_container(value_type) if value_type == ptr_str() else self._zero_value(value_type)
+        self._inst("store", [zero, ValueOperand(result_addr)])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = load_block
+        value = self._inst("call", [base, index], result_type=value_type, type=value_type, callee=self._map_helper(base_type, "get"))
+        self._inst("store", [ValueOperand(value), ValueOperand(result_addr)])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = done_block
+        result = self._inst("load", [ValueOperand(result_addr)], result_type=value_type, type=value_type)
+        return ValueOperand(result)
+
+    def _emit_map_has_del_nullable(self, base, key, base_type, op):
+        result_addr = self._alloc_local(f"__map.{op}.result{self.value_counter}", BOOL)
+        base_int = self._inst("ptrtoint", [base], result_type=I64, type=I64)
+        is_null = self._inst("icmp.eq", [ValueOperand(base_int), ConstIntOperand(I64, 0)], result_type=BOOL)
+        null_block = self._new_block(f"map.{op}.null")
+        call_block = self._new_block(f"map.{op}.call")
+        done_block = self._new_block(f"map.{op}.done")
+        self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, call_block.name)
+
+        self.block = null_block
+        self._inst("store", [ConstBoolOperand(False), ValueOperand(result_addr)])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = call_block
+        value = self._inst("call", [base, key], result_type=BOOL, type=BOOL, callee=self._map_helper(base_type, op))
+        self._inst("store", [ValueOperand(value), ValueOperand(result_addr)])
+        self.block.terminator = Br(done_block.name)
+
+        self.block = done_block
+        result = self._inst("load", [ValueOperand(result_addr)], result_type=BOOL, type=BOOL)
+        return ValueOperand(result)
 
     def _emit_block(self, block):
         for stmt in block.stmts:
@@ -470,17 +558,19 @@ class MirCodegen:
             self._store_field(base, struct_name, stmt.field, value)
         elif isinstance(stmt, SubscriptAssignNode):
             base_type = self._infer_type(stmt.base)
-            base = self._emit_expr(stmt.base)
             index = self._emit_expr(stmt.index)
             value = self._emit_expr(stmt.value)
             if self._is_u8_array_type(base_type):
+                base = self._materialize_container_expr(stmt.base)
                 self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_u8_set")
             elif self._is_i64_array_type(base_type):
+                base = self._materialize_container_expr(stmt.base)
                 self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_i64_set")
             else:
                 callee = self._map_helper(base_type, "set")
                 if callee is None:
                     raise MirCodegenError("subscript assignment only supports primitive arrays and maps in machine MIR so far")
+                base = self._materialize_container_expr(stmt.base)
                 self._inst("call", [base, index, value], type=VOID, callee=callee)
         elif isinstance(stmt, AssignOpNode):
             value = BinaryNode(op=stmt.op, left=stmt.target, right=stmt.value)
@@ -839,7 +929,8 @@ class MirCodegen:
             return ValueOperand(result)
         if name == "push":
             dst_type = self._infer_type(expr.args[0])
-            args = [self._emit_expr(arg) for arg in expr.args]
+            dst = self._materialize_container_expr(expr.args[0])
+            args = [dst, *[self._emit_expr(arg) for arg in expr.args[1:]]]
             if self._is_u8_array_type(dst_type):
                 self._inst("call", args, type=VOID, callee="__ep_slice_u8_push")
             elif self._is_i64_array_type(dst_type):
@@ -853,23 +944,23 @@ class MirCodegen:
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError(f"{name} expects an aggregate pointer")
-            return self._load_field(base, struct_name, name, result_type=I64)
+            return self._load_len_cap_nullable(base, struct_name, name)
         if name == "extend":
             dst_type = self._infer_type(expr.args[0])
-            args = [self._emit_expr(arg) for arg in expr.args]
             if not self._is_u8_array_type(dst_type):
                 raise MirCodegenError("extend only supports u8[]")
+            dst = self._materialize_container_expr(expr.args[0])
+            args = [dst, self._emit_expr(expr.args[1])]
             self._inst("call", args, type=VOID, callee="__ep_slice_u8_extend")
             return ConstIntOperand(I64, 0)
         if name in ("map_has", "map_del"):
             map_type = self._infer_type(expr.args[0])
-            args = [self._emit_expr(arg) for arg in expr.args]
+            base = self._emit_expr(expr.args[0])
+            key = self._emit_expr(expr.args[1])
             op = "has" if name == "map_has" else "del"
-            callee = self._map_helper(map_type, op)
-            if callee is None:
+            if self._map_helper(map_type, op) is None:
                 raise MirCodegenError(f"{name} expects map")
-            result = self._inst("call", args, result_type=BOOL, type=BOOL, callee=callee)
-            return ValueOperand(result)
+            return self._emit_map_has_del_nullable(base, key, map_type, op)
         if name not in self.func_sigs:
             raise MirCodegenError(f"unsupported call: {name}")
         args = [self._emit_expr(arg) for arg in expr.args]
@@ -887,8 +978,7 @@ class MirCodegen:
         index = self._emit_expr(expr.index)
         map_value_type = self._map_value_type(base_type)
         if map_value_type is not None:
-            result = self._inst("call", [base, index], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base_type, "get"))
-            return ValueOperand(result)
+            return self._emit_map_read_nullable(base, index, base_type)
         if self._is_i64_array_type(base_type):
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_slice_i64_get")
             return ValueOperand(result)
@@ -1048,7 +1138,7 @@ class MirCodegen:
             return SymbolOperand(ptr_str(), self._string_label(""))
         return out
 
-    def _zero_value(self, typ):
+    def _materialized_empty_container(self, typ):
         if typ == ptr_str():
             return SymbolOperand(ptr_str(), self._string_label(""))
         if typ == ptr_slice_u8():
@@ -1057,12 +1147,19 @@ class MirCodegen:
         if typ == ptr_slice_i64():
             result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_slice_i64(), type=ptr(), callee="__ep_slice_i64_new")
             return ValueOperand(result)
+        struct_name = self._ptr_struct_name(typ)
+        if struct_name is not None and struct_name.startswith("_slice_"):
+            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=typ, type=ptr(), callee="__ep_slice_ptr_new")
+            return ValueOperand(result)
         map_new = self._map_helper(typ, "new")
         if map_new is not None:
             result = self._inst("call", [], result_type=typ, type=typ, callee=map_new)
             return ValueOperand(result)
-        if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct" and typ.pointee.name in self.structs and not typ.pointee.name.startswith("_slice_"):
-            return self._alloc_struct(typ.pointee.name)
+        raise MirCodegenError(f"cannot materialize empty container for {typ}")
+
+    def _zero_value(self, typ):
+        if typ.kind == "ptr":
+            return ConstNullOperand()
         return ConstIntOperand(typ, 0)
 
     def _string_label(self, text):
