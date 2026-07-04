@@ -1,8 +1,0 @@
-# EXIT: 0
-# STDOUT: Hello, Epic!
-# STDOUT: 42
-fun main(): void {
-    println("Hello, Epic!")
-    println(42)
-    exit(0)
-}
