@@ -407,103 +407,6 @@ def emit___ep_str_get() -> MirFunction:
     return b.fn
 
 
-def emit___ep_str_find() -> MirFunction:
-    """Find the first occurrence of needle in s.
-
-    Empty needle returns 0. Missing needle returns -1.
-
-    fn __ep_str_find(ptr<str> %s, ptr<str> %needle) -> i64
-    """
-    b = MirHelperBuilder(
-        "__ep_str_find",
-        [
-            MirParam("%s", ptr(mir_struct("str"))),
-            MirParam("%needle", ptr(mir_struct("str"))),
-        ],
-        I64,
-    )
-    s_val = ValueOperand(b.fn.params[0].value)
-    needle_val = ValueOperand(b.fn.params[1].value)
-
-    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
-    needle_len = b.load(I64, b.gep_field(needle_val, "str", 1))
-    empty_needle = b.icmp("eq", needle_len, b.const_i64(0))
-    empty_block = b.new_block("empty")
-    nonempty_block = b.new_block("nonempty")
-    absent_block = b.new_block("absent")
-    b.entry.terminator = CondBr(
-        ValueOperand(empty_needle), empty_block.name, nonempty_block.name
-    )
-
-    b.entry = empty_block
-    b.ret(b.const_i64(0))
-
-    b.entry = nonempty_block
-    long_enough = b.icmp("ge", s_len, needle_len)
-    init_block = b.new_block("init")
-    b.entry.terminator = CondBr(ValueOperand(long_enough), init_block.name, absent_block.name)
-
-    b.entry = init_block
-    s_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
-    needle_data = b.load(ptr(), b.gep_field(needle_val, "str", 0))
-    last_start = b.binop("sub", s_len, needle_len)
-    i_slot = b.alloca(I64)
-    j_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    outer_check = b.new_block("outer_check")
-    b.br(outer_check)
-
-    b.entry = outer_check
-    i = b.load(I64, ValueOperand(i_slot))
-    in_outer_range = b.icmp("le", i, last_start)
-    inner_init = b.new_block("inner_init")
-    b.entry.terminator = CondBr(
-        ValueOperand(in_outer_range), inner_init.name, absent_block.name
-    )
-
-    b.entry = inner_init
-    b.store(b.const_i64(0), ValueOperand(j_slot))
-    inner_check = b.new_block("inner_check")
-    b.br(inner_check)
-
-    b.entry = inner_check
-    j = b.load(I64, ValueOperand(j_slot))
-    matched_all = b.icmp("ge", j, needle_len)
-    found_block = b.new_block("found")
-    compare_block = b.new_block("compare")
-    b.entry.terminator = CondBr(
-        ValueOperand(matched_all), found_block.name, compare_block.name
-    )
-
-    b.entry = compare_block
-    src_idx = b.binop("add", i, j)
-    s_byte_addr = b.gep(I8, s_data, [src_idx])
-    s_byte = b.load(I8, s_byte_addr, result_type=I8)
-    needle_byte_addr = b.gep(I8, needle_data, [j])
-    needle_byte = b.load(I8, needle_byte_addr, result_type=I8)
-    bytes_eq = b.icmp("eq", s_byte, needle_byte)
-    inner_next = b.new_block("inner_next")
-    outer_next = b.new_block("outer_next")
-    b.entry.terminator = CondBr(ValueOperand(bytes_eq), inner_next.name, outer_next.name)
-
-    b.entry = inner_next
-    next_j = b.binop("add", j, b.const_i64(1))
-    b.store(next_j, ValueOperand(j_slot))
-    b.br(inner_check)
-
-    b.entry = outer_next
-    next_i = b.binop("add", i, b.const_i64(1))
-    b.store(next_i, ValueOperand(i_slot))
-    b.br(outer_check)
-
-    b.entry = found_block
-    b.ret(ValueOperand(i))
-
-    b.entry = absent_block
-    b.ret(b.const_i64(-1))
-
-    return b.fn
-
 
 def emit_slice_u8_alloc() -> MirFunction:
     """Allocate header + data for u8[], with separate len and cap.
@@ -1464,7 +1367,6 @@ _HELPER_EMITTERS = {
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_str_slice": lambda p: emit___ep_str_slice(),
     "__ep_str_get": lambda p: emit___ep_str_get(),
-    "__ep_str_find": lambda p: emit___ep_str_find(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
     "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
     "__ep_slice_i64_new": lambda p: emit_slice_word_new("__ep_slice_i64_new"),
@@ -1503,7 +1405,6 @@ _HELPER_ORDER = [
     "__ep_str_cat",
     "__ep_str_slice",
     "__ep_str_get",
-    "__ep_str_find",
     "__ep_slice_u8_alloc",
     "__ep_slice_u8_get",
     "__ep_slice_i64_new",

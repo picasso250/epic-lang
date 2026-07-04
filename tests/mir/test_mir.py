@@ -186,7 +186,7 @@ def test_mir_helper_injection():
     assert "__ep_str_slice" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_starts_with" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_get" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_find" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_str_find" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_replace_char" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_trim" not in IMPLEMENTED_MIR_HELPERS
 
