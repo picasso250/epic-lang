@@ -85,7 +85,8 @@ class MirCodegen:
             self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
         self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_from_u64", MirSignature([I64], ptr_str())))
-        self.program.externs.append(MirExtern("__ep_str_from_bool", MirSignature([BOOL], ptr_str())))
+        if "__ep_str_from_bool" not in self.func_sigs:
+            self.program.externs.append(MirExtern("__ep_str_from_bool", MirSignature([BOOL], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_from_slice_u8", MirSignature([ptr_slice_u8()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
         if "__ep_str_eq" not in self.func_sigs:

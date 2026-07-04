@@ -183,30 +183,6 @@ def emit_str_slice_u8() -> MirFunction:
     return b.fn
 
 
-def emit_str_bool() -> MirFunction:
-    """Return the static runtime string for a bool value.
-
-    fn __ep_str_from_bool(bool %value) -> ptr<str>
-    """
-    b = MirHelperBuilder(
-        "__ep_str_from_bool",
-        [MirParam("%value", BOOL)],
-        ptr(mir_struct("str")),
-    )
-    value = ValueOperand(b.fn.params[0].value)
-    true_block = b.new_block("true")
-    false_block = b.new_block("false")
-    b.entry.terminator = CondBr(value, true_block.name, false_block.name)
-
-    b.entry = true_block
-    b.ret(SymbolOperand(ptr(mir_struct("str")), "@str.runtime.bool.true"))
-
-    b.entry = false_block
-    b.ret(SymbolOperand(ptr(mir_struct("str")), "@str.runtime.bool.false"))
-
-    return b.fn
-
-
 
 def emit___ep_str_cat() -> MirFunction:
     """Concatenate two strings into a newly allocated str.
@@ -1363,7 +1339,6 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 _HELPER_EMITTERS = {
     "__ep_slice_u8_from_str": lambda p: emit_bytes_slice_u8(),
     "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
-    "__ep_str_from_bool": lambda p: emit_str_bool(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_str_slice": lambda p: emit___ep_str_slice(),
     "__ep_str_get": lambda p: emit___ep_str_get(),
@@ -1401,7 +1376,6 @@ _HELPER_EMITTERS = {
 _HELPER_ORDER = [
     "__ep_slice_u8_from_str",
     "__ep_str_from_slice_u8",
-    "__ep_str_from_bool",
     "__ep_str_cat",
     "__ep_str_slice",
     "__ep_str_get",

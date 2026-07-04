@@ -181,7 +181,7 @@ def test_mir_helper_injection():
     assert "__ep_slice_ptr_push" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_slice_u8_extend" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_eq" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_from_bool" in IMPLEMENTED_MIR_HELPERS
+    assert "__ep_str_from_bool" not in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_cat" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_slice" in IMPLEMENTED_MIR_HELPERS
     assert "__ep_str_starts_with" not in IMPLEMENTED_MIR_HELPERS
@@ -359,6 +359,23 @@ def test_runtime_source_str_eq_lowers_as_epic_function():
     assert "fn __ep_str_eq" in text
 
 
+def test_runtime_source_str_from_bool_lowers_as_epic_function():
+    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
+    user_src = """fun main(): void {
+    println(str(true))
+    println(str(false))
+}"""
+    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
+    prog = ast_to_mir(sema.analyze_program(ast))
+    text = prog.text()
+    function_names = {fn.name for fn in prog.functions}
+    extern_names = {ext.name for ext in prog.externs}
+    assert "__ep_str_from_bool" in function_names
+    assert "__ep_str_from_bool" not in extern_names
+    assert "call ptr __ep_str_from_bool" in text
+    assert "fn __ep_str_from_bool(bool value) -> ptr" in text
+
+
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
@@ -366,6 +383,7 @@ def main():
     test_codegen_emits_target_mir_only_for_aggregates()
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()
+    test_runtime_source_str_from_bool_lowers_as_epic_function()
     print("PASS test_mir")
 
 

@@ -13,3 +13,10 @@ fun __ep_str_eq(left: str, right: str): bool {
     }
     return true
 }
+
+fun __ep_str_from_bool(value: bool): str {
+    if value {
+        return "true"
+    }
+    return "false"
+}
