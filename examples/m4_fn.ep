@@ -7,8 +7,8 @@ fun add(a: i64, b: i64): i64 {
 
 fun main(): void {
     let x = add(40, 2)
-    println(x)
+    println(str(x))
     let y = add(x, 1)
-    println(y)
+    println(str(y))
     exit(0)
 }

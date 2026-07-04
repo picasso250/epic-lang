@@ -336,11 +336,20 @@ class SemanticAnalyzer:
             self._fail(f"unsupported namespaced call {expr.namespace}.{expr.name}")
 
         name = expr.name
-        if name in ("print", "println"):
+        if name == "print":
+            if len(expr.args) != 1:
+                self._fail("print expects 1 argument")
+            arg = self._expr(expr.args[0])
+            if arg.type != STR:
+                self._fail(f"print expected str, got {arg.type}")
+            return ExprInfo(VOID)
+        if name == "println":
             if len(expr.args) > 1:
-                self._fail(f"{name} expects at most one argument")
+                self._fail("println expects at most one argument")
             if expr.args:
-                self._reject_map_repr(self._expr(expr.args[0]), name)
+                arg = self._expr(expr.args[0])
+                if arg.type != STR:
+                    self._fail(f"println expected str, got {arg.type}")
             return ExprInfo(VOID)
         if name == "exit":
             self._check_call_args(name, [I64], expr.args)

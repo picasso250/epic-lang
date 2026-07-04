@@ -3,5 +3,5 @@
 fun main(): void {
     let b = new u8[1]
     push(b, 255)
-    println(b[0])
+    println(str(b[0]))
 }

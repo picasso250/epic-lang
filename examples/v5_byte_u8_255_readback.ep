@@ -2,5 +2,5 @@
 # STDOUT: 255
 fun main(): void {
     let b = new u8[] { 255 }
-    println(b[0])
+    println(str(b[0]))
 }

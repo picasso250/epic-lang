@@ -6,7 +6,7 @@ fun main(): void {
     let xs = new i64[9]
     push(xs, 10)
     push(xs, 20)
-    println(len(s))
-    println(len(xs))
+    println(str(len(s)))
+    println(str(len(xs)))
     exit(len(s) + len(xs) + cap(xs) + xs[1])
 }

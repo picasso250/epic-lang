@@ -12,7 +12,7 @@ fun main(): void {
     for i in 0:old_len {
         push(xs, xs[i])
     }
-    print(xs[0] + xs[1] + xs[2] + xs[3])
+    print(str(xs[0] + xs[1] + xs[2] + xs[3]))
 
     let b1 = new Box {}
     b1.value = 5
@@ -26,6 +26,6 @@ fun main(): void {
     for i in 0:right_len {
         push(left, right[i])
     }
-    print(left[0].value + left[1].value)
+    print(str(left[0].value + left[1].value))
     exit(0)
 }

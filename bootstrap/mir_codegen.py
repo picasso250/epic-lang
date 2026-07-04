@@ -728,18 +728,19 @@ class MirCodegen:
             raise MirCodegenError(f"unsupported namespaced call: {expr.namespace}.{name}")
         if name == "println":
             if len(expr.args) > 1:
-                raise MirCodegenError("println expects at most one argument in machine MIR")
+                raise MirCodegenError("println expects at most one argument")
             if expr.args:
-                as_str = self._coerce_print_arg(expr.args[0])
-                self._inst("call", [as_str], type=VOID, callee="__ep_print_str")
+                if self._infer_type(expr.args[0]) != ptr_str():
+                    raise MirCodegenError(f"println expected str, got {self._infer_type(expr.args[0])}")
+                self._inst("call", [self._emit_expr(expr.args[0])], type=VOID, callee="__ep_print_str")
             self._inst("call", [], type=VOID, callee="__ep_print_newline")
             return ConstIntOperand(I64, 0)
         if name == "print":
-            if len(expr.args) > 1:
-                raise MirCodegenError("print expects at most one argument in machine MIR")
-            if expr.args:
-                as_str = self._coerce_print_arg(expr.args[0])
-                self._inst("call", [as_str], type=VOID, callee="__ep_print_str")
+            if len(expr.args) != 1:
+                raise MirCodegenError("print expects 1 argument")
+            if self._infer_type(expr.args[0]) != ptr_str():
+                raise MirCodegenError(f"print expected str, got {self._infer_type(expr.args[0])}")
+            self._inst("call", [self._emit_expr(expr.args[0])], type=VOID, callee="__ep_print_str")
             return ConstIntOperand(I64, 0)
         if name == "exit":
             arg = self._emit_expr(expr.args[0])

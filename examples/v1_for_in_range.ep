@@ -6,11 +6,11 @@
 fun main(): void {
     let end = 4
     for i in 0:end {
-        println(i)
+        println(str(i))
         end = end + 1
     }
     for j in end:end {
-        println(j)
+        println(str(j))
     }
     exit(0)
 }

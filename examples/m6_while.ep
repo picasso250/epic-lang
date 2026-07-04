@@ -7,7 +7,7 @@
 fun main(): void {
     let i = 0
     while i < 5 {
-        println(i)
+        println(str(i))
         i = i + 1
     }
     exit(0)

@@ -10,9 +10,9 @@ fun main(): void {
     let s: str
     let xs: u8[]
     let b = new Box
-    println(len(s))
-    println(len(xs))
+    println(str(len(s)))
+    println(str(len(xs)))
     push(xs, 'X')
-    println(xs[0])
+    println(str(xs[0]))
     exit(b.value)
 }

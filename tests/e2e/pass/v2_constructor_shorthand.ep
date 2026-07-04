@@ -8,6 +8,6 @@ struct Box {
 fun main(): i64 {
     # constructor shorthand: new StructName → new StructName {}
     let b = new Box
-    print(b.n)
+    print(str(b.n))
     return 0
 }

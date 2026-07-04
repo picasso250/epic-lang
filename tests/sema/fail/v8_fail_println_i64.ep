@@ -1,0 +1,6 @@
+# COMPILE_FAIL: println expected str, got i64
+
+fun main(): i64 {
+    println(1)
+    return 0
+}

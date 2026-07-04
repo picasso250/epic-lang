@@ -813,36 +813,41 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         emit_label_id(e, "L", done_id)
         return 0
     }
-    if name == "print" || name == "println" {
+    if name == "print" {
+        if len(expr.args) != 1 {
+            die("print expects 1 argument")
+        }
+        let arg = expr.args[0]
+        let typ = expr_type(e, arg)
+        if typ.kind != "str" {
+            die("print expected str")
+        }
+        let put = ast_node("Call")
+        put.name = "putstr"
+        push(put.args, arg)
+        emit_call_expr(e, put)
+        return 0
+    }
+    if name == "println" {
         if len(expr.args) > 1 {
-            die("print and println take at most one argument")
+            die("println expects at most one argument")
         }
         if len(expr.args) == 1 {
             let arg = expr.args[0]
             let typ = expr_type(e, arg)
-            if typ.kind == "str" {
-                let put = ast_node("Call")
-                put.name = "putstr"
-                push(put.args, arg)
-                emit_call_expr(e, put)
-            } else {
-                if type_is_integer(typ) == 1 {
-                    let put = ast_node("Call")
-                    put.name = "putstr"
-                    push(put.args, call1_node("itoa", arg))
-                    emit_call_expr(e, put)
-                } else {
-                    die("print does not support type")
-                }
+            if typ.kind != "str" {
+                die("println expected str")
             }
+            let put = ast_node("Call")
+            put.name = "putstr"
+            push(put.args, arg)
+            emit_call_expr(e, put)
         }
-        if name == "println" {
-            let nl = ast_node("Call")
-            nl.name = "putc"
-            push(nl.args, string_node("10"))
-            nl.args[0].kind = "Literal"
-            emit_call_expr(e, nl)
-        }
+        let nl = ast_node("Call")
+        nl.name = "putc"
+        push(nl.args, string_node("10"))
+        nl.args[0].kind = "Literal"
+        emit_call_expr(e, nl)
         return 0
     }
     if name == "itoa" {

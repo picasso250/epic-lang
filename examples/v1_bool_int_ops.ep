@@ -12,9 +12,9 @@ fun main(): void {
     }
     let combined: u64 = (mask | low) ^ 165
     if combined == 90 {
-        println(combined)
+        println(str(combined))
     }
     let shifted: u64 = (u64(b) << 1) >>> 1
-    println(shifted)
+    println(str(shifted))
     exit(0)
 }

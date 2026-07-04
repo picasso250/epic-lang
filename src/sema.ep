@@ -619,12 +619,25 @@ fun sema_call_type(st: SemaState, node: AstNode): str {
     if node.type_name != "" {
         sema_die(f"unsupported namespaced call {node.type_name}.{node.name}")
     }
-    if node.name == "print" || node.name == "println" {
+    if node.name == "print" {
+        if len(node.args) != 1 {
+            sema_die("print expects 1 argument")
+        }
+        let arg = sema_expr_type(st, node.args[0])
+        if arg != "str" {
+            sema_die(f"print expected str, got {arg}")
+        }
+        return "void"
+    }
+    if node.name == "println" {
         if len(node.args) > 1 {
-            sema_die(f"{node.name} expects at most one argument")
+            sema_die("println expects at most one argument")
         }
         if len(node.args) == 1 {
-            sema_reject_map_repr(sema_expr_type(st, node.args[0]), node.name)
+            let arg = sema_expr_type(st, node.args[0])
+            if arg != "str" {
+                sema_die(f"println expected str, got {arg}")
+            }
         }
         return "void"
     }

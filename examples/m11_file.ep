@@ -9,6 +9,6 @@ fun main(): void {
 
     let prefix = new u8[] { inp[0], inp[1] }
     println(str(prefix))
-    println(n)
+    println(str(n))
     exit(0)
 }

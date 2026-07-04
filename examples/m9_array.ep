@@ -4,6 +4,6 @@
 fun main(): void {
     let buf = new u8[] { 'E', 'p', 'i', 'c' }
     println(str(buf))
-    println(buf[0])
+    println(str(buf[0]))
     exit(0)
 }

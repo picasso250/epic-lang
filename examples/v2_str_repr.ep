@@ -45,7 +45,7 @@ fun main(): i64 {
     println(str(new bool[] { true, false }))
     println(str(new Bytes { data: new u8[] { 65, 66 } }))
     println(f"hello {new Val { val: 3 }}")
-    println(new Val { val: 3 })
+    println(str(new Val { val: 3 }))
 
     return 0
 }

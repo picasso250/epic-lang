@@ -33,6 +33,6 @@ fun main(): i64 {
         return 7
     }
 
-    print(ids["main"])
+    print(str(ids["main"]))
     return 0
 }

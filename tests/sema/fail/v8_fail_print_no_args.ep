@@ -1,0 +1,6 @@
+# COMPILE_FAIL: print expects 1 argument
+
+fun main(): i64 {
+    print()
+    return 0
+}

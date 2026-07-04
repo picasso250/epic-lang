@@ -64,10 +64,10 @@ fun main(): void {
     write_file("test_bytes.bin", buf)
 
     let got = read_file("test_bytes.bin")
-    println(got[0])
-    println(got[1])
-    println(u16_le(got, 2))
-    println(u32_le(got, 4))
-    println(u64_le(got, 8))
+    println(str(got[0]))
+    println(str(got[1]))
+    println(str(u16_le(got, 2)))
+    println(str(u32_le(got, 4)))
+    println(str(u64_le(got, 8)))
     exit(0)
 }

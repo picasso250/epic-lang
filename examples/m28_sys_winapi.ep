@@ -10,7 +10,7 @@ fun main(): void {
     let h = os.kernel32.CreateFileA(cstr("test_sys_create.tmp"), 1073741824, 0, 0, 2, 128, 0)
     if t >= 0 && n == 3 && c == 0 && h + 1 != 0 {
         os.kernel32.CloseHandle(h)
-        println(true)
+        println(str(true))
         exit(0)
     }
     exit(1)
