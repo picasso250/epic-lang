@@ -266,7 +266,7 @@ fun parse_fn_def(p: Parser): AstNode {
     expect(p, "FUN")
     let name = expect(p, "ID")
     if parser_is_reserved_func(name.text) {
-        parse_error(name.line, str_cat2("reserved builtin function name: ", name.text))
+        parse_error(name.line, f"reserved builtin function name: {name.text}")
     }
     expect(p, "LPAREN")
     let params = parse_params(p)
