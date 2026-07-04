@@ -188,7 +188,7 @@ These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.p
 ### x64-backed private helpers
 
 Most other private helpers are still emitted as x64 helper bodies from
-`bootstrap/mir_lower.py`. This includes `__ep_str_from_i64`, `__ep_map_str_i64_*`,
+`bootstrap/mir_lower.py`. This includes `__ep_str_from_i64`, `__ep_str_from_u64`, `__ep_map_str_i64_*`,
 `__ep_read_file`, `__ep_write_file`, `__ep_system_cmd`, `__epx_argv_init`,
 `__ep_print_str`, `__ep_print_newline`, and `__epx_putc`.
 

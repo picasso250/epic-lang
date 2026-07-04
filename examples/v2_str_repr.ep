@@ -1,6 +1,9 @@
 # EXIT: 0
 # STDOUT: -3
 # STDOUT: 3
+# STDOUT: 9223372036854775807
+# STDOUT: 9223372036854775808
+# STDOUT: 18446744073709551615
 # STDOUT: 65
 # STDOUT: true
 # STDOUT: false
@@ -29,9 +32,16 @@ struct Bytes {
     data: u8[]
 }
 
+fun show_u64(x: u64): void {
+    println(str(x))
+}
+
 fun main(): i64 {
     println(str(0 - 3))
     println(str(u64(3)))
+    show_u64(u64(9223372036854775807))
+    show_u64(u64(9223372036854775808))
+    show_u64(u64(18446744073709551615))
     println(str(u8(65)))
     println(str(true))
     println(str(false))

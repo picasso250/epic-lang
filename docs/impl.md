@@ -183,7 +183,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(n)`           | `__ep_str_from_i64` / `__ep_str_from_bool` 等 helper | 公开 |
+| `str(n)`           | `i64` 用 `__ep_str_from_i64`；`u64` 用 `__ep_str_from_u64`；`bool` 用 `__ep_str_from_bool` 等 helper | 公开 |
 | `system`           | `__ep_system_cmd` helper                    | 公开 |
 | `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |
 | `write_file`       | `__ep_write_file` helper                    | 公开 |

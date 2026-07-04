@@ -84,6 +84,7 @@ class MirCodegen:
         for dll, name, params, ret in WINAPI_IMPORTS:
             self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
         self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr_str())))
+        self.program.externs.append(MirExtern("__ep_str_from_u64", MirSignature([I64], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_from_bool", MirSignature([BOOL], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_from_slice_u8", MirSignature([ptr_slice_u8()], ptr_str())))
         self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr_str(), ptr_str()], ptr_str())))
@@ -959,6 +960,7 @@ class MirCodegen:
         static = self._static_repr(expr, repr_context=False)
         if static is not None:
             return SymbolOperand(ptr_str(), self._string_label(static))
+        source_type = self._resolved_type(expr)
         typ = self._infer_type(expr)
         if typ == ptr_str():
             return self._emit_expr(expr)
@@ -968,6 +970,9 @@ class MirCodegen:
             return ValueOperand(result)
         if typ == ptr_slice_u8():
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_slice_u8")
+            return ValueOperand(result)
+        if source_type == et.U64:
+            result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_u64")
             return ValueOperand(result)
         result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_i64")
         return ValueOperand(result)
