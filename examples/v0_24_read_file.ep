@@ -1,5 +1,5 @@
 # EXIT: 35
 fun main(): void {
-    let src = read_file("examples/m1_exit.ep")
+    let src = read_file("examples/v0_1_exit.ep")
     exit(src[0])
 }
