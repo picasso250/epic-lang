@@ -20,7 +20,7 @@ from mir_lower import lower_mir_to_x64
 from ast_nodes import ProgramNode
 from lexer import LexError, lex
 from parser import ParseError, Parser, dump_ast_text
-from sema import SemanticError, analyze_program
+from sema import SemanticError, analyze_program, dump_typed_ast_text
 
 # ── paths ────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -75,7 +75,7 @@ def _parse_file(input_path, verbose=True):
     return parser.parse_program()
 
 
-def _merge_programs(input_paths, main_path):
+def _merge_programs(input_paths, main_path, verbose=True):
     funcs = []
     structs = []
     seen_funcs = {}
@@ -84,7 +84,7 @@ def _merge_programs(input_paths, main_path):
     main_abs = os.path.abspath(main_path)
 
     for input_path in input_paths:
-        ast = _parse_file(input_path)
+        ast = _parse_file(input_path, verbose=verbose)
         is_main_file = os.path.abspath(input_path) == main_abs
 
         for struct in ast.structs:
@@ -178,6 +178,12 @@ def dump_ast_files(input_paths):
         print(dump_ast_text(ast), end="")
 
 
+def dump_typed_ast_files(input_paths, main_path):
+    ast = _merge_programs(input_paths, main_path, verbose=False)
+    ast = analyze_program(ast)
+    print(dump_typed_ast_text(ast), end="")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  CLI
 # ═══════════════════════════════════════════════════════════════════════════
@@ -195,6 +201,8 @@ def parse_args(argv):
                         help="output directory (default: build)")
     parser.add_argument("--dump-ast", action="store_true",
                         help="print parsed AST and exit")
+    parser.add_argument("--dump-typed-ast", action="store_true",
+                        help="print semantically analyzed typed AST and exit")
     return parser.parse_args(argv)
 
 
@@ -209,13 +217,20 @@ def main(argv=None):
         if not os.path.exists(args.main):
             print(f"Error: file not found: {args.main}", file=sys.stderr)
             return 1
-    elif len(args.inputs) > 1 and not args.dump_ast:
+    elif len(args.inputs) > 1 and args.dump_ast:
+        pass
+    elif len(args.inputs) > 1 and not args.main:
         print("Error: --main is required when compiling multiple files", file=sys.stderr)
         return 1
 
     try:
+        if args.dump_ast and args.dump_typed_ast:
+            print("Error: choose only one of --dump-ast or --dump-typed-ast", file=sys.stderr)
+            return 1
         if args.dump_ast:
             dump_ast_files(args.inputs)
+        elif args.dump_typed_ast:
+            dump_typed_ast_files(args.inputs, args.main or args.inputs[0])
         else:
             compile_files(
                 args.inputs,

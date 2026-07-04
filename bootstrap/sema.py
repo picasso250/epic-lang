@@ -804,3 +804,178 @@ def assert_typed_program(program):
 
 def analyze_program(program):
     return SemanticAnalyzer(program).analyze()
+
+
+def _dump_line(depth, text):
+    return f"{'  ' * depth}{text}"
+
+
+def _type_suffix(node):
+    typ = getattr(node, "resolved_type", None)
+    return f" : {typ}" if typ is not None else ""
+
+
+def dump_typed_ast_lines(node, depth=0):
+    out = []
+
+    def emit(text):
+        out.append(_dump_line(depth, text))
+
+    if isinstance(node, ProgramNode):
+        emit("Program")
+        for struct in node.structs:
+            out.extend(dump_typed_ast_lines(struct, depth + 1))
+        for func in node.funcs:
+            out.extend(dump_typed_ast_lines(func, depth + 1))
+    elif isinstance(node, StructDefNode):
+        emit(f"StructDef {node.name}")
+        for field in node.fields:
+            out.extend(dump_typed_ast_lines(field, depth + 1))
+    elif isinstance(node, StructField):
+        emit(f"StructField {node.name}{_type_suffix(node)}")
+    elif isinstance(node, FunDefNode):
+        emit(f"FunDef {node.name}{_type_suffix(node)}")
+        for param in node.params:
+            out.extend(dump_typed_ast_lines(param, depth + 1))
+        out.extend(dump_typed_ast_lines(node.body, depth + 1))
+    elif isinstance(node, Param):
+        emit(f"Param {node.name}{_type_suffix(node)}")
+    elif isinstance(node, BlockNode):
+        emit("Block")
+        for stmt in node.stmts:
+            out.extend(dump_typed_ast_lines(stmt, depth + 1))
+    elif isinstance(node, ReturnNode):
+        emit("Return")
+        if node.expr is not None:
+            out.extend(dump_typed_ast_lines(node.expr, depth + 1))
+    elif isinstance(node, LetNode):
+        emit(f"Let {node.name}{_type_suffix(node)}")
+        if node.value is not None:
+            out.extend(dump_typed_ast_lines(node.value, depth + 1))
+    elif isinstance(node, AssignNode):
+        emit(f"Assign {node.name}")
+        out.extend(dump_typed_ast_lines(node.value, depth + 1))
+    elif isinstance(node, AssignOpNode):
+        emit(f"AssignOp {node.op}")
+        out.extend(dump_typed_ast_lines(node.target, depth + 1))
+        out.extend(dump_typed_ast_lines(node.value, depth + 1))
+    elif isinstance(node, FieldSetNode):
+        emit(f"FieldSet {node.field}")
+        out.extend(dump_typed_ast_lines(node.value, depth + 1))
+        out.extend(dump_typed_ast_lines(node.object, depth + 1))
+    elif isinstance(node, SubscriptAssignNode):
+        emit("SubscriptAssign")
+        out.extend(dump_typed_ast_lines(node.value, depth + 1))
+        out.extend(dump_typed_ast_lines(node.base, depth + 1))
+        out.extend(dump_typed_ast_lines(node.index, depth + 1))
+    elif isinstance(node, IfNode):
+        emit("If")
+        out.extend(dump_typed_ast_lines(node.then_block, depth + 1))
+        if node.else_block is not None:
+            out.extend(dump_typed_ast_lines(node.else_block, depth + 1))
+        out.extend(dump_typed_ast_lines(node.cond, depth + 1))
+    elif isinstance(node, WhileNode):
+        emit("While")
+        out.extend(dump_typed_ast_lines(node.body, depth + 1))
+        out.extend(dump_typed_ast_lines(node.cond, depth + 1))
+    elif isinstance(node, BreakNode):
+        emit("Break")
+    elif isinstance(node, ContinueNode):
+        emit("Continue")
+    elif isinstance(node, ForRangeNode):
+        emit(f"For {node.name}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.body, depth + 1))
+        out.extend(dump_typed_ast_lines(node.start, depth + 1))
+        out.extend(dump_typed_ast_lines(node.end, depth + 1))
+    elif isinstance(node, PanicNode):
+        emit("Panic")
+        out.extend(dump_typed_ast_lines(node.message, depth + 1))
+    elif isinstance(node, AssertNode):
+        emit("Assert")
+        out.extend(dump_typed_ast_lines(node.cond, depth + 1))
+        if node.message is not None:
+            out.extend(dump_typed_ast_lines(node.message, depth + 1))
+    elif isinstance(node, MatchNode):
+        emit("Match")
+        out.extend(dump_typed_ast_lines(node.expr, depth + 1))
+        for case in node.cases:
+            out.extend(dump_typed_ast_lines(case, depth + 1))
+    elif isinstance(node, MatchCase):
+        emit("MatchCase")
+        if node.pattern is not None:
+            out.extend(dump_typed_ast_lines(node.pattern, depth + 1))
+        out.extend(dump_typed_ast_lines(node.body, depth + 1))
+    elif isinstance(node, ExprStmtNode):
+        emit("ExprStmt")
+        out.extend(dump_typed_ast_lines(node.expr, depth + 1))
+    elif isinstance(node, LiteralNode):
+        emit(f"Literal {node.value}{_type_suffix(node)}")
+    elif isinstance(node, CharNode):
+        emit(f"Char {node.value}{_type_suffix(node)}")
+    elif isinstance(node, BoolNode):
+        emit(f"Bool {node.value}{_type_suffix(node)}")
+    elif isinstance(node, StringNode):
+        emit(f"String {node.value}{_type_suffix(node)}")
+    elif isinstance(node, FStringNode):
+        emit(f"FString{_type_suffix(node)}")
+        for kind, value in node.parts:
+            if kind == "text":
+                emit(f"  FStringText {value}")
+            else:
+                out.extend(dump_typed_ast_lines(value, depth + 1))
+    elif isinstance(node, VarNode):
+        emit(f"Var {node.name}{_type_suffix(node)}")
+    elif isinstance(node, CallNode):
+        suffix = f" : {node.namespace}" if node.namespace else ""
+        emit(f"Call {node.name}{suffix}{_type_suffix(node)}")
+        for arg in node.args:
+            out.extend(dump_typed_ast_lines(arg, depth + 1))
+    elif isinstance(node, BinaryNode):
+        emit(f"Binary {node.op}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.left, depth + 1))
+        out.extend(dump_typed_ast_lines(node.right, depth + 1))
+    elif isinstance(node, UnaryNode):
+        emit(f"Unary {node.op}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.expr, depth + 1))
+    elif isinstance(node, FieldAccessNode):
+        emit(f"FieldAccess {node.field}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.object, depth + 1))
+    elif isinstance(node, SubscriptNode):
+        emit(f"Subscript{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.base, depth + 1))
+        out.extend(dump_typed_ast_lines(node.index, depth + 1))
+    elif isinstance(node, SliceNode):
+        emit(f"Slice{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.base, depth + 1))
+        if node.start is not None:
+            out.extend(dump_typed_ast_lines(node.start, depth + 1))
+        if node.end is not None:
+            out.extend(dump_typed_ast_lines(node.end, depth + 1))
+    elif isinstance(node, NewArrayNode):
+        emit(f"NewArray : {node.elem_type}{_type_suffix(node)}")
+        if node.count is not None:
+            out.extend(dump_typed_ast_lines(node.count, depth + 1))
+    elif isinstance(node, StructInitNode):
+        emit(f"StructInit {node.type_name}{_type_suffix(node)}")
+        for field, value in node.fields:
+            out.append(_dump_line(depth + 1, f"InitField {field}"))
+            out.extend(dump_typed_ast_lines(value, depth + 2))
+    elif isinstance(node, ArrayLiteralNode):
+        emit(f"ArrayLiteral : {node.elem_type}{_type_suffix(node)}")
+        for value in node.values:
+            out.extend(dump_typed_ast_lines(value, depth + 1))
+    elif isinstance(node, MapInitNode):
+        emit(f"MapInit : {node.type_name}{_type_suffix(node)}")
+        for key, value in node.entries:
+            out.append(_dump_line(depth + 1, "Key"))
+            out.extend(dump_typed_ast_lines(key, depth + 2))
+            out.append(_dump_line(depth + 1, "Value"))
+            out.extend(dump_typed_ast_lines(value, depth + 2))
+    else:
+        raise TypeError(f"unsupported AST node: {type(node).__name__}")
+
+    return out
+
+
+def dump_typed_ast_text(node):
+    return "\n".join(dump_typed_ast_lines(node)) + "\n"

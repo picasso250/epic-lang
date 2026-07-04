@@ -33,187 +33,15 @@ ALL_EP = os.path.join(PASS_DIR, "all.ep")
 TYPED_AST_DUMP = os.path.join(PASS_DIR, "typed_ast_dump.txt")
 
 sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
-from ast_nodes import *
 from lexer import lex
 from parser import Parser
-from sema import analyze_program
-
-
-def line(depth, text):
-    return f"{'  ' * depth}{text}"
-
-
-def type_suffix(node):
-    typ = getattr(node, "resolved_type", None)
-    return f" : {typ}" if typ is not None else ""
-
-
-def sema_dump(node, depth=0):
-    out = []
-
-    def emit(text):
-        out.append(line(depth, text))
-
-    if isinstance(node, ProgramNode):
-        emit("Program")
-        for struct in node.structs:
-            out.extend(sema_dump(struct, depth + 1))
-        for func in node.funcs:
-            out.extend(sema_dump(func, depth + 1))
-    elif isinstance(node, StructDefNode):
-        emit(f"StructDef {node.name}")
-        for field in node.fields:
-            out.extend(sema_dump(field, depth + 1))
-    elif isinstance(node, StructField):
-        emit(f"StructField {node.name}{type_suffix(node)}")
-    elif isinstance(node, FunDefNode):
-        emit(f"FunDef {node.name}{type_suffix(node)}")
-        for param in node.params:
-            out.extend(sema_dump(param, depth + 1))
-        out.extend(sema_dump(node.body, depth + 1))
-    elif isinstance(node, Param):
-        emit(f"Param {node.name}{type_suffix(node)}")
-    elif isinstance(node, BlockNode):
-        emit("Block")
-        for stmt in node.stmts:
-            out.extend(sema_dump(stmt, depth + 1))
-    elif isinstance(node, ReturnNode):
-        emit("Return")
-        if node.expr is not None:
-            out.extend(sema_dump(node.expr, depth + 1))
-    elif isinstance(node, LetNode):
-        emit(f"Let {node.name}{type_suffix(node)}")
-        if node.value is not None:
-            out.extend(sema_dump(node.value, depth + 1))
-    elif isinstance(node, AssignNode):
-        emit(f"Assign {node.name}")
-        out.extend(sema_dump(node.value, depth + 1))
-    elif isinstance(node, AssignOpNode):
-        emit(f"AssignOp {node.op}")
-        out.extend(sema_dump(node.target, depth + 1))
-        out.extend(sema_dump(node.value, depth + 1))
-    elif isinstance(node, FieldSetNode):
-        emit(f"FieldSet {node.field}")
-        out.extend(sema_dump(node.value, depth + 1))
-        out.extend(sema_dump(node.object, depth + 1))
-    elif isinstance(node, SubscriptAssignNode):
-        emit("SubscriptAssign")
-        out.extend(sema_dump(node.value, depth + 1))
-        out.extend(sema_dump(node.base, depth + 1))
-        out.extend(sema_dump(node.index, depth + 1))
-    elif isinstance(node, IfNode):
-        emit("If")
-        out.extend(sema_dump(node.then_block, depth + 1))
-        if node.else_block is not None:
-            out.extend(sema_dump(node.else_block, depth + 1))
-        out.extend(sema_dump(node.cond, depth + 1))
-    elif isinstance(node, WhileNode):
-        emit("While")
-        out.extend(sema_dump(node.body, depth + 1))
-        out.extend(sema_dump(node.cond, depth + 1))
-    elif isinstance(node, BreakNode):
-        emit("Break")
-    elif isinstance(node, ContinueNode):
-        emit("Continue")
-    elif isinstance(node, ForRangeNode):
-        emit(f"For {node.name}{type_suffix(node)}")
-        out.extend(sema_dump(node.body, depth + 1))
-        out.extend(sema_dump(node.start, depth + 1))
-        out.extend(sema_dump(node.end, depth + 1))
-    elif isinstance(node, PanicNode):
-        emit("Panic")
-        out.extend(sema_dump(node.message, depth + 1))
-    elif isinstance(node, AssertNode):
-        emit("Assert")
-        out.extend(sema_dump(node.cond, depth + 1))
-        if node.message is not None:
-            out.extend(sema_dump(node.message, depth + 1))
-    elif isinstance(node, MatchNode):
-        emit("Match")
-        out.extend(sema_dump(node.expr, depth + 1))
-        for case in node.cases:
-            out.extend(sema_dump(case, depth + 1))
-    elif isinstance(node, MatchCase):
-        emit("MatchCase")
-        if node.pattern is not None:
-            out.extend(sema_dump(node.pattern, depth + 1))
-        out.extend(sema_dump(node.body, depth + 1))
-    elif isinstance(node, ExprStmtNode):
-        emit("ExprStmt")
-        out.extend(sema_dump(node.expr, depth + 1))
-    elif isinstance(node, LiteralNode):
-        emit(f"Literal {node.value}{type_suffix(node)}")
-    elif isinstance(node, CharNode):
-        emit(f"Char {node.value}{type_suffix(node)}")
-    elif isinstance(node, BoolNode):
-        emit(f"Bool {node.value}{type_suffix(node)}")
-    elif isinstance(node, StringNode):
-        emit(f"String {node.value}{type_suffix(node)}")
-    elif isinstance(node, FStringNode):
-        emit(f"FString{type_suffix(node)}")
-        for kind, value in node.parts:
-            if kind == "text":
-                emit(f"  FStringText {value}")
-            else:
-                out.extend(sema_dump(value, depth + 1))
-    elif isinstance(node, VarNode):
-        emit(f"Var {node.name}{type_suffix(node)}")
-    elif isinstance(node, CallNode):
-        suffix = f" : {node.namespace}" if node.namespace else ""
-        emit(f"Call {node.name}{suffix}{type_suffix(node)}")
-        for arg in node.args:
-            out.extend(sema_dump(arg, depth + 1))
-    elif isinstance(node, BinaryNode):
-        emit(f"Binary {node.op}{type_suffix(node)}")
-        out.extend(sema_dump(node.left, depth + 1))
-        out.extend(sema_dump(node.right, depth + 1))
-    elif isinstance(node, UnaryNode):
-        emit(f"Unary {node.op}{type_suffix(node)}")
-        out.extend(sema_dump(node.expr, depth + 1))
-    elif isinstance(node, FieldAccessNode):
-        emit(f"FieldAccess {node.field}{type_suffix(node)}")
-        out.extend(sema_dump(node.object, depth + 1))
-    elif isinstance(node, SubscriptNode):
-        emit(f"Subscript{type_suffix(node)}")
-        out.extend(sema_dump(node.base, depth + 1))
-        out.extend(sema_dump(node.index, depth + 1))
-    elif isinstance(node, SliceNode):
-        emit(f"Slice{type_suffix(node)}")
-        out.extend(sema_dump(node.base, depth + 1))
-        if node.start is not None:
-            out.extend(sema_dump(node.start, depth + 1))
-        if node.end is not None:
-            out.extend(sema_dump(node.end, depth + 1))
-    elif isinstance(node, NewArrayNode):
-        emit(f"NewArray : {node.elem_type}{type_suffix(node)}")
-        if node.count is not None:
-            out.extend(sema_dump(node.count, depth + 1))
-    elif isinstance(node, StructInitNode):
-        emit(f"StructInit {node.type_name}{type_suffix(node)}")
-        for field, value in node.fields:
-            out.append(line(depth + 1, f"InitField {field}"))
-            out.extend(sema_dump(value, depth + 2))
-    elif isinstance(node, ArrayLiteralNode):
-        emit(f"ArrayLiteral : {node.elem_type}{type_suffix(node)}")
-        for value in node.values:
-            out.extend(sema_dump(value, depth + 1))
-    elif isinstance(node, MapInitNode):
-        emit(f"MapInit : {node.type_name}{type_suffix(node)}")
-        for key, value in node.entries:
-            out.append(line(depth + 1, "Key"))
-            out.extend(sema_dump(key, depth + 2))
-            out.append(line(depth + 1, "Value"))
-            out.extend(sema_dump(value, depth + 2))
-    else:
-        raise TypeError(f"unsupported AST node: {type(node).__name__}")
-
-    return out
+from sema import analyze_program, dump_typed_ast_text
 
 
 def python_sema_dump_source(source):
     ast = Parser(lex(source)).parse_program()
     typed = analyze_program(ast)
-    return "\n".join(sema_dump(typed)) + "\n"
+    return dump_typed_ast_text(typed)
 
 
 def python_sema_dump(path):
@@ -241,6 +69,35 @@ def regen_golden():
     with open(TYPED_AST_DUMP, "w", encoding="utf-8", newline="\n") as f:
         f.write(python_sema_dump(ALL_EP))
     print(f"Regenerated {os.path.relpath(TYPED_AST_DUMP, ROOT_DIR)}")
+
+
+def run_cli_dump_typed_ast_test():
+    if not os.path.isfile(TYPED_AST_DUMP):
+        print(f"  FAIL  missing sema golden: {TYPED_AST_DUMP}")
+        return 0, 1, 0
+
+    with open(TYPED_AST_DUMP, "r", encoding="utf-8") as f:
+        expected = f.read()
+    result = subprocess.run(
+        [sys.executable, EPICC, ALL_EP, "--dump-typed-ast"],
+        cwd=ROOT_DIR,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    actual = result.stdout
+    if result.returncode != 0:
+        print("  FAIL  epic.py --dump-typed-ast failed")
+        print((result.stdout + result.stderr)[-2000:])
+        return 0, 1, 0
+    if actual == expected:
+        print("  PASS  epic.py --dump-typed-ast matches typed AST golden")
+        return 1, 0, 0
+
+    print("  FAIL  epic.py --dump-typed-ast matches typed AST golden")
+    print_diff(expected, actual, "golden/typed_ast_dump.txt", "epic.py --dump-typed-ast")
+    return 0, 1, 0
 
 
 def run_pass_tests():
@@ -433,6 +290,11 @@ def main(argv=None):
     total_skipped = 0
 
     p, f, s = run_pass_tests()
+    total_passed += p
+    total_failed += f
+    total_skipped += s
+
+    p, f, s = run_cli_dump_typed_ast_test()
     total_passed += p
     total_failed += f
     total_skipped += s
