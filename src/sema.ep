@@ -369,8 +369,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
 }
 
 fun sema_reset_locals(st: SemaState): void {
-    st.locals = new map[str]str
-    st.locals["argv"] = "str[]"
+    st.locals = new map[str]str { "argv": "str[]" }
 }
 
 fun sema_binary_int_result(left: str, right: str): str {
@@ -1274,7 +1273,7 @@ fun make_sema_state(): SemaState {
     st.funcs_ret = new map[str]str
     st.funcs_param_count = new map[str]i64
     st.funcs_param_types = new map[str]str
-    st.locals = new map[str]str
+    st.locals = new map[str]str { "argv": "str[]" }
     st.current_fn = ""
     st.current_ret = "void"
     st.loop_depth = 0

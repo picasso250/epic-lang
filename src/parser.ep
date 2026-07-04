@@ -338,11 +338,8 @@ fun skip_balanced_brackets(p: Parser, i: i64): i64 {
         let kind = p.tokens[i].kind
         if kind == "LBRACKET" {
             depth += 1
-        }
-        else {
-            if kind == "RBRACKET" {
-                depth -= 1
-            }
+        } else if kind == "RBRACKET" {
+            depth -= 1
         }
         i += 1
     }
@@ -690,121 +687,133 @@ fun parse_expr_stmt(p: Parser): AstNode {
 }
 
 fun is_expr_first(kind: str): i64 {
-    if kind == "NUMBER" {
-        return 1
-    }
-    if kind == "CHAR" {
-        return 1
-    }
-    if kind == "STRING" {
-        return 1
-    }
-    if kind == "FSTRING" {
-        return 1
-    }
-    if kind == "TRUE" {
-        return 1
-    }
-    if kind == "FALSE" {
-        return 1
-    }
-    if kind == "ID" {
-        return 1
-    }
-    if kind == "NEW" {
-        return 1
-    }
-    if kind == "LPAREN" {
-        return 1
-    }
-    if kind == "BANG" {
-        return 1
-    }
-    if kind == "MINUS" {
-        return 1
-    }
-    if kind == "TILDE" {
-        return 1
+    match kind {
+        "NUMBER": {
+            return 1
+        }
+        "CHAR": {
+            return 1
+        }
+        "STRING": {
+            return 1
+        }
+        "FSTRING": {
+            return 1
+        }
+        "TRUE": {
+            return 1
+        }
+        "FALSE": {
+            return 1
+        }
+        "ID": {
+            return 1
+        }
+        "NEW": {
+            return 1
+        }
+        "LPAREN": {
+            return 1
+        }
+        "BANG": {
+            return 1
+        }
+        "MINUS": {
+            return 1
+        }
+        "TILDE": {
+            return 1
+        }
+        else: {
+        }
     }
     return 0
 }
 
 fun is_assignment_op_kind(kind: str): i64 {
-    if kind == "ASSIGN" {
-        return 1
-    }
-    if kind == "PLUS_ASSIGN" {
-        return 1
-    }
-    if kind == "MINUS_ASSIGN" {
-        return 1
-    }
-    if kind == "STAR_ASSIGN" {
-        return 1
-    }
-    if kind == "SLASH_ASSIGN" {
-        return 1
-    }
-    if kind == "PERCENT_ASSIGN" {
-        return 1
-    }
-    if kind == "SHL_ASSIGN" {
-        return 1
-    }
-    if kind == "SHR_ASSIGN" {
-        return 1
-    }
-    if kind == "USHR_ASSIGN" {
-        return 1
-    }
-    if kind == "AMP_ASSIGN" {
-        return 1
-    }
-    if kind == "PIPE_ASSIGN" {
-        return 1
-    }
-    if kind == "CARET_ASSIGN" {
-        return 1
+    match kind {
+        "ASSIGN": {
+            return 1
+        }
+        "PLUS_ASSIGN": {
+            return 1
+        }
+        "MINUS_ASSIGN": {
+            return 1
+        }
+        "STAR_ASSIGN": {
+            return 1
+        }
+        "SLASH_ASSIGN": {
+            return 1
+        }
+        "PERCENT_ASSIGN": {
+            return 1
+        }
+        "SHL_ASSIGN": {
+            return 1
+        }
+        "SHR_ASSIGN": {
+            return 1
+        }
+        "USHR_ASSIGN": {
+            return 1
+        }
+        "AMP_ASSIGN": {
+            return 1
+        }
+        "PIPE_ASSIGN": {
+            return 1
+        }
+        "CARET_ASSIGN": {
+            return 1
+        }
+        else: {
+        }
     }
     return 0
 }
 
 fun assignment_op_from_kind(kind: str): str {
-    if kind == "ASSIGN" {
-        return "="
-    }
-    if kind == "PLUS_ASSIGN" {
-        return "+"
-    }
-    if kind == "MINUS_ASSIGN" {
-        return "-"
-    }
-    if kind == "STAR_ASSIGN" {
-        return "*"
-    }
-    if kind == "SLASH_ASSIGN" {
-        return "/"
-    }
-    if kind == "PERCENT_ASSIGN" {
-        return "%"
-    }
-    if kind == "SHL_ASSIGN" {
-        return "<<"
-    }
-    if kind == "SHR_ASSIGN" {
-        return ">>"
-    }
-    if kind == "USHR_ASSIGN" {
-        return ">>>"
-    }
-    if kind == "AMP_ASSIGN" {
-        return "&"
-    }
-    if kind == "PIPE_ASSIGN" {
-        return "|"
-    }
-    if kind == "CARET_ASSIGN" {
-        return "^"
+    match kind {
+        "ASSIGN": {
+            return "="
+        }
+        "PLUS_ASSIGN": {
+            return "+"
+        }
+        "MINUS_ASSIGN": {
+            return "-"
+        }
+        "STAR_ASSIGN": {
+            return "*"
+        }
+        "SLASH_ASSIGN": {
+            return "/"
+        }
+        "PERCENT_ASSIGN": {
+            return "%"
+        }
+        "SHL_ASSIGN": {
+            return "<<"
+        }
+        "SHR_ASSIGN": {
+            return ">>"
+        }
+        "USHR_ASSIGN": {
+            return ">>>"
+        }
+        "AMP_ASSIGN": {
+            return "&"
+        }
+        "PIPE_ASSIGN": {
+            return "|"
+        }
+        "CARET_ASSIGN": {
+            return "^"
+        }
+        else: {
+        }
     }
     return ""
 }
@@ -854,68 +863,72 @@ fun parse_stmt(p: Parser): AstNode {
 }
 
 fun op_text(kind: str): str {
-    if kind == "PLUS" {
-        return "+"
-    }
-    if kind == "MINUS" {
-        return "-"
-    }
-    if kind == "STAR" {
-        return "*"
-    }
-    if kind == "SLASH" {
-        return "/"
-    }
-    if kind == "PERCENT" {
-        return "%"
-    }
-    if kind == "EQEQ" {
-        return "=="
-    }
-    if kind == "NEQ" {
-        return "!="
-    }
-    if kind == "LT" {
-        return "<"
-    }
-    if kind == "GT" {
-        return ">"
-    }
-    if kind == "LTE" {
-        return "<="
-    }
-    if kind == "GTE" {
-        return ">="
-    }
-    if kind == "AND" {
-        return "&&"
-    }
-    if kind == "OR" {
-        return "||"
-    }
-    if kind == "AMPERSAND" {
-        return "&"
-    }
-    if kind == "PIPE" {
-        return "|"
-    }
-    if kind == "CARET" {
-        return "^"
-    }
-    if kind == "SHL" {
-        return "<<"
-    }
-    if kind == "SHR" {
-        return ">>"
-    }
-    if kind == "USHR" {
-        return ">>>"
-    }
-    if kind == "BANG" {
-        return "!"
-    }
-    if kind == "TILDE" {
-        return "~"
+    match kind {
+        "PLUS": {
+            return "+"
+        }
+        "MINUS": {
+            return "-"
+        }
+        "STAR": {
+            return "*"
+        }
+        "SLASH": {
+            return "/"
+        }
+        "PERCENT": {
+            return "%"
+        }
+        "EQEQ": {
+            return "=="
+        }
+        "NEQ": {
+            return "!="
+        }
+        "LT": {
+            return "<"
+        }
+        "GT": {
+            return ">"
+        }
+        "LTE": {
+            return "<="
+        }
+        "GTE": {
+            return ">="
+        }
+        "AND": {
+            return "&&"
+        }
+        "OR": {
+            return "||"
+        }
+        "AMPERSAND": {
+            return "&"
+        }
+        "PIPE": {
+            return "|"
+        }
+        "CARET": {
+            return "^"
+        }
+        "SHL": {
+            return "<<"
+        }
+        "SHR": {
+            return ">>"
+        }
+        "USHR": {
+            return ">>>"
+        }
+        "BANG": {
+            return "!"
+        }
+        "TILDE": {
+            return "~"
+        }
+        else: {
+        }
     }
     return ""
 }
