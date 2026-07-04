@@ -252,7 +252,18 @@ Program
             Var h : Holder
         Var q : Point
       Let m : map[str]i64
-        New map[str]i64 : map[str]i64
+        MapInit : map[str]i64 : map[str]i64
+          Key
+            String zero : str
+          Value
+            Literal 0 : i64
+          Key
+            FieldAccess label : str
+              Var q : Point
+          Value
+            Call add : i64
+              Literal 2 : i64
+              Literal 5 : i64
       SubscriptAssign
         Literal 1 : i64
         Var m : map[str]i64

@@ -74,7 +74,7 @@ fun use_structs_and_maps(): i64 {
     q.x = p.x
     q.y = h.point.y
     q.label = str(h.bytes)
-    let m = new map[str]i64
+    let m = new map[str]i64 { "zero": 0, q.label: add(2, 5) }
     m["one"] = 1
     m["two"] = add(m["one"], 1)
     let has_one = map_has(m, "one")

@@ -522,15 +522,20 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         return sema_set_type(node, node.name)
     }
-    if node.kind == "New" {
-        let typ = sema_type_name(st, node.name)
+    if node.kind == "MapInit" {
+        let typ = sema_type_name(st, node.type_name)
         if sema_is_map(typ) {
+            let value_type = sema_map_value(typ)
+            if len(node.map_keys) != len(node.map_values) {
+                sema_die("internal map initializer entry mismatch")
+            }
+            for i in 0:len(node.map_keys) {
+                sema_check_assign(st, "str", node.map_keys[i], "map init key")
+                sema_check_assign(st, value_type, node.map_values[i], "map init value")
+            }
             return sema_set_type(node, typ)
         }
-        if map_has(st.struct_names, typ) == false {
-            sema_die(str_cat2("new expected struct or map, got ", typ))
-        }
-        return sema_set_type(node, typ)
+        sema_die(str_cat2("new expected map, got ", typ))
     }
     sema_die(str_cat2("unsupported expression: ", node.kind))
     return ""
@@ -1214,8 +1219,19 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
         sema_dump_node(node.end, depth + 1)
         return
     }
-    if node.kind == "New" {
-        sema_print_expr_head("New", node.name, t)
+    if node.kind == "MapInit" {
+        print("MapInit : ")
+        print(node.type_name)
+        sema_print_type(t)
+        println("")
+        for i in 0:len(node.map_keys) {
+            sema_indent(depth + 1)
+            println("Key")
+            sema_dump_node(node.map_keys[i], depth + 2)
+            sema_indent(depth + 1)
+            println("Value")
+            sema_dump_node(node.map_values[i], depth + 2)
+        }
         return
     }
     if node.kind == "NewArray" {

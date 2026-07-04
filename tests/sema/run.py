@@ -198,9 +198,6 @@ def sema_dump(node, depth=0):
         for value in node.values:
             out.extend(sema_dump(value, depth + 1))
     elif isinstance(node, MapInitNode):
-        if not node.entries:
-            emit(f"New {node.type_name}{type_suffix(node)}")
-            return out
         emit(f"MapInit : {node.type_name}{type_suffix(node)}")
         for key, value in node.entries:
             out.append(line(depth + 1, "Key"))

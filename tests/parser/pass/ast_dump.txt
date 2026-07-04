@@ -30,7 +30,19 @@ Program
         Literal 2
       Let empty : u8[]
       Let mapping : map[str]i64
-        New map[str]i64
+        MapInit : map[str]i64
+      Let mapping2
+        MapInit : map[str]i64
+          Key
+            String one
+          Value
+            Literal 1
+          Key
+            Var text
+          Value
+            Binary +
+              Var typed
+              Var inferred
       Let p
         StructInit Point
       Let p2

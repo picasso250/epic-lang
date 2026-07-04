@@ -23,6 +23,7 @@ fun statements_and_control(flag: bool): void {
     let typed: i64 = 2
     let empty: u8[]
     let mapping: map[str]i64 = new map[str]i64
+    let mapping2 = new map[str]i64 { "one": 1, text: typed + inferred }
     let p = new Point
     let p2 = new Point {}
     let p3 = new Point { x: 1, y: 2, name: "origin" }

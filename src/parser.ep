@@ -19,6 +19,8 @@ struct AstNode {
     params: AstNode[]
     stmts: AstNode[]
     args: AstNode[]
+    map_keys: AstNode[]
+    map_values: AstNode[]
 
     body: AstNode
     then_block: AstNode
@@ -65,6 +67,8 @@ fun ast_node(kind: str): AstNode {
     n.params = new AstNode[0]
     n.stmts = new AstNode[0]
     n.args = new AstNode[0]
+    n.map_keys = new AstNode[0]
+    n.map_values = new AstNode[0]
     n.body = ast_empty()
     n.then_block = ast_empty()
     n.else_block = ast_empty()
@@ -1009,6 +1013,30 @@ fun parse_array_literal(p: Parser, name: Token): AstNode {
     return node
 }
 
+fun parse_map_init_entries(p: Parser, node: AstNode): AstNode {
+    expect(p, "LBRACE")
+    skip_newlines(p)
+    while peek_kind(p, "RBRACE") == 0 {
+        push(node.map_keys, parse_expr(p))
+        expect(p, "COLON")
+        push(node.map_values, parse_expr(p))
+        if check(p, "COMMA") == 1 {
+            skip_newlines(p)
+        } else {
+            if peek_kind(p, "NEWLINE") == 1 {
+                skip_newlines(p)
+            } else {
+                if peek_kind(p, "RBRACE") == 0 {
+                    let t = peek(p)
+                    parse_error(t.line, "Expected comma or newline in map initializer")
+                }
+            }
+        }
+    }
+    expect(p, "RBRACE")
+    return node
+}
+
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[4]
     for i in 0:len(parts) {
@@ -1087,8 +1115,11 @@ fun parse_primary(p: Parser): AstNode {
                 parse_error(key.line, "map key type must be str")
             }
             expect(p, "RBRACKET")
-            let n = ast_node("New")
-            n.name = str_cat2("map[str]", parse_type(p))
+            let n = ast_node("MapInit")
+            n.type_name = str_cat2("map[str]", parse_type(p))
+            if peek_kind(p, "LBRACE") == 1 {
+                return parse_map_init_entries(p, n)
+            }
             return n
         }
         if check(p, "LBRACKET") == 1 {
@@ -1320,6 +1351,20 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         println("MatchCase")
         dump_node(node.expr, depth + 1)
         dump_node(node.body, depth + 1)
+        return 0
+    }
+    if node.kind == "MapInit" {
+        indent(depth)
+        print("MapInit : ")
+        println(node.type_name)
+        for i in 0:len(node.map_keys) {
+            indent(depth + 1)
+            println("Key")
+            dump_node(node.map_keys[i], depth + 2)
+            indent(depth + 1)
+            println("Value")
+            dump_node(node.map_values[i], depth + 2)
+        }
         return 0
     }
     indent(depth)
