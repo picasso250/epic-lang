@@ -120,7 +120,7 @@ class MirHelperBuilder:
 
     def alloca(self, elem_type):
         """Append an alloca and return the address."""
-        r = self.value(ptr(elem_type), "slot")
+        r = self.value(ptr(), "slot")
         self.entry.instructions.append(MirInst("alloca", result=r, type=elem_type))
         return r
 

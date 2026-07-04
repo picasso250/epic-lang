@@ -262,7 +262,7 @@ class MirCodegen:
         return result
 
     def _alloc_local(self, name, typ):
-        addr = self._new_value(ptr(typ), f"{name}.addr")
+        addr = self._new_value(ptr(), f"{name}.addr")
         self.block.instructions.append(MirInst("alloca", result=addr, type=typ))
         self.locals[name] = addr
         self.local_types[name] = typ
@@ -279,7 +279,7 @@ class MirCodegen:
         obj = self._inst(
             "call",
             [ValueOperand(size)],
-            result_type=ptr_struct(struct_name),
+            result_type=ptr(),
             type=ptr(),
             callee="__epx_alloc",
         )
@@ -298,7 +298,7 @@ class MirCodegen:
         addr = self._inst(
             "gep",
             [base, ConstIntOperand(I64, 0), ConstIntOperand(I32, self._field_index(struct_name, field))],
-            result_type=ptr(field_type),
+            result_type=ptr(),
             type=mir_struct(struct_name),
         )
         return ValueOperand(addr)
@@ -735,7 +735,7 @@ class MirCodegen:
         next_check_blocks = [self._new_block("match.next") for _ in checks[:-1]]
         for idx, (case, case_block) in enumerate(checks):
             next_block = next_check_blocks[idx] if idx < len(checks) - 1 else else_block
-            self._emit_match_check(stmt, match_addr, case, case_block, next_block)
+            self._emit_match_check(stmt, match_addr, value.type, case, case_block, next_block)
             if idx < len(checks) - 1:
                 self.block = next_check_blocks[idx]
 
@@ -757,8 +757,8 @@ class MirCodegen:
 
         self.block = end_block
 
-    def _emit_match_check(self, stmt, match_addr, case, case_block, next_block):
-        scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_addr.type.pointee, type=match_addr.type.pointee)
+    def _emit_match_check(self, stmt, match_addr, match_type, case, case_block, next_block):
+        scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_type, type=match_type)
         scrut_op = ValueOperand(scrut)
         pat = self._emit_expr(case.pattern)
         cond = self._inst("icmp.eq", [scrut_op, pat], result_type=BOOL)
@@ -834,7 +834,7 @@ class MirCodegen:
         raise MirCodegenError(f"unsupported binary op: {expr.op}")
 
     def _emit_short_circuit(self, expr):
-        result_addr = self._new_value(ptr(BOOL), "logic.addr")
+        result_addr = self._new_value(ptr(), "logic.addr")
         self.block.instructions.append(MirInst("alloca", result=result_addr, type=BOOL))
 
         left = self._emit_expr(expr.left)
@@ -984,12 +984,12 @@ class MirCodegen:
             return ValueOperand(result)
         elem = self._array_struct_elem(base_type)
         if elem is not None:
-            result_type = ptr_struct(elem)
+            result_type = ptr()
             result = self._inst("call", [base, index], result_type=result_type, type=ptr(), callee="__ep_slice_ptr_get")
             return ValueOperand(result)
         if self._is_ptr_type(base_type):
             elem_type = self._epic_pointee_type(base_type.elem)
-            addr = self._inst("gep", [base, index], result_type=ptr(elem_type), type=elem_type)
+            addr = self._inst("gep", [base, index], result_type=ptr(), type=elem_type)
             load_type = I8 if base_type.elem in (et.I8, et.U8) else elem_type
             result_type = I64 if load_type == I8 else elem_type
             result = self._inst("load", [ValueOperand(addr)], result_type=result_type, type=load_type)
