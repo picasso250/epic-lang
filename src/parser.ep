@@ -457,23 +457,19 @@ fun parse_assign_stmt(p: Parser): AstNode {
 fun parse_bracket_postfix(p: Parser, base: AstNode): AstNode {
     let n = ast_empty()
     if peek_kind(p, "COLON") == 1 {
-        expect(p, "COLON")
-        n = ast_node("Slice")
-        n.base = base
-        if peek_kind(p, "RBRACKET") == 0 {
-            n.end = parse_expr(p)
-        }
-        expect(p, "RBRACKET")
-        return n
+        let t = peek(p)
+        parse_error(t.line, "slice requires explicit start and end")
     }
     let first = parse_expr(p)
     if check(p, "COLON") == 1 {
+        if peek_kind(p, "RBRACKET") == 1 {
+            let t = peek(p)
+            parse_error(t.line, "slice requires explicit start and end")
+        }
         n = ast_node("Slice")
         n.base = base
         n.start = first
-        if peek_kind(p, "RBRACKET") == 0 {
-            n.end = parse_expr(p)
-        }
+        n.end = parse_expr(p)
         expect(p, "RBRACKET")
         return n
     }
