@@ -264,86 +264,6 @@ def emit___ep_str_cat() -> MirFunction:
     return b.fn
 
 
-def emit___ep_str_slice() -> MirFunction:
-    """Copy a half-open string slice [start:end].
-
-    fn __ep_str_slice(ptr<str> %s, i64 %start, i64 %end) -> ptr<str>
-
-    Bounds failures exit with code 1, matching migrated string/array helpers.
-    """
-    b = MirHelperBuilder(
-        "__ep_str_slice",
-        [
-            MirParam("%s", ptr(mir_struct("str"))),
-            MirParam("%start", I64),
-            MirParam("%end", I64),
-        ],
-        ptr(mir_struct("str")),
-    )
-    s_val = ValueOperand(b.fn.params[0].value)
-    start_val = ValueOperand(b.fn.params[1].value)
-    end_val = ValueOperand(b.fn.params[2].value)
-
-    s_len = b.load(I64, b.gep_field(s_val, "str", 1))
-
-    start_ok = b.icmp("ge", start_val, b.const_i64(0))
-    check_order = b.new_block("check_order")
-    check_len = b.new_block("check_len")
-    alloc_block = b.new_block("alloc")
-    copy_check = b.new_block("copy_check")
-    copy_body = b.new_block("copy_body")
-    done = b.new_block("done")
-    fail = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(start_ok), check_order.name, fail.name)
-
-    b.entry = check_order
-    order_ok = b.icmp("ge", end_val, start_val)
-    b.entry.terminator = CondBr(ValueOperand(order_ok), check_len.name, fail.name)
-
-    b.entry = check_len
-    len_ok = b.icmp("ge", s_len, end_val)
-    b.entry.terminator = CondBr(ValueOperand(len_ok), alloc_block.name, fail.name)
-
-    b.entry = alloc_block
-    slice_len = b.binop("sub", end_val, start_val)
-    result_str = b.call("__epx_alloc", [b.const_i64(24)], ptr())
-    data_len = b.binop("add", slice_len, b.const_i64(1))
-    result_data = b.call("__epx_alloc", [data_len], ptr())
-    b.store(result_data, b.gep_field(ValueOperand(result_str), "str", 0))
-    b.store(slice_len, b.gep_field(ValueOperand(result_str), "str", 1))
-    b.store(slice_len, b.gep_field(ValueOperand(result_str), "str", 2))
-    src_data = b.load(ptr(), b.gep_field(s_val, "str", 0))
-    src_start = b.gep(I8, src_data, [start_val])
-    i_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    b.br(copy_check)
-
-    b.entry = copy_check
-    i = b.load(I64, ValueOperand(i_slot))
-    keep_copying = b.icmp("lt", i, slice_len)
-    b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, done.name)
-
-    b.entry = copy_body
-    src_addr = b.gep(I8, src_start, [i])
-    byte = b.load(I8, src_addr, result_type=I8)
-    dst_addr = b.gep(I8, ValueOperand(result_data), [i])
-    b.store(ValueOperand(byte), dst_addr)
-    next_i = b.binop("add", i, b.const_i64(1))
-    b.store(next_i, ValueOperand(i_slot))
-    b.br(copy_check)
-
-    b.entry = done
-    nul_addr = b.gep(I8, ValueOperand(result_data), [slice_len])
-    b.store(b.const_i8(0), nul_addr)
-    b.ret(ValueOperand(result_str))
-
-    b.entry = fail
-    b.call("ExitProcess", [b.const_i64(1)], VOID)
-    b.ret(ConstNullOperand())
-
-    return b.fn
-
-
 
 def emit___ep_str_get() -> MirFunction:
     """Bounds-checked byte read from str.
@@ -1340,7 +1260,6 @@ _HELPER_EMITTERS = {
     "__ep_slice_u8_from_str": lambda p: emit_bytes_slice_u8(),
     "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
-    "__ep_str_slice": lambda p: emit___ep_str_slice(),
     "__ep_str_get": lambda p: emit___ep_str_get(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
     "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
@@ -1377,7 +1296,6 @@ _HELPER_ORDER = [
     "__ep_slice_u8_from_str",
     "__ep_str_from_slice_u8",
     "__ep_str_cat",
-    "__ep_str_slice",
     "__ep_str_get",
     "__ep_slice_u8_alloc",
     "__ep_slice_u8_get",

@@ -1,4 +1,5 @@
 # EXIT: 1
+# STDOUT_CONTAINS: invalid string slice
 fun main(): void {
     let s = "Epic"
     let bad = s[3:2]
