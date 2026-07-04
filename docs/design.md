@@ -313,7 +313,7 @@ let source = str(read_file(path))
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
 | `system(cmd: str): i64`                | 执行命令，返回退出码                        |
 
-以下 builtin 已从 public surface 删除，作为 compiler-internal helper 保留：
+以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 
 | 删除的 public builtin   | 替代方案                                    |
 |------------------------|---------------------------------------------|
@@ -322,9 +322,9 @@ let source = str(read_file(path))
 | `str_get(s, i)`        | `s[i]`（语法）                              |
 | `str_slice(s, start, end)` | `s[start:end]`（语法）                   |
 | `str_eq(s1, s2)`       | `s1 == s2`（语法）                          |
-| `str_find`             | 自己写 `u8[]` 扫描                          |
-| `str_starts_with`      | 自己写 `u8[]` 扫描                          |
-| `str_trim`             | 自己写 `u8[]` 扫描                          |
+| `str_find`             | 自己写 `u8[]` 扫描；未来可提供 `s.find(...)` 方法 |
+| `str_starts_with`      | 自己写 `u8[]` 扫描；未来可提供 `s.starts_with(...)` 方法 |
+| `str_trim`             | 自己写 `u8[]` 扫描；未来可提供 `s.trim()` 方法 |
 | `str_replace_char`     | 自己写 `u8[]` 扫描                          |
 | `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
 | `push(a: T[], x: T): void`             | 追加到动态数组                              |
