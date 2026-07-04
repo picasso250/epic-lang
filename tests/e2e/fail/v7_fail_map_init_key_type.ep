@@ -1,0 +1,4 @@
+# COMPILE_FAIL: map init key expected str
+fun main(): void {
+    let m = new map[str]i64 { 1: 2 }
+}

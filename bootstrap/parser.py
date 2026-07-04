@@ -462,7 +462,9 @@ class Parser:
                 key = self.expect("ID")
                 self.expect("RBRACKET")
                 value = self.parse_type()
-                return NewNode(struct_name=f"map[{key[1]}]{value}")
+                type_name = f"map[{key[1]}]{value}"
+                entries = self.parse_map_entries_after_lbrace() if self.check("LBRACE") else []
+                return MapInitNode(type_name=type_name, entries=entries)
             name = t[1]
             if self.check("LBRACKET"):
                 count = None
@@ -596,6 +598,19 @@ class Parser:
                     break
         self.expect("RBRACE")
         return values
+
+    def parse_map_entries_after_lbrace(self):
+        entries = []
+        if not self.peek_kind("RBRACE"):
+            while True:
+                key = self.parse_expr()
+                self.expect("COLON")
+                value = self.parse_expr()
+                entries.append((key, value))
+                if not self.check("COMMA"):
+                    break
+        self.expect("RBRACE")
+        return entries
 
     def parse_args(self):
         args = []

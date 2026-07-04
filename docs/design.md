@@ -193,12 +193,15 @@ match n {
 
 ```epic
 let ids = new map[str]i64
+let names = new map[str]str { "main": "entry", "lib": "helper" }
 ids["main"] = 1
 let id = ids["main"]
 let ok = map_has(ids, "main")
 ```
 
 键类型固定为 `str`。Python reference compiler 当前支持 `map[str]i64`、`map[str]bool`、`map[str]str`。不存在的键查找返回该值类型的零值；`map_has(m, key)` 区分是否存在；`map_del(m, key)` 删除键并返回是否真的删除了已有项。
+
+Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `str` 表达式，`value` 按 `T` 做普通赋值兼容检查。初始化按源码顺序插入；重复 key 时后面的 entry 覆盖前面的值。`new map[str]T {}` 等价于空 map。
 
 ## 字符串与数组 (Strings and Arrays)
 

@@ -661,8 +661,8 @@ class MirCodegen:
             return self._emit_array_literal(expr)
         if isinstance(expr, NewArrayNode):
             return self._emit_new_array(expr)
-        if isinstance(expr, NewNode):
-            return self._emit_new(expr)
+        if isinstance(expr, MapInitNode):
+            return self._emit_map_init(expr)
         if isinstance(expr, SliceNode):
             return self._emit_slice(expr)
         if isinstance(expr, StructInitNode):
@@ -899,14 +899,17 @@ class MirCodegen:
             return ValueOperand(result)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
-    def _emit_new(self, expr):
-        if expr.struct_name.startswith("map[str]"):
-            result_type = self._type(expr.struct_name)
-            result = self._inst("call", [], result_type=result_type, type=result_type, callee=self._map_helper(result_type, "new"))
-            return ValueOperand(result)
-        if expr.struct_name in self.structs:
-            return self._alloc_struct(expr.struct_name)
-        raise MirCodegenError(f"unsupported new target: {expr.struct_name}")
+    def _emit_map_init(self, expr):
+        result_type = self._type(expr.resolved_type)
+        new_helper = self._map_helper(result_type, "new")
+        set_helper = self._map_helper(result_type, "set")
+        if new_helper is None or set_helper is None:
+            raise MirCodegenError(f"unsupported map init target: {expr.type_name}")
+        result = self._inst("call", [], result_type=result_type, type=result_type, callee=new_helper)
+        map_value = ValueOperand(result)
+        for key_expr, value_expr in expr.entries:
+            self._inst("call", [map_value, self._emit_expr(key_expr), self._emit_expr(value_expr)], type=VOID, callee=set_helper)
+        return map_value
 
     def _emit_slice(self, expr):
         base = self._emit_expr(expr.base)

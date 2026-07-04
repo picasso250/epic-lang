@@ -184,8 +184,6 @@ def sema_dump(node, depth=0):
             out.extend(sema_dump(node.start, depth + 1))
         if node.end is not None:
             out.extend(sema_dump(node.end, depth + 1))
-    elif isinstance(node, NewNode):
-        emit(f"New {node.struct_name}{type_suffix(node)}")
     elif isinstance(node, NewArrayNode):
         emit(f"NewArray : {node.elem_type}{type_suffix(node)}")
         if node.count is not None:
@@ -199,6 +197,16 @@ def sema_dump(node, depth=0):
         emit(f"ArrayLiteral : {node.elem_type}{type_suffix(node)}")
         for value in node.values:
             out.extend(sema_dump(value, depth + 1))
+    elif isinstance(node, MapInitNode):
+        if not node.entries:
+            emit(f"New {node.type_name}{type_suffix(node)}")
+            return out
+        emit(f"MapInit : {node.type_name}{type_suffix(node)}")
+        for key, value in node.entries:
+            out.append(line(depth + 1, "Key"))
+            out.extend(sema_dump(key, depth + 2))
+            out.append(line(depth + 1, "Value"))
+            out.extend(sema_dump(value, depth + 2))
     else:
         raise TypeError(f"unsupported AST node: {type(node).__name__}")
 

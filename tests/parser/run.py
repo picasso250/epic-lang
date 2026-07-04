@@ -179,8 +179,6 @@ def py_dump(node, depth=0):
             out.extend(py_dump(node.start, depth + 1))
         if node.end is not None:
             out.extend(py_dump(node.end, depth + 1))
-    elif isinstance(node, NewNode):
-        emit(f"New {node.struct_name}")
     elif isinstance(node, NewArrayNode):
         emit(f"NewArray : {node.elem_type}")
         if node.count is not None:
@@ -194,6 +192,16 @@ def py_dump(node, depth=0):
         emit(f"ArrayLiteral : {node.elem_type}")
         for value in node.values:
             out.extend(py_dump(value, depth + 1))
+    elif isinstance(node, MapInitNode):
+        if not node.entries:
+            emit(f"New {node.type_name}")
+            return out
+        emit(f"MapInit : {node.type_name}")
+        for key, value in node.entries:
+            out.append(line(depth + 1, "Key"))
+            out.extend(py_dump(key, depth + 2))
+            out.append(line(depth + 1, "Value"))
+            out.extend(py_dump(value, depth + 2))
     elif isinstance(node, TypeDefNode):
         emit(f"TypeDef {node.name}")
         for variant in node.variants:

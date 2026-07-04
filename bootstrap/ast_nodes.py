@@ -252,12 +252,6 @@ class SliceNode(ASTNode):
 
 
 @dataclass
-class NewNode(ASTNode):
-    struct_name: str
-    resolved_type: Optional[EpicType] = None
-
-
-@dataclass
 class NewArrayNode(ASTNode):
     elem_type: str
     count: Optional[ASTNode] = None
@@ -275,6 +269,13 @@ class StructInitNode(ASTNode):
 class ArrayLiteralNode(ASTNode):
     elem_type: str
     values: list
+    resolved_type: Optional[EpicType] = None
+
+
+@dataclass
+class MapInitNode(ASTNode):
+    type_name: str
+    entries: list
     resolved_type: Optional[EpicType] = None
 
 

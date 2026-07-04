@@ -290,8 +290,8 @@ class SemanticAnalyzer:
             return ExprInfo(ARRAY(elem))
         if isinstance(expr, StructInitNode):
             return self._struct_init_expr(expr)
-        if isinstance(expr, NewNode):
-            return self._new_expr(expr)
+        if isinstance(expr, MapInitNode):
+            return self._map_init_expr(expr)
         self._fail(f"unsupported expression: {type(expr).__name__}")
 
     def _unary_expr(self, expr):
@@ -435,13 +435,14 @@ class SemanticAnalyzer:
         self._check_named_fields(self.struct_fields[expr.type_name], expr.fields, expr.type_name)
         return ExprInfo(NAMED(expr.type_name))
 
-    def _new_expr(self, expr):
-        typ = self._type_name(expr.struct_name)
+    def _map_init_expr(self, expr):
+        typ = self._type_name(expr.type_name)
         if typ.kind == "map":
+            for key, value in expr.entries:
+                self._check_assign(STR, self._expr(key), "map init key")
+                self._check_assign(typ.elem, self._expr(value), "map init value")
             return ExprInfo(typ)
-        if typ.kind != "named" or typ.name not in self.struct_fields:
-            self._fail(f"new expected struct or map, got {typ}")
-        return ExprInfo(typ)
+        self._fail(f"new expected map, got {typ}")
 
     def _check_named_fields(self, fields, supplied_fields, owner):
         seen = set()
@@ -671,7 +672,7 @@ def assert_typed_program(program):
 
     def expr(node, path):
         require(node, path)
-        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode, VarNode, NewNode)):
+        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode, VarNode)):
             return
         if isinstance(node, FStringNode):
             for idx, (kind, value) in enumerate(node.parts):
@@ -714,6 +715,11 @@ def assert_typed_program(program):
         if isinstance(node, ArrayLiteralNode):
             for idx, value in enumerate(node.values):
                 expr(value, f"{path}.values[{idx}]")
+            return
+        if isinstance(node, MapInitNode):
+            for idx, (key, value) in enumerate(node.entries):
+                expr(key, f"{path}.entries[{idx}].key")
+                expr(value, f"{path}.entries[{idx}].value")
             return
         fail(path)
 
