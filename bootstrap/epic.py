@@ -19,7 +19,7 @@ from mir_codegen import ast_to_mir
 from mir_lower import lower_mir_to_x64
 from ast_nodes import ProgramNode
 from lexer import LexError, lex
-from parser import ParseError, Parser
+from parser import ParseError, Parser, dump_ast_text
 from sema import SemanticError, analyze_program
 
 # ── paths ────────────────────────────────────────────────────────────────
@@ -65,8 +65,9 @@ def _output_paths(input_path, out_dir):
     return out_base + ".asm", out_base + ".obj", out_base + ".exe"
 
 
-def _parse_file(input_path):
-    print(f"      Reading {input_path}")
+def _parse_file(input_path, verbose=True):
+    if verbose:
+        print(f"      Reading {input_path}")
     with open(input_path, "r", encoding="utf-8") as f:
         source = f.read()
     tokens = lex(source)
@@ -167,6 +168,16 @@ def compile_file(input_path, linker="py", out_dir=BUILD_DIR):
     return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
 
 
+def dump_ast_files(input_paths):
+    for i, input_path in enumerate(input_paths):
+        if len(input_paths) > 1:
+            if i > 0:
+                print()
+            print(f"== {input_path} ==")
+        ast = _parse_file(input_path, verbose=False)
+        print(dump_ast_text(ast), end="")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  CLI
 # ═══════════════════════════════════════════════════════════════════════════
@@ -182,6 +193,8 @@ def parse_args(argv):
                         help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
+    parser.add_argument("--dump-ast", action="store_true",
+                        help="print parsed AST and exit")
     return parser.parse_args(argv)
 
 
@@ -196,17 +209,20 @@ def main(argv=None):
         if not os.path.exists(args.main):
             print(f"Error: file not found: {args.main}", file=sys.stderr)
             return 1
-    elif len(args.inputs) > 1:
+    elif len(args.inputs) > 1 and not args.dump_ast:
         print("Error: --main is required when compiling multiple files", file=sys.stderr)
         return 1
 
     try:
-        compile_files(
-            args.inputs,
-            main_path=args.main or args.inputs[0],
-            linker=args.linker,
-            out_dir=args.out_dir,
-        )
+        if args.dump_ast:
+            dump_ast_files(args.inputs)
+        else:
+            compile_files(
+                args.inputs,
+                main_path=args.main or args.inputs[0],
+                linker=args.linker,
+                out_dir=args.out_dir,
+            )
     except (LexError, ParseError, SemanticError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
