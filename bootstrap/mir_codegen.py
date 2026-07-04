@@ -317,7 +317,35 @@ class MirCodegen:
             return typ.pointee.name
         return None
 
+    def _layout_struct_name(self, typ):
+        """Return the runtime layout struct name for an EpicType or legacy typed MIR ptr."""
+        if isinstance(typ, et.EpicType):
+            if typ == et.STR:
+                return "str"
+            if typ.kind == "array":
+                if typ.elem in (et.I8, et.U8):
+                    return "_slice_u8"
+                if typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
+                    return "_slice_i64"
+                if typ.elem == et.STR:
+                    return "_slice_str"
+                if typ.elem is not None and typ.elem.kind == "named":
+                    return f"_slice_{typ.elem.name}"
+            if typ.kind == "map":
+                suffix = self._map_suffix(typ)
+                return f"_map_str_{suffix}" if suffix is not None else None
+            if typ.kind == "named":
+                return typ.name
+            return None
+        return self._ptr_struct_name(typ)
+
     def _array_struct_elem(self, typ):
+        if isinstance(typ, et.EpicType):
+            if typ.kind == "array" and typ.elem == et.STR:
+                return "str"
+            if typ.kind == "array" and typ.elem is not None and typ.elem.kind == "named":
+                return typ.elem.name if typ.elem.name in self.structs else None
+            return None
         struct_name = self._ptr_struct_name(typ)
         if struct_name is None or not struct_name.startswith("_slice_"):
             return None
@@ -325,6 +353,16 @@ class MirCodegen:
         return elem if elem in self.structs else None
 
     def _map_suffix(self, typ):
+        if isinstance(typ, et.EpicType):
+            if typ.kind != "map":
+                return None
+            if typ.elem == et.I64:
+                return "i64"
+            if typ.elem == et.BOOL:
+                return "bool"
+            if typ.elem == et.STR:
+                return "str"
+            return None
         struct_name = self._ptr_struct_name(typ)
         if struct_name == "_map_str_i64":
             return "i64"
@@ -351,8 +389,19 @@ class MirCodegen:
         return f"__ep_map_str_{suffix}_{op}"
 
     def _is_slice_type(self, typ):
+        if isinstance(typ, et.EpicType):
+            return typ.kind == "array"
         struct_name = self._ptr_struct_name(typ)
         return struct_name is not None and struct_name.startswith("_slice_")
+
+    def _is_u8_array_type(self, typ):
+        return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I8, et.U8)
+
+    def _is_i64_array_type(self, typ):
+        return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL)
+
+    def _is_ptr_type(self, typ):
+        return isinstance(typ, et.EpicType) and typ.kind == "ptr"
 
     def _is_zero_container_type(self, typ):
         return typ == ptr_str() or self._is_slice_type(typ) or self._map_suffix(typ) is not None
@@ -412,22 +461,24 @@ class MirCodegen:
         elif isinstance(stmt, MatchNode):
             self._emit_match(stmt)
         elif isinstance(stmt, FieldSetNode):
+            base_type = self._infer_type(stmt.object)
             base = self._emit_expr(stmt.object)
             value = self._emit_expr(stmt.value)
-            struct_name = self._ptr_struct_name(base.type)
+            struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError("field assignment base must be a struct pointer")
             self._store_field(base, struct_name, stmt.field, value)
         elif isinstance(stmt, SubscriptAssignNode):
+            base_type = self._infer_type(stmt.base)
             base = self._emit_expr(stmt.base)
             index = self._emit_expr(stmt.index)
             value = self._emit_expr(stmt.value)
-            if base.type == ptr_slice_u8():
+            if self._is_u8_array_type(base_type):
                 self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_u8_set")
-            elif base.type == ptr_slice_i64():
+            elif self._is_i64_array_type(base_type):
                 self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_i64_set")
             else:
-                callee = self._map_helper(base.type, "set")
+                callee = self._map_helper(base_type, "set")
                 if callee is None:
                     raise MirCodegenError("subscript assignment only supports primitive arrays and maps in machine MIR so far")
                 self._inst("call", [base, index, value], type=VOID, callee=callee)
@@ -731,7 +782,7 @@ class MirCodegen:
             if len(expr.args) > 1:
                 raise MirCodegenError("println expects at most one argument")
             if expr.args:
-                if self._infer_type(expr.args[0]) != ptr_str():
+                if self._infer_type(expr.args[0]) != et.STR:
                     raise MirCodegenError(f"println expected str, got {self._infer_type(expr.args[0])}")
                 self._inst("call", [self._emit_expr(expr.args[0])], type=VOID, callee="__ep_print_str")
             self._inst("call", [], type=VOID, callee="__ep_print_newline")
@@ -739,7 +790,7 @@ class MirCodegen:
         if name == "print":
             if len(expr.args) != 1:
                 raise MirCodegenError("print expects 1 argument")
-            if self._infer_type(expr.args[0]) != ptr_str():
+            if self._infer_type(expr.args[0]) != et.STR:
                 raise MirCodegenError(f"print expected str, got {self._infer_type(expr.args[0])}")
             self._inst("call", [self._emit_expr(expr.args[0])], type=VOID, callee="__ep_print_str")
             return ConstIntOperand(I64, 0)
@@ -787,30 +838,34 @@ class MirCodegen:
             result = self._inst("call", [arg, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_system_cmd")
             return ValueOperand(result)
         if name == "push":
+            dst_type = self._infer_type(expr.args[0])
             args = [self._emit_expr(arg) for arg in expr.args]
-            if args[0].type == ptr_slice_u8():
+            if self._is_u8_array_type(dst_type):
                 self._inst("call", args, type=VOID, callee="__ep_slice_u8_push")
-            elif args[0].type == ptr_slice_i64():
+            elif self._is_i64_array_type(dst_type):
                 self._inst("call", args, type=VOID, callee="__ep_slice_i64_push")
             else:
                 self._inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
             return ConstIntOperand(I64, 0)
         if name in ("len", "cap"):
+            base_type = self._infer_type(expr.args[0])
             base = self._emit_expr(expr.args[0])
-            struct_name = self._ptr_struct_name(base.type)
+            struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError(f"{name} expects an aggregate pointer")
             return self._load_field(base, struct_name, name, result_type=I64)
         if name == "extend":
+            dst_type = self._infer_type(expr.args[0])
             args = [self._emit_expr(arg) for arg in expr.args]
-            if args[0].type != ptr_slice_u8():
+            if not self._is_u8_array_type(dst_type):
                 raise MirCodegenError("extend only supports u8[]")
             self._inst("call", args, type=VOID, callee="__ep_slice_u8_extend")
             return ConstIntOperand(I64, 0)
         if name in ("map_has", "map_del"):
+            map_type = self._infer_type(expr.args[0])
             args = [self._emit_expr(arg) for arg in expr.args]
             op = "has" if name == "map_has" else "del"
-            callee = self._map_helper(args[0].type, op)
+            callee = self._map_helper(map_type, op)
             if callee is None:
                 raise MirCodegenError(f"{name} expects map")
             result = self._inst("call", args, result_type=BOOL, type=BOOL, callee=callee)
@@ -824,41 +879,38 @@ class MirCodegen:
         return ValueOperand(result) if result is not None else ConstIntOperand(I64, 0)
 
     def _infer_type(self, expr):
-        return self._expr_mir_type(expr)
+        return self._resolved_type(expr)
 
     def _emit_subscript(self, expr):
+        base_type = self._infer_type(expr.base)
         base = self._emit_expr(expr.base)
         index = self._emit_expr(expr.index)
-        map_value_type = self._map_value_type(base.type)
+        map_value_type = self._map_value_type(base_type)
         if map_value_type is not None:
-            result = self._inst("call", [base, index], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base.type, "get"))
+            result = self._inst("call", [base, index], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base_type, "get"))
             return ValueOperand(result)
-        if base.type == ptr_slice_i64():
+        if self._is_i64_array_type(base_type):
             result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_slice_i64_get")
             return ValueOperand(result)
-        elem = self._array_struct_elem(base.type)
+        elem = self._array_struct_elem(base_type)
         if elem is not None:
             result_type = ptr_struct(elem)
             result = self._inst("call", [base, index], result_type=result_type, type=ptr(), callee="__ep_slice_ptr_get")
             return ValueOperand(result)
-        if base.type.kind == "ptr" and base.type.pointee is not None and base.type.pointee.kind == "ptr":
-            addr = self._inst("gep", [base, index], result_type=ptr(base.type.pointee), type=ptr())
-            result = self._inst("load", [ValueOperand(addr)], result_type=base.type.pointee, type=base.type.pointee)
-            return ValueOperand(result)
-        if base.type == ptr(I8):
-            addr = self._inst("gep", [base, index], result_type=ptr(I8), type=I8)
-            result = self._inst("load", [ValueOperand(addr)], result_type=I64, type=I8)
-            return ValueOperand(result)
-        if base.type == ptr(I64):
-            addr = self._inst("gep", [base, index], result_type=ptr(I64), type=I64)
-            result = self._inst("load", [ValueOperand(addr)], result_type=I64, type=I64)
+        if self._is_ptr_type(base_type):
+            elem_type = self._epic_pointee_type(base_type.elem)
+            addr = self._inst("gep", [base, index], result_type=ptr(elem_type), type=elem_type)
+            load_type = I8 if base_type.elem in (et.I8, et.U8) else elem_type
+            result_type = I64 if load_type == I8 else elem_type
+            result = self._inst("load", [ValueOperand(addr)], result_type=result_type, type=load_type)
             return ValueOperand(result)
         result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_slice_u8_get")
         return ValueOperand(result)
 
     def _emit_array_literal(self, expr):
-        arr_type = self._type(expr.resolved_type)
-        if arr_type == ptr_slice_i64():
+        epic_type = self._resolved_type(expr)
+        arr_type = self._type(epic_type)
+        if self._is_i64_array_type(epic_type):
             result = self._inst(
                 "call",
                 [ConstIntOperand(I64, len(expr.values))],
@@ -870,7 +922,7 @@ class MirCodegen:
             for value in expr.values:
                 self._inst("call", [arr, self._emit_expr(value)], type=VOID, callee="__ep_slice_i64_push")
             return arr
-        if arr_type != ptr_slice_u8():
+        if not self._is_u8_array_type(epic_type):
             raise MirCodegenError(f"unsupported array literal element type: {expr.elem_type}")
         result = self._inst(
             "call",
@@ -886,22 +938,24 @@ class MirCodegen:
 
     def _emit_new_array(self, expr):
         count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 0)
-        arr_type = self._type(expr.resolved_type)
-        if arr_type == ptr_slice_u8():
+        epic_type = self._resolved_type(expr)
+        arr_type = self._type(epic_type)
+        if self._is_u8_array_type(epic_type):
             result = self._inst("call", [ConstIntOperand(I64, 0), count], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_alloc")
             return ValueOperand(result)
-        if arr_type == ptr_slice_i64():
+        if self._is_i64_array_type(epic_type):
             result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_i64_new")
             return ValueOperand(result)
-        if arr_type.kind == "ptr" and arr_type.pointee is not None and arr_type.pointee.kind == "struct":
+        if self._array_struct_elem(epic_type) is not None:
             result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_ptr_new")
             return ValueOperand(result)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
     def _emit_map_init(self, expr):
-        result_type = self._type(expr.resolved_type)
-        new_helper = self._map_helper(result_type, "new")
-        set_helper = self._map_helper(result_type, "set")
+        epic_type = self._resolved_type(expr)
+        result_type = self._type(epic_type)
+        new_helper = self._map_helper(epic_type, "new")
+        set_helper = self._map_helper(epic_type, "set")
         if new_helper is None or set_helper is None:
             raise MirCodegenError(f"unsupported map init target: {expr.type_name}")
         result = self._inst("call", [], result_type=result_type, type=result_type, callee=new_helper)
@@ -911,13 +965,14 @@ class MirCodegen:
         return map_value
 
     def _emit_slice(self, expr):
+        base_type = self._infer_type(expr.base)
         base = self._emit_expr(expr.base)
         start = self._emit_expr(expr.start)
         end = self._emit_expr(expr.end)
-        if base.type == ptr_str():
+        if base_type == et.STR:
             result = self._inst("call", [base, start, end], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_slice")
             return ValueOperand(result)
-        if base.type == ptr_slice_u8():
+        if self._is_u8_array_type(base_type):
             result = self._inst("call", [base, start, end], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_slice")
             return ValueOperand(result)
         raise MirCodegenError("slice only supports str and u8[]")
@@ -931,8 +986,9 @@ class MirCodegen:
         return obj
 
     def _emit_field_access(self, expr):
+        base_type = self._infer_type(expr.object)
         base = self._emit_expr(expr.object)
-        struct_name = self._ptr_struct_name(base.type)
+        struct_name = self._layout_struct_name(base_type)
         if struct_name not in self.structs or expr.field not in self.structs[struct_name]["fields"]:
             raise MirCodegenError(f"unknown field: {expr.field}")
         field_type = self.structs[struct_name]["fields"][expr.field]["type"]
@@ -949,20 +1005,20 @@ class MirCodegen:
         return ValueOperand(result) if result is not None else ConstIntOperand(I64, 0)
 
     def _coerce_print_arg(self, expr):
-        if self._infer_type(expr) == ptr_str():
+        if self._infer_type(expr) == et.STR:
             return self._emit_expr(expr)
         return self._emit_str_conversion(expr)
 
     def _emit_str_conversion(self, expr):
         source_type = self._resolved_type(expr)
         typ = self._infer_type(expr)
-        if typ == ptr_str():
+        if typ == et.STR:
             return self._emit_expr(expr)
         arg = self._emit_expr(expr)
-        if typ == BOOL:
+        if typ == et.BOOL:
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_bool")
             return ValueOperand(result)
-        if typ == ptr_slice_u8():
+        if self._is_u8_array_type(typ):
             result = self._inst("call", [arg], result_type=ptr_str(), type=ptr_str(), callee="__ep_str_from_slice_u8")
             return ValueOperand(result)
         if source_type == et.U64:
