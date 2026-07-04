@@ -1,0 +1,15 @@
+# Internal runtime helpers written in Epic.
+# This file is automatically merged by the Python reference compiler.
+
+fun __ep_str_eq(left: str, right: str): bool {
+    let left_len = len(left)
+    if left_len != len(right) {
+        return false
+    }
+    for i in 0:left_len {
+        if left[i] != right[i] {
+            return false
+        }
+    }
+    return true
+}

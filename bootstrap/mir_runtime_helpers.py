@@ -207,66 +207,6 @@ def emit_str_bool() -> MirFunction:
     return b.fn
 
 
-def emit___ep_str_eq() -> MirFunction:
-    """Compare two strings for byte-for-byte equality.
-
-    fn __ep_str_eq(ptr<str> %left, ptr<str> %right) -> bool
-    """
-    b = MirHelperBuilder(
-        "__ep_str_eq",
-        [
-            MirParam("%left", ptr(mir_struct("str"))),
-            MirParam("%right", ptr(mir_struct("str"))),
-        ],
-        BOOL,
-    )
-    left_val = ValueOperand(b.fn.params[0].value)
-    right_val = ValueOperand(b.fn.params[1].value)
-
-    left_len = b.load(I64, b.gep_field(left_val, "str", 1))
-    right_len = b.load(I64, b.gep_field(right_val, "str", 1))
-    same_len = b.icmp("eq", left_len, right_len)
-    loop_init = b.new_block("loop_init")
-    false_block = b.new_block("false")
-    b.entry.terminator = CondBr(ValueOperand(same_len), loop_init.name, false_block.name)
-
-    b.entry = loop_init
-    left_data = b.load(ptr(), b.gep_field(left_val, "str", 0))
-    right_data = b.load(ptr(), b.gep_field(right_val, "str", 0))
-    i_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    loop_check = b.new_block("loop_check")
-    b.br(loop_check)
-
-    b.entry = loop_check
-    i = b.load(I64, ValueOperand(i_slot))
-    keep_checking = b.icmp("lt", i, left_len)
-    loop_body = b.new_block("loop_body")
-    true_block = b.new_block("true")
-    b.entry.terminator = CondBr(ValueOperand(keep_checking), loop_body.name, true_block.name)
-
-    b.entry = loop_body
-    left_byte_addr = b.gep(I8, left_data, [i])
-    left_byte = b.load(I8, left_byte_addr, result_type=I8)
-    right_byte_addr = b.gep(I8, right_data, [i])
-    right_byte = b.load(I8, right_byte_addr, result_type=I8)
-    bytes_eq = b.icmp("eq", left_byte, right_byte)
-    loop_next = b.new_block("loop_next")
-    b.entry.terminator = CondBr(ValueOperand(bytes_eq), loop_next.name, false_block.name)
-
-    b.entry = loop_next
-    next_i = b.binop("add", i, b.const_i64(1))
-    b.store(next_i, ValueOperand(i_slot))
-    b.br(loop_check)
-
-    b.entry = true_block
-    b.ret(ConstBoolOperand(True))
-
-    b.entry = false_block
-    b.ret(ConstBoolOperand(False))
-
-    return b.fn
-
 
 def emit___ep_str_cat() -> MirFunction:
     """Concatenate two strings into a newly allocated str.
@@ -1581,7 +1521,6 @@ _HELPER_EMITTERS = {
     "__ep_slice_u8_from_str": lambda p: emit_bytes_slice_u8(),
     "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
     "__ep_str_from_bool": lambda p: emit_str_bool(),
-    "__ep_str_eq": lambda p: emit___ep_str_eq(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_str_slice": lambda p: emit___ep_str_slice(),
     "__ep_str_starts_with": lambda p: emit___ep_str_starts_with(),
@@ -1622,7 +1561,6 @@ _HELPER_ORDER = [
     "__ep_slice_u8_from_str",
     "__ep_str_from_slice_u8",
     "__ep_str_from_bool",
-    "__ep_str_eq",
     "__ep_str_cat",
     "__ep_str_slice",
     "__ep_str_starts_with",

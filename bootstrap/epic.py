@@ -30,6 +30,7 @@ LLD_LINK = os.path.join(TOOLS_DIR, "lld-link.exe")
 LINK_PY = os.path.join(ROOT_DIR, "link.py")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 BUILD_DIR = os.path.join(ROOT_DIR, "build")
+RUNTIME_DIR = os.path.join(ROOT_DIR, "runtime")
 
 
 def _now():
@@ -65,6 +66,16 @@ def _output_paths(input_path, out_dir):
     return out_base + ".asm", out_base + ".obj", out_base + ".exe"
 
 
+def _runtime_source_paths():
+    if not os.path.isdir(RUNTIME_DIR):
+        return []
+    return [
+        os.path.join(RUNTIME_DIR, name)
+        for name in sorted(os.listdir(RUNTIME_DIR))
+        if name.endswith(".ep")
+    ]
+
+
 def _parse_file(input_path, verbose=True):
     if verbose:
         print(f"      Reading {input_path}")
@@ -75,7 +86,7 @@ def _parse_file(input_path, verbose=True):
     return parser.parse_program()
 
 
-def _merge_programs(input_paths, main_path, verbose=True):
+def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     funcs = []
     structs = []
     seen_funcs = {}
@@ -83,7 +94,9 @@ def _merge_programs(input_paths, main_path, verbose=True):
     found_main = False
     main_abs = os.path.abspath(main_path)
 
-    for input_path in input_paths:
+    all_input_paths = [*_runtime_source_paths(), *input_paths] if include_runtime else input_paths
+
+    for input_path in all_input_paths:
         ast = _parse_file(input_path, verbose=verbose)
         is_main_file = os.path.abspath(input_path) == main_abs
 
@@ -190,7 +203,7 @@ def dump_ast_files(input_paths):
 
 
 def dump_typed_ast_files(input_paths, main_path):
-    ast = _merge_programs(input_paths, main_path, verbose=False)
+    ast = _merge_programs(input_paths, main_path, verbose=False, include_runtime=False)
     ast = analyze_program(ast)
     print(dump_typed_ast_text(ast), end="")
 
