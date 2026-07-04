@@ -2,12 +2,7 @@
 # STDOUT: Epic
 # STDOUT: 69
 fun main(): void {
-    let buf = new u8[10]
-    push(buf, 'E')
-    push(buf, 'p')
-    push(buf, 'i')
-    push(buf, 'c')
-
+    let buf = new u8[] { 'E', 'p', 'i', 'c' }
     println(str(buf))
     println(buf[0])
     exit(0)
