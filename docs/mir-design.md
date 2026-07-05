@@ -147,9 +147,7 @@ WriteFile
 
 ```text
 i64
-u64
 i8
-u8
 bool
 void
 ptr
@@ -362,7 +360,7 @@ ret T %value
 %r: i64 = mod i64 %a, i64 %b
 ```
 
-第一版算术主要支持 `i64`。`u64`、`i8`、`u8` 可以后续补充或在 lowering 前扩展/截断。
+MIR integer signedness is expressed by opcode (`sdiv`/`udiv`, `icmp.slt`/`icmp.ult`, `sar`/`shr`), not by unsigned integer types. `i8` is an internal byte-lane type; Epic source `u8` lowers through this byte lane where needed.
 
 ### 11.2.1 指针整数转换
 
@@ -682,9 +680,7 @@ MirOperand
 
 MirType
   I64
-  U64
   I8
-  U8
   Bool
   Void
   Ptr

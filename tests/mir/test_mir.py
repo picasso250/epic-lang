@@ -187,6 +187,21 @@ fun main(): i64 {
         assert op not in text
 
 
+def test_mir_parser_rejects_unsigned_integer_types():
+    for typ in ("u64", "u8"):
+        source = f"""fn main({typ} %x) -> {typ} {{
+entry:
+  ret {typ} %x
+}}
+"""
+        try:
+            parse_mir_text(source)
+        except Exception as exc:
+            assert "unknown type" in str(exc)
+        else:
+            raise AssertionError(f"MIR parser accepted unsigned integer type: {typ}")
+
+
 def test_mir_parser_strips_text_sigils():
     source = """extern @helper: fn(ptr) -> ptr
 
@@ -465,6 +480,7 @@ def main():
     test_gep_null_and_ptrtoint_text_and_validation()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
+    test_mir_parser_rejects_unsigned_integer_types()
     test_mir_parser_strips_text_sigils()
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()

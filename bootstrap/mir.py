@@ -24,10 +24,8 @@ class MirType:
 
 
 I64 = MirType("i64")
-U64 = MirType("u64")
 I32 = MirType("i32")
 I8 = MirType("i8")
-U8 = MirType("u8")
 BOOL = MirType("bool")
 VOID = MirType("void")
 PTR = MirType("ptr")

@@ -17,8 +17,6 @@ from mir import (
     I64,
     I8,
     PTR,
-    U64,
-    U8,
     VOID,
     Br,
     CondBr,
@@ -50,10 +48,8 @@ class MirParseError(RuntimeError):
 
 _SIMPLE_TYPES = {
     "i64": I64,
-    "u64": U64,
     "i32": I32,
     "i8": I8,
-    "u8": U8,
     "bool": BOOL,
     "void": VOID,
     "ptr": PTR,
