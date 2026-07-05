@@ -29,3 +29,7 @@
 
 - `python test_examples_py.py` 全绿。
 - 正在自举
+
+## 提示
+
+- git 的 CRLF 问题不需要解决，直接提交即可，不论是 python 还是 epic 都能兼容所有的 CRLF/LF
