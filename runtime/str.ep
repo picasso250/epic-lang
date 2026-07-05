@@ -24,29 +24,23 @@ fun __ep_str_from_bool(value: bool): str {
 }
 
 
-# Convert by scanning bits instead of repeatedly dividing value by 10.
-# Current MIR lowering uses signed idiv for / and %, so direct u64 division
-# breaks for values >= 2^63. The per-digit next value below stays in 0..19.
 fun __ep_str_from_u64(value: u64): str {
-    let digits = new u8[] { 0 }
-    for bit_index in 0:64 {
-        let shift = 63 - bit_index
-        let carry = (value >>> shift) & u64(1)
-        for i in 0:len(digits) {
-            let next = u64(digits[i]) * u64(2) + carry
-            digits[i] = u8(next % u64(10))
-            carry = next / u64(10)
-        }
-        if carry > u64(0) {
-            push(digits, u8(carry))
-        }
+    let n = value
+    let rev = new u8[] {}
+    if n == u64(0) {
+        push(rev, '0')
+    }
+    while n != u64(0) {
+        let digit = n % u64(10)
+        push(rev, u8(digit + u64(48)))
+        n = n / u64(10)
     }
 
     let out = new u8[] {}
-    let i = len(digits)
+    let i = len(rev)
     while i > 0 {
         i -= 1
-        push(out, digits[i] + 48)
+        push(out, rev[i])
     }
     return str(out)
 }

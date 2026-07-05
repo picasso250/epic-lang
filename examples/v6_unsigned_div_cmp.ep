@@ -1,0 +1,20 @@
+# EXIT: 0
+# STDOUT: 1844674407370955161
+# STDOUT: 5
+# STDOUT: ugt
+# STDOUT: ule
+# STDOUT: 9223372036854775808
+
+fun main(): void {
+    let max = u64(18446744073709551615)
+    println(str(max / u64(10)))
+    println(str(max % u64(10)))
+    if max > u64(0) {
+        println("ugt")
+    }
+    if u64(0) <= max {
+        println("ule")
+    }
+    println(str(u64(9223372036854775808) / u64(1)))
+    exit(0)
+}

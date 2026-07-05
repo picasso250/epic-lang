@@ -36,7 +36,7 @@ def build_smoke_program():
         "loop",
         [
             MirInst("load", [ValueOperand(x_addr)], result=x0, type=I64),
-            MirInst("icmp.lt", [ValueOperand(x0), ConstIntOperand(I64, 3)], result=c0),
+            MirInst("icmp.slt", [ValueOperand(x0), ConstIntOperand(I64, 3)], result=c0),
         ],
         CondBr(ValueOperand(c0), "body", "done"),
     )
@@ -70,7 +70,7 @@ entry:
 
 loop:
   %x0: i64 = load i64, ptr %x.addr
-  %c0: bool = icmp.lt i64 %x0, i64 3
+  %c0: bool = icmp.slt i64 %x0, i64 3
   condbr bool %c0, label %body, label %done
 
 body:

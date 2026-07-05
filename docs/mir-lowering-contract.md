@@ -190,8 +190,10 @@ _store_result(inst.result, "rax")   # 结果存入 value_slot
 | `add` | `add rax, rcx` | |
 | `sub` | `sub rax, rcx` | |
 | `mul` | `imul rax, rcx` | 有符号，结果截断到 64-bit |
-| `div` | `cqo; idiv rcx` | 有符号，商在 rax |
-| `mod` | `cqo; idiv rcx; mov rax, rdx` | 有符号，余数在 rdx |
+| `sdiv` | `cqo; idiv rcx` | signed quotient in `rax` |
+| `srem` | `cqo; idiv rcx; mov rax, rdx` | signed remainder in `rdx` |
+| `udiv` | `xor rdx, rdx; div rcx` | unsigned quotient in `rax` |
+| `urem` | `xor rdx, rdx; div rcx; mov rax, rdx` | unsigned remainder in `rdx` |
 | `and` | `and rax, rcx` | |
 | `or` | `or rax, rcx` | |
 | `xor` | `xor rax, rcx` | |
@@ -201,6 +203,8 @@ _store_result(inst.result, "rax")   # 结果存入 value_slot
 | `not` | `test rax, rax; sete al; movzx eax, al` | bool not（不是 bitwise not） |
 
 ### 5.5 `icmp.*`
+
+Ordered integer comparisons must spell signedness in the predicate: `icmp.slt` / `icmp.sle` / `icmp.sgt` / `icmp.sge` for signed comparisons and `icmp.ult` / `icmp.ule` / `icmp.ugt` / `icmp.uge` for unsigned comparisons. `icmp.eq` and `icmp.ne` are bitwise equality predicates and do not carry signedness.
 
 ```
 _load_operand("rax", operands[0])

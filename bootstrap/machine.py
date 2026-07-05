@@ -151,7 +151,7 @@ class MachineObjectBuilder:
             self._emit_cmp_reg_reg(operands[0].name, operands[1].name)
         elif op == "cmp" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Imm):
             self._emit_cmp_reg_imm(operands[0].name, operands[1].value)
-        elif op in ("sete", "setne", "setg", "setl", "setge", "setle") and self._regs(operands, "al"):
+        elif op in ("sete", "setne", "setg", "setl", "setge", "setle", "seta", "setae", "setb", "setbe") and self._regs(operands, "al"):
             self._emit_setcc(op)
         elif op == "movzx" and len(operands) == 2 and isinstance(operands[0], Reg) and isinstance(operands[1], Mem):
             mem = operands[1]
@@ -420,6 +420,10 @@ class MachineObjectBuilder:
             "setl": 0x9C,
             "setge": 0x9D,
             "setle": 0x9E,
+            "seta": 0x97,
+            "setae": 0x93,
+            "setb": 0x92,
+            "setbe": 0x96,
         }
         self.text.extend(bytes([0x0F, codes[op], 0xC0]))
 

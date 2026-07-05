@@ -405,7 +405,7 @@ class MirValidator:
             if len(inst.operands) == 2:
                 value, addr = inst.operands
                 self._require(self._is_ptr(addr.type), fn, where, "store address must be ptr")
-        elif inst.op in ("add", "sub", "mul", "div", "mod", "and", "or", "xor", "shl", "sar", "shr"):
+        elif inst.op in ("add", "sub", "mul", "sdiv", "udiv", "srem", "urem", "and", "or", "xor", "shl", "sar", "shr"):
             self._require(len(inst.operands) == 2, fn, where, f"{inst.op} needs two operands")
             self._validate_same_typed_result(fn, where, inst)
         elif inst.op == "not":
@@ -414,6 +414,9 @@ class MirValidator:
             if inst.operands:
                 self._require(inst.operands[0].type == BOOL, fn, where, "not operand must be bool")
         elif inst.op.startswith("icmp."):
+            pred = inst.op[5:]
+            valid_preds = {"eq", "ne", "slt", "sle", "sgt", "sge", "ult", "ule", "ugt", "uge"}
+            self._require(pred in valid_preds, fn, where, f"unsupported icmp predicate: {pred}")
             self._require(len(inst.operands) == 2, fn, where, f"{inst.op} needs two operands")
             if len(inst.operands) == 2:
                 self._require(inst.operands[0].type == inst.operands[1].type, fn, where, "icmp type mismatch")

@@ -109,6 +109,14 @@ fun append_u16(buf: u8[], x: u64): void {
     put_u16_le(buf, off, x)
 }
 
+
+fun put_u32_bits_le(buf: u8[], off: i64, x: u64): void {
+    buf[off] = u8(x & 255)
+    buf[off + 1] = u8((x >>> 8) & 255)
+    buf[off + 2] = u8((x >>> 16) & 255)
+    buf[off + 3] = u8((x >>> 24) & 255)
+}
+
 fun append_u32(buf: u8[], x: u64): void {
     let off = len(buf)
     append_zero(buf, 4)
@@ -513,7 +521,7 @@ fun patch_thunks(st: LinkState, text_sec: Section): void {
         let iat = get_name_value(st.iat_offsets, name)
         let off = thunk - 4096 + 2
         let disp = st.idata_rva + iat - (thunk + 6)
-        put_u32_le(text_sec.data, off, disp)
+        put_u32_bits_le(text_sec.data, off, disp)
     }
 }
 
@@ -530,7 +538,7 @@ fun patch_relocs(st: LinkState, text_sec: Section): void {
         if target != 0 {
             let old = u32_le(text_sec.data, rel.rva)
             let disp = old + target - (4096 + rel.rva + 4)
-            put_u32_le(text_sec.data, rel.rva, disp)
+            put_u32_bits_le(text_sec.data, rel.rva, disp)
         }
     }
 }

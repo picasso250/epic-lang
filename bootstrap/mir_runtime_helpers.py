@@ -225,7 +225,7 @@ def emit___ep_str_cat() -> MirFunction:
 
     b.entry = left_check
     i = b.load(I64, ValueOperand(i_slot))
-    keep_left = b.icmp("lt", i, left_len)
+    keep_left = b.icmp("slt", i, left_len)
     b.entry.terminator = CondBr(ValueOperand(keep_left), left_body.name, right_init.name)
 
     b.entry = left_body
@@ -243,7 +243,7 @@ def emit___ep_str_cat() -> MirFunction:
 
     b.entry = right_check
     i = b.load(I64, ValueOperand(i_slot))
-    keep_right = b.icmp("lt", i, right_len)
+    keep_right = b.icmp("slt", i, right_len)
     b.entry.terminator = CondBr(ValueOperand(keep_right), right_body.name, done.name)
 
     b.entry = right_body
@@ -323,7 +323,7 @@ def emit_slice_u8_get() -> MirFunction:
     arr_len = b.load(I64, len_addr)
 
     # Check idx >= 0
-    ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
+    ge_zero = b.icmp("sge", idx_val, b.const_i64(0))
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
@@ -331,7 +331,7 @@ def emit_slice_u8_get() -> MirFunction:
 
     # check_high: idx < arr.len
     b.entry = check_block
-    lt_len = b.icmp("lt", idx_val, arr_len)
+    lt_len = b.icmp("slt", idx_val, arr_len)
     b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
     # ok: load byte
@@ -402,14 +402,14 @@ def emit_slice_word_get(name: str, elem_type) -> MirFunction:
     len_addr = b.gep(ptr(), arr_val, [b.const_i64(1)])
     arr_len = b.load(I64, len_addr)
 
-    ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
+    ge_zero = b.icmp("sge", idx_val, b.const_i64(0))
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
     b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
     b.entry = check_block
-    lt_len = b.icmp("lt", idx_val, arr_len)
+    lt_len = b.icmp("slt", idx_val, arr_len)
     b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
     b.entry = ok_block
@@ -447,14 +447,14 @@ def emit_slice_word_set(name: str, elem_type) -> MirFunction:
     len_addr = b.gep(ptr(), arr_val, [b.const_i64(1)])
     arr_len = b.load(I64, len_addr)
 
-    ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
+    ge_zero = b.icmp("sge", idx_val, b.const_i64(0))
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
     b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
     b.entry = check_block
-    lt_len = b.icmp("lt", idx_val, arr_len)
+    lt_len = b.icmp("slt", idx_val, arr_len)
     b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
     b.entry = ok_block
@@ -489,7 +489,7 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     cap_addr = b.gep(ptr(), arr_val, [b.const_i64(2)])
     old_cap = b.load(I64, cap_addr)
 
-    need_grow = b.icmp("ge", old_len, old_cap)
+    need_grow = b.icmp("sge", old_len, old_cap)
     grow_block = b.new_block("grow")
     store_block = b.new_block("store")
     b.entry.terminator = CondBr(ValueOperand(need_grow), grow_block.name, store_block.name)
@@ -532,7 +532,7 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
 
     b.entry = copy_check
     i = b.load(I64, ValueOperand(i_slot))
-    cond = b.icmp("lt", i, old_len)
+    cond = b.icmp("slt", i, old_len)
     copy_body = b.new_block("copy_body")
     swap_block = b.new_block("swap")
     b.entry.terminator = CondBr(ValueOperand(cond), copy_body.name, swap_block.name)
@@ -586,7 +586,7 @@ def emit_slice_u8_set() -> MirFunction:
     arr_len = b.load(I64, len_addr)
 
     # Check idx >= 0
-    ge_zero = b.icmp("ge", idx_val, b.const_i64(0))
+    ge_zero = b.icmp("sge", idx_val, b.const_i64(0))
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
@@ -594,7 +594,7 @@ def emit_slice_u8_set() -> MirFunction:
 
     # check_high: idx < arr.len
     b.entry = check_block
-    lt_len = b.icmp("lt", idx_val, arr_len)
+    lt_len = b.icmp("slt", idx_val, arr_len)
     b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
     # ok: store byte (truncate i64 to i8 via alloca roundtrip)
@@ -643,7 +643,7 @@ def emit_slice_u8_push() -> MirFunction:
     old_cap = b.load(I64, cap_addr)
 
     # Check if grow needed
-    need_grow = b.icmp("ge", old_len, old_cap)
+    need_grow = b.icmp("sge", old_len, old_cap)
     grow_block = b.new_block("grow")
     store_block = b.new_block("store")
     b.entry.terminator = CondBr(ValueOperand(need_grow), grow_block.name, store_block.name)
@@ -687,7 +687,7 @@ def emit_slice_u8_push() -> MirFunction:
     # copy_check: loop condition i < old_len
     b.entry = copy_check
     i = b.load(I64, ValueOperand(i_slot))
-    cond = b.icmp("lt", i, old_len)
+    cond = b.icmp("slt", i, old_len)
     copy_body = b.new_block("copy_body")
     swap_block = b.new_block("swap")
     b.entry.terminator = CondBr(ValueOperand(cond), copy_body.name, swap_block.name)
@@ -746,7 +746,7 @@ def emit_slice_u8_slice() -> MirFunction:
 
     arr_len = b.load(I64, b.gep_field(arr_val, "_slice_u8", 1))
 
-    start_ok = b.icmp("ge", start_val, b.const_i64(0))
+    start_ok = b.icmp("sge", start_val, b.const_i64(0))
     check_order = b.new_block("check_order")
     check_len = b.new_block("check_len")
     alloc_block = b.new_block("alloc")
@@ -757,11 +757,11 @@ def emit_slice_u8_slice() -> MirFunction:
     b.entry.terminator = CondBr(ValueOperand(start_ok), check_order.name, fail_block.name)
 
     b.entry = check_order
-    order_ok = b.icmp("ge", end_val, start_val)
+    order_ok = b.icmp("sge", end_val, start_val)
     b.entry.terminator = CondBr(ValueOperand(order_ok), check_len.name, fail_block.name)
 
     b.entry = check_len
-    len_ok = b.icmp("ge", arr_len, end_val)
+    len_ok = b.icmp("sge", arr_len, end_val)
     b.entry.terminator = CondBr(ValueOperand(len_ok), alloc_block.name, fail_block.name)
 
     b.entry = alloc_block
@@ -776,7 +776,7 @@ def emit_slice_u8_slice() -> MirFunction:
 
     b.entry = copy_check
     i = b.load(I64, ValueOperand(i_slot))
-    keep_copying = b.icmp("lt", i, slice_len)
+    keep_copying = b.icmp("slt", i, slice_len)
     b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, done_block.name)
 
     b.entry = copy_body
@@ -824,7 +824,7 @@ def emit_extend_slice_u8() -> MirFunction:
 
     b.entry = loop_check
     i = b.load(I64, ValueOperand(i_slot))
-    keep_copying = b.icmp("lt", i, src_len)
+    keep_copying = b.icmp("slt", i, src_len)
     b.entry.terminator = CondBr(ValueOperand(keep_copying), loop_body.name, done.name)
 
     b.entry = loop_body
@@ -905,7 +905,7 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
 
     b.entry = loop_check
     i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(map_len))
+    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(map_len))
     b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, miss.name)
 
     b.entry = loop_body
@@ -963,7 +963,7 @@ def emit_map_str_word_has(name: str, map_type) -> MirFunction:
 
     b.entry = loop_check
     i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(map_len))
+    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(map_len))
     b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, no.name)
 
     b.entry = loop_body
@@ -1034,7 +1034,7 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
 
     b.entry = loop_check
     i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(old_len))
+    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(old_len))
     b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, grow_check.name)
 
     b.entry = loop_body
@@ -1061,7 +1061,7 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     b.br(loop_check)
 
     b.entry = grow_check
-    need_grow = b.icmp("ge", ValueOperand(old_len), ValueOperand(old_cap))
+    need_grow = b.icmp("sge", ValueOperand(old_len), ValueOperand(old_cap))
     b.entry.terminator = CondBr(ValueOperand(need_grow), grow.name, insert.name)
 
     b.entry = grow
@@ -1091,7 +1091,7 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     b.entry = copy_check
     copy_i = b.load(I64, ValueOperand(copy_i_slot))
     total_words = b.binop("mul", ValueOperand(old_len), b.const_i64(3))
-    keep_copying = b.icmp("lt", ValueOperand(copy_i), ValueOperand(total_words))
+    keep_copying = b.icmp("slt", ValueOperand(copy_i), ValueOperand(total_words))
     b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, swap.name)
 
     b.entry = copy_body
@@ -1156,7 +1156,7 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 
     b.entry = loop_check
     i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("lt", ValueOperand(i), ValueOperand(old_len))
+    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(old_len))
     b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, no.name)
 
     b.entry = loop_body

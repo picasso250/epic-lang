@@ -620,7 +620,7 @@ class MirCodegen:
         self.block = cond_block
         cur = self._inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
         end = self._inst("load", [ValueOperand(end_addr)], result_type=I64, type=I64)
-        cond = self._inst("icmp.lt", [ValueOperand(cur), ValueOperand(end)], result_type=BOOL)
+        cond = self._inst("icmp.slt", [ValueOperand(cur), ValueOperand(end)], result_type=BOOL)
         self.block.terminator = CondBr(ValueOperand(cond), body_block.name, end_block.name)
         self.loop_stack.append((inc_block.name, end_block.name))
         self.block = body_block
@@ -690,11 +690,11 @@ class MirCodegen:
         upper_block = self._new_block(f"{target_name}.range_upper")
         ok_block = self._new_block(f"{target_name}.range_ok")
 
-        low_bad = self._inst("icmp.lt", [value, ConstIntOperand(I64, lo)], result_type=BOOL)
+        low_bad = self._inst("icmp.slt", [value, ConstIntOperand(I64, lo)], result_type=BOOL)
         self.block.terminator = CondBr(ValueOperand(low_bad), fail_block.name, upper_block.name)
 
         self.block = upper_block
-        high_bad = self._inst("icmp.gt", [value, ConstIntOperand(I64, hi)], result_type=BOOL)
+        high_bad = self._inst("icmp.sgt", [value, ConstIntOperand(I64, hi)], result_type=BOOL)
         self.block.terminator = CondBr(ValueOperand(high_bad), fail_block.name, ok_block.name)
 
         self.block = fail_block
@@ -802,19 +802,30 @@ class MirCodegen:
         right_type = self._infer_type(expr.right)
         left = self._emit_expr(expr.left)
         right = self._emit_expr(expr.right)
-        op_map = {"+": "add", "-": "sub", "*": "mul", "/": "div", "%": "mod", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
+        op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
+        unsigned = self._is_unsigned_integer(left_type) or self._is_unsigned_integer(right_type)
         if expr.op in ("==", "!=") and left_type == et.STR and right_type == et.STR:
             result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
             value = ValueOperand(result)
             if expr.op == "!=":
                 value = ValueOperand(self._inst("not", [value], result_type=BOOL))
             return value
+        if expr.op == "/":
+            return ValueOperand(self._inst("udiv" if unsigned else "sdiv", [left, right], result_type=I64))
+        if expr.op == "%":
+            return ValueOperand(self._inst("urem" if unsigned else "srem", [left, right], result_type=I64))
         if expr.op in op_map:
             return ValueOperand(self._inst(op_map[expr.op], [left, right], result_type=I64))
         if expr.op in cmp_map:
-            return ValueOperand(self._inst(f"icmp.{cmp_map[expr.op]}", [left, right], result_type=BOOL))
+            pred = cmp_map[expr.op]
+            if pred not in ("eq", "ne"):
+                pred = ("u" if unsigned else "s") + pred
+            return ValueOperand(self._inst(f"icmp.{pred}", [left, right], result_type=BOOL))
         raise MirCodegenError(f"unsupported binary op: {expr.op}")
+
+    def _is_unsigned_integer(self, typ):
+        return typ in (et.U64, et.U32, et.U8)
 
     def _emit_short_circuit(self, expr):
         result_addr = self._new_value(ptr(), "logic.addr")

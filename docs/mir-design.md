@@ -356,7 +356,10 @@ ret T %value
 %r: i64 = add i64 %a, i64 %b
 %r: i64 = sub i64 %a, i64 %b
 %r: i64 = mul i64 %a, i64 %b
-%r: i64 = div i64 %a, i64 %b
+%r: i64 = sdiv i64 %a, i64 %b
+%r: i64 = udiv i64 %a, i64 %b
+%r: i64 = srem i64 %a, i64 %b
+%r: i64 = urem i64 %a, i64 %b
 %r: i64 = mod i64 %a, i64 %b
 ```
 
@@ -375,13 +378,17 @@ ret T %value
 ```text
 %c: bool = icmp.eq i64 %a, i64 %b
 %c: bool = icmp.ne i64 %a, i64 %b
-%c: bool = icmp.lt i64 %a, i64 %b
-%c: bool = icmp.le i64 %a, i64 %b
-%c: bool = icmp.gt i64 %a, i64 %b
-%c: bool = icmp.ge i64 %a, i64 %b
+%c: bool = icmp.slt i64 %a, i64 %b
+%c: bool = icmp.sle i64 %a, i64 %b
+%c: bool = icmp.sgt i64 %a, i64 %b
+%c: bool = icmp.sge i64 %a, i64 %b
+%c: bool = icmp.ult i64 %a, i64 %b
+%c: bool = icmp.ule i64 %a, i64 %b
+%c: bool = icmp.ugt i64 %a, i64 %b
+%c: bool = icmp.uge i64 %a, i64 %b
 ```
 
-`icmp.*` 返回 `bool`。
+`icmp.*` 返回 `bool`。`eq/ne` 不区分 signedness；ordered predicates 必须显式使用 `s*` 或 `u*`，类似 LLVM IR。
 
 ### 11.4 逻辑
 
@@ -518,7 +525,7 @@ entry:
   store i64 2, ptr %b.addr
   %a0: i64 = load i64, ptr %a.addr
   %b0: i64 = load i64, ptr %b.addr
-  %c0: bool = icmp.lt i64 %a0, i64 %b0
+  %c0: bool = icmp.slt i64 %a0, i64 %b0
   condbr bool %c0, label %then, label %else
 
 then:
@@ -558,7 +565,7 @@ entry:
 
 loop:
   %x0: i64 = load i64, ptr %x.addr
-  %c0: bool = icmp.lt i64 %x0, i64 10
+  %c0: bool = icmp.slt i64 %x0, i64 10
   condbr bool %c0, label %body, label %done
 
 body:
@@ -707,7 +714,7 @@ MirType
 - `store T value, ptr addr` 的 value 类型必须是 `T`，addr 必须是 `ptr`。
 - `gep SourceType, ptr base, indices...` 的 base 必须是 `ptr`，result 必须是 `ptr`，indices 必须匹配 `SourceType`。
 - `ptrtoint ptr -> i64` 类型匹配。
-- `add/sub/mul/div/mod` 两个 operand 类型一致，result 类型一致。
+- `add/sub/mul/sdiv/udiv/srem/urem` 两个 operand 类型一致，result 类型一致；signedness 由 opcode 表达，不由 integer bit width 表达。
 - `icmp.*` 两个 operand 类型一致，result 是 `bool`。
 - `condbr` condition 是 `bool`。
 - `ret` 类型匹配 function return type。

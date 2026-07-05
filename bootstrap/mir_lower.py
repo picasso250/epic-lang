@@ -113,7 +113,7 @@ class MirLower:
             self._load_operand("rax", inst.operands[0])
             self._store_result(inst.result, "rax")
             return
-        if inst.op in ("add", "sub", "mul", "div", "mod", "and", "or", "xor", "shl", "sar", "shr"):
+        if inst.op in ("add", "sub", "mul", "sdiv", "udiv", "srem", "urem", "and", "or", "xor", "shl", "sar", "shr"):
             self._load_operand("rax", inst.operands[0])
             self._load_operand("rcx", inst.operands[1])
             if inst.op == "add":
@@ -130,10 +130,15 @@ class MirLower:
                 self.x64.inst(inst.op, R("rax"), R("cl"))
             elif inst.op == "mul":
                 self.x64.inst("imul", R("rax"), R("rcx"))
-            elif inst.op in ("div", "mod"):
+            elif inst.op in ("sdiv", "srem"):
                 self.x64.inst("cqo")
                 self.x64.inst("idiv", R("rcx"))
-                if inst.op == "mod":
+                if inst.op == "srem":
+                    self.x64.inst("mov", R("rax"), R("rdx"))
+            elif inst.op in ("udiv", "urem"):
+                self.x64.inst("xor", R("rdx"), R("rdx"))
+                self.x64.inst("div", R("rcx"))
+                if inst.op == "urem":
                     self.x64.inst("mov", R("rax"), R("rdx"))
             self._store_result(inst.result, "rax")
             return
@@ -148,7 +153,11 @@ class MirLower:
             self._load_operand("rax", inst.operands[0])
             self._load_operand("rcx", inst.operands[1])
             self.x64.inst("cmp", R("rax"), R("rcx"))
-            cc = {"eq": "sete", "ne": "setne", "lt": "setl", "gt": "setg", "le": "setle", "ge": "setge"}[inst.op[5:]]
+            cc = {
+                "eq": "sete", "ne": "setne",
+                "slt": "setl", "sgt": "setg", "sle": "setle", "sge": "setge",
+                "ult": "setb", "ugt": "seta", "ule": "setbe", "uge": "setae",
+            }[inst.op[5:]]
             self.x64.inst(cc, R("al"))
             self.x64.inst("movzx", R("eax"), R("al"))
             self._store_result(inst.result, "rax")

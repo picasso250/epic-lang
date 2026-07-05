@@ -137,10 +137,11 @@ ret
 | `load` | `mov rax, [rbp+slot]`，再存入结果栈槽。 |
 | `add/sub/and/or/xor` | 左值 -> `rax`，右值 -> `rcx`，二地址 ALU。 |
 | `mul` | `imul rax, rcx`。 |
-| `div/mod` | `cqo; idiv rcx`，`mod` 取 `rdx`。 |
+| `sdiv/srem` | `cqo; idiv rcx`，`srem` 取 `rdx`。 |
+| `udiv/urem` | `xor rdx, rdx; div rcx`，`urem` 取 `rdx`。 |
 | `shl/sar/shr` | 左值 -> `rax`，右值 -> `rcx`，使用 `cl`。 |
 | `not` | `test rax, rax; sete al; movzx eax, al`。 |
-| `icmp.*` | `cmp rax, rcx; setcc al; movzx eax, al`。 |
+| `icmp.*` | `cmp rax, rcx; setcc al; movzx eax, al`；ordered predicates use signed `setl/setle/setg/setge` or unsigned `setb/setbe/seta/setae` explicitly. |
 | `call` | Windows x64 call sequence。 |
 | `br` | `jmp label`。 |
 | `condbr` | `test rax, rax; jnz then; jmp else`。 |
