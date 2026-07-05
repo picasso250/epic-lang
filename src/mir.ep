@@ -95,6 +95,14 @@ fun mir_value_operand(typ: str, name: str): MirOperand {
     return op
 }
 
+fun mir_symbol_operand(typ: str, name: str): MirOperand {
+    let op = mir_operand_empty()
+    op.kind = "symbol"
+    op.typ = typ
+    op.name = name
+    return op
+}
+
 fun mir_operand_text(op: MirOperand): str {
     if op.kind == "value" {
         return str_cat2("%", op.name)

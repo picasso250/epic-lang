@@ -20,6 +20,9 @@ struct MirCodegenState {
     struct_field_keys: str[]
     struct_field_types: str[]
     struct_field_indexes: i64[]
+    string_values: str[]
+    string_labels: str[]
+    string_counter: i64
 }
 
 struct MirValueFlow {
@@ -113,6 +116,10 @@ fun mir_struct_key(struct_name: str, field_name: str): str {
 }
 
 fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
+    let slice_name = mir_slice_struct_name(type_name)
+    if slice_name != "" {
+        return slice_name
+    }
     let i = 0
     while i < len(st.struct_names) {
         if st.struct_names[i] == type_name {
@@ -290,6 +297,80 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): M
     return mir_value_flow(obj, st.current_block)
 }
 
+
+fun mir_string_label(st: MirCodegenState, value: str): str {
+    let i = 0
+    while i < len(st.string_values) {
+        if st.string_values[i] == value {
+            return st.string_labels[i]
+        }
+        i = i + 1
+    }
+    st.string_counter = st.string_counter + 1
+    let label = str_cat2("str.", str(st.string_counter))
+    push(st.string_values, value)
+    push(st.string_labels, label)
+    return label
+}
+
+fun mir_emit_str_conversion(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+    st.current_block = block
+    let typ = expr.resolved_type
+    if typ == "str" {
+        return mir_emit_expr(st, st.current_block, expr)
+    }
+    let arg_flow = mir_emit_expr(st, st.current_block, expr)
+    st.current_block = arg_flow.block
+    let args = new MirOperand[0]
+    push(args, arg_flow.value)
+    if typ == "bool" {
+        return mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_bool", "ptr", args), st.current_block)
+    }
+    if mir_is_u8_array_type(typ) {
+        return mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_slice_u8", "ptr", args), st.current_block)
+    }
+    if typ == "u64" {
+        return mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_u64", "ptr", args), st.current_block)
+    }
+    return mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_i64", "ptr", args), st.current_block)
+}
+
+fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+    st.current_block = block
+    let out = mir_operand_null()
+    let has_out = false
+    let i = 0
+    while i < len(expr.fields) {
+        let part = expr.fields[i]
+        let piece = mir_operand_null()
+        if part.kind == "FStringText" {
+            if len(part.value) > 0 {
+                piece = mir_symbol_operand("ptr", mir_string_label(st, part.value))
+            }
+        } else {
+            let piece_flow = mir_emit_str_conversion(st, st.current_block, part)
+            st.current_block = piece_flow.block
+            piece = piece_flow.value
+        }
+        if piece.kind != "null" {
+            if has_out == false {
+                out = piece
+                has_out = true
+            } else {
+                let args = new MirOperand[0]
+                push(args, out)
+                push(args, piece)
+                out = mir_emit_call_inst(st, "__ep_str_cat", "ptr", args)
+            }
+        }
+        i = i + 1
+    }
+    if has_out == false {
+        out = mir_symbol_operand("ptr", mir_string_label(st, ""))
+    }
+    return mir_value_flow(out, st.current_block)
+}
+
 fun mir_is_i64_array_type(type_name: str): bool {
     return type_name == "i64[]" || type_name == "i32[]" || type_name == "u64[]" || type_name == "u32[]"
 }
@@ -378,7 +459,13 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         return mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)
     }
     if expr.kind == "Bool" {
-        return mir_value_flow(mir_const_bool(expr.value == "true"), st.current_block)
+        return mir_value_flow(mir_const_bool(expr.value == "true" || expr.value == "1"), st.current_block)
+    }
+    if expr.kind == "String" {
+        return mir_value_flow(mir_symbol_operand("ptr", mir_string_label(st, expr.value)), st.current_block)
+    }
+    if expr.kind == "FString" {
+        return mir_emit_fstring(st, st.current_block, expr)
     }
     if expr.kind == "Var" {
         let idx = mir_local_index(st, expr.name)
@@ -441,6 +528,23 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
     }
     if expr.kind == "Call" {
+        if expr.name == "len" || expr.name == "cap" {
+            let base_type = expr.args[0].resolved_type
+            let base_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = base_flow.block
+            let struct_name = mir_layout_struct_name(st, base_type)
+            if struct_name == "" {
+                mir_codegen_die("len/cap expects aggregate pointer")
+            }
+            return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
+        }
+        if expr.name == "bytes" {
+            let args = new MirOperand[0]
+            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = arg_flow.block
+            push(args, arg_flow.value)
+            return mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_from_str", "ptr", args), st.current_block)
+        }
         if expr.name == "exit" {
             let args = new MirOperand[0]
             let code_flow = mir_emit_expr(st, st.current_block, expr.args[0])
@@ -869,6 +973,9 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.struct_field_keys = new str[0]
     st.struct_field_types = new str[0]
     st.struct_field_indexes = new i64[0]
+    st.string_values = new str[0]
+    st.string_labels = new str[0]
+    st.string_counter = 0
 
     let si = 0
     while si < len(ast.structs) {
@@ -884,6 +991,16 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         si = si + 1
     }
 
+    push(st.struct_names, "str")
+    push(st.struct_field_keys, mir_struct_key("str", "data"))
+    push(st.struct_field_types, "ptr")
+    push(st.struct_field_indexes, 0)
+    push(st.struct_field_keys, mir_struct_key("str", "len"))
+    push(st.struct_field_types, "i64")
+    push(st.struct_field_indexes, 1)
+    push(st.struct_field_keys, mir_struct_key("str", "cap"))
+    push(st.struct_field_types, "i64")
+    push(st.struct_field_indexes, 2)
     push(st.struct_names, "_slice_i64")
     push(st.struct_field_keys, mir_struct_key("_slice_i64", "data"))
     push(st.struct_field_types, "ptr")
