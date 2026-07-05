@@ -16,6 +16,7 @@ from mir import (
     I32,
     MirBlock,
     MirExtern,
+    MirField,
     MirFunction,
     MirGlobal,
     MirImport,
@@ -23,6 +24,7 @@ from mir import (
     MirParam,
     MirProgram,
     MirSignature,
+    MirStruct,
     MirValue,
     Ret,
     SymbolOperand,
@@ -289,14 +291,16 @@ class MirCodegen:
 
     def _field_index(self, struct_name, field):
         try:
-            return list(self.structs[struct_name]["fields"]).index(field)
-        except (KeyError, ValueError) as exc:
+            return self.structs[struct_name].field_index(field)
+        except KeyError as exc:
             raise MirCodegenError(f"unknown field: {struct_name}.{field}") from exc
 
     def _field_addr(self, base, struct_name, field, result_type=None):
-        if struct_name not in self.structs or field not in self.structs[struct_name]["fields"]:
-            raise MirCodegenError(f"unknown field: {struct_name}.{field}")
-        field_type = result_type or self.structs[struct_name]["fields"][field]["type"]
+        try:
+            field_layout = self.structs[struct_name].field(field)
+        except KeyError as exc:
+            raise MirCodegenError(f"unknown field: {struct_name}.{field}") from exc
+        field_type = result_type or field_layout.type
         addr = self._inst(
             "gep",
             [base, ConstIntOperand(I64, 0), ConstIntOperand(I32, self._field_index(struct_name, field))],
@@ -306,7 +310,7 @@ class MirCodegen:
         return ValueOperand(addr)
 
     def _load_field(self, base, struct_name, field, result_type=None):
-        field_type = result_type or self.structs[struct_name]["fields"][field]["type"]
+        field_type = result_type or self.structs[struct_name].field(field).type
         addr = self._field_addr(base, struct_name, field, result_type=field_type)
         value = self._inst("load", [addr], result_type=field_type, type=field_type)
         return ValueOperand(value)
@@ -442,7 +446,7 @@ class MirCodegen:
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError("container field base must be a struct pointer")
-            field_type = self.structs[struct_name]["fields"][expr.field]["type"]
+            field_type = self.structs[struct_name].field(expr.field).type
             return self._field_addr(base, struct_name, expr.field, result_type=field_type)
         raise MirCodegenError("container mutation target must be a variable or field")
 
@@ -1109,9 +1113,10 @@ class MirCodegen:
         base_type = self._infer_type(expr.object)
         base = self._emit_expr(expr.object)
         struct_name = self._layout_struct_name(base_type)
-        if struct_name not in self.structs or expr.field not in self.structs[struct_name]["fields"]:
-            raise MirCodegenError(f"unknown field: {expr.field}")
-        field_type = self.structs[struct_name]["fields"][expr.field]["type"]
+        try:
+            field_type = self.structs[struct_name].field(expr.field).type
+        except KeyError as exc:
+            raise MirCodegenError(f"unknown field: {expr.field}") from exc
         return self._load_field(base, struct_name, expr.field, result_type=field_type)
 
     def _emit_os_call(self, expr):
@@ -1200,67 +1205,40 @@ class MirCodegen:
             self.program.globals.append(MirGlobal(label, ptr(), text))
         return self.strings[text]
 
+    def _make_struct_layout(self, name, fields, size=None):
+        layout_fields = [MirField(field_name, field_type, offset) for field_name, field_type, offset in fields]
+        if size is None:
+            size = max((field.offset + 8 for field in layout_fields), default=1)
+        return MirStruct(name, layout_fields, size)
+
+    def _slice_layout(self, name):
+        return self._make_struct_layout(
+            name,
+            [("data", ptr(), 0), ("len", I64, 8), ("cap", I64, 16)],
+            size=24,
+        )
+
     def _compute_struct_layouts(self, ast):
         self.structs = {}
-        self.structs["str"] = {
-            "fields": {
-                "data": {"type": ptr(), "offset": 0},
-                "len": {"type": I64, "offset": 8},
-                "cap": {"type": I64, "offset": 16},
-            },
-            "size": 24,
-        }
-        self.structs["_slice_u8"] = {
-            "fields": {
-                "data": {"type": ptr(), "offset": 0},
-                "len": {"type": I64, "offset": 8},
-                "cap": {"type": I64, "offset": 16},
-            },
-            "size": 24,
-        }
-        self.structs["_slice_i64"] = {
-            "fields": {
-                "data": {"type": ptr(), "offset": 0},
-                "len": {"type": I64, "offset": 8},
-                "cap": {"type": I64, "offset": 16},
-            },
-            "size": 24,
-        }
-        self.structs["_slice_str"] = {
-            "fields": {
-                "data": {"type": ptr(), "offset": 0},
-                "len": {"type": I64, "offset": 8},
-                "cap": {"type": I64, "offset": 16},
-            },
-            "size": 24,
-        }
+        for struct_name in ("str", "_slice_u8", "_slice_i64", "_slice_str"):
+            self.structs[struct_name] = self._slice_layout(struct_name)
         for map_struct in ("_map_str_i64", "_map_str_bool", "_map_str_str"):
-            self.structs[map_struct] = {
-                "fields": {
-                    "entries": {"type": ptr(), "offset": 0},
-                    "len": {"type": I64, "offset": 8},
-                    "cap": {"type": I64, "offset": 16},
-                },
-                "size": 24,
-            }
+            self.structs[map_struct] = self._make_struct_layout(
+                map_struct,
+                [("entries", ptr(), 0), ("len", I64, 8), ("cap", I64, 16)],
+                size=24,
+            )
         for struct_node in ast.structs:
-            self.structs[struct_node.name] = {"fields": {}, "size": 0}
+            self.structs[struct_node.name] = MirStruct(struct_node.name, [], 0)
         for struct_node in ast.structs:
-            fields = {}
+            fields = []
             offset = 0
             for field in struct_node.fields:
-                fields[field.name] = {"type": self._type(field.resolved_type), "offset": offset}
+                fields.append((field.name, self._type(field.resolved_type), offset))
                 offset += 8
-            self.structs[struct_node.name] = {"fields": fields, "size": max(offset, 1)}
+            self.structs[struct_node.name] = self._make_struct_layout(struct_node.name, fields, size=max(offset, 1))
         for struct_name in list(self.structs):
-            self.structs[f"_slice_{struct_name}"] = {
-                "fields": {
-                    "data": {"type": ptr(), "offset": 0},
-                    "len": {"type": I64, "offset": 8},
-                    "cap": {"type": I64, "offset": 16},
-                },
-                "size": 24,
-            }
+            self.structs[f"_slice_{struct_name}"] = self._slice_layout(f"_slice_{struct_name}")
         self.program.structs = self.structs
 
 

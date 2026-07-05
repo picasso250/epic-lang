@@ -278,13 +278,42 @@ class MirFunction:
         return f"fn {self.name}({params}) -> {self.return_type} {{\n{body}\n}}"
 
 
+@dataclass(frozen=True)
+class MirField:
+    name: str
+    type: MirType
+    offset: int
+
+
+@dataclass(frozen=True)
+class MirStruct:
+    name: str
+    fields: list[MirField] = field(default_factory=list)
+    size: int = 0
+
+    def field(self, name):
+        for field_item in self.fields:
+            if field_item.name == name:
+                return field_item
+        raise KeyError(name)
+
+    def field_index(self, name):
+        for idx, field_item in enumerate(self.fields):
+            if field_item.name == name:
+                return idx
+        raise KeyError(name)
+
+    def field_by_index(self, index):
+        return self.fields[index]
+
+
 @dataclass
 class MirProgram:
     imports: list[MirImport] = field(default_factory=list)
     externs: list[MirExtern] = field(default_factory=list)
     globals: list[MirGlobal] = field(default_factory=list)
     functions: list[MirFunction] = field(default_factory=list)
-    structs: dict = field(default_factory=dict)
+    structs: dict[str, MirStruct] = field(default_factory=dict)
 
     def text(self):
         parts = []
@@ -479,8 +508,9 @@ class MirValidator:
             self._require(len(inst.operands) == 3, fn, where, "struct gep needs one or two indices")
             field_index = inst.operands[2]
             if isinstance(field_index, ConstIntOperand):
-                fields = self.program.structs.get(inst.type.name, {}).get("fields", {})
-                self._require(0 <= field_index.value < len(fields), fn, where, f"unknown struct field index: {inst.type.name}.{field_index.value}")
+                struct_layout = self.program.structs.get(inst.type.name)
+                field_count = len(struct_layout.fields) if struct_layout is not None else 0
+                self._require(0 <= field_index.value < field_count, fn, where, f"unknown struct field index: {inst.type.name}.{field_index.value}")
             return
         self._require(inst.type.kind in {"i64", "i8", "ptr", "array"}, fn, where, f"unsupported gep source type: {inst.type}")
 

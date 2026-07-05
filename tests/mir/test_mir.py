@@ -8,8 +8,8 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
 from lexer import lex
-from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirFunction, MirInst, MirParam
-from mir import MirProgram, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
+from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
+from mir import MirProgram, MirStruct, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from mir_codegen import ast_to_mir
 from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
@@ -114,7 +114,7 @@ def test_gep_null_and_ptrtoint_text_and_validation():
     )
     program = MirProgram(
         functions=[MirFunction("@main", [], I64, [block])],
-        structs={"Pair": {"fields": {"left": {"type": I64, "offset": 0}, "right": {"type": I64, "offset": 8}}, "size": 16}},
+        structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
     validate(program)
     expected = """fn @main() -> i64 {

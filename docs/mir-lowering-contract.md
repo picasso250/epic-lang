@@ -262,7 +262,7 @@ _store_result(inst.result, "rax")
 
 **scale_rcx_by_8** 通过三次 `add rcx, rcx` 实现 `rcx *= 8`。这只在 scale == 8 时使用，scale == 1 时直加。
 
-Struct field offset 通过 `program.structs[struct_name]["fields"]` 查表获取，field index 必须是编译期常量。
+Struct field offset 通过 `program.structs[struct_name].field_by_index(index).offset` 查表获取，field index 必须是编译期常量。
 
 ## 6. Call lowering
 

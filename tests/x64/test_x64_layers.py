@@ -7,8 +7,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
 from machine import MachineObjectBuilder
-from mir import I32, I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirFunction, MirInst, MirParam
-from mir import MirProgram, MirSignature, MirValue, Ret, ValueOperand, ptr, struct as mir_struct
+from mir import I32, I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirField
+from mir import MirFunction, MirInst, MirParam, MirProgram, MirSignature, MirStruct
+from mir import MirValue, Ret, ValueOperand, ptr, struct as mir_struct
 from mir_lower import MirLower
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
 from x64 import X64ValidationError, validate_x64_program
@@ -140,7 +141,7 @@ def test_target_mir_memory_ops_to_x64_golden():
     program = MirProgram(
         externs=[MirExtern("__epx_alloc", MirSignature([I64], ptr()))],
         functions=[fn],
-        structs={"Pair": {"fields": {"left": {"type": I64, "offset": 0}, "right": {"type": I64, "offset": 8}}, "size": 16}},
+        structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
     lower = MirLower(program)
     lower.x64.section(".text")

@@ -147,25 +147,6 @@ ret
 | `condbr` | `test rax, rax; jnz then; jmp else`。 |
 | `ret` | `ExitProcess` for `main`，普通函数跳转到 shared return label。 |
 
-当前 Python prototype-only Epic-specific MIR ops：
-
-| MIR op | 说明 |
-| --- | --- |
-| `struct.new` | 使用 `_heap` + `HeapAlloc` 分配结构体大小。 |
-| `field.store` / `field.load` | 通过 `program.structs` 查字段偏移。 |
-| `array.new` | 分配 `{data, len, cap}` header 和 data buffer。 |
-| `array.push` | 内联 grow/copy/store。 |
-| `array.extend` | 内联 grow/copy 多元素。 |
-| `array.index.load` | 带 bounds check 的 8 字节元素读取。 |
-| `ptr.index.load` | 指针按 8 字节元素读取。 |
-| `ptr.i8.get` | 指针按字节读取并 zero-extend。 |
-| `ptr.i64.get` | 指针按 8 字节读取。 |
-
-注意：`adt.payload` 已随 ADT 一并移除，不再出现在当前 codegen 中。
-其余 op 是当前实现债：它们能让 examples 先跑通，但不应固化为目标 MIR。
-迁移方向是按 `docs/mir-design.md` 把它们分解成 `gep/load/store/call/branch`，
-或在必要时显式放进独立 HighMIR，而不是继续扩大 MIR validator 对这类便捷 op 的接受面。
-
 ## 5. 当前 machine instruction subset
 
 支持的寄存器：
@@ -407,26 +388,13 @@ labels, and relocs must reach into private methods.
 Recommended next step: expose a small `build_machine_object(program)` result
 object and let `write_machine_obj()` wrap it.
 
-### 8.4 MIR still accepts prototype high-level ops
+### 8.4 Struct metadata on MirProgram
 
-The target MIR design no longer treats `struct.new`, `field.load`,
-`array.push` as MIR ops. `adt.payload` was removed along with the ADT
-feature and is no longer emitted. Remaining prototype ops still exist.
+`MirProgram.structs` carries typed `MirStruct` layout metadata for aggregate
+`gep` lowering. Field lookup uses ordered `MirField` entries so field index and
+byte offset stay part of the MIR contract.
 
-Recommended next step: first align codegen with `docs/mir-design.md` by lowering
-aggregate allocation/access into `gep/load/store/call/branch`; then make the
-validator reject unknown ops and reject the prototype-only high-level ops.
-
-### 8.5 Dynamic metadata on MirProgram
-
-`mir_codegen.py` assigns `program.structs` dynamically. That hides a real
-contract from the MIR dataclass and will make the Epic port harder to keep in
-sync.
-
-Recommended next step: make struct layout metadata explicit fields on
-`MirProgram`, matching `docs/mir-design.md`.
-
-### 8.6 Symbol spelling is inconsistent
+### 8.5 Symbol spelling is inconsistent
 
 Docs describe module symbols as `@main`, while implementation currently uses raw
 names such as `main`, `str_i64`, and `ExitProcess`. This is tolerable in Python
@@ -436,7 +404,7 @@ backend shape.
 Recommended next step: define one internal symbol spelling and one text printing
 spelling. Do not let pretty-print syntax leak into object symbols.
 
-### 8.7 Self-hosted compiler driver is removed
+### 8.6 Self-hosted compiler driver is removed
 
 The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 

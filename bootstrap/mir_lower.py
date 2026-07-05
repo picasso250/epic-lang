@@ -292,7 +292,7 @@ class MirLower:
     def _sizeof_type(self, typ):
         if typ.kind == "struct":
             try:
-                return self.program.structs[typ.name]["size"]
+                return self.program.structs[typ.name].size
             except KeyError as exc:
                 raise MirLowerError(f"unknown struct layout: {typ.name}") from exc
         if typ.kind == "array":
@@ -303,8 +303,7 @@ class MirLower:
 
     def _field_offset_by_index(self, struct_name, field_index):
         try:
-            fields = list(self.program.structs[struct_name]["fields"].values())
-            return fields[field_index]["offset"]
+            return self.program.structs[struct_name].field_by_index(field_index).offset
         except (KeyError, IndexError) as exc:
             raise MirLowerError(f"unknown field index {struct_name}.{field_index}") from exc
 
