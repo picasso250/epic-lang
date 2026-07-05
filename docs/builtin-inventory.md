@@ -150,7 +150,7 @@ The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
 |----------|--------|----------|
 | `puti` | **Removed from docs examples.** No implementation exists or existed — was a legacy concept. | |
 | `putstr` | **Removed from public builtin surface.** Replaced by `print(s)`. | |
-| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. Backend private label `__epx_putc` still exists as an x64-private implementation detail (direct WriteFile with `_putc_buf`), not referenced by any MIR call. | |
+| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. The old backend-private `__epx_putc` label and `_putc_buf` data have been removed. | |
 
 ---
 
@@ -188,7 +188,7 @@ These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.p
 Most other private helpers are still emitted as x64 helper bodies from
 `bootstrap/mir_lower.py`. This includes `__ep_str_from_i64`, `__ep_str_from_u64`, `__ep_map_str_i64_*`,
 `__ep_read_file`, `__ep_write_file`, `__ep_system_cmd`, `__epx_argv_init`,
-`__ep_print_str`, `__ep_print_newline`, and `__epx_putc`.
+`__ep_print_str` and `__ep_print_newline`.
 
 These should be treated as backend implementation details, not language builtins.
 

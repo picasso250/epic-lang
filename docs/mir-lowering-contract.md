@@ -343,7 +343,6 @@ jmp  LabelRef(fn_name.else_target)
 - `_argv: qword` (8 bytes zero) — 命令行参数数组
 - `_str_i64_buf: [32]byte` — i64→str 转换用的缓冲区
 - `_newline: byte 0x0a`
-- `_putc_buf: byte 0`
 - `_cstr_panic_prefix: "panic line "`
 - `_cstr_panic_suffix: ": invalid cstr"`
 - runtime string globals injected by MIR helpers, such as
@@ -380,7 +379,6 @@ ret
 - `__epx_argv_init`
 - `__ep_str_from_i64`
 - `__ep_print_str` / `__ep_print_newline`
-- `__epx_putc`
 - `__epx_slice_oob`
 
 MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_str_from_bool`,
@@ -397,7 +395,7 @@ bodies are hand-written in `mir_lower.py` `_emit_*()` methods.
 
 ### 9.1 Unused helpers
 
-`__epx_putc` 和 `_putc_buf` 被发射但未被任何 MIR call 引用。
+No known unused runtime helper label is intentionally emitted. The old `__epx_putc` label and `_putc_buf` data were removed after `putc` left the public surface.
 
 ### 9.2 No register allocation
 

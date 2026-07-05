@@ -84,7 +84,7 @@ Important x64-backed families include:
 | map helpers | `MirLower._emit_map_*` |
 | file/process helpers | `MirLower._emit_read_file`, `_emit_write_file`, `_emit_system_cmd` |
 | argv helper | `MirLower._emit_argv_init` |
-| printing helpers | `MirLower._emit_print_str`, `_emit_print_newline`, `_emit_putc` |
+| printing helpers | `MirLower._emit_print_str`, `_emit_print_newline` |
 | error helpers | `MirLower._emit_array_oob` |
 
 ### Duplicate-emission policy
@@ -464,7 +464,7 @@ This requires a separate investigation and is a **language semantics decision**,
 ### Phase 6: Future TODO
 
 - `u64_to_str`: implement `str_u64` helper (currently only `str_i64` exists)
-- Remove unreferenced helpers: `putc` label, `_putc_buf` data
+- Unreferenced `putc` label and `_putc_buf` data were removed
 - Move `array_oob` from x64 primitive to MIR helper (it's a print+exit, could be MIR)
 - When self-hosted compiler is ready: rewrite `mir_runtime_helpers.py` in Epic as `.ep` source files
 

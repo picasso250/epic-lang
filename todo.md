@@ -79,7 +79,7 @@
 
 - allocation / process args：`__epx_alloc`、`__epx_argv_init`
 - OS-facing helpers：`__ep_cstr`、`__ep_read_file`、`__ep_write_file`、`__ep_system_cmd`
-- printing / traps：`__ep_print_str`、`__ep_print_newline`、`__epx_putc`、`__epx_slice_oob`、`__epx_null_deref`
+- printing / traps：`__ep_print_str`、`__ep_print_newline`、`__epx_slice_oob`、`__epx_null_deref`（`__epx_putc` 已删除）
 - numeric formatting：`__ep_str_from_i64`
 
 结论：不要标成完成；下一步应优先迁移 `__ep_str_from_i64`，再考虑 `__ep_cstr` / file / argv / print 这类更贴近平台 ABI 的 helper。
