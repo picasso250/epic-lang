@@ -680,34 +680,15 @@ class MirCodegen:
     def _emit_print_newline(self):
         self._inst("call", [], type=VOID, callee="__ep_print_newline")
 
-    def _emit_checked_int32_conversion(self, expr, target_name):
+    def _emit_truncating_uint_conversion(self, expr, mask):
         value = self._emit_expr(expr)
-        if target_name == "i32":
-            lo = -2147483648
-            hi = 2147483647
-        elif target_name == "u32":
-            lo = 0
-            hi = 4294967295
-        else:
-            raise MirCodegenError(f"unsupported checked conversion: {target_name}")
+        return ValueOperand(self._inst("and", [value, ConstIntOperand(I64, mask)], result_type=I64))
 
-        fail_block = self._new_block(f"{target_name}.range_fail")
-        upper_block = self._new_block(f"{target_name}.range_upper")
-        ok_block = self._new_block(f"{target_name}.range_ok")
-
-        low_bad = self._inst("icmp.slt", [value, ConstIntOperand(I64, lo)], result_type=BOOL)
-        self.block.terminator = CondBr(ValueOperand(low_bad), fail_block.name, upper_block.name)
-
-        self.block = upper_block
-        high_bad = self._inst("icmp.sgt", [value, ConstIntOperand(I64, hi)], result_type=BOOL)
-        self.block.terminator = CondBr(ValueOperand(high_bad), fail_block.name, ok_block.name)
-
-        self.block = fail_block
-        self._emit_exit_current_block(1)
-        self.block.terminator = self._dummy_return()
-
-        self.block = ok_block
-        return value
+    def _emit_truncating_i32_conversion(self, expr):
+        value = self._emit_expr(expr)
+        shifted = self._inst("shl", [value, ConstIntOperand(I64, 32)], result_type=I64)
+        sign_extended = self._inst("sar", [ValueOperand(shifted), ConstIntOperand(I64, 32)], result_type=I64)
+        return ValueOperand(sign_extended)
 
     def _emit_match(self, stmt):
         value = self._emit_expr(stmt.expr)
@@ -930,10 +911,14 @@ class MirCodegen:
                 callee="__ep_cstr",
             )
             return ValueOperand(result)
-        if name in ("i64", "u64", "u8", "bool"):
+        if name in ("i64", "u64", "bool"):
             return self._emit_expr(expr.args[0])
-        if name in ("i32", "u32"):
-            return self._emit_checked_int32_conversion(expr.args[0], name)
+        if name == "u8":
+            return self._emit_truncating_uint_conversion(expr.args[0], 255)
+        if name == "u32":
+            return self._emit_truncating_uint_conversion(expr.args[0], 4294967295)
+        if name == "i32":
+            return self._emit_truncating_i32_conversion(expr.args[0])
         if name == "bytes":
             arg = self._emit_expr(expr.args[0])
             result = self._inst("call", [arg], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_from_str")
