@@ -34,9 +34,13 @@ PTR = MirType("ptr")
 
 
 def ptr(pointee=None):
-    if pointee is None:
-        return PTR
-    return MirType("ptr", pointee=pointee)
+    """Return the single opaque MIR pointer type.
+
+    The optional pointee parameter is accepted during the migration so existing
+    callers can keep spelling layout/access intent nearby, but MIR pointer
+    values themselves never carry pointee type information.
+    """
+    return PTR
 
 
 def array(count, elem):
