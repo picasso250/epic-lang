@@ -328,6 +328,10 @@ class MirValidationError(Exception):
     pass
 
 
+def is_raw_module_symbol(name):
+    return not name.startswith("@")
+
+
 class MirValidator:
     HIGH_LEVEL_OPS = {
         "struct.new",
@@ -356,6 +360,8 @@ class MirValidator:
 
     def _collect_symbols(self):
         for item in [*self.program.imports, *self.program.externs, *self.program.globals, *self.program.functions]:
+            if not is_raw_module_symbol(item.name):
+                self.errors.append(f"module symbol must be raw and must not include text sigil '@': {item.name}")
             if item.name in self.symbols:
                 self.errors.append(f"duplicate module symbol: {item.name}")
             self.symbols[item.name] = item
@@ -395,8 +401,11 @@ class MirValidator:
                 self.errors.append(f"{fn.name}.{where}: undefined value: {name}")
             elif values[name] != operand.type:
                 self.errors.append(f"{fn.name}.{where}: stale value type for {name}")
-        if isinstance(operand, SymbolOperand) and operand.name not in self.symbols:
-            self.errors.append(f"{fn.name}.{where}: undefined symbol: {operand.name}")
+        if isinstance(operand, SymbolOperand):
+            if not is_raw_module_symbol(operand.name):
+                self.errors.append(f"{fn.name}.{where}: symbol operand must be raw and must not include text sigil '@': {operand.name}")
+            elif operand.name not in self.symbols:
+                self.errors.append(f"{fn.name}.{where}: undefined symbol: {operand.name}")
 
     def _validate_inst(self, fn, block, inst, values):
         where = block.name

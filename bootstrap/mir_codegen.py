@@ -134,7 +134,7 @@ class MirCodegen:
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
-        self.program.globals.append(MirGlobal("@argv", ptr(), None))
+        self.program.globals.append(MirGlobal("argv", ptr(), None))
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
         inject_all_mir_helpers(self.program)
@@ -765,7 +765,7 @@ class MirCodegen:
             return self._emit_fstring(expr)
         if isinstance(expr, VarNode):
             if expr.name == "argv":
-                return SymbolOperand(ptr(), "@argv")
+                return SymbolOperand(ptr(), "argv")
             if expr.name not in self.locals:
                 raise MirCodegenError(f"undefined variable: {expr.name}")
             typ = self.local_types[expr.name]
@@ -1200,7 +1200,7 @@ class MirCodegen:
     def _string_label(self, text):
         if text not in self.strings:
             self.string_counter += 1
-            label = f"@str.{self.string_counter}"
+            label = f"str.{self.string_counter}"
             self.strings[text] = label
             self.program.globals.append(MirGlobal(label, ptr(), text))
         return self.strings[text]

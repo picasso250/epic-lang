@@ -62,7 +62,7 @@ contract in these places:
   `write_file(path, data)` use `str` for text/path arguments.
 - `map[str]T` is the only supported map family.
 - The Python reference compiler has explicit `STR`, `ptr_str()`,
-  `ptr_slice_str()`, `@argv`, and `__ep_str_*` paths.
+  `ptr_slice_str()`, `argv`, and `__ep_str_*` paths.
 - The self-hosted compiler (`src/*.ep`) uses `str` for token kinds, names,
   type names, labels, paths, diagnostics, and generated assembly fragments.
 

@@ -129,7 +129,7 @@ aligned_frame = ((next_slot + 32 + 15) // 16) * 16
 | `ConstNullOperand` | `mov reg, 0` |
 | `ValueOperand(name)` — value slot | `mov reg, [rbp+slot]` |
 | `ValueOperand(name)` — address slot | `lea reg, [rbp+slot]` |
-| `SymbolOperand("@argv")` | `mov reg, [_argv]` |
+| `SymbolOperand("argv")` | `mov reg, [_argv]` |
 | `SymbolOperand(string_global)` | 构造 string header 到 reg（见下文） |
 
 ### 4.1 String global materialization
@@ -349,7 +349,7 @@ jmp  LabelRef(fn_name.else_target)
 - `_cstr_panic_prefix: "panic line "`
 - `_cstr_panic_suffix: ": invalid cstr"`
 - runtime string globals injected by MIR helpers, such as
-  `@str.runtime.bool.true` / `@str.runtime.bool.false`
+  `str.runtime.bool.true` / `str.runtime.bool.false`
 - 每个程序全局 string 的 `data_label` 和 `header_label`
 
 ### 8.2 Startup hook

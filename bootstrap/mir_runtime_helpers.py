@@ -872,7 +872,7 @@ def _map_entry_addr(b: MirHelperBuilder, data, index):
 
 def _map_zero_operand(value_type):
     if value_type.kind == "ptr":
-        return SymbolOperand(ptr(), "@str.runtime.empty")
+        return SymbolOperand(ptr(), "str.runtime.empty")
     if value_type == BOOL:
         return ConstBoolOperand(False)
     return ConstIntOperand(value_type, 0)
@@ -1293,9 +1293,9 @@ IMPLEMENTED_MIR_HELPERS = tuple(_HELPER_ORDER)
 
 
 _RUNTIME_STRING_GLOBALS = (
-    ("@str.runtime.bool.true", "true"),
-    ("@str.runtime.bool.false", "false"),
-    ("@str.runtime.empty", ""),
+    ("str.runtime.bool.true", "true"),
+    ("str.runtime.bool.false", "false"),
+    ("str.runtime.empty", ""),
 )
 
 

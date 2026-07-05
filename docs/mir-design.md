@@ -20,7 +20,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ✅ `MirProgram.structs` 使用 `dict[str, MirStruct]`，字段为 `MirField` 列表 |
-| symbol 拼写 | `@name` 统一规则 | ⚠️ `main`、runtime helper、`ExitProcess` 混用，未统一到 `@` 前缀 |
+| symbol contract | object model 使用 raw module symbol；`@` 只保留给未来 text MIR syntax | ✅ 当前 `MirFunction` / `MirExtern` / `MirGlobal` / `SymbolOperand` 都应存 raw name |
 | 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ✅ 前缀已分层 `__ep_*`/`__epx_*`，语义名留待后续 commit |
 | 前缀分层 | `__epx_` = x64 primitive（`__epx_alloc`），`__ep_` = compiler-internal MIR helper（`__ep_str_eq`） | ✅ 已分离 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
@@ -85,7 +85,7 @@ text MIR 只是 pretty printer 输出，用于：
 - 指针类型采用现代 LLVM opaque pointer 思路：value 类型写 `ptr`，被访问类型由 `load/store/gep` 指令携带。
 - bool 类型文本写作 `bool`，不写作 `i1`。
 - block 引用写作 `label %name`，block 定义写作 `name:`。
-- 函数、全局、import 这类 module-level symbol 使用 `@name`。
+- 函数、全局、import 这类 module-level symbol 在 object model 中使用 raw name；未来 text MIR parser/printer 可以把 `@name` 当作纯文本语法糖。
 - import 和普通函数在 call 处不额外区分；它们在 module symbol table 里区分。
 - text MIR pretty printer 默认打印完整类型信息。
 
@@ -132,13 +132,13 @@ condbr bool %c0, label %then, label %else
 
 ### 4.4 Module-level symbol
 
-函数、全局变量、字符串常量、import 使用 `@` 前缀：
+函数、全局变量、字符串常量、import 在 object model 中使用 raw module symbol。未来 text MIR syntax 可选择用 `@` 前缀，但 `@` 不进入 `MirFunction.name` / `MirExtern.name` / `MirGlobal.name` / `SymbolOperand.name`：
 
 ```text
-@main
-@foo
-@str.0
-@WriteFile
+main
+foo
+str.0
+WriteFile
 ```
 
 ## 5. 类型
@@ -258,12 +258,12 @@ module
 示例：
 
 ```text
-import @ExitProcess: fn(i64) -> void
-import @WriteFile: fn(ptr, ptr, i64, ptr, ptr) -> bool
+import ExitProcess: fn(i64) -> void
+import WriteFile: fn(ptr, ptr, i64, ptr, ptr) -> bool
 
-@str.0: array 6 x i8 = global c"hello\00"
+str.0: array 6 x i8 = global c"hello\00"
 
-fn @main() -> i64 {
+fn main() -> i64 {
 entry:
   ret i64 0
 }
@@ -271,17 +271,17 @@ entry:
 
 说明：
 
-- `@ExitProcess` 和 `@WriteFile` 是 import，由 module import table 声明。
-- call 处只写 `call ... @WriteFile(...)`，不写 `call import`。
-- `@str.0` 是 global symbol。
-- `@main` 是函数 symbol。
+- `ExitProcess` 和 `WriteFile` 是 import，由 module import table 声明。
+- call 处只写 `call ... WriteFile(...)`，不写 `call import`。
+- `str.0` 是 global symbol。
+- `main` 是函数 symbol。
 
 ## 9. Function
 
 函数文本格式：
 
 ```text
-fn @name(param_type %param, ...) -> return_type {
+fn name(param_type %param, ...) -> return_type {
 entry:
   ...
 }
@@ -474,12 +474,12 @@ Array header、string header 都按同样规则处理：layout 由 `struct` / `a
 ```text
 %r: i64 = call i64 @foo(i64 %x, i64 %y)
 call void @print(i64 %x)
-%ok: bool = call bool @WriteFile(ptr %h, ptr %buf, i64 %len, ptr %written, ptr %ov)
+%ok: bool = call bool WriteFile(ptr %h, ptr %buf, i64 %len, ptr %written, ptr %ov)
 ```
 
 规则：
 
-- callee 使用 `@name`。
+- callee 使用 `name`。
 - call 处不区分 import / Epic function / runtime helper。
 - callee kind 由 module-level declaration 决定。
 - 参数类型必须匹配 callee signature。
@@ -488,11 +488,11 @@ call void @print(i64 %x)
 示例：
 
 ```text
-import @WriteFile: fn(ptr, ptr, i64, ptr, ptr) -> bool
+import WriteFile: fn(ptr, ptr, i64, ptr, ptr) -> bool
 
-fn @main() -> i64 {
+fn main() -> i64 {
 entry:
-  %ok: bool = call bool @WriteFile(ptr %h, ptr %buf, i64 %len, ptr %written, ptr %ov)
+  %ok: bool = call bool WriteFile(ptr %h, ptr %buf, i64 %len, ptr %written, ptr %ov)
   ret i64 0
 }
 ```
@@ -516,7 +516,7 @@ if a < b {
 MIR：
 
 ```text
-fn @main() -> i64 {
+fn main() -> i64 {
 entry:
   %a.addr: ptr = alloca i64
   %b.addr: ptr = alloca i64
@@ -556,7 +556,7 @@ return x;
 MIR：
 
 ```text
-fn @main() -> i64 {
+fn main() -> i64 {
 entry:
   %x.addr: ptr = alloca i64
   store i64 0, ptr %x.addr
@@ -592,7 +592,7 @@ return 0;
 MIR：
 
 ```text
-fn @main() -> i64 {
+fn main() -> i64 {
 entry:
   %a0: i64 = load i64, ptr %a.addr
   %c0: bool = icmp.ne i64 %a0, i64 0
@@ -625,12 +625,12 @@ MirProgram
   functions: list[MirFunction]
 
 MirImport
-  name: str                  # @WriteFile
+  name: str                  # WriteFile
   signature: MirSignature
   dll: str?                  # 可选，后端/PE writer 可能需要
 
 MirGlobal
-  name: str                  # @str.0
+  name: str                  # str.0
   type: MirType
   init: MirGlobalInit
 
@@ -644,7 +644,7 @@ MirField
   type: MirType
 
 MirFunction
-  name: str                  # @main
+  name: str                  # main
   params: list[MirParam]
   return_type: MirType
   blocks: list[MirBlock]
@@ -718,7 +718,7 @@ MirType
 - `condbr` condition 是 `bool`。
 - `ret` 类型匹配 function return type。
 - `call` 参数和返回值匹配 callee signature。
-- `@name` 必须能在 function/global/import symbol table 中找到。
+- `name` 必须能在 function/global/import symbol table 中找到。
 - `label %name` 必须能在当前 function block table 中找到。
 
 ## 15. SSA 决策

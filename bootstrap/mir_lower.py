@@ -218,7 +218,7 @@ class MirLower:
             else:
                 raise MirLowerError(f"unknown MIR value: {name}")
         elif isinstance(operand, SymbolOperand):
-            if operand.name == "@argv":
+            if operand.name == "argv":
                 self.x64.inst("mov", R(reg), MS("_argv"))
                 return
             if operand.name not in self.string_globals:

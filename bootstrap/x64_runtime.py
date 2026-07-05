@@ -15,7 +15,7 @@ def emit_runtime_data(x64, program):
     x64.data_bytes("_cstr_panic_prefix", list(b"panic line "))
     x64.data_bytes("_cstr_panic_suffix", list(b": invalid cstr"))
     for glob in program.globals:
-        if glob.name == "@argv":
+        if glob.name == "argv":
             continue
         data_label = _data_label(glob.name)
         header_label = _header_label(glob.name)
@@ -59,8 +59,8 @@ def _emit_runtime_start(x64):
 
 
 def _data_label(name):
-    return name[1:] + "_data" if name.startswith("@") else name + "_data"
+    return name + "_data"
 
 
 def _header_label(name):
-    return name[1:] + "_header" if name.startswith("@") else name + "_header"
+    return name + "_header"

@@ -55,14 +55,14 @@ def build_smoke_program():
         ],
         Ret(ValueOperand(r)),
     )
-    main = MirFunction("@main", [], I64, [entry, loop, body, done])
+    main = MirFunction("main", [], I64, [entry, loop, body, done])
     return MirProgram(functions=[main])
 
 
 def test_smoke_text_and_validation():
     program = build_smoke_program()
     validate(program)
-    expected = """fn @main() -> i64 {
+    expected = """fn main() -> i64 {
 entry:
   %x.addr: ptr = alloca i64
   store i64 0, ptr %x.addr
@@ -113,11 +113,11 @@ def test_gep_null_and_ptrtoint_text_and_validation():
         Ret(ValueOperand(size)),
     )
     program = MirProgram(
-        functions=[MirFunction("@main", [], I64, [block])],
+        functions=[MirFunction("main", [], I64, [block])],
         structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
     validate(program)
-    expected = """fn @main() -> i64 {
+    expected = """fn main() -> i64 {
 entry:
   %size.ptr: ptr = gep struct Pair, ptr null, i64 1
   %size: i64 = ptrtoint ptr %size.ptr to i64
@@ -127,12 +127,22 @@ entry:
     assert program.text() == expected
 
 
+def test_validator_rejects_text_sigils_in_module_symbols():
+    value = MirValue("%x", I64)
+    bad_fn = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [], Ret(ConstIntOperand(I64, 0)))])])
+    assert_mir_invalid(bad_fn, "module symbol must be raw")
+
+    block = MirBlock("entry", [MirInst("ptrtoint", [SymbolOperand(ptr(), "@g")], result=value, type=I64)], Ret(ValueOperand(value)))
+    bad_operand = MirProgram(globals=[MirGlobal("g", ptr(), "x")], functions=[MirFunction("main", [], I64, [block])])
+    assert_mir_invalid(bad_operand, "symbol operand must be raw")
+
+
 def test_validator_rejects_unknown_and_high_level_ops():
     result = MirValue("%x", I64)
-    unknown = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [MirInst("mystery", result=result)], Ret(ValueOperand(result)))])])
+    unknown = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [MirInst("mystery", result=result)], Ret(ValueOperand(result)))])])
     assert_mir_invalid(unknown, "unknown MIR op: mystery")
 
-    high = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [MirInst("field.load", [ConstNullOperand()], result=result, type=I64, callee="x")], Ret(ValueOperand(result)))])])
+    high = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [MirInst("field.load", [ConstNullOperand()], result=result, type=I64, callee="x")], Ret(ValueOperand(result)))])])
     assert_mir_invalid(high, "high-level MIR op is not allowed: field.load")
 
 
@@ -227,8 +237,8 @@ def test_mir_helper_injection():
         injected = {fn.name for fn in prog.functions}
         externs = {ext.name for ext in prog.externs}
         global_names = [glob.name for glob in prog.globals]
-        assert global_names.count("@str.runtime.bool.true") == 1
-        assert global_names.count("@str.runtime.bool.false") == 1
+        assert global_names.count("str.runtime.bool.true") == 1
+        assert global_names.count("str.runtime.bool.false") == 1
         for name in IMPLEMENTED_MIR_HELPERS:
             assert name in injected, f"{name} should be injected as MirFunction, got injected={injected}"
             assert name not in externs, f"{name} should be removed from externs, got externs={externs}"

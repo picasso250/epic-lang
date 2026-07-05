@@ -394,15 +394,14 @@ object and let `write_machine_obj()` wrap it.
 `gep` lowering. Field lookup uses ordered `MirField` entries so field index and
 byte offset stay part of the MIR contract.
 
-### 8.5 Symbol spelling is inconsistent
+### 8.5 Symbol spelling contract
 
-Docs describe module symbols as `@main`, while implementation currently uses raw
-names such as `main`, `str_i64`, and `ExitProcess`. This is tolerable in Python
-prototype code, but it should be resolved before committing the self-hosted
-backend shape.
-
-Recommended next step: define one internal symbol spelling and one text printing
-spelling. Do not let pretty-print syntax leak into object symbols.
+MIR object model stores raw module symbols such as `main`, `__ep_str_eq`,
+`ExitProcess`, and `str.1`. The `@` sigil is reserved for a future text MIR
+syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
+`MirGlobal.name`, or `SymbolOperand.name`. Local SSA values currently keep the
+printed `%` sigil in `MirValue.name` / `MirParam.name`; that is accepted as a
+separate local-value convention because it never reaches object/link symbols.
 
 ### 8.6 Self-hosted compiler driver is removed
 
