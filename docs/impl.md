@@ -141,7 +141,7 @@ _slice_T = {
 
 基本类型数组存储基本类型的值。结构体和 `str` 数组存储引用。
 
-`str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示尚未 materialize 的空容器。字段访问或其他容器使用点会插入 ensure：如果槽为 `0`，就写入一个空 header。slice/map header 的 backing storage 仍然懒分配：`push` 或 map set 首次写入时再分配 `data` / `entries`。
+`str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误。slice/map header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` / `entries` 可在首次写入时再分配。
 
 ### 结构体 (Struct)
 

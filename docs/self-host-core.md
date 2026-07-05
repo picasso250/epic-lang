@@ -205,9 +205,10 @@ after ADT removal and naming unification.
 - `new T[] { ... }` array literal
 - `new T[n]` array allocation
 - `let` binding with optional type annotation
-- Zero-value initialization for built-in types (i64, bool, str, T[], map[str]T)
-- Zero-value containers may be internally represented by a `0` slot and lazily materialized by compiler-inserted ensure code
-- **Struct requires explicit `new`**; `let b: Box` is a compile error
+- Local variable declarations must have an initializer; optional type annotations only constrain/check the initializer
+- No zero-value initialization for locals; use literals, `new`, calls, or other expressions explicitly
+- Heap-backed references (`str`, `T[]`, `map[str]T`, structs) may use `0` as null storage, but compiler-inserted container materialization is not part of the language model
+- `new S { ... }` allows partial field initialization: omitted scalar fields default to `0` / `false`, omitted reference fields default to null
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend` / `map_has` / `map_del`

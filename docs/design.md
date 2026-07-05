@@ -79,19 +79,19 @@ fun main(): void {
 
 ### Let 声明 (Let Declarations)
 
-`let` 支持可选的类型注解：
+`let` 支持可选的类型注解，但 local variable 必须带初始化器：
 
 ```epic
 let b: u8 = 1
-let ok: bool
-let xs: u8[]
+let ok = false
+let xs = new u8[]
 ```
 
-当右侧明显确定类型时，应省略注解。
+当右侧明显确定类型时，应省略注解；需要约束类型或消歧时保留注解。
 
-不带初始化器的 `let x: T` 创建零值。对标量类型为 `0` 或 `false`。对 `str`、数组、map，创建对应的空值。结构体是 heap-only reference type，不允许 `let x: Struct` 这种无初始化声明；必须显式写 `new Struct` 或 `new Struct { ... }`。
+不带初始化器的 `let x: T` 非法。Epic 不为 local variable 创建隐式零值；标量、容器、map、字符串和结构体引用都必须由字面量、`new`、函数调用或其他表达式显式初始化。
 
-内建容器零值是语义上的空容器。实现可以把 `str`、`T[]`、`map[str]T` 的存储槽保持为 `0`，并在使用点由编译器懒初始化空 header；这个 `0` 不是语言级 `nil`，用户代码不能观察它。对零值 `str` / `T[]`，`len(x)` 返回 `0`；对零值 `T[]`，`cap(x)` 返回 `0`。这两个查询不要求先 materialize 空 header。用户结构体引用不同：省略的结构体引用字段保持 null，访问其字段会触发 null deref。
+`str`、`T[]`、`map[str]T` 和用户结构体都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
 
 ### 运算符 (Operators)
 
@@ -131,21 +131,21 @@ let xs: u8[]
 
 ### 结构体初始化 (Struct Initialization)
 
-结构体是 heap-only reference type。**局部变量不允许无初始化的结构体声明**：
+结构体是 heap-only reference type。local variable 必须显式初始化：
 
 ```epic
-let p: Pos         # 编译错误！必须用 new
-let p = new Pos    # 合法，所有字段归零
+let p: Pos         # 编译错误！local variable 必须带初始化器
+let p = new Pos    # 合法，分配对象；省略字段按默认存储值初始化
 ```
 
 ```epic
 struct Pos { line: i64; col: i64 }
 let p = new Pos { line: 3, col: 9 }
-let q = new Pos { line: 3 }     # 省略的字段被归零
-let z = new Pos {}              # 所有字段为零
+let q = new Pos { line: 3 }     # 省略的标量字段默认为 0 / false
+let z = new Pos {}              # 所有标量字段为默认值
 ```
 
-`new Ctor` 是 `new Ctor {}` 的简写。对于结构体，`Ctor` 是结构体名称。省略的字段被初始化为零值。
+`new Ctor` 是 `new Ctor {}` 的简写。对于结构体，`Ctor` 是结构体名称。初始化器允许只写部分字段。省略的标量字段默认为 `0` / `false`；省略的 reference 字段默认为 null，必须在使用前显式赋值。
 
 字段按名称指定。顺序无关。未知字段或重复字段是编译错误。
 
