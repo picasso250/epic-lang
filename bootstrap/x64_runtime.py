@@ -11,7 +11,6 @@ def emit_runtime_data(x64, program):
     x64.data_zero("_written", 4)
     x64.data_zero("_heap", 8)
     x64.data_zero("_argv", 8)
-    x64.data_zero("_str_i64_buf", 32)
     x64.data_bytes("_newline", [10])
     x64.data_bytes("_cstr_panic_prefix", list(b"panic line "))
     x64.data_bytes("_cstr_panic_suffix", list(b": invalid cstr"))

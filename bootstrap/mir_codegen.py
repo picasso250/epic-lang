@@ -83,7 +83,8 @@ class MirCodegen:
         }
         for dll, name, params, ret in WINAPI_IMPORTS:
             self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
-        self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr())))
+        if "__ep_str_from_i64" not in self.func_sigs:
+            self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr())))
         if "__ep_str_from_u64" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_from_u64", MirSignature([I64], ptr())))
         if "__ep_str_from_bool" not in self.func_sigs:

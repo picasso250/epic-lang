@@ -24,6 +24,22 @@ fun __ep_str_from_bool(value: bool): str {
 }
 
 
+fun __ep_str_from_i64(value: i64): str {
+    if value == -9223372036854775808 {
+        return "-9223372036854775808"
+    }
+    if value < 0 {
+        let digits = bytes(__ep_str_from_u64(u64(0 - value)))
+        let out = new u8[] {}
+        push(out, '-')
+        for i in 0:len(digits) {
+            push(out, digits[i])
+        }
+        return str(out)
+    }
+    return __ep_str_from_u64(u64(value))
+}
+
 fun __ep_str_from_u64(value: u64): str {
     let n = value
     let rev = new u8[] {}

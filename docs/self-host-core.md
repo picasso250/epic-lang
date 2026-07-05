@@ -259,8 +259,8 @@ Do not rename helpers to public-looking bare names such as `bool_to_str`,
 
 Current direction names:
 - `__ep_str_from_bool` — bool → str
-- `__ep_str_from_i64` — i64 → str
-- `__ep_str_from_u64` — u64 → str
+- `__ep_str_from_i64` — i64 → str, implemented in `runtime/str.ep`
+- `__ep_str_from_u64` — u64 → str, implemented in `runtime/str.ep`
 - `__ep_str_from_slice_u8` — u8[] → str
 - `__ep_slice_u8_from_str` — str → u8[]
 - `__ep_slice_i64_*` — i64[] operations

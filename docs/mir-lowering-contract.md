@@ -28,7 +28,7 @@ lower():
 ```
 
 `lower()` 后，`X64Program` 包含：
-1. 数据段：运行时数据（`_heap`、`_argv`、string headers、`_str_i64_buf` 等）
+1. 数据段：运行时数据（`_heap`、`_argv`、string headers 等）
 2. 代码段：每个用户函数 + runtime helpers
 
 ## 2. Function lowering
@@ -301,7 +301,7 @@ if inst.result is not None:
 
 - 用户函数名（如 `main`、`foo`）
 - WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
-- Runtime helper 名（如 `__ep_str_from_i64`、`__ep_print_str`）
+- Runtime helper 名（如 `__ep_print_str`、`__epx_alloc`）
 - `__epx_alloc`
 
 ### 6.2 Frame alignment
@@ -345,7 +345,6 @@ jmp  LabelRef(fn_name.else_target)
 - `_written: i32` (4 bytes zero)
 - `_heap: qword` (8 bytes zero) — 进程堆句柄
 - `_argv: qword` (8 bytes zero) — 命令行参数数组
-- `_str_i64_buf: [32]byte` — i64→str 转换用的缓冲区
 - `_newline: byte 0x0a`
 - `_cstr_panic_prefix: "panic line "`
 - `_cstr_panic_suffix: ": invalid cstr"`
@@ -381,7 +380,6 @@ ret
 - `cstr` (`__ep_cstr`)
 - `__ep_write_file` / `__ep_read_file` / `__ep_system_cmd`
 - `__epx_argv_init`
-- `__ep_str_from_i64`
 - `__ep_print_str` / `__ep_print_newline`
 - `__epx_slice_oob`
 

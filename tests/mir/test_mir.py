@@ -369,6 +369,23 @@ def test_runtime_source_str_from_bool_lowers_as_epic_function():
     assert "fn __ep_str_from_bool(bool value) -> ptr" in text
 
 
+def test_runtime_source_str_from_i64_lowers_as_epic_function():
+    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
+    user_src = """fun main(): void {
+    println(str(-9223372036854775808))
+}"""
+    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
+    prog = ast_to_mir(sema.analyze_program(ast))
+    text = prog.text()
+    function_names = {fn.name for fn in prog.functions}
+    extern_names = {ext.name for ext in prog.externs}
+    assert "__ep_str_from_i64" in function_names
+    assert "__ep_str_from_i64" not in extern_names
+    assert "call ptr __ep_str_from_i64" in text
+    assert "fn __ep_str_from_i64(i64 value) -> ptr" in text
+    assert "-9223372036854775808" in text
+
+
 def test_runtime_source_str_from_u64_lowers_as_epic_function():
     runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
     user_src = """fun main(): void {
@@ -411,6 +428,7 @@ def main():
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()
     test_runtime_source_str_from_bool_lowers_as_epic_function()
+    test_runtime_source_str_from_i64_lowers_as_epic_function()
     test_runtime_source_str_from_u64_lowers_as_epic_function()
     test_runtime_source_str_slice_lowers_as_epic_function()
     print("PASS test_mir")
