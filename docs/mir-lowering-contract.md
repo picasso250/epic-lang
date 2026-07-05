@@ -391,7 +391,7 @@ ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
 longer have same-named x64 fallback bodies. Remaining x64 labels and function
 bodies are hand-written in `mir_lower.py` `_emit_*()` methods.
 
-**迁移计划**：详见 `docs/mir-runtime-helper-plan.md`。
+Current helper ownership is documented by this contract plus `docs/builtin-inventory.md` and `docs/self-host-core.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.
 
 ## 9. Known debts
 

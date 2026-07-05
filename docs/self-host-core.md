@@ -293,6 +293,5 @@ Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to
 - [`design.md`](design.md) — Epic language design (will be updated)
 - [`impl.md`](impl.md) — Epic implementation notes (will be updated)
 - [`builtin-inventory.md`](builtin-inventory.md) — Full builtin function inventory
-- [`mir-runtime-helper-plan.md`](mir-runtime-helper-plan.md) — MIR helper migration plan
 - [`str-u8-alias-plan.md`](str-u8-alias-plan.md) — staged `str` to `u8[]` alias plan
 - [`todo.md`](../todo.md) — Project todo
