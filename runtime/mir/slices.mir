@@ -1,3 +1,5 @@
+extern ExitProcess: fn(i64) -> void
+
 fn __ep_slice_u8_from_str(ptr %s) -> ptr {
 entry:
   ret ptr %s
@@ -7,3 +9,53 @@ fn __ep_str_from_slice_u8(ptr %input) -> ptr {
 entry:
   ret ptr %input
 }
+
+fn __ep_slice_u8_get(ptr %arr, i64 %idx) -> i64 {
+entry:
+  %gep0: ptr = gep ptr ptr %arr, i64 1
+  %load1: i64 = load i64 ptr %gep0
+  %cmp2: bool = icmp.sge i64 %idx, i64 0
+  condbr bool %cmp2, label %check_high, label %fail
+
+check_high:
+  %cmp3: bool = icmp.slt i64 %idx, i64 %load1
+  condbr bool %cmp3, label %ok, label %fail
+
+ok:
+  %gep4: ptr = gep ptr ptr %arr, i64 0
+  %load5: ptr = load ptr ptr %gep4
+  %gep6: ptr = gep i8 ptr %load5, i64 %idx
+  %load7: i64 = load i8 ptr %gep6
+  ret i64 %load7
+
+fail:
+  call void ExitProcess(i64 1)
+  ret i64 0
+}
+
+fn __ep_slice_u8_set(ptr %arr, i64 %idx, i64 %val) -> void {
+entry:
+  %gep0: ptr = gep ptr ptr %arr, i64 1
+  %load1: i64 = load i64 ptr %gep0
+  %cmp2: bool = icmp.sge i64 %idx, i64 0
+  condbr bool %cmp2, label %check_high, label %fail
+
+check_high:
+  %cmp3: bool = icmp.slt i64 %idx, i64 %load1
+  condbr bool %cmp3, label %ok, label %fail
+
+ok:
+  %slot4: ptr = alloca i64
+  store i64 %val, ptr %slot4
+  %load5: i8 = load i8 ptr %slot4
+  %gep6: ptr = gep ptr ptr %arr, i64 0
+  %load7: ptr = load ptr ptr %gep6
+  %gep8: ptr = gep i8 ptr %load7, i64 %idx
+  store i8 %load5, ptr %gep8
+  ret void
+
+fail:
+  call void ExitProcess(i64 1)
+  ret void
+}
+

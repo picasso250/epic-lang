@@ -1192,7 +1192,6 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 _HELPER_EMITTERS = {
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
-    "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
     "__ep_slice_i64_new": lambda p: emit_slice_word_new("__ep_slice_i64_new"),
     "__ep_slice_i64_get": lambda p: emit_slice_word_get("__ep_slice_i64_get", I64),
     "__ep_slice_i64_set": lambda p: emit_slice_word_set("__ep_slice_i64_set", I64),
@@ -1201,7 +1200,6 @@ _HELPER_EMITTERS = {
     "__ep_slice_ptr_get": lambda p: emit_slice_word_get("__ep_slice_ptr_get", ptr()),
     "__ep_slice_ptr_set": lambda p: emit_slice_word_set("__ep_slice_ptr_set", ptr()),
     "__ep_slice_ptr_push": lambda p: emit_slice_word_push("__ep_slice_ptr_push", ptr()),
-    "__ep_slice_u8_set": lambda p: emit_slice_u8_set(),
     "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
     "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
     "__ep_slice_u8_extend": lambda p: emit_extend_slice_u8(),

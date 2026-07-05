@@ -356,15 +356,16 @@ MIR helper bodies for `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_
 `__ep_str_slice`, `__ep_str_from_bool`,
 `__ep_slice_u8_alloc`, `__ep_slice_u8_alloc`,
 `__ep_slice_u8_get`, `__ep_slice_u8_set`, `__ep_slice_u8_push`, `__ep_slice_u8_slice`, and `__ep_slice_u8_extend`
-now live in `mir_runtime_helpers.py` and are injected as ordinary
+are injected as ordinary
 `MirFunction`s by `mir_codegen.py`.
 
 Most remaining x64-backed helper bodies still live on `MirLower` as `_emit_*`
 methods. Helpers implemented as MIR functions no longer have same-named legacy
 x64 fallback bodies.
 
-Recommended next step: migrate the remaining x64-backed helper families out of
-`MirLower` one family at a time, preferably into MIR helpers first. Only keep
+Recommended next step: continue moving stable Python-builder MIR helper bodies into
+`runtime/mir/*.mir`, then migrate the remaining x64-backed helper families out of
+`MirLower` one family at a time. Only keep
 true machine/runtime primitives such as heap setup and process startup in the
 x64 runtime layer.
 
