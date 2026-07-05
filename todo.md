@@ -98,7 +98,6 @@
 
 - `src/codegen_support.ep` / `src/codegen.ep` 已删除（旧 NASM codegen 线）
 - `src/link.ep` 已清理旧 helper 调用，并新增 `tests/link_ep/run.py` 覆盖 Epic linker 路径
-- 保留的 `src/*.ep` 工具源码仍有旧 helper 残留：`src/parser.ep` 的 `str_new` reserved name
-- 下一步应清理 `src/parser.ep` reserved-name list 中的 `str_new` 残留
+- `src/parser.ep` reserved-name list 中的 `str_new` 残留已清理
 
 结论：Phase 3 的语言/文档/测试表面基本完成；不能标成全完成，因为 self-hosted compiler 源码迁移还没清完。

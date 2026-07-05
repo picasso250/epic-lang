@@ -282,7 +282,7 @@ Completed:
 - `extend` is byte-oriented and only supports `u8[]`.
 
 Remaining:
-- `src/link.ep` no longer calls removed public string helpers; it uses local `u8[]` byte scanning plus `str(n)`. Remaining retained-source cleanup is the `src/parser.ep` reserved-name list entry for `str_new`.
+- No retained `src/*.ep` source currently calls removed public string helpers. `src/link.ep` uses local `u8[]` byte scanning plus `str(n)`, and `src/parser.ep` no longer reserves `str_new`.
 
 Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to make `str` a temporary `u8[]`-layout alias first, then remove the temporary spelling after public APIs, runtime ABI, maps, argv, and self-hosted sources no longer depend on it. See [`str-u8-alias-plan.md`](str-u8-alias-plan.md).
 

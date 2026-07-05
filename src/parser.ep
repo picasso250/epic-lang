@@ -112,7 +112,7 @@ fun is_upper_name(name: str): i64 {
 }
 
 fun parser_is_reserved_func(name: str): bool {
-    let reserved = new map[str]bool { "len": true, "cap": true, "push": true, "extend": true, "bytes": true, "str": true, "str_new": true, "map_has": true }
+    let reserved = new map[str]bool { "len": true, "cap": true, "push": true, "extend": true, "bytes": true, "str": true, "map_has": true }
     return map_has(reserved, name)
 }
 
