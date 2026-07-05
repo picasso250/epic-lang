@@ -72,6 +72,13 @@ fun mir_const_int(typ: str, value: i64): MirOperand {
     return op
 }
 
+fun mir_operand_null(): MirOperand {
+    let op = mir_operand_empty()
+    op.kind = "null"
+    op.typ = "ptr"
+    return op
+}
+
 fun mir_const_bool(value: bool): MirOperand {
     let op = mir_operand_empty()
     op.kind = "bool"
@@ -201,6 +208,32 @@ fun mir_inst_text(inst: MirInst): str {
         str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
         str_buf_extend(buf, ", ")
         str_buf_extend(buf, mir_operand_typed_text(inst.operands[1]))
+        return str_buf_finish(buf)
+    }
+    if inst.op == "gep" {
+        str_buf_extend(buf, "gep ")
+        str_buf_extend(buf, inst.typ)
+        str_buf_extend(buf, ", ")
+        let i = 0
+        while i < len(inst.operands) {
+            if i > 0 {
+                str_buf_extend(buf, ", ")
+            }
+            str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
+            i = i + 1
+        }
+        return str_buf_finish(buf)
+    }
+    if inst.op == "ptrtoint" {
+        str_buf_extend(buf, "ptrtoint ")
+        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
+        str_buf_extend(buf, " to ")
+        str_buf_extend(buf, inst.typ)
+        return str_buf_finish(buf)
+    }
+    if inst.op == "not" {
+        str_buf_extend(buf, "not ")
+        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
         return str_buf_finish(buf)
     }
     if inst.op == "call" {

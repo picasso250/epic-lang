@@ -16,6 +16,10 @@ struct MirCodegenState {
     func_return_types: str[]
     continue_targets: str[]
     break_targets: str[]
+    struct_names: str[]
+    struct_field_keys: str[]
+    struct_field_types: str[]
+    struct_field_indexes: i64[]
 }
 
 fun mir_codegen_die(msg: str): void {
@@ -71,6 +75,47 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
     }
     mir_codegen_die(f"undefined variable: {name}")
     return 0
+}
+
+fun mir_struct_key(struct_name: str, field_name: str): str {
+    return str_cat2(str_cat2(struct_name, "."), field_name)
+}
+
+fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
+    let i = 0
+    while i < len(st.struct_names) {
+        if st.struct_names[i] == type_name {
+            return type_name
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64 {
+    let key = mir_struct_key(struct_name, field_name)
+    let i = 0
+    while i < len(st.struct_field_keys) {
+        if st.struct_field_keys[i] == key {
+            return st.struct_field_indexes[i]
+        }
+        i = i + 1
+    }
+    mir_codegen_die(f"unknown struct field {key}")
+    return 0
+}
+
+fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
+    let key = mir_struct_key(struct_name, field_name)
+    let i = 0
+    while i < len(st.struct_field_keys) {
+        if st.struct_field_keys[i] == key {
+            return st.struct_field_types[i]
+        }
+        i = i + 1
+    }
+    mir_codegen_die(f"unknown struct field {key}")
+    return "i64"
 }
 
 fun mir_func_return_type(st: MirCodegenState, name: str): str {
@@ -129,6 +174,22 @@ fun mir_op_result_type(op: str): str {
     return "i64"
 }
 
+fun mir_make_gep(st: MirCodegenState, source_type: str, operands: MirOperand[]): MirOperand {
+    let inst = mir_make_result_inst(st, "gep", "ptr")
+    inst.typ = source_type
+    inst.operands = operands
+    mir_emit_inst(st, inst)
+    return mir_value_operand("ptr", inst.result_name)
+}
+
+fun mir_make_ptrtoint(st: MirCodegenState, operand: MirOperand, target_type: str): MirOperand {
+    let inst = mir_make_result_inst(st, "ptrtoint", target_type)
+    inst.typ = target_type
+    push(inst.operands, operand)
+    mir_emit_inst(st, inst)
+    return mir_value_operand(target_type, inst.result_name)
+}
+
 fun mir_make_result_inst(st: MirCodegenState, op: str, result_type: str): MirInst {
     let inst = mir_inst_empty()
     inst.op = op
@@ -136,6 +197,47 @@ fun mir_make_result_inst(st: MirCodegenState, op: str, result_type: str): MirIns
     inst.result_type = result_type
     inst.has_result = true
     return inst
+}
+
+fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
+    let ops = new MirOperand[0]
+    push(ops, base)
+    push(ops, mir_const_int("i64", 0))
+    push(ops, mir_const_int("i32", mir_field_index(st, struct_name, field_name)))
+    return mir_make_gep(st, str_cat2("struct ", struct_name), ops)
+}
+
+fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
+    let field_typ = mir_field_type(st, struct_name, field_name)
+    let addr = mir_field_addr(st, base, struct_name, field_name)
+    let result_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
+    return mir_value_operand(field_typ, result_name)
+}
+
+fun mir_emit_struct_init(st: MirCodegenState, expr: AstNode): MirOperand {
+    let size_ops = new MirOperand[0]
+    push(size_ops, mir_operand_null())
+    push(size_ops, mir_const_int("i64", 1))
+    let size_ptr = mir_make_gep(st, str_cat2("struct ", expr.name), size_ops)
+    let size_i64 = mir_make_ptrtoint(st, size_ptr, "i64")
+    let args = new MirOperand[0]
+    push(args, size_i64)
+    let call = mir_make_result_inst(st, "call", "ptr")
+    call.typ = "ptr"
+    call.callee = "__epx_alloc"
+    call.operands = args
+    mir_emit_inst(st, call)
+    let obj = mir_value_operand("ptr", call.result_name)
+    let i = 0
+    while i < len(expr.fields) {
+        let field = expr.fields[i]
+        let addr = mir_field_addr(st, obj, expr.name, field.name)
+        let value = mir_emit_expr(st, field.value_expr)
+        mir_emit_inst(st, mir_store(value, addr))
+        i = i + 1
+    }
+    return obj
 }
 
 fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
@@ -179,6 +281,18 @@ fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
         push(inst.operands, right)
         mir_emit_inst(st, inst)
         return mir_value_operand(result_type, inst.result_name)
+    }
+    if expr.kind == "StructInit" {
+        return mir_emit_struct_init(st, expr)
+    }
+    if expr.kind == "FieldAccess" {
+        let base_type = expr.object.resolved_type
+        let struct_name = mir_layout_struct_name(st, base_type)
+        if struct_name == "" {
+            mir_codegen_die("field access base must be struct")
+        }
+        let base = mir_emit_expr(st, expr.object)
+        return mir_load_field(st, base, struct_name, expr.name)
     }
     if expr.kind == "Call" {
         if expr.name == "exit" {
@@ -301,6 +415,18 @@ fun mir_emit_stmt(st: MirCodegenState, stmt: AstNode): void {
         mir_emit_inst(st, mir_store(value, addr))
         return
     }
+    if stmt.kind == "FieldSet" {
+        let base_type = stmt.object.resolved_type
+        let struct_name = mir_layout_struct_name(st, base_type)
+        if struct_name == "" {
+            mir_codegen_die("field assignment base must be struct")
+        }
+        let base = mir_emit_expr(st, stmt.object)
+        let value = mir_emit_expr(st, stmt.value_expr)
+        let addr = mir_field_addr(st, base, struct_name, stmt.name)
+        mir_emit_inst(st, mir_store(value, addr))
+        return
+    }
     if stmt.kind == "Assign" {
         let idx = mir_local_index(st, stmt.name)
         let value = mir_emit_expr(st, stmt.value_expr)
@@ -414,6 +540,24 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.func_return_types = new str[0]
     st.continue_targets = new str[0]
     st.break_targets = new str[0]
+    st.struct_names = new str[0]
+    st.struct_field_keys = new str[0]
+    st.struct_field_types = new str[0]
+    st.struct_field_indexes = new i64[0]
+
+    let si = 0
+    while si < len(ast.structs) {
+        let sdef = ast.structs[si]
+        push(st.struct_names, sdef.name)
+        let fi2 = 0
+        while fi2 < len(sdef.fields) {
+            push(st.struct_field_keys, mir_struct_key(sdef.name, sdef.fields[fi2].name))
+            push(st.struct_field_types, mir_epic_type(sdef.fields[fi2].type_name))
+            push(st.struct_field_indexes, fi2)
+            fi2 = fi2 + 1
+        }
+        si = si + 1
+    }
 
     let fi = 0
     while fi < len(ast.funcs) {

@@ -1,0 +1,13 @@
+struct Pair {
+    a: i64
+    b: i64
+}
+
+fun sum(p: Pair): i64 {
+    return p.a + p.b
+}
+
+fun main(): i64 {
+    let p = new Pair { a: 4, b: 5 }
+    return sum(p)
+}
