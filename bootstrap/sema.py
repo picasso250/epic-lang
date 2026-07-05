@@ -174,20 +174,17 @@ class SemanticAnalyzer:
         self._fail(f"unsupported statement: {type(stmt).__name__}")
 
     def _analyze_let(self, stmt):
-        if stmt.var_type is None and stmt.value is None:
-            self._fail(f"let {stmt.name} needs a type annotation or initializer")
+        if stmt.value is None:
+            self._fail(f"let {stmt.name} requires an initializer")
         target = self._type_name(stmt.var_type) if stmt.var_type is not None else None
-        value = self._expr(stmt.value) if stmt.value is not None else None
+        value = self._expr(stmt.value)
         if target is None:
             target = value.type
             if target == VOID:
                 self._fail(f"let {stmt.name} cannot infer void")
         elif target == VOID:
             self._fail(f"let {stmt.name} cannot have type void")
-        if value is None and target is not None and target.kind == "named":
-            self._fail(f"let {stmt.name}: struct variable requires explicit initialization, use `new`")
-        if value is not None:
-            self._check_assign(target, value, f"let {stmt.name}")
+        self._check_assign(target, value, f"let {stmt.name}")
         stmt.resolved_type = target
         self.locals[stmt.name] = target
 

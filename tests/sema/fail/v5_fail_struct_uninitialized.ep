@@ -1,4 +1,4 @@
-# COMPILE_FAIL: struct variable requires explicit initialization
+# COMPILE_FAIL: requires an initializer
 struct Box {
     value: i64
 }

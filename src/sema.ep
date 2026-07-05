@@ -762,27 +762,21 @@ fun sema_lvalue_type(st: SemaState, node: AstNode): str {
 
 fun sema_stmt(st: SemaState, node: AstNode): void {
     if node.kind == "Let" {
-        if node.type_name == "" && node.value_expr.kind == "" {
-            sema_die(f"let {node.name} needs a type annotation or initializer")
+        if node.value_expr.kind == "" {
+            sema_die(f"let {node.name} requires an initializer")
         }
         let target = ""
         if node.type_name != "" {
             target = sema_type_name(st, node.type_name)
         }
-        if node.value_expr.kind != "" {
-            let val = sema_expr_type(st, node.value_expr)
-            if target == "" {
-                target = val
-                if target == "void" {
-                    sema_die(f"let {node.name} cannot infer void")
-                }
-            } else {
-                sema_check_assign_info(target, val, node.value_expr, f"let {node.name}")
+        let val = sema_expr_type(st, node.value_expr)
+        if target == "" {
+            target = val
+            if target == "void" {
+                sema_die(f"let {node.name} cannot infer void")
             }
         } else {
-            if map_has(st.struct_names, target) {
-                sema_die(f"let {node.name}: struct variable requires explicit initialization, use `new`")
-            }
+            sema_check_assign_info(target, val, node.value_expr, f"let {node.name}")
         }
         if target == "void" {
             sema_die(f"let {node.name} cannot have type void")
