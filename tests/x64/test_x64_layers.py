@@ -75,8 +75,8 @@ done:
 
 
 def test_mir_function_to_x64_golden():
-    param = MirParam("%x", I64)
-    result = MirValue("%r", I64)
+    param = MirParam("x", I64)
+    result = MirValue("r", I64)
     block = MirBlock(
         "entry",
         [
@@ -115,11 +115,11 @@ add1.__return:
 
 
 def test_target_mir_memory_ops_to_x64_golden():
-    size_ptr = MirValue("%size.ptr", ptr())
-    size = MirValue("%size", I64)
-    obj = MirValue("%obj", ptr())
-    field_ptr = MirValue("%field.ptr", ptr())
-    loaded = MirValue("%loaded", I64)
+    size_ptr = MirValue("size.ptr", ptr())
+    size = MirValue("size", I64)
+    obj = MirValue("obj", ptr())
+    field_ptr = MirValue("field.ptr", ptr())
+    loaded = MirValue("loaded", I64)
     block = MirBlock(
         "entry",
         [

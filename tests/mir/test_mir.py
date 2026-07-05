@@ -18,11 +18,11 @@ import sema
 
 
 def build_smoke_program():
-    x_addr = MirValue("%x.addr", ptr())
-    x0 = MirValue("%x0", I64)
-    c0 = MirValue("%c0", BOOL)
-    x1 = MirValue("%x1", I64)
-    r = MirValue("%r", I64)
+    x_addr = MirValue("x.addr", ptr())
+    x0 = MirValue("x0", I64)
+    c0 = MirValue("c0", BOOL)
+    x1 = MirValue("x1", I64)
+    r = MirValue("r", I64)
 
     entry = MirBlock(
         "entry",
@@ -95,9 +95,9 @@ def assert_mir_invalid(program, message):
 
 
 def test_gep_null_and_ptrtoint_text_and_validation():
-    size_ptr = MirValue("%size.ptr", ptr())
-    size = MirValue("%size", I64)
-    field_ptr = MirValue("%field.ptr", ptr())
+    size_ptr = MirValue("size.ptr", ptr())
+    size = MirValue("size", I64)
+    field_ptr = MirValue("field.ptr", ptr())
     block = MirBlock(
         "entry",
         [
@@ -127,8 +127,17 @@ entry:
     assert program.text() == expected
 
 
+def test_validator_rejects_text_sigils_in_local_names():
+    bad_value = MirValue("%x", I64)
+    bad_value_program = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [], Ret(ValueOperand(bad_value)))])])
+    assert_mir_invalid(bad_value_program, "local value name must be raw")
+
+    bad_param_program = MirProgram(functions=[MirFunction("main", [MirParam("%p", I64)], I64, [MirBlock("entry", [], Ret(ValueOperand(MirValue("%p", I64))))])])
+    assert_mir_invalid(bad_param_program, "local value name must be raw")
+
+
 def test_validator_rejects_text_sigils_in_module_symbols():
-    value = MirValue("%x", I64)
+    value = MirValue("x", I64)
     bad_fn = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [], Ret(ConstIntOperand(I64, 0)))])])
     assert_mir_invalid(bad_fn, "module symbol must be raw")
 
@@ -138,7 +147,7 @@ def test_validator_rejects_text_sigils_in_module_symbols():
 
 
 def test_validator_rejects_unknown_and_high_level_ops():
-    result = MirValue("%x", I64)
+    result = MirValue("x", I64)
     unknown = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [MirInst("mystery", result=result)], Ret(ValueOperand(result)))])])
     assert_mir_invalid(unknown, "unknown MIR op: mystery")
 
@@ -358,7 +367,7 @@ def test_runtime_source_str_eq_lowers_as_epic_function():
     assert "__ep_str_eq" in function_names
     assert "__ep_str_eq" not in extern_names
     assert "call bool __ep_str_eq" in text
-    assert "fn __ep_str_eq(ptr left, ptr right) -> bool" in text
+    assert "fn __ep_str_eq(ptr %left, ptr %right) -> bool" in text
     assert "fn __ep_str_eq" in text
 
 
@@ -376,7 +385,7 @@ def test_runtime_source_str_from_bool_lowers_as_epic_function():
     assert "__ep_str_from_bool" in function_names
     assert "__ep_str_from_bool" not in extern_names
     assert "call ptr __ep_str_from_bool" in text
-    assert "fn __ep_str_from_bool(bool value) -> ptr" in text
+    assert "fn __ep_str_from_bool(bool %value) -> ptr" in text
 
 
 def test_runtime_source_str_from_i64_lowers_as_epic_function():
@@ -392,7 +401,7 @@ def test_runtime_source_str_from_i64_lowers_as_epic_function():
     assert "__ep_str_from_i64" in function_names
     assert "__ep_str_from_i64" not in extern_names
     assert "call ptr __ep_str_from_i64" in text
-    assert "fn __ep_str_from_i64(i64 value) -> ptr" in text
+    assert "fn __ep_str_from_i64(i64 %value) -> ptr" in text
     assert "-9223372036854775808" in text
 
 
@@ -409,7 +418,7 @@ def test_runtime_source_str_from_u64_lowers_as_epic_function():
     assert "__ep_str_from_u64" in function_names
     assert "__ep_str_from_u64" not in extern_names
     assert "call ptr __ep_str_from_u64" in text
-    assert "fn __ep_str_from_u64(i64 value) -> ptr" in text
+    assert "fn __ep_str_from_u64(i64 %value) -> ptr" in text
 
 
 def test_runtime_source_str_slice_lowers_as_epic_function():
@@ -426,7 +435,7 @@ def test_runtime_source_str_slice_lowers_as_epic_function():
     assert "__ep_str_slice" in function_names
     assert "__ep_str_slice" not in extern_names
     assert "call ptr __ep_str_slice" in text
-    assert "fn __ep_str_slice(ptr s, i64 start, i64 end) -> ptr" in text
+    assert "fn __ep_str_slice(ptr %s, i64 %start, i64 %end) -> ptr" in text
     assert "invalid string slice" in text
 
 

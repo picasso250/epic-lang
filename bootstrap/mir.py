@@ -66,7 +66,7 @@ class MirValue:
     type: MirType
 
     def __str__(self):
-        return self.name
+        return mir_local_text(self.name)
 
 
 @dataclass(frozen=True)
@@ -89,7 +89,7 @@ class ValueOperand(MirOperand):
         object.__setattr__(self, "value", value)
 
     def text(self):
-        return self.value.name
+        return mir_local_text(self.value.name)
 
 
 @dataclass(frozen=True)
@@ -172,7 +172,7 @@ class MirParam:
         return MirValue(self.name, self.type)
 
     def text(self):
-        return f"{self.type} {self.name}"
+        return f"{self.type} {mir_local_text(self.name)}"
 
 
 @dataclass
@@ -186,7 +186,7 @@ class MirInst:
     def text(self):
         prefix = ""
         if self.result is not None:
-            prefix = f"{self.result.name}: {self.result.type} = "
+            prefix = f"{mir_local_text(self.result.name)}: {self.result.type} = "
         if self.op == "alloca":
             return f"{prefix}alloca {self.type}"
         if self.op == "load":
@@ -332,6 +332,14 @@ def is_raw_module_symbol(name):
     return not name.startswith("@")
 
 
+def is_raw_local_name(name):
+    return not name.startswith("%")
+
+
+def mir_local_text(name):
+    return name if name.startswith("%") else f"%{name}"
+
+
 class MirValidator:
     HIGH_LEVEL_OPS = {
         "struct.new",
@@ -390,6 +398,8 @@ class MirValidator:
             self._validate_terminator(fn, block, block.terminator, values, blocks)
 
     def _define(self, values, fn, where, value):
+        if not is_raw_local_name(value.name):
+            self.errors.append(f"{fn.name}.{where}: local value name must be raw and must not include text sigil '%': {value.name}")
         if value.name in values:
             self.errors.append(f"{fn.name}.{where}: duplicate value: {value.name}")
         values[value.name] = value.type

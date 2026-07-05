@@ -399,9 +399,7 @@ byte offset stay part of the MIR contract.
 MIR object model stores raw module symbols such as `main`, `__ep_str_eq`,
 `ExitProcess`, and `str.1`. The `@` sigil is reserved for a future text MIR
 syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
-`MirGlobal.name`, or `SymbolOperand.name`. Local SSA values currently keep the
-printed `%` sigil in `MirValue.name` / `MirParam.name`; that is accepted as a
-separate local-value convention because it never reaches object/link symbols.
+`MirGlobal.name`, or `SymbolOperand.name`. Local SSA values also use raw names in `MirValue.name` / `MirParam.name`; the `%` sigil belongs to text MIR printing/parsing only.
 
 ### 8.6 Self-hosted compiler driver is removed
 

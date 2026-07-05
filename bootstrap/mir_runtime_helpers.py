@@ -61,7 +61,7 @@ class MirHelperBuilder:
         """Create a new %vN value with the given type."""
         n = self._value_counter
         self._value_counter += 1
-        return MirValue(f"%{hint}{n}", typ)
+        return MirValue(f"{hint}{n}", typ)
 
     def const_i64(self, n):
         return ConstIntOperand(I64, n)
@@ -162,7 +162,7 @@ def emit_bytes_slice_u8() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_slice_u8_from_str",
-        [MirParam("%s", ptr())],
+        [MirParam("s", ptr())],
         ptr(),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
@@ -176,7 +176,7 @@ def emit_str_slice_u8() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_str_from_slice_u8",
-        [MirParam("%input", ptr())],
+        [MirParam("input", ptr())],
         ptr(),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
@@ -192,8 +192,8 @@ def emit___ep_str_cat() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_str_cat",
         [
-            MirParam("%left", ptr()),
-            MirParam("%right", ptr()),
+            MirParam("left", ptr()),
+            MirParam("right", ptr()),
         ],
         ptr(),
     )
@@ -273,7 +273,7 @@ def emit_slice_u8_alloc() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_slice_u8_alloc",
-        [MirParam("%len", I64), MirParam("%cap", I64)],
+        [MirParam("len", I64), MirParam("cap", I64)],
         ptr(),
     )
     len_val = ValueOperand(b.fn.params[0].value)
@@ -312,7 +312,7 @@ def emit_slice_u8_get() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_slice_u8_get",
-        [MirParam("%arr", ptr()), MirParam("%idx", I64)],
+        [MirParam("arr", ptr()), MirParam("idx", I64)],
         I64,
     )
     arr_val = ValueOperand(b.fn.params[0].value)
@@ -357,7 +357,7 @@ def emit_slice_word_new(name: str) -> MirFunction:
     """
     b = MirHelperBuilder(
         name,
-        [MirParam("%cap", I64)],
+        [MirParam("cap", I64)],
         ptr(),
     )
     cap_val = ValueOperand(b.fn.params[0].value)
@@ -393,7 +393,7 @@ def emit_slice_word_get(name: str, elem_type) -> MirFunction:
     """Bounds-checked read from a word-sized slice."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%arr", ptr()), MirParam("%idx", I64)],
+        [MirParam("arr", ptr()), MirParam("idx", I64)],
         elem_type,
     )
     arr_val = ValueOperand(b.fn.params[0].value)
@@ -434,9 +434,9 @@ def emit_slice_word_set(name: str, elem_type) -> MirFunction:
     b = MirHelperBuilder(
         name,
         [
-            MirParam("%arr", ptr()),
-            MirParam("%idx", I64),
-            MirParam("%val", elem_type),
+            MirParam("arr", ptr()),
+            MirParam("idx", I64),
+            MirParam("val", elem_type),
         ],
         VOID,
     )
@@ -476,8 +476,8 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     b = MirHelperBuilder(
         name,
         [
-            MirParam("%arr", ptr()),
-            MirParam("%val", elem_type),
+            MirParam("arr", ptr()),
+            MirParam("val", elem_type),
         ],
         VOID,
     )
@@ -571,9 +571,9 @@ def emit_slice_u8_set() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_set",
         [
-            MirParam("%arr", ptr()),
-            MirParam("%idx", I64),
-            MirParam("%val", I64),
+            MirParam("arr", ptr()),
+            MirParam("idx", I64),
+            MirParam("val", I64),
         ],
         VOID,
     )
@@ -628,8 +628,8 @@ def emit_slice_u8_push() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_push",
         [
-            MirParam("%arr", ptr()),
-            MirParam("%val", I64),
+            MirParam("arr", ptr()),
+            MirParam("val", I64),
         ],
         VOID,
     )
@@ -734,9 +734,9 @@ def emit_slice_u8_slice() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_slice",
         [
-            MirParam("%arr", ptr()),
-            MirParam("%start", I64),
-            MirParam("%end", I64),
+            MirParam("arr", ptr()),
+            MirParam("start", I64),
+            MirParam("end", I64),
         ],
         ptr(),
     )
@@ -806,8 +806,8 @@ def emit_extend_slice_u8() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_extend",
         [
-            MirParam("%dst", ptr()),
-            MirParam("%src", ptr()),
+            MirParam("dst", ptr()),
+            MirParam("src", ptr()),
         ],
         VOID,
     )
@@ -882,7 +882,7 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
     """Lookup a str key in a word-valued map, returning value zero on miss."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%map", map_type), MirParam("%key", ptr())],
+        [MirParam("map", map_type), MirParam("key", ptr())],
         value_type,
     )
     map_val = ValueOperand(b.fn.params[0].value)
@@ -940,7 +940,7 @@ def emit_map_str_word_has(name: str, map_type) -> MirFunction:
     """Return true when a key exists in a str-keyed map."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%map", map_type), MirParam("%key", ptr())],
+        [MirParam("map", map_type), MirParam("key", ptr())],
         BOOL,
     )
     map_val = ValueOperand(b.fn.params[0].value)
@@ -997,9 +997,9 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     b = MirHelperBuilder(
         name,
         [
-            MirParam("%map", map_type),
-            MirParam("%key", ptr()),
-            MirParam("%val", value_type),
+            MirParam("map", map_type),
+            MirParam("key", ptr()),
+            MirParam("val", value_type),
         ],
         VOID,
     )
@@ -1131,7 +1131,7 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
     """Delete a key from a str-keyed word map using swap-delete."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%map", map_type), MirParam("%key", ptr())],
+        [MirParam("map", map_type), MirParam("key", ptr())],
         BOOL,
     )
     map_val = ValueOperand(b.fn.params[0].value)

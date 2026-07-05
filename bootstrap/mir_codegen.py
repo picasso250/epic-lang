@@ -251,7 +251,7 @@ class MirCodegen:
 
     def _new_value(self, typ, hint="v"):
         self.value_counter += 1
-        return MirValue(f"%{hint}{self.value_counter}", typ)
+        return MirValue(f"{hint}{self.value_counter}", typ)
 
     def _new_block(self, prefix):
         self.block_counter += 1
