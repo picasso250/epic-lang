@@ -23,6 +23,7 @@ MODULES = [
     "x64",
     "machine",
     "coff",
+    "link_ep",
     "e2e",
 ]
 

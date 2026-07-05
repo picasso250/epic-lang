@@ -46,10 +46,10 @@ struct LinkState {
 }
 
 fun die_link(msg: str): void {
-    putstr("link.ep: ")
-    putstr(msg)
-    putc(10)
-    os.ExitProcess(1)
+    print("link.ep: ")
+    print(msg)
+    println()
+    os.kernel32.ExitProcess(1)
 }
 
 fun align_to(n: i64, a: i64): i64 {
@@ -76,7 +76,7 @@ fun u64_le(buf: u8[], off: i64): u64 {
 
 fun put_u16_le(buf: u8[], off: i64, x: u64): void {
     if x > 65535 {
-        os.ExitProcess(1)
+        os.kernel32.ExitProcess(1)
     }
     buf[off] = u8(x & 255)
     buf[off + 1] = u8((x >>> 8) & 255)
@@ -84,7 +84,7 @@ fun put_u16_le(buf: u8[], off: i64, x: u64): void {
 
 fun put_u32_le(buf: u8[], off: i64, x: u64): void {
     if x > 4294967295 {
-        os.ExitProcess(1)
+        os.kernel32.ExitProcess(1)
     }
     buf[off] = u8(x & 255)
     buf[off + 1] = u8((x >>> 8) & 255)
@@ -123,6 +123,19 @@ fun append_u64(buf: u8[], x: u64): void {
 
 fun append_str(buf: u8[], s: str): void {
     extend(buf, bytes(s))
+}
+
+fun str_cat_local(left: str, right: str): str {
+    let out = new u8[]
+    extend(out, bytes(left))
+    extend(out, bytes(right))
+    return str(out)
+}
+
+fun cstr_ready_path(s: str): str {
+    let out = new u8[len(s) + 1]
+    extend(out, bytes(s))
+    return str(out)
 }
 
 fun append_name8(buf: u8[], name: str): void {
@@ -194,8 +207,35 @@ fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64): str {
     return str(out)
 }
 
+fun find_text(s: str, needle: str): i64 {
+    let hay = bytes(s)
+    let pat = bytes(needle)
+    let n = len(pat)
+    if n == 0 {
+        return 0
+    }
+    if len(hay) < n {
+        return -1
+    }
+    for i in 0:(len(hay) - n + 1) {
+        let ok = true
+        for j in 0:n {
+            if hay[i + j] != pat[j] {
+                ok = false
+            }
+        }
+        if ok {
+            return i
+        }
+    }
+    return -1
+}
+
 fun has_text(s: str, needle: str): i64 {
-    return str_find(s, needle) >= 0
+    if find_text(s, needle) >= 0 {
+        return 1
+    }
+    return 0
 }
 
 fun get_name_value(items: NameValue[], name: str): i64 {
@@ -684,32 +724,35 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
 }
 
 fun default_out_path(obj_path: str): str {
-    let dot = str_find(obj_path, ".obj")
+    let dot = find_text(obj_path, ".obj")
     if dot >= 0 {
-        return obj_path[:dot] + ".exe"
+        return str_cat_local(obj_path[0:dot], ".exe")
     }
-    return obj_path + ".exe"
+    return str_cat_local(obj_path, ".exe")
 }
 
 fun main(): i64 {
     if len(argv) < 2 {
-        putstr("Usage: link.ep <file.obj> [-o out.exe]\n")
-        os.ExitProcess(1)
+        print("Usage: link.ep <file.obj> [-o out.exe]\n")
+        os.kernel32.ExitProcess(1)
     }
-    let obj_path = argv[1]
-    let exe_path = default_out_path(obj_path)
+    let obj_path = cstr_ready_path(argv[1])
+    let exe_path = ""
     let i = 2
     while i + 1 < len(argv) {
         if argv[i] == "-o" {
-            exe_path = argv[i + 1]
+            exe_path = cstr_ready_path(argv[i + 1])
         }
         i += 1
     }
+    if len(exe_path) == 0 {
+        exe_path = cstr_ready_path(default_out_path(obj_path))
+    }
     let sz = link_obj(obj_path, exe_path)
-    putstr("  OK: ")
-    putstr(exe_path)
-    putstr(" (")
-    putstr(itoa(sz))
-    putstr(" bytes)\n")
+    print("  OK: ")
+    print(exe_path)
+    print(" (")
+    print(str(sz))
+    print(" bytes)\n")
     return 0
 }
