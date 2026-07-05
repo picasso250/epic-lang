@@ -435,12 +435,8 @@ backend shape.
 Recommended next step: define one internal symbol spelling and one text printing
 spelling. Do not let pretty-print syntax leak into object symbols.
 
-### 8.7 Self-hosted compiler is still old backend
+### 8.7 Self-hosted compiler driver is removed
 
-`src/epic.ep` still emits text ASM and invokes `tools\\nasm.exe` and `link.py`.
-That is acceptable for the current staged migration, but it must remain an
-explicit milestone: Python machine backend passing examples is not the same as
-the Epic compiler supporting the machine path.
+The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
-Recommended next step: keep `test_bootstrap_fixed_point.py` marked as expected
-to fail on the machine path until `src/` has its own MIR/X64IR/machine emitter.
+Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.

@@ -5,7 +5,7 @@ Epic is a small self-hosting systems language experiment targeting Windows x64.
 The active development line has two compiler implementations:
 
 - `bootstrap/`: Python reference compiler for the current Epic language.
-- `src/`: Epic compiler and Epic-written tools, written in the current language.
+- `src/`: Epic-written compiler modules and tools that are still active.
 
 Earlier staged bootstrap directories are preserved in Git history and tags, not
 as maintained source directories. The last directory-based chain is tagged as:
@@ -17,7 +17,7 @@ staged-bootstrap-archive-2026-06-30
 ## Layout
 
 - `bootstrap/`: Python lexer, parser, semantic analyzer, MIR/X64 lowering, machine backend, and compiler driver.
-- `src/`: self-hosted compiler sources and `link.ep`.
+- `src/`: Epic-written lexer/parser/sema modules and `link.ep`.
 - `runtime/`: NASM runtime helpers for the older Epic-written backend line.
 - `examples/`: annotated acceptance examples for the current language.
 - `docs/`: merged design and implementation notes, plus archived source notes.
@@ -29,8 +29,7 @@ staged-bootstrap-archive-2026-06-30
 ## Bootstrapping
 
 The Python reference compiler under `bootstrap/` is the oracle for the current
-language. The Epic-written compiler under `src/` is being restored module by
-module on top of that current language.
+language. Epic-written modules under `src/` are being restored module by module on top of that current language. The old `src/epic.ep` NASM driver has been removed because its backend path no longer exists.
 
 The default self-hosting path is lockstep and unoptimized: Python and Epic
 implementations should produce matching dumps at each compiler stage before the
@@ -71,8 +70,7 @@ implementation and is tested separately.
 
 The old Python `--backend asm` path was archived at tag
 `python-asm-archive-2026-07-02` and removed from the active Python reference
-compiler. The Epic-written compiler under `src/` is being moved toward the current
-language and backend model incrementally.
+compiler. Epic-written modules under `src/` are being moved toward the current language and backend model incrementally.
 
 ## Development Rule
 
