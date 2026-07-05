@@ -94,29 +94,35 @@ class _MirTextParser:
             if line.startswith("import "):
                 program.imports.append(self._parse_import(line_no, line))
                 self.i += 1
-            elif line.startswith("extern "):
-                program.externs.append(self._parse_extern(line_no, line))
+            elif line.startswith("declare "):
+                program.externs.append(self._parse_declare(line_no, line))
                 self.i += 1
-            elif line.startswith("fn "):
+            elif line.startswith("define "):
                 program.functions.append(self._parse_function())
             elif " = global " in line:
                 program.globals.append(self._parse_global(line_no, line))
                 self.i += 1
             else:
-                self._error(line_no, f"expected import, extern, global, or fn; got: {line}")
+                self._error(line_no, f"expected import, declare, global, or define; got: {line}")
         return program
 
     def _parse_import(self, line_no, line):
-        m = re.fullmatch(r"import\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(fn\(.*\)\s*->\s*.+)", line)
+        m = re.fullmatch(r"import\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
         if not m:
             self._error(line_no, f"invalid import: {line}")
-        return MirImport(_strip_module_sigil(m.group(1)), self._parse_signature(m.group(2)))
+        return MirImport(
+            _strip_module_sigil(m.group(2)),
+            self._parse_signature_parts(m.group(3), m.group(1), line_no),
+        )
 
-    def _parse_extern(self, line_no, line):
-        m = re.fullmatch(r"extern\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(fn\(.*\)\s*->\s*.+)", line)
+    def _parse_declare(self, line_no, line):
+        m = re.fullmatch(r"declare\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
         if not m:
-            self._error(line_no, f"invalid extern: {line}")
-        return MirExtern(_strip_module_sigil(m.group(1)), self._parse_signature(m.group(2)))
+            self._error(line_no, f"invalid declare: {line}")
+        return MirExtern(
+            _strip_module_sigil(m.group(2)),
+            self._parse_signature_parts(m.group(3), m.group(1), line_no),
+        )
 
     def _parse_global(self, line_no, line):
         m = re.fullmatch(r"(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(.+?)\s*=\s*global\s*(.*)", line)
@@ -132,12 +138,12 @@ class _MirTextParser:
 
     def _parse_function(self):
         line_no, header = self._next()
-        m = re.fullmatch(r"fn\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)\s*->\s*(.+)\s*\{", header)
+        m = re.fullmatch(r"define\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)\s*\{", header)
         if not m:
             self._error(line_no, f"invalid function header: {header}")
-        name = _strip_module_sigil(m.group(1))
-        params = self._parse_params(m.group(2), line_no)
-        ret = self._parse_type(m.group(3))
+        name = _strip_module_sigil(m.group(2))
+        params = self._parse_params(m.group(3), line_no)
+        ret = self._parse_type(m.group(1))
         blocks = []
         current = None
         while not self._done():
@@ -170,12 +176,9 @@ class _MirTextParser:
             params.append(MirParam(_strip_local_sigil(name), typ))
         return params
 
-    def _parse_signature(self, text):
-        m = re.fullmatch(r"fn\((.*)\)\s*->\s*(.+)", text.strip())
-        if not m:
-            raise MirParseError(f"invalid signature: {text}")
-        params = [] if not m.group(1).strip() else [self._parse_type(part) for part in self._split_commas(m.group(1))]
-        return MirSignature(params, self._parse_type(m.group(2)))
+    def _parse_signature_parts(self, params_text, ret_text, line_no):
+        params = [] if not params_text.strip() else [self._parse_type(part) for part in self._split_commas(params_text)]
+        return MirSignature(params, self._parse_type(ret_text))
 
     def _parse_statement(self, line_no, line):
         if line.startswith("br "):

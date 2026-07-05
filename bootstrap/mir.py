@@ -57,6 +57,9 @@ class MirSignature:
     def __str__(self):
         return f"fn({', '.join(str(p) for p in self.params)}) -> {self.ret}"
 
+    def text_parts(self):
+        return str(self.ret), ", ".join(str(p) for p in self.params)
+
 
 @dataclass(frozen=True)
 class MirValue:
@@ -138,7 +141,8 @@ class MirImport:
     dll: str | None = None
 
     def text(self):
-        return f"import {self.name}: {self.signature}"
+        ret, params = self.signature.text_parts()
+        return f"import {ret} @{self.name}({params})"
 
 
 @dataclass
@@ -147,7 +151,8 @@ class MirExtern:
     signature: MirSignature
 
     def text(self):
-        return f"extern {self.name}: {self.signature}"
+        ret, params = self.signature.text_parts()
+        return f"declare {ret} @{self.name}({params})"
 
 
 @dataclass
@@ -273,7 +278,7 @@ class MirFunction:
     def text(self):
         params = ", ".join(p.text() for p in self.params)
         body = "\n\n".join(block.text() for block in self.blocks)
-        return f"fn {self.name}({params}) -> {self.return_type} {{\n{body}\n}}"
+        return f"define {self.return_type} @{self.name}({params}) {{\n{body}\n}}"
 
 
 @dataclass(frozen=True)

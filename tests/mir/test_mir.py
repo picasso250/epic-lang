@@ -63,7 +63,7 @@ def build_smoke_program():
 def test_smoke_text_and_validation():
     program = build_smoke_program()
     validate(program)
-    expected = """fn main() -> i64 {
+    expected = """define i64 @main() {
 entry:
   %x.addr: ptr = alloca i64
   store i64 0, ptr %x.addr
@@ -118,7 +118,7 @@ def test_gep_null_and_ptrtoint_text_and_validation():
         structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
     validate(program)
-    expected = """fn main() -> i64 {
+    expected = """define i64 @main() {
 entry:
   %size.ptr: ptr = gep struct Pair, ptr null, i64 1
   %size: i64 = ptrtoint ptr %size.ptr to i64
@@ -189,7 +189,7 @@ fun main(): i64 {
 
 def test_mir_parser_rejects_unsigned_integer_types():
     for typ in ("u64", "u8"):
-        source = f"""fn main({typ} %x) -> {typ} {{
+        source = f"""define {typ} @main({typ} %x) {{
 entry:
   ret {typ} %x
 }}
@@ -203,9 +203,9 @@ entry:
 
 
 def test_mir_parser_strips_text_sigils():
-    source = """extern @helper: fn(ptr) -> ptr
+    source = """declare ptr @helper(ptr)
 
-fn @main(ptr %arg) -> ptr {
+define ptr @main(ptr %arg) {
 entry:
   %tmp: ptr = call ptr @helper(ptr %arg)
   ret ptr %tmp
@@ -219,7 +219,7 @@ entry:
     inst = fn.blocks[0].instructions[0]
     assert inst.result.name == "tmp"
     assert inst.callee == "helper"
-    assert fn.text().startswith("fn main(ptr %arg) -> ptr")
+    assert fn.text().startswith("define ptr @main(ptr %arg)")
 
 
 def test_mir_helper_injection():
@@ -403,8 +403,8 @@ def test_runtime_source_str_eq_lowers_as_epic_function():
     assert "__ep_str_eq" in function_names
     assert "__ep_str_eq" not in extern_names
     assert "call bool __ep_str_eq" in text
-    assert "fn __ep_str_eq(ptr %left, ptr %right) -> bool" in text
-    assert "fn __ep_str_eq" in text
+    assert "define bool @__ep_str_eq(ptr %left, ptr %right)" in text
+    assert "define bool @__ep_str_eq" in text
 
 
 def test_runtime_source_str_from_bool_lowers_as_epic_function():
@@ -421,7 +421,7 @@ def test_runtime_source_str_from_bool_lowers_as_epic_function():
     assert "__ep_str_from_bool" in function_names
     assert "__ep_str_from_bool" not in extern_names
     assert "call ptr __ep_str_from_bool" in text
-    assert "fn __ep_str_from_bool(bool %value) -> ptr" in text
+    assert "define ptr @__ep_str_from_bool(bool %value)" in text
 
 
 def test_runtime_source_str_from_i64_lowers_as_epic_function():
@@ -437,7 +437,7 @@ def test_runtime_source_str_from_i64_lowers_as_epic_function():
     assert "__ep_str_from_i64" in function_names
     assert "__ep_str_from_i64" not in extern_names
     assert "call ptr __ep_str_from_i64" in text
-    assert "fn __ep_str_from_i64(i64 %value) -> ptr" in text
+    assert "define ptr @__ep_str_from_i64(i64 %value)" in text
     assert "-9223372036854775808" in text
 
 
@@ -454,7 +454,7 @@ def test_runtime_source_str_from_u64_lowers_as_epic_function():
     assert "__ep_str_from_u64" in function_names
     assert "__ep_str_from_u64" not in extern_names
     assert "call ptr __ep_str_from_u64" in text
-    assert "fn __ep_str_from_u64(i64 %value) -> ptr" in text
+    assert "define ptr @__ep_str_from_u64(i64 %value)" in text
 
 
 def test_runtime_source_str_slice_lowers_as_epic_function():
@@ -471,7 +471,7 @@ def test_runtime_source_str_slice_lowers_as_epic_function():
     assert "__ep_str_slice" in function_names
     assert "__ep_str_slice" not in extern_names
     assert "call ptr __ep_str_slice" in text
-    assert "fn __ep_str_slice(ptr %s, i64 %start, i64 %end) -> ptr" in text
+    assert "define ptr @__ep_str_slice(ptr %s, i64 %start, i64 %end)" in text
     assert "invalid string slice" in text
 
 
