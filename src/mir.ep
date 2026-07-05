@@ -1,0 +1,376 @@
+#
+# Minimal self-hosted MIR DTO and text output helpers.
+# This is intentionally not a complete MIR library; it only serves the
+# first EP typed-AST -> MIR oracle comparison path.
+#
+
+struct MirOperand {
+    kind: str
+    typ: str
+    name: str
+    int_value: i64
+    bool_value: bool
+}
+
+struct MirInst {
+    op: str
+    operands: MirOperand[]
+    result_name: str
+    result_type: str
+    typ: str
+    callee: str
+    has_result: bool
+}
+
+struct MirTerminator {
+    kind: str
+    value: MirOperand
+    target: str
+    then_target: str
+    else_target: str
+    has_value: bool
+}
+
+struct MirBlock {
+    name: str
+    instructions: MirInst[]
+    terminator: MirTerminator
+    has_terminator: bool
+}
+
+struct MirParam {
+    name: str
+    typ: str
+}
+
+struct MirFunction {
+    name: str
+    params: MirParam[]
+    return_type: str
+    blocks: MirBlock[]
+}
+
+struct MirProgram {
+    functions: MirFunction[]
+}
+
+fun mir_operand_empty(): MirOperand {
+    let op = new MirOperand
+    op.kind = ""
+    op.typ = ""
+    op.name = ""
+    op.int_value = 0
+    op.bool_value = false
+    return op
+}
+
+fun mir_const_int(typ: str, value: i64): MirOperand {
+    let op = mir_operand_empty()
+    op.kind = "int"
+    op.typ = typ
+    op.int_value = value
+    return op
+}
+
+fun mir_const_bool(value: bool): MirOperand {
+    let op = mir_operand_empty()
+    op.kind = "bool"
+    op.typ = "bool"
+    op.bool_value = value
+    return op
+}
+
+fun mir_value_operand(typ: str, name: str): MirOperand {
+    let op = mir_operand_empty()
+    op.kind = "value"
+    op.typ = typ
+    op.name = name
+    return op
+}
+
+fun mir_operand_text(op: MirOperand): str {
+    if op.kind == "value" {
+        return str_cat2("%", op.name)
+    }
+    if op.kind == "int" {
+        return str(op.int_value)
+    }
+    if op.kind == "bool" {
+        if op.bool_value {
+            return "true"
+        }
+        return "false"
+    }
+    if op.kind == "null" {
+        return "null"
+    }
+    if op.kind == "symbol" {
+        return op.name
+    }
+    return "<bad operand>"
+}
+
+fun mir_operand_typed_text(op: MirOperand): str {
+    let buf = make_str_buf()
+    str_buf_extend(buf, op.typ)
+    str_buf_extend(buf, " ")
+    str_buf_extend(buf, mir_operand_text(op))
+    return str_buf_finish(buf)
+}
+
+fun mir_inst_empty(): MirInst {
+    let inst = new MirInst
+    inst.op = ""
+    inst.operands = new MirOperand[0]
+    inst.result_name = ""
+    inst.result_type = ""
+    inst.typ = ""
+    inst.callee = ""
+    inst.has_result = false
+    return inst
+}
+
+fun mir_alloca(result_name: str, elem_type: str): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = "alloca"
+    inst.result_name = result_name
+    inst.result_type = "ptr"
+    inst.typ = elem_type
+    inst.has_result = true
+    return inst
+}
+
+fun mir_load(result_name: str, result_type: str, access_type: str, addr: MirOperand): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = "load"
+    inst.result_name = result_name
+    inst.result_type = result_type
+    inst.typ = access_type
+    inst.has_result = true
+    push(inst.operands, addr)
+    return inst
+}
+
+fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = "store"
+    push(inst.operands, value)
+    push(inst.operands, addr)
+    return inst
+}
+
+fun mir_call(callee: str, ret_type: str, args: MirOperand[]): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = "call"
+    inst.callee = callee
+    inst.typ = ret_type
+    inst.operands = args
+    return inst
+}
+
+
+
+fun mir_inst_result_prefix(inst: MirInst, buf: u8[]): void {
+    if inst.has_result {
+        str_buf_extend(buf, "%")
+        str_buf_extend(buf, inst.result_name)
+        str_buf_extend(buf, ": ")
+        str_buf_extend(buf, inst.result_type)
+        str_buf_extend(buf, " = ")
+    }
+}
+
+fun mir_inst_text(inst: MirInst): str {
+    let buf = make_str_buf()
+    mir_inst_result_prefix(inst, buf)
+
+    if inst.op == "alloca" {
+        str_buf_extend(buf, "alloca ")
+        str_buf_extend(buf, inst.typ)
+        return str_buf_finish(buf)
+    }
+    if inst.op == "load" {
+        str_buf_extend(buf, "load ")
+        str_buf_extend(buf, inst.typ)
+        str_buf_extend(buf, ", ")
+        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
+        return str_buf_finish(buf)
+    }
+    if inst.op == "store" {
+        str_buf_extend(buf, "store ")
+        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
+        str_buf_extend(buf, ", ")
+        str_buf_extend(buf, mir_operand_typed_text(inst.operands[1]))
+        return str_buf_finish(buf)
+    }
+    if inst.op == "call" {
+        str_buf_extend(buf, "call ")
+        str_buf_extend(buf, inst.typ)
+        str_buf_extend(buf, " ")
+        str_buf_extend(buf, inst.callee)
+        str_buf_extend(buf, "(")
+        let i = 0
+        while i < len(inst.operands) {
+            if i > 0 {
+                str_buf_extend(buf, ", ")
+            }
+            str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
+            i = i + 1
+        }
+        str_buf_extend(buf, ")")
+        return str_buf_finish(buf)
+    }
+
+    str_buf_extend(buf, inst.op)
+    str_buf_extend(buf, " ")
+    let i = 0
+    while i < len(inst.operands) {
+        if i > 0 {
+            str_buf_extend(buf, ", ")
+        }
+        str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
+        i = i + 1
+    }
+    return str_buf_finish(buf)
+}
+
+fun mir_br(target: str): MirTerminator {
+    let term = new MirTerminator
+    term.kind = "br"
+    term.value = mir_operand_empty()
+    term.target = target
+    term.then_target = ""
+    term.else_target = ""
+    term.has_value = false
+    return term
+}
+
+fun mir_condbr(cond: MirOperand, then_target: str, else_target: str): MirTerminator {
+    let term = new MirTerminator
+    term.kind = "condbr"
+    term.value = cond
+    term.target = ""
+    term.then_target = then_target
+    term.else_target = else_target
+    term.has_value = true
+    return term
+}
+
+fun mir_ret_void(): MirTerminator {
+    let term = new MirTerminator
+    term.kind = "ret"
+    term.value = mir_operand_empty()
+    term.target = ""
+    term.then_target = ""
+    term.else_target = ""
+    term.has_value = false
+    return term
+}
+
+fun mir_ret_value(value: MirOperand): MirTerminator {
+    let term = mir_ret_void()
+    term.has_value = true
+    term.value = value
+    return term
+}
+
+fun mir_terminator_text(term: MirTerminator): str {
+    if term.kind == "br" {
+        return str_cat2("br label %", term.target)
+    }
+    if term.kind == "condbr" {
+        let buf = make_str_buf()
+        str_buf_extend(buf, "condbr ")
+        str_buf_extend(buf, mir_operand_typed_text(term.value))
+        str_buf_extend(buf, ", label %")
+        str_buf_extend(buf, term.then_target)
+        str_buf_extend(buf, ", label %")
+        str_buf_extend(buf, term.else_target)
+        return str_buf_finish(buf)
+    }
+    if term.kind == "ret" {
+        if term.has_value {
+            return str_cat2("ret ", mir_operand_typed_text(term.value))
+        }
+        return "ret void"
+    }
+    return "<bad terminator>"
+}
+
+fun mir_block_empty(name: str): MirBlock {
+    let block = new MirBlock
+    block.name = name
+    block.instructions = new MirInst[0]
+    block.terminator = mir_ret_void()
+    block.has_terminator = false
+    return block
+}
+
+fun mir_function_empty(name: str, ret: str): MirFunction {
+    let fn = new MirFunction
+    fn.name = name
+    fn.params = new MirParam[0]
+    fn.return_type = ret
+    fn.blocks = new MirBlock[0]
+    return fn
+}
+
+fun mir_program_empty(): MirProgram {
+    let p = new MirProgram
+    p.functions = new MirFunction[0]
+    return p
+}
+
+fun mir_print_function(fn: MirFunction): void {
+    let header = make_str_buf()
+    str_buf_extend(header, "define ")
+    str_buf_extend(header, fn.return_type)
+    str_buf_extend(header, " @")
+    str_buf_extend(header, fn.name)
+    str_buf_extend(header, "(")
+    let i = 0
+    while i < len(fn.params) {
+        if i > 0 {
+            str_buf_extend(header, ", ")
+        }
+        str_buf_extend(header, fn.params[i].typ)
+        str_buf_extend(header, " %")
+        str_buf_extend(header, fn.params[i].name)
+        i = i + 1
+    }
+    str_buf_extend(header, ") {")
+    println(str_buf_finish(header))
+
+    let b = 0
+    while b < len(fn.blocks) {
+        if b > 0 {
+            println("")
+        }
+        println(str_cat2(fn.blocks[b].name, ":"))
+        let j = 0
+        while j < len(fn.blocks[b].instructions) {
+            print("  ")
+            println(mir_inst_text(fn.blocks[b].instructions[j]))
+            j = j + 1
+        }
+        if fn.blocks[b].has_terminator {
+            print("  ")
+            println(mir_terminator_text(fn.blocks[b].terminator))
+        }
+        b = b + 1
+    }
+    println("}")
+}
+
+fun mir_print_program(program: MirProgram): void {
+    let i = 0
+    while i < len(program.functions) {
+        if i > 0 {
+            println("")
+        }
+        mir_print_function(program.functions[i])
+        i = i + 1
+    }
+}
+
+

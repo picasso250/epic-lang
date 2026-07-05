@@ -1,0 +1,269 @@
+#
+# Minimal self-hosted typed AST -> MIR codegen.
+# First milestone: user-function MIR text oracle comparison against Python.
+#
+
+struct MirCodegenState {
+    program: MirProgram
+    current_fn: MirFunction
+    current_block: MirBlock
+    value_counter: i64
+    block_counter: i64
+    local_names: str[]
+    local_addr_names: str[]
+    local_types: str[]
+}
+
+fun mir_codegen_die(msg: str): void {
+    println(f"MIR codegen error: {msg}")
+    exit(1)
+}
+
+fun mir_epic_type(type_name: str): str {
+    if type_name == "void" {
+        return "void"
+    }
+    if type_name == "bool" {
+        return "bool"
+    }
+    if type_name == "i64" || type_name == "i32" || type_name == "u64" || type_name == "u32" || type_name == "u8" {
+        return "i64"
+    }
+    return "ptr"
+}
+
+fun mir_new_value(st: MirCodegenState, hint: str): str {
+    st.value_counter = st.value_counter + 1
+    return str_cat2(hint, str(st.value_counter))
+}
+
+fun mir_new_block(st: MirCodegenState, prefix: str): MirBlock {
+    st.block_counter = st.block_counter + 1
+    let block = mir_block_empty(str_cat2(prefix, str(st.block_counter)))
+    push(st.current_fn.blocks, block)
+    return block
+}
+
+fun mir_emit_inst(st: MirCodegenState, inst: MirInst): void {
+    push(st.current_block.instructions, inst)
+}
+
+fun mir_alloc_local(st: MirCodegenState, name: str, typ: str): MirOperand {
+    let addr_name = mir_new_value(st, str_cat2(name, ".addr"))
+    mir_emit_inst(st, mir_alloca(addr_name, typ))
+    push(st.local_names, name)
+    push(st.local_addr_names, addr_name)
+    push(st.local_types, typ)
+    return mir_value_operand("ptr", addr_name)
+}
+
+fun mir_local_index(st: MirCodegenState, name: str): i64 {
+    let i = 0
+    while i < len(st.local_names) {
+        if st.local_names[i] == name {
+            return i
+        }
+        i = i + 1
+    }
+    mir_codegen_die(f"undefined variable: {name}")
+    return 0
+}
+
+fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
+    if expr.kind == "Literal" {
+        return mir_const_int("i64", sema_parse_i64(expr.value))
+    }
+    if expr.kind == "Bool" {
+        return mir_const_bool(expr.value == "true")
+    }
+    if expr.kind == "Var" {
+        let idx = mir_local_index(st, expr.name)
+        let result_name = mir_new_value(st, "load")
+        let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+        mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
+        return mir_value_operand(st.local_types[idx], result_name)
+    }
+    if expr.kind == "Binary" {
+        let left = mir_emit_expr(st, expr.left)
+        let right = mir_emit_expr(st, expr.right)
+        let op = ""
+        if expr.op == "+" {
+            op = "add"
+        } else if expr.op == "-" {
+            op = "sub"
+        } else if expr.op == "*" {
+            op = "mul"
+        } else if expr.op == "/" {
+            op = "sdiv"
+        } else if expr.op == "%" {
+            op = "srem"
+        } else if expr.op == "<" {
+            op = "icmp.slt"
+        } else {
+            mir_codegen_die(f"unsupported binary op {expr.op}")
+        }
+        let result_name = mir_new_value(st, str_replace_char_local(op, 46, 95))
+        let inst = mir_inst_empty()
+        inst.op = op
+        inst.result_name = result_name
+        if op == "icmp.slt" {
+            inst.result_type = "bool"
+        } else {
+            inst.result_type = "i64"
+        }
+        inst.has_result = true
+        push(inst.operands, left)
+        push(inst.operands, right)
+        mir_emit_inst(st, inst)
+        return mir_value_operand(inst.result_type, result_name)
+    }
+    if expr.kind == "Call" {
+        if expr.name == "exit" {
+            let args = new MirOperand[0]
+            push(args, mir_emit_expr(st, expr.args[0]))
+            mir_emit_inst(st, mir_call("ExitProcess", "void", args))
+            return mir_const_int("i64", 0)
+        }
+        mir_codegen_die(f"unsupported call {expr.name}")
+    }
+    mir_codegen_die(f"unsupported expr {expr.kind}")
+    return mir_const_int("i64", 0)
+}
+
+fun str_replace_char_local(s: str, from_ch: i64, to_ch: i64): str {
+    let out = make_str_buf()
+    let bs = bytes(s)
+    let i = 0
+    while i < len(bs) {
+        if i64(bs[i]) == from_ch {
+            push(out, u8(to_ch))
+        } else {
+            push(out, bs[i])
+        }
+        i = i + 1
+    }
+    return str(out)
+}
+
+fun mir_emit_if(st: MirCodegenState, stmt: AstNode): void {
+    let cond = mir_emit_expr(st, stmt.expr)
+    let then_block = mir_new_block(st, "if.then")
+    let else_block = mir_new_block(st, "if.else")
+    let end_block = mir_new_block(st, "if.end")
+    st.current_block.terminator = mir_condbr(cond, then_block.name, else_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = then_block
+    mir_emit_block(st, stmt.then_block)
+    if st.current_block.has_terminator == false {
+        st.current_block.terminator = mir_br(end_block.name)
+        st.current_block.has_terminator = true
+    }
+
+    st.current_block = else_block
+    mir_emit_block(st, stmt.else_block)
+    if st.current_block.has_terminator == false {
+        st.current_block.terminator = mir_br(end_block.name)
+        st.current_block.has_terminator = true
+    }
+
+    st.current_block = end_block
+}
+
+fun mir_emit_stmt(st: MirCodegenState, stmt: AstNode): void {
+    if stmt.kind == "ExprStmt" {
+        mir_emit_expr(st, stmt.expr)
+        return
+    }
+    if stmt.kind == "Let" {
+        let typ = mir_epic_type(stmt.resolved_type)
+        let addr = mir_alloc_local(st, stmt.name, typ)
+        let value = mir_emit_expr(st, stmt.value_expr)
+        mir_emit_inst(st, mir_store(value, addr))
+        return
+    }
+    if stmt.kind == "If" {
+        mir_emit_if(st, stmt)
+        return
+    }
+    if stmt.kind == "Return" {
+        if stmt.expr.kind == "" {
+            st.current_block.terminator = mir_ret_void()
+        } else {
+            st.current_block.terminator = mir_ret_value(mir_emit_expr(st, stmt.expr))
+        }
+        st.current_block.has_terminator = true
+        return
+    }
+    mir_codegen_die(f"unsupported stmt {stmt.kind}")
+}
+
+fun mir_emit_block(st: MirCodegenState, block: AstNode): void {
+    let i = 0
+    while i < len(block.stmts) {
+        if st.current_block.has_terminator {
+            return
+        }
+        mir_emit_stmt(st, block.stmts[i])
+        i = i + 1
+    }
+}
+
+fun mir_emit_function(st: MirCodegenState, fn_ast: AstNode): MirFunction {
+    st.value_counter = 0
+    st.block_counter = 0
+    st.local_names = new str[0]
+    st.local_addr_names = new str[0]
+    st.local_types = new str[0]
+    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(fn_ast.resolved_type))
+    st.current_block = mir_new_block(st, "entry")
+    mir_emit_block(st, fn_ast.body)
+    if st.current_block.has_terminator == false {
+        if st.current_fn.return_type == "void" {
+            st.current_block.terminator = mir_ret_void()
+            st.current_block.has_terminator = true
+        } else {
+            st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
+            st.current_block.has_terminator = true
+        }
+    }
+    return st.current_fn
+}
+
+fun mir_ast_to_mir(ast: AstNode): MirProgram {
+    let st = new MirCodegenState
+    st.program = mir_program_empty()
+    st.current_fn = mir_function_empty("", "void")
+    st.current_block = mir_block_empty("")
+    st.value_counter = 0
+    st.block_counter = 0
+    st.local_names = new str[0]
+    st.local_addr_names = new str[0]
+    st.local_types = new str[0]
+
+    let i = 0
+    while i < len(ast.funcs) {
+        let fn = mir_emit_function(st, ast.funcs[i])
+        push(st.program.functions, fn)
+        i = i + 1
+    }
+    return st.program
+}
+
+fun main(): void {
+    if len(argv) < 2 {
+        println("usage: mir_codegen <file>")
+        exit(1)
+    }
+    let src = str(read_file(argv[1]))
+    let tokens = lex(src)
+    let p = make_parser(tokens)
+    let ast = parse_program(p)
+    let st = make_sema_state()
+    sema_program(st, ast)
+    let mir = mir_ast_to_mir(ast)
+    mir_print_program(mir)
+}
+
+
+
