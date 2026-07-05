@@ -17,6 +17,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(ROOT_DIR, "build", "mir-codegen-bootstrap")
 MIR_EXE = os.path.join(BUILD_DIR, "src", "mir_codegen.exe")
+EXAMPLES_DIR = os.path.join(ROOT_DIR, "examples")
 CASES = [
     os.path.join(SCRIPT_DIR, "pass_m1_exit.ep"),
     os.path.join(SCRIPT_DIR, "pass_m2_return_i64.ep"),
@@ -35,6 +36,16 @@ CASES = [
     os.path.join(SCRIPT_DIR, "pass_m15_u8_array_push_set.ep"),
     os.path.join(SCRIPT_DIR, "pass_m16_for_assign_op.ep"),
     os.path.join(SCRIPT_DIR, "pass_m17_string_fstring.ep"),
+]
+EXAMPLE_CASES = [
+    os.path.join(EXAMPLES_DIR, "m1_exit.ep"),
+    os.path.join(EXAMPLES_DIR, "m20_comment.ep"),
+    os.path.join(EXAMPLES_DIR, "m22_self_ref.ep"),
+    os.path.join(EXAMPLES_DIR, "v1_break_continue.ep"),
+    os.path.join(EXAMPLES_DIR, "v2_array_literal.ep"),
+    os.path.join(EXAMPLES_DIR, "v2_array_literal_u8.ep"),
+    os.path.join(EXAMPLES_DIR, "v2_struct_init.ep"),
+    os.path.join(EXAMPLES_DIR, "v4_exit_return_path.ep"),
 ]
 sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import lex
@@ -110,7 +121,7 @@ def print_diff(expected, actual):
 def main():
     ensure_ep_mir_codegen()
     failed = 0
-    for path in CASES:
+    for path in CASES + EXAMPLE_CASES:
         rel = os.path.relpath(path, ROOT_DIR)
         try:
             expected = python_user_mir(path)
