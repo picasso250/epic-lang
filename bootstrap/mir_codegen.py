@@ -726,7 +726,7 @@ class MirCodegen:
         else:
             any_reachable = True
 
-        return self._reachable(end_block) if any_reachable else self._unreachable()
+        return self._reachable(end_block)
 
     def _emit_match_check(self, stmt, match_addr, match_type, case, case_block, next_block):
         scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_type, type=match_type)
