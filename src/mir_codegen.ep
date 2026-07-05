@@ -413,6 +413,17 @@ fun mir_slice_struct_name(type_name: str): str {
 fun mir_emit_empty_array(st: MirCodegenState, elem_type: str, count: MirOperand): MirOperand {
     let args = new MirOperand[0]
     if elem_type == "u8" {
+        push(args, mir_const_int("i64", 0))
+        push(args, count)
+        return mir_emit_call_inst(st, "__ep_slice_u8_alloc", "ptr", args)
+    }
+    push(args, count)
+    return mir_emit_call_inst(st, "__ep_slice_i64_new", "ptr", args)
+}
+
+fun mir_emit_array_literal_storage(st: MirCodegenState, elem_type: str, count: MirOperand): MirOperand {
+    let args = new MirOperand[0]
+    if elem_type == "u8" {
         push(args, count)
         push(args, count)
         return mir_emit_call_inst(st, "__ep_slice_u8_alloc", "ptr", args)
@@ -436,7 +447,7 @@ fun mir_emit_new_array(st: MirCodegenState, block: MirBlock, expr: AstNode): Mir
 fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
     let count = mir_const_int("i64", len(expr.args))
-    let arr = mir_emit_empty_array(st, expr.type_name, count)
+    let arr = mir_emit_array_literal_storage(st, expr.type_name, count)
     let i = 0
     while i < len(expr.args) {
         let args = new MirOperand[0]
@@ -521,6 +532,19 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         st.current_block = left_flow.block
         let right_flow = mir_emit_expr(st, st.current_block, expr.right)
         st.current_block = right_flow.block
+        if expr.left.resolved_type == "str" && expr.right.resolved_type == "str" && (expr.op == "==" || expr.op == "!=") {
+            let args = new MirOperand[0]
+            push(args, left_flow.value)
+            push(args, right_flow.value)
+            let eq = mir_emit_call_inst(st, "__ep_str_eq", "bool", args)
+            if expr.op == "!=" {
+                let not_inst = mir_make_result_inst(st, "not", "bool")
+                push(not_inst.operands, eq)
+                mir_emit_inst(st, not_inst)
+                return mir_value_flow(mir_value_operand("bool", not_inst.result_name), st.current_block)
+            }
+            return mir_value_flow(eq, st.current_block)
+        }
         let op = mir_binary_op(expr.op)
         let result_type = mir_op_result_type(op)
         let inst = mir_make_result_inst(st, op, result_type)
