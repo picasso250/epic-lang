@@ -22,8 +22,12 @@ CASES = [
     os.path.join(SCRIPT_DIR, "pass_m2_return_i64.ep"),
     os.path.join(SCRIPT_DIR, "pass_m3_let_arith.ep"),
     os.path.join(SCRIPT_DIR, "pass_m4_if_else.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m5_call_params.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m6_assign_while.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m7_unary_bool_cmp.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m8_break_continue.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m9_bit_shift_cmp.ep"),
 ]
-
 sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import lex
 from parser import Parser

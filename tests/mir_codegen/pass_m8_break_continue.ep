@@ -1,0 +1,13 @@
+fun main(): i64 {
+    let x = 0
+    while x < 10 {
+        x = x + 1
+        if x == 3 {
+            continue
+        }
+        if x == 5 {
+            break
+        }
+    }
+    return x
+}

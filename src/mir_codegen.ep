@@ -1,6 +1,6 @@
 #
 # Minimal self-hosted typed AST -> MIR codegen.
-# First milestone: user-function MIR text oracle comparison against Python.
+# First milestone path: user-function MIR text oracle comparison against Python.
 #
 
 struct MirCodegenState {
@@ -12,6 +12,10 @@ struct MirCodegenState {
     local_names: str[]
     local_addr_names: str[]
     local_types: str[]
+    func_names: str[]
+    func_return_types: str[]
+    continue_targets: str[]
+    break_targets: str[]
 }
 
 fun mir_codegen_die(msg: str): void {
@@ -69,65 +73,16 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
     return 0
 }
 
-fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
-    if expr.kind == "Literal" {
-        return mir_const_int("i64", sema_parse_i64(expr.value))
-    }
-    if expr.kind == "Bool" {
-        return mir_const_bool(expr.value == "true")
-    }
-    if expr.kind == "Var" {
-        let idx = mir_local_index(st, expr.name)
-        let result_name = mir_new_value(st, "load")
-        let addr = mir_value_operand("ptr", st.local_addr_names[idx])
-        mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
-        return mir_value_operand(st.local_types[idx], result_name)
-    }
-    if expr.kind == "Binary" {
-        let left = mir_emit_expr(st, expr.left)
-        let right = mir_emit_expr(st, expr.right)
-        let op = ""
-        if expr.op == "+" {
-            op = "add"
-        } else if expr.op == "-" {
-            op = "sub"
-        } else if expr.op == "*" {
-            op = "mul"
-        } else if expr.op == "/" {
-            op = "sdiv"
-        } else if expr.op == "%" {
-            op = "srem"
-        } else if expr.op == "<" {
-            op = "icmp.slt"
-        } else {
-            mir_codegen_die(f"unsupported binary op {expr.op}")
+fun mir_func_return_type(st: MirCodegenState, name: str): str {
+    let i = 0
+    while i < len(st.func_names) {
+        if st.func_names[i] == name {
+            return st.func_return_types[i]
         }
-        let result_name = mir_new_value(st, str_replace_char_local(op, 46, 95))
-        let inst = mir_inst_empty()
-        inst.op = op
-        inst.result_name = result_name
-        if op == "icmp.slt" {
-            inst.result_type = "bool"
-        } else {
-            inst.result_type = "i64"
-        }
-        inst.has_result = true
-        push(inst.operands, left)
-        push(inst.operands, right)
-        mir_emit_inst(st, inst)
-        return mir_value_operand(inst.result_type, result_name)
+        i = i + 1
     }
-    if expr.kind == "Call" {
-        if expr.name == "exit" {
-            let args = new MirOperand[0]
-            push(args, mir_emit_expr(st, expr.args[0]))
-            mir_emit_inst(st, mir_call("ExitProcess", "void", args))
-            return mir_const_int("i64", 0)
-        }
-        mir_codegen_die(f"unsupported call {expr.name}")
-    }
-    mir_codegen_die(f"unsupported expr {expr.kind}")
-    return mir_const_int("i64", 0)
+    mir_codegen_die(f"undefined function: {name}")
+    return "i64"
 }
 
 fun str_replace_char_local(s: str, from_ch: i64, to_ch: i64): str {
@@ -145,12 +100,133 @@ fun str_replace_char_local(s: str, from_ch: i64, to_ch: i64): str {
     return str(out)
 }
 
+fun mir_binary_op(expr_op: str): str {
+    if expr_op == "+" { return "add" }
+    if expr_op == "-" { return "sub" }
+    if expr_op == "*" { return "mul" }
+    if expr_op == "/" { return "sdiv" }
+    if expr_op == "%" { return "srem" }
+    if expr_op == "&" { return "and" }
+    if expr_op == "|" { return "or" }
+    if expr_op == "^" { return "xor" }
+    if expr_op == "<<" { return "shl" }
+    if expr_op == ">>" { return "sar" }
+    if expr_op == ">>>" { return "shr" }
+    if expr_op == "==" { return "icmp.eq" }
+    if expr_op == "!=" { return "icmp.ne" }
+    if expr_op == "<" { return "icmp.slt" }
+    if expr_op == ">" { return "icmp.sgt" }
+    if expr_op == "<=" { return "icmp.sle" }
+    if expr_op == ">=" { return "icmp.sge" }
+    mir_codegen_die(f"unsupported binary op {expr_op}")
+    return ""
+}
+
+fun mir_op_result_type(op: str): str {
+    if op == "icmp.eq" || op == "icmp.ne" || op == "icmp.slt" || op == "icmp.sgt" || op == "icmp.sle" || op == "icmp.sge" {
+        return "bool"
+    }
+    return "i64"
+}
+
+fun mir_make_result_inst(st: MirCodegenState, op: str, result_type: str): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = op
+    inst.result_name = mir_new_value(st, str_replace_char_local(op, 46, 95))
+    inst.result_type = result_type
+    inst.has_result = true
+    return inst
+}
+
+fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
+    if expr.kind == "Literal" {
+        return mir_const_int("i64", sema_parse_i64(expr.value))
+    }
+    if expr.kind == "Bool" {
+        return mir_const_bool(expr.value == "true")
+    }
+    if expr.kind == "Var" {
+        let idx = mir_local_index(st, expr.name)
+        let result_name = mir_new_value(st, "load")
+        let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+        mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
+        return mir_value_operand(st.local_types[idx], result_name)
+    }
+    if expr.kind == "Unary" {
+        let inner = mir_emit_expr(st, expr.expr)
+        if expr.op == "-" {
+            let inst = mir_make_result_inst(st, "sub", "i64")
+            push(inst.operands, mir_const_int("i64", 0))
+            push(inst.operands, inner)
+            mir_emit_inst(st, inst)
+            return mir_value_operand("i64", inst.result_name)
+        }
+        if expr.op == "!" {
+            let inst = mir_make_result_inst(st, "not", "bool")
+            push(inst.operands, inner)
+            mir_emit_inst(st, inst)
+            return mir_value_operand("bool", inst.result_name)
+        }
+        mir_codegen_die(f"unsupported unary op {expr.op}")
+    }
+    if expr.kind == "Binary" {
+        let left = mir_emit_expr(st, expr.left)
+        let right = mir_emit_expr(st, expr.right)
+        let op = mir_binary_op(expr.op)
+        let result_type = mir_op_result_type(op)
+        let inst = mir_make_result_inst(st, op, result_type)
+        push(inst.operands, left)
+        push(inst.operands, right)
+        mir_emit_inst(st, inst)
+        return mir_value_operand(result_type, inst.result_name)
+    }
+    if expr.kind == "Call" {
+        if expr.name == "exit" {
+            let args = new MirOperand[0]
+            push(args, mir_emit_expr(st, expr.args[0]))
+            mir_emit_inst(st, mir_call("ExitProcess", "void", args))
+            return mir_const_int("i64", 0)
+        }
+        let ret_type = mir_func_return_type(st, expr.name)
+        let args = new MirOperand[0]
+        let i = 0
+        while i < len(expr.args) {
+            push(args, mir_emit_expr(st, expr.args[i]))
+            i = i + 1
+        }
+        let inst = mir_inst_empty()
+        inst.op = "call"
+        inst.callee = expr.name
+        inst.typ = ret_type
+        inst.operands = args
+        if ret_type == "void" {
+            mir_emit_inst(st, inst)
+            return mir_const_int("i64", 0)
+        }
+        inst.result_name = mir_new_value(st, "call")
+        inst.result_type = ret_type
+        inst.has_result = true
+        mir_emit_inst(st, inst)
+        return mir_value_operand(ret_type, inst.result_name)
+    }
+    mir_codegen_die(f"unsupported expr {expr.kind}")
+    return mir_const_int("i64", 0)
+}
+
 fun mir_emit_if(st: MirCodegenState, stmt: AstNode): void {
     let cond = mir_emit_expr(st, stmt.expr)
     let then_block = mir_new_block(st, "if.then")
-    let else_block = mir_new_block(st, "if.else")
+    let has_else = stmt.else_block.kind != ""
+    let else_block = mir_block_empty("")
+    if has_else {
+        else_block = mir_new_block(st, "if.else")
+    }
     let end_block = mir_new_block(st, "if.end")
-    st.current_block.terminator = mir_condbr(cond, then_block.name, else_block.name)
+    if has_else {
+        st.current_block.terminator = mir_condbr(cond, then_block.name, else_block.name)
+    } else {
+        st.current_block.terminator = mir_condbr(cond, then_block.name, end_block.name)
+    }
     st.current_block.has_terminator = true
 
     st.current_block = then_block
@@ -160,13 +236,56 @@ fun mir_emit_if(st: MirCodegenState, stmt: AstNode): void {
         st.current_block.has_terminator = true
     }
 
-    st.current_block = else_block
-    mir_emit_block(st, stmt.else_block)
-    if st.current_block.has_terminator == false {
-        st.current_block.terminator = mir_br(end_block.name)
-        st.current_block.has_terminator = true
+    if has_else {
+        st.current_block = else_block
+        mir_emit_block(st, stmt.else_block)
+        if st.current_block.has_terminator == false {
+            st.current_block.terminator = mir_br(end_block.name)
+            st.current_block.has_terminator = true
+        }
     }
 
+    st.current_block = end_block
+}
+
+fun mir_push_loop(st: MirCodegenState, continue_target: str, break_target: str): void {
+    push(st.continue_targets, continue_target)
+    push(st.break_targets, break_target)
+}
+
+fun mir_pop_loop(st: MirCodegenState): void {
+    let c = new str[0]
+    let b = new str[0]
+    let i = 0
+    while i < len(st.continue_targets) - 1 {
+        push(c, st.continue_targets[i])
+        push(b, st.break_targets[i])
+        i = i + 1
+    }
+    st.continue_targets = c
+    st.break_targets = b
+}
+
+fun mir_emit_while(st: MirCodegenState, stmt: AstNode): void {
+    let cond_block = mir_new_block(st, "while.cond")
+    let body_block = mir_new_block(st, "while.body")
+    let end_block = mir_new_block(st, "while.end")
+    st.current_block.terminator = mir_br(cond_block.name)
+    st.current_block.has_terminator = true
+
+    mir_push_loop(st, cond_block.name, end_block.name)
+    st.current_block = cond_block
+    let cond = mir_emit_expr(st, stmt.expr)
+    st.current_block.terminator = mir_condbr(cond, body_block.name, end_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = body_block
+    mir_emit_block(st, stmt.body)
+    if st.current_block.has_terminator == false {
+        st.current_block.terminator = mir_br(cond_block.name)
+        st.current_block.has_terminator = true
+    }
+    mir_pop_loop(st)
     st.current_block = end_block
 }
 
@@ -182,8 +301,35 @@ fun mir_emit_stmt(st: MirCodegenState, stmt: AstNode): void {
         mir_emit_inst(st, mir_store(value, addr))
         return
     }
+    if stmt.kind == "Assign" {
+        let idx = mir_local_index(st, stmt.name)
+        let value = mir_emit_expr(st, stmt.value_expr)
+        let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+        mir_emit_inst(st, mir_store(value, addr))
+        return
+    }
     if stmt.kind == "If" {
         mir_emit_if(st, stmt)
+        return
+    }
+    if stmt.kind == "While" {
+        mir_emit_while(st, stmt)
+        return
+    }
+    if stmt.kind == "Break" {
+        if len(st.break_targets) == 0 {
+            mir_codegen_die("break outside loop")
+        }
+        st.current_block.terminator = mir_br(st.break_targets[len(st.break_targets) - 1])
+        st.current_block.has_terminator = true
+        return
+    }
+    if stmt.kind == "Continue" {
+        if len(st.continue_targets) == 0 {
+            mir_codegen_die("continue outside loop")
+        }
+        st.current_block.terminator = mir_br(st.continue_targets[len(st.continue_targets) - 1])
+        st.current_block.has_terminator = true
         return
     }
     if stmt.kind == "Return" {
@@ -209,14 +355,38 @@ fun mir_emit_block(st: MirCodegenState, block: AstNode): void {
     }
 }
 
+fun mir_param(name: str, typ: str): MirParam {
+    let p = new MirParam
+    p.name = name
+    p.typ = typ
+    return p
+}
+
 fun mir_emit_function(st: MirCodegenState, fn_ast: AstNode): MirFunction {
     st.value_counter = 0
     st.block_counter = 0
     st.local_names = new str[0]
     st.local_addr_names = new str[0]
     st.local_types = new str[0]
+    st.continue_targets = new str[0]
+    st.break_targets = new str[0]
     st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(fn_ast.resolved_type))
+
+    let pi = 0
+    while pi < len(fn_ast.params) {
+        push(st.current_fn.params, mir_param(fn_ast.params[pi].name, mir_epic_type(fn_ast.params[pi].resolved_type)))
+        pi = pi + 1
+    }
+
     st.current_block = mir_new_block(st, "entry")
+
+    let i = 0
+    while i < len(st.current_fn.params) {
+        let addr = mir_alloc_local(st, st.current_fn.params[i].name, st.current_fn.params[i].typ)
+        mir_emit_inst(st, mir_store(mir_value_operand(st.current_fn.params[i].typ, st.current_fn.params[i].name), addr))
+        i = i + 1
+    }
+
     mir_emit_block(st, fn_ast.body)
     if st.current_block.has_terminator == false {
         if st.current_fn.return_type == "void" {
@@ -240,6 +410,17 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.local_names = new str[0]
     st.local_addr_names = new str[0]
     st.local_types = new str[0]
+    st.func_names = new str[0]
+    st.func_return_types = new str[0]
+    st.continue_targets = new str[0]
+    st.break_targets = new str[0]
+
+    let fi = 0
+    while fi < len(ast.funcs) {
+        push(st.func_names, ast.funcs[fi].name)
+        push(st.func_return_types, mir_epic_type(ast.funcs[fi].resolved_type))
+        fi = fi + 1
+    }
 
     let i = 0
     while i < len(ast.funcs) {
@@ -264,6 +445,3 @@ fun main(): void {
     let mir = mir_ast_to_mir(ast)
     mir_print_program(mir)
 }
-
-
-
