@@ -854,121 +854,148 @@ class MirCodegen:
             return
 
     def _emit_expr(self, expr):
+        return self._emit_expr_from(self._ensure_insertable(), expr).value
+
+    def _emit_expr_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         if isinstance(expr, (LiteralNode, CharNode)):
-            return ConstIntOperand(I64, expr.value)
+            return ValueFlow(ConstIntOperand(I64, expr.value), self.block)
         if isinstance(expr, BoolNode):
-            return ConstBoolOperand(bool(expr.value))
+            return ValueFlow(ConstBoolOperand(bool(expr.value)), self.block)
         if isinstance(expr, StringNode):
-            return SymbolOperand(ptr(), self._string_label(expr.value))
+            return ValueFlow(SymbolOperand(ptr(), self._string_label(expr.value)), self.block)
         if isinstance(expr, FStringNode):
-            return self._emit_fstring(expr)
+            return self._emit_fstring_from(self.block, expr)
         if isinstance(expr, VarNode):
             if expr.name == "argv":
-                return SymbolOperand(ptr(), "argv")
+                return ValueFlow(SymbolOperand(ptr(), "argv"), self.block)
             if expr.name not in self.locals:
                 raise MirCodegenError(f"undefined variable: {expr.name}")
             typ = self.local_types[expr.name]
             value = self._inst("load", [ValueOperand(self.locals[expr.name])], result_type=typ, type=typ)
-            return ValueOperand(value)
+            return ValueFlow(ValueOperand(value), self.block)
         if isinstance(expr, UnaryNode):
-            inner = self._emit_expr(expr.expr)
+            inner = self._emit_expr_from(self.block, expr.expr)
+            self._set_insert_block(inner.block)
             if expr.op == "-":
                 zero = ConstIntOperand(I64, 0)
-                return ValueOperand(self._inst("sub", [zero, inner], result_type=I64))
+                return ValueFlow(ValueOperand(self._inst("sub", [zero, inner.value], result_type=I64)), self.block)
             if expr.op == "!":
-                return ValueOperand(self._inst("not", [inner], result_type=BOOL))
+                return ValueFlow(ValueOperand(self._inst("not", [inner.value], result_type=BOOL)), self.block)
             raise MirCodegenError(f"unsupported unary op: {expr.op}")
         if isinstance(expr, BinaryNode):
-            return self._emit_binary(expr)
+            return self._emit_binary_from(self.block, expr)
         if isinstance(expr, CallNode):
-            return self._emit_call(expr)
+            return self._emit_call_from(self.block, expr)
         if isinstance(expr, SubscriptNode):
-            return self._emit_subscript(expr)
+            return self._emit_subscript_from(self.block, expr)
         if isinstance(expr, ArrayLiteralNode):
-            return self._emit_array_literal(expr)
+            return self._emit_array_literal_from(self.block, expr)
         if isinstance(expr, NewArrayNode):
-            return self._emit_new_array(expr)
+            return self._emit_new_array_from(self.block, expr)
         if isinstance(expr, MapInitNode):
-            return self._emit_map_init(expr)
+            return self._emit_map_init_from(self.block, expr)
         if isinstance(expr, SliceNode):
-            return self._emit_slice(expr)
+            return self._emit_slice_from(self.block, expr)
         if isinstance(expr, StructInitNode):
-            return self._emit_struct_init(expr)
+            return self._emit_struct_init_from(self.block, expr)
         if isinstance(expr, FieldAccessNode):
-            return self._emit_field_access(expr)
+            return self._emit_field_access_from(self.block, expr)
         raise MirCodegenError(f"machine MIR does not support expr yet: {type(expr).__name__}")
 
+    def _emit_arg_flows_from(self, in_block, exprs):
+        block = in_block
+        values = []
+        for expr in exprs:
+            flow = self._emit_expr_from(block, expr)
+            values.append(flow.value)
+            block = flow.block
+        self._set_insert_block(block)
+        return ValueFlow(values, block)
+
     def _emit_binary(self, expr):
+        return self._emit_binary_from(self._ensure_insertable(), expr).value
+
+    def _emit_binary_from(self, in_block, expr):
         if expr.op in ("&&", "||"):
-            return self._emit_short_circuit(expr)
+            return self._emit_short_circuit_from(in_block, expr)
 
         left_type = self._infer_type(expr.left)
         right_type = self._infer_type(expr.right)
-        left = self._emit_expr(expr.left)
-        right = self._emit_expr(expr.right)
+        left = self._emit_expr_from(in_block, expr.left)
+        right = self._emit_expr_from(left.block, expr.right)
+        self._set_insert_block(right.block)
         op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
         unsigned = self._is_unsigned_integer(left_type) or self._is_unsigned_integer(right_type)
         if expr.op in ("==", "!=") and left_type == et.STR and right_type == et.STR:
-            result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
+            result = self._inst("call", [left.value, right.value], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
             value = ValueOperand(result)
             if expr.op == "!=":
                 value = ValueOperand(self._inst("not", [value], result_type=BOOL))
-            return value
+            return ValueFlow(value, self.block)
         if expr.op == "/":
-            return ValueOperand(self._inst("udiv" if unsigned else "sdiv", [left, right], result_type=I64))
+            return ValueFlow(ValueOperand(self._inst("udiv" if unsigned else "sdiv", [left.value, right.value], result_type=I64)), self.block)
         if expr.op == "%":
-            return ValueOperand(self._inst("urem" if unsigned else "srem", [left, right], result_type=I64))
+            return ValueFlow(ValueOperand(self._inst("urem" if unsigned else "srem", [left.value, right.value], result_type=I64)), self.block)
         if expr.op in op_map:
-            return ValueOperand(self._inst(op_map[expr.op], [left, right], result_type=I64))
+            return ValueFlow(ValueOperand(self._inst(op_map[expr.op], [left.value, right.value], result_type=I64)), self.block)
         if expr.op in cmp_map:
             pred = cmp_map[expr.op]
             if pred not in ("eq", "ne"):
                 pred = ("u" if unsigned else "s") + pred
-            return ValueOperand(self._inst(f"icmp.{pred}", [left, right], result_type=BOOL))
+            return ValueFlow(ValueOperand(self._inst(f"icmp.{pred}", [left.value, right.value], result_type=BOOL)), self.block)
         raise MirCodegenError(f"unsupported binary op: {expr.op}")
 
     def _is_unsigned_integer(self, typ):
         return typ in (et.U64, et.U32, et.U8)
 
     def _emit_short_circuit(self, expr):
+        return self._emit_short_circuit_from(self._ensure_insertable(), expr).value
+
+    def _emit_short_circuit_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         result_addr = self._new_value(ptr(), "logic.addr")
         self.block.instructions.append(MirInst("alloca", result=result_addr, type=BOOL))
 
-        left = self._emit_expr(expr.left)
+        left = self._emit_expr_from(self.block, expr.left)
         rhs_block = self._new_block("logic.rhs")
         short_block = self._new_block("logic.short")
         end_block = self._new_block("logic.end")
 
         if expr.op == "&&":
-            self.block.terminator = CondBr(left, rhs_block.name, short_block.name)
+            self._terminate_block(left.block, CondBr(left.value, rhs_block.name, short_block.name))
             short_value = ConstBoolOperand(False)
         else:
-            self.block.terminator = CondBr(left, short_block.name, rhs_block.name)
+            self._terminate_block(left.block, CondBr(left.value, short_block.name, rhs_block.name))
             short_value = ConstBoolOperand(True)
 
-        self.block = short_block
+        self._set_insert_block(short_block)
         self._inst("store", [short_value, ValueOperand(result_addr)])
-        self.block.terminator = Br(end_block.name)
+        self._terminate_block(short_block, Br(end_block.name))
 
-        self.block = rhs_block
-        right = self._emit_expr(expr.right)
-        self._inst("store", [right, ValueOperand(result_addr)])
-        self.block.terminator = Br(end_block.name)
+        right = self._emit_expr_from(rhs_block, expr.right)
+        self._set_insert_block(right.block)
+        self._inst("store", [right.value, ValueOperand(result_addr)])
+        self._terminate_block(right.block, Br(end_block.name))
 
-        self.block = end_block
+        self._set_insert_block(end_block)
         result = self._inst("load", [ValueOperand(result_addr)], result_type=BOOL, type=BOOL)
-        return ValueOperand(result)
+        return ValueFlow(ValueOperand(result), self.block)
 
     def _emit_call(self, expr):
+        return self._emit_call_from(self._ensure_insertable(), expr).value
+
+    def _emit_call_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         name = expr.name
         if expr.namespace == "os":
-            return self._emit_os_call(expr)
+            return self._emit_os_call_from(self.block, expr)
         if expr.namespace:
             raise MirCodegenError(f"unsupported namespaced call: {expr.namespace}.{name}")
         if self._is_builtin(name):
-            return self._emit_builtin(expr)
-        return self._emit_user_call(expr)
+            return self._emit_builtin_from(self.block, expr)
+        return self._emit_user_call_from(self.block, expr)
 
     def _is_builtin(self, name):
         return name in {
@@ -996,6 +1023,10 @@ class MirCodegen:
         }
 
     def _emit_builtin(self, expr):
+        return self._emit_builtin_from(self._ensure_insertable(), expr).value
+
+    def _emit_builtin_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         name = expr.name
         if name == "println":
             if len(expr.args) > 1:
@@ -1003,182 +1034,206 @@ class MirCodegen:
             if expr.args:
                 if self._infer_type(expr.args[0]) != et.STR:
                     raise MirCodegenError(f"println expected str, got {self._infer_type(expr.args[0])}")
-                self._inst("call", [self._emit_expr(expr.args[0])], type=VOID, callee="__ep_print_str")
+                arg = self._emit_expr_from(self.block, expr.args[0])
+                self._set_insert_block(arg.block)
+                self._inst("call", [arg.value], type=VOID, callee="__ep_print_str")
             self._inst("call", [], type=VOID, callee="__ep_print_newline")
-            return ConstIntOperand(I64, 0)
+            return ValueFlow(ConstIntOperand(I64, 0), self.block)
         if name == "print":
             if len(expr.args) != 1:
                 raise MirCodegenError("print expects 1 argument")
             if self._infer_type(expr.args[0]) != et.STR:
                 raise MirCodegenError(f"print expected str, got {self._infer_type(expr.args[0])}")
-            self._inst("call", [self._emit_expr(expr.args[0])], type=VOID, callee="__ep_print_str")
-            return ConstIntOperand(I64, 0)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            self._inst("call", [arg.value], type=VOID, callee="__ep_print_str")
+            return ValueFlow(ConstIntOperand(I64, 0), self.block)
         if name == "exit":
-            arg = self._emit_expr(expr.args[0])
-            self._inst("call", [arg], type=VOID, callee="ExitProcess")
-            return ConstIntOperand(I64, 0)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            self._inst("call", [arg.value], type=VOID, callee="ExitProcess")
+            return ValueFlow(ConstIntOperand(I64, 0), self.block)
         if name == "str":
-            return self._emit_str_conversion(expr.args[0])
+            return self._emit_str_conversion_from(self.block, expr.args[0])
         if name == "cstr":
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst(
-                "call",
-                [arg, ConstIntOperand(I64, expr.line)],
-                result_type=I64,
-                type=I64,
-                callee="__ep_cstr",
-            )
-            return ValueOperand(result)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            result = self._inst("call", [arg.value, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_cstr")
+            return ValueFlow(ValueOperand(result), self.block)
         if name in ("i64", "u64", "bool"):
-            return self._emit_expr(expr.args[0])
+            return self._emit_expr_from(self.block, expr.args[0])
         if name == "u8":
-            return self._emit_truncating_uint_conversion(expr.args[0], 255)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            return ValueFlow(self._emit_truncating_uint_conversion_value(arg.value, 255), self.block)
         if name == "u32":
-            return self._emit_truncating_uint_conversion(expr.args[0], 4294967295)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            return ValueFlow(self._emit_truncating_uint_conversion_value(arg.value, 4294967295), self.block)
         if name == "i32":
-            return self._emit_truncating_i32_conversion(expr.args[0])
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            return ValueFlow(self._emit_truncating_i32_conversion_value(arg.value), self.block)
         if name == "bytes":
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_from_str")
-            return ValueOperand(result)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            result = self._inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_from_str")
+            return ValueFlow(ValueOperand(result), self.block)
         if name == "read_file":
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst(
-                "call",
-                [arg, ConstIntOperand(I64, expr.line)],
-                result_type=ptr(),
-                type=ptr(),
-                callee="__ep_read_file",
-            )
-            return ValueOperand(result)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            result = self._inst("call", [arg.value, ConstIntOperand(I64, expr.line)], result_type=ptr(), type=ptr(), callee="__ep_read_file")
+            return ValueFlow(ValueOperand(result), self.block)
         if name == "write_file":
-            args = [self._emit_expr(arg) for arg in expr.args]
-            args.append(ConstIntOperand(I64, expr.line))
-            result = self._inst("call", args, result_type=I64, type=I64, callee="__ep_write_file")
-            return ValueOperand(result)
+            args = self._emit_arg_flows_from(self.block, expr.args)
+            args.value.append(ConstIntOperand(I64, expr.line))
+            result = self._inst("call", args.value, result_type=I64, type=I64, callee="__ep_write_file")
+            return ValueFlow(ValueOperand(result), self.block)
         if name == "system":
-            arg = self._emit_expr(expr.args[0])
-            result = self._inst("call", [arg, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_system_cmd")
-            return ValueOperand(result)
+            arg = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(arg.block)
+            result = self._inst("call", [arg.value, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_system_cmd")
+            return ValueFlow(ValueOperand(result), self.block)
         if name == "push":
             dst_type = self._infer_type(expr.args[0])
             dst = self._materialize_container_expr(expr.args[0])
-            args = [dst, *[self._emit_expr(arg) for arg in expr.args[1:]]]
+            rest = self._emit_arg_flows_from(self.block, expr.args[1:])
+            args = [dst, *rest.value]
             if self._is_u8_array_type(dst_type):
                 self._inst("call", args, type=VOID, callee="__ep_slice_u8_push")
             elif self._is_i64_array_type(dst_type):
                 self._inst("call", args, type=VOID, callee="__ep_slice_i64_push")
             else:
                 self._inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
-            return ConstIntOperand(I64, 0)
+            return ValueFlow(ConstIntOperand(I64, 0), self.block)
         if name in ("len", "cap"):
             base_type = self._infer_type(expr.args[0])
-            base = self._emit_expr(expr.args[0])
+            base = self._emit_expr_from(self.block, expr.args[0])
+            self._set_insert_block(base.block)
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError(f"{name} expects an aggregate pointer")
-            return self._load_len_cap_nullable(base, struct_name, name)
+            return ValueFlow(self._load_len_cap_nullable(base.value, struct_name, name), self.block)
         if name == "extend":
             dst_type = self._infer_type(expr.args[0])
             if not self._is_u8_array_type(dst_type):
                 raise MirCodegenError("extend only supports u8[]")
             dst = self._materialize_container_expr(expr.args[0])
-            args = [dst, self._emit_expr(expr.args[1])]
-            self._inst("call", args, type=VOID, callee="__ep_slice_u8_extend")
-            return ConstIntOperand(I64, 0)
+            src = self._emit_expr_from(self.block, expr.args[1])
+            self._set_insert_block(src.block)
+            self._inst("call", [dst, src.value], type=VOID, callee="__ep_slice_u8_extend")
+            return ValueFlow(ConstIntOperand(I64, 0), self.block)
         if name in ("map_has", "map_del"):
             map_type = self._infer_type(expr.args[0])
-            base = self._emit_expr(expr.args[0])
-            key = self._emit_expr(expr.args[1])
+            base = self._emit_expr_from(self.block, expr.args[0])
+            key = self._emit_expr_from(base.block, expr.args[1])
+            self._set_insert_block(key.block)
             op = "has" if name == "map_has" else "del"
             if self._map_helper(map_type, op) is None:
                 raise MirCodegenError(f"{name} expects map")
-            return self._emit_map_has_del_nullable(base, key, map_type, op)
+            return ValueFlow(self._emit_map_has_del_nullable(base.value, key.value, map_type, op), self.block)
         raise MirCodegenError(f"unsupported builtin call: {name}")
 
     def _emit_user_call(self, expr):
+        return self._emit_user_call_from(self._ensure_insertable(), expr).value
+
+    def _emit_user_call_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         name = expr.name
         if name not in self.func_sigs:
             raise MirCodegenError(f"unsupported call: {name}")
-        args = [self._emit_expr(arg) for arg in expr.args]
+        args = self._emit_arg_flows_from(self.block, expr.args)
         sig = self.func_sigs[name]
         result_type = None if sig.ret == VOID else sig.ret
-        result = self._inst("call", args, result_type=result_type, type=sig.ret, callee=name)
-        return ValueOperand(result) if result is not None else ConstIntOperand(I64, 0)
+        result = self._inst("call", args.value, result_type=result_type, type=sig.ret, callee=name)
+        return ValueFlow(ValueOperand(result) if result is not None else ConstIntOperand(I64, 0), self.block)
 
     def _infer_type(self, expr):
         return self._resolved_type(expr)
 
     def _emit_subscript(self, expr):
+        return self._emit_subscript_from(self._ensure_insertable(), expr).value
+
+    def _emit_subscript_from(self, in_block, expr):
         base_type = self._infer_type(expr.base)
-        base = self._emit_expr(expr.base)
-        index = self._emit_expr(expr.index)
+        base = self._emit_expr_from(in_block, expr.base)
+        index = self._emit_expr_from(base.block, expr.index)
+        self._set_insert_block(index.block)
         map_value_type = self._map_value_type(base_type)
         if map_value_type is not None:
-            return self._emit_map_read_nullable(base, index, base_type)
+            return ValueFlow(self._emit_map_read_nullable(base.value, index.value, base_type), self.block)
         if self._is_i64_array_type(base_type):
-            result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_slice_i64_get")
-            return ValueOperand(result)
+            result = self._inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_i64_get")
+            return ValueFlow(ValueOperand(result), self.block)
         elem = self._array_struct_elem(base_type)
         if elem is not None:
-            result_type = ptr()
-            result = self._inst("call", [base, index], result_type=result_type, type=ptr(), callee="__ep_slice_ptr_get")
-            return ValueOperand(result)
+            result = self._inst("call", [base.value, index.value], result_type=ptr(), type=ptr(), callee="__ep_slice_ptr_get")
+            return ValueFlow(ValueOperand(result), self.block)
         if self._is_ptr_type(base_type):
             elem_type = self._epic_pointee_type(base_type.elem)
-            addr = self._inst("gep", [base, index], result_type=ptr(), type=elem_type)
+            addr = self._inst("gep", [base.value, index.value], result_type=ptr(), type=elem_type)
             load_type = I8 if base_type.elem in (et.I8, et.U8) else elem_type
             result_type = I64 if load_type == I8 else elem_type
             result = self._inst("load", [ValueOperand(addr)], result_type=result_type, type=load_type)
-            return ValueOperand(result)
-        result = self._inst("call", [base, index], result_type=I64, type=I64, callee="__ep_slice_u8_get")
-        return ValueOperand(result)
+            return ValueFlow(ValueOperand(result), self.block)
+        result = self._inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_u8_get")
+        return ValueFlow(ValueOperand(result), self.block)
 
     def _emit_array_literal(self, expr):
+        return self._emit_array_literal_from(self._ensure_insertable(), expr).value
+
+    def _emit_array_literal_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         epic_type = self._resolved_type(expr)
         arr_type = self._type(epic_type)
         if self._is_i64_array_type(epic_type):
-            result = self._inst(
-                "call",
-                [ConstIntOperand(I64, len(expr.values))],
-                result_type=arr_type,
-                type=ptr(),
-                callee="__ep_slice_i64_new",
-            )
+            result = self._inst("call", [ConstIntOperand(I64, len(expr.values))], result_type=arr_type, type=ptr(), callee="__ep_slice_i64_new")
             arr = ValueOperand(result)
-            for value in expr.values:
-                self._inst("call", [arr, self._emit_expr(value)], type=VOID, callee="__ep_slice_i64_push")
-            return arr
+            block = self.block
+            for value_expr in expr.values:
+                value = self._emit_expr_from(block, value_expr)
+                self._set_insert_block(value.block)
+                self._inst("call", [arr, value.value], type=VOID, callee="__ep_slice_i64_push")
+                block = self.block
+            return ValueFlow(arr, self.block)
         if not self._is_u8_array_type(epic_type):
             raise MirCodegenError(f"unsupported array literal element type: {expr.elem_type}")
-        result = self._inst(
-            "call",
-            [ConstIntOperand(I64, len(expr.values)), ConstIntOperand(I64, len(expr.values))],
-            result_type=ptr(),
-            type=ptr(),
-            callee="__ep_slice_u8_alloc",
-        )
+        result = self._inst("call", [ConstIntOperand(I64, len(expr.values)), ConstIntOperand(I64, len(expr.values))], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_alloc")
         arr = ValueOperand(result)
-        for idx, value in enumerate(expr.values):
-            self._inst("call", [arr, ConstIntOperand(I64, idx), self._emit_expr(value)], type=VOID, callee="__ep_slice_u8_set")
-        return arr
+        block = self.block
+        for idx, value_expr in enumerate(expr.values):
+            value = self._emit_expr_from(block, value_expr)
+            self._set_insert_block(value.block)
+            self._inst("call", [arr, ConstIntOperand(I64, idx), value.value], type=VOID, callee="__ep_slice_u8_set")
+            block = self.block
+        return ValueFlow(arr, self.block)
 
     def _emit_new_array(self, expr):
-        count = self._emit_expr(expr.count) if expr.count is not None else ConstIntOperand(I64, 0)
+        return self._emit_new_array_from(self._ensure_insertable(), expr).value
+
+    def _emit_new_array_from(self, in_block, expr):
+        self._set_insert_block(in_block)
+        count_flow = self._emit_expr_from(self.block, expr.count) if expr.count is not None else ValueFlow(ConstIntOperand(I64, 0), self.block)
+        self._set_insert_block(count_flow.block)
+        count = count_flow.value
         epic_type = self._resolved_type(expr)
         arr_type = self._type(epic_type)
         if self._is_u8_array_type(epic_type):
             result = self._inst("call", [ConstIntOperand(I64, 0), count], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_alloc")
-            return ValueOperand(result)
+            return ValueFlow(ValueOperand(result), self.block)
         if self._is_i64_array_type(epic_type):
             result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_i64_new")
-            return ValueOperand(result)
+            return ValueFlow(ValueOperand(result), self.block)
         if self._array_struct_elem(epic_type) is not None:
             result = self._inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_ptr_new")
-            return ValueOperand(result)
+            return ValueFlow(ValueOperand(result), self.block)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
 
     def _emit_map_init(self, expr):
+        return self._emit_map_init_from(self._ensure_insertable(), expr).value
+
+    def _emit_map_init_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         epic_type = self._resolved_type(expr)
         result_type = self._type(epic_type)
         new_helper = self._map_helper(epic_type, "new")
@@ -1187,50 +1242,146 @@ class MirCodegen:
             raise MirCodegenError(f"unsupported map init target: {expr.type_name}")
         result = self._inst("call", [], result_type=result_type, type=result_type, callee=new_helper)
         map_value = ValueOperand(result)
+        block = self.block
         for key_expr, value_expr in expr.entries:
-            self._inst("call", [map_value, self._emit_expr(key_expr), self._emit_expr(value_expr)], type=VOID, callee=set_helper)
-        return map_value
+            key = self._emit_expr_from(block, key_expr)
+            value = self._emit_expr_from(key.block, value_expr)
+            self._set_insert_block(value.block)
+            self._inst("call", [map_value, key.value, value.value], type=VOID, callee=set_helper)
+            block = self.block
+        return ValueFlow(map_value, self.block)
 
     def _emit_slice(self, expr):
+        return self._emit_slice_from(self._ensure_insertable(), expr).value
+
+    def _emit_slice_from(self, in_block, expr):
         base_type = self._infer_type(expr.base)
-        base = self._emit_expr(expr.base)
-        start = self._emit_expr(expr.start)
-        end = self._emit_expr(expr.end)
+        base = self._emit_expr_from(in_block, expr.base)
+        start = self._emit_expr_from(base.block, expr.start)
+        end = self._emit_expr_from(start.block, expr.end)
+        self._set_insert_block(end.block)
         if base_type == et.STR:
-            result = self._inst("call", [base, start, end], result_type=ptr(), type=ptr(), callee="__ep_str_slice")
-            return ValueOperand(result)
+            result = self._inst("call", [base.value, start.value, end.value], result_type=ptr(), type=ptr(), callee="__ep_str_slice")
+            return ValueFlow(ValueOperand(result), self.block)
         if self._is_u8_array_type(base_type):
-            result = self._inst("call", [base, start, end], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_slice")
-            return ValueOperand(result)
+            result = self._inst("call", [base.value, start.value, end.value], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_slice")
+            return ValueFlow(ValueOperand(result), self.block)
         raise MirCodegenError("slice only supports str and u8[]")
 
     def _emit_struct_init(self, expr):
+        return self._emit_struct_init_from(self._ensure_insertable(), expr).value
+
+    def _emit_struct_init_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         if expr.type_name not in self.structs:
             raise MirCodegenError(f"unknown struct: {expr.type_name}")
         obj = self._alloc_struct(expr.type_name)
+        block = self.block
         for field, value_expr in expr.fields:
-            self._store_field(obj, expr.type_name, field, self._emit_expr(value_expr))
-        return obj
+            value = self._emit_expr_from(block, value_expr)
+            self._set_insert_block(value.block)
+            self._store_field(obj, expr.type_name, field, value.value)
+            block = self.block
+        return ValueFlow(obj, self.block)
 
     def _emit_field_access(self, expr):
+        return self._emit_field_access_from(self._ensure_insertable(), expr).value
+
+    def _emit_field_access_from(self, in_block, expr):
         base_type = self._infer_type(expr.object)
-        base = self._emit_expr(expr.object)
+        base = self._emit_expr_from(in_block, expr.object)
+        self._set_insert_block(base.block)
         struct_name = self._layout_struct_name(base_type)
         try:
             field_type = self.structs[struct_name].field(expr.field).type
         except KeyError as exc:
             raise MirCodegenError(f"unknown field: {expr.field}") from exc
-        return self._load_field(base, struct_name, expr.field, result_type=field_type)
+        return ValueFlow(self._load_field(base.value, struct_name, expr.field, result_type=field_type), self.block)
 
     def _emit_os_call(self, expr):
+        return self._emit_os_call_from(self._ensure_insertable(), expr).value
+
+    def _emit_os_call_from(self, in_block, expr):
+        self._set_insert_block(in_block)
         try:
             signature = next(imp.signature for imp in self.program.imports if imp.name == expr.name and imp.dll == f"{expr.dll}.dll")
         except StopIteration as exc:
             raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}") from exc
-        args = [self._emit_expr(arg) for arg in expr.args]
+        args = self._emit_arg_flows_from(self.block, expr.args)
         result_type = None if signature.ret == VOID else signature.ret
-        result = self._inst("call", args, result_type=result_type, type=signature.ret, callee=expr.name)
-        return ValueOperand(result) if result is not None else ConstIntOperand(I64, 0)
+        result = self._inst("call", args.value, result_type=result_type, type=signature.ret, callee=expr.name)
+        return ValueFlow(ValueOperand(result) if result is not None else ConstIntOperand(I64, 0), self.block)
+
+    def _emit_truncating_uint_conversion_value(self, value, mask):
+        return ValueOperand(self._inst("and", [value, ConstIntOperand(I64, mask)], result_type=I64))
+
+    def _emit_truncating_i32_conversion_value(self, value):
+        shifted = self._inst("shl", [value, ConstIntOperand(I64, 32)], result_type=I64)
+        sign_extended = self._inst("sar", [ValueOperand(shifted), ConstIntOperand(I64, 32)], result_type=I64)
+        return ValueOperand(sign_extended)
+
+    def _emit_truncating_uint_conversion(self, expr, mask):
+        flow = self._emit_expr_from(self._ensure_insertable(), expr)
+        self._set_insert_block(flow.block)
+        return self._emit_truncating_uint_conversion_value(flow.value, mask)
+
+    def _emit_truncating_i32_conversion(self, expr):
+        flow = self._emit_expr_from(self._ensure_insertable(), expr)
+        self._set_insert_block(flow.block)
+        return self._emit_truncating_i32_conversion_value(flow.value)
+
+    def _emit_str_conversion(self, expr):
+        return self._emit_str_conversion_from(self._ensure_insertable(), expr).value
+
+    def _emit_str_conversion_from(self, in_block, expr):
+        self._set_insert_block(in_block)
+        source_type = self._resolved_type(expr)
+        typ = self._infer_type(expr)
+        if typ == et.STR:
+            return self._emit_expr_from(self.block, expr)
+        arg = self._emit_expr_from(self.block, expr)
+        self._set_insert_block(arg.block)
+        if typ == et.BOOL:
+            result = self._inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_bool")
+            return ValueFlow(ValueOperand(result), self.block)
+        if self._is_u8_array_type(typ):
+            result = self._inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_slice_u8")
+            return ValueFlow(ValueOperand(result), self.block)
+        if source_type == et.U64:
+            result = self._inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_u64")
+            return ValueFlow(ValueOperand(result), self.block)
+        result = self._inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_i64")
+        return ValueFlow(ValueOperand(result), self.block)
+
+    def _emit_fstring(self, expr):
+        return self._emit_fstring_from(self._ensure_insertable(), expr).value
+
+    def _emit_fstring_from(self, in_block, expr):
+        self._set_insert_block(in_block)
+        out = None
+        block = self.block
+        for kind, value in expr.parts:
+            if kind == "text":
+                if value:
+                    piece = SymbolOperand(ptr(), self._string_label(value))
+                else:
+                    continue
+            elif kind == "expr":
+                piece_flow = self._emit_str_conversion_from(block, value)
+                piece = piece_flow.value
+                block = piece_flow.block
+                self._set_insert_block(block)
+            else:
+                raise MirCodegenError(f"unsupported f-string part: {kind}")
+            if out is None:
+                out = piece
+            else:
+                result = self._inst("call", [out, piece], result_type=ptr(), type=ptr(), callee="__ep_str_cat")
+                out = ValueOperand(result)
+            block = self.block
+        if out is None:
+            return ValueFlow(SymbolOperand(ptr(), self._string_label("")), self.block)
+        return ValueFlow(out, self.block)
 
     def _coerce_print_arg(self, expr):
         if self._infer_type(expr) == et.STR:
