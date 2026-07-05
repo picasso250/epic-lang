@@ -850,6 +850,37 @@ class MirCodegen:
             return self._emit_os_call(expr)
         if expr.namespace:
             raise MirCodegenError(f"unsupported namespaced call: {expr.namespace}.{name}")
+        if self._is_builtin(name):
+            return self._emit_builtin(expr)
+        return self._emit_user_call(expr)
+
+    def _is_builtin(self, name):
+        return name in {
+            "println",
+            "print",
+            "exit",
+            "str",
+            "cstr",
+            "i64",
+            "u64",
+            "u8",
+            "bool",
+            "i32",
+            "u32",
+            "bytes",
+            "read_file",
+            "write_file",
+            "system",
+            "push",
+            "len",
+            "cap",
+            "extend",
+            "map_has",
+            "map_del",
+        }
+
+    def _emit_builtin(self, expr):
+        name = expr.name
         if name == "println":
             if len(expr.args) > 1:
                 raise MirCodegenError("println expects at most one argument")
@@ -943,6 +974,10 @@ class MirCodegen:
             if self._map_helper(map_type, op) is None:
                 raise MirCodegenError(f"{name} expects map")
             return self._emit_map_has_del_nullable(base, key, map_type, op)
+        raise MirCodegenError(f"unsupported builtin call: {name}")
+
+    def _emit_user_call(self, expr):
+        name = expr.name
         if name not in self.func_sigs:
             raise MirCodegenError(f"unsupported call: {name}")
         args = [self._emit_expr(arg) for arg in expr.args]
