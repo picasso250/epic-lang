@@ -561,7 +561,7 @@ class SemanticAnalyzer:
                 if value.literal_int is None:
                     self._fail(
                         f"{context} expected {target}, got {value.type}; "
-                        f"use {target}(... ) for an explicit checked conversion"
+                        f"use {target}(... ) for an explicit conversion"
                     )
                 self._check_int_literal_range(target, value.literal_int, context)
             elif value.literal_int is not None:

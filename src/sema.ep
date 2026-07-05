@@ -285,7 +285,7 @@ fun sema_check_assign_info(target: str, value_type: str, value_node: AstNode, co
     if sema_is_int(target) && sema_is_int(value_type) {
         if target == "i32" || target == "u32" {
             if sema_has_literal_int(value_node) == false {
-                sema_die(f"{context} expected {target}, got {value_type}; use {target}(... ) for an explicit checked conversion")
+                sema_die(f"{context} expected {target}, got {value_type}; use {target}(... ) for an explicit conversion")
             }
             sema_check_int_literal_range(target, sema_literal_int(value_node), context)
         } else {
