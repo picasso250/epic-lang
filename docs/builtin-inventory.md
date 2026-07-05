@@ -1,7 +1,6 @@
 # Builtin Inventory
 
-Current snapshot of functions handled specially by the Epic compiler pipeline
-(bootstrap Python reference compiler + self-hosted Epic compiler).
+Current snapshot of functions handled specially by the active Python reference compiler pipeline. Historical self-hosted codegen notes may remain for context only.
 
 > **2026-07-03 update**: Some `str_*` builtins have been removed from public surface.
 > See [design.md](design.md) for the current public string surface.
@@ -9,11 +8,11 @@ Current snapshot of functions handled specially by the Epic compiler pipeline
 > still exist even after public removal.
 > `bootstrap/epic_builtins.py` now records the Python-side builtin inventory,
 > but it is not wired into parser, sema, or codegen yet.
-> Four source files define the builtin surface:
-> - `bootstrap/sema.py` — type checking (bootstrap path)
-> - `bootstrap/mir_codegen.py` — codegen (bootstrap path)
-> - `src/parser.ep` — parser (self-hosted path, reserved name list)
-> - `src/codegen.ep` — codegen (self-hosted path)
+> Active Python-side builtin handling lives in:
+> - `bootstrap/sema.py` — type checking
+> - `bootstrap/mir_codegen.py` — typed AST to MIR
+>
+> `src/parser.ep` still has a reserved-name list. The old NASM-oriented `src/codegen_support.ep` / `src/codegen.ep` path has been deleted; any remaining `codegen.ep` column below is historical and should be removed in a later inventory refresh.
 
 ---
 

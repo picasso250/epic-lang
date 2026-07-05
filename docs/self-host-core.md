@@ -165,9 +165,9 @@ ADT is **not** part of the self-hosting core. The following are removed:
 - `bootstrap/mir_codegen.py` — ADT allocation, tag dispatch, payload lowering → **removed**
 - `bootstrap/mir.py` — ADT-specific ops or validators → **removed**
 
-**Self-hosted compiler (deferred):**
-- `src/parser.ep` — ADT parse rules
-- `src/codegen.ep` — ADT codegen paths
+**Self-hosted sources:**
+- `src/parser.ep` — ADT parse rules remain deferred/stale until parser cleanup
+- old `src/codegen.ep` ADT codegen paths were deleted with the NASM-oriented codegen line
 
 ---
 
@@ -282,9 +282,7 @@ Completed:
 - `extend` is byte-oriented and only supports `u8[]`.
 
 Remaining:
-- Some `src/*.ep` self-hosted compiler code may still call old helpers such as
-  `itoa`, `str_find`, and `str_new`. These should migrate to `str(n)`,
-  explicit `u8[]` byte scanning, and `str(bytes)`.
+- Some retained `src/*.ep` tools still call old helpers such as `itoa`, `str_find`, and `str_new` (notably `src/link.ep` and parser reserved-name lists). These should migrate to `str(n)`, explicit `u8[]` byte scanning, and `str(bytes)`.
 
 Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to make `str` a temporary `u8[]`-layout alias first, then remove the temporary spelling after public APIs, runtime ABI, maps, argv, and self-hosted sources no longer depend on it. See [`str-u8-alias-plan.md`](str-u8-alias-plan.md).
 
