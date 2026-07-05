@@ -172,7 +172,7 @@ mov   rax, qword [rax]            # 其他类型
 _store_result(inst.result, "rax")
 ```
 
-**重要语义**：u8 是 Epic 的 byte 类型。8-bit load 零扩展到 i64，结果范围 0..255。Epic 不暴露 signed i8。MIR 内部 `I8` 名暂留，但行为已改为零扩展。
+**重要语义**：Epic MIR 沿用 LLVM-like spelling，`i8` 表示 8-bit integer / byte lane，不表示 signed source type。Epic public surface 只暴露 `u8` 作为 byte 类型。8-bit load 零扩展到 i64，结果范围 0..255；signedness 由 opcode 表达，不由 `i8` 类型名表达。
 
 ### 5.4 Arithmetic
 

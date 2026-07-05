@@ -4,9 +4,9 @@
 
 MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“生成结构化 IR，再 lowering 到 LowMIR/X64MIR，最后输出 ASM pretty print 或机器码”。
 
-> **关于 MIR 内部的 `I8` 类型**：本文多处示例使用 `i8` 作为 MIR 底层 byte storage type。
-> 这是 MIR 内部表示，与 Epic 语言的 public type 无关。Epic 语言 public surface 只暴露 `u8` 作为 byte 类型，不提供 signed `i8`。
-> MIR 的 `I8` 当前仍保留此名，后续可能重命名为 `BYTE` 或 `U8`。
+> **关于 MIR 内部的 `i8` 类型**：Epic MIR 沿用 LLVM-like spelling，使用 `i8` 表示 8-bit integer / byte lane。
+> `i8` 不表示 signed source type；Epic 语言 public surface 只暴露 `u8` 作为 byte 类型，不提供 signed `i8`。
+> signedness 由 opcode 表达，例如 `sext`/`zext`、`icmp.slt`/`icmp.ult`、`sdiv`/`udiv`，不是由 `i8` 类型名表达。
 
 当前 MIR 与 machine backend 的实现合约见 `docs/x64-instruction-subset.md`。
 
@@ -360,7 +360,7 @@ ret T %value
 %r: i64 = mod i64 %a, i64 %b
 ```
 
-MIR integer signedness is expressed by opcode (`sdiv`/`udiv`, `icmp.slt`/`icmp.ult`, `sar`/`shr`), not by unsigned integer types. `i8` is an internal byte-lane type; Epic source `u8` lowers through this byte lane where needed.
+MIR integer signedness is expressed by opcode (`sdiv`/`udiv`, `icmp.slt`/`icmp.ult`, `sar`/`shr`), not by unsigned integer types. `i8` follows LLVM-like spelling for an 8-bit integer / byte lane; Epic source `u8` lowers through this lane where needed.
 
 ### 11.2.1 指针整数转换
 
