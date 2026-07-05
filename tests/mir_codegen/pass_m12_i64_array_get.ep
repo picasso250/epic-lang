@@ -1,0 +1,4 @@
+fun main(): i64 {
+    let a = new i64[] { 1, 2 }
+    return a[1]
+}

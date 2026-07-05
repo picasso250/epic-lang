@@ -190,6 +190,23 @@ fun mir_make_ptrtoint(st: MirCodegenState, operand: MirOperand, target_type: str
     return mir_value_operand(target_type, inst.result_name)
 }
 
+fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: MirOperand[]): MirOperand {
+    let inst = mir_inst_empty()
+    inst.op = "call"
+    inst.callee = callee
+    inst.typ = ret_type
+    inst.operands = args
+    if ret_type == "void" {
+        mir_emit_inst(st, inst)
+        return mir_const_int("i64", 0)
+    }
+    inst.result_name = mir_new_value(st, "call")
+    inst.result_type = ret_type
+    inst.has_result = true
+    mir_emit_inst(st, inst)
+    return mir_value_operand(ret_type, inst.result_name)
+}
+
 fun mir_make_result_inst(st: MirCodegenState, op: str, result_type: str): MirInst {
     let inst = mir_inst_empty()
     inst.op = op
@@ -240,6 +257,145 @@ fun mir_emit_struct_init(st: MirCodegenState, expr: AstNode): MirOperand {
     return obj
 }
 
+fun mir_is_i64_array_type(type_name: str): bool {
+    return type_name == "i64[]" || type_name == "i32[]" || type_name == "u64[]" || type_name == "u32[]"
+}
+
+fun mir_is_u8_array_type(type_name: str): bool {
+    return type_name == "u8[]"
+}
+
+fun mir_slice_struct_name(type_name: str): str {
+    if mir_is_u8_array_type(type_name) {
+        return "_slice_u8"
+    }
+    if mir_is_i64_array_type(type_name) {
+        return "_slice_i64"
+    }
+    return ""
+}
+
+fun mir_emit_empty_array(st: MirCodegenState, elem_type: str, count: MirOperand): MirOperand {
+    let args = new MirOperand[0]
+    if elem_type == "u8" {
+        push(args, count)
+        push(args, count)
+        return mir_emit_call_inst(st, "__ep_slice_u8_alloc", "ptr", args)
+    }
+    push(args, count)
+    return mir_emit_call_inst(st, "__ep_slice_i64_new", "ptr", args)
+}
+
+fun mir_emit_new_array(st: MirCodegenState, expr: AstNode): MirOperand {
+    let count = mir_const_int("i64", 0)
+    if expr.count.kind != "" {
+        count = mir_emit_expr(st, expr.count)
+    }
+    return mir_emit_empty_array(st, expr.type_name, count)
+}
+
+fun mir_emit_array_literal(st: MirCodegenState, expr: AstNode): MirOperand {
+    let count = mir_const_int("i64", len(expr.args))
+    let arr = mir_emit_empty_array(st, expr.type_name, count)
+    let i = 0
+    while i < len(expr.args) {
+        let args = new MirOperand[0]
+        push(args, arr)
+        if expr.type_name == "u8" {
+            push(args, mir_const_int("i64", i))
+            push(args, mir_emit_expr(st, expr.args[i]))
+            mir_emit_call_inst(st, "__ep_slice_u8_set", "void", args)
+        } else {
+            push(args, mir_emit_expr(st, expr.args[i]))
+            mir_emit_call_inst(st, "__ep_slice_i64_push", "void", args)
+        }
+        i = i + 1
+    }
+    return arr
+}
+
+fun mir_emit_subscript(st: MirCodegenState, expr: AstNode): MirOperand {
+    let base_type = expr.base.resolved_type
+    let base = mir_emit_expr(st, expr.base)
+    let index = mir_emit_expr(st, expr.index)
+    let args = new MirOperand[0]
+    push(args, base)
+    push(args, index)
+    if mir_is_u8_array_type(base_type) {
+        return mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", args)
+    }
+    return mir_emit_call_inst(st, "__ep_slice_i64_get", "i64", args)
+}
+
+fun mir_materialize_container_expr(st: MirCodegenState, expr: AstNode): MirOperand {
+    if expr.kind != "Var" {
+        mir_codegen_die("container lvalue must be variable")
+    }
+    let idx = mir_local_index(st, expr.name)
+    let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+    let base_type = expr.resolved_type
+    let load_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(load_name, "ptr", "ptr", addr))
+    let loaded = mir_value_operand("ptr", load_name)
+    let base_int = mir_make_ptrtoint(st, loaded, "i64")
+    let cmp = mir_make_result_inst(st, "icmp.eq", "bool")
+    push(cmp.operands, base_int)
+    push(cmp.operands, mir_const_int("i64", 0))
+    mir_emit_inst(st, cmp)
+
+    let init_block = mir_new_block(st, "container.init")
+    let done_block = mir_new_block(st, "container.done")
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cmp.result_name), init_block.name, done_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = init_block
+    let elem_type = "i64"
+    if mir_is_u8_array_type(base_type) {
+        elem_type = "u8"
+    }
+    let empty = mir_emit_empty_array(st, elem_type, mir_const_int("i64", 0))
+    mir_emit_inst(st, mir_store(empty, addr))
+    st.current_block.terminator = mir_br(done_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = done_block
+    let ensured_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(ensured_name, "ptr", "ptr", addr))
+    return mir_value_operand("ptr", ensured_name)
+}
+
+fun mir_load_len_cap_nullable(st: MirCodegenState, base: MirOperand, struct_name: str, field: str): MirOperand {
+    let local_name = str_cat2(str_cat2("__", field), str_cat2(".result", str(st.value_counter)))
+    let result_addr = mir_alloc_local(st, local_name, "i64")
+    let base_int = mir_make_ptrtoint(st, base, "i64")
+    let cmp = mir_make_result_inst(st, "icmp.eq", "bool")
+    push(cmp.operands, base_int)
+    push(cmp.operands, mir_const_int("i64", 0))
+    mir_emit_inst(st, cmp)
+
+    let null_block = mir_new_block(st, str_cat2(field, ".null"))
+    let load_block = mir_new_block(st, str_cat2(field, ".load"))
+    let done_block = mir_new_block(st, str_cat2(field, ".done"))
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cmp.result_name), null_block.name, load_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = null_block
+    mir_emit_inst(st, mir_store(mir_const_int("i64", 0), result_addr))
+    st.current_block.terminator = mir_br(done_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = load_block
+    let value = mir_load_field(st, base, struct_name, field)
+    mir_emit_inst(st, mir_store(value, result_addr))
+    st.current_block.terminator = mir_br(done_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = done_block
+    let out_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(out_name, "i64", "i64", result_addr))
+    return mir_value_operand("i64", out_name)
+}
+
 fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
     if expr.kind == "Literal" {
         return mir_const_int("i64", sema_parse_i64(expr.value))
@@ -282,6 +438,15 @@ fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
         mir_emit_inst(st, inst)
         return mir_value_operand(result_type, inst.result_name)
     }
+    if expr.kind == "NewArray" {
+        return mir_emit_new_array(st, expr)
+    }
+    if expr.kind == "ArrayLiteral" {
+        return mir_emit_array_literal(st, expr)
+    }
+    if expr.kind == "Subscript" {
+        return mir_emit_subscript(st, expr)
+    }
     if expr.kind == "StructInit" {
         return mir_emit_struct_init(st, expr)
     }
@@ -301,6 +466,19 @@ fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
             mir_emit_inst(st, mir_call("ExitProcess", "void", args))
             return mir_const_int("i64", 0)
         }
+        if expr.name == "push" {
+            let base_type = expr.args[0].resolved_type
+            let dst = mir_materialize_container_expr(st, expr.args[0])
+            let args = new MirOperand[0]
+            push(args, dst)
+            push(args, mir_emit_expr(st, expr.args[1]))
+            if mir_is_u8_array_type(base_type) {
+                mir_emit_call_inst(st, "__ep_slice_u8_push", "void", args)
+            } else {
+                mir_emit_call_inst(st, "__ep_slice_i64_push", "void", args)
+            }
+            return mir_const_int("i64", 0)
+        }
         let ret_type = mir_func_return_type(st, expr.name)
         let args = new MirOperand[0]
         let i = 0
@@ -308,20 +486,7 @@ fun mir_emit_expr(st: MirCodegenState, expr: AstNode): MirOperand {
             push(args, mir_emit_expr(st, expr.args[i]))
             i = i + 1
         }
-        let inst = mir_inst_empty()
-        inst.op = "call"
-        inst.callee = expr.name
-        inst.typ = ret_type
-        inst.operands = args
-        if ret_type == "void" {
-            mir_emit_inst(st, inst)
-            return mir_const_int("i64", 0)
-        }
-        inst.result_name = mir_new_value(st, "call")
-        inst.result_type = ret_type
-        inst.has_result = true
-        mir_emit_inst(st, inst)
-        return mir_value_operand(ret_type, inst.result_name)
+        return mir_emit_call_inst(st, expr.name, ret_type, args)
     }
     mir_codegen_die(f"unsupported expr {expr.kind}")
     return mir_const_int("i64", 0)
@@ -413,6 +578,22 @@ fun mir_emit_stmt(st: MirCodegenState, stmt: AstNode): void {
         let addr = mir_alloc_local(st, stmt.name, typ)
         let value = mir_emit_expr(st, stmt.value_expr)
         mir_emit_inst(st, mir_store(value, addr))
+        return
+    }
+    if stmt.kind == "SubscriptAssign" {
+        let base_type = stmt.base.resolved_type
+        let index = mir_emit_expr(st, stmt.index)
+        let value = mir_emit_expr(st, stmt.value_expr)
+        let dst = mir_materialize_container_expr(st, stmt.base)
+        let args = new MirOperand[0]
+        push(args, dst)
+        push(args, index)
+        push(args, value)
+        if mir_is_u8_array_type(base_type) {
+            mir_emit_call_inst(st, "__ep_slice_u8_set", "void", args)
+        } else {
+            mir_emit_call_inst(st, "__ep_slice_i64_set", "void", args)
+        }
         return
     }
     if stmt.kind == "FieldSet" {
@@ -558,6 +739,27 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         }
         si = si + 1
     }
+
+    push(st.struct_names, "_slice_i64")
+    push(st.struct_field_keys, mir_struct_key("_slice_i64", "data"))
+    push(st.struct_field_types, "ptr")
+    push(st.struct_field_indexes, 0)
+    push(st.struct_field_keys, mir_struct_key("_slice_i64", "len"))
+    push(st.struct_field_types, "i64")
+    push(st.struct_field_indexes, 1)
+    push(st.struct_field_keys, mir_struct_key("_slice_i64", "cap"))
+    push(st.struct_field_types, "i64")
+    push(st.struct_field_indexes, 2)
+    push(st.struct_names, "_slice_u8")
+    push(st.struct_field_keys, mir_struct_key("_slice_u8", "data"))
+    push(st.struct_field_types, "ptr")
+    push(st.struct_field_indexes, 0)
+    push(st.struct_field_keys, mir_struct_key("_slice_u8", "len"))
+    push(st.struct_field_types, "i64")
+    push(st.struct_field_indexes, 1)
+    push(st.struct_field_keys, mir_struct_key("_slice_u8", "cap"))
+    push(st.struct_field_types, "i64")
+    push(st.struct_field_indexes, 2)
 
     let fi = 0
     while fi < len(ast.funcs) {

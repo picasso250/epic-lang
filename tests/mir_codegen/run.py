@@ -29,6 +29,10 @@ CASES = [
     os.path.join(SCRIPT_DIR, "pass_m9_bit_shift_cmp.ep"),
     os.path.join(SCRIPT_DIR, "pass_m10_struct.ep"),
     os.path.join(SCRIPT_DIR, "pass_m11_struct_param.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m12_i64_array_get.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m13_u8_array_get.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m14_i64_array_push_set.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m15_u8_array_push_set.ep"),
 ]
 sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import lex
