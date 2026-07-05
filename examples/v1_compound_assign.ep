@@ -1,4 +1,4 @@
-# EXIT: 47
+# EXIT: 67
 struct Box {
     value: i64
     small: u8
@@ -28,6 +28,7 @@ fun main(): void {
     let xs = new i64[1]
     push(xs, 5)
     xs[0] += 8
+    xs[0] += b.value
 
     let s = "abc"
 
