@@ -82,7 +82,7 @@
 - printing / traps：`__ep_print_str`、`__ep_print_newline`、`__epx_slice_oob`、`__epx_null_deref`（`__epx_putc` 已删除）
 - numeric formatting：`__ep_str_from_i64`
 
-结论：不要标成完成；下一步应优先迁移 `__ep_str_from_i64`，再考虑 `__ep_cstr` / file / argv / print 这类更贴近平台 ABI 的 helper。
+结论：不要标成完成；`__ep_str_from_u64` 已迁移到 `runtime/str.ep`，下一步应优先迁移 `__ep_str_from_i64`，再考虑 `__ep_cstr` / file / argv / print 这类更贴近平台 ABI 的 helper。
 
 ### 优先级 3：str → u8[] 收敛（公共表面已完成，self-hosted 源码残留待清）
 
