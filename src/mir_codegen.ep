@@ -539,6 +539,59 @@ fun mir_pop_loop(st: MirCodegenState): void {
     st.break_targets = b
 }
 
+fun mir_emit_for(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
+    st.current_block = block
+    let var_addr = mir_alloc_local(st, stmt.name, "i64")
+    let end_name = str_cat2(str_cat2("__", stmt.name), str_cat2(".end", str(st.value_counter)))
+    let end_addr = mir_alloc_local(st, end_name, "i64")
+
+    let start_flow = mir_emit_expr(st, st.current_block, stmt.start)
+    st.current_block = start_flow.block
+    mir_emit_inst(st, mir_store(start_flow.value, var_addr))
+    let end_flow = mir_emit_expr(st, st.current_block, stmt.end)
+    st.current_block = end_flow.block
+    mir_emit_inst(st, mir_store(end_flow.value, end_addr))
+
+    let cond_block = mir_new_block(st, "for.cond")
+    let body_block = mir_new_block(st, "for.body")
+    let inc_block = mir_new_block(st, "for.inc")
+    let end_block = mir_new_block(st, "for.end")
+    st.current_block.terminator = mir_br(cond_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = cond_block
+    let cur_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(cur_name, "i64", "i64", var_addr))
+    let end_load_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(end_load_name, "i64", "i64", end_addr))
+    let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
+    push(cond_inst.operands, mir_value_operand("i64", cur_name))
+    push(cond_inst.operands, mir_value_operand("i64", end_load_name))
+    mir_emit_inst(st, cond_inst)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_name), body_block.name, end_block.name)
+    st.current_block.has_terminator = true
+
+    mir_push_loop(st, inc_block.name, end_block.name)
+    let body_flow = mir_emit_block(st, body_block, stmt.body)
+    if body_flow.reachable {
+        body_flow.block.terminator = mir_br(inc_block.name)
+        body_flow.block.has_terminator = true
+    }
+    mir_pop_loop(st)
+
+    st.current_block = inc_block
+    let inc_cur_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(inc_cur_name, "i64", "i64", var_addr))
+    let add_inst = mir_make_result_inst(st, "add", "i64")
+    push(add_inst.operands, mir_value_operand("i64", inc_cur_name))
+    push(add_inst.operands, mir_const_int("i64", 1))
+    mir_emit_inst(st, add_inst)
+    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), var_addr))
+    st.current_block.terminator = mir_br(cond_block.name)
+    st.current_block.has_terminator = true
+    return mir_reachable_flow(end_block)
+}
+
 fun mir_emit_while(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
     st.current_block = block
     let cond_block = mir_new_block(st, "while.cond")
@@ -616,11 +669,91 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         mir_emit_inst(st, mir_store(value_flow.value, addr))
         return mir_reachable_flow(st.current_block)
     }
+    if stmt.kind == "AssignOp" {
+        if stmt.expr.kind == "Var" {
+            let idx = mir_local_index(st, stmt.expr.name)
+            let result_name = mir_new_value(st, "load")
+            let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+            mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
+            let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
+            st.current_block = rhs_flow.block
+            let op = mir_binary_op(stmt.op)
+            let result_type = mir_op_result_type(op)
+            let inst = mir_make_result_inst(st, op, result_type)
+            push(inst.operands, mir_value_operand(st.local_types[idx], result_name))
+            push(inst.operands, rhs_flow.value)
+            mir_emit_inst(st, inst)
+            mir_emit_inst(st, mir_store(mir_value_operand(result_type, inst.result_name), addr))
+            return mir_reachable_flow(st.current_block)
+        }
+        if stmt.expr.kind == "FieldAccess" {
+            let base_type = stmt.expr.object.resolved_type
+            let struct_name = mir_layout_struct_name(st, base_type)
+            if struct_name == "" {
+                mir_codegen_die("compound field assignment base must be struct")
+            }
+            let base_flow = mir_emit_expr(st, st.current_block, stmt.expr.object)
+            st.current_block = base_flow.block
+            let addr = mir_field_addr(st, base_flow.value, struct_name, stmt.expr.name)
+            let field_typ = mir_field_type(st, struct_name, stmt.expr.name)
+            let result_name = mir_new_value(st, "load")
+            mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
+            let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
+            st.current_block = rhs_flow.block
+            let op = mir_binary_op(stmt.op)
+            let result_type = mir_op_result_type(op)
+            let inst = mir_make_result_inst(st, op, result_type)
+            push(inst.operands, mir_value_operand(field_typ, result_name))
+            push(inst.operands, rhs_flow.value)
+            mir_emit_inst(st, inst)
+            mir_emit_inst(st, mir_store(mir_value_operand(result_type, inst.result_name), addr))
+            return mir_reachable_flow(st.current_block)
+        }
+        if stmt.expr.kind == "Subscript" {
+            let base_type = stmt.expr.base.resolved_type
+            let dst_flow = mir_emit_expr(st, st.current_block, stmt.expr.base)
+            st.current_block = dst_flow.block
+            let index_flow = mir_emit_expr(st, st.current_block, stmt.expr.index)
+            st.current_block = index_flow.block
+            let get_args = new MirOperand[0]
+            push(get_args, dst_flow.value)
+            push(get_args, index_flow.value)
+            let current = mir_const_int("i64", 0)
+            if mir_is_u8_array_type(base_type) {
+                current = mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", get_args)
+            } else {
+                current = mir_emit_call_inst(st, "__ep_slice_i64_get", "i64", get_args)
+            }
+            let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
+            st.current_block = rhs_flow.block
+            let op = mir_binary_op(stmt.op)
+            let result_type = mir_op_result_type(op)
+            let inst = mir_make_result_inst(st, op, result_type)
+            push(inst.operands, current)
+            push(inst.operands, rhs_flow.value)
+            mir_emit_inst(st, inst)
+            let set_args = new MirOperand[0]
+            push(set_args, dst_flow.value)
+            push(set_args, index_flow.value)
+            push(set_args, mir_value_operand(result_type, inst.result_name))
+            if mir_is_u8_array_type(base_type) {
+                mir_emit_call_inst(st, "__ep_slice_u8_set", "void", set_args)
+            } else {
+                mir_emit_call_inst(st, "__ep_slice_i64_set", "void", set_args)
+            }
+            return mir_reachable_flow(st.current_block)
+        }
+        mir_codegen_die("unsupported compound assignment target")
+        return mir_unreachable_flow()
+    }
     if stmt.kind == "If" {
         return mir_emit_if(st, st.current_block, stmt)
     }
     if stmt.kind == "While" {
         return mir_emit_while(st, st.current_block, stmt)
+    }
+    if stmt.kind == "For" {
+        return mir_emit_for(st, st.current_block, stmt)
     }
     if stmt.kind == "Break" {
         if len(st.break_targets) == 0 {
