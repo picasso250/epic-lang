@@ -91,7 +91,7 @@ let xs: u8[]
 
 不带初始化器的 `let x: T` 创建零值。对标量类型为 `0` 或 `false`。对 `str`、数组、map，创建对应的空值。结构体是 heap-only reference type，不允许 `let x: Struct` 这种无初始化声明；必须显式写 `new Struct` 或 `new Struct { ... }`。
 
-内建容器零值是语义上的空容器。实现可以把 `str`、`T[]`、`map[str]T` 的存储槽保持为 `0`，并在使用点由编译器懒初始化空 header；这个 `0` 不是语言级 `nil`，用户代码不能观察它。用户结构体引用不同：省略的结构体引用字段保持 null，访问其字段会触发 null deref。
+内建容器零值是语义上的空容器。实现可以把 `str`、`T[]`、`map[str]T` 的存储槽保持为 `0`，并在使用点由编译器懒初始化空 header；这个 `0` 不是语言级 `nil`，用户代码不能观察它。对零值 `str` / `T[]`，`len(x)` 返回 `0`；对零值 `T[]`，`cap(x)` 返回 `0`。这两个查询不要求先 materialize 空 header。用户结构体引用不同：省略的结构体引用字段保持 null，访问其字段会触发 null deref。
 
 ### 运算符 (Operators)
 
