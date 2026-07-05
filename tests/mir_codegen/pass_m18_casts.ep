@@ -1,0 +1,9 @@
+fun main(): i64 {
+    let x = 257
+    let y = 4294967295
+    let a = u8(x)
+    let b = i32(y)
+    let c = u32(y)
+    let d = u64(c)
+    return a + b + d
+}

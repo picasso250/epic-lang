@@ -298,6 +298,27 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): M
 }
 
 
+
+fun mir_trunc_uint_value(st: MirCodegenState, value: MirOperand, mask: i64): MirOperand {
+    let inst = mir_make_result_inst(st, "and", "i64")
+    push(inst.operands, value)
+    push(inst.operands, mir_const_int("i64", mask))
+    mir_emit_inst(st, inst)
+    return mir_value_operand("i64", inst.result_name)
+}
+
+fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
+    let shl_inst = mir_make_result_inst(st, "shl", "i64")
+    push(shl_inst.operands, value)
+    push(shl_inst.operands, mir_const_int("i64", 32))
+    mir_emit_inst(st, shl_inst)
+    let sar_inst = mir_make_result_inst(st, "sar", "i64")
+    push(sar_inst.operands, mir_value_operand("i64", shl_inst.result_name))
+    push(sar_inst.operands, mir_const_int("i64", 32))
+    mir_emit_inst(st, sar_inst)
+    return mir_value_operand("i64", sar_inst.result_name)
+}
+
 fun mir_string_label(st: MirCodegenState, value: str): str {
     let i = 0
     while i < len(st.string_values) {
@@ -458,6 +479,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
     if expr.kind == "Literal" {
         return mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)
     }
+    if expr.kind == "Char" {
+        return mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)
+    }
     if expr.kind == "Bool" {
         return mir_value_flow(mir_const_bool(expr.value == "true" || expr.value == "1"), st.current_block)
     }
@@ -528,6 +552,26 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
     }
     if expr.kind == "Call" {
+        if expr.name == "println" {
+            if len(expr.args) == 1 {
+                let args = new MirOperand[0]
+                let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+                st.current_block = arg_flow.block
+                push(args, arg_flow.value)
+                mir_emit_call_inst(st, "__ep_print_str", "void", args)
+            }
+            let nl_args = new MirOperand[0]
+            mir_emit_call_inst(st, "__ep_print_newline", "void", nl_args)
+            return mir_value_flow(mir_const_int("i64", 0), st.current_block)
+        }
+        if expr.name == "print" {
+            let args = new MirOperand[0]
+            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = arg_flow.block
+            push(args, arg_flow.value)
+            mir_emit_call_inst(st, "__ep_print_str", "void", args)
+            return mir_value_flow(mir_const_int("i64", 0), st.current_block)
+        }
         if expr.name == "len" || expr.name == "cap" {
             let base_type = expr.args[0].resolved_type
             let base_flow = mir_emit_expr(st, st.current_block, expr.args[0])
@@ -537,6 +581,27 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 mir_codegen_die("len/cap expects aggregate pointer")
             }
             return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
+        }
+        if expr.name == "i64" || expr.name == "u64" || expr.name == "bool" {
+            return mir_emit_expr(st, st.current_block, expr.args[0])
+        }
+        if expr.name == "u8" {
+            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = arg_flow.block
+            return mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 255), st.current_block)
+        }
+        if expr.name == "u32" {
+            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = arg_flow.block
+            return mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 4294967295), st.current_block)
+        }
+        if expr.name == "i32" {
+            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = arg_flow.block
+            return mir_value_flow(mir_trunc_i32_value(st, arg_flow.value), st.current_block)
+        }
+        if expr.name == "str" {
+            return mir_emit_str_conversion(st, st.current_block, expr.args[0])
         }
         if expr.name == "bytes" {
             let args = new MirOperand[0]
