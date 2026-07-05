@@ -155,21 +155,6 @@ class MirHelperBuilder:
 # ── Helper emitters ───────────────────────────────────────────────────────
 
 
-def emit_str_slice_u8() -> MirFunction:
-    """Identity: returns the input ptr<_slice_u8> as ptr<str>.
-
-    x64: mov rax, rcx; ret
-    """
-    b = MirHelperBuilder(
-        "__ep_str_from_slice_u8",
-        [MirParam("input", ptr())],
-        ptr(),
-    )
-    b.ret(ValueOperand(b.fn.params[0].value))
-    return b.fn
-
-
-
 def emit___ep_str_cat() -> MirFunction:
     """Concatenate two strings into a newly allocated str.
 
@@ -1205,7 +1190,6 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 
 
 _HELPER_EMITTERS = {
-    "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
     "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
