@@ -409,7 +409,7 @@ No known unused runtime helper label is intentionally emitted. The old `__epx_pu
 
 ### 9.4 Dynamic GEP scale
 
-`_add_scaled_index` 在 `scale != 1` 且 `scale != 8` 时抛出 `MirLowerError`。scale=8 仅通过三次 `add rcx, rcx` 实现，不是真正的 shift。
+`_add_scaled_index` 在动态 index 且 `scale != 1` / `scale != 8` 时抛出 `MirLowerError`。常量 index 不受此限制，因为 offset 会在 lowering 时折叠成立即数。当前这足够覆盖 `u8` buffer（scale=1）、word/pointer array（scale=8）和常量 struct field offset；未来若支持紧凑 `i32[]`、value struct array，或更通用 aggregate GEP，需要补通用 `index * element_size` 地址计算。scale=8 仅通过三次 `add rcx, rcx` 实现，不是真正的 shift。
 
 ### 9.5 `_add_rax_imm` 不使用 `add rax, imm32/imm8`
 
