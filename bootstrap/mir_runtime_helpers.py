@@ -7,6 +7,8 @@ implemented helpers, and the lowering pipeline emits them through the normal
 _lower_function path.
 """
 
+from pathlib import Path
+
 from mir import (
     BOOL,
     I32,
@@ -31,6 +33,7 @@ from mir import (
     ptr,
     struct as mir_struct,
 )
+from mir_parser import parse_mir_file
 
 
 # ── MirHelperBuilder ──────────────────────────────────────────────────────
@@ -150,23 +153,6 @@ class MirHelperBuilder:
 
 
 # ── Helper emitters ───────────────────────────────────────────────────────
-
-
-def emit_bytes_slice_u8() -> MirFunction:
-    """Identity cast: str and _slice_u8 now have identical layout {data, len, cap}.
-
-    fn __ep_slice_u8_from_str(%s: ptr<str>) -> ptr<_slice_u8> {
-        entry:
-            ret %s   ; reinterpret same pointer as ptr<_slice_u8>
-        }
-    """
-    b = MirHelperBuilder(
-        "__ep_slice_u8_from_str",
-        [MirParam("s", ptr())],
-        ptr(),
-    )
-    b.ret(ValueOperand(b.fn.params[0].value))
-    return b.fn
 
 
 def emit_str_slice_u8() -> MirFunction:
@@ -1219,7 +1205,6 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 
 
 _HELPER_EMITTERS = {
-    "__ep_slice_u8_from_str": lambda p: emit_bytes_slice_u8(),
     "__ep_str_from_slice_u8": lambda p: emit_str_slice_u8(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
@@ -1299,6 +1284,26 @@ _RUNTIME_STRING_GLOBALS = (
 )
 
 
+_RUNTIME_MIR_DIR = Path(__file__).resolve().parent.parent / "runtime" / "mir"
+_PARSED_HELPERS = None
+
+
+def _parsed_runtime_helpers():
+    global _PARSED_HELPERS
+    if _PARSED_HELPERS is not None:
+        return _PARSED_HELPERS
+    helpers = {}
+    if _RUNTIME_MIR_DIR.exists():
+        for path in sorted(_RUNTIME_MIR_DIR.glob("*.mir")):
+            parsed = parse_mir_file(path)
+            for fn in parsed.functions:
+                if fn.name in helpers:
+                    raise RuntimeError(f"duplicate parsed MIR helper: {fn.name}")
+                helpers[fn.name] = fn
+    _PARSED_HELPERS = helpers
+    return helpers
+
+
 def inject_all_mir_helpers(program: MirProgram) -> None:
     """Inject every implemented MIR helper in deterministic order."""
     implemented = set(IMPLEMENTED_MIR_HELPERS)
@@ -1312,5 +1317,9 @@ def inject_all_mir_helpers(program: MirProgram) -> None:
             program.globals.append(MirGlobal(name, ptr(), text))
             global_names.add(name)
 
+    parsed_helpers = _parsed_runtime_helpers()
     for name in IMPLEMENTED_MIR_HELPERS:
-        program.functions.append(_HELPER_EMITTERS[name](program))
+        if name in parsed_helpers:
+            program.functions.append(parsed_helpers[name])
+        else:
+            program.functions.append(_HELPER_EMITTERS[name](program))

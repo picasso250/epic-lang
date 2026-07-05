@@ -13,6 +13,7 @@ from mir import MirProgram, MirStruct, MirValue, Ret, ValueOperand, ConstIntOper
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from mir_codegen import ast_to_mir
 from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
+from mir_parser import parse_mir_text
 from parser import Parser
 import sema
 
@@ -184,6 +185,26 @@ fun main(): i64 {
         "ptr.i64.get",
     ):
         assert op not in text
+
+
+def test_mir_parser_strips_text_sigils():
+    source = """extern @helper: fn(ptr) -> ptr
+
+fn @main(ptr %arg) -> ptr {
+entry:
+  %tmp: ptr = call ptr @helper(ptr %arg)
+  ret ptr %tmp
+}
+"""
+    program = parse_mir_text(source)
+    assert program.externs[0].name == "helper"
+    fn = program.functions[0]
+    assert fn.name == "main"
+    assert fn.params[0].name == "arg"
+    inst = fn.blocks[0].instructions[0]
+    assert inst.result.name == "tmp"
+    assert inst.callee == "helper"
+    assert fn.text().startswith("fn main(ptr %arg) -> ptr")
 
 
 def test_mir_helper_injection():
@@ -444,6 +465,7 @@ def main():
     test_gep_null_and_ptrtoint_text_and_validation()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
+    test_mir_parser_strips_text_sigils()
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()
     test_runtime_source_str_from_bool_lowers_as_epic_function()

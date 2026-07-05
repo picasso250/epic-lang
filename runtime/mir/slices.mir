@@ -1,0 +1,4 @@
+fn __ep_slice_u8_from_str(ptr %s) -> ptr {
+entry:
+  ret ptr %s
+}

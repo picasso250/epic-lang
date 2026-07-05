@@ -17,7 +17,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | 方面 | 目标 MIR | 当前 Python prototype |
 |------|----------|----------------------|
 | Runtime helper call in MIR | 降到 MIR `call` + MIR helper function | ⚠️ 当前降到 MIR `call` + x64-backed runtime helper；helper 尚未是 `MirFunction` |
-| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ❌ 当前全部手写在 `mir_lower._emit_*()` 中，作为 x64 asm 标签直接生成 |
+| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ⚠️ 运行时 helper 已支持 `runtime/mir/*.mir` + Python builder 混合注入；部分底层 `__epx_*` 仍手写 x64 asm |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ✅ `MirProgram.structs` 使用 `dict[str, MirStruct]`，字段为 `MirField` 列表 |
 | symbol contract | object model 使用 raw module symbol；`@` 只保留给未来 text MIR syntax | ✅ 当前 `MirFunction` / `MirExtern` / `MirGlobal` / `SymbolOperand` 都应存 raw name |
