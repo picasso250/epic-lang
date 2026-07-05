@@ -518,13 +518,56 @@ class MirCodegen:
                 self._inst("call", [base.value, index.value, value.value], type=VOID, callee=callee)
             return self._reachable(self.block)
         elif isinstance(stmt, AssignOpNode):
-            value = BinaryNode(op=stmt.op, left=stmt.target, right=stmt.value)
             if isinstance(stmt.target, VarNode):
-                return self._emit_stmt_from(in_block, AssignNode(name=stmt.target.name, value=value))
+                if stmt.target.name not in self.locals:
+                    raise MirCodegenError(f"undefined variable: {stmt.target.name}")
+                typ = self.local_types[stmt.target.name]
+                addr = ValueOperand(self.locals[stmt.target.name])
+                current = self._inst("load", [addr], result_type=typ, type=typ)
+                rhs = self._expr_from(in_block, stmt.value)
+                self._set_insert_block(rhs.block)
+                result = self._binary(stmt.op, ValueOperand(current), rhs.value)
+                self._inst("store", [result, addr])
+                return self._reachable(self.block)
             if isinstance(stmt.target, FieldAccessNode):
-                return self._emit_stmt_from(in_block, FieldSetNode(object=stmt.target.object, field=stmt.target.field, value=value))
+                base_type = self._infer_type(stmt.target.object)
+                struct_name = self._layout_struct_name(base_type)
+                if struct_name is None:
+                    raise MirCodegenError("compound field assignment base must be a struct pointer")
+                base = self._expr_from(in_block, stmt.target.object)
+                self._set_insert_block(base.block)
+                addr = self._field_addr(base.value, struct_name, stmt.target.field)
+                field_type = self.structs[struct_name].field(stmt.target.field).type
+                current = self._inst("load", [addr], result_type=field_type, type=field_type)
+                rhs = self._expr_from(self.block, stmt.value)
+                self._set_insert_block(rhs.block)
+                result = self._binary(stmt.op, ValueOperand(current), rhs.value)
+                self._inst("store", [result, addr])
+                return self._reachable(self.block)
             if isinstance(stmt.target, SubscriptNode):
-                return self._emit_stmt_from(in_block, SubscriptAssignNode(base=stmt.target.base, index=stmt.target.index, value=value))
+                base_type = self._infer_type(stmt.target.base)
+                base = self._expr_from(in_block, stmt.target.base)
+                index = self._expr_from(base.block, stmt.target.index)
+                self._set_insert_block(index.block)
+                map_value_type = self._map_value_type(base_type)
+                if map_value_type is not None:
+                    current = self._inst("call", [base.value, index.value], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base_type, "get"))
+                elif self._is_i64_array_type(base_type):
+                    current = self._inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_i64_get")
+                elif self._is_u8_array_type(base_type):
+                    current = self._inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_u8_get")
+                else:
+                    raise MirCodegenError("compound subscript assignment only supports primitive arrays and maps in machine MIR so far")
+                rhs = self._expr_from(self.block, stmt.value)
+                self._set_insert_block(rhs.block)
+                result = self._binary(stmt.op, ValueOperand(current), rhs.value)
+                if map_value_type is not None:
+                    self._inst("call", [base.value, index.value, result], type=VOID, callee=self._map_helper(base_type, "set"))
+                elif self._is_i64_array_type(base_type):
+                    self._inst("call", [base.value, index.value, result], type=VOID, callee="__ep_slice_i64_set")
+                else:
+                    self._inst("call", [base.value, index.value, result], type=VOID, callee="__ep_slice_u8_set")
+                return self._reachable(self.block)
             raise MirCodegenError(f"unsupported compound assignment target: {type(stmt.target).__name__}")
         elif isinstance(stmt, BreakNode):
             if not self.loop_stack:
@@ -798,6 +841,17 @@ class MirCodegen:
             block = flow.block
         self._set_insert_block(block)
         return ValueFlow(values, block)
+
+    def _binary(self, op, left, right):
+        op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor",
+                  "<<": "shl", ">>": "sar", ">>>": "shr"}
+        if op == "/":
+            return ValueOperand(self._inst("sdiv", [left, right], result_type=I64))
+        if op == "%":
+            return ValueOperand(self._inst("srem", [left, right], result_type=I64))
+        if op in op_map:
+            return ValueOperand(self._inst(op_map[op], [left, right], result_type=I64))
+        raise MirCodegenError(f"unsupported compound assignment op: {op}")
 
     def _emit_binary(self, expr):
         return self._emit_binary_from(self._ensure_insertable(), expr).value

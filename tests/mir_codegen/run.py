@@ -42,6 +42,7 @@ EXAMPLE_CASES = [
     os.path.join(EXAMPLES_DIR, "m20_comment.ep"),
     os.path.join(EXAMPLES_DIR, "m22_self_ref.ep"),
     os.path.join(EXAMPLES_DIR, "v1_break_continue.ep"),
+    os.path.join(EXAMPLES_DIR, "v1_compound_assign.ep"),
     os.path.join(EXAMPLES_DIR, "v2_array_literal.ep"),
     os.path.join(EXAMPLES_DIR, "v2_array_literal_u8.ep"),
     os.path.join(EXAMPLES_DIR, "v2_struct_init.ep"),
