@@ -17,7 +17,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | 方面 | 目标 MIR | 当前 Python prototype |
 |------|----------|----------------------|
 | Runtime helper call in MIR | 降到 MIR `call` + MIR helper function | ⚠️ 当前降到 MIR `call` + x64-backed runtime helper；helper 尚未是 `MirFunction` |
-| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ⚠️ 运行时 helper 已支持 `runtime/mir/*.mir` + Python builder 混合注入；部分底层 `__epx_*` 仍手写 x64 asm |
+| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ⚠️ 运行时 helper 以 Python builder / Epic runtime source 为主；`runtime/mir/*.mir` 加载能力保留但不作为默认迁移方向；部分底层 `__epx_*` 仍手写 x64 asm |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ❌ 无条件注入全部 extern + 全部 helper 函数体 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ✅ `MirProgram.structs` 使用 `dict[str, MirStruct]`，字段为 `MirField` 列表 |
 | symbol contract | object model 使用 raw module symbol；`@` 只保留给未来 text MIR syntax | ✅ 当前 `MirFunction` / `MirExtern` / `MirGlobal` / `SymbolOperand` 都应存 raw name |
@@ -804,3 +804,4 @@ LowMIR / X64MIR backend 负责：
 - 跨平台 ABI。
 - 通用汇编器。
 - 通用寄存器分配器。
+

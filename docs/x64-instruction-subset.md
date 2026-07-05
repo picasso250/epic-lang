@@ -363,9 +363,11 @@ Most remaining x64-backed helper bodies still live on `MirLower` as `_emit_*`
 methods. Helpers implemented as MIR functions no longer have same-named legacy
 x64 fallback bodies.
 
-Recommended next step: continue moving stable Python-builder MIR helper bodies into
-`runtime/mir/*.mir`, then migrate the remaining x64-backed helper families out of
-`MirLower` one family at a time. Only keep
+Recommended next step: do not mechanically move Python-builder MIR helper bodies into
+`runtime/mir/*.mir`. Prefer Epic runtime source for readable library logic,
+Python builders for templated helper families, and text MIR only for low-level
+helpers where auditability outweighs verbosity. Continue migrating remaining
+x64-backed helper families out of `MirLower` one family at a time; only keep
 true machine/runtime primitives such as heap setup and process startup in the
 x64 runtime layer.
 
@@ -407,3 +409,6 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
 Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
+
+
+

@@ -418,3 +418,4 @@ No known unused runtime helper label is intentionally emitted. The old `__epx_pu
 ### 9.6 No `.data` relocations
 
 `machine.py` 支持 `data_relocs` API 但当前不发射任何 `.data` section relocations。string header 初始化由 runtime `_load_operand` 以代码形式生成（lea + mov 序列），而非数据重定位。
+

@@ -154,6 +154,32 @@ class MirHelperBuilder:
 
 # ── Helper emitters ───────────────────────────────────────────────────────
 
+def emit_slice_u8_from_str() -> MirFunction:
+    """View/convert str as u8[].
+
+    fn __ep_slice_u8_from_str(ptr %s) -> ptr
+    """
+    b = MirHelperBuilder(
+        "__ep_slice_u8_from_str",
+        [MirParam("s", ptr())],
+        ptr(),
+    )
+    b.ret(ValueOperand(b.fn.params[0].value))
+    return b.fn
+
+
+def emit_str_from_slice_u8() -> MirFunction:
+    """View/convert u8[] as str.
+
+    fn __ep_str_from_slice_u8(ptr %input) -> ptr
+    """
+    b = MirHelperBuilder(
+        "__ep_str_from_slice_u8",
+        [MirParam("input", ptr())],
+        ptr(),
+    )
+    b.ret(ValueOperand(b.fn.params[0].value))
+    return b.fn
 
 def emit___ep_str_cat() -> MirFunction:
     """Concatenate two strings into a newly allocated str.
@@ -1190,8 +1216,11 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 
 
 _HELPER_EMITTERS = {
+    "__ep_slice_u8_from_str": lambda p: emit_slice_u8_from_str(),
+    "__ep_str_from_slice_u8": lambda p: emit_str_from_slice_u8(),
     "__ep_str_cat": lambda p: emit___ep_str_cat(),
     "__ep_slice_u8_alloc": lambda p: emit_slice_u8_alloc(),
+    "__ep_slice_u8_get": lambda p: emit_slice_u8_get(),
     "__ep_slice_i64_new": lambda p: emit_slice_word_new("__ep_slice_i64_new"),
     "__ep_slice_i64_get": lambda p: emit_slice_word_get("__ep_slice_i64_get", I64),
     "__ep_slice_i64_set": lambda p: emit_slice_word_set("__ep_slice_i64_set", I64),
@@ -1200,6 +1229,7 @@ _HELPER_EMITTERS = {
     "__ep_slice_ptr_get": lambda p: emit_slice_word_get("__ep_slice_ptr_get", ptr()),
     "__ep_slice_ptr_set": lambda p: emit_slice_word_set("__ep_slice_ptr_set", ptr()),
     "__ep_slice_ptr_push": lambda p: emit_slice_word_push("__ep_slice_ptr_push", ptr()),
+    "__ep_slice_u8_set": lambda p: emit_slice_u8_set(),
     "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
     "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
     "__ep_slice_u8_extend": lambda p: emit_extend_slice_u8(),
@@ -1305,3 +1335,4 @@ def inject_all_mir_helpers(program: MirProgram) -> None:
             program.functions.append(parsed_helpers[name])
         else:
             program.functions.append(_HELPER_EMITTERS[name](program))
+

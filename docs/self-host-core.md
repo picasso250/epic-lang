@@ -105,7 +105,7 @@ required_helpers: defer; unconditional injection stays for now
 
 ### Runtime Helpers (MIR-implemented)
 
-These are unconditionally injected and considered part of the core runtime:
+These are unconditionally injected and considered part of the core runtime. Implementation ownership is split between Python MIR builders, Epic runtime source, and optional text MIR files; helper bodies are not mechanically migrated to `runtime/mir/*.mir` when another representation is clearer:
 
 - `__ep_slice_u8_from_str` — str to `_slice_u8`
 - `__ep_str_from_slice_u8` — `_slice_u8` to str
@@ -295,3 +295,4 @@ Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to
 - [`builtin-inventory.md`](builtin-inventory.md) — Full builtin function inventory
 - [`str-u8-alias-plan.md`](str-u8-alias-plan.md) — staged `str` to `u8[]` alias plan
 - [`todo.md`](../todo.md) — Project todo
+
