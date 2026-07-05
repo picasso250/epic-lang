@@ -218,7 +218,7 @@ class MirCodegen:
         if typ.kind == "named":
             return ptr_struct(typ.name)
         if typ.kind == "ptr":
-            return ptr(self._epic_pointee_type(typ.elem))
+            return ptr()
         raise MirCodegenError(f"machine MIR does not support type yet: {typ}")
 
     def _epic_pointee_type(self, typ):
@@ -233,7 +233,7 @@ class MirCodegen:
         if typ is not None and typ.kind == "named":
             return ptr_struct(typ.name)
         if typ is not None and typ.kind == "ptr":
-            return ptr(self._epic_pointee_type(typ.elem))
+            return ptr()
         raise MirCodegenError(f"machine MIR does not support pointer type yet: {typ}")
 
     def _resolved_type(self, node):
@@ -335,63 +335,45 @@ class MirCodegen:
         addr = self._field_addr(base, struct_name, field)
         self._inst("store", [value, addr])
 
-    def _ptr_struct_name(self, typ):
-        if typ.kind == "ptr" and typ.pointee is not None and typ.pointee.kind == "struct":
-            return typ.pointee.name
+    def _layout_struct_name(self, typ):
+        """Return the runtime layout struct name for an EpicType."""
+        if not isinstance(typ, et.EpicType):
+            return None
+        if typ == et.STR:
+            return "str"
+        if typ.kind == "array":
+            if typ.elem in (et.I8, et.U8):
+                return "_slice_u8"
+            if typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
+                return "_slice_i64"
+            if typ.elem == et.STR:
+                return "_slice_str"
+            if typ.elem is not None and typ.elem.kind == "named":
+                return f"_slice_{typ.elem.name}"
+        if typ.kind == "map":
+            suffix = self._map_suffix(typ)
+            return f"_map_str_{suffix}" if suffix is not None else None
+        if typ.kind == "named":
+            return typ.name
         return None
 
-    def _layout_struct_name(self, typ):
-        """Return the runtime layout struct name for an EpicType or legacy typed MIR ptr."""
-        if isinstance(typ, et.EpicType):
-            if typ == et.STR:
-                return "str"
-            if typ.kind == "array":
-                if typ.elem in (et.I8, et.U8):
-                    return "_slice_u8"
-                if typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
-                    return "_slice_i64"
-                if typ.elem == et.STR:
-                    return "_slice_str"
-                if typ.elem is not None and typ.elem.kind == "named":
-                    return f"_slice_{typ.elem.name}"
-            if typ.kind == "map":
-                suffix = self._map_suffix(typ)
-                return f"_map_str_{suffix}" if suffix is not None else None
-            if typ.kind == "named":
-                return typ.name
-            return None
-        return self._ptr_struct_name(typ)
-
     def _array_struct_elem(self, typ):
-        if isinstance(typ, et.EpicType):
-            if typ.kind == "array" and typ.elem == et.STR:
-                return "str"
-            if typ.kind == "array" and typ.elem is not None and typ.elem.kind == "named":
-                return typ.elem.name if typ.elem.name in self.structs else None
+        if not isinstance(typ, et.EpicType):
             return None
-        struct_name = self._ptr_struct_name(typ)
-        if struct_name is None or not struct_name.startswith("_slice_"):
-            return None
-        elem = struct_name[len("_slice_"):]
-        return elem if elem in self.structs else None
+        if typ.kind == "array" and typ.elem == et.STR:
+            return "str"
+        if typ.kind == "array" and typ.elem is not None and typ.elem.kind == "named":
+            return typ.elem.name if typ.elem.name in self.structs else None
+        return None
 
     def _map_suffix(self, typ):
-        if isinstance(typ, et.EpicType):
-            if typ.kind != "map":
-                return None
-            if typ.elem == et.I64:
-                return "i64"
-            if typ.elem == et.BOOL:
-                return "bool"
-            if typ.elem == et.STR:
-                return "str"
+        if not isinstance(typ, et.EpicType) or typ.kind != "map":
             return None
-        struct_name = self._ptr_struct_name(typ)
-        if struct_name == "_map_str_i64":
+        if typ.elem == et.I64:
             return "i64"
-        if struct_name == "_map_str_bool":
+        if typ.elem == et.BOOL:
             return "bool"
-        if struct_name == "_map_str_str":
+        if typ.elem == et.STR:
             return "str"
         return None
 
@@ -412,10 +394,7 @@ class MirCodegen:
         return f"__ep_map_str_{suffix}_{op}"
 
     def _is_slice_type(self, typ):
-        if isinstance(typ, et.EpicType):
-            return typ.kind == "array"
-        struct_name = self._ptr_struct_name(typ)
-        return struct_name is not None and struct_name.startswith("_slice_")
+        return isinstance(typ, et.EpicType) and typ.kind == "array"
 
     def _is_u8_array_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I8, et.U8)
@@ -427,13 +406,14 @@ class MirCodegen:
         return isinstance(typ, et.EpicType) and typ.kind == "ptr"
 
     def _is_zero_container_type(self, typ):
-        return typ == ptr_str() or self._is_slice_type(typ) or self._map_suffix(typ) is not None
+        return isinstance(typ, et.EpicType) and (typ == et.STR or self._is_slice_type(typ) or self._map_suffix(typ) is not None)
 
     def _materialize_container_slot(self, addr, typ):
         if not self._is_zero_container_type(typ):
             raise MirCodegenError(f"cannot materialize non-container type {typ}")
 
-        current = self._inst("load", [addr], result_type=typ, type=typ)
+        mir_type = self._type(typ)
+        current = self._inst("load", [addr], result_type=mir_type, type=mir_type)
         current_int = self._inst("ptrtoint", [ValueOperand(current)], result_type=I64, type=I64)
         is_null = self._inst("icmp.eq", [ValueOperand(current_int), ConstIntOperand(I64, 0)], result_type=BOOL)
         init_block = self._new_block("container.init")
@@ -446,7 +426,7 @@ class MirCodegen:
         self.block.terminator = Br(done_block.name)
 
         self.block = done_block
-        ensured = self._inst("load", [addr], result_type=typ, type=typ)
+        ensured = self._inst("load", [addr], result_type=mir_type, type=mir_type)
         return ValueOperand(ensured)
 
     def _container_lvalue_addr(self, expr):
@@ -465,7 +445,7 @@ class MirCodegen:
         raise MirCodegenError("container mutation target must be a variable or field")
 
     def _materialize_container_expr(self, expr):
-        typ = self._expr_mir_type(expr)
+        typ = self._resolved_type(expr)
         addr = self._container_lvalue_addr(expr)
         return self._materialize_container_slot(addr, typ)
 
@@ -480,7 +460,7 @@ class MirCodegen:
         self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, load_block.name)
 
         self.block = null_block
-        zero = self._materialized_empty_container(value_type) if value_type == ptr_str() else self._zero_value(value_type)
+        zero = self._materialized_empty_container(et.STR) if self._map_suffix(base_type) == "str" else self._zero_value(value_type)
         self._inst("store", [zero, ValueOperand(result_addr)])
         self.block.terminator = Br(done_block.name)
 
@@ -817,11 +797,13 @@ class MirCodegen:
         if expr.op in ("&&", "||"):
             return self._emit_short_circuit(expr)
 
+        left_type = self._infer_type(expr.left)
+        right_type = self._infer_type(expr.right)
         left = self._emit_expr(expr.left)
         right = self._emit_expr(expr.right)
         op_map = {"+": "add", "-": "sub", "*": "mul", "/": "div", "%": "mod", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
-        if expr.op in ("==", "!=") and left.type == ptr_str() and right.type == ptr_str():
+        if expr.op in ("==", "!=") and left_type == et.STR and right_type == et.STR:
             result = self._inst("call", [left, right], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
             value = ValueOperand(result)
             if expr.op == "!=":
@@ -1139,21 +1121,21 @@ class MirCodegen:
         return out
 
     def _materialized_empty_container(self, typ):
-        if typ == ptr_str():
-            return SymbolOperand(ptr_str(), self._string_label(""))
-        if typ == ptr_slice_u8():
-            result = self._inst("call", [ConstIntOperand(I64, 0), ConstIntOperand(I64, 0)], result_type=ptr_slice_u8(), type=ptr_slice_u8(), callee="__ep_slice_u8_alloc")
+        mir_type = self._type(typ)
+        if typ == et.STR:
+            return SymbolOperand(mir_type, self._string_label(""))
+        if self._is_u8_array_type(typ):
+            result = self._inst("call", [ConstIntOperand(I64, 0), ConstIntOperand(I64, 0)], result_type=mir_type, type=mir_type, callee="__ep_slice_u8_alloc")
             return ValueOperand(result)
-        if typ == ptr_slice_i64():
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=ptr_slice_i64(), type=ptr(), callee="__ep_slice_i64_new")
+        if self._is_i64_array_type(typ):
+            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=mir_type, type=ptr(), callee="__ep_slice_i64_new")
             return ValueOperand(result)
-        struct_name = self._ptr_struct_name(typ)
-        if struct_name is not None and struct_name.startswith("_slice_"):
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=typ, type=ptr(), callee="__ep_slice_ptr_new")
+        if self._array_struct_elem(typ) is not None:
+            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=mir_type, type=ptr(), callee="__ep_slice_ptr_new")
             return ValueOperand(result)
         map_new = self._map_helper(typ, "new")
         if map_new is not None:
-            result = self._inst("call", [], result_type=typ, type=typ, callee=map_new)
+            result = self._inst("call", [], result_type=mir_type, type=mir_type, callee=map_new)
             return ValueOperand(result)
         raise MirCodegenError(f"cannot materialize empty container for {typ}")
 
