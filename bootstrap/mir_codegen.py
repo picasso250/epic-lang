@@ -362,28 +362,6 @@ class MirCodegen:
         value = self._inst("load", [addr], result_type=field_type, type=field_type)
         return ValueOperand(value)
 
-    def _load_len_cap_nullable(self, base, struct_name, field):
-        result_addr = self._alloc_local(f"__{field}.result{self.value_counter}", I64)
-        base_int = self._inst("ptrtoint", [base], result_type=I64, type=I64)
-        is_null = self._inst("icmp.eq", [ValueOperand(base_int), ConstIntOperand(I64, 0)], result_type=BOOL)
-        null_block = self._new_block(f"{field}.null")
-        load_block = self._new_block(f"{field}.load")
-        done_block = self._new_block(f"{field}.done")
-        self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, load_block.name)
-
-        self.block = null_block
-        self._inst("store", [ConstIntOperand(I64, 0), ValueOperand(result_addr)])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = load_block
-        value = self._load_field(base, struct_name, field, result_type=I64)
-        self._inst("store", [value, ValueOperand(result_addr)])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = done_block
-        result = self._inst("load", [ValueOperand(result_addr)], result_type=I64, type=I64)
-        return ValueOperand(result)
-
     def _store_field(self, base, struct_name, field, value):
         addr = self._field_addr(base, struct_name, field)
         self._inst("store", [value, addr])
@@ -458,96 +436,6 @@ class MirCodegen:
     def _is_ptr_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "ptr"
 
-    def _is_zero_container_type(self, typ):
-        return isinstance(typ, et.EpicType) and (typ == et.STR or self._is_slice_type(typ) or self._map_suffix(typ) is not None)
-
-    def _materialize_container_slot(self, addr, typ):
-        if not self._is_zero_container_type(typ):
-            raise MirCodegenError(f"cannot materialize non-container type {typ}")
-
-        mir_type = self._type(typ)
-        current = self._inst("load", [addr], result_type=mir_type, type=mir_type)
-        current_int = self._inst("ptrtoint", [ValueOperand(current)], result_type=I64, type=I64)
-        is_null = self._inst("icmp.eq", [ValueOperand(current_int), ConstIntOperand(I64, 0)], result_type=BOOL)
-        init_block = self._new_block("container.init")
-        done_block = self._new_block("container.done")
-        self.block.terminator = CondBr(ValueOperand(is_null), init_block.name, done_block.name)
-
-        self.block = init_block
-        empty = self._materialized_empty_container(typ)
-        self._inst("store", [empty, addr])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = done_block
-        ensured = self._inst("load", [addr], result_type=mir_type, type=mir_type)
-        return ValueOperand(ensured)
-
-    def _container_lvalue_addr(self, expr):
-        if isinstance(expr, VarNode):
-            if expr.name not in self.locals:
-                raise MirCodegenError(f"undefined variable: {expr.name}")
-            return ValueOperand(self.locals[expr.name])
-        if isinstance(expr, FieldAccessNode):
-            base_type = self._infer_type(expr.object)
-            base = self._emit_expr(expr.object)
-            struct_name = self._layout_struct_name(base_type)
-            if struct_name is None:
-                raise MirCodegenError("container field base must be a struct pointer")
-            field_type = self.structs[struct_name].field(expr.field).type
-            return self._field_addr(base, struct_name, expr.field, result_type=field_type)
-        raise MirCodegenError("container mutation target must be a variable or field")
-
-    def _materialize_container_expr(self, expr):
-        typ = self._resolved_type(expr)
-        addr = self._container_lvalue_addr(expr)
-        return self._materialize_container_slot(addr, typ)
-
-    def _emit_map_read_nullable(self, base, index, base_type):
-        value_type = self._map_value_type(base_type)
-        result_addr = self._alloc_local(f"__map.get.result{self.value_counter}", value_type)
-        base_int = self._inst("ptrtoint", [base], result_type=I64, type=I64)
-        is_null = self._inst("icmp.eq", [ValueOperand(base_int), ConstIntOperand(I64, 0)], result_type=BOOL)
-        null_block = self._new_block("map.get.null")
-        load_block = self._new_block("map.get.load")
-        done_block = self._new_block("map.get.done")
-        self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, load_block.name)
-
-        self.block = null_block
-        zero = self._materialized_empty_container(et.STR) if self._map_suffix(base_type) == "str" else self._zero_value(value_type)
-        self._inst("store", [zero, ValueOperand(result_addr)])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = load_block
-        value = self._inst("call", [base, index], result_type=value_type, type=value_type, callee=self._map_helper(base_type, "get"))
-        self._inst("store", [ValueOperand(value), ValueOperand(result_addr)])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = done_block
-        result = self._inst("load", [ValueOperand(result_addr)], result_type=value_type, type=value_type)
-        return ValueOperand(result)
-
-    def _emit_map_has_del_nullable(self, base, key, base_type, op):
-        result_addr = self._alloc_local(f"__map.{op}.result{self.value_counter}", BOOL)
-        base_int = self._inst("ptrtoint", [base], result_type=I64, type=I64)
-        is_null = self._inst("icmp.eq", [ValueOperand(base_int), ConstIntOperand(I64, 0)], result_type=BOOL)
-        null_block = self._new_block(f"map.{op}.null")
-        call_block = self._new_block(f"map.{op}.call")
-        done_block = self._new_block(f"map.{op}.done")
-        self.block.terminator = CondBr(ValueOperand(is_null), null_block.name, call_block.name)
-
-        self.block = null_block
-        self._inst("store", [ConstBoolOperand(False), ValueOperand(result_addr)])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = call_block
-        value = self._inst("call", [base, key], result_type=BOOL, type=BOOL, callee=self._map_helper(base_type, op))
-        self._inst("store", [ValueOperand(value), ValueOperand(result_addr)])
-        self.block.terminator = Br(done_block.name)
-
-        self.block = done_block
-        result = self._inst("load", [ValueOperand(result_addr)], result_type=BOOL, type=BOOL)
-        return ValueOperand(result)
-
     def _emit_block(self, block):
         flow = self._emit_block_from(self._ensure_insertable(), block)
         self.block = flow.block if flow.reachable else None
@@ -615,21 +503,19 @@ class MirCodegen:
             return self._reachable(self.block)
         elif isinstance(stmt, SubscriptAssignNode):
             base_type = self._infer_type(stmt.base)
-            index = self._expr_from(in_block, stmt.index)
+            base = self._expr_from(in_block, stmt.base)
+            index = self._expr_from(base.block, stmt.index)
             value = self._expr_from(index.block, stmt.value)
             self._set_insert_block(value.block)
             if self._is_u8_array_type(base_type):
-                base = self._materialize_container_expr(stmt.base)
-                self._inst("call", [base, index.value, value.value], type=VOID, callee="__ep_slice_u8_set")
+                self._inst("call", [base.value, index.value, value.value], type=VOID, callee="__ep_slice_u8_set")
             elif self._is_i64_array_type(base_type):
-                base = self._materialize_container_expr(stmt.base)
-                self._inst("call", [base, index.value, value.value], type=VOID, callee="__ep_slice_i64_set")
+                self._inst("call", [base.value, index.value, value.value], type=VOID, callee="__ep_slice_i64_set")
             else:
                 callee = self._map_helper(base_type, "set")
                 if callee is None:
                     raise MirCodegenError("subscript assignment only supports primitive arrays and maps in machine MIR so far")
-                base = self._materialize_container_expr(stmt.base)
-                self._inst("call", [base, index.value, value.value], type=VOID, callee=callee)
+                self._inst("call", [base.value, index.value, value.value], type=VOID, callee=callee)
             return self._reachable(self.block)
         elif isinstance(stmt, AssignOpNode):
             value = BinaryNode(op=stmt.op, left=stmt.target, right=stmt.value)
@@ -1096,9 +982,9 @@ class MirCodegen:
             return ValueFlow(ValueOperand(result), self.block)
         if name == "push":
             dst_type = self._infer_type(expr.args[0])
-            dst = self._materialize_container_expr(expr.args[0])
-            rest = self._emit_arg_flows_from(self.block, expr.args[1:])
-            args = [dst, *rest.value]
+            dst = self._emit_expr_from(self.block, expr.args[0])
+            rest = self._emit_arg_flows_from(dst.block, expr.args[1:])
+            args = [dst.value, *rest.value]
             if self._is_u8_array_type(dst_type):
                 self._inst("call", args, type=VOID, callee="__ep_slice_u8_push")
             elif self._is_i64_array_type(dst_type):
@@ -1113,15 +999,15 @@ class MirCodegen:
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError(f"{name} expects an aggregate pointer")
-            return ValueFlow(self._load_len_cap_nullable(base.value, struct_name, name), self.block)
+            return ValueFlow(self._load_field(base.value, struct_name, name, result_type=I64), self.block)
         if name == "extend":
             dst_type = self._infer_type(expr.args[0])
             if not self._is_u8_array_type(dst_type):
                 raise MirCodegenError("extend only supports u8[]")
-            dst = self._materialize_container_expr(expr.args[0])
-            src = self._emit_expr_from(self.block, expr.args[1])
+            dst = self._emit_expr_from(self.block, expr.args[0])
+            src = self._emit_expr_from(dst.block, expr.args[1])
             self._set_insert_block(src.block)
-            self._inst("call", [dst, src.value], type=VOID, callee="__ep_slice_u8_extend")
+            self._inst("call", [dst.value, src.value], type=VOID, callee="__ep_slice_u8_extend")
             return ValueFlow(ConstIntOperand(I64, 0), self.block)
         if name in ("map_has", "map_del"):
             map_type = self._infer_type(expr.args[0])
@@ -1131,7 +1017,8 @@ class MirCodegen:
             op = "has" if name == "map_has" else "del"
             if self._map_helper(map_type, op) is None:
                 raise MirCodegenError(f"{name} expects map")
-            return ValueFlow(self._emit_map_has_del_nullable(base.value, key.value, map_type, op), self.block)
+            result = self._inst("call", [base.value, key.value], result_type=BOOL, type=BOOL, callee=self._map_helper(map_type, op))
+            return ValueFlow(ValueOperand(result), self.block)
         raise MirCodegenError(f"unsupported builtin call: {name}")
 
     def _emit_user_call(self, expr):
@@ -1161,7 +1048,8 @@ class MirCodegen:
         self._set_insert_block(index.block)
         map_value_type = self._map_value_type(base_type)
         if map_value_type is not None:
-            return ValueFlow(self._emit_map_read_nullable(base.value, index.value, base_type), self.block)
+            result = self._inst("call", [base.value, index.value], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base_type, "get"))
+            return ValueFlow(ValueOperand(result), self.block)
         if self._is_i64_array_type(base_type):
             result = self._inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_i64_get")
             return ValueFlow(ValueOperand(result), self.block)
@@ -1426,25 +1314,6 @@ class MirCodegen:
         if out is None:
             return SymbolOperand(ptr(), self._string_label(""))
         return out
-
-    def _materialized_empty_container(self, typ):
-        mir_type = self._type(typ)
-        if typ == et.STR:
-            return SymbolOperand(mir_type, self._string_label(""))
-        if self._is_u8_array_type(typ):
-            result = self._inst("call", [ConstIntOperand(I64, 0), ConstIntOperand(I64, 0)], result_type=mir_type, type=mir_type, callee="__ep_slice_u8_alloc")
-            return ValueOperand(result)
-        if self._is_i64_array_type(typ):
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=mir_type, type=ptr(), callee="__ep_slice_i64_new")
-            return ValueOperand(result)
-        if self._array_struct_elem(typ) is not None:
-            result = self._inst("call", [ConstIntOperand(I64, 0)], result_type=mir_type, type=ptr(), callee="__ep_slice_ptr_new")
-            return ValueOperand(result)
-        map_new = self._map_helper(typ, "new")
-        if map_new is not None:
-            result = self._inst("call", [], result_type=mir_type, type=mir_type, callee=map_new)
-            return ValueOperand(result)
-        raise MirCodegenError(f"cannot materialize empty container for {typ}")
 
     def _zero_value(self, typ):
         if typ.kind == "ptr":

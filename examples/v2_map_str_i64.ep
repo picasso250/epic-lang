@@ -27,7 +27,7 @@ fun main(): i64 {
         return 6
     }
 
-    let more: map[str]i64
+    let more = new map[str]i64
     more["later"] = 7
     if more["later"] != 7 {
         return 7
