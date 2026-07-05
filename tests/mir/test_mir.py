@@ -18,7 +18,7 @@ import sema
 
 
 def build_smoke_program():
-    x_addr = MirValue("%x.addr", ptr(I64))
+    x_addr = MirValue("%x.addr", ptr())
     x0 = MirValue("%x0", I64)
     c0 = MirValue("%c0", BOOL)
     x1 = MirValue("%x1", I64)
@@ -97,7 +97,7 @@ def assert_mir_invalid(program, message):
 def test_gep_null_and_ptrtoint_text_and_validation():
     size_ptr = MirValue("%size.ptr", ptr())
     size = MirValue("%size", I64)
-    field_ptr = MirValue("%field.ptr", ptr(I64))
+    field_ptr = MirValue("%field.ptr", ptr())
     block = MirBlock(
         "entry",
         [

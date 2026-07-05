@@ -162,8 +162,8 @@ def emit_bytes_slice_u8() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_slice_u8_from_str",
-        [MirParam("%s", ptr(mir_struct("str")))],
-        ptr(mir_struct("_slice_u8")),
+        [MirParam("%s", ptr())],
+        ptr(),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
     return b.fn
@@ -176,8 +176,8 @@ def emit_str_slice_u8() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_str_from_slice_u8",
-        [MirParam("%input", ptr(mir_struct("_slice_u8")))],
-        ptr(mir_struct("str")),
+        [MirParam("%input", ptr())],
+        ptr(),
     )
     b.ret(ValueOperand(b.fn.params[0].value))
     return b.fn
@@ -192,10 +192,10 @@ def emit___ep_str_cat() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_str_cat",
         [
-            MirParam("%left", ptr(mir_struct("str"))),
-            MirParam("%right", ptr(mir_struct("str"))),
+            MirParam("%left", ptr()),
+            MirParam("%right", ptr()),
         ],
-        ptr(mir_struct("str")),
+        ptr(),
     )
     left_val = ValueOperand(b.fn.params[0].value)
     right_val = ValueOperand(b.fn.params[1].value)
@@ -274,7 +274,7 @@ def emit_slice_u8_alloc() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_alloc",
         [MirParam("%len", I64), MirParam("%cap", I64)],
-        ptr(mir_struct("_slice_u8")),
+        ptr(),
     )
     len_val = ValueOperand(b.fn.params[0].value)
     cap_val = ValueOperand(b.fn.params[1].value)
@@ -312,7 +312,7 @@ def emit_slice_u8_get() -> MirFunction:
     """
     b = MirHelperBuilder(
         "__ep_slice_u8_get",
-        [MirParam("%arr", ptr(mir_struct("_slice_u8"))), MirParam("%idx", I64)],
+        [MirParam("%arr", ptr()), MirParam("%idx", I64)],
         I64,
     )
     arr_val = ValueOperand(b.fn.params[0].value)
@@ -571,7 +571,7 @@ def emit_slice_u8_set() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_set",
         [
-            MirParam("%arr", ptr(mir_struct("_slice_u8"))),
+            MirParam("%arr", ptr()),
             MirParam("%idx", I64),
             MirParam("%val", I64),
         ],
@@ -628,7 +628,7 @@ def emit_slice_u8_push() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_push",
         [
-            MirParam("%arr", ptr(mir_struct("_slice_u8"))),
+            MirParam("%arr", ptr()),
             MirParam("%val", I64),
         ],
         VOID,
@@ -734,11 +734,11 @@ def emit_slice_u8_slice() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_slice",
         [
-            MirParam("%arr", ptr(mir_struct("_slice_u8"))),
+            MirParam("%arr", ptr()),
             MirParam("%start", I64),
             MirParam("%end", I64),
         ],
-        ptr(mir_struct("_slice_u8")),
+        ptr(),
     )
     arr_val = ValueOperand(b.fn.params[0].value)
     start_val = ValueOperand(b.fn.params[1].value)
@@ -766,7 +766,7 @@ def emit_slice_u8_slice() -> MirFunction:
 
     b.entry = alloc_block
     slice_len = b.binop("sub", end_val, start_val)
-    result_arr = b.call("__ep_slice_u8_alloc", [slice_len, slice_len], ptr(mir_struct("_slice_u8")))
+    result_arr = b.call("__ep_slice_u8_alloc", [slice_len, slice_len], ptr())
     i_slot = b.alloca(I64)
     b.store(b.const_i64(0), ValueOperand(i_slot))
     src_data = b.load(ptr(), b.gep_field(arr_val, "_slice_u8", 0))
@@ -806,8 +806,8 @@ def emit_extend_slice_u8() -> MirFunction:
     b = MirHelperBuilder(
         "__ep_slice_u8_extend",
         [
-            MirParam("%dst", ptr(mir_struct("_slice_u8"))),
-            MirParam("%src", ptr(mir_struct("_slice_u8"))),
+            MirParam("%dst", ptr()),
+            MirParam("%src", ptr()),
         ],
         VOID,
     )
@@ -872,7 +872,7 @@ def _map_entry_addr(b: MirHelperBuilder, data, index):
 
 def _map_zero_operand(value_type):
     if value_type.kind == "ptr":
-        return SymbolOperand(ptr(mir_struct("str")), "@str.runtime.empty")
+        return SymbolOperand(ptr(), "@str.runtime.empty")
     if value_type == BOOL:
         return ConstBoolOperand(False)
     return ConstIntOperand(value_type, 0)
@@ -882,7 +882,7 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
     """Lookup a str key in a word-valued map, returning value zero on miss."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%map", map_type), MirParam("%key", ptr(mir_struct("str")))],
+        [MirParam("%map", map_type), MirParam("%key", ptr())],
         value_type,
     )
     map_val = ValueOperand(b.fn.params[0].value)
@@ -917,7 +917,7 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
 
     b.entry = key_check
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
     b.entry.terminator = CondBr(ValueOperand(keys_equal), found.name, next_block.name)
 
@@ -940,7 +940,7 @@ def emit_map_str_word_has(name: str, map_type) -> MirFunction:
     """Return true when a key exists in a str-keyed map."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%map", map_type), MirParam("%key", ptr(mir_struct("str")))],
+        [MirParam("%map", map_type), MirParam("%key", ptr())],
         BOOL,
     )
     map_val = ValueOperand(b.fn.params[0].value)
@@ -975,7 +975,7 @@ def emit_map_str_word_has(name: str, map_type) -> MirFunction:
 
     b.entry = key_check
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
     b.entry.terminator = CondBr(ValueOperand(keys_equal), yes.name, next_block.name)
 
@@ -998,7 +998,7 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
         name,
         [
             MirParam("%map", map_type),
-            MirParam("%key", ptr(mir_struct("str"))),
+            MirParam("%key", ptr()),
             MirParam("%val", value_type),
         ],
         VOID,
@@ -1046,7 +1046,7 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
 
     b.entry = key_check
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
     b.entry.terminator = CondBr(ValueOperand(keys_equal), update.name, next_block.name)
 
@@ -1131,7 +1131,7 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
     """Delete a key from a str-keyed word map using swap-delete."""
     b = MirHelperBuilder(
         name,
-        [MirParam("%map", map_type), MirParam("%key", ptr(mir_struct("str")))],
+        [MirParam("%map", map_type), MirParam("%key", ptr())],
         BOOL,
     )
     map_val = ValueOperand(b.fn.params[0].value)
@@ -1168,7 +1168,7 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
 
     b.entry = key_check
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(mir_struct("str")), ValueOperand(key_addr))
+    entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
     b.entry.terminator = CondBr(ValueOperand(keys_equal), found.name, next_block.name)
 
@@ -1236,21 +1236,21 @@ _HELPER_EMITTERS = {
     "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
     "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
     "__ep_slice_u8_extend": lambda p: emit_extend_slice_u8(),
-    "__ep_map_str_i64_new": lambda p: emit_map_str_word_new("__ep_map_str_i64_new", ptr(mir_struct("_map_str_i64"))),
-    "__ep_map_str_i64_get": lambda p: emit_map_str_word_get("__ep_map_str_i64_get", ptr(mir_struct("_map_str_i64")), I64),
-    "__ep_map_str_i64_set": lambda p: emit_map_str_word_set("__ep_map_str_i64_set", ptr(mir_struct("_map_str_i64")), I64),
-    "__ep_map_str_i64_has": lambda p: emit_map_str_word_has("__ep_map_str_i64_has", ptr(mir_struct("_map_str_i64"))),
-    "__ep_map_str_i64_del": lambda p: emit_map_str_word_del("__ep_map_str_i64_del", ptr(mir_struct("_map_str_i64"))),
-    "__ep_map_str_bool_new": lambda p: emit_map_str_word_new("__ep_map_str_bool_new", ptr(mir_struct("_map_str_bool"))),
-    "__ep_map_str_bool_get": lambda p: emit_map_str_word_get("__ep_map_str_bool_get", ptr(mir_struct("_map_str_bool")), BOOL),
-    "__ep_map_str_bool_set": lambda p: emit_map_str_word_set("__ep_map_str_bool_set", ptr(mir_struct("_map_str_bool")), BOOL),
-    "__ep_map_str_bool_has": lambda p: emit_map_str_word_has("__ep_map_str_bool_has", ptr(mir_struct("_map_str_bool"))),
-    "__ep_map_str_bool_del": lambda p: emit_map_str_word_del("__ep_map_str_bool_del", ptr(mir_struct("_map_str_bool"))),
-    "__ep_map_str_str_new": lambda p: emit_map_str_word_new("__ep_map_str_str_new", ptr(mir_struct("_map_str_str"))),
-    "__ep_map_str_str_get": lambda p: emit_map_str_word_get("__ep_map_str_str_get", ptr(mir_struct("_map_str_str")), ptr(mir_struct("str"))),
-    "__ep_map_str_str_set": lambda p: emit_map_str_word_set("__ep_map_str_str_set", ptr(mir_struct("_map_str_str")), ptr(mir_struct("str"))),
-    "__ep_map_str_str_has": lambda p: emit_map_str_word_has("__ep_map_str_str_has", ptr(mir_struct("_map_str_str"))),
-    "__ep_map_str_str_del": lambda p: emit_map_str_word_del("__ep_map_str_str_del", ptr(mir_struct("_map_str_str"))),
+    "__ep_map_str_i64_new": lambda p: emit_map_str_word_new("__ep_map_str_i64_new", ptr()),
+    "__ep_map_str_i64_get": lambda p: emit_map_str_word_get("__ep_map_str_i64_get", ptr(), I64),
+    "__ep_map_str_i64_set": lambda p: emit_map_str_word_set("__ep_map_str_i64_set", ptr(), I64),
+    "__ep_map_str_i64_has": lambda p: emit_map_str_word_has("__ep_map_str_i64_has", ptr()),
+    "__ep_map_str_i64_del": lambda p: emit_map_str_word_del("__ep_map_str_i64_del", ptr()),
+    "__ep_map_str_bool_new": lambda p: emit_map_str_word_new("__ep_map_str_bool_new", ptr()),
+    "__ep_map_str_bool_get": lambda p: emit_map_str_word_get("__ep_map_str_bool_get", ptr(), BOOL),
+    "__ep_map_str_bool_set": lambda p: emit_map_str_word_set("__ep_map_str_bool_set", ptr(), BOOL),
+    "__ep_map_str_bool_has": lambda p: emit_map_str_word_has("__ep_map_str_bool_has", ptr()),
+    "__ep_map_str_bool_del": lambda p: emit_map_str_word_del("__ep_map_str_bool_del", ptr()),
+    "__ep_map_str_str_new": lambda p: emit_map_str_word_new("__ep_map_str_str_new", ptr()),
+    "__ep_map_str_str_get": lambda p: emit_map_str_word_get("__ep_map_str_str_get", ptr(), ptr()),
+    "__ep_map_str_str_set": lambda p: emit_map_str_word_set("__ep_map_str_str_set", ptr(), ptr()),
+    "__ep_map_str_str_has": lambda p: emit_map_str_word_has("__ep_map_str_str_has", ptr()),
+    "__ep_map_str_str_del": lambda p: emit_map_str_word_del("__ep_map_str_str_del", ptr()),
 }
 
 _HELPER_ORDER = [
@@ -1309,7 +1309,7 @@ def inject_all_mir_helpers(program: MirProgram) -> None:
     global_names = {g.name for g in program.globals}
     for name, text in _RUNTIME_STRING_GLOBALS:
         if name not in global_names:
-            program.globals.append(MirGlobal(name, ptr(mir_struct("str")), text))
+            program.globals.append(MirGlobal(name, ptr(), text))
             global_names.add(name)
 
     for name in IMPLEMENTED_MIR_HELPERS:
