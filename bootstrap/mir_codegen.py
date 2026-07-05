@@ -1,5 +1,7 @@
 """AST -> Epic MIR codegen for the initial machine-backend path."""
 
+from dataclasses import dataclass
+
 import epic_types as et
 from sema import assert_typed_program
 from ast_nodes import *
@@ -38,6 +40,18 @@ from mir_runtime_helpers import inject_all_mir_helpers
 
 class MirCodegenError(RuntimeError):
     pass
+
+
+@dataclass
+class ValueFlow:
+    value: object
+    block: MirBlock
+
+
+@dataclass
+class BlockFlow:
+    reachable: bool
+    block: object = None
 
 
 WINAPI_IMPORTS = [
@@ -152,16 +166,17 @@ class MirCodegen:
         self.value_counter = 0
         self.block_counter = 0
         entry = self._new_block("entry")
-        self.block = entry
         for param in self.fn.params:
+            self._set_insert_block(entry)
             addr = self._alloc_local(param.name, param.type)
             self._inst("store", [ValueOperand(param.value), ValueOperand(addr)])
-        self._emit_block(ast_fn.body)
-        if self.block.terminator is None:
+            entry = self.block
+        body = self._emit_block_from(entry, ast_fn.body)
+        if body.reachable:
             if self.fn.return_type == VOID:
-                self.block.terminator = Ret()
+                self._terminate_block(body.block, Ret())
             else:
-                self.block.terminator = Ret(ConstIntOperand(self.fn.return_type, 0))
+                self._terminate_block(body.block, Ret(ConstIntOperand(self.fn.return_type, 0)))
         return self.fn
 
     def _type(self, typ):
@@ -259,15 +274,47 @@ class MirCodegen:
         self.fn.blocks.append(block)
         return block
 
+    def _ensure_insertable(self, block=None):
+        block = self.block if block is None else block
+        if block is None:
+            raise MirCodegenError("no reachable MIR insertion block")
+        if block.terminator is not None:
+            raise MirCodegenError(f"cannot emit after terminator in block {block.name}")
+        return block
+
+    def _set_insert_block(self, block):
+        self.block = self._ensure_insertable(block)
+        return self.block
+
+    def _terminate_block(self, block, terminator):
+        block = self._ensure_insertable(block)
+        block.terminator = terminator
+        if self.block is block:
+            self.block = None
+        return BlockFlow(False, None)
+
+    def _reachable(self, block):
+        return BlockFlow(True, self._ensure_insertable(block))
+
+    def _unreachable(self):
+        return BlockFlow(False, None)
+
+    def _expr_from(self, block, expr):
+        self._set_insert_block(block)
+        value = self._emit_expr(expr)
+        return ValueFlow(value, self._ensure_insertable(self.block))
+
     def _inst(self, op, operands=None, result_type=None, type=None, callee=None):
+        block = self._ensure_insertable()
         result = self._new_value(result_type, op.replace(".", "_")) if result_type is not None else None
         inst = MirInst(op, operands or [], result=result, type=type, callee=callee)
-        self.block.instructions.append(inst)
+        block.instructions.append(inst)
         return result
 
     def _alloc_local(self, name, typ):
+        block = self._ensure_insertable()
         addr = self._new_value(ptr(), f"{name}.addr")
-        self.block.instructions.append(MirInst("alloca", result=addr, type=typ))
+        block.instructions.append(MirInst("alloca", result=addr, type=typ))
         self.locals[name] = addr
         self.local_types[name] = typ
         return addr
@@ -502,150 +549,202 @@ class MirCodegen:
         return ValueOperand(result)
 
     def _emit_block(self, block):
+        flow = self._emit_block_from(self._ensure_insertable(), block)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_block_from(self, in_block, block):
+        flow = self._reachable(in_block)
         for stmt in block.stmts:
-            if self.block.terminator is not None:
-                break
-            self._emit_stmt(stmt)
+            if not flow.reachable:
+                return flow
+            flow = self._emit_stmt_from(flow.block, stmt)
+        return flow
 
     def _emit_stmt(self, stmt):
+        flow = self._emit_stmt_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_stmt_from(self, in_block, stmt):
+        self._set_insert_block(in_block)
         if isinstance(stmt, ExprStmtNode):
-            self._emit_expr(stmt.expr)
+            value = self._expr_from(in_block, stmt.expr)
+            return self._reachable(value.block)
         elif isinstance(stmt, LetNode):
             typ = self._type(stmt.resolved_type)
             addr = self._alloc_local(stmt.name, typ)
-            value = self._emit_expr(stmt.value) if stmt.value is not None else self._zero_value(typ)
-            self._inst("store", [value, ValueOperand(addr)])
+            init_block = self.block
+            value = self._expr_from(init_block, stmt.value) if stmt.value is not None else ValueFlow(self._zero_value(typ), init_block)
+            self._set_insert_block(value.block)
+            self._inst("store", [value.value, ValueOperand(addr)])
+            return self._reachable(self.block)
         elif isinstance(stmt, AssignNode):
             if stmt.name not in self.locals:
                 raise MirCodegenError(f"undefined variable: {stmt.name}")
-            value = self._emit_expr(stmt.value)
-            self._inst("store", [value, ValueOperand(self.locals[stmt.name])])
+            value = self._expr_from(in_block, stmt.value)
+            self._set_insert_block(value.block)
+            self._inst("store", [value.value, ValueOperand(self.locals[stmt.name])])
+            return self._reachable(self.block)
         elif isinstance(stmt, ReturnNode):
-            self.block.terminator = Ret(self._emit_expr(stmt.expr) if stmt.expr is not None else None)
+            if stmt.expr is None:
+                return self._terminate_block(in_block, Ret())
+            value = self._expr_from(in_block, stmt.expr)
+            return self._terminate_block(value.block, Ret(value.value))
         elif isinstance(stmt, IfNode):
-            self._emit_if(stmt)
+            return self._emit_if_from(in_block, stmt)
         elif isinstance(stmt, WhileNode):
-            self._emit_while(stmt)
+            return self._emit_while_from(in_block, stmt)
         elif isinstance(stmt, ForRangeNode):
-            self._emit_for_range(stmt)
+            return self._emit_for_range_from(in_block, stmt)
         elif isinstance(stmt, AssertNode):
-            self._emit_assert(stmt)
+            return self._emit_assert_from(in_block, stmt)
         elif isinstance(stmt, PanicNode):
-            self._emit_panic(stmt)
+            return self._emit_panic_from(in_block, stmt)
         elif isinstance(stmt, MatchNode):
-            self._emit_match(stmt)
+            return self._emit_match_from(in_block, stmt)
         elif isinstance(stmt, FieldSetNode):
             base_type = self._infer_type(stmt.object)
-            base = self._emit_expr(stmt.object)
-            value = self._emit_expr(stmt.value)
+            base = self._expr_from(in_block, stmt.object)
+            value = self._expr_from(base.block, stmt.value)
+            self._set_insert_block(value.block)
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError("field assignment base must be a struct pointer")
-            self._store_field(base, struct_name, stmt.field, value)
+            self._store_field(base.value, struct_name, stmt.field, value.value)
+            return self._reachable(self.block)
         elif isinstance(stmt, SubscriptAssignNode):
             base_type = self._infer_type(stmt.base)
-            index = self._emit_expr(stmt.index)
-            value = self._emit_expr(stmt.value)
+            index = self._expr_from(in_block, stmt.index)
+            value = self._expr_from(index.block, stmt.value)
+            self._set_insert_block(value.block)
             if self._is_u8_array_type(base_type):
                 base = self._materialize_container_expr(stmt.base)
-                self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_u8_set")
+                self._inst("call", [base, index.value, value.value], type=VOID, callee="__ep_slice_u8_set")
             elif self._is_i64_array_type(base_type):
                 base = self._materialize_container_expr(stmt.base)
-                self._inst("call", [base, index, value], type=VOID, callee="__ep_slice_i64_set")
+                self._inst("call", [base, index.value, value.value], type=VOID, callee="__ep_slice_i64_set")
             else:
                 callee = self._map_helper(base_type, "set")
                 if callee is None:
                     raise MirCodegenError("subscript assignment only supports primitive arrays and maps in machine MIR so far")
                 base = self._materialize_container_expr(stmt.base)
-                self._inst("call", [base, index, value], type=VOID, callee=callee)
+                self._inst("call", [base, index.value, value.value], type=VOID, callee=callee)
+            return self._reachable(self.block)
         elif isinstance(stmt, AssignOpNode):
             value = BinaryNode(op=stmt.op, left=stmt.target, right=stmt.value)
             if isinstance(stmt.target, VarNode):
-                self._emit_stmt(AssignNode(name=stmt.target.name, value=value))
-            elif isinstance(stmt.target, FieldAccessNode):
-                self._emit_stmt(FieldSetNode(object=stmt.target.object, field=stmt.target.field, value=value))
-            elif isinstance(stmt.target, SubscriptNode):
-                self._emit_stmt(SubscriptAssignNode(base=stmt.target.base, index=stmt.target.index, value=value))
-            else:
-                raise MirCodegenError(f"unsupported compound assignment target: {type(stmt.target).__name__}")
+                return self._emit_stmt_from(in_block, AssignNode(name=stmt.target.name, value=value))
+            if isinstance(stmt.target, FieldAccessNode):
+                return self._emit_stmt_from(in_block, FieldSetNode(object=stmt.target.object, field=stmt.target.field, value=value))
+            if isinstance(stmt.target, SubscriptNode):
+                return self._emit_stmt_from(in_block, SubscriptAssignNode(base=stmt.target.base, index=stmt.target.index, value=value))
+            raise MirCodegenError(f"unsupported compound assignment target: {type(stmt.target).__name__}")
         elif isinstance(stmt, BreakNode):
             if not self.loop_stack:
                 raise MirCodegenError("break outside loop")
-            self.block.terminator = Br(self.loop_stack[-1][1])
+            return self._terminate_block(in_block, Br(self.loop_stack[-1][1]))
         elif isinstance(stmt, ContinueNode):
             if not self.loop_stack:
                 raise MirCodegenError("continue outside loop")
-            self.block.terminator = Br(self.loop_stack[-1][0])
-        else:
-            raise MirCodegenError(f"machine MIR does not support stmt yet: {type(stmt).__name__}")
+            return self._terminate_block(in_block, Br(self.loop_stack[-1][0]))
+        raise MirCodegenError(f"machine MIR does not support stmt yet: {type(stmt).__name__}")
 
     def _emit_if(self, stmt):
-        cond = self._emit_expr(stmt.cond)
+        flow = self._emit_if_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_if_from(self, in_block, stmt):
+        cond = self._expr_from(in_block, stmt.cond)
         then_block = self._new_block("if.then")
         else_block = self._new_block("if.else") if stmt.else_block else None
         end_block = self._new_block("if.end")
-        self.block.terminator = CondBr(cond, then_block.name, else_block.name if else_block else end_block.name)
-        self.block = then_block
-        self._emit_block(stmt.then_block)
-        if self.block.terminator is None:
-            self.block.terminator = Br(end_block.name)
+        self._terminate_block(cond.block, CondBr(cond.value, then_block.name, else_block.name if else_block else end_block.name))
+
+        then_flow = self._emit_block_from(then_block, stmt.then_block)
+        if then_flow.reachable:
+            self._terminate_block(then_flow.block, Br(end_block.name))
+
         if else_block is not None:
-            self.block = else_block
-            self._emit_block(stmt.else_block)
-            if self.block.terminator is None:
-                self.block.terminator = Br(end_block.name)
-        self.block = end_block
+            else_flow = self._emit_block_from(else_block, stmt.else_block)
+            if else_flow.reachable:
+                self._terminate_block(else_flow.block, Br(end_block.name))
+
+        return self._reachable(end_block)
 
     def _emit_while(self, stmt):
+        flow = self._emit_while_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_while_from(self, in_block, stmt):
         cond_block = self._new_block("while.cond")
         body_block = self._new_block("while.body")
         end_block = self._new_block("while.end")
-        self.block.terminator = Br(cond_block.name)
+        self._terminate_block(in_block, Br(cond_block.name))
         self.loop_stack.append((cond_block.name, end_block.name))
-        self.block = cond_block
-        cond = self._emit_expr(stmt.cond)
-        self.block.terminator = CondBr(cond, body_block.name, end_block.name)
-        self.block = body_block
-        self._emit_block(stmt.body)
-        if self.block.terminator is None:
-            self.block.terminator = Br(cond_block.name)
+        cond = self._expr_from(cond_block, stmt.cond)
+        self._terminate_block(cond.block, CondBr(cond.value, body_block.name, end_block.name))
+        body_flow = self._emit_block_from(body_block, stmt.body)
+        if body_flow.reachable:
+            self._terminate_block(body_flow.block, Br(cond_block.name))
         self.loop_stack.pop()
-        self.block = end_block
+        return self._reachable(end_block)
 
     def _emit_for_range(self, stmt):
+        flow = self._emit_for_range_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_for_range_from(self, in_block, stmt):
+        self._set_insert_block(in_block)
         var_addr = self._alloc_local(stmt.name, I64)
         end_addr = self._alloc_local(f"__{stmt.name}.end{self.value_counter}", I64)
-        self._inst("store", [self._emit_expr(stmt.start), ValueOperand(var_addr)])
-        self._inst("store", [self._emit_expr(stmt.end), ValueOperand(end_addr)])
+        start = self._expr_from(self.block, stmt.start)
+        self._set_insert_block(start.block)
+        self._inst("store", [start.value, ValueOperand(var_addr)])
+        end_value = self._expr_from(self.block, stmt.end)
+        self._set_insert_block(end_value.block)
+        self._inst("store", [end_value.value, ValueOperand(end_addr)])
+
         cond_block = self._new_block("for.cond")
         body_block = self._new_block("for.body")
         inc_block = self._new_block("for.inc")
         end_block = self._new_block("for.end")
-        self.block.terminator = Br(cond_block.name)
-        self.block = cond_block
+        self._terminate_block(self.block, Br(cond_block.name))
+
+        self._set_insert_block(cond_block)
         cur = self._inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
         end = self._inst("load", [ValueOperand(end_addr)], result_type=I64, type=I64)
         cond = self._inst("icmp.slt", [ValueOperand(cur), ValueOperand(end)], result_type=BOOL)
-        self.block.terminator = CondBr(ValueOperand(cond), body_block.name, end_block.name)
+        self._terminate_block(cond_block, CondBr(ValueOperand(cond), body_block.name, end_block.name))
+
         self.loop_stack.append((inc_block.name, end_block.name))
-        self.block = body_block
-        self._emit_block(stmt.body)
-        if self.block.terminator is None:
-            self.block.terminator = Br(inc_block.name)
+        body_flow = self._emit_block_from(body_block, stmt.body)
+        if body_flow.reachable:
+            self._terminate_block(body_flow.block, Br(inc_block.name))
         self.loop_stack.pop()
-        self.block = inc_block
+
+        self._set_insert_block(inc_block)
         cur = self._inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
         nxt = self._inst("add", [ValueOperand(cur), ConstIntOperand(I64, 1)], result_type=I64)
         self._inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
-        self.block.terminator = Br(cond_block.name)
-        self.block = end_block
+        self._terminate_block(inc_block, Br(cond_block.name))
+        return self._reachable(end_block)
 
     def _emit_assert(self, stmt):
-        cond = self._emit_expr(stmt.cond)
+        flow = self._emit_assert_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_assert_from(self, in_block, stmt):
+        cond = self._expr_from(in_block, stmt.cond)
         ok_block = self._new_block("assert.ok")
         fail_block = self._new_block("assert.fail")
-        self.block.terminator = CondBr(cond, ok_block.name, fail_block.name)
-        self.block = fail_block
+        self._terminate_block(cond.block, CondBr(cond.value, ok_block.name, fail_block.name))
+
+        self._set_insert_block(fail_block)
         self._emit_print_text(f"assert line {stmt.line}: ")
         if stmt.message is None:
             self._emit_print_text("assertion failed")
@@ -653,15 +752,21 @@ class MirCodegen:
             self._emit_print_expr(stmt.message)
         self._emit_print_newline()
         self._emit_exit_current_block()
-        self.block.terminator = self._dummy_return()
-        self.block = ok_block
+        self._terminate_block(fail_block, self._dummy_return())
+        return self._reachable(ok_block)
 
     def _emit_panic(self, stmt):
+        flow = self._emit_panic_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_panic_from(self, in_block, stmt):
+        self._set_insert_block(in_block)
         self._emit_print_text(f"panic line {stmt.line}: ")
         self._emit_print_expr(stmt.message)
         self._emit_print_newline()
         self._emit_exit_current_block()
-        self.block.terminator = self._dummy_return()
+        return self._terminate_block(self.block, self._dummy_return())
 
     def _dummy_return(self):
         if self.fn.return_type == VOID:
@@ -691,45 +796,58 @@ class MirCodegen:
         return ValueOperand(sign_extended)
 
     def _emit_match(self, stmt):
-        value = self._emit_expr(stmt.expr)
-        match_addr = self._alloc_local(f"__match{self.value_counter}", value.type)
-        self._inst("store", [value, ValueOperand(match_addr)])
+        flow = self._emit_match_from(self._ensure_insertable(), stmt)
+        self.block = flow.block if flow.reachable else None
+        return flow
+
+    def _emit_match_from(self, in_block, stmt):
+        scrutinee = self._expr_from(in_block, stmt.expr)
+        self._set_insert_block(scrutinee.block)
+        match_addr = self._alloc_local(f"__match{self.value_counter}", scrutinee.value.type)
+        self._inst("store", [scrutinee.value, ValueOperand(match_addr)])
+
         end_block = self._new_block("match.end")
         else_case = next((case for case in stmt.cases if case.is_else), None)
         checks = [(case, self._new_block("match.case")) for case in stmt.cases if not case.is_else]
         else_block = self._new_block("match.else") if else_case is not None else end_block
 
+        check_block = self.block
         next_check_blocks = [self._new_block("match.next") for _ in checks[:-1]]
         for idx, (case, case_block) in enumerate(checks):
+            self._set_insert_block(check_block)
             next_block = next_check_blocks[idx] if idx < len(checks) - 1 else else_block
-            self._emit_match_check(stmt, match_addr, value.type, case, case_block, next_block)
+            self._emit_match_check(stmt, match_addr, scrutinee.value.type, case, case_block, next_block)
             if idx < len(checks) - 1:
-                self.block = next_check_blocks[idx]
+                check_block = next_check_blocks[idx]
 
         if not checks:
-            self.block.terminator = Br(else_block.name)
+            self._terminate_block(check_block, Br(else_block.name))
 
+        any_reachable = False
         for case, case_block in checks:
-            self.block = case_block
+            self._set_insert_block(case_block)
             self._emit_match_bindings(match_addr, case)
-            self._emit_block(case.body)
-            if self.block.terminator is None:
-                self.block.terminator = Br(end_block.name)
+            case_flow = self._emit_block_from(case_block, case.body)
+            if case_flow.reachable:
+                any_reachable = True
+                self._terminate_block(case_flow.block, Br(end_block.name))
 
         if else_case is not None:
-            self.block = else_block
-            self._emit_block(else_case.body)
-            if self.block.terminator is None:
-                self.block.terminator = Br(end_block.name)
+            else_flow = self._emit_block_from(else_block, else_case.body)
+            if else_flow.reachable:
+                any_reachable = True
+                self._terminate_block(else_flow.block, Br(end_block.name))
+        else:
+            any_reachable = True
 
-        self.block = end_block
+        return self._reachable(end_block) if any_reachable else self._unreachable()
 
     def _emit_match_check(self, stmt, match_addr, match_type, case, case_block, next_block):
         scrut = self._inst("load", [ValueOperand(match_addr)], result_type=match_type, type=match_type)
         scrut_op = ValueOperand(scrut)
         pat = self._emit_expr(case.pattern)
         cond = self._inst("icmp.eq", [scrut_op, pat], result_type=BOOL)
-        self.block.terminator = CondBr(ValueOperand(cond), case_block.name, next_block.name)
+        self._terminate_block(self.block, CondBr(ValueOperand(cond), case_block.name, next_block.name))
 
     def _emit_match_bindings(self, match_addr, case):
         if not case.bindings:
