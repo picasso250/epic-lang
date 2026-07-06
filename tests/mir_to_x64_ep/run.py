@@ -22,59 +22,10 @@ DRIVER = ROOT / "tests" / "mir_to_x64_ep" / "driver.ep"
 FIXTURE_EXE = BUILD_DIR / "tests" / "mir_to_x64_ep" / "fixture.exe"
 DRIVER_EXE = BUILD_DIR / "tests" / "mir_to_x64_ep" / "driver.exe"
 EXAMPLES_DIR = ROOT / "examples"
-EXAMPLE_CASES = [
-    EXAMPLES_DIR / "m1_exit.ep",
-    EXAMPLES_DIR / "m20_comment.ep",
-    EXAMPLES_DIR / "m22_self_ref.ep",
-    EXAMPLES_DIR / "m2_expr.ep",
-    EXAMPLES_DIR / "m3_var.ep",
-    EXAMPLES_DIR / "m4_fn.ep",
-    EXAMPLES_DIR / "m5_if.ep",
-    EXAMPLES_DIR / "m6_while.ep",
-    EXAMPLES_DIR / "v1_break_continue.ep",
-    EXAMPLES_DIR / "v3_return_paths.ep",
-    EXAMPLES_DIR / "v4_exit_return_path.ep",
-    EXAMPLES_DIR / "v1_else_if.ep",
-    EXAMPLES_DIR / "v1_bool_int_ops.ep",
-    EXAMPLES_DIR / "m10_str.ep",
-    EXAMPLES_DIR / "m30_str_cat.ep",
-    EXAMPLES_DIR / "m9_array.ep",
-    EXAMPLES_DIR / "v1_len_cap.ep",
-    EXAMPLES_DIR / "v1_checked_index.ep",
-    EXAMPLES_DIR / "v1_slice.ep",
-    EXAMPLES_DIR / "v2_array_literal.ep",
-    EXAMPLES_DIR / "v2_array_literal_u8.ep",
-    EXAMPLES_DIR / "v5_byte_u8_push_255.ep",
-    EXAMPLES_DIR / "m33_fstring_print.ep",
-    EXAMPLES_DIR / "v2_str_repr.ep",
-    EXAMPLES_DIR / "v4_str_eq.ep",
-    EXAMPLES_DIR / "v6_i64_min_str.ep",
-    EXAMPLES_DIR / "v1_compound_assign.ep",
-    EXAMPLES_DIR / "v5_byte_u8_255_readback.ep",
-    EXAMPLES_DIR / "v5_zero_copy_str_bytes.ep",
-    EXAMPLES_DIR / "v4_empty_array_push.ep",
-    EXAMPLES_DIR / "v1_checked_index_oob.ep",
-    EXAMPLES_DIR / "v1_slice_oob.ep",
-    EXAMPLES_DIR / "v1_for_in_range.ep",
-    EXAMPLES_DIR / "v1_extend_generic.ep",
-    EXAMPLES_DIR / "v2_struct_init.ep",
-    EXAMPLES_DIR / "v3_i32_u32.ep",
-    EXAMPLES_DIR / "v6_unsigned_div_cmp.ep",
-    EXAMPLES_DIR / "v2_assert_ok.ep",
-    EXAMPLES_DIR / "v2_match_basic.ep",
-    EXAMPLES_DIR / "v2_panic.ep",
-    EXAMPLES_DIR / "m32_bytes_extend.ep",
-    EXAMPLES_DIR / "v1_byte_io_endian.ep",
-    EXAMPLES_DIR / "v2_map_str_i64.ep",
-    EXAMPLES_DIR / "v4_cstr_invalid.ep",
-    EXAMPLES_DIR / "v4_messagebox_compile.ep",
-    EXAMPLES_DIR / "m11_file.ep",
-    EXAMPLES_DIR / "m15_system.ep",
-    EXAMPLES_DIR / "m24_read_file.ep",
-    EXAMPLES_DIR / "m25_argv.ep",
-    EXAMPLES_DIR / "m26_write_file.ep",
-    EXAMPLES_DIR / "m28_sys_winapi.ep",
-]
+AST_TO_MIR_PASS_DIR = ROOT / "tests" / "ast_to_mir" / "pass"
+EXAMPLE_CASES = sorted(EXAMPLES_DIR.glob("*.ep"))
+AST_TO_MIR_PASS_CASES = sorted(AST_TO_MIR_PASS_DIR.glob("*.ep"))
+USER_CASES = EXAMPLE_CASES + AST_TO_MIR_PASS_CASES
 
 EXPECTED = """section .text
 add1:
@@ -250,7 +201,7 @@ def main() -> int:
     if not check_text_case("mir_to_x64_ep integer ops and branches", EXPECTED, result.stdout):
         failed += 1
 
-    for path in EXAMPLE_CASES:
+    for path in USER_CASES:
         rel = str(path.relative_to(ROOT))
         try:
             expected = python_user_x64(path)

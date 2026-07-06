@@ -25,41 +25,9 @@ CASES = [
     if name.endswith(".ep")
 ]
 EXAMPLE_CASES = [
-    os.path.join(EXAMPLES_DIR, "m1_exit.ep"),
-    os.path.join(EXAMPLES_DIR, "m20_comment.ep"),
-    os.path.join(EXAMPLES_DIR, "m22_self_ref.ep"),
-    os.path.join(EXAMPLES_DIR, "m25_argv.ep"),
-    os.path.join(EXAMPLES_DIR, "m28_sys_winapi.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_break_continue.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_compound_assign.ep"),
-    os.path.join(EXAMPLES_DIR, "v2_array_literal.ep"),
-    os.path.join(EXAMPLES_DIR, "v2_array_literal_u8.ep"),
-    os.path.join(EXAMPLES_DIR, "v2_struct_init.ep"),
-    os.path.join(EXAMPLES_DIR, "v3_i32_u32.ep"),
-    os.path.join(EXAMPLES_DIR, "v4_exit_return_path.ep"),
-    os.path.join(EXAMPLES_DIR, "v4_empty_array_push.ep"),
-    os.path.join(EXAMPLES_DIR, "v4_messagebox_compile.ep"),
-    os.path.join(EXAMPLES_DIR, "v4_cstr_invalid.ep"),
-    os.path.join(EXAMPLES_DIR, "v5_zero_copy_str_bytes.ep"),
-    os.path.join(EXAMPLES_DIR, "v5_byte_u8_push_255.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_checked_index.ep"),
-    os.path.join(EXAMPLES_DIR, "m10_str.ep"),
-    os.path.join(EXAMPLES_DIR, "v6_i64_min_str.ep"),
-    os.path.join(EXAMPLES_DIR, "v2_str_repr.ep"),
-    os.path.join(EXAMPLES_DIR, "v5_byte_u8_255_readback.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_len_cap.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_for_in_range.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_else_if.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_extend_generic.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_checked_index_oob.ep"),
-    os.path.join(EXAMPLES_DIR, "m33_fstring_print.ep"),
-    os.path.join(EXAMPLES_DIR, "m9_array.ep"),
-    os.path.join(EXAMPLES_DIR, "v1_bool_int_ops.ep"),
-    os.path.join(EXAMPLES_DIR, "m6_while.ep"),
-    os.path.join(EXAMPLES_DIR, "m5_if.ep"),
-    os.path.join(EXAMPLES_DIR, "m4_fn.ep"),
-    os.path.join(EXAMPLES_DIR, "m3_var.ep"),
-    os.path.join(EXAMPLES_DIR, "m2_expr.ep"),
+    os.path.join(EXAMPLES_DIR, name)
+    for name in sorted(os.listdir(EXAMPLES_DIR))
+    if name.endswith(".ep")
 ]
 sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import lex
