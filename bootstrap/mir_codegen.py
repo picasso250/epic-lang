@@ -526,7 +526,7 @@ class MirCodegen:
                 current = self._inst("load", [addr], result_type=typ, type=typ)
                 rhs = self._expr_from(in_block, stmt.value)
                 self._set_insert_block(rhs.block)
-                result = self._binary(stmt.op, ValueOperand(current), rhs.value)
+                result = self._binary(stmt.op, ValueOperand(current), rhs.value, self._infer_type(stmt.target), self._node_line(stmt))
                 self._inst("store", [result, addr])
                 return self._reachable(self.block)
             if isinstance(stmt.target, FieldAccessNode):
@@ -541,7 +541,7 @@ class MirCodegen:
                 current = self._inst("load", [addr], result_type=field_type, type=field_type)
                 rhs = self._expr_from(self.block, stmt.value)
                 self._set_insert_block(rhs.block)
-                result = self._binary(stmt.op, ValueOperand(current), rhs.value)
+                result = self._binary(stmt.op, ValueOperand(current), rhs.value, self._infer_type(stmt.target), self._node_line(stmt))
                 self._inst("store", [result, addr])
                 return self._reachable(self.block)
             if isinstance(stmt.target, SubscriptNode):
@@ -560,7 +560,7 @@ class MirCodegen:
                     raise MirCodegenError("compound subscript assignment only supports primitive arrays and maps in machine MIR so far")
                 rhs = self._expr_from(self.block, stmt.value)
                 self._set_insert_block(rhs.block)
-                result = self._binary(stmt.op, ValueOperand(current), rhs.value)
+                result = self._binary(stmt.op, ValueOperand(current), rhs.value, self._infer_type(stmt.target), self._node_line(stmt))
                 if map_value_type is not None:
                     self._inst("call", [base.value, index.value, result], type=VOID, callee=self._map_helper(base_type, "set"))
                 elif self._is_i64_array_type(base_type):
@@ -714,6 +714,37 @@ class MirCodegen:
     def _emit_print_newline(self):
         self._inst("call", [], type=VOID, callee="__ep_print_newline")
 
+    def _node_line(self, node):
+        return getattr(node, "line", getattr(getattr(node, "target", None), "line", getattr(getattr(node, "value", None), "line", 0)))
+
+    def _shift_width(self, typ):
+        if typ in (et.U8, "u8"):
+            return 8
+        if typ in (et.I32, et.U32, "i32", "u32"):
+            return 32
+        return 64
+
+    def _emit_shift_count_check(self, count, lhs_type, line):
+        width = self._shift_width(lhs_type)
+        high_block = self._new_block("shift.high")
+        ok_block = self._new_block("shift.ok")
+        fail_block = self._new_block("shift.fail")
+
+        nonneg = self._inst("icmp.sge", [count, ConstIntOperand(I64, 0)], result_type=BOOL)
+        self._terminate_block(self.block, CondBr(ValueOperand(nonneg), high_block.name, fail_block.name))
+
+        self._set_insert_block(high_block)
+        in_range = self._inst("icmp.slt", [count, ConstIntOperand(I64, width)], result_type=BOOL)
+        self._terminate_block(high_block, CondBr(ValueOperand(in_range), ok_block.name, fail_block.name))
+
+        self._set_insert_block(fail_block)
+        self._emit_print_text(f"panic line {line}: invalid shift count")
+        self._emit_print_newline()
+        self._emit_exit_current_block()
+        self._terminate_block(fail_block, self._dummy_return())
+
+        self._set_insert_block(ok_block)
+
     def _emit_truncating_uint_conversion(self, expr, mask):
         value = self._emit_expr(expr)
         return ValueOperand(self._inst("and", [value, ConstIntOperand(I64, mask)], result_type=I64))
@@ -842,13 +873,15 @@ class MirCodegen:
         self._set_insert_block(block)
         return ValueFlow(values, block)
 
-    def _binary(self, op, left, right):
+    def _binary(self, op, left, right, lhs_type=None, line=0):
         op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor",
                   "<<": "shl", ">>": "sar", ">>>": "shr"}
         if op == "/":
             return ValueOperand(self._inst("sdiv", [left, right], result_type=I64))
         if op == "%":
             return ValueOperand(self._inst("srem", [left, right], result_type=I64))
+        if op in ("<<", ">>", ">>>"):
+            self._emit_shift_count_check(right, lhs_type, line)
         if op in op_map:
             return ValueOperand(self._inst(op_map[op], [left, right], result_type=I64))
         raise MirCodegenError(f"unsupported compound assignment op: {op}")
@@ -879,6 +912,8 @@ class MirCodegen:
         if expr.op == "%":
             return ValueFlow(ValueOperand(self._inst("urem" if unsigned else "srem", [left.value, right.value], result_type=I64)), self.block)
         if expr.op in op_map:
+            if expr.op in ("<<", ">>", ">>>"):
+                self._emit_shift_count_check(right.value, left_type, self._node_line(expr))
             return ValueFlow(ValueOperand(self._inst(op_map[expr.op], [left.value, right.value], result_type=I64)), self.block)
         if expr.op in cmp_map:
             pred = cmp_map[expr.op]
