@@ -1,0 +1,5 @@
+# MIR-CODEGEN: assert lowering should create ok/fail control flow.
+fun main(): i64 {
+    assert true, "bad"
+    return 5
+}

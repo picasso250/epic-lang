@@ -1,0 +1,20 @@
+# MIR-CODEGEN: literal match over integer, bool, and string cases.
+fun main(): i64 {
+    let n = 1
+    match n {
+        0: { print("zero") }
+        1: { print("one") }
+        else: { print("many") }
+    }
+    let b = true
+    match b {
+        true: { print("T") }
+        else: { print("F") }
+    }
+    let s = "x"
+    match s {
+        "x": { print("S") }
+        else: { print("N") }
+    }
+    return 0
+}

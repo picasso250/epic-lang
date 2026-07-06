@@ -37,6 +37,12 @@ CASES = [
     os.path.join(SCRIPT_DIR, "pass_m16_for_assign_op.ep"),
     os.path.join(SCRIPT_DIR, "pass_m17_string_fstring.ep"),
     os.path.join(SCRIPT_DIR, "pass_m18_casts.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m19_assert.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m20_panic.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m21_match.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m22_slice.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m23_map.ep"),
+    os.path.join(SCRIPT_DIR, "pass_m24_file_system.ep"),
 ]
 EXAMPLE_CASES = [
     os.path.join(EXAMPLES_DIR, "m1_exit.ep"),
@@ -162,5 +168,3 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

@@ -1,0 +1,4 @@
+# MIR-CODEGEN: panic lowering should print and terminate the current block.
+fun main(): void {
+    panic "boom"
+}
