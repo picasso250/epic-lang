@@ -49,6 +49,11 @@ EXAMPLE_CASES = [
     EXAMPLES_DIR / "v2_str_repr.ep",
     EXAMPLES_DIR / "v4_str_eq.ep",
     EXAMPLES_DIR / "v6_i64_min_str.ep",
+    EXAMPLES_DIR / "v1_compound_assign.ep",
+    EXAMPLES_DIR / "v5_byte_u8_255_readback.ep",
+    EXAMPLES_DIR / "v5_zero_copy_str_bytes.ep",
+    EXAMPLES_DIR / "v4_empty_array_push.ep",
+    EXAMPLES_DIR / "v1_checked_index_oob.ep",
 ]
 
 EXPECTED = """section .text
@@ -242,3 +247,8 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+
+
+
