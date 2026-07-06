@@ -1,6 +1,6 @@
 # 原则
 
-- 新 feature / bug fix / refactor 完成之后，git 提交 并 push。
+- 新 feature / bug fix / refactor 完成之后，git 提交 并 push。（如push被安全拦截，则不再尝试push）
 - 马斯克五步工作法。（第一步：质疑需求；第二步：删掉所有可能的部件；第三步：简化与优化；第四步：加速周转；第五步：自动化）
 - 不要向前兼容。
 - 用性能换代码清晰。
