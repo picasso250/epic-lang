@@ -84,6 +84,7 @@ class AssignOpNode(ASTNode):
     op: str
     target: ASTNode
     value: ASTNode
+    line: int = 0
 
 
 @dataclass
@@ -171,36 +172,42 @@ class ExprStmtNode(ASTNode):
 @dataclass
 class LiteralNode(ASTNode):
     value: int
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class CharNode(ASTNode):
     value: int
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class BoolNode(ASTNode):
     value: int
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class StringNode(ASTNode):
     value: str
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class FStringNode(ASTNode):
     parts: list
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class VarNode(ASTNode):
     name: str
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -219,6 +226,7 @@ class BinaryNode(ASTNode):
     op: str
     left: ASTNode
     right: ASTNode
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -226,6 +234,7 @@ class BinaryNode(ASTNode):
 class UnaryNode(ASTNode):
     op: str
     expr: ASTNode
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -233,6 +242,7 @@ class UnaryNode(ASTNode):
 class FieldAccessNode(ASTNode):
     object: ASTNode
     field: str
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -240,6 +250,7 @@ class FieldAccessNode(ASTNode):
 class SubscriptNode(ASTNode):
     base: ASTNode
     index: ASTNode
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -248,6 +259,7 @@ class SliceNode(ASTNode):
     base: ASTNode
     start: ASTNode
     end: ASTNode
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -255,6 +267,7 @@ class SliceNode(ASTNode):
 class NewArrayNode(ASTNode):
     elem_type: str
     count: Optional[ASTNode] = None
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -262,6 +275,7 @@ class NewArrayNode(ASTNode):
 class StructInitNode(ASTNode):
     type_name: str
     fields: list
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -269,6 +283,7 @@ class StructInitNode(ASTNode):
 class ArrayLiteralNode(ASTNode):
     elem_type: str
     values: list
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -276,6 +291,7 @@ class ArrayLiteralNode(ASTNode):
 class MapInitNode(ASTNode):
     type_name: str
     entries: list
+    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 

@@ -586,7 +586,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         let op = mir_binary_op(expr.op)
         let result_type = mir_op_result_type(op)
         if expr.op == "<<" || expr.op == ">>" || expr.op == ">>>" {
-            mir_emit_shift_count_check(st, right_flow.value, expr.left.resolved_type, 0)
+            mir_emit_shift_count_check(st, right_flow.value, expr.left.resolved_type, expr.line)
         }
         let inst = mir_make_result_inst(st, op, result_type)
         push(inst.operands, left_flow.value)
@@ -914,7 +914,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             let op = mir_binary_op(stmt.op)
             let result_type = mir_op_result_type(op)
             if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
-                mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, 0)
+                mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, stmt.line)
             }
             let inst = mir_make_result_inst(st, op, result_type)
             push(inst.operands, mir_value_operand(st.local_types[idx], result_name))
@@ -940,7 +940,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             let op = mir_binary_op(stmt.op)
             let result_type = mir_op_result_type(op)
             if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
-                mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, 0)
+                mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, stmt.line)
             }
             let inst = mir_make_result_inst(st, op, result_type)
             push(inst.operands, mir_value_operand(field_typ, result_name))
@@ -969,7 +969,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             let op = mir_binary_op(stmt.op)
             let result_type = mir_op_result_type(op)
             if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
-                mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, 0)
+                mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, stmt.line)
             }
             let inst = mir_make_result_inst(st, op, result_type)
             push(inst.operands, current)

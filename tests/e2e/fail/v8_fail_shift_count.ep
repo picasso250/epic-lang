@@ -1,5 +1,5 @@
 # EXIT: 1
-# STDOUT: panic line 0: invalid shift count
+# STDOUT: panic line 5: invalid shift count
 fun main(): void {
     let n = 64
     exit(1 << n)

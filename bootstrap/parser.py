@@ -244,15 +244,15 @@ class Parser:
     def parse_assign_stmt(self):
         name = self.expect("ID")
         # Build LHS chain: .field | [index]
-        lhs = VarNode(name=name[1])
+        lhs = VarNode(name=name[1], line=name[2])
         while True:
             if self.check("DOT"):
                 field = self.expect("ID")
-                lhs = FieldAccessNode(object=lhs, field=field[1])
+                lhs = FieldAccessNode(object=lhs, field=field[1], line=field[2])
             elif self.check("LBRACKET"):
                 index = self.parse_expr()
                 self.expect("RBRACKET")
-                lhs = SubscriptNode(base=lhs, index=index)
+                lhs = SubscriptNode(base=lhs, index=index, line=getattr(index, "line", name[2]))
             else:
                 break
         op_token = self.advance()
@@ -262,7 +262,7 @@ class Parser:
         self.expect_stmt_end()
         op = self.ASSIGN_TOKENS[op_token[0]]
         if op:
-            return AssignOpNode(op=op, target=lhs, value=value)
+            return AssignOpNode(op=op, target=lhs, value=value, line=op_token[2])
         if isinstance(lhs, VarNode):
             return AssignNode(name=lhs.name, value=value)
         elif isinstance(lhs, FieldAccessNode):
@@ -374,16 +374,16 @@ class Parser:
 
     def parse_logic_or(self):
         left = self.parse_logic_and()
-        while self.check("OR"):
+        while op := self.check("OR"):
             right = self.parse_logic_and()
-            left = BinaryNode(op="||", left=left, right=right)
+            left = BinaryNode(op="||", left=left, right=right, line=op[2])
         return left
 
     def parse_logic_and(self):
         left = self.parse_equality()
-        while self.check("AND"):
+        while op := self.check("AND"):
             right = self.parse_equality()
-            left = BinaryNode(op="&&", left=left, right=right)
+            left = BinaryNode(op="&&", left=left, right=right, line=op[2])
         return left
 
     # Token kind → operator string
@@ -398,59 +398,59 @@ class Parser:
     def parse_equality(self):
         left = self.parse_bit_or()
         while op := self.check("EQEQ") or self.check("NEQ"):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_bit_or())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_bit_or())
         return left
 
     def parse_bit_or(self):
         left = self.parse_bit_xor()
         while op := self.check("PIPE"):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_bit_xor())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_bit_xor())
         return left
 
     def parse_bit_xor(self):
         left = self.parse_bit_and()
         while op := self.check("CARET"):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_bit_and())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_bit_and())
         return left
 
     def parse_bit_and(self):
         left = self.parse_comparison()
         while op := self.check("AMPERSAND"):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_comparison())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_comparison())
         return left
 
     def parse_comparison(self):
         left = self.parse_shift()
         while op := (self.check("LT") or self.check("GT")
                      or self.check("LTE") or self.check("GTE")):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_shift())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_shift())
         return left
 
     def parse_shift(self):
         left = self.parse_term()
         while op := (self.check("SHL") or self.check("SHR") or self.check("USHR")):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_term())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_term())
         return left
 
     def parse_term(self):
         left = self.parse_factor()
         while op := self.check("PLUS") or self.check("MINUS"):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_factor())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_factor())
         return left
 
     def parse_factor(self):
         left = self.parse_unary()
         while op := (self.check("STAR") or self.check("SLASH") or self.check("PERCENT")):
-            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_unary())
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_unary())
         return left
 
     def parse_unary(self):
-        if self.check("BANG"):
-            return UnaryNode(op="!", expr=self.parse_unary())
-        if self.check("MINUS"):
-            return UnaryNode(op="-", expr=self.parse_unary())
-        if self.check("TILDE"):
-            return UnaryNode(op="~", expr=self.parse_unary())
+        if op := self.check("BANG"):
+            return UnaryNode(op="!", expr=self.parse_unary(), line=op[2])
+        if op := self.check("MINUS"):
+            return UnaryNode(op="-", expr=self.parse_unary(), line=op[2])
+        if op := self.check("TILDE"):
+            return UnaryNode(op="~", expr=self.parse_unary(), line=op[2])
         return self.parse_primary()
 
     def parse_primary(self):
@@ -466,7 +466,7 @@ class Parser:
                 value = self.parse_type()
                 type_name = f"map[{key[1]}]{value}"
                 entries = self.parse_map_entries_after_lbrace() if self.check("LBRACE") else []
-                return MapInitNode(type_name=type_name, entries=entries)
+                return MapInitNode(type_name=type_name, entries=entries, line=t[2])
             name = t[1]
             if self.check("LBRACKET"):
                 count = None
@@ -474,29 +474,29 @@ class Parser:
                     count = self.parse_expr()
                 self.expect("RBRACKET")
                 if count is None and self.check("LBRACE"):
-                    return ArrayLiteralNode(elem_type=name, values=self.parse_brace_values())
-                return NewArrayNode(elem_type=name, count=count)
+                    return ArrayLiteralNode(elem_type=name, values=self.parse_brace_values(), line=t[2])
+                return NewArrayNode(elem_type=name, count=count, line=t[2])
             if self.check("LBRACE"):
-                return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace())
-            return StructInitNode(type_name=name, fields=[])
+                return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace(), line=t[2])
+            return StructInitNode(type_name=name, fields=[], line=t[2])
         if self.peek_kind("NUMBER"):
             t = self.advance()
-            return LiteralNode(value=t[1])
+            return LiteralNode(value=t[1], line=t[2])
         if self.peek_kind("TRUE"):
-            self.advance()
-            return BoolNode(value=1)
+            t = self.advance()
+            return BoolNode(value=1, line=t[2])
         if self.peek_kind("FALSE"):
-            self.advance()
-            return BoolNode(value=0)
+            t = self.advance()
+            return BoolNode(value=0, line=t[2])
         if self.peek_kind("CHAR"):
             t = self.advance()
-            return CharNode(value=t[1])
+            return CharNode(value=t[1], line=t[2])
         if self.peek_kind("STRING"):
             t = self.advance()
-            return StringNode(value=t[1])
+            return StringNode(value=t[1], line=t[2])
         if self.peek_kind("FSTRING"):
             t = self.advance()
-            return FStringNode(parts=self.parse_fstring_parts(t[1], t[2]))
+            return FStringNode(parts=self.parse_fstring_parts(t[1], t[2]), line=t[2])
         if self.peek_kind("ID"):
             t = self.advance()
             name = t[1]
@@ -505,7 +505,7 @@ class Parser:
                 self.advance()
                 elem_type = name
                 if self.check("LBRACE"):
-                    return ArrayLiteralNode(elem_type=elem_type, values=self.parse_brace_values())
+                    return ArrayLiteralNode(elem_type=elem_type, values=self.parse_brace_values(), line=t[2])
                 raise ParseError("Expected array literal after type[]", t[2])
             if self.check("LPAREN"):
                 args = self.parse_args()
@@ -514,7 +514,7 @@ class Parser:
                     raise ParseError("function calls may have at most 4 arguments in v0", t[2])
                 node = CallNode(name=name, args=args, line=t[2])
             else:
-                node = VarNode(name=name)
+                node = VarNode(name=name, line=t[2])
             # Postfix: .field and [index]
             while True:
                 if self.check("DOT"):
@@ -535,7 +535,7 @@ class Parser:
                                 raise ParseError("function calls may have at most 4 arguments in v0", field[2])
                             raise ParseError("method calls are only supported for os.<dll>.* in v0", field[2])
                     else:
-                        node = FieldAccessNode(object=node, field=field[1])
+                        node = FieldAccessNode(object=node, field=field[1], line=field[2])
                 elif self.check("LBRACKET"):
                     if self.check("COLON"):
                         raise ParseError("slice requires explicit start and end")
@@ -545,10 +545,10 @@ class Parser:
                             raise ParseError("slice requires explicit start and end")
                         end = self.parse_expr()
                         self.expect("RBRACKET")
-                        node = SliceNode(base=node, start=index, end=end)
+                        node = SliceNode(base=node, start=index, end=end, line=getattr(index, "line", t[2]))
                         continue
                     self.expect("RBRACKET")
-                    node = SubscriptNode(base=node, index=index)
+                    node = SubscriptNode(base=node, index=index, line=getattr(index, "line", t[2]))
                 else:
                     break
             return node
