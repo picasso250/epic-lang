@@ -183,12 +183,23 @@ fun str_replace_char_local(s: str, from_ch: i64, to_ch: i64): str {
     return str(out)
 }
 
-fun mir_binary_op(expr_op: str): str {
+fun mir_is_unsigned_int_type(type_name: str): bool {
+    return type_name == "u64" || type_name == "u32" || type_name == "u8"
+}
+
+fun mir_binary_op(expr_op: str, source_type: str): str {
+    let unsigned = mir_is_unsigned_int_type(source_type)
     if expr_op == "+" { return "add" }
     if expr_op == "-" { return "sub" }
     if expr_op == "*" { return "mul" }
-    if expr_op == "/" { return "sdiv" }
-    if expr_op == "%" { return "srem" }
+    if expr_op == "/" {
+        if unsigned { return "udiv" }
+        return "sdiv"
+    }
+    if expr_op == "%" {
+        if unsigned { return "urem" }
+        return "srem"
+    }
     if expr_op == "&" { return "and" }
     if expr_op == "|" { return "or" }
     if expr_op == "^" { return "xor" }
@@ -197,16 +208,28 @@ fun mir_binary_op(expr_op: str): str {
     if expr_op == ">>>" { return "shr" }
     if expr_op == "==" { return "icmp.eq" }
     if expr_op == "!=" { return "icmp.ne" }
-    if expr_op == "<" { return "icmp.slt" }
-    if expr_op == ">" { return "icmp.sgt" }
-    if expr_op == "<=" { return "icmp.sle" }
-    if expr_op == ">=" { return "icmp.sge" }
+    if expr_op == "<" {
+        if unsigned { return "icmp.ult" }
+        return "icmp.slt"
+    }
+    if expr_op == ">" {
+        if unsigned { return "icmp.ugt" }
+        return "icmp.sgt"
+    }
+    if expr_op == "<=" {
+        if unsigned { return "icmp.ule" }
+        return "icmp.sle"
+    }
+    if expr_op == ">=" {
+        if unsigned { return "icmp.uge" }
+        return "icmp.sge"
+    }
     mir_codegen_die(f"unsupported binary op {expr_op}")
     return ""
 }
 
 fun mir_op_result_type(op: str): str {
-    if op == "icmp.eq" || op == "icmp.ne" || op == "icmp.slt" || op == "icmp.sgt" || op == "icmp.sle" || op == "icmp.sge" {
+    if op == "icmp.eq" || op == "icmp.ne" || op == "icmp.slt" || op == "icmp.sgt" || op == "icmp.sle" || op == "icmp.sge" || op == "icmp.ult" || op == "icmp.ugt" || op == "icmp.ule" || op == "icmp.uge" {
         return "bool"
     }
     return "i64"
@@ -355,6 +378,19 @@ fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
     push(sar_inst.operands, mir_const_int("i64", 32))
     mir_emit_inst(st, sar_inst)
     return mir_value_operand("i64", sar_inst.result_name)
+}
+
+fun mir_normalize_int_value(st: MirCodegenState, value: MirOperand, source_type: str): MirOperand {
+    if source_type == "u8" {
+        return mir_trunc_uint_value(st, value, 255)
+    }
+    if source_type == "u32" {
+        return mir_trunc_uint_value(st, value, 4294967295)
+    }
+    if source_type == "i32" {
+        return mir_trunc_i32_value(st, value)
+    }
+    return value
 }
 
 fun mir_string_label(st: MirCodegenState, value: str): str {
@@ -583,7 +619,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             return mir_value_flow(eq, st.current_block)
         }
-        let op = mir_binary_op(expr.op)
+        let op = mir_binary_op(expr.op, expr.left.resolved_type)
         let result_type = mir_op_result_type(op)
         if expr.op == "<<" || expr.op == ">>" || expr.op == ">>>" {
             mir_emit_shift_count_check(st, right_flow.value, expr.left.resolved_type, expr.line)
@@ -592,7 +628,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         push(inst.operands, left_flow.value)
         push(inst.operands, right_flow.value)
         mir_emit_inst(st, inst)
-        return mir_value_flow(mir_value_operand(result_type, inst.result_name), st.current_block)
+        return mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), expr.resolved_type), st.current_block)
     }
     if expr.kind == "NewArray" {
         return mir_emit_new_array(st, st.current_block, expr)
@@ -911,7 +947,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
             let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
             st.current_block = rhs_flow.block
-            let op = mir_binary_op(stmt.op)
+            let op = mir_binary_op(stmt.op, stmt.expr.resolved_type)
             let result_type = mir_op_result_type(op)
             if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
                 mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, stmt.line)
@@ -920,7 +956,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             push(inst.operands, mir_value_operand(st.local_types[idx], result_name))
             push(inst.operands, rhs_flow.value)
             mir_emit_inst(st, inst)
-            mir_emit_inst(st, mir_store(mir_value_operand(result_type, inst.result_name), addr))
+            mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), stmt.expr.resolved_type), addr))
             return mir_reachable_flow(st.current_block)
         }
         if stmt.expr.kind == "FieldAccess" {
@@ -937,7 +973,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
             let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
             st.current_block = rhs_flow.block
-            let op = mir_binary_op(stmt.op)
+            let op = mir_binary_op(stmt.op, stmt.expr.resolved_type)
             let result_type = mir_op_result_type(op)
             if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
                 mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, stmt.line)
@@ -946,7 +982,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             push(inst.operands, mir_value_operand(field_typ, result_name))
             push(inst.operands, rhs_flow.value)
             mir_emit_inst(st, inst)
-            mir_emit_inst(st, mir_store(mir_value_operand(result_type, inst.result_name), addr))
+            mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), stmt.expr.resolved_type), addr))
             return mir_reachable_flow(st.current_block)
         }
         if stmt.expr.kind == "Subscript" {
@@ -966,7 +1002,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             }
             let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
             st.current_block = rhs_flow.block
-            let op = mir_binary_op(stmt.op)
+            let op = mir_binary_op(stmt.op, stmt.expr.resolved_type)
             let result_type = mir_op_result_type(op)
             if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
                 mir_emit_shift_count_check(st, rhs_flow.value, stmt.expr.resolved_type, stmt.line)
@@ -978,7 +1014,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             let set_args = new MirOperand[0]
             push(set_args, dst_flow.value)
             push(set_args, index_flow.value)
-            push(set_args, mir_value_operand(result_type, inst.result_name))
+            push(set_args, mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), stmt.expr.resolved_type))
             if mir_is_u8_array_type(base_type) {
                 mir_emit_call_inst(st, "__ep_slice_u8_set", "void", set_args)
             } else {

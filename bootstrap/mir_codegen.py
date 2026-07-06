@@ -873,17 +873,30 @@ class MirCodegen:
         self._set_insert_block(block)
         return ValueFlow(values, block)
 
+    def _normalize_integer_value(self, value, typ):
+        if typ in (et.U8, "u8"):
+            return self._emit_truncating_uint_conversion_value(value, 255)
+        if typ in (et.U32, "u32"):
+            return self._emit_truncating_uint_conversion_value(value, 4294967295)
+        if typ in (et.I32, "i32"):
+            return self._emit_truncating_i32_conversion_value(value)
+        return value
+
     def _binary(self, op, left, right, lhs_type=None, line=0):
         op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor",
                   "<<": "shl", ">>": "sar", ">>>": "shr"}
+        unsigned = self._is_unsigned_integer(lhs_type)
         if op == "/":
-            return ValueOperand(self._inst("sdiv", [left, right], result_type=I64))
+            value = ValueOperand(self._inst("udiv" if unsigned else "sdiv", [left, right], result_type=I64))
+            return self._normalize_integer_value(value, lhs_type)
         if op == "%":
-            return ValueOperand(self._inst("srem", [left, right], result_type=I64))
+            value = ValueOperand(self._inst("urem" if unsigned else "srem", [left, right], result_type=I64))
+            return self._normalize_integer_value(value, lhs_type)
         if op in ("<<", ">>", ">>>"):
             self._emit_shift_count_check(right, lhs_type, line)
         if op in op_map:
-            return ValueOperand(self._inst(op_map[op], [left, right], result_type=I64))
+            value = ValueOperand(self._inst(op_map[op], [left, right], result_type=I64))
+            return self._normalize_integer_value(value, lhs_type)
         raise MirCodegenError(f"unsupported compound assignment op: {op}")
 
     def _emit_binary(self, expr):
@@ -900,7 +913,7 @@ class MirCodegen:
         self._set_insert_block(right.block)
         op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
-        unsigned = self._is_unsigned_integer(left_type) or self._is_unsigned_integer(right_type)
+        unsigned = self._is_unsigned_integer(left_type)
         if expr.op in ("==", "!=") and left_type == et.STR and right_type == et.STR:
             result = self._inst("call", [left.value, right.value], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
             value = ValueOperand(result)
@@ -908,13 +921,16 @@ class MirCodegen:
                 value = ValueOperand(self._inst("not", [value], result_type=BOOL))
             return ValueFlow(value, self.block)
         if expr.op == "/":
-            return ValueFlow(ValueOperand(self._inst("udiv" if unsigned else "sdiv", [left.value, right.value], result_type=I64)), self.block)
+            value = ValueOperand(self._inst("udiv" if unsigned else "sdiv", [left.value, right.value], result_type=I64))
+            return ValueFlow(self._normalize_integer_value(value, left_type), self.block)
         if expr.op == "%":
-            return ValueFlow(ValueOperand(self._inst("urem" if unsigned else "srem", [left.value, right.value], result_type=I64)), self.block)
+            value = ValueOperand(self._inst("urem" if unsigned else "srem", [left.value, right.value], result_type=I64))
+            return ValueFlow(self._normalize_integer_value(value, left_type), self.block)
         if expr.op in op_map:
             if expr.op in ("<<", ">>", ">>>"):
                 self._emit_shift_count_check(right.value, left_type, self._node_line(expr))
-            return ValueFlow(ValueOperand(self._inst(op_map[expr.op], [left.value, right.value], result_type=I64)), self.block)
+            value = ValueOperand(self._inst(op_map[expr.op], [left.value, right.value], result_type=I64))
+            return ValueFlow(self._normalize_integer_value(value, left_type), self.block)
         if expr.op in cmp_map:
             pred = cmp_map[expr.op]
             if pred not in ("eq", "ne"):
