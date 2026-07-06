@@ -23,10 +23,16 @@ FIXTURE_EXE = BUILD_DIR / "tests" / "mir_to_x64_ep" / "fixture.exe"
 DRIVER_EXE = BUILD_DIR / "tests" / "mir_to_x64_ep" / "driver.exe"
 EXAMPLES_DIR = ROOT / "examples"
 EXAMPLE_CASES = [
+    EXAMPLES_DIR / "m1_exit.ep",
+    EXAMPLES_DIR / "m20_comment.ep",
     EXAMPLES_DIR / "m2_expr.ep",
     EXAMPLES_DIR / "m3_var.ep",
     EXAMPLES_DIR / "m4_fn.ep",
     EXAMPLES_DIR / "m5_if.ep",
+    EXAMPLES_DIR / "m6_while.ep",
+    EXAMPLES_DIR / "v1_break_continue.ep",
+    EXAMPLES_DIR / "v3_return_paths.ep",
+    EXAMPLES_DIR / "v4_exit_return_path.ep",
 ]
 
 EXPECTED = """section .text
