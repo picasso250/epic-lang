@@ -7,7 +7,9 @@ line<TAB>kind<TAB>len<TAB>source_spelling.
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap"))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import dump_tokens, lex
 
 
@@ -68,7 +70,7 @@ def main():
     test_fstring_dump_linearized_from_source_spelling()
     test_char_dump_uses_decimal_byte_value()
     test_number_dump_uses_source_digits()
-    print("PASS test_lexer_dump_format")
+    print("  PASS  lexer dump format")
 
 
 if __name__ == "__main__":

@@ -5,10 +5,11 @@ Handles REL32 for both imports and section-relative references.
 
 import struct, sys, os
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
-from bootstrap.coff import build_coff_obj
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+from coff import build_coff_obj
 
 IMAGE_FILE_MACHINE_AMD64 = 0x8664
 IMAGE_SUBSYSTEM_WINDOWS_CUI = 3
@@ -345,7 +346,7 @@ def align(n, a): return ((n + a - 1) // a) * a
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python link.py <file.obj> [-o out.exe]")
+        print("Usage: python bootstrap/link.py <file.obj> [-o out.exe]")
         sys.exit(1)
     obj = sys.argv[1]
     out = sys.argv[sys.argv.index('-o') + 1] if '-o' in sys.argv else os.path.splitext(obj)[0] + '.exe'

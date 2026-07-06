@@ -77,7 +77,7 @@ machine backend 验收入口。
 
 当前 Python reference compiler 工具链路径：
 
-- `link.py`（Python PE 链接器，默认）
+- `bootstrap/link.py`（Python PE 链接器，默认）
 - `tools/lld-link.exe`（可选）
 - Windows SDK 中的 `kernel32.lib` 和 `user32.lib`
 
@@ -174,7 +174,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 ## 链接器 (Linker)
 
-`link.py` 是默认的 Python PE 链接器，支持生成的示例所需的窄单对象 PE64 路径。`src/link.ep` 是一个面向相同路径的 Epic MVP 链接器，用当前 Epic 编译器编译。
+`bootstrap/link.py` 是默认的 Python PE 链接器，支持生成的示例所需的窄单对象 PE64 路径。`src/link.ep` 是一个面向相同路径的 Epic MVP 链接器，用当前 Epic 编译器编译。
 
 也可以通过 `--linker lld-link` 使用 `lld-link`。
 

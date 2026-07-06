@@ -224,6 +224,24 @@ def regen_golden():
     print("Do not commit without review.")
 
 
+
+def check_dump_format_unit_tests() -> bool:
+    test_file = os.path.join(SCRIPT_DIR, "test_dump_format.py")
+    result = subprocess.run(
+        [sys.executable, test_file],
+        cwd=ROOT_DIR,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode == 0:
+        print(result.stdout, end="")
+        return True
+    print("  FAIL  lexer dump format")
+    print((result.stdout + result.stderr)[-2000:])
+    return False
+
 def main():
     parser = argparse.ArgumentParser(description="Epic lexer test runner")
     parser.add_argument("--regen", action="store_true",
@@ -235,6 +253,10 @@ def main():
     if args.regen:
         regen_golden()
         sys.exit(0)
+
+    print("--- dump format unit tests ---")
+    if not check_dump_format_unit_tests():
+        sys.exit(1)
 
     # --- Normal mode: frozen golden check ---
     print("--- golden check ---")

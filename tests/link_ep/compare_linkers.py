@@ -1,10 +1,14 @@
-"""Compare lld-link vs link.py output for all .obj files in build/examples."""
+"""Compare lld-link vs bootstrap/link.py output for all .obj files in build/examples.
+
+Historical development aid; not part of the default test suite.
+"""
 import os, subprocess, sys, hashlib, struct
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OBJ_DIR = os.path.join(SCRIPT_DIR, "build", "examples")
-LLD = os.path.join(SCRIPT_DIR, "tools", "lld-link.exe")
-LINK_PY = os.path.join(SCRIPT_DIR, "link.py")
+ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+OBJ_DIR = os.path.join(ROOT_DIR, "build", "examples")
+LLD = os.path.join(ROOT_DIR, "tools", "lld-link.exe")
+LINK_PY = os.path.join(ROOT_DIR, "bootstrap", "link.py")
 SDK_LIB = r"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64"
 
 

@@ -65,7 +65,7 @@ python tests/lexer/run.py --no-self-hosted  # Skip self-hosted lexer.exe compari
 python tests/parser/run.py         # Parser Python/self-hosted dump comparison
 ```
 
-`link.py` is the default Python linker. `src/link.ep` is the Epic linker
+`bootstrap/link.py` is the default Python linker. `src/link.ep` is the Epic linker
 implementation and is tested separately.
 
 The old Python `--backend asm` path was archived at tag

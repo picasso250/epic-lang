@@ -13,7 +13,7 @@ machine bytes -> COFF -> PE` 这条线建立可测试边界。
 - `bootstrap/x64.py`: X64IR data model and text pretty printer。
 - `bootstrap/machine.py`: X64IR -> machine bytes + COFF reloc records。
 - `bootstrap/coff.py`: minimal AMD64 COFF object writer。
-- `link.py`: minimal PE linker for generated COFF objects。
+- `bootstrap/link.py`: minimal PE linker for generated COFF objects。
 
 ## 1. 分层边界
 
@@ -25,7 +25,7 @@ AST
   -> X64Program
   -> MachineObjectBuilder(text bytes, data bytes, relocs, symbols)
   -> COFF obj
-  -> link.py / lld-link
+  -> bootstrap/link.py / lld-link
   -> PE exe
 ```
 
@@ -313,7 +313,7 @@ COFF contract:
 - Symbols use section number 1 for `.text`, 2 for `.data`, 0 for external。
 - `data_relocs` exists in the writer API but current machine backend does not emit it。
 
-`link.py` contract:
+`bootstrap/link.py` contract:
 
 - Reads the generated COFF object.
 - Builds import thunks in `.text`。
@@ -401,7 +401,7 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 
 ### 8.6 Self-hosted compiler driver is removed
 
-The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
+The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `bootstrap/link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
 Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
 
