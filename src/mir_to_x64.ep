@@ -12,6 +12,8 @@ struct MirToX64Lower {
     x64: X64Program
     value_slots: MirToX64Slot[]
     addr_slots: MirToX64Slot[]
+    string_names: str[]
+    string_lengths: i64[]
     next_slot: i64
     return_label: str
 }
@@ -21,6 +23,8 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.x64 = x64_program_empty()
     lower.value_slots = new MirToX64Slot[0]
     lower.addr_slots = new MirToX64Slot[0]
+    lower.string_names = new str[0]
+    lower.string_lengths = new i64[0]
     lower.next_slot = 0
     lower.return_label = ""
     return lower
@@ -30,6 +34,41 @@ fun mir_to_x64_die(msg: str): void {
     println(str_cat2("MIR-to-X64 error: ", msg))
     exit(1)
 }
+
+fun mir_to_x64_data_label(name: str): str {
+    return str_cat2(name, "_data")
+}
+
+fun mir_to_x64_header_label(name: str): str {
+    return str_cat2(name, "_header")
+}
+
+fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): void {
+    push(lower.string_names, name)
+    push(lower.string_lengths, length)
+}
+
+fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram): void {
+    let i = 0
+    while i < len(program.globals) {
+        if program.globals[i].has_init {
+            mir_to_x64_add_string_global(lower, program.globals[i].name, len(program.globals[i].init))
+        }
+        i = i + 1
+    }
+}
+
+fun mir_to_x64_string_index(lower: MirToX64Lower, name: str): i64 {
+    let i = 0
+    while i < len(lower.string_names) {
+        if lower.string_names[i] == name {
+            return i
+        }
+        i = i + 1
+    }
+    return 0 - 1
+}
+
 
 fun mir_to_x64_slot(lower: MirToX64Lower): i64 {
     lower.next_slot = lower.next_slot + 8
@@ -145,7 +184,22 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
         return
     }
     if operand.kind == "symbol" {
-        x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(operand.name, 8))
+        if operand.name == "argv" {
+            x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_symbol("_argv", 8))
+            return
+        }
+        let string_index = mir_to_x64_string_index(lower, operand.name)
+        if string_index >= 0 {
+            let data_label = mir_to_x64_data_label(operand.name)
+            let header_label = mir_to_x64_header_label(operand.name)
+            x64_add_inst2(lower.x64, "lea", x64_reg("r11"), x64_mem_symbol(data_label, 8))
+            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(header_label, 8))
+            x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 0, 8), x64_reg("r11"))
+            x64_add_inst2(lower.x64, "mov", x64_reg("r11"), x64_imm(lower.string_lengths[string_index]))
+            x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 8, 8), x64_reg("r11"))
+            return
+        }
+        mir_to_x64_die(str_cat2("unsupported symbol operand: ", operand.name))
         return
     }
     mir_to_x64_die(str_cat2("unsupported operand: ", operand.kind))
@@ -326,8 +380,13 @@ fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTermin
     mir_to_x64_die(str_cat2("unsupported MIR terminator: ", term.kind))
 }
 
-fun mir_to_x64_lower_function(fn: MirFunction): X64Program {
+fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction): X64Program {
     let lower = mir_to_x64_lower_empty()
+    mir_to_x64_prepare_program_globals(lower, program)
+    return mir_to_x64_lower_function_with_lower(lower, fn)
+}
+
+fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction): X64Program {
     lower.return_label = str_cat2(fn.name, ".__return")
     mir_to_x64_plan_slots(lower, fn)
     let frame = mir_to_x64_aligned_frame(lower)
@@ -380,4 +439,9 @@ fun mir_to_x64_lower_function(fn: MirFunction): X64Program {
     x64_add_inst1(lower.x64, "pop", x64_reg("rbp"))
     x64_add_inst0(lower.x64, "ret")
     return lower.x64
+}
+
+fun mir_to_x64_lower_function(fn: MirFunction): X64Program {
+    let lower = mir_to_x64_lower_empty()
+    return mir_to_x64_lower_function_with_lower(lower, fn)
 }

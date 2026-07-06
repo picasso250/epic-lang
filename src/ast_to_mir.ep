@@ -409,6 +409,7 @@ fun mir_string_label(st: MirCodegenState, value: str): str {
     let label = str_cat2("str.", str(st.string_counter))
     push(st.string_values, value)
     push(st.string_labels, label)
+    push(st.program.globals, mir_global_string(label, value))
     return label
 }
 

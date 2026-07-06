@@ -50,7 +50,15 @@ struct MirFunction {
     blocks: MirBlock[]
 }
 
+struct MirGlobal {
+    name: str
+    typ: str
+    init: str
+    has_init: bool
+}
+
 struct MirProgram {
+    globals: MirGlobal[]
     functions: MirFunction[]
 }
 
@@ -357,8 +365,27 @@ fun mir_function_empty(name: str, ret: str): MirFunction {
     return fn
 }
 
+fun mir_global_string(name: str, init: str): MirGlobal {
+    let glob = new MirGlobal
+    glob.name = name
+    glob.typ = "ptr"
+    glob.init = init
+    glob.has_init = true
+    return glob
+}
+
+fun mir_global_decl(name: str, typ: str): MirGlobal {
+    let glob = new MirGlobal
+    glob.name = name
+    glob.typ = typ
+    glob.init = ""
+    glob.has_init = false
+    return glob
+}
+
 fun mir_program_empty(): MirProgram {
     let p = new MirProgram
+    p.globals = new MirGlobal[0]
     p.functions = new MirFunction[0]
     return p
 }

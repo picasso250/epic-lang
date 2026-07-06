@@ -33,6 +33,13 @@ EXAMPLE_CASES = [
     EXAMPLES_DIR / "v1_break_continue.ep",
     EXAMPLES_DIR / "v3_return_paths.ep",
     EXAMPLES_DIR / "v4_exit_return_path.ep",
+    EXAMPLES_DIR / "v1_else_if.ep",
+    EXAMPLES_DIR / "v1_bool_int_ops.ep",
+    EXAMPLES_DIR / "m10_str.ep",
+    EXAMPLES_DIR / "m33_fstring_print.ep",
+    EXAMPLES_DIR / "v2_str_repr.ep",
+    EXAMPLES_DIR / "v4_str_eq.ep",
+    EXAMPLES_DIR / "v6_i64_min_str.ep",
 ]
 
 EXPECTED = """section .text
@@ -122,6 +129,17 @@ def run_checked(cmd: list[str], label: str) -> subprocess.CompletedProcess[str]:
     return result
 
 
+def python_string_globals(program) -> dict[str, tuple[str, str, int]]:
+    out: dict[str, tuple[str, str, int]] = {}
+    for glob in program.globals:
+        if glob.name == "argv":
+            continue
+        if glob.init is None:
+            continue
+        out[glob.name] = (glob.name + "_header", glob.name + "_data", len(glob.init))
+    return out
+
+
 def print_diff(expected: str, actual: str) -> None:
     for i, line in enumerate(difflib.unified_diff(
         expected.splitlines(), actual.splitlines(), fromfile="expected", tofile="actual", lineterm=""
@@ -163,6 +181,7 @@ def python_user_x64(path: Path) -> str:
     parts: list[str] = []
     for fn in program.functions[: len(typed.funcs)]:
         lower = MirLower(program)
+        lower.string_globals = python_string_globals(program)
         lower.x64.section(".text")
         lower._lower_function(fn)
         parts.append(lower.x64.text())
