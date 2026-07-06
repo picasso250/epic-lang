@@ -467,6 +467,9 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         if sema_is_int(right) == false {
             sema_die(f"operator {node.op} right expected integer, got {right}")
         }
+        if node.op == "<<" || node.op == ">>" || node.op == ">>>" {
+            return sema_set_type(node, left)
+        }
         if left != right {
             sema_die(f"operator {node.op} expected matching integer types, got {left} and {right}; use an explicit conversion")
         }

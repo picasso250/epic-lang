@@ -321,7 +321,12 @@ class SemanticAnalyzer:
             if left.type != right.type:
                 self._fail(f"comparison {expr.op} expected {left.type}, got {right.type}")
             return ExprInfo(BOOL)
-        if expr.op in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>", ">>>"):
+        if expr.op in ("<<", ">>", ">>>"):
+            self._expect_integer(left, f"operator {expr.op} left")
+            self._expect_integer(right, f"operator {expr.op} count")
+            literal = self._fold_binary_literal(expr.op, left.literal_int, right.literal_int)
+            return ExprInfo(left.type, literal)
+        if expr.op in ("+", "-", "*", "/", "%", "&", "|", "^"):
             self._expect_integer(left, f"operator {expr.op} left")
             self._expect_integer(right, f"operator {expr.op} right")
             if left.type != right.type:

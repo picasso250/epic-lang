@@ -14,7 +14,7 @@ fun main(): void {
     if combined == u64(90) {
         println(str(combined))
     }
-    let shifted: u64 = (u64(b) << u64(1)) >>> u64(1)
+    let shifted: u64 = (u64(b) << 1) >>> 1
     println(str(shifted))
     exit(0)
 }
