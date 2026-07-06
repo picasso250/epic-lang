@@ -1,29 +1,79 @@
-# MIR-to-X64 fixture for the first self-hosted lowering milestone.
+# MIR-to-X64 fixtures for self-hosted lowering milestones.
+
+fun add_param(fn: MirFunction, name: str, typ: str): void {
+    let param = new MirParam
+    param.name = name
+    param.typ = typ
+    push(fn.params, param)
+}
+
+fun make_result_inst(op: str, result_name: str, left: MirOperand, right: MirOperand): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = op
+    inst.result_name = result_name
+    if op == "icmp.sgt" {
+        inst.result_type = "bool"
+    } else {
+        inst.result_type = "i64"
+    }
+    inst.has_result = true
+    push(inst.operands, left)
+    push(inst.operands, right)
+    return inst
+}
 
 fun build_add1_function(): MirFunction {
     let fn = mir_function_empty("add1", "i64")
-
-    let param = new MirParam
-    param.name = "x"
-    param.typ = "i64"
-    push(fn.params, param)
+    add_param(fn, "x", "i64")
 
     let block = mir_block_empty("entry")
-    let inst = mir_inst_empty()
-    inst.op = "add"
-    inst.result_name = "r"
-    inst.result_type = "i64"
-    inst.has_result = true
-    push(inst.operands, mir_value_operand("i64", "x"))
-    push(inst.operands, mir_const_int("i64", 1))
-    push(block.instructions, inst)
+    push(block.instructions, make_result_inst("add", "r", mir_value_operand("i64", "x"), mir_const_int("i64", 1)))
     block.terminator = mir_ret_value(mir_value_operand("i64", "r"))
     block.has_terminator = true
     push(fn.blocks, block)
     return fn
 }
 
-fun main(): void {
-    let x64 = mir_to_x64_lower_function(build_add1_function())
-    print(x64_program_text(x64))
+fun build_arith_mix_function(): MirFunction {
+    let fn = mir_function_empty("arith_mix", "i64")
+    add_param(fn, "x", "i64")
+
+    let block = mir_block_empty("entry")
+    push(block.instructions, make_result_inst("sub", "a", mir_value_operand("i64", "x"), mir_const_int("i64", 2)))
+    push(block.instructions, make_result_inst("mul", "b", mir_value_operand("i64", "a"), mir_const_int("i64", 3)))
+    push(block.instructions, make_result_inst("and", "c", mir_value_operand("i64", "b"), mir_const_int("i64", 7)))
+    block.terminator = mir_ret_value(mir_value_operand("i64", "c"))
+    block.has_terminator = true
+    push(fn.blocks, block)
+    return fn
 }
+
+fun build_max2_function(): MirFunction {
+    let fn = mir_function_empty("max2", "i64")
+    add_param(fn, "x", "i64")
+    add_param(fn, "y", "i64")
+
+    let entry = mir_block_empty("entry")
+    push(entry.instructions, make_result_inst("icmp.sgt", "cond", mir_value_operand("i64", "x"), mir_value_operand("i64", "y")))
+    entry.terminator = mir_condbr(mir_value_operand("bool", "cond"), "then", "else")
+    entry.has_terminator = true
+    push(fn.blocks, entry)
+
+    let then_block = mir_block_empty("then")
+    then_block.terminator = mir_ret_value(mir_value_operand("i64", "x"))
+    then_block.has_terminator = true
+    push(fn.blocks, then_block)
+
+    let else_block = mir_block_empty("else")
+    else_block.terminator = mir_ret_value(mir_value_operand("i64", "y"))
+    else_block.has_terminator = true
+    push(fn.blocks, else_block)
+    return fn
+}
+
+fun main(): void {
+    print(x64_program_text(mir_to_x64_lower_function(build_add1_function())))
+    print(x64_program_text(mir_to_x64_lower_function(build_arith_mix_function())))
+    print(x64_program_text(mir_to_x64_lower_function(build_max2_function())))
+}
+

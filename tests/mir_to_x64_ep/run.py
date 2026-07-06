@@ -31,6 +31,59 @@ add1.__return:
     add rsp, 112
     pop rbp
     ret
+section .text
+arith_mix:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 128
+    mov qword [rbp-8], rcx
+arith_mix.entry:
+    mov rax, qword [rbp-8]
+    mov rcx, 2
+    sub rax, rcx
+    mov qword [rbp-16], rax
+    mov rax, qword [rbp-16]
+    mov rcx, 3
+    imul rax, rcx
+    mov qword [rbp-24], rax
+    mov rax, qword [rbp-24]
+    mov rcx, 7
+    and rax, rcx
+    mov qword [rbp-32], rax
+    mov rax, qword [rbp-32]
+    jmp arith_mix.__return
+arith_mix.__return:
+    add rsp, 128
+    pop rbp
+    ret
+section .text
+max2:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 128
+    mov qword [rbp-8], rcx
+    mov qword [rbp-16], rdx
+max2.entry:
+    mov rax, qword [rbp-8]
+    mov rcx, qword [rbp-16]
+    cmp rax, rcx
+    setg al
+    movzx eax, al
+    mov qword [rbp-24], rax
+    mov rax, qword [rbp-24]
+    test rax, rax
+    jnz max2.then
+    jmp max2.else
+max2.then:
+    mov rax, qword [rbp-8]
+    jmp max2.__return
+max2.else:
+    mov rax, qword [rbp-16]
+    jmp max2.__return
+max2.__return:
+    add rsp, 128
+    pop rbp
+    ret
 """
 
 
@@ -81,10 +134,10 @@ def main() -> int:
 
     result = run_checked([str(FIXTURE_EXE)], "run tests/mir_to_x64_ep/fixture.exe")
     if result.stdout != EXPECTED:
-        print("  FAIL  mir_to_x64_ep add1")
+        print("  FAIL  mir_to_x64_ep integer ops and branches")
         print_diff(EXPECTED, result.stdout)
         return 1
-    print("  PASS  mir_to_x64_ep add1")
+    print("  PASS  mir_to_x64_ep integer ops and branches")
     return 0
 
 
