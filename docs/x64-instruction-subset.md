@@ -359,17 +359,12 @@ MIR helper bodies for `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_
 are injected as ordinary
 `MirFunction`s by `mir_codegen.py`.
 
-Most remaining x64-backed helper bodies still live on `MirLower` as `_emit_*`
-methods. Helpers implemented as MIR functions no longer have same-named legacy
-x64 fallback bodies.
+Remaining hand-written x64 helper bodies live in `bootstrap/x64_runtime.py`, not on `MirLower`. Public `__ep_*` helper symbols are semantic-layer entry points; hand-written x64 implementations use `__epx_*` primitive symbols. Current public wrappers tail-jump to the matching primitive so frontend/codegen call sites stay stable while individual helpers migrate to MIR or Epic runtime source.
 
 Recommended next step: do not mechanically move Python-builder MIR helper bodies into
 `runtime/mir/*.mir`. Prefer Epic runtime source for readable library logic,
 Python builders for templated helper families, and text MIR only for low-level
-helpers where auditability outweighs verbosity. Continue migrating remaining
-x64-backed helper families out of `MirLower` one family at a time; only keep
-true machine/runtime primitives such as heap setup and process startup in the
-x64 runtime layer.
+helpers where auditability outweighs verbosity. Continue replacing `__ep_*` wrappers with MIR/Epic implementations one family at a time; keep only true machine/runtime primitives such as heap setup, process startup, OS calls, and traps in `x64_runtime.py` as `__epx_*`.
 
 ### 8.2 X64Program validator exists
 
@@ -409,6 +404,7 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
 Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
+
 
 
 

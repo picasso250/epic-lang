@@ -185,10 +185,7 @@ These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.p
 
 ### x64-backed private helpers
 
-Most other private helpers are still emitted as x64 helper bodies from
-`bootstrap/mir_lower.py`. This includes `__ep_map_str_i64_*`,
-`__ep_read_file`, `__ep_write_file`, `__ep_system_cmd`, `__epx_argv_init`,
-`__ep_print_str` and `__ep_print_newline`.
+Remaining hand-written x64 private helpers are emitted from `bootstrap/x64_runtime.py` as `__epx_*` primitives. Public `__ep_*` helper symbols are semantic-layer wrappers and may later be replaced by MIR/Epic implementations. This currently covers OS/ABI-facing helpers such as `__epx_cstr`, `__epx_read_file`, `__epx_write_file`, `__epx_system_cmd`, `__epx_argv_init`, `__epx_print_str`, and `__epx_print_newline`. Slice and map helpers are MIR helpers, not x64-backed helpers.
 
 These should be treated as backend implementation details, not language builtins.
 
@@ -225,4 +222,5 @@ or may be broken in the self-hosted path. Needs verification.
 
 Note: `i8` was previously listed here but has been removed from the public
 surface. `u8` is Epic's only byte type.
+
 

@@ -203,17 +203,9 @@ def test_startup_hook_call_golden():
 
 
 def test_runtime_start_helper_golden():
-    class StubLower:
-        def __init__(self):
-            self.x64 = X64Program()
-            self.helper_bodies_appended = False
-
-        def _emit_runtime_helpers(self):
-            self.helper_bodies_appended = True
-
-    lower = StubLower()
-    lower.x64.section(".text")
-    append_runtime_helpers(lower)
+    program = X64Program()
+    program.section(".text")
+    append_runtime_helpers(program)
     expected = """section .text
 __epx_runtime_start:
     push rbp
@@ -229,8 +221,10 @@ __epx_runtime_start:
     pop rbp
     ret
 """
-    assert lower.x64.text() == expected
-    assert lower.helper_bodies_appended
+    text = program.text()
+    assert text.startswith(expected)
+    assert "__ep_cstr:\n    jmp __epx_cstr" in text
+    assert "__epx_cstr:\n" in text
 
 
 def test_x64_to_machine_bytes_and_fixups_golden():
