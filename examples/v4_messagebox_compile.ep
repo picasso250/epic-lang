@@ -1,5 +1,5 @@
 # COMPILE_ONLY
 fun main(): void {
-    os.user32.MessageBoxA(0, cstr("hi"), cstr("Epic"), u32(0))
+    os.user32.MessageBoxA(0, cstr("hi"), cstr("Epic"), i64(u32(0)))
     exit(0)
 }

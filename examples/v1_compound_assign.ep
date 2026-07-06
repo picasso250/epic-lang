@@ -22,8 +22,8 @@ fun main(): void {
     b.value = 4
     b.value += 6
     b.value *= 2
-    b.small = 3
-    b.small += 4
+    b.small = u8(3)
+    b.small += u8(4)
 
     let xs = new i64[1]
     push(xs, 5)
@@ -32,5 +32,5 @@ fun main(): void {
 
     let s = "abc"
 
-    exit(x + b.value + b.small + xs[0] + len(s))
+    exit(x + b.value + i64(b.small) + xs[0] + len(s))
 }

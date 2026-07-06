@@ -40,7 +40,7 @@ fun sema_ends_with(s: str, suffix: str): bool {
 fun sema_key2(a: str, b: str): str {
     let out = new u8[]
     extend(out, bytes(a))
-    push(out, 46)
+    push(out, '.')
     extend(out, bytes(b))
     return str(out)
 }
@@ -156,7 +156,7 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
 }
 
 fun sema_digit_value(c: u8): i64 {
-    if c < 48 || c > 57 {
+    if c < u8(48) || c > u8(57) {
         return 0
     }
     return i64(c) - 48
@@ -169,6 +169,16 @@ fun sema_parse_i64(s: str): i64 {
         n = n * 10 + sema_digit_value(bs[i])
     }
     return n
+}
+
+fun sema_check_decimal_i64_literal(s: str, context: str): void {
+    let max = "9223372036854775807"
+    if len(s) > len(max) {
+        sema_die(f"{context} literal out of range for i64")
+    }
+    if len(s) == len(max) && s > max {
+        sema_die(f"{context} literal out of range for i64")
+    }
 }
 
 fun sema_has_literal_int(node: AstNode): bool {
@@ -248,7 +258,7 @@ fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
         }
     }
     if target == "i32" {
-        if value < -2147483648 || value > 2147483647 {
+        if value < (0 - 2147483647 - 1) || value > 2147483647 {
             sema_die(f"{context} literal {value} out of range for {target}")
         }
     }
@@ -258,7 +268,7 @@ fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
         }
     }
     if target == "i64" {
-        if value < -9223372036854775808 {
+        if false {
             sema_die(f"{context} literal {value} out of range for {target}")
         }
     }
@@ -283,17 +293,7 @@ fun sema_check_assign_info(target: str, value_type: str, value_node: AstNode, co
         return
     }
     if sema_is_int(target) && sema_is_int(value_type) {
-        if target == "i32" || target == "u32" {
-            if sema_has_literal_int(value_node) == false {
-                sema_die(f"{context} expected {target}, got {value_type}; use {target}(... ) for an explicit conversion")
-            }
-            sema_check_int_literal_range(target, sema_literal_int(value_node), context)
-        } else {
-            if sema_has_literal_int(value_node) {
-                sema_check_int_literal_range(target, sema_literal_int(value_node), context)
-            }
-        }
-        return
+        sema_die(f"{context} expected {target}, got {value_type}; use {target}(... ) for an explicit conversion")
     }
     sema_die(f"{context} expected {target}, got {value_type}")
 }
@@ -377,19 +377,6 @@ fun sema_reset_locals(st: SemaState): void {
     st.locals = new map[str]str { "argv": "str[]" }
 }
 
-fun sema_binary_int_result(left: str, right: str): str {
-    if left == "i32" || left == "u32" || right == "i32" || right == "u32" {
-        return "i64"
-    }
-    if left == "u64" || right == "u64" {
-        return "u64"
-    }
-    if left == "i64" || left == "u64" {
-        return left
-    }
-    return "i64"
-}
-
 fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode): str {
     let base = sema_expr_type(st, base_expr)
     if sema_is_map(base) {
@@ -409,6 +396,7 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
 
 fun sema_expr_type(st: SemaState, node: AstNode): str {
     if node.kind == "Literal" {
+        sema_check_decimal_i64_literal(node.value, "integer")
         return sema_set_type(node, "i64")
     }
     if node.kind == "Char" {
@@ -465,6 +453,9 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         if node.op == "==" || node.op == "!=" || node.op == "<" || node.op == ">" || node.op == "<=" || node.op == ">=" {
             if sema_is_int(left) && sema_is_int(right) {
+                if left != right {
+                    sema_die(f"comparison expected {left}, got {right}; use an explicit conversion")
+                }
                 return sema_set_type(node, "bool")
             }
             sema_check_assign_info(left, right, node.right, "comparison")
@@ -476,7 +467,10 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         if sema_is_int(right) == false {
             sema_die(f"operator {node.op} right expected integer, got {right}")
         }
-        return sema_set_type(node, sema_binary_int_result(left, right))
+        if left != right {
+            sema_die(f"operator {node.op} expected matching integer types, got {left} and {right}; use an explicit conversion")
+        }
+        return sema_set_type(node, left)
     }
     if node.kind == "Call" {
         return sema_set_type(node, sema_call_type(st, node))
@@ -663,7 +657,11 @@ fun sema_call_type(st: SemaState, node: AstNode): str {
     }
     if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "u8" {
         sema_check_arity(node.name, 1, node.args)
-        sema_expect_int(st, node.args[0], f"{node.name} argument")
+        if node.args[0].kind == "Literal" {
+            sema_set_type(node.args[0], "i64")
+        } else {
+            sema_expect_int(st, node.args[0], f"{node.name} argument")
+        }
         return sema_type_name(st, node.name)
     }
     if node.name == "bool" {
@@ -810,7 +808,9 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
         if sema_is_int(rhs) == false {
             sema_die(f"compound assignment value expected integer, got {rhs}")
         }
-        sema_check_assign_info(target, sema_binary_int_result(target, rhs), node.value_expr, "compound assignment")
+        if target != rhs {
+            sema_die(f"compound assignment expected matching integer types, got {target} and {rhs}; use an explicit conversion")
+        }
         return
     }
     if node.kind == "ExprStmt" {

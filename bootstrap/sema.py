@@ -197,8 +197,8 @@ class SemanticAnalyzer:
         if not self._is_integer(target_type):
             self._fail(f"compound assignment expected integer target, got {target_type}")
         self._expect_integer(rhs, "compound assignment value")
-        result = ExprInfo(self._binary_int_result(target_type, rhs.type))
-        self._check_assign(target_type, result, "compound assignment")
+        if target_type != rhs.type:
+            self._fail(f"compound assignment expected matching integer types, got {target_type} and {rhs.type}; use an explicit conversion")
 
     def _analyze_return(self, stmt):
         ret_type = self.func_sigs[self.fn_name][1]
@@ -315,15 +315,19 @@ class SemanticAnalyzer:
             self._fail("string concatenation is removed; use u8[] + extend + str(bytes)")
         if expr.op in ("==", "!=", "<", ">", "<=", ">="):
             if self._is_integer(left.type) and self._is_integer(right.type):
+                if left.type != right.type:
+                    self._fail(f"comparison {expr.op} expected {left.type}, got {right.type}; use an explicit conversion")
                 return ExprInfo(BOOL)
             if left.type != right.type:
-                self._fail(f"comparison expected {left.type}, got {right.type}")
+                self._fail(f"comparison {expr.op} expected {left.type}, got {right.type}")
             return ExprInfo(BOOL)
         if expr.op in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>", ">>>"):
             self._expect_integer(left, f"operator {expr.op} left")
             self._expect_integer(right, f"operator {expr.op} right")
+            if left.type != right.type:
+                self._fail(f"operator {expr.op} expected matching integer types, got {left.type} and {right.type}; use an explicit conversion")
             literal = self._fold_binary_literal(expr.op, left.literal_int, right.literal_int)
-            return ExprInfo(self._binary_int_result(left.type, right.type), literal)
+            return ExprInfo(left.type, literal)
         self._fail(f"unsupported binary operator {expr.op}")
 
     def _call_expr(self, expr):
@@ -360,7 +364,8 @@ class SemanticAnalyzer:
             return ExprInfo(I64)
         if name in ("i64", "u64", "i32", "u32", "u8"):
             self._check_arity(name, 1, expr.args)
-            self._expect_integer(self._expr(expr.args[0]), f"{name} argument")
+            arg = self._expr(expr.args[0])
+            self._expect_integer(arg, f"{name} argument")
             return ExprInfo(self._type_name(name))
         if name == "bool":
             self._check_arity(name, 1, expr.args)
@@ -528,7 +533,11 @@ class SemanticAnalyzer:
         self._fail_global(f"unknown type {name}")
 
     def _check_str_convertible(self, info, context):
-        if info.type == STR or self._is_integer(info.type) or info.type == BOOL or info.type == ARRAY(U8):
+        if info.type == STR or info.type == BOOL or info.type == ARRAY(U8):
+            return
+        if self._is_integer(info.type):
+            if info.literal_int is not None:
+                self._check_int_literal_range(info.type, info.literal_int, context)
             return
         if info.type == VOID:
             self._fail(f"{context} argument cannot be void")
@@ -550,20 +559,11 @@ class SemanticAnalyzer:
         if value.type == VOID:
             self._fail(f"{context} expected {target}, got void")
         if target == value.type:
-            if target in (I32, U32) and value.literal_int is not None:
+            if self._is_integer(target) and value.literal_int is not None:
                 self._check_int_literal_range(target, value.literal_int, context)
             return
         if self._is_integer(target) and self._is_integer(value.type):
-            if target in (I32, U32):
-                if value.literal_int is None:
-                    self._fail(
-                        f"{context} expected {target}, got {value.type}; "
-                        f"use {target}(... ) for an explicit conversion"
-                    )
-                self._check_int_literal_range(target, value.literal_int, context)
-            elif value.literal_int is not None:
-                self._check_int_literal_range(target, value.literal_int, context)
-            return
+            self._fail(f"{context} expected {target}, got {value.type}; use {target}(... ) for an explicit conversion")
         self._fail(f"{context} expected {target}, got {value.type}")
 
     def _check_int_literal_range(self, target, value, context):
@@ -620,15 +620,6 @@ class SemanticAnalyzer:
 
     def _is_integer(self, typ):
         return typ.kind in self.INT_RANGES
-
-    def _binary_int_result(self, left, right):
-        if left in (I32, U32) or right in (I32, U32):
-            return I64
-        if left == U64 or right == U64:
-            return U64
-        if left in (I64, U64):
-            return left
-        return I64
 
     def _fold_binary_literal(self, op, left, right):
         if left is None or right is None:

@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: 255
 fun main(): void {
-    let b = new u8[] { 255 }
+    let b = new u8[] { u8(255) }
     println(str(b[0]))
 }

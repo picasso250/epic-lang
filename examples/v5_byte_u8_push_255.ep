@@ -2,6 +2,6 @@
 # STDOUT: 255
 fun main(): void {
     let b = new u8[1]
-    push(b, 255)
+    push(b, u8(255))
     println(str(b[0]))
 }

@@ -9,7 +9,7 @@ fun main(): void {
     println(str(0))
     println(str(123))
     println(str(0 - 1))
-    println(str(-9223372036854775808))
+    println(str(0 - 9223372036854775807 - 1))
     println(str(9223372036854775807))
     exit(0)
 }

@@ -8,7 +8,7 @@ fun main(): void {
     print(s)
 
     # Test 2: str(u8[]) is identity, bytes(str) shares same buffer
-    let arr = new u8[] { 65, 66, 99 }
+    let arr = new u8[] { u8(65), u8(66), u8(99) }
     let s2 = str(arr)
     let bs2 = bytes(s2)
     bs2[1] = 'e'

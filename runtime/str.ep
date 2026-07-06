@@ -25,7 +25,7 @@ fun __ep_str_from_bool(value: bool): str {
 
 
 fun __ep_str_from_i64(value: i64): str {
-    if value == -9223372036854775808 {
+    if value == (0 - 9223372036854775807 - 1) {
         return "-9223372036854775808"
     }
     if value < 0 {

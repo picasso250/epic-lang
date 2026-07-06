@@ -6,61 +6,61 @@
 # STDOUT: 283686952306183
 # CLEAN: test_bytes.bin
 fun u16_le(buf: u8[], off: i64): u64 {
-    return u64(buf[off]) | (u64(buf[off + 1]) << 8)
+    return u64(buf[off]) | (u64(buf[off + 1]) << u64(8))
 }
 
 fun u32_le(buf: u8[], off: i64): u64 {
-    return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
+    return u64(buf[off]) | (u64(buf[off + 1]) << u64(8)) | (u64(buf[off + 2]) << u64(16)) | (u64(buf[off + 3]) << u64(24))
 }
 
 fun u64_le(buf: u8[], off: i64): u64 {
-    return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24) | (u64(buf[off + 4]) << 32) | (u64(buf[off + 5]) << 40) | (u64(buf[off + 6]) << 48) | (u64(buf[off + 7]) << 56)
+    return u64(buf[off]) | (u64(buf[off + 1]) << u64(8)) | (u64(buf[off + 2]) << u64(16)) | (u64(buf[off + 3]) << u64(24)) | (u64(buf[off + 4]) << u64(32)) | (u64(buf[off + 5]) << u64(40)) | (u64(buf[off + 6]) << u64(48)) | (u64(buf[off + 7]) << u64(56))
 }
 
 fun put_u16_le(buf: u8[], off: i64, x: u64): void {
-    buf[off] = u8(x & 255)
-    buf[off + 1] = u8((x >>> 8) & 255)
+    buf[off] = u8(x & u64(255))
+    buf[off + 1] = u8((x >>> u64(8)) & u64(255))
 }
 
 fun put_u32_le(buf: u8[], off: i64, x: u64): void {
-    buf[off] = u8(x & 255)
-    buf[off + 1] = u8((x >>> 8) & 255)
-    buf[off + 2] = u8((x >>> 16) & 255)
-    buf[off + 3] = u8((x >>> 24) & 255)
+    buf[off] = u8(x & u64(255))
+    buf[off + 1] = u8((x >>> u64(8)) & u64(255))
+    buf[off + 2] = u8((x >>> u64(16)) & u64(255))
+    buf[off + 3] = u8((x >>> u64(24)) & u64(255))
 }
 
 fun put_u64_le(buf: u8[], off: i64, x: u64): void {
-    buf[off] = u8(x & 255)
-    buf[off + 1] = u8((x >>> 8) & 255)
-    buf[off + 2] = u8((x >>> 16) & 255)
-    buf[off + 3] = u8((x >>> 24) & 255)
-    buf[off + 4] = u8((x >>> 32) & 255)
-    buf[off + 5] = u8((x >>> 40) & 255)
-    buf[off + 6] = u8((x >>> 48) & 255)
-    buf[off + 7] = u8((x >>> 56) & 255)
+    buf[off] = u8(x & u64(255))
+    buf[off + 1] = u8((x >>> u64(8)) & u64(255))
+    buf[off + 2] = u8((x >>> u64(16)) & u64(255))
+    buf[off + 3] = u8((x >>> u64(24)) & u64(255))
+    buf[off + 4] = u8((x >>> u64(32)) & u64(255))
+    buf[off + 5] = u8((x >>> u64(40)) & u64(255))
+    buf[off + 6] = u8((x >>> u64(48)) & u64(255))
+    buf[off + 7] = u8((x >>> u64(56)) & u64(255))
 }
 
 fun main(): void {
     let buf = new u8[16]
     push(buf, 'M')
     push(buf, 'Z')
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    push(buf, 0)
-    put_u16_le(buf, 2, 4660)
-    put_u32_le(buf, 4, 16909060)
-    put_u64_le(buf, 8, 283686952306183)
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    push(buf, u8(0))
+    put_u16_le(buf, 2, u64(4660))
+    put_u32_le(buf, 4, u64(16909060))
+    put_u64_le(buf, 8, u64(283686952306183))
     write_file("test_bytes.bin", buf)
 
     let got = read_file("test_bytes.bin")

@@ -5,5 +5,5 @@ fun main(): i64 {
     let b = i32(y)
     let c = u32(y)
     let d = u64(c)
-    return a + b + d
+    return i64(a) + i64(b) + i64(d)
 }

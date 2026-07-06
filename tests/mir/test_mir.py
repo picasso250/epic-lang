@@ -298,7 +298,7 @@ def test_mir_helper_injection():
 
     check(
         """fun main(): i64 {
-    let a = new u8[] { 65 }
+    let a = new u8[] { u8(65) }
     println(str(a))
     return 0
 }"""
@@ -306,29 +306,29 @@ def test_mir_helper_injection():
 
     check(
         """fun main(): i64 {
-    let a = new u8[] { 1, 2 }
+    let a = new u8[] { u8(1), u8(2) }
     return 0
 }"""
     )
 
     check(
         """fun main(): i64 {
-    let b = new u8[] { 1, 2 }
-    return b[0]
+    let b = new u8[] { u8(1), u8(2) }
+    return i64(b[0])
 }"""
     )
 
     check(
         """fun main(): i64 {
-    let b = new u8[] { 1, 2 }
-    push(b, 3)
+    let b = new u8[] { u8(1), u8(2) }
+    push(b, u8(3))
     return len(b)
 }"""
     )
 
     check(
         """fun main(): i64 {
-    let b = new u8[] { 1, 2, 3 }
+    let b = new u8[] { u8(1), u8(2), u8(3) }
     let c = b[1:3]
     return len(c)
 }"""
@@ -336,8 +336,8 @@ def test_mir_helper_injection():
 
     check(
         """fun main(): i64 {
-    let a = new u8[] { 1, 2 }
-    let b = new u8[] { 3, 4 }
+    let a = new u8[] { u8(1), u8(2) }
+    let b = new u8[] { u8(3), u8(4) }
     extend(a, b)
     return len(a)
 }"""
@@ -370,9 +370,9 @@ def test_mir_helper_injection():
 
     # Deterministic order: running twice gives same injection list
     src = """fun main(): i64 {
-    let b = new u8[] { 65, 66 }
-    b[0] = 99
-    return b[0]
+    let b = new u8[] { u8(65), u8(66) }
+    b[0] = u8(99)
+    return i64(b[0])
 }"""
     ast = sema.analyze_program(Parser(lex(src)).parse_program())
     prog1 = ast_to_mir(ast)

@@ -2,5 +2,5 @@
 fun main(): void {
     let s = "ABC"
     let bs = bytes(s)
-    exit(bs[1])
+    exit(i64(bs[1]))
 }

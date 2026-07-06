@@ -1,4 +1,4 @@
-# COMPILE_FAIL: literal 2147483648 out of range for i32
+# COMPILE_FAIL: let x expected i32, got i64; use i32(... ) for an explicit conversion
 
 fun main(): i64 {
     let x: i32 = 2147483648

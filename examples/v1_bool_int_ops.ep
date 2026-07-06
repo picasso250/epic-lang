@@ -5,16 +5,16 @@
 fun main(): void {
     let ok: bool = true
     let b: u8 = 'A'
-    let mask: u64 = 240
-    let low: u64 = 15
+    let mask: u64 = u64(240)
+    let low: u64 = u64(15)
     if ok && !false {
         println("OK")
     }
-    let combined: u64 = (mask | low) ^ 165
-    if combined == 90 {
+    let combined: u64 = (mask | low) ^ u64(165)
+    if combined == u64(90) {
         println(str(combined))
     }
-    let shifted: u64 = (u64(b) << 1) >>> 1
+    let shifted: u64 = (u64(b) << u64(1)) >>> u64(1)
     println(str(shifted))
     exit(0)
 }
