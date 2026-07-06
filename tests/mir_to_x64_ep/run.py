@@ -54,6 +54,26 @@ EXAMPLE_CASES = [
     EXAMPLES_DIR / "v5_zero_copy_str_bytes.ep",
     EXAMPLES_DIR / "v4_empty_array_push.ep",
     EXAMPLES_DIR / "v1_checked_index_oob.ep",
+    EXAMPLES_DIR / "v1_slice_oob.ep",
+    EXAMPLES_DIR / "v1_for_in_range.ep",
+    EXAMPLES_DIR / "v1_extend_generic.ep",
+    EXAMPLES_DIR / "v2_struct_init.ep",
+    EXAMPLES_DIR / "v3_i32_u32.ep",
+    EXAMPLES_DIR / "v6_unsigned_div_cmp.ep",
+    EXAMPLES_DIR / "v2_assert_ok.ep",
+    EXAMPLES_DIR / "v2_match_basic.ep",
+    EXAMPLES_DIR / "v2_panic.ep",
+    EXAMPLES_DIR / "m32_bytes_extend.ep",
+    EXAMPLES_DIR / "v1_byte_io_endian.ep",
+    EXAMPLES_DIR / "v2_map_str_i64.ep",
+    EXAMPLES_DIR / "v4_cstr_invalid.ep",
+    EXAMPLES_DIR / "v4_messagebox_compile.ep",
+    EXAMPLES_DIR / "m11_file.ep",
+    EXAMPLES_DIR / "m15_system.ep",
+    EXAMPLES_DIR / "m24_read_file.ep",
+    EXAMPLES_DIR / "m25_argv.ep",
+    EXAMPLES_DIR / "m26_write_file.ep",
+    EXAMPLES_DIR / "m28_sys_winapi.ep",
 ]
 
 EXPECTED = """section .text
@@ -247,6 +267,10 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+
+
 
 
 
