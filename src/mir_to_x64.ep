@@ -14,6 +14,9 @@ struct MirToX64Lower {
     addr_slots: MirToX64Slot[]
     string_names: str[]
     string_lengths: i64[]
+    struct_field_names: str[]
+    struct_field_types: str[]
+    struct_field_indexes: i64[]
     next_slot: i64
     return_label: str
 }
@@ -25,6 +28,9 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.addr_slots = new MirToX64Slot[0]
     lower.string_names = new str[0]
     lower.string_lengths = new i64[0]
+    lower.struct_field_names = new str[0]
+    lower.struct_field_types = new str[0]
+    lower.struct_field_indexes = new i64[0]
     lower.next_slot = 0
     lower.return_label = ""
     return lower
@@ -54,6 +60,13 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
         if program.globals[i].has_init {
             mir_to_x64_add_string_global(lower, program.globals[i].name, len(program.globals[i].init))
         }
+        i = i + 1
+    }
+    i = 0
+    while i < len(program.struct_fields) {
+        push(lower.struct_field_names, program.struct_fields[i].struct_name)
+        push(lower.struct_field_types, program.struct_fields[i].field_type)
+        push(lower.struct_field_indexes, program.struct_fields[i].field_index)
         i = i + 1
     }
 }
@@ -209,6 +222,121 @@ fun mir_to_x64_store_result(lower: MirToX64Lower, result_name: str, reg: str): v
     x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, result_name), 8), x64_reg(reg))
 }
 
+fun mir_to_x64_type_size(typ: str): i64 {
+    if typ == "i8" {
+        return 1
+    }
+    return 8
+}
+
+fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field_index: i64): i64 {
+    let offset = 0
+    let i = 0
+    while i < len(lower.struct_field_names) {
+        if lower.struct_field_names[i] == struct_name {
+            if lower.struct_field_indexes[i] == field_index {
+                return offset
+            }
+            offset = offset + mir_to_x64_type_size(lower.struct_field_types[i])
+        }
+        i = i + 1
+    }
+    mir_to_x64_die(str_cat2("unknown struct field index: ", struct_name))
+    return 0
+}
+
+fun mir_to_x64_struct_size(lower: MirToX64Lower, struct_name: str): i64 {
+    let size = 0
+    let i = 0
+    while i < len(lower.struct_field_names) {
+        if lower.struct_field_names[i] == struct_name {
+            size = size + mir_to_x64_type_size(lower.struct_field_types[i])
+        }
+        i = i + 1
+    }
+    if size == 0 {
+        mir_to_x64_die(str_cat2("unknown struct layout: ", struct_name))
+    }
+    return size
+}
+
+fun mir_to_x64_source_struct_name(source_type: str): str {
+    let prefix = "struct "
+    if len(source_type) > len(prefix) {
+        if source_type[0:len(prefix)] == prefix {
+            return source_type[len(prefix):len(source_type)]
+        }
+    }
+    return ""
+}
+
+fun mir_to_x64_add_rax_imm(lower: MirToX64Lower, value: i64): void {
+    if value == 0 {
+        return
+    }
+    x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_imm(value))
+    x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
+}
+
+fun mir_to_x64_scale_rcx_by_8(lower: MirToX64Lower): void {
+    x64_add_inst2(lower.x64, "add", x64_reg("rcx"), x64_reg("rcx"))
+    x64_add_inst2(lower.x64, "add", x64_reg("rcx"), x64_reg("rcx"))
+    x64_add_inst2(lower.x64, "add", x64_reg("rcx"), x64_reg("rcx"))
+}
+
+fun mir_to_x64_add_scaled_index(lower: MirToX64Lower, operand: MirOperand, scale: i64): void {
+    if operand.kind == "int" {
+        mir_to_x64_add_rax_imm(lower, operand.int_value * scale)
+        return
+    }
+    mir_to_x64_load_operand(lower, "rcx", operand)
+    if scale == 8 {
+        mir_to_x64_scale_rcx_by_8(lower)
+    } else if scale != 1 {
+        mir_to_x64_die(str_cat2("dynamic gep scale is not supported yet: ", str(scale)))
+    }
+    x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
+}
+
+fun mir_to_x64_gep_scale(lower: MirToX64Lower, source_type: str): i64 {
+    let struct_name = mir_to_x64_source_struct_name(source_type)
+    if struct_name != "" {
+        return mir_to_x64_struct_size(lower, struct_name)
+    }
+    if source_type == "i8" {
+        return 1
+    }
+    return 8
+}
+
+fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
+    mir_to_x64_load_operand(lower, "rax", inst.operands[0])
+    if inst.operands[0].kind != "null" {
+        x64_add_inst2(lower.x64, "test", x64_reg("rax"), x64_reg("rax"))
+        x64_add_inst1(lower.x64, "jz", x64_label_ref("__epx_null_deref"))
+    }
+    let struct_name = mir_to_x64_source_struct_name(inst.typ)
+    if struct_name != "" {
+        if len(inst.operands) == 2 {
+            mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
+        } else if len(inst.operands) == 3 {
+            mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
+            if inst.operands[2].kind != "int" {
+                mir_to_x64_die("struct field gep needs a constant field index")
+            }
+            mir_to_x64_add_rax_imm(lower, mir_to_x64_struct_field_offset(lower, struct_name, inst.operands[2].int_value))
+        } else {
+            mir_to_x64_die("struct gep needs one or two indices")
+        }
+    } else {
+        if len(inst.operands) < 2 {
+            mir_to_x64_die("gep needs an index")
+        }
+        mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_gep_scale(lower, inst.typ))
+    }
+    mir_to_x64_store_result(lower, inst.result_name, "rax")
+}
+
 fun mir_to_x64_is_binary_op(op: str): bool {
     return op == "add" || op == "sub" || op == "mul" || op == "and" || op == "or" || op == "xor" || op == "shl" || op == "sar" || op == "shr" || op == "sdiv" || op == "srem" || op == "udiv" || op == "urem"
 }
@@ -321,6 +449,15 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
     }
     if inst.op == "call" {
         mir_to_x64_emit_call(lower, inst)
+        return
+    }
+    if inst.op == "ptrtoint" {
+        mir_to_x64_load_operand(lower, "rax", inst.operands[0])
+        mir_to_x64_store_result(lower, inst.result_name, "rax")
+        return
+    }
+    if inst.op == "gep" {
+        mir_to_x64_emit_gep(lower, inst)
         return
     }
     if mir_to_x64_is_binary_op(inst.op) {
