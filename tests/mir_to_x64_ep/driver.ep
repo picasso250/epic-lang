@@ -1,0 +1,21 @@
+# Source-to-X64IR driver for self-hosted MIR-to-X64 oracle tests.
+
+fun main(): void {
+    if len(argv) < 2 {
+        println("usage: mir_to_x64_driver <file>")
+        exit(1)
+    }
+    let src = str(read_file(argv[1]))
+    let tokens = lex(src)
+    let p = make_parser(tokens)
+    let ast = parse_program(p)
+    let st = make_sema_state()
+    sema_program(st, ast)
+    let mir = mir_ast_to_mir(ast)
+    let i = 0
+    while i < len(mir.functions) {
+        let x64 = mir_to_x64_lower_function(mir.functions[i])
+        print(x64_program_text(x64))
+        i = i + 1
+    }
+}
