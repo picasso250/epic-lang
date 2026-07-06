@@ -49,16 +49,3 @@
 - `src/parser.ep` reserved-name list 中的 `str_new` 残留已清理
 
 结论：Phase 3 的语言/文档/测试表面基本完成；不能标成全完成，因为 self-hosted compiler 源码迁移还没清完。
-
-__eq__ str 动态加载 by __epic_extentions__ map: 比如我们的 str==str 现在其实调用的是 runtime\str.ep的__ep_str_eq 
-那么，我们其实可以做成一个真实而有用的机制，运算符重载
-```
-__epic_extentions__ = new map{
-  "==": new map{
-    "str": fun (a,b){
-      ...
-    }
-  }
-}
-```
-当然，这个需要lambda，我们还未支持
