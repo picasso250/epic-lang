@@ -171,13 +171,29 @@ fun sema_parse_i64(s: str): i64 {
     return n
 }
 
-fun sema_check_decimal_i64_literal(s: str, context: str): void {
-    let max = "9223372036854775807"
-    if len(s) > len(max) {
-        sema_die(f"{context} literal out of range for i64")
+fun sema_decimal_gt(a: str, b: str): bool {
+    if len(a) > len(b) {
+        return true
     }
-    if len(s) == len(max) && s > max {
-        sema_die(f"{context} literal out of range for i64")
+    if len(a) < len(b) {
+        return false
+    }
+    let ab = bytes(a)
+    let bb = bytes(b)
+    for i in 0:len(ab) {
+        if ab[i] > bb[i] {
+            return true
+        }
+        if ab[i] < bb[i] {
+            return false
+        }
+    }
+    return false
+}
+
+fun sema_check_decimal_i64_literal(s: str, context: str): void {
+    if sema_decimal_gt(s, "9223372036854775807") {
+        sema_die(f"{context} literal {s} out of range for i64")
     }
 }
 
@@ -660,11 +676,7 @@ fun sema_call_type(st: SemaState, node: AstNode): str {
     }
     if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "u8" {
         sema_check_arity(node.name, 1, node.args)
-        if node.args[0].kind == "Literal" {
-            sema_set_type(node.args[0], "i64")
-        } else {
-            sema_expect_int(st, node.args[0], f"{node.name} argument")
-        }
+        sema_expect_int(st, node.args[0], f"{node.name} argument")
         return sema_type_name(st, node.name)
     }
     if node.name == "bool" {

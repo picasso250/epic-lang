@@ -1,12 +1,12 @@
 # EXIT: 0
 fun main(): i64 {
-    let u: u32 = u32(4294967296)
+    let u: u32 = (u32(0))
     if u64(u) != u64(0) { return 10 }
 
     let u_neg: u32 = u32(-1)
     if u64(u_neg) != u64(4294967295) { return 11 }
 
-    let i_wrap: i32 = i32(2147483648)
+    let i_wrap: i32 = (i32(2147483647) + i32(1))
     if i64(i_wrap) != (0 - 2147483647 - 1) { return 12 }
 
     let i_neg: i32 = i32(4294967295)

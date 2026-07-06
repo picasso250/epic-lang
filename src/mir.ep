@@ -9,7 +9,6 @@ struct MirOperand {
     typ: str
     name: str
     int_value: i64
-    int_text: str
     bool_value: bool
 }
 
@@ -61,7 +60,6 @@ fun mir_operand_empty(): MirOperand {
     op.typ = ""
     op.name = ""
     op.int_value = 0
-    op.int_text = ""
     op.bool_value = false
     return op
 }
@@ -74,11 +72,6 @@ fun mir_const_int(typ: str, value: i64): MirOperand {
     return op
 }
 
-fun mir_const_int_text(typ: str, value: i64, text: str): MirOperand {
-    let op = mir_const_int(typ, value)
-    op.int_text = text
-    return op
-}
 
 fun mir_operand_null(): MirOperand {
     let op = mir_operand_empty()
@@ -116,9 +109,6 @@ fun mir_operand_text(op: MirOperand): str {
         return str_cat2("%", op.name)
     }
     if op.kind == "int" {
-        if op.int_text != "" {
-            return op.int_text
-        }
         return str(op.int_value)
     }
     if op.kind == "bool" {

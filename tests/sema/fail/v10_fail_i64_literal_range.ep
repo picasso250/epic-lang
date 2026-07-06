@@ -1,0 +1,5 @@
+# COMPILE_FAIL: integer literal 9223372036854775808 out of range for i64
+
+fun main(): i64 {
+    return 9223372036854775808
+}

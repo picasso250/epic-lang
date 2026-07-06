@@ -427,7 +427,7 @@ def test_runtime_source_str_from_bool_lowers_as_epic_function():
 def test_runtime_source_str_from_i64_lowers_as_epic_function():
     runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
     user_src = """fun main(): void {
-    println(str(-9223372036854775808))
+    println(str(0 - 9223372036854775807 - 1))
 }"""
     ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
     prog = ast_to_mir(sema.analyze_program(ast))
@@ -444,7 +444,7 @@ def test_runtime_source_str_from_i64_lowers_as_epic_function():
 def test_runtime_source_str_from_u64_lowers_as_epic_function():
     runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
     user_src = """fun main(): void {
-    println(str(u64(18446744073709551615)))
+    println(str((u64(0) - u64(1))))
 }"""
     ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
     prog = ast_to_mir(sema.analyze_program(ast))

@@ -562,7 +562,7 @@ fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstNode): Mir
 fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
     if expr.kind == "Literal" {
-        return mir_value_flow(mir_const_int_text("i64", sema_parse_i64(expr.value), expr.value), st.current_block)
+        return mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)
     }
     if expr.kind == "Char" {
         return mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)

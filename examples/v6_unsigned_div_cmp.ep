@@ -6,7 +6,7 @@
 # STDOUT: 9223372036854775808
 
 fun main(): void {
-    let max = u64(18446744073709551615)
+    let max = (u64(0) - u64(1))
     println(str(max / u64(10)))
     println(str(max % u64(10)))
     if max > u64(0) {
@@ -15,6 +15,6 @@ fun main(): void {
     if u64(0) <= max {
         println("ule")
     }
-    println(str(u64(9223372036854775808) / u64(1)))
+    println(str((u64(9223372036854775807) + u64(1)) / u64(1)))
     exit(0)
 }

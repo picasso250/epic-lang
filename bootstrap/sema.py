@@ -240,6 +240,8 @@ class SemanticAnalyzer:
         if expr is None:
             self._fail("missing expression")
         if isinstance(expr, LiteralNode):
+            if expr.value > self.INT_RANGES["i64"][1]:
+                self._fail(f"integer literal {expr.value} out of range for i64")
             return ExprInfo(I64, expr.value)
         if isinstance(expr, CharNode):
             return ExprInfo(U8, expr.value)

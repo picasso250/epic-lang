@@ -2,7 +2,7 @@
 fun main(): i64 {
     let signed: i64 = -1
     let unsigned: u64 = u64(signed)
-    if unsigned != u64(18446744073709551615) { return 12 }
+    if unsigned != (u64(0) - u64(1)) { return 12 }
 
     let signed_again: i64 = i64(unsigned)
     if signed_again != (0 - 1) { return 13 }
