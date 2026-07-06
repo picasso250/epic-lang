@@ -67,6 +67,7 @@ EXAMPLE_CASES = [
     os.path.join(EXAMPLES_DIR, "v1_checked_index_oob.ep"),
     os.path.join(EXAMPLES_DIR, "m33_fstring_print.ep"),
     os.path.join(EXAMPLES_DIR, "m9_array.ep"),
+    os.path.join(EXAMPLES_DIR, "v1_bool_int_ops.ep"),
     os.path.join(EXAMPLES_DIR, "m6_while.ep"),
     os.path.join(EXAMPLES_DIR, "m5_if.ep"),
     os.path.join(EXAMPLES_DIR, "m4_fn.ep"),

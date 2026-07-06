@@ -662,6 +662,44 @@ fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstNode):
     return mir_value_flow(arr, st.current_block)
 }
 
+fun mir_emit_short_circuit(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+    st.current_block = block
+    let addr_name = mir_new_value(st, "logic.addr")
+    let result_addr = mir_value_operand("ptr", addr_name)
+    mir_emit_inst(st, mir_alloca(addr_name, "bool"))
+
+    let left_flow = mir_emit_expr(st, st.current_block, expr.left)
+    st.current_block = left_flow.block
+    let rhs_block = mir_new_block(st, "logic.rhs")
+    let short_block = mir_new_block(st, "logic.short")
+    let end_block = mir_new_block(st, "logic.end")
+    let short_value = mir_const_bool(false)
+    if expr.op == "&&" {
+        st.current_block.terminator = mir_condbr(left_flow.value, rhs_block.name, short_block.name)
+        short_value = mir_const_bool(false)
+    } else {
+        st.current_block.terminator = mir_condbr(left_flow.value, short_block.name, rhs_block.name)
+        short_value = mir_const_bool(true)
+    }
+    st.current_block.has_terminator = true
+
+    st.current_block = short_block
+    mir_emit_inst(st, mir_store(short_value, result_addr))
+    st.current_block.terminator = mir_br(end_block.name)
+    st.current_block.has_terminator = true
+
+    let right_flow = mir_emit_expr(st, rhs_block, expr.right)
+    st.current_block = right_flow.block
+    mir_emit_inst(st, mir_store(right_flow.value, result_addr))
+    st.current_block.terminator = mir_br(end_block.name)
+    st.current_block.has_terminator = true
+
+    st.current_block = end_block
+    let result_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(result_name, "bool", "bool", result_addr))
+    return mir_value_flow(mir_value_operand("bool", result_name), st.current_block)
+}
+
 fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
     let base_type = expr.base.resolved_type
@@ -728,6 +766,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         mir_codegen_die(f"unsupported unary op {expr.op}")
     }
     if expr.kind == "Binary" {
+        if expr.op == "&&" || expr.op == "||" {
+            return mir_emit_short_circuit(st, st.current_block, expr)
+        }
         let left_flow = mir_emit_expr(st, st.current_block, expr.left)
         st.current_block = left_flow.block
         let right_flow = mir_emit_expr(st, st.current_block, expr.right)
