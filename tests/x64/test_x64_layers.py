@@ -10,7 +10,7 @@ from machine import MachineObjectBuilder
 from mir import I32, I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirField
 from mir import MirFunction, MirInst, MirParam, MirProgram, MirSignature, MirStruct
 from mir import MirValue, Ret, ValueOperand, ptr, struct as mir_struct
-from mir_lower import MirLower
+from mir_to_x64 import MirLower
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
 from x64 import X64ValidationError, validate_x64_program
 from x64_runtime import append_runtime_helpers, emit_startup_hook_call

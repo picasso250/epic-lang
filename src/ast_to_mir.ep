@@ -1,5 +1,5 @@
 #
-# Minimal self-hosted typed AST -> MIR codegen.
+# Minimal self-hosted typed AST -> AST-to-MIR.
 # First milestone path: user-function MIR text oracle comparison against Python.
 #
 
@@ -56,8 +56,8 @@ fun mir_unreachable_flow(): MirBlockFlow {
     return flow
 }
 
-fun mir_codegen_die(msg: str): void {
-    println(f"MIR codegen error: {msg}")
+fun ast_to_mir_die(msg: str): void {
+    println(f"AST-to-MIR error: {msg}")
     exit(1)
 }
 
@@ -107,7 +107,7 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
         }
         i = i - 1
     }
-    mir_codegen_die(f"undefined variable: {name}")
+    ast_to_mir_die(f"undefined variable: {name}")
     return 0
 }
 
@@ -143,7 +143,7 @@ fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64
         }
         i = i + 1
     }
-    mir_codegen_die(f"unknown struct field {key}")
+    ast_to_mir_die(f"unknown struct field {key}")
     return 0
 }
 
@@ -156,7 +156,7 @@ fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str 
         }
         i = i + 1
     }
-    mir_codegen_die(f"unknown struct field {key}")
+    ast_to_mir_die(f"unknown struct field {key}")
     return "i64"
 }
 
@@ -168,7 +168,7 @@ fun mir_func_return_type(st: MirCodegenState, name: str): str {
         }
         i = i + 1
     }
-    mir_codegen_die(f"undefined function: {name}")
+    ast_to_mir_die(f"undefined function: {name}")
     return "i64"
 }
 
@@ -228,7 +228,7 @@ fun mir_binary_op(expr_op: str, source_type: str): str {
         if unsigned { return "icmp.uge" }
         return "icmp.sge"
     }
-    mir_codegen_die(f"unsupported binary op {expr_op}")
+    ast_to_mir_die(f"unsupported binary op {expr_op}")
     return ""
 }
 
@@ -618,7 +618,7 @@ fun mir_emit_slice(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValu
     if mir_is_u8_array_type(base_type) {
         return mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_slice", "ptr", args), st.current_block)
     }
-    mir_codegen_die("slice only supports str and u8[]")
+    ast_to_mir_die("slice only supports str and u8[]")
     return mir_value_flow(mir_operand_null(), st.current_block)
 }
 
@@ -627,7 +627,7 @@ fun mir_emit_map_init(st: MirCodegenState, block: MirBlock, expr: AstNode): MirV
     let new_helper = mir_map_helper(expr.resolved_type, "new")
     let set_helper = mir_map_helper(expr.resolved_type, "set")
     if new_helper == "" || set_helper == "" {
-        mir_codegen_die(f"unsupported map init target: {expr.type_name}")
+        ast_to_mir_die(f"unsupported map init target: {expr.type_name}")
     }
     let args0 = new MirOperand[0]
     let map_value = mir_emit_call_inst(st, new_helper, "ptr", args0)
@@ -661,7 +661,7 @@ fun mir_emit_empty_array(st: MirCodegenState, elem_type: str, count: MirOperand)
     if mir_is_ptr_array_elem_type(st, elem_type) {
         return mir_emit_call_inst(st, "__ep_slice_ptr_new", "ptr", args)
     }
-    mir_codegen_die(f"unsupported array element type: {elem_type}")
+    ast_to_mir_die(f"unsupported array element type: {elem_type}")
     return mir_operand_null()
 }
 
@@ -679,7 +679,7 @@ fun mir_emit_array_literal_storage(st: MirCodegenState, elem_type: str, count: M
     if mir_is_ptr_array_elem_type(st, elem_type) {
         return mir_emit_call_inst(st, "__ep_slice_ptr_new", "ptr", args)
     }
-    mir_codegen_die(f"unsupported array literal element type: {elem_type}")
+    ast_to_mir_die(f"unsupported array literal element type: {elem_type}")
     return mir_operand_null()
 }
 
@@ -747,7 +747,7 @@ fun mir_os_call_return_type(dll: str, name: str): str {
     if dll == "user32" {
         if name == "MessageBoxA" { return "i64" }
     }
-    mir_codegen_die(f"unsupported os call: os.{dll}.{name}")
+    ast_to_mir_die(f"unsupported os call: os.{dll}.{name}")
     return "i64"
 }
 
@@ -825,7 +825,7 @@ fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstNode): Mir
     if mir_is_ptr_array_type(st, base_type) {
         return mir_value_flow(mir_emit_call_inst(st, "__ep_slice_ptr_get", "ptr", args), st.current_block)
     }
-    mir_codegen_die(f"unsupported subscript base type {base_type}")
+    ast_to_mir_die(f"unsupported subscript base type {base_type}")
     return mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
 
@@ -872,7 +872,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             mir_emit_inst(st, inst)
             return mir_value_flow(mir_value_operand("bool", inst.result_name), st.current_block)
         }
-        mir_codegen_die(f"unsupported unary op {expr.op}")
+        ast_to_mir_die(f"unsupported unary op {expr.op}")
     }
     if expr.kind == "Binary" {
         if expr.op == "&&" || expr.op == "||" {
@@ -928,7 +928,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         let base_type = expr.object.resolved_type
         let struct_name = mir_layout_struct_name(st, base_type)
         if struct_name == "" {
-            mir_codegen_die("field access base must be struct")
+            ast_to_mir_die("field access base must be struct")
         }
         let base_flow = mir_emit_expr(st, st.current_block, expr.object)
         st.current_block = base_flow.block
@@ -939,7 +939,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             return mir_emit_os_call(st, expr)
         }
         if expr.type_name != "" {
-            mir_codegen_die(f"unsupported namespaced call: {expr.type_name}.{expr.name}")
+            ast_to_mir_die(f"unsupported namespaced call: {expr.type_name}.{expr.name}")
         }
         if expr.name == "println" {
             if len(expr.args) == 1 {
@@ -967,7 +967,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             st.current_block = base_flow.block
             let struct_name = mir_layout_struct_name(st, base_type)
             if struct_name == "" {
-                mir_codegen_die("len/cap expects aggregate pointer")
+                ast_to_mir_die("len/cap expects aggregate pointer")
             }
             return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
         }
@@ -1081,7 +1081,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 helper = mir_map_helper(map_type, "del")
             }
             if helper == "" {
-                mir_codegen_die(f"{expr.name} expects map")
+                ast_to_mir_die(f"{expr.name} expects map")
             }
             let base_flow = mir_emit_expr(st, st.current_block, expr.args[0])
             st.current_block = base_flow.block
@@ -1103,7 +1103,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         }
         return mir_value_flow(mir_emit_call_inst(st, expr.name, ret_type, args), st.current_block)
     }
-    mir_codegen_die(f"unsupported expr {expr.kind}")
+    ast_to_mir_die(f"unsupported expr {expr.kind}")
     return mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
 
@@ -1398,7 +1398,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         let base_type = stmt.object.resolved_type
         let struct_name = mir_layout_struct_name(st, base_type)
         if struct_name == "" {
-            mir_codegen_die("field assignment base must be struct")
+            ast_to_mir_die("field assignment base must be struct")
         }
         let base_flow = mir_emit_expr(st, st.current_block, stmt.object)
         st.current_block = base_flow.block
@@ -1440,7 +1440,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             let base_type = stmt.expr.object.resolved_type
             let struct_name = mir_layout_struct_name(st, base_type)
             if struct_name == "" {
-                mir_codegen_die("compound field assignment base must be struct")
+                ast_to_mir_die("compound field assignment base must be struct")
             }
             let base_flow = mir_emit_expr(st, st.current_block, stmt.expr.object)
             st.current_block = base_flow.block
@@ -1509,7 +1509,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             }
             return mir_reachable_flow(st.current_block)
         }
-        mir_codegen_die("unsupported compound assignment target")
+        ast_to_mir_die("unsupported compound assignment target")
         return mir_unreachable_flow()
     }
     if stmt.kind == "If" {
@@ -1532,7 +1532,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
     }
     if stmt.kind == "Break" {
         if len(st.break_targets) == 0 {
-            mir_codegen_die("break outside loop")
+            ast_to_mir_die("break outside loop")
         }
         st.current_block.terminator = mir_br(st.break_targets[len(st.break_targets) - 1])
         st.current_block.has_terminator = true
@@ -1540,7 +1540,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
     }
     if stmt.kind == "Continue" {
         if len(st.continue_targets) == 0 {
-            mir_codegen_die("continue outside loop")
+            ast_to_mir_die("continue outside loop")
         }
         st.current_block.terminator = mir_br(st.continue_targets[len(st.continue_targets) - 1])
         st.current_block.has_terminator = true
@@ -1557,7 +1557,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         st.current_block.has_terminator = true
         return mir_unreachable_flow()
     }
-    mir_codegen_die(f"unsupported stmt {stmt.kind}")
+    ast_to_mir_die(f"unsupported stmt {stmt.kind}")
     return mir_unreachable_flow()
 }
 
@@ -1750,7 +1750,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
 
 fun main(): void {
     if len(argv) < 2 {
-        println("usage: mir_codegen <file>")
+        println("usage: ast_to_mir <file>")
         exit(1)
     }
     let src = str(read_file(argv[1]))

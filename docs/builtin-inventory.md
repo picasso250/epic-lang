@@ -10,7 +10,7 @@ Current snapshot of functions handled specially by the active Python reference c
 > but it is not wired into parser, sema, or codegen yet.
 > Active Python-side builtin handling lives in:
 > - `bootstrap/sema.py` — type checking
-> - `bootstrap/mir_codegen.py` — typed AST to MIR
+> - `bootstrap/ast_to_mir.py` — typed AST to MIR
 >
 > `src/parser.ep` still has a reserved-name list. The old NASM-oriented `src/codegen_support.ep` / `src/codegen.ep` path has been deleted; any remaining `codegen.ep` column below is historical and should be removed in a later inventory refresh.
 
@@ -18,7 +18,7 @@ Current snapshot of functions handled specially by the active Python reference c
 
 ## I/O / Process
 
-| Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
+| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `print`  | ✓ (ln 401) | ✓ (ln 588) | ✗ | ✓ (ln 831) | Print with trailing newline — `println` handled same line |
 | `println` | ✓ (ln 401) | ✓ (ln 580) | ✗ | ✓ (ln 831) | |
@@ -37,7 +37,7 @@ Current snapshot of functions handled specially by the active Python reference c
 - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
 `str`, `bytes`, and `cstr` remain public during the alias transition, but `str` is now documented as a temporary `u8[]`-layout view rather than the future UTF-8 string design.
 
-| Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
+| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Transitional formatting/view operation; `u8[]` is the text truth |
 | `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to C-style (null-terminated); WinAPI interop |
@@ -54,7 +54,7 @@ Current snapshot of functions handled specially by the active Python reference c
 
 ## Array
 
-| Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
+| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `len`    | ✓ (ln 482) | ✓ (auto handled) | ✓ (ln 299) | ✓ (ln 1011) | `str` and `array` |
 | `cap`    | ✓ (ln 488) | ✓ (auto handled) | ✓ (ln 302) | ✓ (ln 1023) | `array` only |
@@ -69,7 +69,7 @@ Current snapshot of functions handled specially by the active Python reference c
 
 These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 
-| Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
+| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `i64`  | ✓ (ln 613) | ✗ delegated | ✗ | ✓ (ln 869) | |
 | `u64`  | ✓ (ln 615) | ✗ delegated | ✗ | ✓ (ln 869) | |
@@ -88,7 +88,7 @@ u8 is Epic's only byte type.
 
 ## File I/O
 
-| Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
+| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `read_file`  | ✓ (ln 439) | ✓ (ln 654) | ✗ | ✓ (ln 1035) | Returns `u8[]` |
 | `write_file` | ✓ (ln 442) | ✓ (ln 664) | ✗ | ✓ (ln 1043) | Returns `i64` |
@@ -97,7 +97,7 @@ u8 is Epic's only byte type.
 
 ## Map
 
-| Function | sema.py | mir_codegen.py | parser.ep reserved | codegen.ep | Notes |
+| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `map_has` | ✓ (ln 494) | ✓ (ln 707) | ✓ (ln 335) | ✓ (ln 986) | Only `map[str]i64` path |
 

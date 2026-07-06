@@ -11,7 +11,7 @@ from lexer import lex
 from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
 from mir import MirProgram, MirStruct, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
-from mir_codegen import ast_to_mir
+from ast_to_mir import ast_to_mir
 from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
 from mir_parser import parse_mir_text
 from parser import Parser

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tests/mir_codegen/run.py — compare EP MIR codegen against the Python MIR oracle.
+tests/ast_to_mir/run.py — compare EP AST-to-MIR against the Python MIR oracle.
 
 First milestone compares user functions only. Python ast_to_mir injects runtime
 helpers unconditionally; the EP self-hosted path does not implement helper
@@ -16,7 +16,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(ROOT_DIR, "build", "mir-codegen-bootstrap")
-MIR_EXE = os.path.join(BUILD_DIR, "src", "mir_codegen.exe")
+AST_TO_MIR_EXE = os.path.join(BUILD_DIR, "src", "ast_to_mir.exe")
 EXAMPLES_DIR = os.path.join(ROOT_DIR, "examples")
 PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
 CASES = [
@@ -65,7 +65,7 @@ sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import lex
 from parser import Parser
 from sema import analyze_program
-from mir_codegen import ast_to_mir
+from ast_to_mir import ast_to_mir
 
 
 def run_checked(cmd, label):
@@ -82,27 +82,27 @@ def run_checked(cmd, label):
     return result
 
 
-def ensure_ep_mir_codegen():
+def ensure_ep_ast_to_mir():
     os.makedirs(BUILD_DIR, exist_ok=True)
     run_checked(
         [
             sys.executable,
             EPICC,
             "--main",
-            os.path.join("src", "mir_codegen.ep"),
+            os.path.join("src", "ast_to_mir.ep"),
             os.path.join("src", "util.ep"),
             os.path.join("src", "lexer.ep"),
             os.path.join("src", "parser.ep"),
             os.path.join("src", "sema.ep"),
             os.path.join("src", "mir.ep"),
-            os.path.join("src", "mir_codegen.ep"),
+            os.path.join("src", "ast_to_mir.ep"),
             "--out-dir",
             BUILD_DIR,
         ],
-        "compile src/mir_codegen.ep",
+        "compile src/ast_to_mir.ep",
     )
-    if not os.path.isfile(MIR_EXE):
-        raise RuntimeError(f"expected mir_codegen.exe at {MIR_EXE}")
+    if not os.path.isfile(AST_TO_MIR_EXE):
+        raise RuntimeError(f"expected ast_to_mir.exe at {AST_TO_MIR_EXE}")
 
 
 def python_user_mir(path):
@@ -114,7 +114,7 @@ def python_user_mir(path):
 
 
 def ep_user_mir(path):
-    result = run_checked([MIR_EXE, path], f"EP MIR codegen {os.path.relpath(path, ROOT_DIR)}")
+    result = run_checked([AST_TO_MIR_EXE, path], f"EP AST-to-MIR {os.path.relpath(path, ROOT_DIR)}")
     return result.stdout
 
 
@@ -133,7 +133,7 @@ def print_diff(expected, actual):
 
 
 def main():
-    ensure_ep_mir_codegen()
+    ensure_ep_ast_to_mir()
     failed = 0
     for path in CASES + EXAMPLE_CASES:
         rel = os.path.relpath(path, ROOT_DIR)

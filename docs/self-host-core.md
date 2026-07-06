@@ -162,7 +162,7 @@ ADT is **not** part of the self-hosting core. The following are removed:
 
 **Python reference compiler (cleared):**
 - `bootstrap/sema.py` — ADT type registration, variant checking → **removed**
-- `bootstrap/mir_codegen.py` — ADT allocation, tag dispatch, payload lowering → **removed**
+- `bootstrap/ast_to_mir.py` — ADT allocation, tag dispatch, payload lowering → **removed**
 - `bootstrap/mir.py` — ADT-specific ops or validators → **removed**
 
 **Self-hosted sources:**

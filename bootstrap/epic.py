@@ -15,8 +15,8 @@ import sys
 import time
 
 from machine import write_machine_obj
-from mir_codegen import ast_to_mir
-from mir_lower import lower_mir_to_x64
+from ast_to_mir import ast_to_mir
+from mir_to_x64 import lower_mir_to_x64
 from ast_nodes import ProgramNode
 from lexer import LexError, dump_tokens, lex
 from parser import ParseError, Parser, dump_ast_text

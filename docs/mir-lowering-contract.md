@@ -2,7 +2,7 @@
 
 ## Scope
 
-本文档记录 **当前实现** 的 MIR → X64Program lowering 规则。它不是目标设计，也不是理想合约，而是 `bootstrap/mir_lower.py` 的真实行为。
+本文档记录 **当前实现** 的 MIR → X64Program lowering 规则。它不是目标设计，也不是理想合约，而是 `bootstrap/mir_to_x64.py` 的真实行为。
 
 目标 MIR 设计见 `docs/mir-design.md`。X64IR 合约见 `docs/x64-instruction-subset.md`。
 
@@ -389,7 +389,7 @@ MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
 longer have same-named x64 fallback bodies. Remaining x64 labels and function
-bodies are hand-written in `mir_lower.py` `_emit_*()` methods.
+bodies are hand-written in `mir_to_x64.py` `_emit_*()` methods.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md` and `docs/self-host-core.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.
 

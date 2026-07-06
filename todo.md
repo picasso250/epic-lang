@@ -25,11 +25,11 @@
 - slice：`__ep_slice_u8_*`、`__ep_slice_i64_*`、`__ep_slice_ptr_*`
 - map：`__ep_map_str_i64_*`、`__ep_map_str_bool_*`、`__ep_map_str_str_*`
 
-仍由 `bootstrap/mir_lower.py` 直接发 x64 的是底层 runtime/OS glue：
+仍由 `bootstrap/x64_runtime.py` 直接发 x64 的是底层 runtime/OS glue；`bootstrap/mir_to_x64.py` 只负责 MIR -> X64IR lowering 并追加 runtime 片段：
 
 - allocation / process args：`__epx_alloc`、`__epx_argv_init`
-- OS-facing helpers：`__ep_cstr`、`__ep_read_file`、`__ep_write_file`、`__ep_system_cmd`
-- printing / traps：`__ep_print_str`、`__ep_print_newline`、`__epx_slice_oob`、`__epx_null_deref`（`__epx_putc` 已删除）
+- OS-facing helpers：`__ep_*` semantic wrapper tail-jump 到对应 `__epx_*` primitive（如 cstr/read/write/system）
+- printing / traps：`__ep_print_*` wrapper、`__epx_print_*` primitive、`__epx_slice_oob`、`__epx_null_deref`（`__epx_putc` 已删除）
 结论：numeric formatting helper 已迁移到 `runtime/str.ep`；不要标成完成，下一步应考虑 `__ep_cstr` / file / argv / print 这类更贴近平台 ABI 的 helper。
 
 ### 优先级 3：str → u8[] 收敛（公共表面已完成，self-hosted 源码残留待清）

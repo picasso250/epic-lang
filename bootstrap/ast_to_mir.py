@@ -1,4 +1,4 @@
-"""AST -> Epic MIR codegen for the initial machine-backend path."""
+"""AST -> Epic AST-to-MIR for the initial machine-backend path."""
 
 from dataclasses import dataclass
 
@@ -258,7 +258,7 @@ class MirCodegen:
     def _resolved_type(self, node):
         typ = getattr(node, "resolved_type", None)
         if typ is None:
-            raise MirCodegenError(f"untyped AST node reached MIR codegen: {type(node).__name__}")
+            raise MirCodegenError(f"untyped AST node reached AST-to-MIR: {type(node).__name__}")
         return typ
 
     def _expr_mir_type(self, expr):

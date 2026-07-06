@@ -24,8 +24,8 @@ bootstrap/lexer.py
 bootstrap/parser.py
 bootstrap/ast_nodes.py
 bootstrap/sema.py
-bootstrap/mir_codegen.py
-bootstrap/mir_lower.py
+bootstrap/ast_to_mir.py
+bootstrap/mir_to_x64.py
 bootstrap/machine.py
 ```
 

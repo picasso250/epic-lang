@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tests/mir_lower/run.py — MVP MIR lowering test runner.
+tests/mir_to_x64/run.py — MVP MIR lowering test runner.
 
 No cases yet.
 """
@@ -9,7 +9,7 @@ import sys
 
 
 def main():
-    print("  PASS  mir_lower (no cases yet)")
+    print("  PASS  mir_to_x64 (no cases yet)")
     sys.exit(0)
 
 

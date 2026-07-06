@@ -7,8 +7,8 @@ machine bytes -> COFF -> PE` 这条线建立可测试边界。
 对应实现：
 
 - `bootstrap/mir.py`: typed MIR data model and validator。
-- `bootstrap/mir_codegen.py`: AST -> MIR。
-- `bootstrap/mir_lower.py`: MIR -> structured X64IR。
+- `bootstrap/ast_to_mir.py`: AST -> MIR。
+- `bootstrap/mir_to_x64.py`: MIR -> structured X64IR。
 - `bootstrap/x64_runtime.py`: runtime data, startup hook, and runtime append policy。
 - `bootstrap/x64.py`: X64IR data model and text pretty printer。
 - `bootstrap/machine.py`: X64IR -> machine bytes + COFF reloc records。
@@ -357,7 +357,7 @@ MIR helper bodies for `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_
 `__ep_slice_u8_alloc`, `__ep_slice_u8_alloc`,
 `__ep_slice_u8_get`, `__ep_slice_u8_set`, `__ep_slice_u8_push`, `__ep_slice_u8_slice`, and `__ep_slice_u8_extend`
 are injected as ordinary
-`MirFunction`s by `mir_codegen.py`.
+`MirFunction`s by `ast_to_mir.py`.
 
 Remaining hand-written x64 helper bodies live in `bootstrap/x64_runtime.py`, not on `MirLower`. Public `__ep_*` helper symbols are semantic-layer entry points; hand-written x64 implementations use `__epx_*` primitive symbols. Current public wrappers tail-jump to the matching primitive so frontend/codegen call sites stay stable while individual helpers migrate to MIR or Epic runtime source.
 

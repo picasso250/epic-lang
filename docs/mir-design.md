@@ -25,7 +25,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | 前缀分层 | `__epx_` = x64 primitive（`__epx_alloc`），`__ep_` = compiler-internal MIR helper（`__ep_str_eq`） | ✅ 已分离 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
 
-> **使用本文档时请注意**：所有 code block 中的 MIR 示例是 target 格式，不代表当前 `mir_codegen.py` 的实际输出。当前实现的实际 MIR 行为通过 `docs/x64-instruction-subset.md`（lowering 后的 X64IR 合约）和 `docs/mir-lowering-contract.md`（lowering 规则）描述。
+> **使用本文档时请注意**：所有 code block 中的 MIR 示例是 target 格式，不代表当前 `ast_to_mir.py` 的实际输出。当前实现的实际 MIR 行为通过 `docs/x64-instruction-subset.md`（lowering 后的 X64IR 合约）和 `docs/mir-lowering-contract.md`（lowering 规则）描述。
 
 当前实现债的跟踪见 `docs/x64-instruction-subset.md §8 Design audit`。
 
