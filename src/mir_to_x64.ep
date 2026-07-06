@@ -1,0 +1,185 @@
+#
+# Minimal self-hosted MIR -> X64IR lowering.
+# First milestone: enough for the add1 text oracle.
+#
+
+struct MirToX64Slot {
+    name: str
+    offset: i64
+}
+
+struct MirToX64Lower {
+    x64: X64Program
+    value_slots: MirToX64Slot[]
+    next_slot: i64
+    return_label: str
+}
+
+fun mir_to_x64_lower_empty(): MirToX64Lower {
+    let lower = new MirToX64Lower
+    lower.x64 = x64_program_empty()
+    lower.value_slots = new MirToX64Slot[0]
+    lower.next_slot = 0
+    lower.return_label = ""
+    return lower
+}
+
+fun mir_to_x64_die(msg: str): void {
+    println(str_cat2("MIR-to-X64 error: ", msg))
+    exit(1)
+}
+
+fun mir_to_x64_slot(lower: MirToX64Lower): i64 {
+    lower.next_slot = lower.next_slot + 8
+    return 0 - lower.next_slot
+}
+
+fun mir_to_x64_add_value_slot(lower: MirToX64Lower, name: str): void {
+    let slot = new MirToX64Slot
+    slot.name = name
+    slot.offset = mir_to_x64_slot(lower)
+    push(lower.value_slots, slot)
+}
+
+fun mir_to_x64_value_slot(lower: MirToX64Lower, name: str): i64 {
+    let i = 0
+    while i < len(lower.value_slots) {
+        if lower.value_slots[i].name == name {
+            return lower.value_slots[i].offset
+        }
+        i = i + 1
+    }
+    mir_to_x64_die(str_cat2("unknown MIR value: ", name))
+    return 0
+}
+
+fun mir_to_x64_aligned_frame(lower: MirToX64Lower): i64 {
+    return ((lower.next_slot + 32 + 15) / 16) * 16
+}
+
+fun mir_to_x64_block_label(fn: MirFunction, block_name: str): str {
+    return str_cat2(str_cat2(fn.name, "."), block_name)
+}
+
+fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
+    let i = 0
+    while i < len(fn.params) {
+        mir_to_x64_add_value_slot(lower, fn.params[i].name)
+        i = i + 1
+    }
+    let b = 0
+    while b < len(fn.blocks) {
+        let j = 0
+        while j < len(fn.blocks[b].instructions) {
+            if fn.blocks[b].instructions[j].has_result {
+                mir_to_x64_add_value_slot(lower, fn.blocks[b].instructions[j].result_name)
+            }
+            j = j + 1
+        }
+        b = b + 1
+    }
+    i = 0
+    while i < 8 {
+        mir_to_x64_slot(lower)
+        i = i + 1
+    }
+}
+
+fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand): void {
+    if operand.kind == "int" {
+        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(operand.int_value))
+        return
+    }
+    if operand.kind == "bool" {
+        if operand.bool_value {
+            x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(1))
+        } else {
+            x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
+        }
+        return
+    }
+    if operand.kind == "null" {
+        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
+        return
+    }
+    if operand.kind == "value" {
+        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_base("rbp", mir_to_x64_value_slot(lower, operand.name), 8))
+        return
+    }
+    mir_to_x64_die(str_cat2("unsupported operand: ", operand.kind))
+}
+
+fun mir_to_x64_store_result(lower: MirToX64Lower, result_name: str, reg: str): void {
+    x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, result_name), 8), x64_reg(reg))
+}
+
+fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
+    if inst.op == "add" {
+        mir_to_x64_load_operand(lower, "rax", inst.operands[0])
+        mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
+        x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
+        mir_to_x64_store_result(lower, inst.result_name, "rax")
+        return
+    }
+    mir_to_x64_die(str_cat2("unsupported MIR instruction: ", inst.op))
+}
+
+fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTerminator): void {
+    if term.kind == "ret" {
+        if term.has_value {
+            mir_to_x64_load_operand(lower, "rax", term.value)
+        }
+        x64_add_inst1(lower.x64, "jmp", x64_label_ref(lower.return_label))
+        return
+    }
+    mir_to_x64_die(str_cat2("unsupported MIR terminator: ", term.kind))
+}
+
+fun mir_to_x64_lower_function(fn: MirFunction): X64Program {
+    let lower = mir_to_x64_lower_empty()
+    lower.return_label = str_cat2(fn.name, ".__return")
+    mir_to_x64_plan_slots(lower, fn)
+    let frame = mir_to_x64_aligned_frame(lower)
+
+    x64_add_section(lower.x64, ".text")
+    x64_add_label(lower.x64, fn.name)
+    x64_add_inst1(lower.x64, "push", x64_reg("rbp"))
+    x64_add_inst2(lower.x64, "mov", x64_reg("rbp"), x64_reg("rsp"))
+    if frame != 0 {
+        x64_add_inst2(lower.x64, "sub", x64_reg("rsp"), x64_imm(frame))
+    }
+
+    let arg_regs = new str[0]
+    push(arg_regs, "rcx")
+    push(arg_regs, "rdx")
+    push(arg_regs, "r8")
+    push(arg_regs, "r9")
+    let i = 0
+    while i < len(fn.params) {
+        if i >= len(arg_regs) {
+            mir_to_x64_die("more than four params are not supported")
+        }
+        x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].name), 8), x64_reg(arg_regs[i]))
+        i = i + 1
+    }
+
+    let b = 0
+    while b < len(fn.blocks) {
+        x64_add_label(lower.x64, mir_to_x64_block_label(fn, fn.blocks[b].name))
+        let j = 0
+        while j < len(fn.blocks[b].instructions) {
+            mir_to_x64_lower_inst(lower, fn.blocks[b].instructions[j])
+            j = j + 1
+        }
+        mir_to_x64_lower_term(lower, fn, fn.blocks[b].terminator)
+        b = b + 1
+    }
+
+    x64_add_label(lower.x64, lower.return_label)
+    if frame != 0 {
+        x64_add_inst2(lower.x64, "add", x64_reg("rsp"), x64_imm(frame))
+    }
+    x64_add_inst1(lower.x64, "pop", x64_reg("rbp"))
+    x64_add_inst0(lower.x64, "ret")
+    return lower.x64
+}

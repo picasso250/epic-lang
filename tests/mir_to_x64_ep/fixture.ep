@@ -1,0 +1,29 @@
+# MIR-to-X64 fixture for the first self-hosted lowering milestone.
+
+fun build_add1_function(): MirFunction {
+    let fn = mir_function_empty("add1", "i64")
+
+    let param = new MirParam
+    param.name = "x"
+    param.typ = "i64"
+    push(fn.params, param)
+
+    let block = mir_block_empty("entry")
+    let inst = mir_inst_empty()
+    inst.op = "add"
+    inst.result_name = "r"
+    inst.result_type = "i64"
+    inst.has_result = true
+    push(inst.operands, mir_value_operand("i64", "x"))
+    push(inst.operands, mir_const_int("i64", 1))
+    push(block.instructions, inst)
+    block.terminator = mir_ret_value(mir_value_operand("i64", "r"))
+    block.has_terminator = true
+    push(fn.blocks, block)
+    return fn
+}
+
+fun main(): void {
+    let x64 = mir_to_x64_lower_function(build_add1_function())
+    print(x64_program_text(x64))
+}
