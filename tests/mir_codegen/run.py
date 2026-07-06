@@ -18,31 +18,11 @@ EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(ROOT_DIR, "build", "mir-codegen-bootstrap")
 MIR_EXE = os.path.join(BUILD_DIR, "src", "mir_codegen.exe")
 EXAMPLES_DIR = os.path.join(ROOT_DIR, "examples")
+PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
 CASES = [
-    os.path.join(SCRIPT_DIR, "pass_m1_exit.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m2_return_i64.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m3_let_arith.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m4_if_else.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m5_call_params.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m6_assign_while.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m7_unary_bool_cmp.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m8_break_continue.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m9_bit_shift_cmp.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m10_struct.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m11_struct_param.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m12_i64_array_get.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m13_u8_array_get.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m14_i64_array_push_set.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m15_u8_array_push_set.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m16_for_assign_op.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m17_string_fstring.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m18_casts.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m19_assert.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m20_panic.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m21_match.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m22_slice.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m23_map.ep"),
-    os.path.join(SCRIPT_DIR, "pass_m24_file_system.ep"),
+    os.path.join(PASS_DIR, name)
+    for name in sorted(os.listdir(PASS_DIR))
+    if name.endswith(".ep")
 ]
 EXAMPLE_CASES = [
     os.path.join(EXAMPLES_DIR, "m1_exit.ep"),
@@ -176,3 +156,5 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
