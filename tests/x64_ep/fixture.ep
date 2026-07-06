@@ -1,0 +1,31 @@
+# X64IR pretty-print fixture for the self-hosted x64 DTO.
+
+fun build_x64_fixture(): X64Program {
+    let program = x64_program_empty()
+    x64_add_global(program, "_start")
+    x64_add_extern(program, "ExitProcess")
+    x64_add_section(program, ".data")
+
+    let msg = new i64[0]
+    push(msg, 65)
+    push(msg, 0)
+    x64_add_data_bytes(program, "msg", msg)
+    x64_add_data_zero(program, "scratch", 8)
+
+    x64_add_section(program, ".text")
+    x64_add_label(program, "_start")
+    x64_add_inst2(program, "mov", x64_reg("rax"), x64_imm(1))
+    x64_add_inst2(program, "cmp", x64_reg("rax"), x64_imm(1))
+    x64_add_inst1(program, "jz", x64_label_ref("done"))
+    x64_add_inst2(program, "mov", x64_reg("rax"), x64_imm(2))
+    x64_add_label(program, "done")
+    x64_add_inst2(program, "lea", x64_reg("rdx"), x64_mem_symbol("msg", 8))
+    x64_add_inst2(program, "mov", x64_reg("rcx"), x64_reg("rax"))
+    x64_add_inst1(program, "call", x64_symbol("ExitProcess"))
+    x64_add_inst0(program, "ret")
+    return program
+}
+
+fun main(): void {
+    print(x64_program_text(build_x64_fixture()))
+}

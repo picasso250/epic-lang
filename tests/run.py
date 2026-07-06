@@ -21,6 +21,7 @@ MODULES = [
     "ast_to_mir",
     "mir_to_x64",
     "x64",
+    "x64_ep",
     "machine",
     "coff",
     "link_ep",
