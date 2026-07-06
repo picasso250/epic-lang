@@ -353,9 +353,9 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): M
     let i = 0
     while i < len(expr.fields) {
         let field = expr.fields[i]
-        let addr = mir_field_addr(st, obj, expr.name, field.name)
         let value_flow = mir_emit_expr(st, st.current_block, field.value_expr)
         st.current_block = value_flow.block
+        let addr = mir_field_addr(st, obj, expr.name, field.name)
         mir_emit_inst(st, mir_store(value_flow.value, addr))
         i = i + 1
     }
@@ -662,6 +662,46 @@ fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstNode):
     return mir_value_flow(arr, st.current_block)
 }
 
+fun mir_os_call_return_type(dll: str, name: str): str {
+    if dll == "kernel32" {
+        if name == "ExitProcess" { return "void" }
+        if name == "Sleep" { return "void" }
+        if name == "GetTickCount64" { return "i64" }
+        if name == "lstrlenA" { return "i64" }
+        if name == "lstrcmpA" { return "i64" }
+        if name == "GetStdHandle" { return "i64" }
+        if name == "GetProcessHeap" { return "i64" }
+        if name == "HeapAlloc" { return "i64" }
+        if name == "CreateFileA" { return "i64" }
+        if name == "GetFileSize" { return "i64" }
+        if name == "ReadFile" { return "i64" }
+        if name == "WriteFile" { return "i64" }
+        if name == "CloseHandle" { return "i64" }
+        if name == "CreateProcessA" { return "i64" }
+        if name == "WaitForSingleObject" { return "i64" }
+        if name == "GetExitCodeProcess" { return "i64" }
+        if name == "GetCommandLineA" { return "i64" }
+    }
+    if dll == "user32" {
+        if name == "MessageBoxA" { return "i64" }
+    }
+    mir_codegen_die(f"unsupported os call: os.{dll}.{name}")
+    return "i64"
+}
+
+fun mir_emit_os_call(st: MirCodegenState, expr: AstNode): MirValueFlow {
+    let args = new MirOperand[0]
+    let i = 0
+    while i < len(expr.args) {
+        let arg_flow = mir_emit_expr(st, st.current_block, expr.args[i])
+        st.current_block = arg_flow.block
+        push(args, arg_flow.value)
+        i = i + 1
+    }
+    let ret_type = mir_os_call_return_type(expr.dll, expr.name)
+    return mir_value_flow(mir_emit_call_inst(st, expr.name, ret_type, args), st.current_block)
+}
+
 fun mir_emit_short_circuit(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
     let addr_name = mir_new_value(st, "logic.addr")
@@ -826,6 +866,12 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
     }
     if expr.kind == "Call" {
+        if expr.type_name == "os" {
+            return mir_emit_os_call(st, expr)
+        }
+        if expr.type_name != "" {
+            mir_codegen_die(f"unsupported namespaced call: {expr.type_name}.{expr.name}")
+        }
         if expr.name == "println" {
             if len(expr.args) == 1 {
                 let args = new MirOperand[0]
@@ -855,6 +901,14 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 mir_codegen_die("len/cap expects aggregate pointer")
             }
             return mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
+        }
+        if expr.name == "cstr" {
+            let args = new MirOperand[0]
+            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+            st.current_block = arg_flow.block
+            push(args, arg_flow.value)
+            push(args, mir_const_int("i64", expr.line))
+            return mir_value_flow(mir_emit_call_inst(st, "__ep_cstr", "i64", args), st.current_block)
         }
         if expr.name == "i64" || expr.name == "u64" || expr.name == "bool" {
             return mir_emit_expr(st, st.current_block, expr.args[0])
