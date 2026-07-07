@@ -12,6 +12,14 @@ fun epic_obj_path(exe_path: str): str {
     return str_cat2(exe_path, ".obj")
 }
 
+fun epic_now_ms(): i64 {
+    return os.kernel32.GetTickCount64()
+}
+
+fun epic_timing(label: str, start: i64, stop: i64): void {
+    println(f"  timing: {label}: {stop - start} ms")
+}
+
 fun epic_parse_file(path: str): AstNode {
     let src = str(read_file(cstr_ready_path(path)))
     let tokens = lex(src)
@@ -107,17 +115,53 @@ fun epic_lower_program(program: MirProgram): X64Program {
 }
 
 fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
+    let total_start = epic_now_ms()
+
+    let parse_start = epic_now_ms()
     let ast = epic_merge_program(input_paths, main_path)
+    let parse_stop = epic_now_ms()
+    epic_timing("read+lex+parse+merge", parse_start, parse_stop)
+
+    let sema_start = epic_now_ms()
     let st = make_sema_state()
     sema_program(st, ast)
+    let sema_stop = epic_now_ms()
+    epic_timing("sema", sema_start, sema_stop)
+
+    let mir_start = epic_now_ms()
     let mir = mir_ast_to_mir(ast)
     mir_inject_all_runtime_helpers(mir)
+    let mir_stop = epic_now_ms()
+    epic_timing("ast->mir+runtime", mir_start, mir_stop)
+
+    let lower_start = epic_now_ms()
     let x64 = epic_lower_program(mir)
+    let lower_stop = epic_now_ms()
+    epic_timing("lower x64", lower_start, lower_stop)
+
+    let machine_start = epic_now_ms()
     let machine = machine_build_object(x64)
+    let machine_stop = epic_now_ms()
+    epic_timing("machine object", machine_start, machine_stop)
+
+    let coff_start = epic_now_ms()
     let obj_bytes = coff_build_obj(machine)
+    let coff_stop = epic_now_ms()
+    epic_timing("coff bytes", coff_start, coff_stop)
     let obj_path = epic_obj_path(exe_path)
+
+    let write_start = epic_now_ms()
     write_file(cstr_ready_path(obj_path), obj_bytes)
+    let write_stop = epic_now_ms()
+    epic_timing("write obj", write_start, write_stop)
+
+    let link_start = epic_now_ms()
     link_obj(cstr_ready_path(obj_path), cstr_ready_path(exe_path))
+    let link_stop = epic_now_ms()
+    epic_timing("link", link_start, link_stop)
+
+    let total_stop = epic_now_ms()
+    epic_timing("total", total_start, total_stop)
 }
 
 fun main(): i64 {
