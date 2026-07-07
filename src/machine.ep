@@ -21,12 +21,18 @@ struct MachineFixup {
     kind: str
 }
 
+struct MachineStrI64Index {
+    names: str[]
+    values: i64[]
+}
+
 struct MachineBuilder {
     text: i64[]
     data: i64[]
     section: str
     text_label_names: str[]
     text_label_offsets: i64[]
+    text_label_index: MachineStrI64Index
     data_label_names: str[]
     data_label_offsets: i64[]
     fixups: MachineFixup[]
@@ -43,6 +49,7 @@ fun machine_builder_empty(): MachineBuilder {
     b.section = ""
     b.text_label_names = new str[0]
     b.text_label_offsets = new i64[0]
+    b.text_label_index = machine_str_i64_index_empty()
     b.data_label_names = new str[0]
     b.data_label_offsets = new i64[0]
     b.fixups = new MachineFixup[0]
@@ -148,33 +155,28 @@ fun machine_mem_modrm(b: MachineBuilder, reg_field: i64, base: str, disp: i64): 
 }
 
 fun machine_add_text_label(b: MachineBuilder, name: str): void {
+    let offset = len(b.text)
     push(b.text_label_names, name)
-    push(b.text_label_offsets, len(b.text))
+    push(b.text_label_offsets, offset)
+    machine_str_i64_index_set(b.text_label_index, name, offset)
+}
+
+fun machine_text_label_offset_or_neg1(b: MachineBuilder, name: str): i64 {
+    return machine_str_i64_index_get_or_neg1(b.text_label_index, name)
 }
 
 fun machine_text_label_offset(b: MachineBuilder, name: str): i64 {
-    let i = 0
-    while i < len(b.text_label_names) {
-        if b.text_label_names[i] == name {
-            return b.text_label_offsets[i]
-        }
-        i = i + 1
+    let offset = machine_text_label_offset_or_neg1(b, name)
+    if offset >= 0 {
+        return offset
     }
     machine_die(str_cat2("unknown text label: ", name))
     return 0
 }
 
 fun machine_has_text_label(b: MachineBuilder, name: str): bool {
-    let i = 0
-    while i < len(b.text_label_names) {
-        if b.text_label_names[i] == name {
-            return true
-        }
-        i = i + 1
-    }
-    return false
+    return machine_text_label_offset_or_neg1(b, name) >= 0
 }
-
 fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
     let f = new MachineFixup
     f.offset = offset
@@ -219,6 +221,70 @@ fun machine_ascii_less(a: str, b: str): bool {
     return len(ab) < len(bb)
 }
 
+fun machine_str_i64_index_empty(): MachineStrI64Index {
+    let idx = new MachineStrI64Index
+    idx.names = new str[0]
+    idx.values = new i64[0]
+    return idx
+}
+
+fun machine_str_i64_index_find_pos(idx: MachineStrI64Index, key: str): i64 {
+    let lo = 0
+    let hi = len(idx.names)
+    while lo < hi {
+        let mid = (lo + hi) / 2
+        if idx.names[mid] == key {
+            return mid
+        }
+        if machine_ascii_less(idx.names[mid], key) {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return 0 - lo - 1
+}
+
+fun machine_str_i64_index_get_or_neg1(idx: MachineStrI64Index, key: str): i64 {
+    let pos = machine_str_i64_index_find_pos(idx, key)
+    if pos >= 0 {
+        return idx.values[pos]
+    }
+    return -1
+}
+
+fun machine_str_i64_index_set(idx: MachineStrI64Index, key: str, value: i64): void {
+    let names = idx.names
+    let values = idx.values
+    let pos = machine_str_i64_index_find_pos(idx, key)
+    if pos >= 0 {
+        values[pos] = value
+        idx.values = values
+        return
+    }
+    let insert_at = 0 - pos - 1
+    let new_names = new str[0]
+    let new_values = new i64[0]
+    let inserted = false
+    let i = 0
+    while i < len(names) {
+        if !inserted && i == insert_at {
+            push(new_names, key)
+            push(new_values, value)
+            inserted = true
+        }
+        push(new_names, names[i])
+        push(new_values, values[i])
+        i = i + 1
+    }
+    if !inserted {
+        push(new_names, key)
+        push(new_values, value)
+    }
+    idx.names = new_names
+    idx.values = new_values
+}
+
 fun machine_sorted_strings(names: str[]): str[] {
     let out = new str[0]
     let i = 0
@@ -256,8 +322,8 @@ fun machine_patch_fixups(b: MachineBuilder): void {
     let i = 0
     while i < len(b.fixups) {
         if b.fixups[i].kind == "label" {
-            if machine_has_text_label(b, b.fixups[i].label) {
-                let target = machine_text_label_offset(b, b.fixups[i].label)
+            let target = machine_text_label_offset_or_neg1(b, b.fixups[i].label)
+            if target >= 0 {
                 let disp = target - (b.fixups[i].offset + 4)
                 machine_patch_i32(b.text, b.fixups[i].offset, disp)
             } else {
