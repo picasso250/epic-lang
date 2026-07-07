@@ -1,17 +1,13 @@
 (comment) @comment
 
 [
-  "fun"
-  "struct"
-  "let"
-  "ret"
-  "if"
-  "else"
-  "for"
-  "new"
-] @keyword
-
-[
+  (function_definition)
+  (struct_definition)
+  (let_statement)
+  (return_statement)
+  (if_statement)
+  (while_statement)
+  (new_expression)
   (break_statement)
   (continue_statement)
 ] @keyword
