@@ -1722,6 +1722,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     mir_program_add_struct_field(st.program, "_slice_u8", "i64", 2)
 
     mir_register_slice_layout(st, "_slice_str")
+    mir_register_slice_layout(st, "_slice_ptr")
     let asi = 0
     while asi < len(ast.structs) {
         mir_register_slice_layout(st, str_cat2("_slice_", ast.structs[asi].name))
@@ -1738,12 +1739,15 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         push(st.struct_field_keys, mir_struct_key(map_layouts[mi], "entries"))
         push(st.struct_field_types, "ptr")
         push(st.struct_field_indexes, 0)
+        mir_program_add_struct_field(st.program, map_layouts[mi], "ptr", 0)
         push(st.struct_field_keys, mir_struct_key(map_layouts[mi], "len"))
         push(st.struct_field_types, "i64")
         push(st.struct_field_indexes, 1)
+        mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 1)
         push(st.struct_field_keys, mir_struct_key(map_layouts[mi], "cap"))
         push(st.struct_field_types, "i64")
         push(st.struct_field_indexes, 2)
+        mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 2)
         mi = mi + 1
     }
 

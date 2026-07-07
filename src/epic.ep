@@ -1,0 +1,153 @@
+#
+# Self-hosted Epic compiler driver.
+# Python epic.py is still the stage-0 compiler; this executable is used by
+# tests to compile user programs through the EP frontend/backend/linker stack.
+#
+
+fun epic_die(msg: str): void {
+    println(str_cat2("epic error: ", msg))
+    exit(1)
+}
+
+fun epic_obj_path(exe_path: str): str {
+    return str_cat2(exe_path, ".obj")
+}
+
+fun epic_parse_file(path: str): AstNode {
+    let src = str(read_file(cstr_ready_path(path)))
+    let tokens = lex(src)
+    let p = make_parser(tokens)
+    return parse_program(p)
+}
+
+fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
+    let merged = ast_node("Program")
+    let found_main = false
+    let i = 0
+    while i < len(input_paths) {
+        let ast = epic_parse_file(input_paths[i])
+        let is_main = input_paths[i] == main_path
+        let si = 0
+        while si < len(ast.structs) {
+            push(merged.structs, ast.structs[si])
+            si = si + 1
+        }
+        let fi = 0
+        while fi < len(ast.funcs) {
+            if ast.funcs[fi].name == "main" {
+                if is_main {
+                    push(merged.funcs, ast.funcs[fi])
+                    found_main = true
+                }
+            } else {
+                push(merged.funcs, ast.funcs[fi])
+            }
+            fi = fi + 1
+        }
+        i = i + 1
+    }
+    if !found_main {
+        epic_die(str_cat2("main file has no main function: ", main_path))
+    }
+    return merged
+}
+
+fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
+    let i = 0
+    while i < len(bs) {
+        push(out, i64(bs[i]))
+        i = i + 1
+    }
+}
+
+fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
+    x64_add_data_zero(x64, "_written", 4)
+    x64_add_data_zero(x64, "_heap", 8)
+    x64_add_data_zero(x64, "_argv", 8)
+    let newline = new i64[0]
+    push(newline, 10)
+    x64_add_data_bytes(x64, "_newline", newline)
+    let panic_prefix = new i64[0]
+    epic_push_bytes_i64(panic_prefix, bytes("panic line "))
+    x64_add_data_bytes(x64, "_cstr_panic_prefix", panic_prefix)
+    let panic_suffix = new i64[0]
+    epic_push_bytes_i64(panic_suffix, bytes(": invalid cstr"))
+    x64_add_data_bytes(x64, "_cstr_panic_suffix", panic_suffix)
+    let i = 0
+    while i < len(program.globals) {
+        if program.globals[i].has_init {
+            let values = new i64[0]
+            epic_push_bytes_i64(values, bytes(program.globals[i].init))
+            push(values, 0)
+            x64_add_data_bytes(x64, mir_to_x64_data_label(program.globals[i].name), values)
+            x64_add_data_zero(x64, mir_to_x64_header_label(program.globals[i].name), 24)
+        }
+        i = i + 1
+    }
+}
+
+fun epic_lower_program(program: MirProgram): X64Program {
+    let lower = mir_to_x64_lower_empty()
+    x64_add_global(lower.x64, "_start")
+    x64_add_section(lower.x64, ".data")
+    epic_emit_runtime_data(lower.x64, program)
+    mir_to_x64_prepare_program_globals(lower, program)
+    let i = 0
+    while i < len(program.functions) {
+        mir_to_x64_lower_function_with_lower(lower, program.functions[i])
+        i = i + 1
+    }
+    x64_runtime_append_runtime_helpers(lower.x64)
+    return lower.x64
+}
+
+fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
+    let ast = epic_merge_program(input_paths, main_path)
+    let st = make_sema_state()
+    sema_program(st, ast)
+    let mir = mir_ast_to_mir(ast)
+    mir_inject_all_runtime_helpers(mir)
+    let x64 = epic_lower_program(mir)
+    let machine = machine_build_object(x64)
+    let obj_bytes = coff_build_obj(machine)
+    let obj_path = epic_obj_path(exe_path)
+    write_file(cstr_ready_path(obj_path), obj_bytes)
+    link_obj(cstr_ready_path(obj_path), cstr_ready_path(exe_path))
+}
+
+fun main(): i64 {
+    let inputs = new str[0]
+    let main_path = ""
+    let exe_path = ""
+    let i = 1
+    while i < len(argv) {
+        if argv[i] == "--main" {
+            if i + 1 >= len(argv) {
+                epic_die("--main needs a path")
+            }
+            main_path = argv[i + 1]
+            i = i + 2
+        } else if argv[i] == "-o" {
+            if i + 1 >= len(argv) {
+                epic_die("-o needs a path")
+            }
+            exe_path = argv[i + 1]
+            i = i + 2
+        } else {
+            push(inputs, argv[i])
+            i = i + 1
+        }
+    }
+    if len(inputs) == 0 {
+        println("usage: epic <runtime-and-source.ep...> --main <main.ep> -o <out.exe>")
+        return 1
+    }
+    if len(main_path) == 0 {
+        main_path = inputs[len(inputs) - 1]
+    }
+    if len(exe_path) == 0 {
+        epic_die("-o is required for the self-hosted test driver")
+    }
+    epic_compile(inputs, main_path, exe_path)
+    return 0
+}

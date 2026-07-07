@@ -321,6 +321,12 @@ fun machine_emit_jump(b: MachineBuilder, op: str, label: str): void {
     } else if op == "jnz" {
         machine_append_byte(b.text, 15)
         machine_append_byte(b.text, 133)
+    } else if op == "jl" {
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, 140)
+    } else if op == "jge" {
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, 141)
     } else {
         machine_die(str_cat2("unsupported jump: ", op))
     }
@@ -585,7 +591,7 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
         machine_emit_cmp_reg_imm(b, ops[0].name, ops[1].value)
         return
     }
-    if (item.op == "jmp" || item.op == "jz" || item.op == "jnz") && len(ops) == 1 && ops[0].kind == "label_ref" {
+    if (item.op == "jmp" || item.op == "jz" || item.op == "jnz" || item.op == "jl" || item.op == "jge") && len(ops) == 1 && ops[0].kind == "label_ref" {
         machine_emit_jump(b, item.op, ops[0].name)
         return
     }
