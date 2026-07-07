@@ -10,8 +10,8 @@ struct MirToX64Slot {
 
 struct MirToX64Lower {
     x64: X64Program
-    value_slots: MirToX64Slot[]
-    addr_slots: MirToX64Slot[]
+    value_slots: map[str]i64
+    addr_slots: map[str]i64
     string_names: str[]
     string_lengths: i64[]
     struct_field_names: str[]
@@ -19,13 +19,22 @@ struct MirToX64Lower {
     struct_field_indexes: i64[]
     next_slot: i64
     return_label: str
+    timing_plan_slots: i64
+    timing_prologue: i64
+    timing_params: i64
+    timing_insts: i64
+    timing_terms: i64
+    timing_epilogue: i64
+    timing_functions: i64
+    timing_blocks: i64
+    timing_instructions: i64
 }
 
 fun mir_to_x64_lower_empty(): MirToX64Lower {
     let lower = new MirToX64Lower
     lower.x64 = x64_program_empty()
-    lower.value_slots = new MirToX64Slot[0]
-    lower.addr_slots = new MirToX64Slot[0]
+    lower.value_slots = new map[str]i64
+    lower.addr_slots = new map[str]i64
     lower.string_names = new str[0]
     lower.string_lengths = new i64[0]
     lower.struct_field_names = new str[0]
@@ -33,6 +42,15 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.struct_field_indexes = new i64[0]
     lower.next_slot = 0
     lower.return_label = ""
+    lower.timing_plan_slots = 0
+    lower.timing_prologue = 0
+    lower.timing_params = 0
+    lower.timing_insts = 0
+    lower.timing_terms = 0
+    lower.timing_epilogue = 0
+    lower.timing_functions = 0
+    lower.timing_blocks = 0
+    lower.timing_instructions = 0
     return lower
 }
 
@@ -88,26 +106,16 @@ fun mir_to_x64_slot(lower: MirToX64Lower): i64 {
 }
 
 fun mir_to_x64_add_value_slot(lower: MirToX64Lower, name: str): void {
-    let slot = new MirToX64Slot
-    slot.name = name
-    slot.offset = mir_to_x64_slot(lower)
-    push(lower.value_slots, slot)
+    lower.value_slots[name] = mir_to_x64_slot(lower)
 }
 
 fun mir_to_x64_add_addr_slot(lower: MirToX64Lower, name: str): void {
-    let slot = new MirToX64Slot
-    slot.name = name
-    slot.offset = mir_to_x64_slot(lower)
-    push(lower.addr_slots, slot)
+    lower.addr_slots[name] = mir_to_x64_slot(lower)
 }
 
-fun mir_to_x64_find_slot(slots: MirToX64Slot[], name: str): i64 {
-    let i = 0
-    while i < len(slots) {
-        if slots[i].name == name {
-            return slots[i].offset
-        }
-        i = i + 1
+fun mir_to_x64_find_slot(slots: map[str]i64, name: str): i64 {
+    if map_has(slots, name) {
+        return slots[name]
     }
     return 0
 }
@@ -129,7 +137,6 @@ fun mir_to_x64_addr_slot(lower: MirToX64Lower, name: str): i64 {
     mir_to_x64_die(str_cat2("unknown MIR address: ", name))
     return 0
 }
-
 fun mir_to_x64_aligned_frame(lower: MirToX64Lower): i64 {
     return ((lower.next_slot + 32 + 15) / 16) * 16
 }
@@ -530,14 +537,24 @@ fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction)
     return mir_to_x64_lower_function_with_lower(lower, fn)
 }
 
+fun mir_to_x64_now_ms(): i64 {
+    return os.kernel32.GetTickCount64()
+}
+
 fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction): X64Program {
-    lower.value_slots = new MirToX64Slot[0]
-    lower.addr_slots = new MirToX64Slot[0]
+    lower.timing_functions = lower.timing_functions + 1
+    lower.value_slots = new map[str]i64
+    lower.addr_slots = new map[str]i64
     lower.next_slot = 0
     lower.return_label = str_cat2(fn.name, ".__return")
+
+    let plan_start = mir_to_x64_now_ms()
     mir_to_x64_plan_slots(lower, fn)
     let frame = mir_to_x64_aligned_frame(lower)
+    let plan_stop = mir_to_x64_now_ms()
+    lower.timing_plan_slots = lower.timing_plan_slots + (plan_stop - plan_start)
 
+    let prologue_start = mir_to_x64_now_ms()
     x64_add_section(lower.x64, ".text")
     if fn.name == "main" {
         x64_add_label(lower.x64, "_start")
@@ -552,7 +569,10 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     if fn.name == "main" {
         mir_to_x64_emit_startup_hook_call(lower)
     }
+    let prologue_stop = mir_to_x64_now_ms()
+    lower.timing_prologue = lower.timing_prologue + (prologue_stop - prologue_start)
 
+    let params_start = mir_to_x64_now_ms()
     let arg_regs = new str[0]
     push(arg_regs, "rcx")
     push(arg_regs, "rdx")
@@ -568,28 +588,41 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
         }
         i = i + 1
     }
+    let params_stop = mir_to_x64_now_ms()
+    lower.timing_params = lower.timing_params + (params_stop - params_start)
 
     let b = 0
     while b < len(fn.blocks) {
+        lower.timing_blocks = lower.timing_blocks + 1
         x64_add_label(lower.x64, mir_to_x64_block_label(fn, fn.blocks[b].name))
         let j = 0
+        let inst_start = mir_to_x64_now_ms()
         while j < len(fn.blocks[b].instructions) {
+            lower.timing_instructions = lower.timing_instructions + 1
             mir_to_x64_lower_inst(lower, fn.blocks[b].instructions[j])
             j = j + 1
         }
+        let inst_stop = mir_to_x64_now_ms()
+        lower.timing_insts = lower.timing_insts + (inst_stop - inst_start)
+
+        let term_start = mir_to_x64_now_ms()
         mir_to_x64_lower_term(lower, fn, fn.blocks[b].terminator)
+        let term_stop = mir_to_x64_now_ms()
+        lower.timing_terms = lower.timing_terms + (term_stop - term_start)
         b = b + 1
     }
 
+    let epilogue_start = mir_to_x64_now_ms()
     x64_add_label(lower.x64, lower.return_label)
     if frame != 0 {
         x64_add_inst2(lower.x64, "add", x64_reg("rsp"), x64_imm(frame))
     }
     x64_add_inst1(lower.x64, "pop", x64_reg("rbp"))
     x64_add_inst0(lower.x64, "ret")
+    let epilogue_stop = mir_to_x64_now_ms()
+    lower.timing_epilogue = lower.timing_epilogue + (epilogue_stop - epilogue_start)
     return lower.x64
 }
-
 fun mir_to_x64_lower_function(fn: MirFunction): X64Program {
     let lower = mir_to_x64_lower_empty()
     return mir_to_x64_lower_function_with_lower(lower, fn)

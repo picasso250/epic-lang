@@ -101,19 +101,40 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
 
 fun epic_lower_program(program: MirProgram): X64Program {
     let lower = mir_to_x64_lower_empty()
+    let start = epic_now_ms()
     x64_add_global(lower.x64, "_start")
     x64_add_section(lower.x64, ".data")
+
+    let data_start = epic_now_ms()
     epic_emit_runtime_data(lower.x64, program)
+    let data_stop = epic_now_ms()
+    epic_timing("lower runtime data", data_start, data_stop)
+
+    let prepare_start = epic_now_ms()
     mir_to_x64_prepare_program_globals(lower, program)
+    let prepare_stop = epic_now_ms()
+    epic_timing("lower prepare globals", prepare_start, prepare_stop)
+
+    let funcs_start = epic_now_ms()
     let i = 0
     while i < len(program.functions) {
         mir_to_x64_lower_function_with_lower(lower, program.functions[i])
         i = i + 1
     }
+    let funcs_stop = epic_now_ms()
+    epic_timing("lower functions", funcs_start, funcs_stop)
+
+    let runtime_start = epic_now_ms()
     x64_runtime_append_runtime_helpers(lower.x64)
+    let runtime_stop = epic_now_ms()
+    epic_timing("lower x64 runtime", runtime_start, runtime_stop)
+
+    let stop = epic_now_ms()
+    println(f"  timing: lower function parts: plan={lower.timing_plan_slots} ms prologue={lower.timing_prologue} ms params={lower.timing_params} ms insts={lower.timing_insts} ms terms={lower.timing_terms} ms epilogue={lower.timing_epilogue} ms")
+    println(f"  timing: lower counts: functions={len(program.functions)} lowered_functions={lower.timing_functions} blocks={lower.timing_blocks} instructions={lower.timing_instructions} globals={len(program.globals)} struct_fields={len(program.struct_fields)} x64_items={len(lower.x64.items)}")
+    epic_timing("lower total inner", start, stop)
     return lower.x64
 }
-
 fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     let total_start = epic_now_ms()
 
