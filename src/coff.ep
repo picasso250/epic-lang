@@ -98,20 +98,19 @@ fun coff_symbol_index(obj: MachineObject, name: str): i64 {
     return 0
 }
 
-fun coff_symbol_index_build(obj: MachineObject): MachineStrI64Index {
-    let idx = machine_str_i64_index_empty()
+fun coff_symbol_index_build(obj: MachineObject): map[str]i64 {
+    let idx = new map[str]i64
     let i = 0
     while i < len(obj.symbol_names) {
-        machine_str_i64_index_set(idx, obj.symbol_names[i], i)
+        idx[obj.symbol_names[i]] = i
         i = i + 1
     }
     return idx
 }
 
-fun coff_symbol_index_lookup(idx: MachineStrI64Index, name: str): i64 {
-    let value = machine_str_i64_index_get_or_neg1(idx, name)
-    if value >= 0 {
-        return value
+fun coff_symbol_index_lookup(idx: map[str]i64, name: str): i64 {
+    if map_has(idx, name) {
+        return idx[name]
     }
     coff_die(str_cat2("unknown symbol: ", name))
     return 0
