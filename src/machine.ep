@@ -755,14 +755,15 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
     machine_die(str_cat2("unsupported item: ", item.kind))
 }
 
-fun machine_build_object(program: X64Program): MachineObject {
-    let b = machine_builder_empty()
-    let i = 0
-    while i < len(program.items) {
-        machine_emit_item(b, program.items[i])
-        i = i + 1
-    }
-    machine_patch_fixups(b)
+fun machine_now_ms(): i64 {
+    return os.kernel32.GetTickCount64()
+}
+
+fun machine_print_timing(label: str, start: i64, stop: i64): void {
+    println(f"  timing: machine {label}: {stop - start} ms")
+}
+
+fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     let obj = new MachineObject
     obj.text = b.text
     obj.data = b.data
@@ -773,7 +774,7 @@ fun machine_build_object(program: X64Program): MachineObject {
     obj.symbol_names = new str[0]
     obj.symbol_sections = new i64[0]
     obj.symbol_values = new i64[0]
-    i = 0
+    let i = 0
     while i < len(b.text_label_names) {
         if !machine_has_symbol_name(obj.symbol_names, b.text_label_names[i]) {
             push(obj.symbol_names, b.text_label_names[i])
@@ -812,6 +813,44 @@ fun machine_build_object(program: X64Program): MachineObject {
     return obj
 }
 
+fun machine_build_object(program: X64Program): MachineObject {
+    let b = machine_builder_empty()
+    let i = 0
+    while i < len(program.items) {
+        machine_emit_item(b, program.items[i])
+        i = i + 1
+    }
+    machine_patch_fixups(b)
+    return machine_object_from_builder(b)
+}
+
+fun machine_build_object_timed(program: X64Program): MachineObject {
+    let b = machine_builder_empty()
+
+    let emit_start = machine_now_ms()
+    let i = 0
+    while i < len(program.items) {
+        machine_emit_item(b, program.items[i])
+        i = i + 1
+    }
+    let emit_stop = machine_now_ms()
+    machine_print_timing("emit items", emit_start, emit_stop)
+
+    println(f"  timing: machine counts: items={len(program.items)} text_labels={len(b.text_label_names)} data_labels={len(b.data_label_names)} fixups={len(b.fixups)} text_relocs={len(b.text_reloc_names)} text_bytes={len(b.text)} data_bytes={len(b.data)}")
+
+    let patch_start = machine_now_ms()
+    machine_patch_fixups(b)
+    let patch_stop = machine_now_ms()
+    machine_print_timing("patch fixups", patch_start, patch_stop)
+
+    let symbols_start = machine_now_ms()
+    let obj = machine_object_from_builder(b)
+    let symbols_stop = machine_now_ms()
+    machine_print_timing("build symbols", symbols_start, symbols_stop)
+
+    println(f"  timing: machine output counts: symbols={len(obj.symbol_names)} text_relocs={len(obj.text_reloc_names)} data_relocs={len(obj.data_reloc_names)}")
+    return obj
+}
 fun machine_print_bytes(label: str, values: i64[]): void {
     println(label)
     let i = 0

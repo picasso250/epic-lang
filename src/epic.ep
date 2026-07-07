@@ -140,7 +140,7 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     epic_timing("lower x64", lower_start, lower_stop)
 
     let machine_start = epic_now_ms()
-    let machine = machine_build_object(x64)
+    let machine = machine_build_object_timed(x64)
     let machine_stop = epic_now_ms()
     epic_timing("machine object", machine_start, machine_stop)
 
