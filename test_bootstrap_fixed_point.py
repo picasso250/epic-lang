@@ -49,6 +49,14 @@ COMPILER_SOURCES = [
 TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "240"))
 
 
+def format_size(num_bytes):
+    return f"{num_bytes:,} bytes ({num_bytes / (1024 * 1024):.2f} MiB)"
+
+
+def print_exe_size(path, label):
+    print(f"  {label} exe size: {format_size(os.path.getsize(path))}", flush=True)
+
+
 def run_checked(cmd, label):
     start = time.perf_counter()
     try:
@@ -105,6 +113,7 @@ def build_with_python(output_path):
     if not os.path.exists(produced):
         raise RuntimeError(f"expected compiler output missing: {produced}")
     shutil.copyfile(produced, output_path)
+    print_exe_size(output_path, "python -> epic-py")
 
 
 def build_with_epic(compiler, output_path, label):
@@ -122,6 +131,7 @@ def build_with_epic(compiler, output_path, label):
     )
     if not os.path.exists(output_path):
         raise RuntimeError(f"expected compiler output missing: {output_path}")
+    print_exe_size(output_path, label)
 
 
 def main():
