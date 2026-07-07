@@ -6,6 +6,13 @@
 struct MachineObject {
     text: i64[]
     data: i64[]
+    text_reloc_offsets: i64[]
+    text_reloc_names: str[]
+    data_reloc_offsets: i64[]
+    data_reloc_names: str[]
+    symbol_names: str[]
+    symbol_sections: i64[]
+    symbol_values: i64[]
 }
 
 struct MachineFixup {
@@ -23,6 +30,10 @@ struct MachineBuilder {
     data_label_names: str[]
     data_label_offsets: i64[]
     fixups: MachineFixup[]
+    text_reloc_offsets: i64[]
+    text_reloc_names: str[]
+    data_reloc_offsets: i64[]
+    data_reloc_names: str[]
 }
 
 fun machine_builder_empty(): MachineBuilder {
@@ -35,6 +46,10 @@ fun machine_builder_empty(): MachineBuilder {
     b.data_label_names = new str[0]
     b.data_label_offsets = new i64[0]
     b.fixups = new MachineFixup[0]
+    b.text_reloc_offsets = new i64[0]
+    b.text_reloc_names = new str[0]
+    b.data_reloc_offsets = new i64[0]
+    b.data_reloc_names = new str[0]
     return b
 }
 
@@ -169,6 +184,67 @@ fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): vo
     push(b.fixups, f)
 }
 
+fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
+    push(b.text_reloc_offsets, offset)
+    push(b.text_reloc_names, name)
+}
+
+fun machine_has_symbol_name(names: str[], name: str): bool {
+    let i = 0
+    while i < len(names) {
+        if names[i] == name {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+fun machine_ascii_less(a: str, b: str): bool {
+    let ab = bytes(a)
+    let bb = bytes(b)
+    let n = len(ab)
+    if len(bb) < n {
+        n = len(bb)
+    }
+    let i = 0
+    while i < n {
+        if ab[i] < bb[i] {
+            return true
+        }
+        if ab[i] > bb[i] {
+            return false
+        }
+        i = i + 1
+    }
+    return len(ab) < len(bb)
+}
+
+fun machine_sorted_strings(names: str[]): str[] {
+    let out = new str[0]
+    let i = 0
+    while i < len(names) {
+        let key = names[i]
+        let next = new str[0]
+        let inserted = false
+        let j = 0
+        while j < len(out) {
+            if !inserted && machine_ascii_less(key, out[j]) {
+                push(next, key)
+                inserted = true
+            }
+            push(next, out[j])
+            j = j + 1
+        }
+        if !inserted {
+            push(next, key)
+        }
+        out = next
+        i = i + 1
+    }
+    return out
+}
+
 fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
     let v = machine_u32_value(value)
     out[offset] = v & 255
@@ -185,6 +261,8 @@ fun machine_patch_fixups(b: MachineBuilder): void {
                 let target = machine_text_label_offset(b, b.fixups[i].label)
                 let disp = target - (b.fixups[i].offset + 4)
                 machine_patch_i32(b.text, b.fixups[i].offset, disp)
+            } else {
+                machine_add_text_reloc(b, b.fixups[i].offset, b.fixups[i].label)
             }
         }
         i = i + 1
@@ -256,11 +334,13 @@ fun machine_emit_lea_symbol(b: MachineBuilder, dst: str, symbol: str): void {
     machine_rex(b, true, d / 8, 0)
     machine_append_byte(b.text, 141)
     machine_append_byte(b.text, 5 | ((d & 7) * 8))
+    machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
 
 fun machine_emit_call_symbol(b: MachineBuilder, symbol: str): void {
     machine_append_byte(b.text, 232)
+    machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
 
@@ -328,6 +408,7 @@ fun machine_emit_mov_reg_symbol(b: MachineBuilder, dst: str, symbol: str): void 
     machine_rex(b, true, d / 8, 0)
     machine_append_byte(b.text, 139)
     machine_append_byte(b.text, 5 | ((d & 7) * 8))
+    machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
 
@@ -336,6 +417,7 @@ fun machine_emit_mov_symbol_reg(b: MachineBuilder, symbol: str, src: str): void 
     machine_rex(b, true, s / 8, 0)
     machine_append_byte(b.text, 137)
     machine_append_byte(b.text, 5 | ((s & 7) * 8))
+    machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
 
@@ -345,6 +427,7 @@ fun machine_emit_mov_symbol_reg8(b: MachineBuilder, symbol: str, src: str): void
     }
     machine_append_byte(b.text, 136)
     machine_append_byte(b.text, 5)
+    machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
 
@@ -678,6 +761,49 @@ fun machine_build_object(program: X64Program): MachineObject {
     let obj = new MachineObject
     obj.text = b.text
     obj.data = b.data
+    obj.text_reloc_offsets = b.text_reloc_offsets
+    obj.text_reloc_names = b.text_reloc_names
+    obj.data_reloc_offsets = b.data_reloc_offsets
+    obj.data_reloc_names = b.data_reloc_names
+    obj.symbol_names = new str[0]
+    obj.symbol_sections = new i64[0]
+    obj.symbol_values = new i64[0]
+    i = 0
+    while i < len(b.text_label_names) {
+        if !machine_has_symbol_name(obj.symbol_names, b.text_label_names[i]) {
+            push(obj.symbol_names, b.text_label_names[i])
+            push(obj.symbol_sections, 1)
+            push(obj.symbol_values, b.text_label_offsets[i])
+        }
+        i = i + 1
+    }
+    i = 0
+    while i < len(b.data_label_names) {
+        if !machine_has_symbol_name(obj.symbol_names, b.data_label_names[i]) {
+            push(obj.symbol_names, b.data_label_names[i])
+            push(obj.symbol_sections, 2)
+            push(obj.symbol_values, b.data_label_offsets[i])
+        }
+        i = i + 1
+    }
+    let externs = new str[0]
+    i = 0
+    while i < len(b.text_reloc_names) {
+        if !machine_has_symbol_name(obj.symbol_names, b.text_reloc_names[i]) && !machine_has_symbol_name(externs, b.text_reloc_names[i]) {
+            push(externs, b.text_reloc_names[i])
+        }
+        i = i + 1
+    }
+    let sorted_externs = machine_sorted_strings(externs)
+    i = 0
+    while i < len(sorted_externs) {
+        if !machine_has_symbol_name(obj.symbol_names, sorted_externs[i]) {
+            push(obj.symbol_names, sorted_externs[i])
+            push(obj.symbol_sections, 0)
+            push(obj.symbol_values, 0)
+        }
+        i = i + 1
+    }
     return obj
 }
 

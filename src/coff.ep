@@ -1,0 +1,201 @@
+#
+# Minimal AMD64 COFF object writer for self-hosted bootstrap tests.
+# Mirrors bootstrap/coff.py for two sections: .text and .data.
+#
+
+struct CoffSectionSpec {
+    name: str
+    size: i64
+    raw: i64
+    rel_off: i64
+    rel_count: i64
+    chars: i64
+}
+
+fun coff_section_spec(name: str, size: i64, raw: i64, rel_off: i64): CoffSectionSpec {
+    let spec = new CoffSectionSpec
+    spec.name = name
+    spec.size = size
+    spec.raw = raw
+    spec.rel_off = rel_off
+    spec.rel_count = 0
+    spec.chars = 0
+    return spec
+}
+
+fun coff_die(msg: str): void {
+    println(str_cat2("coff error: ", msg))
+    exit(1)
+}
+
+fun coff_append_byte(buf: u8[], value: i64): void {
+    push(buf, u8(value & 255))
+}
+
+fun coff_append_i64_bytes(buf: u8[], values: i64[]): void {
+    let i = 0
+    while i < len(values) {
+        coff_append_byte(buf, values[i])
+        i = i + 1
+    }
+}
+
+fun coff_u32_value(value: i64): i64 {
+    if value < 0 {
+        return value + 4294967296
+    }
+    return value
+}
+
+fun coff_append_u16(buf: u8[], value: i64): void {
+    let v = value
+    coff_append_byte(buf, v)
+    coff_append_byte(buf, v / 256)
+}
+
+fun coff_append_u32(buf: u8[], value: i64): void {
+    let v = coff_u32_value(value)
+    coff_append_byte(buf, v)
+    coff_append_byte(buf, v / 256)
+    coff_append_byte(buf, v / 65536)
+    coff_append_byte(buf, v / 16777216)
+}
+
+fun coff_append_name8(buf: u8[], name: str): void {
+    let bs = bytes(name)
+    let i = 0
+    while i < 8 {
+        if i < len(bs) {
+            push(buf, bs[i])
+        } else {
+            coff_append_byte(buf, 0)
+        }
+        i = i + 1
+    }
+}
+
+fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
+    let bs = bytes(name)
+    if len(bs) <= 8 {
+        coff_append_name8(buf, name)
+        return
+    }
+    let off = 4 + len(strings)
+    coff_append_u32(buf, 0)
+    coff_append_u32(buf, off)
+    extend(strings, bs)
+    coff_append_byte(strings, 0)
+}
+
+fun coff_symbol_index(obj: MachineObject, name: str): i64 {
+    let i = 0
+    while i < len(obj.symbol_names) {
+        if obj.symbol_names[i] == name {
+            return i
+        }
+        i = i + 1
+    }
+    coff_die(str_cat2("unknown symbol: ", name))
+    return 0
+}
+
+fun coff_append_section_header(buf: u8[], spec: CoffSectionSpec): void {
+    coff_append_name8(buf, spec.name)
+    coff_append_u32(buf, 0)
+    coff_append_u32(buf, 0)
+    coff_append_u32(buf, spec.size)
+    if spec.size != 0 {
+        coff_append_u32(buf, spec.raw)
+    } else {
+        coff_append_u32(buf, 0)
+    }
+    if spec.rel_count != 0 {
+        coff_append_u32(buf, spec.rel_off)
+    } else {
+        coff_append_u32(buf, 0)
+    }
+    coff_append_u32(buf, 0)
+    coff_append_u16(buf, spec.rel_count)
+    coff_append_u16(buf, 0)
+    coff_append_u32(buf, spec.chars)
+}
+
+fun coff_append_symbols(symtab: u8[], obj: MachineObject, strings: u8[]): void {
+    let i = 0
+    while i < len(obj.symbol_names) {
+        coff_append_coff_name(symtab, obj.symbol_names[i], strings)
+        coff_append_u32(symtab, obj.symbol_values[i])
+        coff_append_u16(symtab, obj.symbol_sections[i])
+        coff_append_u16(symtab, 0)
+        coff_append_byte(symtab, 2)
+        coff_append_byte(symtab, 0)
+        i = i + 1
+    }
+}
+
+fun coff_append_reloc(buf: u8[], off: i64, symbol_index: i64): void {
+    coff_append_u32(buf, off)
+    coff_append_u32(buf, symbol_index)
+    coff_append_u16(buf, 4)
+}
+
+fun coff_build_obj(obj: MachineObject): u8[] {
+    let section_count = 2
+    let header_size = 20
+    let section_table_size = section_count * 40
+    let raw_offset = header_size + section_table_size
+    let text_raw = raw_offset
+    let data_raw = text_raw + len(obj.text)
+    let text_rel_off = data_raw + len(obj.data)
+    let data_rel_off = text_rel_off + len(obj.text_reloc_offsets) * 10
+    let symtab_off = data_rel_off + len(obj.data_reloc_offsets) * 10
+
+    let strings = new u8[0]
+    let symtab = new u8[0]
+    coff_append_symbols(symtab, obj, strings)
+
+    let buf = new u8[0]
+    coff_append_u16(buf, 34404)
+    coff_append_u16(buf, section_count)
+    coff_append_u32(buf, 0)
+    coff_append_u32(buf, symtab_off)
+    coff_append_u32(buf, len(obj.symbol_names))
+    coff_append_u16(buf, 0)
+    coff_append_u16(buf, 0)
+
+    let text_spec = coff_section_spec(".text", len(obj.text), text_raw, text_rel_off)
+    text_spec.rel_count = len(obj.text_reloc_offsets)
+    text_spec.chars = 1610612768
+    coff_append_section_header(buf, text_spec)
+    let data_spec = coff_section_spec(".data", len(obj.data), data_raw, data_rel_off)
+    data_spec.rel_count = len(obj.data_reloc_offsets)
+    data_spec.chars = 3221225536
+    coff_append_section_header(buf, data_spec)
+
+    coff_append_i64_bytes(buf, obj.text)
+    coff_append_i64_bytes(buf, obj.data)
+
+    let i = 0
+    while i < len(obj.text_reloc_offsets) {
+        coff_append_reloc(buf, obj.text_reloc_offsets[i], coff_symbol_index(obj, obj.text_reloc_names[i]))
+        i = i + 1
+    }
+    i = 0
+    while i < len(obj.data_reloc_offsets) {
+        coff_append_reloc(buf, obj.data_reloc_offsets[i], coff_symbol_index(obj, obj.data_reloc_names[i]))
+        i = i + 1
+    }
+
+    extend(buf, symtab)
+    coff_append_u32(buf, 4 + len(strings))
+    extend(buf, strings)
+    return buf
+}
+
+fun coff_print_bytes(values: u8[]): void {
+    let i = 0
+    while i < len(values) {
+        println(str(i64(values[i])))
+        i = i + 1
+    }
+}

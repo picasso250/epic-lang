@@ -1,0 +1,26 @@
+# Source-to-COFF-byte driver for self-hosted COFF oracle tests.
+
+fun coff_dump_user_program(path: str): void {
+    let src = str(read_file(path))
+    let tokens = lex(src)
+    let p = make_parser(tokens)
+    let ast = parse_program(p)
+    let st = make_sema_state()
+    sema_program(st, ast)
+    let mir = mir_ast_to_mir(ast)
+    let i = 0
+    while i < len(mir.functions) {
+        let x64 = mir_to_x64_lower_function_with_program(mir, mir.functions[i])
+        let obj = machine_build_object(x64)
+        coff_print_bytes(coff_build_obj(obj))
+        i = i + 1
+    }
+}
+
+fun main(): void {
+    if len(argv) < 2 {
+        println("usage: coff_driver <file>")
+        exit(1)
+    }
+    coff_dump_user_program(argv[1])
+}
