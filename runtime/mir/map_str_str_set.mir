@@ -1,0 +1,128 @@
+define void @__ep_map_str_str_set(ptr %map, ptr %key, ptr %val) {
+entry:
+  %gep0: ptr = gep ptr, ptr %map, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %gep2: ptr = gep ptr, ptr %map, i64 2
+  %load3: i64 = load i64, ptr %gep2
+  %gep4: ptr = gep ptr, ptr %map, i64 0
+  %load5: ptr = load ptr, ptr %gep4
+  %call6: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
+  %icmp_sge7: bool = icmp.sge i64 %call6, i64 0
+  condbr bool %icmp_sge7, label %update, label %insert_prep
+
+update:
+  %add8: i64 = add i64 %call6, i64 %call6
+  %add9: i64 = add i64 %add8, i64 %call6
+  %gep10: ptr = gep ptr, ptr %load5, i64 %add9
+  %gep11: ptr = gep ptr, ptr %gep10, i64 1
+  store ptr %val, ptr %gep11
+  ret void
+
+insert_prep:
+  %alloca12: ptr = alloca i64
+  %sub13: i64 = sub i64 0, i64 %call6
+  %sub14: i64 = sub i64 %sub13, i64 1
+  store i64 %sub14, ptr %alloca12
+  %icmp_sge15: bool = icmp.sge i64 %load1, i64 %load3
+  condbr bool %icmp_sge15, label %grow, label %shift_init
+
+grow:
+  %alloca16: ptr = alloca i64
+  %alloca17: ptr = alloca ptr
+  %alloca18: ptr = alloca i64
+  %icmp_eq19: bool = icmp.eq i64 %load3, i64 0
+  condbr bool %icmp_eq19, label %grow_zero, label %grow_double
+
+shift_init:
+  %load34: ptr = load ptr, ptr %gep4
+  %alloca35: ptr = alloca i64
+  store i64 %load1, ptr %alloca35
+  br label %shift_check
+
+grow_zero:
+  store i64 4, ptr %alloca16
+  br label %copy_init
+
+grow_double:
+  %add20: i64 = add i64 %load3, i64 %load3
+  store i64 %add20, ptr %alloca16
+  br label %copy_init
+
+copy_init:
+  %load21: i64 = load i64, ptr %alloca16
+  %mul22: i64 = mul i64 %load21, i64 24
+  %call23: ptr = call ptr __epx_alloc(i64 %mul22)
+  store ptr %call23, ptr %alloca17
+  store i64 0, ptr %alloca18
+  br label %copy_check
+
+copy_check:
+  %load24: i64 = load i64, ptr %alloca18
+  %mul25: i64 = mul i64 %load1, i64 3
+  %icmp_slt26: bool = icmp.slt i64 %load24, i64 %mul25
+  condbr bool %icmp_slt26, label %copy_body, label %swap
+
+copy_body:
+  %gep27: ptr = gep ptr, ptr %load5, i64 %load24
+  %load28: i64 = load i64, ptr %gep27
+  %load29: ptr = load ptr, ptr %alloca17
+  %gep30: ptr = gep ptr, ptr %load29, i64 %load24
+  store i64 %load28, ptr %gep30
+  %add31: i64 = add i64 %load24, i64 1
+  store i64 %add31, ptr %alloca18
+  br label %copy_check
+
+swap:
+  %load32: ptr = load ptr, ptr %alloca17
+  store ptr %load32, ptr %gep4
+  %load33: i64 = load i64, ptr %alloca16
+  store i64 %load33, ptr %gep2
+  br label %shift_init
+
+shift_check:
+  %load36: i64 = load i64, ptr %alloca35
+  %load37: i64 = load i64, ptr %alloca12
+  %icmp_sgt38: bool = icmp.sgt i64 %load36, i64 %load37
+  condbr bool %icmp_sgt38, label %shift_body, label %write_entry
+
+shift_body:
+  %load39: i64 = load i64, ptr %alloca35
+  %sub40: i64 = sub i64 %load39, i64 1
+  %add41: i64 = add i64 %sub40, i64 %sub40
+  %add42: i64 = add i64 %add41, i64 %sub40
+  %gep43: ptr = gep ptr, ptr %load34, i64 %add42
+  %add44: i64 = add i64 %load39, i64 %load39
+  %add45: i64 = add i64 %add44, i64 %load39
+  %gep46: ptr = gep ptr, ptr %load34, i64 %add45
+  %gep47: ptr = gep ptr, ptr %gep43, i64 0
+  %load48: i64 = load i64, ptr %gep47
+  %gep49: ptr = gep ptr, ptr %gep46, i64 0
+  store i64 %load48, ptr %gep49
+  %gep50: ptr = gep ptr, ptr %gep43, i64 1
+  %load51: i64 = load i64, ptr %gep50
+  %gep52: ptr = gep ptr, ptr %gep46, i64 1
+  store i64 %load51, ptr %gep52
+  %gep53: ptr = gep ptr, ptr %gep43, i64 2
+  %load54: i64 = load i64, ptr %gep53
+  %gep55: ptr = gep ptr, ptr %gep46, i64 2
+  store i64 %load54, ptr %gep55
+  %sub56: i64 = sub i64 %load39, i64 1
+  store i64 %sub56, ptr %alloca35
+  br label %shift_check
+
+write_entry:
+  %load57: i64 = load i64, ptr %alloca12
+  %load58: ptr = load ptr, ptr %gep4
+  %add59: i64 = add i64 %load57, i64 %load57
+  %add60: i64 = add i64 %add59, i64 %load57
+  %gep61: ptr = gep ptr, ptr %load58, i64 %add60
+  %gep62: ptr = gep ptr, ptr %gep61, i64 0
+  store ptr %key, ptr %gep62
+  %gep63: ptr = gep ptr, ptr %gep61, i64 1
+  store ptr %val, ptr %gep63
+  %gep64: ptr = gep ptr, ptr %gep61, i64 2
+  store i64 1, ptr %gep64
+  %add65: i64 = add i64 %load1, i64 1
+  store i64 %add65, ptr %gep0
+  ret void
+}

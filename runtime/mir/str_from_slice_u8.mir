@@ -1,0 +1,4 @@
+define ptr @__ep_str_from_slice_u8(ptr %input) {
+entry:
+  ret ptr %input
+}

@@ -1,0 +1,22 @@
+define i64 @__ep_slice_u8_get(ptr %arr, i64 %idx) {
+entry:
+  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
+  condbr bool %icmp_sge2, label %check_high, label %fail
+
+check_high:
+  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
+  condbr bool %icmp_slt3, label %ok, label %fail
+
+ok:
+  %gep4: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
+  %load5: ptr = load ptr, ptr %gep4
+  %gep6: ptr = gep i8, ptr %load5, i64 %idx
+  %load7: i64 = load i8, ptr %gep6
+  ret i64 %load7
+
+fail:
+  call void ExitProcess(i64 1)
+  ret i64 0
+}

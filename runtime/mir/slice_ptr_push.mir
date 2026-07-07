@@ -1,0 +1,69 @@
+define void @__ep_slice_ptr_push(ptr %arr, ptr %val) {
+entry:
+  %gep0: ptr = gep ptr, ptr %arr, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %gep2: ptr = gep ptr, ptr %arr, i64 2
+  %load3: i64 = load i64, ptr %gep2
+  %icmp_sge4: bool = icmp.sge i64 %load1, i64 %load3
+  condbr bool %icmp_sge4, label %grow, label %store
+
+grow:
+  %alloca5: ptr = alloca i64
+  %alloca6: ptr = alloca ptr
+  %alloca7: ptr = alloca i64
+  %icmp_eq8: bool = icmp.eq i64 %load3, i64 0
+  condbr bool %icmp_eq8, label %grow_zero, label %grow_double
+
+store:
+  %gep26: ptr = gep ptr, ptr %arr, i64 0
+  %load27: ptr = load ptr, ptr %gep26
+  %gep28: ptr = gep ptr, ptr %load27, i64 %load1
+  store ptr %val, ptr %gep28
+  %add29: i64 = add i64 %load1, i64 1
+  store i64 %add29, ptr %gep0
+  ret void
+
+grow_zero:
+  store i64 4, ptr %alloca5
+  %call9: ptr = call ptr __epx_alloc(i64 32)
+  store ptr %call9, ptr %alloca6
+  br label %copy_entry
+
+grow_double:
+  %add10: i64 = add i64 %load3, i64 %load3
+  store i64 %add10, ptr %alloca5
+  %add11: i64 = add i64 %add10, i64 %add10
+  %add12: i64 = add i64 %add11, i64 %add11
+  %add13: i64 = add i64 %add12, i64 %add12
+  %call14: ptr = call ptr __epx_alloc(i64 %add13)
+  store ptr %call14, ptr %alloca6
+  br label %copy_entry
+
+copy_entry:
+  %gep15: ptr = gep ptr, ptr %arr, i64 0
+  %load16: ptr = load ptr, ptr %gep15
+  %load17: ptr = load ptr, ptr %alloca6
+  store i64 0, ptr %alloca7
+  br label %copy_check
+
+copy_check:
+  %load18: i64 = load i64, ptr %alloca7
+  %icmp_slt19: bool = icmp.slt i64 %load18, i64 %load1
+  condbr bool %icmp_slt19, label %copy_body, label %swap
+
+copy_body:
+  %gep20: ptr = gep ptr, ptr %load16, i64 %load18
+  %load21: ptr = load ptr, ptr %gep20
+  %gep22: ptr = gep ptr, ptr %load17, i64 %load18
+  store ptr %load21, ptr %gep22
+  %add23: i64 = add i64 %load18, i64 1
+  store i64 %add23, ptr %alloca7
+  br label %copy_check
+
+swap:
+  %gep24: ptr = gep ptr, ptr %arr, i64 0
+  store ptr %load17, ptr %gep24
+  %load25: i64 = load i64, ptr %alloca5
+  store i64 %load25, ptr %gep2
+  br label %store
+}

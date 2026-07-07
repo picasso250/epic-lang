@@ -517,6 +517,22 @@ how hard it is to compare parsed helper with existing emitted helper
 
 Only after that should the Python injection path use the parsed helper.
 
+
+
+## Full MIR text migration result
+
+The first full migration replaced the generated Epic builder-style runtime emitters with embedded canonical MIR text plus a small line-oriented parser in `src/mir_runtime.ep`. The MIR text fixtures were mechanically dumped from the Python helper emitters into `runtime/mir/*.mir` to avoid hand transcription bugs.
+
+Measured result:
+
+```text
+before full Epic-side migration exe: 1,486,848 bytes
+after full Epic-side migration exe:  1,018,368 bytes
+reduction:                          468,480 bytes, about 31.5%
+```
+
+Fixed-point stage time also improved. The stable self-host stages moved from roughly 3.1s to roughly 2.3s on the measured run. `scripts/size_profile.py 30` no longer shows the old `mir_runtime_emit_*` builder emitters in the top size list; the largest MIR-text parser function was `mrt_parse_inst` at about 9,315 MIR text bytes.
+
 ## Success criteria
 
 The direction is considered worth continuing if:

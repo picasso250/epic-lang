@@ -1,0 +1,25 @@
+define void @__ep_slice_u8_set(ptr %arr, i64 %idx, i64 %val) {
+entry:
+  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
+  condbr bool %icmp_sge2, label %check_high, label %fail
+
+check_high:
+  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
+  condbr bool %icmp_slt3, label %ok, label %fail
+
+ok:
+  %alloca4: ptr = alloca i64
+  store i64 %val, ptr %alloca4
+  %load5: i8 = load i8, ptr %alloca4
+  %gep6: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
+  %load7: ptr = load ptr, ptr %gep6
+  %gep8: ptr = gep i8, ptr %load7, i64 %idx
+  store i8 %load5, ptr %gep8
+  ret void
+
+fail:
+  call void ExitProcess(i64 1)
+  ret void
+}

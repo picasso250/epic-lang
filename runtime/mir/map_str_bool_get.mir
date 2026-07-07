@@ -1,0 +1,19 @@
+define bool @__ep_map_str_bool_get(ptr %map, ptr %key) {
+entry:
+  %gep0: ptr = gep ptr, ptr %map, i64 0
+  %load1: ptr = load ptr, ptr %gep0
+  %call2: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
+  %icmp_sge3: bool = icmp.sge i64 %call2, i64 0
+  condbr bool %icmp_sge3, label %found, label %miss
+
+found:
+  %add4: i64 = add i64 %call2, i64 %call2
+  %add5: i64 = add i64 %add4, i64 %call2
+  %gep6: ptr = gep ptr, ptr %load1, i64 %add5
+  %gep7: ptr = gep ptr, ptr %gep6, i64 1
+  %load8: bool = load bool, ptr %gep7
+  ret bool %load8
+
+miss:
+  ret bool false
+}

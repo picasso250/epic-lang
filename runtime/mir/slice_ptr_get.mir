@@ -1,0 +1,22 @@
+define ptr @__ep_slice_ptr_get(ptr %arr, i64 %idx) {
+entry:
+  %gep0: ptr = gep ptr, ptr %arr, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
+  condbr bool %icmp_sge2, label %check_high, label %fail
+
+check_high:
+  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
+  condbr bool %icmp_slt3, label %ok, label %fail
+
+ok:
+  %gep4: ptr = gep ptr, ptr %arr, i64 0
+  %load5: ptr = load ptr, ptr %gep4
+  %gep6: ptr = gep ptr, ptr %load5, i64 %idx
+  %load7: ptr = load ptr, ptr %gep6
+  ret ptr %load7
+
+fail:
+  call void ExitProcess(i64 1)
+  ret ptr null
+}

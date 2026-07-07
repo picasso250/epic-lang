@@ -1,0 +1,11 @@
+define ptr @__ep_map_str_str_new() {
+entry:
+  %call0: ptr = call ptr __epx_alloc(i64 24)
+  %gep1: ptr = gep ptr, ptr %call0, i64 0
+  store ptr null, ptr %gep1
+  %gep2: ptr = gep ptr, ptr %call0, i64 1
+  store i64 0, ptr %gep2
+  %gep3: ptr = gep ptr, ptr %call0, i64 2
+  store i64 0, ptr %gep3
+  ret ptr %call0
+}

@@ -1,0 +1,48 @@
+define ptr @__ep_slice_u8_slice(ptr %arr, i64 %start, i64 %end) {
+entry:
+  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sge2: bool = icmp.sge i64 %start, i64 0
+  condbr bool %icmp_sge2, label %check_order, label %fail
+
+check_order:
+  %icmp_sge3: bool = icmp.sge i64 %end, i64 %start
+  condbr bool %icmp_sge3, label %check_len, label %fail
+
+check_len:
+  %icmp_sge4: bool = icmp.sge i64 %load1, i64 %end
+  condbr bool %icmp_sge4, label %alloc, label %fail
+
+alloc:
+  %sub5: i64 = sub i64 %end, i64 %start
+  %call6: ptr = call ptr __ep_slice_u8_alloc(i64 %sub5, i64 %sub5)
+  %alloca7: ptr = alloca i64
+  store i64 0, ptr %alloca7
+  %gep8: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
+  %load9: ptr = load ptr, ptr %gep8
+  %gep10: ptr = gep i8, ptr %load9, i64 %start
+  %gep11: ptr = gep struct _slice_u8, ptr %call6, i64 0, i32 0
+  %load12: ptr = load ptr, ptr %gep11
+  br label %copy_check
+
+copy_check:
+  %load13: i64 = load i64, ptr %alloca7
+  %icmp_slt14: bool = icmp.slt i64 %load13, i64 %sub5
+  condbr bool %icmp_slt14, label %copy_body, label %done
+
+copy_body:
+  %gep15: ptr = gep i8, ptr %gep10, i64 %load13
+  %load16: i8 = load i8, ptr %gep15
+  %gep17: ptr = gep i8, ptr %load12, i64 %load13
+  store i8 %load16, ptr %gep17
+  %add18: i64 = add i64 %load13, i64 1
+  store i64 %add18, ptr %alloca7
+  br label %copy_check
+
+done:
+  ret ptr %call6
+
+fail:
+  call void ExitProcess(i64 1)
+  ret ptr null
+}

@@ -1,0 +1,6 @@
+define bool @__ep_map_str_i64_has(ptr %map, ptr %key) {
+entry:
+  %call0: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
+  %icmp_sge1: bool = icmp.sge i64 %call0, i64 0
+  ret bool %icmp_sge1
+}
