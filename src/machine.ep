@@ -245,10 +245,35 @@ fun machine_emit_call_symbol(b: MachineBuilder, symbol: str): void {
     machine_append_i32(b.text, 0)
 }
 
+fun machine_emit_rsp_imm(b: MachineBuilder, op: str, imm: i64): void {
+    machine_append_byte(b.text, 72)
+    if imm >= 0 && imm <= 127 {
+        machine_append_byte(b.text, 131)
+        if op == "sub" { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) }
+        machine_append_byte(b.text, imm)
+        return
+    }
+    machine_append_byte(b.text, 129)
+    if op == "sub" { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) }
+    machine_append_i32(b.text, imm)
+}
+
 fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
     let ops = item.operands
+    if item.op == "push" && len(ops) == 1 && machine_is_reg(ops[0], "rbp") {
+        machine_append_byte(b.text, 85)
+        return
+    }
+    if item.op == "pop" && len(ops) == 1 && machine_is_reg(ops[0], "rbp") {
+        machine_append_byte(b.text, 93)
+        return
+    }
     if item.op == "ret" && len(ops) == 0 {
         machine_append_byte(b.text, 195)
+        return
+    }
+    if (item.op == "sub" || item.op == "add") && len(ops) == 2 && machine_is_reg(ops[0], "rsp") && ops[1].kind == "imm" {
+        machine_emit_rsp_imm(b, item.op, ops[1].value)
         return
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
@@ -355,5 +380,6 @@ fun machine_print_object(obj: MachineObject): void {
     machine_print_bytes("TEXT", obj.text)
     machine_print_bytes("DATA", obj.data)
 }
+
 
 
