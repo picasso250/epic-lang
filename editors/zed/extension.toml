@@ -10,4 +10,3 @@ repository = "https://github.com/picasso250/epic-lang"
 repository = "https://github.com/picasso250/epic-lang"
 rev = "main"
 path = "tree-sitter-epic"
-
