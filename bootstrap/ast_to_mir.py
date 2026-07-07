@@ -5,13 +5,12 @@ from dataclasses import dataclass
 import epic_types as et
 from sema import assert_typed_program
 from ast_nodes import *
+from mir_builder import MirFunctionBuilder
 from mir import (
     BOOL,
     I8,
     I64,
     VOID,
-    Br,
-    CondBr,
     ConstBoolOperand,
     ConstIntOperand,
     ConstNullOperand,
@@ -19,7 +18,6 @@ from mir import (
     MirBlock,
     MirExtern,
     MirField,
-    MirFunction,
     MirGlobal,
     MirImport,
     MirInst,
@@ -27,7 +25,6 @@ from mir import (
     MirProgram,
     MirSignature,
     MirStruct,
-    MirValue,
     Ret,
     SymbolOperand,
     ValueOperand,
@@ -76,16 +73,13 @@ WINAPI_IMPORTS = [
 ]
 
 
-class MirCodegen:
+class MirCodegen(MirFunctionBuilder):
     def __init__(self):
+        super().__init__(numbered_blocks=True, preincrement_values=True)
         self.program = MirProgram()
         self.func_sigs = {}
-        self.fn = None
-        self.current_block = None
         self.locals = {}
         self.local_types = {}
-        self.value_counter = 0
-        self.block_counter = 0
         self.strings = {}
         self.string_counter = 0
         self.structs = {}
@@ -156,15 +150,13 @@ class MirCodegen:
         return self.program
 
     def _emit_function(self, ast_fn):
-        self.fn = MirFunction(
+        self.begin_function(
             ast_fn.name,
             [MirParam(p.name, self._type(p.resolved_type)) for p in ast_fn.params],
             self._type(ast_fn.resolved_type),
         )
         self.locals = {}
         self.local_types = {}
-        self.value_counter = 0
-        self.block_counter = 0
         entry = self.new_block("entry")
         for param in self.fn.params:
             self.set_block(entry)
@@ -264,48 +256,9 @@ class MirCodegen:
     def _expr_mir_type(self, expr):
         return self._type(self._resolved_type(expr))
 
-    def new_value(self, typ, hint="v"):
-        self.value_counter += 1
-        return MirValue(f"{hint}{self.value_counter}", typ)
-
-    def new_block(self, prefix):
-        self.block_counter += 1
-        block = MirBlock(f"{prefix}{self.block_counter}")
-        self.fn.blocks.append(block)
-        return block
-
-    def ensure_insertable(self, block=None):
-        block = self.current_block if block is None else block
-        if block is None:
-            raise MirCodegenError("no reachable MIR insertion block")
-        if block.terminator is not None:
-            raise MirCodegenError(f"cannot emit after terminator in block {block.name}")
-        return block
-
-    def set_block(self, block):
-        self.current_block = self.ensure_insertable(block)
-        return self.current_block
-
-    def terminate(self, block, terminator):
-        block = self.ensure_insertable(block)
-        block.terminator = terminator
-        if self.current_block is block:
-            self.current_block = None
+    def terminate(self, block_or_terminator, terminator=None):
+        super().terminate(block_or_terminator, terminator)
         return BlockFlow(False, None)
-
-    def br(self, block, target):
-        target_name = target.name if isinstance(target, MirBlock) else target
-        return self.terminate(block, Br(target_name))
-
-    def condbr(self, block, cond, then_target, else_target):
-        then_name = then_target.name if isinstance(then_target, MirBlock) else then_target
-        else_name = else_target.name if isinstance(else_target, MirBlock) else else_target
-        return self.terminate(block, CondBr(cond, then_name, else_name))
-
-    def ret(self, block, value=None):
-        if value is None:
-            return self.terminate(block, Ret())
-        return self.terminate(block, Ret(value))
 
     def _reachable(self, block):
         return BlockFlow(True, self.ensure_insertable(block))
@@ -317,13 +270,6 @@ class MirCodegen:
         self.set_block(block)
         value = self._emit_expr(expr)
         return ValueFlow(value, self.ensure_insertable(self.current_block))
-
-    def inst(self, op, operands=None, result_type=None, type=None, callee=None):
-        block = self.ensure_insertable()
-        result = self.new_value(result_type, op.replace(".", "_")) if result_type is not None else None
-        inst = MirInst(op, operands or [], result=result, type=type, callee=callee)
-        block.instructions.append(inst)
-        return result
 
     def _alloc_local(self, name, typ):
         block = self.ensure_insertable()

@@ -9,25 +9,21 @@ _lower_function path.
 
 from pathlib import Path
 
+from mir_builder import MirFunctionBuilder
 from mir import (
     BOOL,
     I32,
     I64,
     I8,
     VOID,
-    Br,
-    CondBr,
     ConstBoolOperand,
     ConstIntOperand,
     ConstNullOperand,
-    MirBlock,
     MirFunction,
     MirGlobal,
-    MirInst,
     MirParam,
     MirProgram,
     MirValue,
-    Ret,
     SymbolOperand,
     ValueOperand,
     ptr,
@@ -39,15 +35,18 @@ from mir_parser import parse_mir_file
 # ── MirHelperBuilder ──────────────────────────────────────────────────────
 
 
-class MirHelperBuilder:
+class MirHelperBuilder(MirFunctionBuilder):
     """Small builder that reduces MIR boilerplate when constructing helpers."""
 
     def __init__(self, name: str, params: list[MirParam], ret_type):
-        self.fn = MirFunction(name, params, ret_type)
-        self.entry_block = MirBlock("entry")
-        self.current_block = self.entry_block
-        self.fn.blocks.append(self.entry_block)
-        self._value_counter = 0
+        super().__init__(
+            name,
+            params,
+            ret_type,
+            numbered_blocks=False,
+            preincrement_values=False,
+            create_entry=True,
+        )
 
     @staticmethod
     def _op(val):
@@ -61,12 +60,6 @@ class MirHelperBuilder:
         """Wrap each arg that is a MirValue."""
         return [MirHelperBuilder._op(a) for a in args]
 
-    def value(self, typ, hint="v"):
-        """Create a new %vN value with the given type."""
-        n = self._value_counter
-        self._value_counter += 1
-        return MirValue(f"{hint}{n}", typ)
-
     def const_i64(self, n):
         return ConstIntOperand(I64, n)
 
@@ -78,55 +71,37 @@ class MirHelperBuilder:
 
     def call(self, callee, args, ret_type):
         """Append a call and return the result value (or None if void)."""
-        result = self.value(ret_type, "call") if ret_type != VOID else None
-        inst = MirInst("call", self._ops(*args), result=result, type=ret_type, callee=callee)
-        self.current_block.instructions.append(inst)
-        return result
+        result_type = ret_type if ret_type != VOID else None
+        return self.inst("call", self._ops(*args), result_type=result_type, type=ret_type, callee=callee)
 
     def gep(self, source_type, base, indices, result_type=None):
         """Append a gep and return the result ptr value."""
         if result_type is None:
             result_type = ptr()
-        r = self.value(result_type, "gep")
         ops = self._ops(base) + self._ops(*indices)
-        self.current_block.instructions.append(MirInst("gep", ops, result=r, type=source_type))
-        return r
+        return self.inst("gep", ops, result_type=result_type, type=source_type)
 
     def load(self, access_type, addr, result_type=None):
         """Append a load and return the result value."""
         if result_type is None:
             result_type = access_type
-        r = self.value(result_type, "load")
-        self.current_block.instructions.append(
-            MirInst("load", self._ops(addr), result=r, type=access_type)
-        )
-        return r
+        return self.inst("load", self._ops(addr), result_type=result_type, type=access_type)
 
     def store(self, value, addr):
         """Append a store.  No result."""
-        self.current_block.instructions.append(MirInst("store", self._ops(value, addr)))
+        self.inst("store", self._ops(value, addr))
 
     def icmp(self, cond, left, right):
         """Append an icmp.<cond> and return the bool result value."""
-        r = self.value(BOOL, "cmp")
-        self.current_block.instructions.append(
-            MirInst(f"icmp.{cond}", self._ops(left, right), result=r, type=BOOL)
-        )
-        return r
+        return self.inst(f"icmp.{cond}", self._ops(left, right), result_type=BOOL, type=BOOL)
 
     def binop(self, op, left, right):
         """Append an integer binary op (add/sub/and/…)."""
-        r = self.value(I64, "binop")
-        self.current_block.instructions.append(
-            MirInst(op, self._ops(left, right), result=r, type=I64)
-        )
-        return r
+        return self.inst(op, self._ops(left, right), result_type=I64, type=I64)
 
     def alloca(self, elem_type):
         """Append an alloca and return the address."""
-        r = self.value(ptr(), "slot")
-        self.current_block.instructions.append(MirInst("alloca", result=r, type=elem_type))
-        return r
+        return self.inst("alloca", result_type=ptr(), type=elem_type)
 
     def gep_field(self, base, struct_name, field_index, result_type=None):
         """Convenience: gep into a struct field by index (0/1/2)."""
@@ -136,34 +111,6 @@ class MirHelperBuilder:
             [self.const_i64(0), self.const_i32(field_index)],
             result_type=result_type,
         )
-
-    def new_block(self, prefix):
-        block = MirBlock(prefix)
-        self.fn.blocks.append(block)
-        return block
-
-    def ret(self, value=None):
-        """Set ret terminator on the current insertion block."""
-        if value is not None:
-            self.terminate(Ret(value))
-        else:
-            self.terminate(Ret())
-
-    def set_block(self, block):
-        self.current_block = block
-        return block
-
-    def terminate(self, terminator):
-        self.current_block.terminator = terminator
-
-    def br(self, target):
-        self.terminate(Br(target.name if isinstance(target, MirBlock) else target))
-
-    def condbr(self, cond, then_target, else_target):
-        then_name = then_target.name if isinstance(then_target, MirBlock) else then_target
-        else_name = else_target.name if isinstance(else_target, MirBlock) else else_target
-        self.terminate(CondBr(cond, then_name, else_name))
-
 
 # ── Helper emitters ───────────────────────────────────────────────────────
 
