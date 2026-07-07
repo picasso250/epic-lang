@@ -835,8 +835,156 @@ def _map_zero_operand(value_type):
     return ConstIntOperand(value_type, 0)
 
 
+
+def emit___ep_str_cmp() -> MirFunction:
+    """Compare two Epic strings bytewise. Return -1, 0, or 1."""
+    b = MirHelperBuilder(
+        "__ep_str_cmp",
+        [MirParam("left", ptr()), MirParam("right", ptr())],
+        I64,
+    )
+    left_val = ValueOperand(b.fn.params[0].value)
+    right_val = ValueOperand(b.fn.params[1].value)
+
+    left_data = b.load(ptr(), b.gep_field(left_val, "str", 0))
+    left_len = b.load(I64, b.gep_field(left_val, "str", 1))
+    right_data = b.load(ptr(), b.gep_field(right_val, "str", 0))
+    right_len = b.load(I64, b.gep_field(right_val, "str", 1))
+
+    i_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(i_slot))
+    loop_check = b.new_block("loop_check")
+    check_right = b.new_block("check_right")
+    body = b.new_block("body")
+    left_done = b.new_block("left_done")
+    next_block = b.new_block("next")
+    less = b.new_block("less")
+    greater = b.new_block("greater")
+    equal = b.new_block("equal")
+    right_done = b.new_block("right_done")
+    check_gt = b.new_block("check_gt")
+    b.br(loop_check)
+
+    b.set_block(loop_check)
+    i = b.load(I64, ValueOperand(i_slot))
+    left_has = b.icmp("slt", ValueOperand(i), ValueOperand(left_len))
+    b.condbr(ValueOperand(left_has), check_right.name, left_done.name)
+
+    b.set_block(check_right)
+    i2 = b.load(I64, ValueOperand(i_slot))
+    right_has = b.icmp("slt", ValueOperand(i2), ValueOperand(right_len))
+    b.condbr(ValueOperand(right_has), body.name, greater.name)
+
+    b.set_block(body)
+    i3 = b.load(I64, ValueOperand(i_slot))
+    left_byte_addr = b.gep(I8, ValueOperand(left_data), [ValueOperand(i3)])
+    left_byte = b.load(I8, ValueOperand(left_byte_addr), result_type=I8)
+    right_byte_addr = b.gep(I8, ValueOperand(right_data), [ValueOperand(i3)])
+    right_byte = b.load(I8, ValueOperand(right_byte_addr), result_type=I8)
+    is_less = b.icmp("ult", ValueOperand(left_byte), ValueOperand(right_byte))
+    b.condbr(ValueOperand(is_less), less.name, check_gt.name)
+
+    b.set_block(check_gt)
+    is_greater = b.icmp("ugt", ValueOperand(left_byte), ValueOperand(right_byte))
+    b.condbr(ValueOperand(is_greater), greater.name, next_block.name)
+
+    b.set_block(next_block)
+    next_i = b.binop("add", ValueOperand(i3), b.const_i64(1))
+    b.store(ValueOperand(next_i), ValueOperand(i_slot))
+    b.br(loop_check)
+
+    b.set_block(left_done)
+    i4 = b.load(I64, ValueOperand(i_slot))
+    right_has_more = b.icmp("slt", ValueOperand(i4), ValueOperand(right_len))
+    b.condbr(ValueOperand(right_has_more), less.name, equal.name)
+
+    b.set_block(less)
+    b.ret(b.const_i64(-1))
+
+    b.set_block(greater)
+    b.ret(b.const_i64(1))
+
+    b.set_block(equal)
+    b.ret(b.const_i64(0))
+
+    b.set_block(right_done)
+    b.ret(b.const_i64(1))
+    return b.fn
+
+
+def emit_map_str_find_pos() -> MirFunction:
+    """Binary search a sorted str-keyed word map. Return index or -(lo + 1)."""
+    b = MirHelperBuilder(
+        "__ep_map_str_find_pos",
+        [MirParam("map", ptr()), MirParam("key", ptr())],
+        I64,
+    )
+    map_val = ValueOperand(b.fn.params[0].value)
+    key_val = ValueOperand(b.fn.params[1].value)
+
+    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
+    map_len = b.load(I64, len_addr)
+    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
+    data = b.load(ptr(), data_addr)
+
+    lo_slot = b.alloca(I64)
+    hi_slot = b.alloca(I64)
+    b.store(b.const_i64(0), ValueOperand(lo_slot))
+    b.store(ValueOperand(map_len), ValueOperand(hi_slot))
+
+    loop_check = b.new_block("loop_check")
+    loop_body = b.new_block("loop_body")
+    found = b.new_block("found")
+    check_less = b.new_block("check_less")
+    move_lo = b.new_block("move_lo")
+    move_hi = b.new_block("move_hi")
+    miss = b.new_block("miss")
+    b.br(loop_check)
+
+    b.set_block(loop_check)
+    lo = b.load(I64, ValueOperand(lo_slot))
+    hi = b.load(I64, ValueOperand(hi_slot))
+    keep_going = b.icmp("slt", ValueOperand(lo), ValueOperand(hi))
+    b.condbr(ValueOperand(keep_going), loop_body.name, miss.name)
+
+    b.set_block(loop_body)
+    lo2 = b.load(I64, ValueOperand(lo_slot))
+    hi2 = b.load(I64, ValueOperand(hi_slot))
+    sum_v = b.binop("add", ValueOperand(lo2), ValueOperand(hi2))
+    mid = b.binop("sdiv", ValueOperand(sum_v), b.const_i64(2))
+    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(mid))
+    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
+    entry_key = b.load(ptr(), ValueOperand(key_addr))
+    cmp = b.call("__ep_str_cmp", [ValueOperand(entry_key), key_val], I64)
+    is_equal = b.icmp("eq", ValueOperand(cmp), b.const_i64(0))
+    b.condbr(ValueOperand(is_equal), found.name, check_less.name)
+
+    b.set_block(check_less)
+    is_less = b.icmp("slt", ValueOperand(cmp), b.const_i64(0))
+    b.condbr(ValueOperand(is_less), move_lo.name, move_hi.name)
+
+    b.set_block(move_lo)
+    next_lo = b.binop("add", ValueOperand(mid), b.const_i64(1))
+    b.store(ValueOperand(next_lo), ValueOperand(lo_slot))
+    b.br(loop_check)
+
+    b.set_block(move_hi)
+    b.store(ValueOperand(mid), ValueOperand(hi_slot))
+    b.br(loop_check)
+
+    b.set_block(found)
+    b.ret(ValueOperand(mid))
+
+    b.set_block(miss)
+    final_lo = b.load(I64, ValueOperand(lo_slot))
+    neg_lo = b.binop("sub", b.const_i64(0), ValueOperand(final_lo))
+    encoded = b.binop("sub", ValueOperand(neg_lo), b.const_i64(1))
+    b.ret(ValueOperand(encoded))
+    return b.fn
+
+
 def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
-    """Lookup a str key in a word-valued map, returning value zero on miss."""
+    """Lookup a str key in a sorted word-valued map, returning value zero on miss."""
     b = MirHelperBuilder(
         name,
         [MirParam("map", map_type), MirParam("key", ptr())],
@@ -844,49 +992,18 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
     )
     map_val = ValueOperand(b.fn.params[0].value)
     key_val = ValueOperand(b.fn.params[1].value)
-
-    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
-    map_len = b.load(I64, len_addr)
-    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
-    data = b.load(ptr(), data_addr)
-
-    i_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    loop_check = b.new_block("loop_check")
-    loop_body = b.new_block("loop_body")
-    key_check = b.new_block("key_check")
-    found = b.new_block("found")
-    next_block = b.new_block("next")
+    data = b.load(ptr(), b.gep(ptr(), map_val, [b.const_i64(0)]))
+    pos = b.call("__ep_map_str_find_pos", [map_val, key_val], I64)
+    found = b.icmp("sge", ValueOperand(pos), b.const_i64(0))
+    found_block = b.new_block("found")
     miss = b.new_block("miss")
-    b.br(loop_check)
+    b.condbr(ValueOperand(found), found_block.name, miss.name)
 
-    b.set_block(loop_check)
-    i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(map_len))
-    b.condbr(ValueOperand(in_range), loop_body.name, miss.name)
-
-    b.set_block(loop_body)
-    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
-    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
-    occ = b.load(I64, ValueOperand(occ_addr))
-    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
-
-    b.set_block(key_check)
-    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(), ValueOperand(key_addr))
-    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.condbr(ValueOperand(keys_equal), found.name, next_block.name)
-
-    b.set_block(found)
+    b.set_block(found_block)
+    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(pos))
     value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
     result = b.load(value_type, ValueOperand(value_addr))
     b.ret(ValueOperand(result))
-
-    b.set_block(next_block)
-    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
-    b.store(ValueOperand(next_i), ValueOperand(i_slot))
-    b.br(loop_check)
 
     b.set_block(miss)
     b.ret(_map_zero_operand(value_type))
@@ -894,7 +1011,7 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
 
 
 def emit_map_str_word_has(name: str, map_type) -> MirFunction:
-    """Return true when a key exists in a str-keyed map."""
+    """Return true when a key exists in a sorted str-keyed map."""
     b = MirHelperBuilder(
         name,
         [MirParam("map", map_type), MirParam("key", ptr())],
@@ -902,62 +1019,17 @@ def emit_map_str_word_has(name: str, map_type) -> MirFunction:
     )
     map_val = ValueOperand(b.fn.params[0].value)
     key_val = ValueOperand(b.fn.params[1].value)
-
-    len_addr = b.gep(ptr(), map_val, [b.const_i64(1)])
-    map_len = b.load(I64, len_addr)
-    data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
-    data = b.load(ptr(), data_addr)
-
-    i_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    loop_check = b.new_block("loop_check")
-    loop_body = b.new_block("loop_body")
-    key_check = b.new_block("key_check")
-    yes = b.new_block("yes")
-    next_block = b.new_block("next")
-    no = b.new_block("no")
-    b.br(loop_check)
-
-    b.set_block(loop_check)
-    i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(map_len))
-    b.condbr(ValueOperand(in_range), loop_body.name, no.name)
-
-    b.set_block(loop_body)
-    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
-    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
-    occ = b.load(I64, ValueOperand(occ_addr))
-    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
-
-    b.set_block(key_check)
-    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(), ValueOperand(key_addr))
-    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.condbr(ValueOperand(keys_equal), yes.name, next_block.name)
-
-    b.set_block(yes)
-    b.ret(ConstBoolOperand(True))
-
-    b.set_block(next_block)
-    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
-    b.store(ValueOperand(next_i), ValueOperand(i_slot))
-    b.br(loop_check)
-
-    b.set_block(no)
-    b.ret(ConstBoolOperand(False))
+    pos = b.call("__ep_map_str_find_pos", [map_val, key_val], I64)
+    found = b.icmp("sge", ValueOperand(pos), b.const_i64(0))
+    b.ret(ValueOperand(found))
     return b.fn
 
 
 def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
-    """Insert or update a key/value entry in a str-keyed word map."""
+    """Insert or update a key/value entry in a sorted str-keyed word map."""
     b = MirHelperBuilder(
         name,
-        [
-            MirParam("map", map_type),
-            MirParam("key", ptr()),
-            MirParam("val", value_type),
-        ],
+        [MirParam("map", map_type), MirParam("key", ptr()), MirParam("val", value_type)],
         VOID,
     )
     map_val = ValueOperand(b.fn.params[0].value)
@@ -971,61 +1043,36 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
     old_data = b.load(ptr(), data_addr)
 
-    i_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    loop_check = b.new_block("loop_check")
-    loop_body = b.new_block("loop_body")
-    key_check = b.new_block("key_check")
+    pos = b.call("__ep_map_str_find_pos", [map_val, key_val], I64)
+    found = b.icmp("sge", ValueOperand(pos), b.const_i64(0))
     update = b.new_block("update")
-    next_block = b.new_block("next")
-    grow_check = b.new_block("grow_check")
-    grow = b.new_block("grow")
-    grow_zero = b.new_block("grow_zero")
-    grow_double = b.new_block("grow_double")
-    copy_init = b.new_block("copy_init")
-    copy_check = b.new_block("copy_check")
-    copy_body = b.new_block("copy_body")
-    swap = b.new_block("swap")
-    insert = b.new_block("insert")
-    b.br(loop_check)
-
-    b.set_block(loop_check)
-    i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(old_len))
-    b.condbr(ValueOperand(in_range), loop_body.name, grow_check.name)
-
-    b.set_block(loop_body)
-    entry = _map_entry_addr(b, ValueOperand(old_data), ValueOperand(i))
-    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
-    occ = b.load(I64, ValueOperand(occ_addr))
-    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
-
-    b.set_block(key_check)
-    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(), ValueOperand(key_addr))
-    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.condbr(ValueOperand(keys_equal), update.name, next_block.name)
+    insert_prep = b.new_block("insert_prep")
+    b.condbr(ValueOperand(found), update.name, insert_prep.name)
 
     b.set_block(update)
-    update_value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
+    update_entry = _map_entry_addr(b, ValueOperand(old_data), ValueOperand(pos))
+    update_value_addr = b.gep(ptr(), ValueOperand(update_entry), [b.const_i64(1)])
     b.store(val_val, ValueOperand(update_value_addr))
     b.ret()
 
-    b.set_block(next_block)
-    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
-    b.store(ValueOperand(next_i), ValueOperand(i_slot))
-    b.br(loop_check)
-
-    b.set_block(grow_check)
+    b.set_block(insert_prep)
+    insert_at_slot = b.alloca(I64)
+    neg_pos = b.binop("sub", b.const_i64(0), ValueOperand(pos))
+    insert_at = b.binop("sub", ValueOperand(neg_pos), b.const_i64(1))
+    b.store(ValueOperand(insert_at), ValueOperand(insert_at_slot))
     need_grow = b.icmp("sge", ValueOperand(old_len), ValueOperand(old_cap))
-    b.condbr(ValueOperand(need_grow), grow.name, insert.name)
+    grow = b.new_block("grow")
+    shift_init = b.new_block("shift_init")
+    b.condbr(ValueOperand(need_grow), grow.name, shift_init.name)
 
     b.set_block(grow)
     new_cap_slot = b.alloca(I64)
     new_data_slot = b.alloca(ptr())
     copy_i_slot = b.alloca(I64)
     cap_zero = b.icmp("eq", ValueOperand(old_cap), b.const_i64(0))
+    grow_zero = b.new_block("grow_zero")
+    grow_double = b.new_block("grow_double")
+    copy_init = b.new_block("copy_init")
     b.condbr(ValueOperand(cap_zero), grow_zero.name, grow_double.name)
 
     b.set_block(grow_zero)
@@ -1043,6 +1090,9 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     new_data = b.call("__epx_alloc", [ValueOperand(bytes_count)], ptr())
     b.store(ValueOperand(new_data), ValueOperand(new_data_slot))
     b.store(b.const_i64(0), ValueOperand(copy_i_slot))
+    copy_check = b.new_block("copy_check")
+    copy_body = b.new_block("copy_body")
+    swap = b.new_block("swap")
     b.br(copy_check)
 
     b.set_block(copy_check)
@@ -1066,11 +1116,48 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     b.store(ValueOperand(final_data), ValueOperand(data_addr))
     final_cap = b.load(I64, ValueOperand(new_cap_slot))
     b.store(ValueOperand(final_cap), ValueOperand(cap_addr))
-    b.br(insert)
+    b.br(shift_init)
 
-    b.set_block(insert)
+    b.set_block(shift_init)
     data = b.load(ptr(), ValueOperand(data_addr))
-    new_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(old_len))
+    j_slot = b.alloca(I64)
+    b.store(ValueOperand(old_len), ValueOperand(j_slot))
+    shift_check = b.new_block("shift_check")
+    shift_body = b.new_block("shift_body")
+    write_entry = b.new_block("write_entry")
+    b.br(shift_check)
+
+    b.set_block(shift_check)
+    j = b.load(I64, ValueOperand(j_slot))
+    insert_at_now = b.load(I64, ValueOperand(insert_at_slot))
+    should_shift = b.icmp("sgt", ValueOperand(j), ValueOperand(insert_at_now))
+    b.condbr(ValueOperand(should_shift), shift_body.name, write_entry.name)
+
+    b.set_block(shift_body)
+    j2 = b.load(I64, ValueOperand(j_slot))
+    src_index = b.binop("sub", ValueOperand(j2), b.const_i64(1))
+    src_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(src_index))
+    dst_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(j2))
+    src_key_addr = b.gep(ptr(), ValueOperand(src_entry), [b.const_i64(0)])
+    src_key = b.load(I64, ValueOperand(src_key_addr))
+    dst_key_addr = b.gep(ptr(), ValueOperand(dst_entry), [b.const_i64(0)])
+    b.store(ValueOperand(src_key), ValueOperand(dst_key_addr))
+    src_value_addr = b.gep(ptr(), ValueOperand(src_entry), [b.const_i64(1)])
+    src_value = b.load(I64, ValueOperand(src_value_addr))
+    dst_value_addr = b.gep(ptr(), ValueOperand(dst_entry), [b.const_i64(1)])
+    b.store(ValueOperand(src_value), ValueOperand(dst_value_addr))
+    src_occ_addr = b.gep(ptr(), ValueOperand(src_entry), [b.const_i64(2)])
+    src_occ = b.load(I64, ValueOperand(src_occ_addr))
+    dst_occ_addr = b.gep(ptr(), ValueOperand(dst_entry), [b.const_i64(2)])
+    b.store(ValueOperand(src_occ), ValueOperand(dst_occ_addr))
+    prev_j = b.binop("sub", ValueOperand(j2), b.const_i64(1))
+    b.store(ValueOperand(prev_j), ValueOperand(j_slot))
+    b.br(shift_check)
+
+    b.set_block(write_entry)
+    insert_at_final = b.load(I64, ValueOperand(insert_at_slot))
+    data_final = b.load(ptr(), ValueOperand(data_addr))
+    new_entry = _map_entry_addr(b, ValueOperand(data_final), ValueOperand(insert_at_final))
     new_key_addr = b.gep(ptr(), ValueOperand(new_entry), [b.const_i64(0)])
     b.store(key_val, ValueOperand(new_key_addr))
     new_value_addr = b.gep(ptr(), ValueOperand(new_entry), [b.const_i64(1)])
@@ -1083,9 +1170,8 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     return b.fn
 
 
-
 def emit_map_str_word_del(name: str, map_type) -> MirFunction:
-    """Delete a key from a str-keyed word map using swap-delete."""
+    """Delete a key from a sorted str-keyed word map by shifting entries left."""
     b = MirHelperBuilder(
         name,
         [MirParam("map", map_type), MirParam("key", ptr())],
@@ -1098,74 +1184,57 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
     old_len = b.load(I64, len_addr)
     data_addr = b.gep(ptr(), map_val, [b.const_i64(0)])
     data = b.load(ptr(), data_addr)
-
-    i_slot = b.alloca(I64)
-    b.store(b.const_i64(0), ValueOperand(i_slot))
-    loop_check = b.new_block("loop_check")
-    loop_body = b.new_block("loop_body")
-    key_check = b.new_block("key_check")
-    found = b.new_block("found")
-    copy_last = b.new_block("copy_last")
-    clear_last = b.new_block("clear_last")
-    next_block = b.new_block("next")
+    pos = b.call("__ep_map_str_find_pos", [map_val, key_val], I64)
+    found = b.icmp("sge", ValueOperand(pos), b.const_i64(0))
+    shift_init = b.new_block("shift_init")
     no = b.new_block("no")
-    b.br(loop_check)
+    b.condbr(ValueOperand(found), shift_init.name, no.name)
 
-    b.set_block(loop_check)
-    i = b.load(I64, ValueOperand(i_slot))
-    in_range = b.icmp("slt", ValueOperand(i), ValueOperand(old_len))
-    b.condbr(ValueOperand(in_range), loop_body.name, no.name)
-
-    b.set_block(loop_body)
-    entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
-    occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
-    occ = b.load(I64, ValueOperand(occ_addr))
-    occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
-
-    b.set_block(key_check)
-    key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    entry_key = b.load(ptr(), ValueOperand(key_addr))
-    keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.condbr(ValueOperand(keys_equal), found.name, next_block.name)
-
-    b.set_block(found)
+    b.set_block(shift_init)
     last_index = b.binop("sub", ValueOperand(old_len), b.const_i64(1))
-    same_entry = b.icmp("eq", ValueOperand(i), ValueOperand(last_index))
-    b.condbr(ValueOperand(same_entry), clear_last.name, copy_last.name)
+    i_slot = b.alloca(I64)
+    b.store(ValueOperand(pos), ValueOperand(i_slot))
+    shift_check = b.new_block("shift_check")
+    shift_body = b.new_block("shift_body")
+    clear_last = b.new_block("clear_last")
+    b.br(shift_check)
 
-    b.set_block(copy_last)
-    last_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
-    # Copy key/value/occupied as raw words so i64/bool/str variants share code.
-    last_key_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(0)])
-    last_key_word = b.load(I64, ValueOperand(last_key_addr))
-    cur_key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
-    b.store(ValueOperand(last_key_word), ValueOperand(cur_key_addr))
-    last_value_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(1)])
-    last_value_word = b.load(I64, ValueOperand(last_value_addr))
-    cur_value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
-    b.store(ValueOperand(last_value_word), ValueOperand(cur_value_addr))
-    last_occ_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(2)])
-    last_occ_word = b.load(I64, ValueOperand(last_occ_addr))
-    cur_occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
-    b.store(ValueOperand(last_occ_word), ValueOperand(cur_occ_addr))
-    b.br(clear_last)
+    b.set_block(shift_check)
+    i = b.load(I64, ValueOperand(i_slot))
+    keep_shifting = b.icmp("slt", ValueOperand(i), ValueOperand(last_index))
+    b.condbr(ValueOperand(keep_shifting), shift_body.name, clear_last.name)
+
+    b.set_block(shift_body)
+    i2 = b.load(I64, ValueOperand(i_slot))
+    src_index = b.binop("add", ValueOperand(i2), b.const_i64(1))
+    src_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(src_index))
+    dst_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i2))
+    src_key_addr = b.gep(ptr(), ValueOperand(src_entry), [b.const_i64(0)])
+    src_key = b.load(I64, ValueOperand(src_key_addr))
+    dst_key_addr = b.gep(ptr(), ValueOperand(dst_entry), [b.const_i64(0)])
+    b.store(ValueOperand(src_key), ValueOperand(dst_key_addr))
+    src_value_addr = b.gep(ptr(), ValueOperand(src_entry), [b.const_i64(1)])
+    src_value = b.load(I64, ValueOperand(src_value_addr))
+    dst_value_addr = b.gep(ptr(), ValueOperand(dst_entry), [b.const_i64(1)])
+    b.store(ValueOperand(src_value), ValueOperand(dst_value_addr))
+    src_occ_addr = b.gep(ptr(), ValueOperand(src_entry), [b.const_i64(2)])
+    src_occ = b.load(I64, ValueOperand(src_occ_addr))
+    dst_occ_addr = b.gep(ptr(), ValueOperand(dst_entry), [b.const_i64(2)])
+    b.store(ValueOperand(src_occ), ValueOperand(dst_occ_addr))
+    next_i = b.binop("add", ValueOperand(i2), b.const_i64(1))
+    b.store(ValueOperand(next_i), ValueOperand(i_slot))
+    b.br(shift_check)
 
     b.set_block(clear_last)
-    last_entry_for_clear = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
-    clear_key_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(0)])
+    last_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
+    clear_key_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(0)])
     b.store(b.const_i64(0), ValueOperand(clear_key_addr))
-    clear_value_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(1)])
+    clear_value_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(1)])
     b.store(b.const_i64(0), ValueOperand(clear_value_addr))
-    clear_occ_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(2)])
+    clear_occ_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(2)])
     b.store(b.const_i64(0), ValueOperand(clear_occ_addr))
     b.store(ValueOperand(last_index), ValueOperand(len_addr))
     b.ret(ConstBoolOperand(True))
-
-    b.set_block(next_block)
-    next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
-    b.store(ValueOperand(next_i), ValueOperand(i_slot))
-    b.br(loop_check)
 
     b.set_block(no)
     b.ret(ConstBoolOperand(False))
@@ -1193,6 +1262,8 @@ _HELPER_EMITTERS = {
     "__ep_slice_u8_push": lambda p: emit_slice_u8_push(),
     "__ep_slice_u8_slice": lambda p: emit_slice_u8_slice(),
     "__ep_slice_u8_extend": lambda p: emit_extend_slice_u8(),
+    "__ep_str_cmp": lambda p: emit___ep_str_cmp(),
+    "__ep_map_str_find_pos": lambda p: emit_map_str_find_pos(),
     "__ep_map_str_i64_new": lambda p: emit_map_str_word_new("__ep_map_str_i64_new", ptr()),
     "__ep_map_str_i64_get": lambda p: emit_map_str_word_get("__ep_map_str_i64_get", ptr(), I64),
     "__ep_map_str_i64_set": lambda p: emit_map_str_word_set("__ep_map_str_i64_set", ptr(), I64),
@@ -1228,6 +1299,8 @@ _HELPER_ORDER = [
     "__ep_slice_u8_push",
     "__ep_slice_u8_slice",
     "__ep_slice_u8_extend",
+    "__ep_str_cmp",
+    "__ep_map_str_find_pos",
     "__ep_map_str_i64_new",
     "__ep_map_str_i64_get",
     "__ep_map_str_i64_set",
