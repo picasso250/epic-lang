@@ -183,7 +183,9 @@ fun append_dos_stub(buf: u8[]): void {
     push(buf, u8(0))
     push(buf, u8(0))
     push(buf, u8(4))
-    append_zero(buf, 51)
+    append_zero(buf, 15)
+    push(buf, u8(64))
+    append_zero(buf, 35)
     push(buf, u8(120))
     push(buf, u8(0))
     push(buf, u8(0))
@@ -340,6 +342,56 @@ fun parse_strtab(st: LinkState, symtab_off: i64, nsyms: i64): void {
     st.strtab = copy_bytes(st.data, start, size)
 }
 
+fun ascii_lower_byte(b: u8): u8 {
+    if b >= u8(65) && b <= u8(90) {
+        return b + u8(32)
+    }
+    return b
+}
+
+fun import_less_casefold(a: str, b: str): bool {
+    let ab = bytes(a)
+    let bb = bytes(b)
+    let n = len(ab)
+    if len(bb) < n {
+        n = len(bb)
+    }
+    let i = 0
+    while i < n {
+        let ac = ascii_lower_byte(ab[i])
+        let bc = ascii_lower_byte(bb[i])
+        if ac < bc {
+            return true
+        }
+        if ac > bc {
+            return false
+        }
+        i += 1
+    }
+    return len(ab) < len(bb)
+}
+
+fun sorted_imports(items: str[]): str[] {
+    let out = new str[0]
+    for i in 0:len(items) {
+        let key = items[i]
+        let next = new str[0]
+        let inserted = false
+        for j in 0:len(out) {
+            if !inserted && import_less_casefold(key, out[j]) {
+                push(next, key)
+                inserted = true
+            }
+            push(next, out[j])
+        }
+        if !inserted {
+            push(next, key)
+        }
+        out = next
+    }
+    return out
+}
+
 fun collect_imports(st: LinkState): void {
     for i in 0:len(st.syms) {
         let sym = st.syms[i]
@@ -395,14 +447,29 @@ fun kernel32_hint(name: str): i64 {
     if name == "GetProcessHeap" {
         return 740
     }
+    if name == "GetStdHandle" {
+        return 805
+    }
+    if name == "GetTickCount64" {
+        return 846
+    }
     if name == "HeapAlloc" {
         return 892
+    }
+    if name == "lstrcmpA" {
+        return 985
+    }
+    if name == "lstrlenA" {
+        return 991
     }
     if name == "ReadFile" {
         return 1193
     }
     if name == "SetFilePointer" {
         return 1384
+    }
+    if name == "Sleep" {
+        return 1410
     }
     if name == "WaitForSingleObject" {
         return 1573
@@ -411,6 +478,74 @@ fun kernel32_hint(name: str): i64 {
         return 1632
     }
     return 0
+}
+
+fun is_user32_import(name: str): bool {
+    return name == "MessageBoxA"
+}
+
+fun import_user32_count(st: LinkState): i64 {
+    let n = 0
+    for i in 0:len(st.imports) {
+        if is_user32_import(st.imports[i]) {
+            n += 1
+        }
+    }
+    return n
+}
+
+fun import_kernel32_count(st: LinkState): i64 {
+    return len(st.imports) - import_user32_count(st)
+}
+
+fun import_dll_count(st: LinkState): i64 {
+    if import_user32_count(st) > 0 {
+        return 2
+    }
+    if len(st.imports) > 0 {
+        return 1
+    }
+    return 0
+}
+
+fun import_iat_dir_offset(st: LinkState): i64 {
+    let dlls = import_dll_count(st)
+    if dlls == 0 {
+        return 0
+    }
+    let off = (dlls + 1) * 20
+    off = align_to(off, 8)
+    let k = import_kernel32_count(st)
+    if k > 0 {
+        off += (k + 1) * 8
+    }
+    off = align_to(off, 8)
+    let u = import_user32_count(st)
+    if u > 0 {
+        off += (u + 1) * 8
+    }
+    off = align_to(off, 8)
+    return off
+}
+
+fun import_iat_dir_size(st: LinkState): i64 {
+    let size = 0
+    let k = import_kernel32_count(st)
+    if k > 0 {
+        size += (k + 1) * 8
+    }
+    let u = import_user32_count(st)
+    if u > 0 {
+        size += (u + 1) * 8
+    }
+    return size
+}
+
+fun import_hint(name: str): i64 {
+    if is_user32_import(name) {
+        return 0
+    }
+    return kernel32_hint(name)
 }
 
 fun find_section(st: LinkState, needle: str): Section {
@@ -458,47 +593,99 @@ fun build_idata(st: LinkState): void {
         return
     }
 
-    let ilt_off = 40
-    let table_size = len(st.imports) * 8 + 8
-    let iat_off = ilt_off + table_size
-    let hint_off = iat_off + table_size
-    let hint_blob = new u8[128]
+    let dll_count = import_dll_count(st)
+    let desc_size = (dll_count + 1) * 20
+    append_zero(st.idata, desc_size)
 
+    let k_count = import_kernel32_count(st)
+    let u_count = import_user32_count(st)
+    let k_ilt = 0
+    let u_ilt = 0
+    let k_iat = 0
+    let u_iat = 0
+    while len(st.idata) % 8 != 0 {
+        push(st.idata, u8(0))
+    }
+    if k_count > 0 {
+        k_ilt = len(st.idata)
+        append_zero(st.idata, (k_count + 1) * 8)
+    }
+    while len(st.idata) % 8 != 0 {
+        push(st.idata, u8(0))
+    }
+    if u_count > 0 {
+        u_ilt = len(st.idata)
+        append_zero(st.idata, (u_count + 1) * 8)
+    }
+    while len(st.idata) % 8 != 0 {
+        push(st.idata, u8(0))
+    }
+    if k_count > 0 {
+        k_iat = len(st.idata)
+        append_zero(st.idata, (k_count + 1) * 8)
+    }
+    while len(st.idata) % 8 != 0 {
+        push(st.idata, u8(0))
+    }
+    if u_count > 0 {
+        u_iat = len(st.idata)
+        append_zero(st.idata, (u_count + 1) * 8)
+    }
+
+    let ki = 0
+    let ui = 0
     for i in 0:len(st.imports) {
         let name = st.imports[i]
-        append_u16(hint_blob, kernel32_hint(name))
-        append_str(hint_blob, name)
-        push(hint_blob, u8(0))
-        if len(hint_blob) % 2 != 0 {
-            push(hint_blob, u8(0))
+        if !is_user32_import(name) {
+            let hint_rva = st.idata_rva + len(st.idata)
+            append_u16(st.idata, import_hint(name))
+            append_str(st.idata, name)
+            push(st.idata, u8(0))
+            if len(st.idata) % 2 != 0 {
+                push(st.idata, u8(0))
+            }
+            put_u64_le(st.idata, k_ilt + ki * 8, u64(hint_rva))
+            put_u64_le(st.idata, k_iat + ki * 8, u64(hint_rva))
+            put_name_value(st.iat_offsets, name, k_iat + ki * 8)
+            ki += 1
+        }
+    }
+    for i in 0:len(st.imports) {
+        let name = st.imports[i]
+        if is_user32_import(name) {
+            let hint_rva = st.idata_rva + len(st.idata)
+            append_u16(st.idata, import_hint(name))
+            append_str(st.idata, name)
+            push(st.idata, u8(0))
+            if len(st.idata) % 2 != 0 {
+                push(st.idata, u8(0))
+            }
+            put_u64_le(st.idata, u_ilt + ui * 8, u64(hint_rva))
+            put_u64_le(st.idata, u_iat + ui * 8, u64(hint_rva))
+            put_name_value(st.iat_offsets, name, u_iat + ui * 8)
+            ui += 1
         }
     }
 
-    let dll_off = hint_off + len(hint_blob)
-    append_u32(st.idata, st.idata_rva + ilt_off)
-    append_u32(st.idata, 0)
-    append_u32(st.idata, 0)
-    append_u32(st.idata, st.idata_rva + dll_off)
-    append_u32(st.idata, st.idata_rva + iat_off)
-    append_zero(st.idata, 20)
-
-    let hint_cursor = 0
-    for i in 0:len(st.imports) {
-        let name = st.imports[i]
-        append_u64(st.idata, st.idata_rva + hint_off + hint_cursor)
-        put_name_value(st.iat_offsets, name, iat_off + i * 8)
-        hint_cursor += hint_size(name)
+    let desc = 0
+    if k_count > 0 {
+        let dll_off = len(st.idata)
+        append_str(st.idata, "KERNEL32.dll")
+        push(st.idata, u8(0))
+        put_u32_le(st.idata, desc * 20, u64(st.idata_rva + k_ilt))
+        put_u32_le(st.idata, desc * 20 + 12, u64(st.idata_rva + dll_off))
+        put_u32_le(st.idata, desc * 20 + 16, u64(st.idata_rva + k_iat))
+        desc += 1
     }
-    append_u64(st.idata, 0)
-
-    for i in 0:len(st.imports) + 1 {
-        let val = u64_le(st.idata, ilt_off + i * 8)
-        append_u64(st.idata, i64(val))
+    if u_count > 0 {
+        let dll_off = len(st.idata)
+        append_str(st.idata, "USER32.dll")
+        push(st.idata, u8(0))
+        put_u32_le(st.idata, desc * 20, u64(st.idata_rva + u_ilt))
+        put_u32_le(st.idata, desc * 20 + 12, u64(st.idata_rva + dll_off))
+        put_u32_le(st.idata, desc * 20 + 16, u64(st.idata_rva + u_iat))
+        desc += 1
     }
-
-    extend(st.idata, hint_blob)
-    append_str(st.idata, "KERNEL32.dll")
-    push(st.idata, u8(0))
 }
 
 fun section_rva(st: LinkState, sec_index: i64): i64 {
@@ -651,15 +838,15 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
     append_u32(buf, 0)
     if len(st.idata) > 0 {
         append_u32(buf, st.idata_rva)
-        append_u32(buf, 40)
+        append_u32(buf, len(st.idata))
     } else {
         append_u32(buf, 0)
         append_u32(buf, 0)
     }
     append_zero(buf, 80)
     if len(st.idata) > 0 {
-        append_u32(buf, st.idata_rva + 40 + (len(st.imports) + 1) * 8)
-        append_u32(buf, (len(st.imports) + 1) * 8)
+        append_u32(buf, st.idata_rva + import_iat_dir_offset(st))
+        append_u32(buf, import_iat_dir_size(st))
     } else {
         append_u32(buf, 0)
         append_u32(buf, 0)
@@ -726,6 +913,7 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
     parse_symbols(st, symtab_off, nsyms)
     parse_strtab(st, symtab_off, nsyms)
     collect_imports(st)
+    st.imports = sorted_imports(st.imports)
     collect_relocs(st)
 
     let text_sec = find_section(st, "text")

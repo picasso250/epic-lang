@@ -1,48 +1,43 @@
 #!/usr/bin/env python3
-"""Build src/link.ep and use the resulting Epic linker on selected examples."""
+"""Self-hosted PE linker byte oracle tests."""
 
 from __future__ import annotations
 
-import os
+import contextlib
+import difflib
+import io
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "bootstrap"))
+
+from epic import compile_files  # noqa: E402
+
 EPICC = ROOT / "bootstrap" / "epic.py"
 LINK_SRC = ROOT / "src" / "link.ep"
 LINK_EXE = ROOT / "build" / "src" / "link.exe"
 OUT_DIR = ROOT / "build" / "link_ep"
-
-sys.path.insert(0, str(ROOT))
-import test_examples_py  # noqa: E402
-
-EXAMPLES = [
-    "m1_exit.ep",
-    "m2_expr.ep",
-    "m10_str.ep",
-    "m11_file.ep",
-    "m15_system.ep",
-    "m25_argv.ep",
-    "m26_write_file.ep",
-    "m30_str_cat.ep",
-    "m32_bytes_extend.ep",
-    "v1_byte_io_endian.ep",
-    "v2_map_str_i64.ep",
-    "v4_str_eq.ep",
-    "v5_zero_copy_str_bytes.ep",
-]
+PY_OUT_DIR = OUT_DIR / "py"
+EP_OUT_DIR = OUT_DIR / "ep"
+EXAMPLES_DIR = ROOT / "examples"
+AST_TO_MIR_PASS_DIR = ROOT / "tests" / "ast_to_mir" / "pass"
+EXAMPLE_CASES = sorted(EXAMPLES_DIR.glob("*.ep"))
+AST_TO_MIR_PASS_CASES = sorted(AST_TO_MIR_PASS_DIR.glob("*.ep"))
+USER_CASES = EXAMPLE_CASES + AST_TO_MIR_PASS_CASES
+EXPECTED_PASS = {path.relative_to(ROOT).as_posix() for path in USER_CASES}
 
 
-def run(cmd: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+def run(cmd: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
 
 
 def compile_linker() -> bool:
-    result = run([sys.executable, str(EPICC), str(LINK_SRC), "--linker", "py"])
+    result = run([sys.executable, str(EPICC), str(LINK_SRC), "--linker", "py"], timeout=60)
     if result.returncode != 0:
         print("  FAIL  compile src/link.ep")
-        print((result.stdout + result.stderr)[-2000:])
+        print((result.stdout + result.stderr)[-3000:])
         return False
     if not LINK_EXE.exists():
         print(f"  FAIL  missing linker exe: {LINK_EXE}")
@@ -51,78 +46,90 @@ def compile_linker() -> bool:
     return True
 
 
-def expected_exe_obj(ep_path: Path) -> tuple[Path, Path]:
-    rel = ep_path.relative_to(ROOT)
+def output_paths_for(source: Path, out_dir: Path) -> tuple[Path, Path, Path]:
+    rel = source.relative_to(ROOT)
     stem = rel.with_suffix("")
-    return ROOT / "build" / stem.with_suffix(".obj"), OUT_DIR / rel.with_suffix(".exe").name
+    asm = out_dir / stem.with_suffix(".asm")
+    obj = out_dir / stem.with_suffix(".obj")
+    exe = out_dir / stem.with_suffix(".exe")
+    return asm, obj, exe
 
 
-def run_one(name: str) -> bool:
-    ep_path = ROOT / "examples" / name
-    source = ep_path.read_text(encoding="utf-8")
-    exit_expected, stdout_expected, argv, clean_paths, compile_fail, compile_only = test_examples_py.parse_annotations(source)
-    if compile_fail is not None or compile_only:
-        print(f"  SKIP  {name:24s} unsupported annotation")
-        return True
+def compile_reference(source: Path) -> tuple[Path, Path]:
+    _, obj, exe = output_paths_for(source, PY_OUT_DIR)
+    obj.parent.mkdir(parents=True, exist_ok=True)
+    exe.parent.mkdir(parents=True, exist_ok=True)
+    for path in (obj, exe):
+        if path.exists():
+            path.unlink()
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        compile_files([str(source)], main_path=str(source), linker="py", out_dir=str(PY_OUT_DIR))
+    if not obj.exists() or not exe.exists():
+        raise RuntimeError(f"reference compile did not produce expected obj/exe for {source}")
+    return obj, exe
 
-    ok, detail = test_examples_py.run_test(str(ep_path), linker="py")
-    if not ok:
-        print(f"  FAIL  {name:24s} python compile baseline failed: {detail}")
-        return False
 
-    obj_path, exe_path = expected_exe_obj(ep_path)
-    if not obj_path.exists():
-        print(f"  FAIL  {name:24s} missing obj: {obj_path}")
-        return False
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    if exe_path.exists():
-        exe_path.unlink()
+def print_byte_diff(expected: bytes, actual: bytes) -> None:
+    expected_lines = [str(b) for b in expected]
+    actual_lines = [str(b) for b in actual]
+    for i, line in enumerate(difflib.unified_diff(expected_lines, actual_lines, fromfile="expected", tofile="actual", lineterm="")):
+        if i >= 120:
+            print("  ... diff truncated ...")
+            break
+        print(line)
 
-    link_result = run([str(LINK_EXE), str(obj_path), "-o", str(exe_path)], timeout=10)
+
+def run_one(source: Path) -> bool:
+    rel = source.relative_to(ROOT).as_posix()
+    obj, expected_exe = compile_reference(source)
+    actual_exe = EP_OUT_DIR / source.relative_to(ROOT).with_suffix(".exe")
+    actual_exe.parent.mkdir(parents=True, exist_ok=True)
+    if actual_exe.exists():
+        actual_exe.unlink()
+    link_result = run([str(LINK_EXE), str(obj), "-o", str(actual_exe)], timeout=15)
     if link_result.returncode != 0:
-        print(f"  FAIL  {name:24s} link.ep failed")
-        print((link_result.stdout + link_result.stderr)[-1000:])
+        print(f"  FAIL  {rel}")
+        print((link_result.stdout + link_result.stderr)[-2000:])
         return False
-    if not exe_path.exists():
-        print(f"  FAIL  {name:24s} link.ep produced no exe")
+    if not actual_exe.exists():
+        print(f"  FAIL  {rel} link.ep produced no exe")
         return False
-
-    try:
-        test_examples_py.clean_test_paths(clean_paths)
-        proc = subprocess.run([str(exe_path), *argv], cwd=ROOT, capture_output=True, timeout=test_examples_py.EXEC_TIMEOUT)
-    finally:
-        try:
-            test_examples_py.clean_test_paths(clean_paths)
-        except RuntimeError as exc:
-            print(f"  FAIL  {name:24s} clean failed: {exc}")
-            return False
-
-    failures: list[str] = []
-    if exit_expected is not None and proc.returncode != exit_expected:
-        failures.append(f"EXIT expected {exit_expected}, got {proc.returncode}")
-    if stdout_expected is not None:
-        actual = (proc.stdout or b"").decode("ascii", errors="replace").strip()[: len(stdout_expected) + 100]
-        if actual != stdout_expected.strip():
-            failures.append(f"STDOUT expected {stdout_expected!r}, got {actual!r}")
-    if failures:
-        print(f"  FAIL  {name:24s} {'; '.join(failures)}")
+    expected = expected_exe.read_bytes()
+    actual = actual_exe.read_bytes()
+    if expected != actual:
+        print(f"  FAIL  {rel}")
+        print_byte_diff(expected, actual)
         return False
-
-    print(f"  PASS  {name:24s} OK")
+    print(f"  PASS  {rel}")
     return True
 
 
 def main() -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    PY_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    EP_OUT_DIR.mkdir(parents=True, exist_ok=True)
     if not compile_linker():
         sys.exit(1)
     failed = 0
-    for name in EXAMPLES:
-        if not run_one(name):
+    passed = 0
+    for source in USER_CASES:
+        rel = source.relative_to(ROOT).as_posix()
+        should_pass = rel in EXPECTED_PASS
+        try:
+            ok = run_one(source)
+        except Exception as exc:
+            ok = False
+            print(f"  FAIL  {rel}")
+            print(f"        {exc}")
+        if ok:
+            passed += 1
+        elif should_pass:
             failed += 1
+    total = len(USER_CASES)
+    print(f"\nlink_ep examples: {passed}/{total} expected-pass, {failed} failed")
     if failed:
-        print(f"\nlink_ep: {failed} failed")
         sys.exit(1)
-    print(f"\nlink_ep: {len(EXAMPLES)} passed")
 
 
 if __name__ == "__main__":
