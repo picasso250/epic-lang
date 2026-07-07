@@ -6,7 +6,7 @@
 # STDOUT: 4
 fun main(): void {
     let i = 0
-    while i < 5 {
+    for i < 5 {
         println(str(i))
         i = i + 1
     }

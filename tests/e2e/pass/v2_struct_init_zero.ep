@@ -7,7 +7,7 @@ struct Box {
 fun main(): i64 {
     let b = new Box { n: 9 }
     if b.missing == 0 {
-        return b.n
+        ret b.n
     }
-    return 1
+    ret 1
 }

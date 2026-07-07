@@ -9,11 +9,11 @@ fun mir_runtime_die(msg: str): void {
 
 fun mir_runtime_has_global(program: MirProgram, name: str): bool {
     let i = 0
-    while i < len(program.globals) {
-        if program.globals[i].name == name { return true }
+    for i < len(program.globals) {
+        if program.globals[i].name == name { ret true }
         i = i + 1
     }
-    return false
+    ret false
 }
 
 fun mir_runtime_add_global(program: MirProgram, name: str, init: str): void {
@@ -21,40 +21,40 @@ fun mir_runtime_add_global(program: MirProgram, name: str, init: str): void {
 }
 
 fun mrt_starts_with(s: str, prefix: str): bool {
-    if len(s) < len(prefix) { return false }
-    return s[0:len(prefix)] == prefix
+    if len(s) < len(prefix) { ret false }
+    ret s[0:len(prefix)] == prefix
 }
 
 fun mrt_ends_with(s: str, suffix: str): bool {
-    if len(s) < len(suffix) { return false }
-    return s[len(s) - len(suffix):len(s)] == suffix
+    if len(s) < len(suffix) { ret false }
+    ret s[len(s) - len(suffix):len(s)] == suffix
 }
 
 fun mrt_trim(s: str): str {
     let bs = bytes(s)
     let start = 0
     let end = len(bs)
-    while start < end && (bs[start] == u8(32) || bs[start] == u8(9) || bs[start] == u8(13)) {
+    for start < end && (bs[start] == u8(32) || bs[start] == u8(9) || bs[start] == u8(13)) {
         start = start + 1
     }
-    while end > start && (bs[end - 1] == u8(32) || bs[end - 1] == u8(9) || bs[end - 1] == u8(13)) {
+    for end > start && (bs[end - 1] == u8(32) || bs[end - 1] == u8(9) || bs[end - 1] == u8(13)) {
         end = end - 1
     }
-    return s[start:end]
+    ret s[start:end]
 }
 
 fun mrt_find_from(s: str, needle: str, start: i64): i64 {
-    if len(needle) == 0 { return start }
+    if len(needle) == 0 { ret start }
     let i = start
-    while i + len(needle) <= len(s) {
-        if s[i:i + len(needle)] == needle { return i }
+    for i + len(needle) <= len(s) {
+        if s[i:i + len(needle)] == needle { ret i }
         i = i + 1
     }
-    return 0 - 1
+    ret 0 - 1
 }
 
 fun mrt_find(s: str, needle: str): i64 {
-    return mrt_find_from(s, needle, 0)
+    ret mrt_find_from(s, needle, 0)
 }
 
 fun mrt_split_lines(text: str): str[] {
@@ -62,7 +62,7 @@ fun mrt_split_lines(text: str): str[] {
     let bs = bytes(text)
     let start = 0
     let i = 0
-    while i < len(bs) {
+    for i < len(bs) {
         if bs[i] == u8(10) {
             let line = mrt_trim(text[start:i])
             if len(line) > 0 { push(out, line) }
@@ -74,7 +74,7 @@ fun mrt_split_lines(text: str): str[] {
         let line = mrt_trim(text[start:len(text)])
         if len(line) > 0 { push(out, line) }
     }
-    return out
+    ret out
 }
 
 fun mrt_split_commas(text: str): str[] {
@@ -82,7 +82,7 @@ fun mrt_split_commas(text: str): str[] {
     let bs = bytes(text)
     let start = 0
     let i = 0
-    while i < len(bs) {
+    for i < len(bs) {
         if bs[i] == u8(44) {
             push(out, mrt_trim(text[start:i]))
             start = i + 1
@@ -91,29 +91,29 @@ fun mrt_split_commas(text: str): str[] {
     }
     let last = mrt_trim(text[start:len(text)])
     if len(last) > 0 { push(out, last) }
-    return out
+    ret out
 }
 
 fun mrt_first_word(text: str): str {
     let s = mrt_trim(text)
     let sp = mrt_find(s, " ")
-    if sp < 0 { return s }
-    return s[0:sp]
+    if sp < 0 { ret s }
+    ret s[0:sp]
 }
 
 fun mrt_after_first_word(text: str): str {
     let s = mrt_trim(text)
     let sp = mrt_find(s, " ")
-    if sp < 0 { return "" }
-    return mrt_trim(s[sp + 1:len(s)])
+    if sp < 0 { ret "" }
+    ret mrt_trim(s[sp + 1:len(s)])
 }
 
 fun mrt_strip_trailing_comma(s: str): str {
     let t = mrt_trim(s)
     if len(t) > 0 && t[len(t) - 1:len(t)] == "," {
-        return t[0:len(t) - 1]
+        ret t[0:len(t) - 1]
     }
-    return t
+    ret t
 }
 
 fun mrt_parse_i64(s: str): i64 {
@@ -126,27 +126,27 @@ fun mrt_parse_i64(s: str): i64 {
         i = 1
     }
     let n = 0
-    while i < len(bs) {
+    for i < len(bs) {
         n = n * 10 + (i64(bs[i]) - 48)
         i = i + 1
     }
-    return n * sign
+    ret n * sign
 }
 
 fun mrt_is_int_text(s: str): bool {
     let t = mrt_trim(s)
     let bs = bytes(t)
-    if len(bs) == 0 { return false }
+    if len(bs) == 0 { ret false }
     let i = 0
     if bs[0] == u8(45) {
-        if len(bs) == 1 { return false }
+        if len(bs) == 1 { ret false }
         i = 1
     }
-    while i < len(bs) {
-        if bs[i] < u8(48) || bs[i] > u8(57) { return false }
+    for i < len(bs) {
+        if bs[i] < u8(48) || bs[i] > u8(57) { ret false }
         i = i + 1
     }
-    return true
+    ret true
 }
 
 fun mrt_parse_typed_operand(text: str): MirOperand {
@@ -154,21 +154,21 @@ fun mrt_parse_typed_operand(text: str): MirOperand {
     let typ = mrt_strip_trailing_comma(typ_raw)
     let value = mrt_after_first_word(text)
     if len(value) == 0 { mir_runtime_die(str_cat2("missing operand: ", text)) }
-    if value[0:1] == "%" { return mir_value_operand(typ, value[1:len(value)]) }
-    if value == "null" { return mir_operand_null() }
-    if value == "true" { return mir_const_bool(true) }
-    if value == "false" { return mir_const_bool(false) }
-    if mrt_is_int_text(value) { return mir_const_int(typ, mrt_parse_i64(value)) }
-    return mir_symbol_operand(typ, value)
+    if value[0:1] == "%" { ret mir_value_operand(typ, value[1:len(value)]) }
+    if value == "null" { ret mir_operand_null() }
+    if value == "true" { ret mir_const_bool(true) }
+    if value == "false" { ret mir_const_bool(false) }
+    if mrt_is_int_text(value) { ret mir_const_int(typ, mrt_parse_i64(value)) }
+    ret mir_symbol_operand(typ, value)
 }
 
 fun mrt_parse_params(text: str): MirParam[] {
     let out = new MirParam[0]
     let t = mrt_trim(text)
-    if len(t) == 0 { return out }
+    if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
     let i = 0
-    while i < len(parts) {
+    for i < len(parts) {
         let part = parts[i]
         let p = new MirParam
         p.typ = mrt_first_word(part)
@@ -178,20 +178,20 @@ fun mrt_parse_params(text: str): MirParam[] {
         push(out, p)
         i = i + 1
     }
-    return out
+    ret out
 }
 
 fun mrt_parse_operands(text: str): MirOperand[] {
     let out = new MirOperand[0]
     let t = mrt_trim(text)
-    if len(t) == 0 { return out }
+    if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
     let i = 0
-    while i < len(parts) {
+    for i < len(parts) {
         push(out, mrt_parse_typed_operand(parts[i]))
         i = i + 1
     }
-    return out
+    ret out
 }
 
 fun mrt_inst_with_result(inst: MirInst, result_name: str, result_type: str): MirInst {
@@ -200,7 +200,7 @@ fun mrt_inst_with_result(inst: MirInst, result_name: str, result_type: str): Mir
         inst.result_name = result_name
         inst.result_type = result_type
     }
-    return inst
+    ret inst
 }
 
 fun mrt_parse_inst(line: str): MirInst {
@@ -219,18 +219,18 @@ fun mrt_parse_inst(line: str): MirInst {
     }
 
     if mrt_starts_with(body, "alloca ") {
-        return mir_alloca(result_name, mrt_trim(body[7:len(body)]))
+        ret mir_alloca(result_name, mrt_trim(body[7:len(body)]))
     }
     if mrt_starts_with(body, "load ") {
         let rest = body[5:len(body)]
         let comma = mrt_find(rest, ",")
         if comma < 0 { mir_runtime_die(str_cat2("bad load: ", line)) }
-        return mir_load(result_name, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
+        ret mir_load(result_name, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "store ") {
         let ops = mrt_parse_operands(body[6:len(body)])
         if len(ops) != 2 { mir_runtime_die(str_cat2("bad store: ", line)) }
-        return mir_store(ops[0], ops[1])
+        ret mir_store(ops[0], ops[1])
     }
     if mrt_starts_with(body, "gep ") {
         let rest = body[4:len(body)]
@@ -240,7 +240,7 @@ fun mrt_parse_inst(line: str): MirInst {
         inst.op = "gep"
         inst.typ = mrt_trim(rest[0:comma])
         inst.operands = mrt_parse_operands(rest[comma + 1:len(rest)])
-        return mrt_inst_with_result(inst, result_name, result_type)
+        ret mrt_inst_with_result(inst, result_name, result_type)
     }
     if mrt_starts_with(body, "call ") {
         let rest = body[5:len(body)]
@@ -251,7 +251,7 @@ fun mrt_parse_inst(line: str): MirInst {
         if lp < 0 || rp < lp { mir_runtime_die(str_cat2("bad call: ", line)) }
         let callee = after_ret[0:lp]
         let args = mrt_parse_operands(after_ret[lp + 1:rp])
-        return mrt_inst_with_result(mir_call(callee, ret_type, args), result_name, result_type)
+        ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_name, result_type)
     }
     if mrt_starts_with(body, "ptrtoint ") {
         let rest = body[9:len(body)]
@@ -261,29 +261,29 @@ fun mrt_parse_inst(line: str): MirInst {
         inst.op = "ptrtoint"
         inst.typ = mrt_trim(rest[to_pos + 4:len(rest)])
         push(inst.operands, mrt_parse_typed_operand(rest[0:to_pos]))
-        return mrt_inst_with_result(inst, result_name, result_type)
+        ret mrt_inst_with_result(inst, result_name, result_type)
     }
     if mrt_starts_with(body, "not ") {
         let inst = mir_inst_empty()
         inst.op = "not"
         push(inst.operands, mrt_parse_typed_operand(body[4:len(body)]))
-        return mrt_inst_with_result(inst, result_name, result_type)
+        ret mrt_inst_with_result(inst, result_name, result_type)
     }
 
     let op = mrt_first_word(body)
     let inst = mir_inst_empty()
     inst.op = op
     inst.operands = mrt_parse_operands(mrt_after_first_word(body))
-    return mrt_inst_with_result(inst, result_name, result_type)
+    ret mrt_inst_with_result(inst, result_name, result_type)
 }
 
 fun mrt_is_terminator(line: str): bool {
-    return mrt_starts_with(line, "br ") || mrt_starts_with(line, "condbr ") || mrt_starts_with(line, "ret ")
+    ret mrt_starts_with(line, "br ") || mrt_starts_with(line, "condbr ") || mrt_starts_with(line, "ret ")
 }
 
 fun mrt_parse_terminator(line: str): MirTerminator {
     if mrt_starts_with(line, "br label %") {
-        return mir_br(line[10:len(line)])
+        ret mir_br(line[10:len(line)])
     }
     if mrt_starts_with(line, "condbr ") {
         let parts = mrt_split_commas(line[7:len(line)])
@@ -293,15 +293,15 @@ fun mrt_parse_terminator(line: str): MirTerminator {
         if !mrt_starts_with(then_part, "label %") || !mrt_starts_with(else_part, "label %") {
             mir_runtime_die(str_cat2("bad condbr labels: ", line))
         }
-        return mir_condbr(mrt_parse_typed_operand(parts[0]), then_part[7:len(then_part)], else_part[7:len(else_part)])
+        ret mir_condbr(mrt_parse_typed_operand(parts[0]), then_part[7:len(then_part)], else_part[7:len(else_part)])
     }
     if mrt_starts_with(line, "ret ") {
         let rest = line[4:len(line)]
-        if rest == "void" { return mir_ret_void() }
-        return mir_ret_value(mrt_parse_typed_operand(rest))
+        if rest == "void" { ret mir_ret_void() }
+        ret mir_ret_value(mrt_parse_typed_operand(rest))
     }
     mir_runtime_die(str_cat2("bad terminator: ", line))
-    return mir_ret_void()
+    ret mir_ret_void()
 }
 
 fun mrt_parse_function(text: str): MirFunction {
@@ -325,11 +325,11 @@ fun mrt_parse_function(text: str): MirFunction {
     let current = mir_block_empty("")
     let has_current = false
     let i = 1
-    while i < len(lines) {
+    for i < len(lines) {
         let line = lines[i]
         if line == "}" {
             if has_current { push(fn.blocks, current) }
-            return fn
+            ret fn
         }
         if mrt_ends_with(line, ":") {
             if has_current { push(fn.blocks, current) }
@@ -347,7 +347,7 @@ fun mrt_parse_function(text: str): MirFunction {
         i = i + 1
     }
     mir_runtime_die(str_cat2("missing closing brace: ", name))
-    return fn
+    ret fn
 }
 
 fun mir_runtime_helper_texts(): str[] {
@@ -386,7 +386,7 @@ fun mir_runtime_helper_texts(): str[] {
     push(out, "define ptr @__ep_str_cat(ptr %left, ptr %right) {\nentry:\n  %gep0: ptr = gep struct str, ptr %left, i64 0, i32 1\n  %load1: i64 = load i64, ptr %gep0\n  %gep2: ptr = gep struct str, ptr %right, i64 0, i32 1\n  %load3: i64 = load i64, ptr %gep2\n  %add4: i64 = add i64 %load1, i64 %load3\n  %call5: ptr = call ptr __epx_alloc(i64 24)\n  %add6: i64 = add i64 %add4, i64 1\n  %call7: ptr = call ptr __epx_alloc(i64 %add6)\n  %gep8: ptr = gep struct str, ptr %call5, i64 0, i32 0\n  store ptr %call7, ptr %gep8\n  %gep9: ptr = gep struct str, ptr %call5, i64 0, i32 1\n  store i64 %add4, ptr %gep9\n  %gep10: ptr = gep struct str, ptr %call5, i64 0, i32 2\n  store i64 %add4, ptr %gep10\n  %gep11: ptr = gep struct str, ptr %left, i64 0, i32 0\n  %load12: ptr = load ptr, ptr %gep11\n  %gep13: ptr = gep struct str, ptr %right, i64 0, i32 0\n  %load14: ptr = load ptr, ptr %gep13\n  %alloca15: ptr = alloca i64\n  store i64 0, ptr %alloca15\n  br label %left_check\n\nleft_check:\n  %load16: i64 = load i64, ptr %alloca15\n  %icmp_slt17: bool = icmp.slt i64 %load16, i64 %load1\n  condbr bool %icmp_slt17, label %left_body, label %right_init\n\nleft_body:\n  %gep18: ptr = gep i8, ptr %load12, i64 %load16\n  %load19: i8 = load i8, ptr %gep18\n  %gep20: ptr = gep i8, ptr %call7, i64 %load16\n  store i8 %load19, ptr %gep20\n  %add21: i64 = add i64 %load16, i64 1\n  store i64 %add21, ptr %alloca15\n  br label %left_check\n\nright_init:\n  store i64 0, ptr %alloca15\n  br label %right_check\n\nright_check:\n  %load22: i64 = load i64, ptr %alloca15\n  %icmp_slt23: bool = icmp.slt i64 %load22, i64 %load3\n  condbr bool %icmp_slt23, label %right_body, label %done\n\nright_body:\n  %gep24: ptr = gep i8, ptr %load14, i64 %load22\n  %load25: i8 = load i8, ptr %gep24\n  %add26: i64 = add i64 %load1, i64 %load22\n  %gep27: ptr = gep i8, ptr %call7, i64 %add26\n  store i8 %load25, ptr %gep27\n  %add28: i64 = add i64 %load22, i64 1\n  store i64 %add28, ptr %alloca15\n  br label %right_check\n\ndone:\n  %gep29: ptr = gep i8, ptr %call7, i64 %add4\n  store i8 0, ptr %gep29\n  ret ptr %call5\n}\n")
     push(out, "define i64 @__ep_str_cmp(ptr %left, ptr %right) {\nentry:\n  %gep0: ptr = gep struct str, ptr %left, i64 0, i32 0\n  %load1: ptr = load ptr, ptr %gep0\n  %gep2: ptr = gep struct str, ptr %left, i64 0, i32 1\n  %load3: i64 = load i64, ptr %gep2\n  %gep4: ptr = gep struct str, ptr %right, i64 0, i32 0\n  %load5: ptr = load ptr, ptr %gep4\n  %gep6: ptr = gep struct str, ptr %right, i64 0, i32 1\n  %load7: i64 = load i64, ptr %gep6\n  %alloca8: ptr = alloca i64\n  store i64 0, ptr %alloca8\n  br label %loop_check\n\nloop_check:\n  %load9: i64 = load i64, ptr %alloca8\n  %icmp_slt10: bool = icmp.slt i64 %load9, i64 %load3\n  condbr bool %icmp_slt10, label %check_right, label %left_done\n\ncheck_right:\n  %load11: i64 = load i64, ptr %alloca8\n  %icmp_slt12: bool = icmp.slt i64 %load11, i64 %load7\n  condbr bool %icmp_slt12, label %body, label %greater\n\nbody:\n  %load13: i64 = load i64, ptr %alloca8\n  %gep14: ptr = gep i8, ptr %load1, i64 %load13\n  %load15: i8 = load i8, ptr %gep14\n  %gep16: ptr = gep i8, ptr %load5, i64 %load13\n  %load17: i8 = load i8, ptr %gep16\n  %icmp_ult18: bool = icmp.ult i8 %load15, i8 %load17\n  condbr bool %icmp_ult18, label %less, label %check_gt\n\nleft_done:\n  %load21: i64 = load i64, ptr %alloca8\n  %icmp_slt22: bool = icmp.slt i64 %load21, i64 %load7\n  condbr bool %icmp_slt22, label %less, label %equal\n\nnext:\n  %add20: i64 = add i64 %load13, i64 1\n  store i64 %add20, ptr %alloca8\n  br label %loop_check\n\nless:\n  ret i64 -1\n\ngreater:\n  ret i64 1\n\nequal:\n  ret i64 0\n\nright_done:\n  ret i64 1\n\ncheck_gt:\n  %icmp_ugt19: bool = icmp.ugt i8 %load15, i8 %load17\n  condbr bool %icmp_ugt19, label %greater, label %next\n}\n")
     push(out, "define ptr @__ep_str_from_slice_u8(ptr %input) {\nentry:\n  ret ptr %input\n}\n")
-    return out
+    ret out
 }
 
 fun mir_inject_all_runtime_helpers(program: MirProgram): void {
@@ -395,7 +395,7 @@ fun mir_inject_all_runtime_helpers(program: MirProgram): void {
     mir_runtime_add_global(program, "str.runtime.empty", "")
     let texts = mir_runtime_helper_texts()
     let i = 0
-    while i < len(texts) {
+    for i < len(texts) {
         push(program.functions, mrt_parse_function(texts[i]))
         i = i + 1
     }

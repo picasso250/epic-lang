@@ -196,8 +196,6 @@ class Parser:
             return self.parse_let_stmt()
         if t[0] == "IF":
             return self.parse_if_stmt()
-        if t[0] == "WHILE":
-            return self.parse_while_stmt()
         if t[0] == "FOR":
             return self.parse_for_stmt()
         if t[0] == "BREAK":
@@ -298,21 +296,19 @@ class Parser:
                 else_block = self.parse_block()
         return IfNode(cond=cond, then_block=then_block, else_block=else_block)
 
-    def parse_while_stmt(self):
-        self.expect("WHILE")
+    def parse_for_stmt(self):
+        self.expect("FOR")
+        if self.peek_kind("ID") and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "IN":
+            name = self.expect("ID")
+            self.expect("IN")
+            start = self.parse_expr()
+            self.expect("COLON")
+            end = self.parse_expr()
+            body = self.parse_block()
+            return ForRangeNode(name=name[1], start=start, end=end, body=body)
         cond = self.parse_expr()
         body = self.parse_block()
         return WhileNode(cond=cond, body=body)
-
-    def parse_for_stmt(self):
-        self.expect("FOR")
-        name = self.expect("ID")
-        self.expect("IN")
-        start = self.parse_expr()
-        self.expect("COLON")
-        end = self.parse_expr()
-        body = self.parse_block()
-        return ForRangeNode(name=name[1], start=start, end=end, body=body)
 
     def parse_panic_stmt(self):
         t = self.expect("PANIC")

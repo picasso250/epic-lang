@@ -3,5 +3,5 @@ fun main(): i64 {
     for i in 0:4 {
         sum += i
     }
-    return sum
+    ret sum
 }

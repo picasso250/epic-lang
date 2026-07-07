@@ -1,7 +1,7 @@
 fun classify(n: i64): i64 {
     match n {
-        0: { return 10 }
-        1: { return 20 }
-        else: { return }
+        0: { ret 10 }
+        1: { ret 20 }
+        else: { ret }
     }
 }

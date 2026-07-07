@@ -7,15 +7,15 @@ struct Pair32 {
 }
 
 fun ret_i32(x: i64): i32 {
-    return i32(x)
+    ret i32(x)
 }
 
 fun ret_u32(x: i64): u32 {
-    return u32(x)
+    ret u32(x)
 }
 
 fun takes_i64(x: i64): i64 {
-    return x
+    ret x
 }
 
 fun main(): i64 {
@@ -30,37 +30,37 @@ fun main(): i64 {
     let ys = new u32[] { u32(0), u32(4294967295) }
 
     if lo != i32(0 - 2147483647 - 1) {
-        return 1
+        ret 1
     }
     if hi != i32(2147483647) {
-        return 2
+        ret 2
     }
     if zero != u32(0) {
-        return 3
+        ret 3
     }
     if umax != u32(4294967295) {
-        return 4
+        ret 4
     }
     if p.a != i32(-1) {
-        return 5
+        ret 5
     }
     if p.b != u32(4294967295) {
-        return 6
+        ret 6
     }
     if xs[0] != i32(-1) {
-        return 7
+        ret 7
     }
     if ys[1] != u32(4294967295) {
-        return 8
+        ret 8
     }
     if ret_i32(7) != i32(7) {
-        return 9
+        ret 9
     }
     if i64(ret_u32(8)) != takes_i64(8) {
-        return 10
+        ret 10
     }
 
     os.kernel32.Sleep(i64(u32(0)))
     print("ok")
-    return 0
+    ret 0
 }

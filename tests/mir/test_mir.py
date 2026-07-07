@@ -167,7 +167,7 @@ fun main(): i64 {
     let p = new Point { y: 2, x: 1 }
     let xs = new i64[] { 4 }
     push(xs, 5)
-    return xs[0]
+    ret xs[0]
 }
 """
     program = ast_to_mir(sema.analyze_program(Parser(lex(source)).parse_program()))
@@ -264,7 +264,7 @@ def test_mir_helper_injection():
     # i64[] reads use __ep_slice_i64_get, not __epic_slice_i64_get
     src_i64 = """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
-    return xs[1]
+    ret xs[1]
 }"""
     ast_i64 = sema.analyze_program(Parser(lex(src_i64)).parse_program())
     prog_i64 = ast_to_mir(ast_i64)
@@ -284,7 +284,7 @@ def test_mir_helper_injection():
     src_i64_set = """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
     xs[0] = 99
-    return xs[0]
+    ret xs[0]
 }"""
     ast_i64_set = sema.analyze_program(Parser(lex(src_i64_set)).parse_program())
     prog_i64_set = ast_to_mir(ast_i64_set)
@@ -308,7 +308,7 @@ def test_mir_helper_injection():
     check(
         """fun main(): i64 {
     let b = bytes("AB")
-    return 0
+    ret 0
 }"""
     )
 
@@ -317,7 +317,7 @@ def test_mir_helper_injection():
     parsed_prog = check(
         """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
-    return xs[1]
+    ret xs[1]
 }"""
     )
     parsed_fn = next(fn for fn in parsed_prog.functions if fn.name == "__ep_slice_i64_get")
@@ -327,21 +327,21 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let a = new u8[] { u8(65) }
     println(str(a))
-    return 0
+    ret 0
 }"""
     )
 
     check(
         """fun main(): i64 {
     let a = new u8[] { u8(1), u8(2) }
-    return 0
+    ret 0
 }"""
     )
 
     check(
         """fun main(): i64 {
     let b = new u8[] { u8(1), u8(2) }
-    return i64(b[0])
+    ret i64(b[0])
 }"""
     )
 
@@ -349,7 +349,7 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let b = new u8[] { u8(1), u8(2) }
     push(b, u8(3))
-    return len(b)
+    ret len(b)
 }"""
     )
 
@@ -357,7 +357,7 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let b = new u8[] { u8(1), u8(2), u8(3) }
     let c = b[1:3]
-    return len(c)
+    ret len(c)
 }"""
     )
 
@@ -366,16 +366,16 @@ def test_mir_helper_injection():
     let a = new u8[] { u8(1), u8(2) }
     let b = new u8[] { u8(3), u8(4) }
     extend(a, b)
-    return len(a)
+    ret len(a)
 }"""
     )
 
     check(
         """fun main(): i64 {
     if "epic" == "epic" {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }"""
     )
 
@@ -383,7 +383,7 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     println(str(true))
     println(str(false))
-    return 0
+    ret 0
 }"""
     )
 
@@ -391,7 +391,7 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let s = "epic-lang"
     let t = s[5:9]
-    return len(t)
+    ret len(t)
 }"""
     )
 
@@ -399,7 +399,7 @@ def test_mir_helper_injection():
     src = """fun main(): i64 {
     let b = new u8[] { u8(65), u8(66) }
     b[0] = u8(99)
-    return i64(b[0])
+    ret i64(b[0])
 }"""
     ast = sema.analyze_program(Parser(lex(src)).parse_program())
     prog1 = ast_to_mir(ast)
@@ -415,12 +415,12 @@ def test_runtime_source_str_eq_lowers_as_epic_function():
     runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
     user_src = """fun main(): i64 {
     if "epic" == "epic" {
-        return 1
+        ret 1
     }
     if "epic" != "lang" {
-        return 2
+        ret 2
     }
-    return 0
+    ret 0
 }"""
     ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
     prog = ast_to_mir(sema.analyze_program(ast))

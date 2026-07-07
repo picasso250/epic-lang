@@ -38,6 +38,6 @@ fun main(): i64 {
     assert(s.names["a"] == "")
 
     println("ok")
-    return 0
+    ret 0
 }
 

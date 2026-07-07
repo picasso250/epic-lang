@@ -14,11 +14,11 @@ struct Holder {
 }
 
 fun add(a: i64, b: i64): i64 {
-    return a + b
+    ret a + b
 }
 
 fun make_point(x: i64, y: i64, label: str): Point {
-    return new Point { x: x, y: y, label: label }
+    ret new Point { x: x, y: y, label: label }
 }
 
 fun use_scalars(): i64 {
@@ -40,9 +40,9 @@ fun use_scalars(): i64 {
     let cmp = sum == shifted || sum != bits && sum < bits || sum <= bits && bits > 0 || bits >= 0
     let logic = ok && !no || converted_bool
     if logic {
-        return add(sum, bits)
+        ret add(sum, bits)
     }
-    return i64(byte)
+    ret i64(byte)
 }
 
 fun use_arrays_and_strings(): i64 {
@@ -64,7 +64,7 @@ fun use_arrays_and_strings(): i64 {
     xs[0] = add(xs[1], xs[2])
     xs[1] += 1
     println(f"{again} {sub} {bsub} {b0}")
-    return n + c + xs[0]
+    ret n + c + xs[0]
 }
 
 fun use_structs_and_maps(): i64 {
@@ -80,9 +80,9 @@ fun use_structs_and_maps(): i64 {
     let has_one = map_has(m, "one")
     let removed = map_del(m, "missing")
     if has_one && !removed {
-        return m["two"] + h.count
+        ret m["two"] + h.count
     }
-    return 0
+    ret 0
 }
 
 fun use_control(limit: i64): i64 {
@@ -96,18 +96,18 @@ fun use_control(limit: i64): i64 {
         }
         total += i
     }
-    while total < 10 {
+    for total < 10 {
         total += 1
     }
     match total {
         0: {
-            return 0
+            ret 0
         }
         10: {
-            return total
+            ret total
         }
         else: {
-            return total + 1
+            ret total + 1
         }
     }
 }
@@ -120,5 +120,5 @@ fun main(): void {
     assert a >= 0, "a"
     assert b >= 0
     println(str(a + b + c + d))
-    return
+    ret
 }

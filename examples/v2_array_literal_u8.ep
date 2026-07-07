@@ -1,5 +1,5 @@
 # EXIT: 66
 fun main(): i64 {
     let bs = new u8[] { u8(65), u8(66) }
-    return i64(bs[1])
+    ret i64(bs[1])
 }

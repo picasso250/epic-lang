@@ -6,5 +6,5 @@ struct Point {
 
 fun main(): i64 {
     let p = new Point { y: 40, x: 2 }
-    return p.x + p.y
+    ret p.x + p.y
 }

@@ -4,10 +4,10 @@ fun main(): i64 {
     let ids = new map[str]i64
 
     if ids["main"] != 0 {
-        return 1
+        ret 1
     }
     if map_has(ids, "main") {
-        return 2
+        ret 2
     }
 
     ids["main"] = 1
@@ -15,24 +15,24 @@ fun main(): i64 {
     ids["main"] = ids["main"] + 100
 
     if ids["main"] != 101 {
-        return 3
+        ret 3
     }
     if map_has(ids, "main") == false {
-        return 4
+        ret 4
     }
     if ids["zero"] != 0 {
-        return 5
+        ret 5
     }
     if map_has(ids, "zero") == false {
-        return 6
+        ret 6
     }
 
     let more = new map[str]i64
     more["later"] = 7
     if more["later"] != 7 {
-        return 7
+        ret 7
     }
 
     print(str(ids["main"]))
-    return 0
+    ret 0
 }

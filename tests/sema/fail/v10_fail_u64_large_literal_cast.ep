@@ -2,5 +2,5 @@
 
 fun main(): i64 {
     let x: u64 = u64(18446744073709551615)
-    return i64(x)
+    ret i64(x)
 }

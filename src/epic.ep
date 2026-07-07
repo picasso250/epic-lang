@@ -9,11 +9,11 @@ fun epic_die(msg: str): void {
 }
 
 fun epic_obj_path(exe_path: str): str {
-    return str_cat2(exe_path, ".obj")
+    ret str_cat2(exe_path, ".obj")
 }
 
 fun epic_now_ms(): i64 {
-    return os.kernel32.GetTickCount64()
+    ret os.kernel32.GetTickCount64()
 }
 
 fun epic_timing(label: str, start: i64, stop: i64): void {
@@ -24,23 +24,23 @@ fun epic_parse_file(path: str): AstNode {
     let src = str(read_file(cstr_ready_path(path)))
     let tokens = lex(src)
     let p = make_parser(tokens)
-    return parse_program(p)
+    ret parse_program(p)
 }
 
 fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
     let merged = ast_node("Program")
     let found_main = false
     let i = 0
-    while i < len(input_paths) {
+    for i < len(input_paths) {
         let ast = epic_parse_file(input_paths[i])
         let is_main = input_paths[i] == main_path
         let si = 0
-        while si < len(ast.structs) {
+        for si < len(ast.structs) {
             push(merged.structs, ast.structs[si])
             si = si + 1
         }
         let fi = 0
-        while fi < len(ast.funcs) {
+        for fi < len(ast.funcs) {
             if ast.funcs[fi].name == "main" {
                 if is_main {
                     push(merged.funcs, ast.funcs[fi])
@@ -56,12 +56,12 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
     if !found_main {
         epic_die(str_cat2("main file has no main function: ", main_path))
     }
-    return merged
+    ret merged
 }
 
 fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
     let i = 0
-    while i < len(bs) {
+    for i < len(bs) {
         push(out, i64(bs[i]))
         i = i + 1
     }
@@ -87,7 +87,7 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
     epic_push_bytes_i64(null_deref, bytes("runtime trap: null deref"))
     x64_add_data_bytes(x64, "_trap_null_deref", null_deref)
     let i = 0
-    while i < len(program.globals) {
+    for i < len(program.globals) {
         if program.globals[i].has_init {
             let values = new i64[0]
             epic_push_bytes_i64(values, bytes(program.globals[i].init))
@@ -117,7 +117,7 @@ fun epic_lower_program(program: MirProgram): X64Program {
 
     let funcs_start = epic_now_ms()
     let i = 0
-    while i < len(program.functions) {
+    for i < len(program.functions) {
         mir_to_x64_lower_function_with_lower(lower, program.functions[i])
         i = i + 1
     }
@@ -133,7 +133,7 @@ fun epic_lower_program(program: MirProgram): X64Program {
     println(f"  timing: lower function parts: plan={lower.timing_plan_slots} ms prologue={lower.timing_prologue} ms params={lower.timing_params} ms insts={lower.timing_insts} ms terms={lower.timing_terms} ms epilogue={lower.timing_epilogue} ms")
     println(f"  timing: lower counts: functions={len(program.functions)} lowered_functions={lower.timing_functions} blocks={lower.timing_blocks} instructions={lower.timing_instructions} globals={len(program.globals)} struct_fields={len(program.struct_fields)} x64_items={len(lower.x64.items)}")
     epic_timing("lower total inner", start, stop)
-    return lower.x64
+    ret lower.x64
 }
 fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     let total_start = epic_now_ms()
@@ -190,7 +190,7 @@ fun main(): i64 {
     let main_path = ""
     let exe_path = ""
     let i = 1
-    while i < len(argv) {
+    for i < len(argv) {
         if argv[i] == "--main" {
             if i + 1 >= len(argv) {
                 epic_die("--main needs a path")
@@ -210,7 +210,7 @@ fun main(): i64 {
     }
     if len(inputs) == 0 {
         println("usage: epic <runtime-and-source.ep...> --main <main.ep> -o <out.exe>")
-        return 1
+        ret 1
     }
     if len(main_path) == 0 {
         main_path = inputs[len(inputs) - 1]
@@ -219,5 +219,5 @@ fun main(): i64 {
         epic_die("-o is required for the self-hosted test driver")
     }
     epic_compile(inputs, main_path, exe_path)
-    return 0
+    ret 0
 }

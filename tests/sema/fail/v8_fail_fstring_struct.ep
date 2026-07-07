@@ -6,6 +6,6 @@ struct Val {
 
 fun main(): i64 {
     println(f"value {new Val { val: 3 }}")
-    return 0
+    ret 0
 }
 

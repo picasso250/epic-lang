@@ -2,5 +2,5 @@
 
 fun main(): i64 {
     print()
-    return 0
+    ret 0
 }

@@ -4,11 +4,11 @@
 fun main(): i64 {
     let xs = new i64[]
     if false && xs[0] == 1 {
-        return 1
+        ret 1
     }
     if true || xs[0] == 1 {
         println("ok")
-        return 0
+        ret 0
     }
-    return 2
+    ret 2
 }

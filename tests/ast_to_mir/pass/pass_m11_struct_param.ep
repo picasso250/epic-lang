@@ -4,10 +4,10 @@ struct Pair {
 }
 
 fun sum(p: Pair): i64 {
-    return p.a + p.b
+    ret p.a + p.b
 }
 
 fun main(): i64 {
     let p = new Pair { a: 4, b: 5 }
-    return sum(p)
+    ret sum(p)
 }

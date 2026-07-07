@@ -3,5 +3,5 @@
 fun main(): i64 {
     let y = 1
     let x: i32 = y
-    return x
+    ret x
 }

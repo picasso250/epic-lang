@@ -2,23 +2,23 @@
 
 fun choose(n: i64): i64 {
     if n == 0 {
-        return 2
+        ret 2
     } else {
-        return 3
+        ret 3
     }
 }
 
 fun classify(n: i64): i64 {
     match n {
         0: {
-            return 5
+            ret 5
         }
         else: {
-            return 7
+            ret 7
         }
     }
 }
 
 fun main(): i64 {
-    return choose(0) + classify(1) - 9
+    ret choose(0) + classify(1) - 9
 }

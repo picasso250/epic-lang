@@ -7,10 +7,9 @@ import re
 
 TOKEN_SPEC = [
     ("FUN",       r'\bfun\b'),
-    ("RETURN",    r'\breturn\b'),
+    ("RETURN",    r'\bret\b'),
     ("IF",        r'\bif\b'),
     ("ELSE",      r'\belse\b'),
-    ("WHILE",     r'\bwhile\b'),
     ("FOR",       r'\bfor\b'),
     ("IN",        r'\bin\b'),
     ("TYPE",      r'\btype\b'),

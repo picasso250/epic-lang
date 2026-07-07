@@ -48,7 +48,7 @@ struct Parser {
 fun ast_empty(): AstNode {
     let n = new AstNode
     n.kind = ""
-    return n
+    ret n
 }
 
 fun ast_node(kind: str): AstNode {
@@ -82,7 +82,7 @@ fun ast_node(kind: str): AstNode {
     n.start = ast_empty()
     n.end = ast_empty()
     n.count = ast_empty()
-    return n
+    ret n
 }
 
 fun make_parser(tokens: Token[]): Parser {
@@ -96,64 +96,64 @@ fun make_parser(tokens: Token[]): Parser {
     p.eof.text = ""
     p.eof.dump_text = ""
     p.eof.line = 0
-    return p
+    ret p
 }
 
 fun is_upper_name(name: str): i64 {
     if len(name) == 0 {
-        return 0
+        ret 0
     }
     let bs = bytes(name)
     let c = bs[0]
     if c >= u8(65) && c <= u8(90) {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun parser_is_reserved_func(name: str): bool {
     let reserved = new map[str]bool { "len": true, "cap": true, "push": true, "extend": true, "bytes": true, "str": true, "map_has": true }
-    return map_has(reserved, name)
+    ret map_has(reserved, name)
 }
 
 fun peek(p: Parser): Token {
     if p.pos < len(p.tokens) {
-        return p.tokens[p.pos]
+        ret p.tokens[p.pos]
     }
-    return p.eof
+    ret p.eof
 }
 
 fun peek_kind(p: Parser, kind: str): i64 {
     let t = peek(p)
     if t.kind == kind {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun peek_empty_braces(p: Parser): i64 {
     if peek_kind(p, "LBRACE") == 0 {
-        return 0
+        ret 0
     }
     let i = p.pos + 1
-    while i < len(p.tokens) && p.tokens[i].kind == "NEWLINE" {
+    for i < len(p.tokens) && p.tokens[i].kind == "NEWLINE" {
         i += 1
     }
     if i < len(p.tokens) && p.tokens[i].kind == "RBRACE" {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun advance(p: Parser): Token {
     let t = peek(p)
     p.pos += 1
-    return t
+    ret t
 }
 
 fun parse_error(line: i64, msg: str): i64 {
     panic str_cat2(str_cat2("Parse error line ", str(line)), str_cat2(": ", msg))
-    return 1
+    ret 1
 }
 
 fun expect(p: Parser, kind: str): Token {
@@ -161,35 +161,35 @@ fun expect(p: Parser, kind: str): Token {
     if t.kind != kind {
         panic f"Parse error line {t.line}: Expected {kind}, got {t.kind}('{t.text}')"
     }
-    return t
+    ret t
 }
 
 fun check(p: Parser, kind: str): i64 {
     if peek_kind(p, kind) == 1 {
         advance(p)
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun skip_newlines(p: Parser): i64 {
-    while peek_kind(p, "NEWLINE") == 1 {
+    for peek_kind(p, "NEWLINE") == 1 {
         advance(p)
     }
-    return 0
+    ret 0
 }
 
 fun expect_stmt_end(p: Parser): i64 {
     if check(p, "NEWLINE") == 1 {
         skip_newlines(p)
-        return 0
+        ret 0
     }
     if peek_kind(p, "RBRACE") == 1 {
-        return 0
+        ret 0
     }
     let t = peek(p)
     parse_error(t.line, "Expected end of line")
-    return 1
+    ret 1
 }
 
 fun parse_type(p: Parser): str {
@@ -205,24 +205,24 @@ fun parse_type(p: Parser): str {
         }
         expect(p, "RBRACKET")
         let value_type = parse_type(p)
-        return str_cat2("map[str]", value_type)
+        ret str_cat2("map[str]", value_type)
     }
     let buf = make_str_buf()
     str_buf_extend(buf, t.text)
-    while check(p, "LBRACKET") == 1 {
+    for check(p, "LBRACKET") == 1 {
         expect(p, "RBRACKET")
         str_buf_extend(buf, "[]")
     }
-    return str_buf_finish(buf)
+    ret str_buf_finish(buf)
 }
 
 fun parse_params(p: Parser): AstNode[] {
     let params = new AstNode[0]
     if peek_kind(p, "ID") == 0 {
-        return params
+        ret params
     }
     let done = 0
-    while done == 0 {
+    for done == 0 {
         let pname = expect(p, "ID")
         expect(p, "COLON")
         let ptype = parse_type(p)
@@ -234,7 +234,7 @@ fun parse_params(p: Parser): AstNode[] {
             done = 1
         }
     }
-    return params
+    ret params
 }
 
 fun parse_struct_def(p: Parser): AstNode {
@@ -244,7 +244,7 @@ fun parse_struct_def(p: Parser): AstNode {
     node.name = name.text
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         let fname = expect(p, "ID")
         expect(p, "COLON")
         let ftype = parse_type(p)
@@ -255,7 +255,7 @@ fun parse_struct_def(p: Parser): AstNode {
         push(node.fields, field)
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun parse_fn_def(p: Parser): AstNode {
@@ -276,13 +276,13 @@ fun parse_fn_def(p: Parser): AstNode {
     node.type_name = ret_type
     node.body = body
     node.line = name.line
-    return node
+    ret node
 }
 
 fun parse_program(p: Parser): AstNode {
     let node = ast_node("Program")
     skip_newlines(p)
-    while peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 {
+    for peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
@@ -294,14 +294,14 @@ fun parse_program(p: Parser): AstNode {
         let t = peek(p)
         parse_error(t.line, "Unexpected token at top level")
     }
-    return node
+    ret node
 }
 
 fun parse_block(p: Parser): AstNode {
     let node = ast_node("Block")
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         if peek_kind(p, "EOF") == 1 {
             let t = peek(p)
             parse_error(t.line, "Unexpected end of file in block")
@@ -310,13 +310,13 @@ fun parse_block(p: Parser): AstNode {
         skip_newlines(p)
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     let depth = 1
     i += 1
-    while i < len(p.tokens) && depth > 0 {
+    for i < len(p.tokens) && depth > 0 {
         let kind = p.tokens[i].kind
         if kind == "LBRACKET" {
             depth += 1
@@ -325,19 +325,19 @@ fun skip_balanced_brackets(p: Parser, i: i64): i64 {
         }
         i += 1
     }
-    return i
+    ret i
 }
 
 fun is_assignment(p: Parser): i64 {
     if peek_kind(p, "ID") == 0 {
-        return 0
+        ret 0
     }
     let i = p.pos + 1
-    while i < len(p.tokens) {
+    for i < len(p.tokens) {
         let kind = p.tokens[i].kind
         if kind == "DOT" {
             if i + 1 >= len(p.tokens) || p.tokens[i + 1].kind != "ID" {
-                return 0
+                ret 0
             }
             i += 2
         } else {
@@ -345,18 +345,18 @@ fun is_assignment(p: Parser): i64 {
                 i = skip_balanced_brackets(p, i)
             } else {
                 if is_assignment_op_kind(kind) == 1 {
-                    return 1
+                    ret 1
                 }
-                return 0
+                ret 0
             }
         }
     }
-    return 0
+    ret 0
 }
 
 fun parse_return_stmt(p: Parser): AstNode {
-    let ret = peek(p)
-    let line = ret.line
+    let tok = peek(p)
+    let line = tok.line
     expect(p, "RETURN")
     let node = ast_node("Return")
     if peek_kind(p, "NEWLINE") == 0 {
@@ -366,7 +366,7 @@ fun parse_return_stmt(p: Parser): AstNode {
     }
     node.line = line
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun parse_let_stmt(p: Parser): AstNode {
@@ -381,7 +381,7 @@ fun parse_let_stmt(p: Parser): AstNode {
         node.value_expr = parse_expr(p)
     }
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun parse_assign_stmt(p: Parser): AstNode {
@@ -390,7 +390,7 @@ fun parse_assign_stmt(p: Parser): AstNode {
     lhs.name = name.text
     lhs.line = name.line
     let done = 0
-    while done == 0 {
+    for done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
             let n = ast_node("FieldAccess")
@@ -419,30 +419,30 @@ fun parse_assign_stmt(p: Parser): AstNode {
         node.op = op
         node.value_expr = value
         node.line = op_token.line
-        return node
+        ret node
     }
     if lhs.kind == "Var" {
         let node = ast_node("Assign")
         node.name = lhs.name
         node.value_expr = value
-        return node
+        ret node
     }
     if lhs.kind == "FieldAccess" {
         let node = ast_node("FieldSet")
         node.object = lhs.object
         node.name = lhs.name
         node.value_expr = value
-        return node
+        ret node
     }
     if lhs.kind == "Subscript" {
         let node = ast_node("SubscriptAssign")
         node.base = lhs.base
         node.index = lhs.index
         node.value_expr = value
-        return node
+        ret node
     }
     parse_error(name.line, "Invalid assignment target")
-    return ast_empty()
+    ret ast_empty()
 }
 
 fun parse_bracket_postfix(p: Parser, base: AstNode): AstNode {
@@ -463,14 +463,14 @@ fun parse_bracket_postfix(p: Parser, base: AstNode): AstNode {
         n.end = parse_expr(p)
         n.line = base.line
         expect(p, "RBRACKET")
-        return n
+        ret n
     }
     n = ast_node("Subscript")
     n.base = base
     n.index = first
     n.line = base.line
     expect(p, "RBRACKET")
-    return n
+    ret n
 }
 
 fun parse_if_stmt(p: Parser): AstNode {
@@ -489,17 +489,7 @@ fun parse_if_stmt(p: Parser): AstNode {
             node.else_block = parse_block(p)
         }
     }
-    return node
-}
-
-fun parse_while_stmt(p: Parser): AstNode {
-    expect(p, "WHILE")
-    let node = ast_node("While")
-    node.expr = parse_expr(p)
-    p.loop_depth += 1
-    node.body = parse_block(p)
-    p.loop_depth -= 1
-    return node
+    ret node
 }
 
 fun parse_break_stmt(p: Parser): AstNode {
@@ -510,7 +500,7 @@ fun parse_break_stmt(p: Parser): AstNode {
     let node = ast_node("Break")
     node.line = t.line
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun parse_continue_stmt(p: Parser): AstNode {
@@ -521,7 +511,7 @@ fun parse_continue_stmt(p: Parser): AstNode {
     let node = ast_node("Continue")
     node.line = t.line
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun parse_panic_stmt(p: Parser): AstNode {
@@ -533,7 +523,7 @@ fun parse_panic_stmt(p: Parser): AstNode {
     }
     node.expr = parse_expr(p)
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun parse_assert_stmt(p: Parser): AstNode {
@@ -545,7 +535,7 @@ fun parse_assert_stmt(p: Parser): AstNode {
         node.value_expr = parse_expr(p)
     }
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun parse_match_literal(p: Parser): AstNode {
@@ -555,7 +545,7 @@ fun parse_match_literal(p: Parser): AstNode {
         n.value = t.text
         n.line = t.line
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "CHAR") == 1 {
         let t = advance(p)
@@ -563,7 +553,7 @@ fun parse_match_literal(p: Parser): AstNode {
         n.value = t.text
         n.line = t.line
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "STRING") == 1 {
         let t = advance(p)
@@ -571,25 +561,25 @@ fun parse_match_literal(p: Parser): AstNode {
         n.value = t.text
         n.line = t.line
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "TRUE") == 1 {
         let t = advance(p)
         let n = ast_node("Bool")
         n.value = "1"
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "FALSE") == 1 {
         let t = advance(p)
         let n = ast_node("Bool")
         n.value = "0"
         n.line = t.line
-        return n
+        ret n
     }
     let t = peek(p)
     parse_error(t.line, "Expected match literal case")
-    return ast_empty()
+    ret ast_empty()
 }
 
 
@@ -601,7 +591,7 @@ fun parse_match_stmt(p: Parser): AstNode {
     expect(p, "LBRACE")
     skip_newlines(p)
     let saw_else = 0
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         if saw_else == 1 {
             let bad = peek(p)
             parse_error(bad.line, "match else must be last")
@@ -622,317 +612,322 @@ fun parse_match_stmt(p: Parser): AstNode {
         skip_newlines(p)
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun var_node(name: str): AstNode {
     let n = ast_node("Var")
     n.name = name
-    return n
+    ret n
 }
 
 fun lit_node(value: str): AstNode {
     let n = ast_node("Literal")
     n.value = value
-    return n
+    ret n
 }
 
 fun let_node(name: str, value: AstNode): AstNode {
     let n = ast_node("Let")
     n.name = name
     n.value_expr = value
-    return n
+    ret n
 }
 
 fun assign_node(name: str, value: AstNode): AstNode {
     let n = ast_node("Assign")
     n.name = name
     n.value_expr = value
-    return n
+    ret n
 }
 
 fun parse_for_stmt(p: Parser): AstNode {
     expect(p, "FOR")
-    let name = expect(p, "ID")
-    expect(p, "IN")
-    let start = parse_expr(p)
-    expect(p, "COLON")
-    let end = parse_expr(p)
-    p.loop_depth += 1
-    let body = parse_block(p)
-    p.loop_depth -= 1
+    if peek_kind(p, "ID") == 1 && p.pos + 1 < len(p.tokens) && p.tokens[p.pos + 1].kind == "IN" {
+        let name = expect(p, "ID")
+        expect(p, "IN")
+        let start = parse_expr(p)
+        expect(p, "COLON")
+        let end = parse_expr(p)
+        p.loop_depth += 1
+        let body = parse_block(p)
+        p.loop_depth -= 1
 
-    let out = ast_node("For")
-    out.name = name.text
-    out.start = start
-    out.end = end
-    out.body = body
-    return out
+        let out = ast_node("For")
+        out.name = name.text
+        out.start = start
+        out.end = end
+        out.body = body
+        ret out
+    }
+    let node = ast_node("While")
+    node.expr = parse_expr(p)
+    p.loop_depth += 1
+    node.body = parse_block(p)
+    p.loop_depth -= 1
+    ret node
 }
 
 fun parse_expr_stmt(p: Parser): AstNode {
     let node = ast_node("ExprStmt")
     node.expr = parse_expr(p)
     expect_stmt_end(p)
-    return node
+    ret node
 }
 
 fun is_expr_first(kind: str): i64 {
     match kind {
         "NUMBER": {
-            return 1
+            ret 1
         }
         "CHAR": {
-            return 1
+            ret 1
         }
         "STRING": {
-            return 1
+            ret 1
         }
         "FSTRING": {
-            return 1
+            ret 1
         }
         "TRUE": {
-            return 1
+            ret 1
         }
         "FALSE": {
-            return 1
+            ret 1
         }
         "ID": {
-            return 1
+            ret 1
         }
         "NEW": {
-            return 1
+            ret 1
         }
         "LPAREN": {
-            return 1
+            ret 1
         }
         "BANG": {
-            return 1
+            ret 1
         }
         "MINUS": {
-            return 1
+            ret 1
         }
         "TILDE": {
-            return 1
+            ret 1
         }
         else: {
         }
     }
-    return 0
+    ret 0
 }
 
 fun is_assignment_op_kind(kind: str): i64 {
     match kind {
         "ASSIGN": {
-            return 1
+            ret 1
         }
         "PLUS_ASSIGN": {
-            return 1
+            ret 1
         }
         "MINUS_ASSIGN": {
-            return 1
+            ret 1
         }
         "STAR_ASSIGN": {
-            return 1
+            ret 1
         }
         "SLASH_ASSIGN": {
-            return 1
+            ret 1
         }
         "PERCENT_ASSIGN": {
-            return 1
+            ret 1
         }
         "SHL_ASSIGN": {
-            return 1
+            ret 1
         }
         "SHR_ASSIGN": {
-            return 1
+            ret 1
         }
         "USHR_ASSIGN": {
-            return 1
+            ret 1
         }
         "AMP_ASSIGN": {
-            return 1
+            ret 1
         }
         "PIPE_ASSIGN": {
-            return 1
+            ret 1
         }
         "CARET_ASSIGN": {
-            return 1
+            ret 1
         }
         else: {
         }
     }
-    return 0
+    ret 0
 }
 
 fun assignment_op_from_kind(kind: str): str {
     match kind {
         "ASSIGN": {
-            return "="
+            ret "="
         }
         "PLUS_ASSIGN": {
-            return "+"
+            ret "+"
         }
         "MINUS_ASSIGN": {
-            return "-"
+            ret "-"
         }
         "STAR_ASSIGN": {
-            return "*"
+            ret "*"
         }
         "SLASH_ASSIGN": {
-            return "/"
+            ret "/"
         }
         "PERCENT_ASSIGN": {
-            return "%"
+            ret "%"
         }
         "SHL_ASSIGN": {
-            return "<<"
+            ret "<<"
         }
         "SHR_ASSIGN": {
-            return ">>"
+            ret ">>"
         }
         "USHR_ASSIGN": {
-            return ">>>"
+            ret ">>>"
         }
         "AMP_ASSIGN": {
-            return "&"
+            ret "&"
         }
         "PIPE_ASSIGN": {
-            return "|"
+            ret "|"
         }
         "CARET_ASSIGN": {
-            return "^"
+            ret "^"
         }
         else: {
         }
     }
-    return ""
+    ret ""
 }
 
 fun parse_stmt(p: Parser): AstNode {
     let t = peek(p)
     if t.kind == "RETURN" {
-        return parse_return_stmt(p)
+        ret parse_return_stmt(p)
     }
     if t.kind == "LET" {
-        return parse_let_stmt(p)
+        ret parse_let_stmt(p)
     }
     if t.kind == "IF" {
-        return parse_if_stmt(p)
-    }
-    if t.kind == "WHILE" {
-        return parse_while_stmt(p)
+        ret parse_if_stmt(p)
     }
     if t.kind == "FOR" {
-        return parse_for_stmt(p)
+        ret parse_for_stmt(p)
     }
     if t.kind == "BREAK" {
-        return parse_break_stmt(p)
+        ret parse_break_stmt(p)
     }
     if t.kind == "CONTINUE" {
-        return parse_continue_stmt(p)
+        ret parse_continue_stmt(p)
     }
     if t.kind == "PANIC" {
-        return parse_panic_stmt(p)
+        ret parse_panic_stmt(p)
     }
     if t.kind == "ASSERT" {
-        return parse_assert_stmt(p)
+        ret parse_assert_stmt(p)
     }
     if t.kind == "MATCH" {
-        return parse_match_stmt(p)
+        ret parse_match_stmt(p)
     }
     if t.kind == "ID" {
         if is_assignment(p) == 1 {
-            return parse_assign_stmt(p)
+            ret parse_assign_stmt(p)
         }
     }
     if is_expr_first(t.kind) == 1 {
-        return parse_expr_stmt(p)
+        ret parse_expr_stmt(p)
     }
     parse_error(t.line, "Unexpected token in statement")
-    return ast_empty()
+    ret ast_empty()
 }
 
 fun op_text(kind: str): str {
     match kind {
         "PLUS": {
-            return "+"
+            ret "+"
         }
         "MINUS": {
-            return "-"
+            ret "-"
         }
         "STAR": {
-            return "*"
+            ret "*"
         }
         "SLASH": {
-            return "/"
+            ret "/"
         }
         "PERCENT": {
-            return "%"
+            ret "%"
         }
         "EQEQ": {
-            return "=="
+            ret "=="
         }
         "NEQ": {
-            return "!="
+            ret "!="
         }
         "LT": {
-            return "<"
+            ret "<"
         }
         "GT": {
-            return ">"
+            ret ">"
         }
         "LTE": {
-            return "<="
+            ret "<="
         }
         "GTE": {
-            return ">="
+            ret ">="
         }
         "AND": {
-            return "&&"
+            ret "&&"
         }
         "OR": {
-            return "||"
+            ret "||"
         }
         "AMPERSAND": {
-            return "&"
+            ret "&"
         }
         "PIPE": {
-            return "|"
+            ret "|"
         }
         "CARET": {
-            return "^"
+            ret "^"
         }
         "SHL": {
-            return "<<"
+            ret "<<"
         }
         "SHR": {
-            return ">>"
+            ret ">>"
         }
         "USHR": {
-            return ">>>"
+            ret ">>>"
         }
         "BANG": {
-            return "!"
+            ret "!"
         }
         "TILDE": {
-            return "~"
+            ret "~"
         }
         else: {
         }
     }
-    return ""
+    ret ""
 }
 
 fun parse_args(p: Parser): AstNode[] {
     let args = new AstNode[0]
     if peek_kind(p, "RPAREN") == 0 {
         push(args, parse_expr(p))
-        while check(p, "COMMA") == 1 {
+        for check(p, "COMMA") == 1 {
             push(args, parse_expr(p))
         }
     }
-    return args
+    ret args
 }
 
 fun parse_struct_init(p: Parser, name: Token): AstNode {
@@ -941,7 +936,7 @@ fun parse_struct_init(p: Parser, name: Token): AstNode {
     node.line = name.line
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         let field_name = expect(p, "ID")
         expect(p, "COLON")
         let field = ast_node("InitField")
@@ -963,13 +958,13 @@ fun parse_struct_init(p: Parser, name: Token): AstNode {
         }
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun parse_named_init_fields(p: Parser, node: AstNode): AstNode {
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         let field_name = expect(p, "ID")
         expect(p, "COLON")
         let field = ast_node("InitField")
@@ -991,7 +986,7 @@ fun parse_named_init_fields(p: Parser, node: AstNode): AstNode {
         }
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun parse_array_literal(p: Parser, name: Token): AstNode {
@@ -1000,7 +995,7 @@ fun parse_array_literal(p: Parser, name: Token): AstNode {
     node.line = name.line
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         push(node.args, parse_expr(p))
         if check(p, "COMMA") == 1 {
             skip_newlines(p)
@@ -1016,13 +1011,13 @@ fun parse_array_literal(p: Parser, name: Token): AstNode {
         }
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun parse_map_init_entries(p: Parser, node: AstNode): AstNode {
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         push(node.map_keys, parse_expr(p))
         expect(p, "COLON")
         push(node.map_values, parse_expr(p))
@@ -1040,7 +1035,7 @@ fun parse_map_init_entries(p: Parser, node: AstNode): AstNode {
         }
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
@@ -1068,13 +1063,13 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
             }
         }
     }
-    return out
+    ret out
 }
 
 fun parse_postfix(p: Parser, node: AstNode): AstNode {
     let current = node
     let done = 0
-    while done == 0 {
+    for done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
             if check(p, "LPAREN") == 1 {
@@ -1109,7 +1104,7 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
             }
         }
     }
-    return current
+    ret current
 }
 
 fun parse_primary(p: Parser): AstNode {
@@ -1127,9 +1122,9 @@ fun parse_primary(p: Parser): AstNode {
             n.type_name = str_cat2("map[str]", parse_type(p))
             n.line = t.line
             if peek_kind(p, "LBRACE") == 1 {
-                return parse_map_init_entries(p, n)
+                ret parse_map_init_entries(p, n)
             }
-            return n
+            ret n
         }
         if check(p, "LBRACKET") == 1 {
             let count = ast_empty()
@@ -1138,42 +1133,42 @@ fun parse_primary(p: Parser): AstNode {
             }
             expect(p, "RBRACKET")
             if count.kind == "" && peek_kind(p, "LBRACE") == 1 {
-                return parse_array_literal(p, t)
+                ret parse_array_literal(p, t)
             }
             let n = ast_node("NewArray")
             n.type_name = t.text
             n.count = count
             n.line = t.line
-            return n
+            ret n
         }
         if peek_kind(p, "LBRACE") == 1 {
-            return parse_struct_init(p, t)
+            ret parse_struct_init(p, t)
         }
         let n = ast_node("StructInit")
         n.name = t.text
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "NUMBER") == 1 {
         let t = advance(p)
         let n = ast_node("Literal")
         n.value = t.text
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "CHAR") == 1 {
         let t = advance(p)
         let n = ast_node("Char")
         n.value = t.text
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "STRING") == 1 {
         let t = advance(p)
         let n = ast_node("String")
         n.value = t.text
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "FSTRING") == 1 {
         let t = advance(p)
@@ -1183,21 +1178,21 @@ fun parse_primary(p: Parser): AstNode {
             parse_error(t.line, "Expected f-string parts")
         }
         n.fields = parse_fstring_parts(t.fstring_parts, t.line)
-        return n
+        ret n
     }
     if peek_kind(p, "TRUE") == 1 {
         let t = advance(p)
         let n = ast_node("Bool")
         n.value = "1"
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "FALSE") == 1 {
         let t = advance(p)
         let n = ast_node("Bool")
         n.value = "0"
         n.line = t.line
-        return n
+        ret n
     }
     if peek_kind(p, "ID") == 1 {
         let t = advance(p)
@@ -1209,18 +1204,18 @@ fun parse_primary(p: Parser): AstNode {
             node.args = parse_args(p)
             node.line = t.line
             expect(p, "RPAREN")
-            return parse_postfix(p, node)
+            ret parse_postfix(p, node)
         }
-        return parse_postfix(p, node)
+        ret parse_postfix(p, node)
     }
     if check(p, "LPAREN") == 1 {
         let expr = parse_expr(p)
         expect(p, "RPAREN")
-        return expr
+        ret expr
     }
     let t = peek(p)
     parse_error(t.line, "Unexpected token in expression")
-    return ast_empty()
+    ret ast_empty()
 }
 
 fun bin_node(op: str, left: AstNode, right: AstNode, line: i64): AstNode {
@@ -1229,7 +1224,7 @@ fun bin_node(op: str, left: AstNode, right: AstNode, line: i64): AstNode {
     n.left = left
     n.right = right
     n.line = line
-    return n
+    ret n
 }
 
 fun parse_unary(p: Parser): AstNode {
@@ -1239,118 +1234,118 @@ fun parse_unary(p: Parser): AstNode {
         n.op = op_text(op.kind)
         n.expr = parse_unary(p)
         n.line = op.line
-        return n
+        ret n
     }
-    return parse_primary(p)
+    ret parse_primary(p)
 }
 
 fun parse_factor(p: Parser): AstNode {
     let left = parse_unary(p)
-    while peek_kind(p, "STAR") == 1 || peek_kind(p, "SLASH") == 1 || peek_kind(p, "PERCENT") == 1 {
+    for peek_kind(p, "STAR") == 1 || peek_kind(p, "SLASH") == 1 || peek_kind(p, "PERCENT") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_unary(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_term(p: Parser): AstNode {
     let left = parse_factor(p)
-    while peek_kind(p, "PLUS") == 1 || peek_kind(p, "MINUS") == 1 {
+    for peek_kind(p, "PLUS") == 1 || peek_kind(p, "MINUS") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_factor(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_shift(p: Parser): AstNode {
     let left = parse_term(p)
-    while peek_kind(p, "SHL") == 1 || peek_kind(p, "SHR") == 1 || peek_kind(p, "USHR") == 1 {
+    for peek_kind(p, "SHL") == 1 || peek_kind(p, "SHR") == 1 || peek_kind(p, "USHR") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_term(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_comparison(p: Parser): AstNode {
     let left = parse_shift(p)
-    while peek_kind(p, "LT") == 1 || peek_kind(p, "GT") == 1 || peek_kind(p, "LTE") == 1 || peek_kind(p, "GTE") == 1 {
+    for peek_kind(p, "LT") == 1 || peek_kind(p, "GT") == 1 || peek_kind(p, "LTE") == 1 || peek_kind(p, "GTE") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_shift(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_equality(p: Parser): AstNode {
     let left = parse_comparison(p)
-    while peek_kind(p, "EQEQ") == 1 || peek_kind(p, "NEQ") == 1 {
+    for peek_kind(p, "EQEQ") == 1 || peek_kind(p, "NEQ") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_comparison(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_bit_and(p: Parser): AstNode {
     let left = parse_equality(p)
-    while peek_kind(p, "AMPERSAND") == 1 {
+    for peek_kind(p, "AMPERSAND") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_equality(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_bit_xor(p: Parser): AstNode {
     let left = parse_bit_and(p)
-    while peek_kind(p, "CARET") == 1 {
+    for peek_kind(p, "CARET") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_bit_and(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_bit_or(p: Parser): AstNode {
     let left = parse_bit_xor(p)
-    while peek_kind(p, "PIPE") == 1 {
+    for peek_kind(p, "PIPE") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_bit_xor(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_logic_and(p: Parser): AstNode {
     let left = parse_bit_or(p)
-    while peek_kind(p, "AND") == 1 {
+    for peek_kind(p, "AND") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_bit_or(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun parse_expr(p: Parser): AstNode {
     let left = parse_logic_and(p)
-    while peek_kind(p, "OR") == 1 {
+    for peek_kind(p, "OR") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_logic_and(p), op.line)
     }
-    return left
+    ret left
 }
 
 fun indent(n: i64): i64 {
     for i in 0:n {
         print("  ")
     }
-    return 0
+    ret 0
 }
 
 fun dump_list(nodes: AstNode[], depth: i64): i64 {
     for i in 0:len(nodes) {
         dump_node(nodes[i], depth)
     }
-    return 0
+    ret 0
 }
 
 fun dump_node(node: AstNode, depth: i64): i64 {
     if node.kind == "" {
-        return 0
+        ret 0
     }
     if node.kind == "Match" {
         indent(depth)
@@ -1362,14 +1357,14 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             println("MatchCase")
             dump_node(node.else_block, depth + 2)
         }
-        return 0
+        ret 0
     }
     if node.kind == "MatchCase" {
         indent(depth)
         println("MatchCase")
         dump_node(node.expr, depth + 1)
         dump_node(node.body, depth + 1)
-        return 0
+        ret 0
     }
     if node.kind == "MapInit" {
         indent(depth)
@@ -1383,7 +1378,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             println("Value")
             dump_node(node.map_values[i], depth + 2)
         }
-        return 0
+        ret 0
     }
     indent(depth)
     print(node.kind)
@@ -1423,7 +1418,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
     dump_node(node.end, depth + 1)
     dump_node(node.count, depth + 1)
     dump_list(node.args, depth + 1)
-    return 0
+    ret 0
 }
 
 fun main(): i64 {
@@ -1435,5 +1430,5 @@ fun main(): i64 {
     let p = make_parser(tokens)
     let ast = parse_program(p)
     dump_node(ast, 0)
-    return 0
+    ret 0
 }

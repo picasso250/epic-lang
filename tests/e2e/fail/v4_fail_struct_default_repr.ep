@@ -10,5 +10,5 @@ struct Outer {
 
 fun main(): i64 {
     println(str(new Outer {}))
-    return 0
+    ret 0
 }

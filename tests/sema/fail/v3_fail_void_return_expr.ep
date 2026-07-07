@@ -1,5 +1,5 @@
 # COMPILE_FAIL: return expected void, got i64
 
 fun main(): void {
-    return 1
+    ret 1
 }

@@ -2,15 +2,15 @@
 fun main(): i64 {
     let ids = new map[str]i64 { "main": 1 }
     ids["main"] += 100
-    if ids["main"] != 101 { return 1 }
-    if map_has(ids, "main") == false { return 2 }
-    if map_del(ids, "main") == false { return 3 }
+    if ids["main"] != 101 { ret 1 }
+    if map_has(ids, "main") == false { ret 2 }
+    if map_del(ids, "main") == false { ret 3 }
 
     let flags = new map[str]bool
     flags["ok"] = true
-    if flags["ok"] == false { return 4 }
+    if flags["ok"] == false { ret 4 }
 
     let names = new map[str]str { "a": "one" }
-    if names["a"] != "one" { return 5 }
-    return 0
+    if names["a"] != "one" { ret 5 }
+    ret 0
 }

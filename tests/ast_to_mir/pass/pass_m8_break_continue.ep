@@ -1,6 +1,6 @@
 fun main(): i64 {
     let x = 0
-    while x < 10 {
+    for x < 10 {
         x = x + 1
         if x == 3 {
             continue
@@ -9,5 +9,5 @@ fun main(): i64 {
             break
         }
     }
-    return x
+    ret x
 }

@@ -52,7 +52,7 @@ fun machine_builder_empty(): MachineBuilder {
     b.text_reloc_names = new str[0]
     b.data_reloc_offsets = new i64[0]
     b.data_reloc_names = new str[0]
-    return b
+    ret b
 }
 
 fun machine_die(msg: str): void {
@@ -65,9 +65,9 @@ fun machine_append_byte(out: i64[], value: i64): void {
 
 fun machine_u32_value(value: i64): i64 {
     if value < 0 {
-        return value + 4294967296
+        ret value + 4294967296
     }
-    return value
+    ret value
 }
 
 fun machine_append_i32(out: i64[], value: i64): void {
@@ -91,24 +91,24 @@ fun machine_append_u64(out: i64[], value: i64): void {
 }
 
 fun machine_reg64(name: str): i64 {
-    if name == "rax" { return 0 }
-    if name == "rcx" { return 1 }
-    if name == "rdx" { return 2 }
-    if name == "rbx" { return 3 }
-    if name == "rsp" { return 4 }
-    if name == "rbp" { return 5 }
-    if name == "rsi" { return 6 }
-    if name == "rdi" { return 7 }
-    if name == "r8" { return 8 }
-    if name == "r9" { return 9 }
-    if name == "r10" { return 10 }
-    if name == "r11" { return 11 }
+    if name == "rax" { ret 0 }
+    if name == "rcx" { ret 1 }
+    if name == "rdx" { ret 2 }
+    if name == "rbx" { ret 3 }
+    if name == "rsp" { ret 4 }
+    if name == "rbp" { ret 5 }
+    if name == "rsi" { ret 6 }
+    if name == "rdi" { ret 7 }
+    if name == "r8" { ret 8 }
+    if name == "r9" { ret 9 }
+    if name == "r10" { ret 10 }
+    if name == "r11" { ret 11 }
     machine_die(str_cat2("unsupported reg64: ", name))
-    return 0
+    ret 0
 }
 
 fun machine_is_reg(op: X64Operand, name: str): bool {
-    return op.kind == "reg" && op.name == name
+    ret op.kind == "reg" && op.name == name
 }
 
 fun machine_rex(b: MachineBuilder, w: bool, r: i64, rb: i64): void {
@@ -158,22 +158,22 @@ fun machine_add_text_label(b: MachineBuilder, name: str): void {
 
 fun machine_text_label_offset_or_neg1(b: MachineBuilder, name: str): i64 {
     if map_has(b.text_label_index, name) {
-        return b.text_label_index[name]
+        ret b.text_label_index[name]
     }
-    return -1
+    ret -1
 }
 
 fun machine_text_label_offset(b: MachineBuilder, name: str): i64 {
     let offset = machine_text_label_offset_or_neg1(b, name)
     if offset >= 0 {
-        return offset
+        ret offset
     }
     machine_die(str_cat2("unknown text label: ", name))
-    return 0
+    ret 0
 }
 
 fun machine_has_text_label(b: MachineBuilder, name: str): bool {
-    return machine_text_label_offset_or_neg1(b, name) >= 0
+    ret machine_text_label_offset_or_neg1(b, name) >= 0
 }
 fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
     let f = new MachineFixup
@@ -190,13 +190,13 @@ fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
 
 fun machine_has_symbol_name(names: str[], name: str): bool {
     let i = 0
-    while i < len(names) {
+    for i < len(names) {
         if names[i] == name {
-            return true
+            ret true
         }
         i = i + 1
     }
-    return false
+    ret false
 }
 
 fun machine_ascii_less(a: str, b: str): bool {
@@ -207,27 +207,27 @@ fun machine_ascii_less(a: str, b: str): bool {
         n = len(bb)
     }
     let i = 0
-    while i < n {
+    for i < n {
         if ab[i] < bb[i] {
-            return true
+            ret true
         }
         if ab[i] > bb[i] {
-            return false
+            ret false
         }
         i = i + 1
     }
-    return len(ab) < len(bb)
+    ret len(ab) < len(bb)
 }
 
 fun machine_sorted_strings(names: str[]): str[] {
     let out = new str[0]
     let i = 0
-    while i < len(names) {
+    for i < len(names) {
         let key = names[i]
         let next = new str[0]
         let inserted = false
         let j = 0
-        while j < len(out) {
+        for j < len(out) {
             if !inserted && machine_ascii_less(key, out[j]) {
                 push(next, key)
                 inserted = true
@@ -241,7 +241,7 @@ fun machine_sorted_strings(names: str[]): str[] {
         out = next
         i = i + 1
     }
-    return out
+    ret out
 }
 
 fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
@@ -254,7 +254,7 @@ fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
 
 fun machine_patch_fixups(b: MachineBuilder): void {
     let i = 0
-    while i < len(b.fixups) {
+    for i < len(b.fixups) {
         if b.fixups[i].kind == "label" {
             let target = machine_text_label_offset_or_neg1(b, b.fixups[i].label)
             if target >= 0 {
@@ -274,14 +274,14 @@ fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
         machine_rex(b, true, 0, reg / 8)
         machine_append_byte(b.text, 184 + (reg & 7))
         machine_append_u64(b.text, imm)
-        return
+        ret
     }
     if dst == "rax" {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 199)
         machine_append_byte(b.text, 192)
         machine_append_i32(b.text, imm)
-        return
+        ret
     }
     machine_rex(b, true, 0, reg / 8)
     machine_append_byte(b.text, 199)
@@ -351,22 +351,22 @@ fun machine_emit_call_symbol(b: MachineBuilder, symbol: str): void {
 
 
 fun machine_reg8(name: str): i64 {
-    if name == "al" { return 0 }
-    if name == "cl" { return 1 }
-    if name == "dl" { return 2 }
-    if name == "r8b" { return 8 }
-    if name == "r9b" { return 9 }
-    if name == "r10b" { return 10 }
-    if name == "r11b" { return 11 }
+    if name == "al" { ret 0 }
+    if name == "cl" { ret 1 }
+    if name == "dl" { ret 2 }
+    if name == "r8b" { ret 8 }
+    if name == "r9b" { ret 9 }
+    if name == "r10b" { ret 10 }
+    if name == "r11b" { ret 11 }
     machine_die(str_cat2("unsupported reg8: ", name))
-    return 0
+    ret 0
 }
 
 fun machine_is_reg8_name(name: str): bool {
     if name == "al" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" {
-        return true
+        ret true
     }
-    return false
+    ret false
 }
 
 fun machine_emit_mov_reg_mem(b: MachineBuilder, dst: str, base: str, disp: i64): void {
@@ -384,7 +384,7 @@ fun machine_emit_mov_mem_reg(b: MachineBuilder, base: str, disp: i64, src: str):
         machine_rex(b, false, s8 / 8, base_code / 8)
         machine_append_byte(b.text, 136)
         machine_mem_modrm(b, s8, base, disp)
-        return
+        ret
     }
     let s = machine_reg64(src)
     machine_rex(b, true, s / 8, base_code / 8)
@@ -453,13 +453,13 @@ fun machine_emit_cmp_reg_reg(b: MachineBuilder, left: str, right: str): void {
 }
 
 fun machine_alu_opcode(op: str): i64 {
-    if op == "add" { return 1 }
-    if op == "sub" { return 41 }
-    if op == "and" { return 33 }
-    if op == "or" { return 9 }
-    if op == "xor" { return 49 }
+    if op == "add" { ret 1 }
+    if op == "sub" { ret 41 }
+    if op == "and" { ret 33 }
+    if op == "or" { ret 9 }
+    if op == "xor" { ret 49 }
     machine_die(str_cat2("unsupported alu op: ", op))
-    return 0
+    ret 0
 }
 
 fun machine_emit_reg_reg_alu(b: MachineBuilder, op: str, dst: str, src: str): void {
@@ -502,7 +502,7 @@ fun machine_emit_add_reg_imm(b: MachineBuilder, reg_name: str, imm: i64): void {
         machine_append_byte(b.text, 128)
         machine_modrm(b, 3, 0, r8)
         machine_append_byte(b.text, imm)
-        return
+        ret
     }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r / 8)
@@ -553,7 +553,7 @@ fun machine_emit_rsp_imm(b: MachineBuilder, op: str, imm: i64): void {
         machine_append_byte(b.text, 131)
         if op == "sub" { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) }
         machine_append_byte(b.text, imm)
-        return
+        ret
     }
     machine_append_byte(b.text, 129)
     if op == "sub" { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) }
@@ -564,127 +564,127 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
     let ops = item.operands
     if item.op == "push" && len(ops) == 1 && machine_is_reg(ops[0], "rbp") {
         machine_append_byte(b.text, 85)
-        return
+        ret
     }
     if item.op == "pop" && len(ops) == 1 && machine_is_reg(ops[0], "rbp") {
         machine_append_byte(b.text, 93)
-        return
+        ret
     }
     if item.op == "ret" && len(ops) == 0 {
         machine_append_byte(b.text, 195)
-        return
+        ret
     }
     if (item.op == "sub" || item.op == "add") && len(ops) == 2 && machine_is_reg(ops[0], "rsp") && ops[1].kind == "imm" {
         machine_emit_rsp_imm(b, item.op, ops[1].value)
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
         machine_emit_mov_reg_imm(b, ops[0].name, ops[1].value)
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
         machine_emit_mov_reg_reg(b, ops[0].name, ops[1].name)
-        return
+        ret
     }
     if item.op == "cmp" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
         machine_emit_cmp_reg_imm(b, ops[0].name, ops[1].value)
-        return
+        ret
     }
     if (item.op == "jmp" || item.op == "jz" || item.op == "jnz" || item.op == "jl" || item.op == "jge") && len(ops) == 1 && ops[0].kind == "label_ref" {
         machine_emit_jump(b, item.op, ops[0].name)
-        return
+        ret
     }
     if item.op == "lea" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_symbol {
         machine_emit_lea_symbol(b, ops[0].name, ops[1].symbol)
-        return
+        ret
     }
     if item.op == "call" && len(ops) == 1 && ops[0].kind == "symbol" {
         machine_emit_call_symbol(b, ops[0].name)
-        return
+        ret
     }
     if item.op == "cqo" && len(ops) == 0 {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 153)
-        return
+        ret
     }
     if item.op == "idiv" && len(ops) == 1 && machine_is_reg(ops[0], "rcx") {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 247)
         machine_append_byte(b.text, 249)
-        return
+        ret
     }
     if item.op == "div" && len(ops) == 1 && machine_is_reg(ops[0], "rcx") {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 247)
         machine_append_byte(b.text, 241)
-        return
+        ret
     }
     if item.op == "imul" && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "rcx") {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 15)
         machine_append_byte(b.text, 175)
         machine_append_byte(b.text, 193)
-        return
+        ret
     }
     if item.op == "neg" && len(ops) == 1 && machine_is_reg(ops[0], "rax") {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 247)
         machine_append_byte(b.text, 216)
-        return
+        ret
     }
     if item.op == "cmp" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
         machine_emit_cmp_reg_reg(b, ops[0].name, ops[1].name)
-        return
+        ret
     }
     if (item.op == "add" || item.op == "sub" || item.op == "and" || item.op == "or" || item.op == "xor") && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
         machine_emit_reg_reg_alu(b, item.op, ops[0].name, ops[1].name)
-        return
+        ret
     }
     if item.op == "add" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
         machine_emit_add_reg_imm(b, ops[0].name, ops[1].value)
-        return
+        ret
     }
     if item.op == "test" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" && ops[0].name == ops[1].name {
         machine_emit_test_reg_reg(b, ops[0].name)
-        return
+        ret
     }
     if (item.op == "sete" || item.op == "setne" || item.op == "setg" || item.op == "setl" || item.op == "setge" || item.op == "setle" || item.op == "seta" || item.op == "setae" || item.op == "setb" || item.op == "setbe") && len(ops) == 1 && machine_is_reg(ops[0], "al") {
         machine_emit_setcc(b, item.op)
-        return
+        ret
     }
     if item.op == "movzx" && len(ops) == 2 && machine_is_reg(ops[0], "eax") && machine_is_reg(ops[1], "al") {
         machine_append_byte(b.text, 15)
         machine_append_byte(b.text, 182)
         machine_append_byte(b.text, 192)
-        return
+        ret
     }
     if item.op == "movzx" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base && ops[1].size == 1 {
         machine_emit_movzx_reg_mem8(b, ops[0].name, ops[1].base, ops[1].disp)
-        return
+        ret
     }
     if item.op == "movsx" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base && ops[1].size == 1 {
         machine_emit_movsx_reg_mem8(b, ops[0].name, ops[1].base, ops[1].disp)
-        return
+        ret
     }
     if (item.op == "shl" || item.op == "sar" || item.op == "shr") && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "cl") {
         machine_emit_shift_rax_cl(b, item.op)
-        return
+        ret
     }
     if (item.op == "inc" || item.op == "dec") && len(ops) == 1 && ops[0].kind == "reg" {
         machine_emit_inc_dec(b, item.op, ops[0].name)
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base {
         machine_emit_mov_reg_mem(b, ops[0].name, ops[1].base, ops[1].disp)
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_symbol {
         machine_emit_mov_reg_symbol(b, ops[0].name, ops[1].symbol)
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_base && ops[1].kind == "reg" {
         machine_emit_mov_mem_reg(b, ops[0].base, ops[0].disp, ops[1].name)
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_symbol && ops[1].kind == "reg" {
         if machine_is_reg8_name(ops[1].name) {
@@ -692,71 +692,71 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
         } else {
             machine_emit_mov_symbol_reg(b, ops[0].symbol, ops[1].name)
         }
-        return
+        ret
     }
     if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_base && ops[1].kind == "imm" {
         if ops[0].size == 1 { machine_emit_mov_mem_imm8(b, ops[0].base, ops[0].disp, ops[1].value) } else { machine_emit_mov_mem_imm64(b, ops[0].base, ops[0].disp, ops[1].value) }
-        return
+        ret
     }
     if item.op == "lea" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base {
         machine_emit_lea_base_disp(b, ops[0].name, ops[1].base, ops[1].disp)
-        return
+        ret
     }
     machine_die(str_cat2("unsupported instruction: ", item.op))
 }
 
 fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
     if item.kind == "global" || item.kind == "extern" {
-        return
+        ret
     }
     if item.kind == "section" {
         b.section = item.name
-        return
+        ret
     }
     if item.kind == "label" {
         if b.section == ".text" {
             machine_add_text_label(b, item.name)
-            return
+            ret
         }
         if b.section == ".data" {
             push(b.data_label_names, item.name)
             push(b.data_label_offsets, len(b.data))
-            return
+            ret
         }
         machine_die(str_cat2("label outside section: ", item.name))
     }
     if item.kind == "inst" {
         if b.section != ".text" { machine_die(str_cat2("instruction outside .text: ", item.op)) }
         machine_emit_inst(b, item)
-        return
+        ret
     }
     if item.kind == "data_bytes" {
         if b.section != ".data" { machine_die(str_cat2("data outside .data: ", item.name)) }
         push(b.data_label_names, item.name)
         push(b.data_label_offsets, len(b.data))
         let i = 0
-        while i < len(item.values) {
+        for i < len(item.values) {
             machine_append_byte(b.data, item.values[i])
             i = i + 1
         }
-        return
+        ret
     }
     if item.kind == "data_zero" {
         if b.section != ".data" { machine_die(str_cat2("data outside .data: ", item.name)) }
         push(b.data_label_names, item.name)
         push(b.data_label_offsets, len(b.data))
         let i = 0
-        while i < item.count {
+        for i < item.count {
             machine_append_byte(b.data, 0)
             i = i + 1
         }
-        return
+        ret
     }
     machine_die(str_cat2("unsupported item: ", item.kind))
 }
 
 fun machine_now_ms(): i64 {
-    return os.kernel32.GetTickCount64()
+    ret os.kernel32.GetTickCount64()
 }
 
 fun machine_print_timing(label: str, start: i64, stop: i64): void {
@@ -776,7 +776,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.symbol_values = new i64[0]
     let symbol_seen = new map[str]i64
     let i = 0
-    while i < len(b.text_label_names) {
+    for i < len(b.text_label_names) {
         if !map_has(symbol_seen, b.text_label_names[i]) {
             symbol_seen[b.text_label_names[i]] = 1
             push(obj.symbol_names, b.text_label_names[i])
@@ -786,7 +786,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
         i = i + 1
     }
     i = 0
-    while i < len(b.data_label_names) {
+    for i < len(b.data_label_names) {
         if !map_has(symbol_seen, b.data_label_names[i]) {
             symbol_seen[b.data_label_names[i]] = 1
             push(obj.symbol_names, b.data_label_names[i])
@@ -798,7 +798,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     let externs = new str[0]
     let extern_seen = new map[str]i64
     i = 0
-    while i < len(b.text_reloc_names) {
+    for i < len(b.text_reloc_names) {
         if !map_has(symbol_seen, b.text_reloc_names[i]) && !map_has(extern_seen, b.text_reloc_names[i]) {
             extern_seen[b.text_reloc_names[i]] = 1
             push(externs, b.text_reloc_names[i])
@@ -807,7 +807,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     }
     let sorted_externs = machine_sorted_strings(externs)
     i = 0
-    while i < len(sorted_externs) {
+    for i < len(sorted_externs) {
         if !map_has(symbol_seen, sorted_externs[i]) {
             symbol_seen[sorted_externs[i]] = 1
             push(obj.symbol_names, sorted_externs[i])
@@ -816,18 +816,18 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
         }
         i = i + 1
     }
-    return obj
+    ret obj
 }
 
 fun machine_build_object(program: X64Program): MachineObject {
     let b = machine_builder_empty()
     let i = 0
-    while i < len(program.items) {
+    for i < len(program.items) {
         machine_emit_item(b, program.items[i])
         i = i + 1
     }
     machine_patch_fixups(b)
-    return machine_object_from_builder(b)
+    ret machine_object_from_builder(b)
 }
 
 fun machine_build_object_timed(program: X64Program): MachineObject {
@@ -835,7 +835,7 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
 
     let emit_start = machine_now_ms()
     let i = 0
-    while i < len(program.items) {
+    for i < len(program.items) {
         machine_emit_item(b, program.items[i])
         i = i + 1
     }
@@ -855,12 +855,12 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
     machine_print_timing("build symbols", symbols_start, symbols_stop)
 
     println(f"  timing: machine output counts: symbols={len(obj.symbol_names)} text_relocs={len(obj.text_reloc_names)} data_relocs={len(obj.data_reloc_names)}")
-    return obj
+    ret obj
 }
 fun machine_print_bytes(label: str, values: i64[]): void {
     println(label)
     let i = 0
-    while i < len(values) {
+    for i < len(values) {
         println(str(values[i]))
         i = i + 1
     }

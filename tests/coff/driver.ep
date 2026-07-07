@@ -9,7 +9,7 @@ fun coff_dump_user_program(path: str): void {
     sema_program(st, ast)
     let mir = mir_ast_to_mir(ast)
     let i = 0
-    while i < len(mir.functions) {
+    for i < len(mir.functions) {
         let x64 = mir_to_x64_lower_function_with_program(mir, mir.functions[i])
         let obj = machine_build_object(x64)
         coff_print_bytes(coff_build_obj(obj))

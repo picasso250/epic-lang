@@ -19,7 +19,7 @@ fun make_result_inst(op: str, result_name: str, left: MirOperand, right: MirOper
     inst.has_result = true
     push(inst.operands, left)
     push(inst.operands, right)
-    return inst
+    ret inst
 }
 
 fun build_add1_function(): MirFunction {
@@ -31,7 +31,7 @@ fun build_add1_function(): MirFunction {
     block.terminator = mir_ret_value(mir_value_operand("i64", "r"))
     block.has_terminator = true
     push(fn.blocks, block)
-    return fn
+    ret fn
 }
 
 fun build_arith_mix_function(): MirFunction {
@@ -45,7 +45,7 @@ fun build_arith_mix_function(): MirFunction {
     block.terminator = mir_ret_value(mir_value_operand("i64", "c"))
     block.has_terminator = true
     push(fn.blocks, block)
-    return fn
+    ret fn
 }
 
 fun build_max2_function(): MirFunction {
@@ -68,7 +68,7 @@ fun build_max2_function(): MirFunction {
     else_block.terminator = mir_ret_value(mir_value_operand("i64", "y"))
     else_block.has_terminator = true
     push(fn.blocks, else_block)
-    return fn
+    ret fn
 }
 
 fun main(): void {

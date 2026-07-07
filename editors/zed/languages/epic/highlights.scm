@@ -4,10 +4,10 @@
   "fun"
   "struct"
   "let"
-  "return"
+  "ret"
   "if"
   "else"
-  "while"
+  "for"
   "new"
 ] @keyword
 

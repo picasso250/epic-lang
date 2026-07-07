@@ -135,7 +135,7 @@ class SemanticAnalyzer:
                 self._analyze_block(stmt.else_block)
             return
         if isinstance(stmt, WhileNode):
-            self._expect_bool(self._expr(stmt.cond), "while condition")
+            self._expect_bool(self._expr(stmt.cond), "for condition")
             self.loop_depth += 1
             self._analyze_block(stmt.body)
             self.loop_depth -= 1

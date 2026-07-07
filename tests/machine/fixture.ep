@@ -23,7 +23,7 @@ fun build_machine_x64_fixture(): X64Program {
     x64_add_inst2(program, "mov", x64_reg("rcx"), x64_reg("rax"))
     x64_add_inst1(program, "call", x64_symbol("ExitProcess"))
     x64_add_inst0(program, "ret")
-    return program
+    ret program
 }
 
 fun main(): void {

@@ -3,7 +3,7 @@
 #
 
 fun make_str_buf(): u8[] {
-    return new u8[]
+    ret new u8[]
 }
 
 fun str_buf_extend(buf: u8[], s: str): void {
@@ -11,12 +11,12 @@ fun str_buf_extend(buf: u8[], s: str): void {
 }
 
 fun str_buf_finish(buf: u8[]): str {
-    return str(buf)
+    ret str(buf)
 }
 
 fun str_cat2(a: str, b: str): str {
     let out = make_str_buf()
     str_buf_extend(out, a)
     str_buf_extend(out, b)
-    return str_buf_finish(out)
+    ret str_buf_finish(out)
 }

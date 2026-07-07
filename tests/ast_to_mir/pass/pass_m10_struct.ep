@@ -6,5 +6,5 @@ struct Pair {
 fun main(): i64 {
     let p = new Pair { a: 2, b: 3 }
     p.b = p.a + p.b
-    return p.b
+    ret p.b
 }

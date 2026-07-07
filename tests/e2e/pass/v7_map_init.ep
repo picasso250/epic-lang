@@ -22,5 +22,5 @@ fun main(): i64 {
     assert(flags["a"] == false)
     assert(names["x"] == "ex")
     assert(names["y"] == "2")
-    return 0
+    ret 0
 }

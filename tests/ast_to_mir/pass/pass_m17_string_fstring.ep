@@ -2,5 +2,5 @@ fun main(): i64 {
     let name = "epic"
     let bs = bytes(name)
     let msg = f"hello {name} {len(bs)} {true}"
-    return len(msg)
+    ret len(msg)
 }

@@ -1,4 +1,4 @@
 fun main(): i64 {
     let b = new u8[] { u8(65), u8(66) }
-    return i64(b[1])
+    ret i64(b[1])
 }

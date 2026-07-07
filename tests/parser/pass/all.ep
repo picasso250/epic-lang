@@ -15,7 +15,7 @@ struct Box {
 }
 
 fun helper(a: i64, b: i64, c: i64, d: i64): i64 {
-    return a + b * c - d
+    ret a + b * c - d
 }
 
 fun statements_and_control(flag: bool): void {
@@ -64,7 +64,7 @@ fun statements_and_control(flag: bool): void {
         println("no")
     }
 
-    while typed < 10 {
+    for typed < 10 {
         typed += 1
         if typed == 5 {
             continue
@@ -120,7 +120,7 @@ fun statements_and_control(flag: bool): void {
     assert typed >= 0, "typed should be non-negative"
     assert flag || typed != 0
     panic "parser-only panic statement"
-    return
+    ret
 }
 
 fun expressions(): i64 {
@@ -132,11 +132,11 @@ fun expressions(): i64 {
     let f = -a
     let g = helper(a, b, c, f)
     helper(g, 1, 2, 3)
-    return g
+    ret g
 }
 
 fun main(): void {
     statements_and_control(true)
     expressions()
-    return
+    ret
 }

@@ -13,7 +13,7 @@ fun main(): void {
     sema_program(st, ast)
     let mir = mir_ast_to_mir(ast)
     let i = 0
-    while i < len(mir.functions) {
+    for i < len(mir.functions) {
         let x64 = mir_to_x64_lower_function_with_program(mir, mir.functions[i])
         print(x64_program_text(x64))
         i = i + 1

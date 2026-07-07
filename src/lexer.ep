@@ -23,31 +23,31 @@ fun make_token(kind: str, text: str, dump_text: str, line: i64): Token {
     t.dump_text = dump_text
     t.line = line
     t.fstring_parts = new FStringPart[]
-    return t
+    ret t
 }
 
 fun make_fstring_token(parts: FStringPart[], line: i64): Token {
     let t = make_token("FSTRING", "", "", line)
     t.fstring_parts = parts
-    return t
+    ret t
 }
 
 fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
     let t = make_token(kind, text, text, line)
     push(tokens, t)
-    return 0
+    ret 0
 }
 
 fun push_newline_token(tokens: Token[], line: i64): i64 {
     let t = make_token("NEWLINE", "\n", "\\n", line)
     push(tokens, t)
-    return 0
+    ret 0
 }
 
 fun push_string_token(tokens: Token[], text: str, dump_text: str, line: i64): i64 {
     let t = make_token("STRING", text, dump_text, line)
     push(tokens, t)
-    return 0
+    ret 0
 }
 
 fun push_fstring_text(parts: FStringPart[], text: str, dump_text: str): i64 {
@@ -58,7 +58,7 @@ fun push_fstring_text(parts: FStringPart[], text: str, dump_text: str): i64 {
         p.dump_text = dump_text
         push(parts, p)
     }
-    return 0
+    ret 0
 }
 
 fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
@@ -67,7 +67,7 @@ fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
     p.text = text
     p.dump_text = text
     push(parts, p)
-    return 0
+    ret 0
 }
 
 
@@ -75,113 +75,110 @@ fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
 
 fun is_alpha(c: u8): i64 {
     if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun is_alnum(c: u8): i64 {
     if is_alpha(c) == 1 || (c >= '0' && c <= '9') {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun is_digit(c: u8): i64 {
     if c >= '0' && c <= '9' {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun keyword_kind(text: str): str {
     if text == "if" {
-        return "IF"
+        ret "IF"
     }
     if text == "in" {
-        return "IN"
+        ret "IN"
     }
     if text == "fun" {
-        return "FUN"
+        ret "FUN"
     }
     if text == "for" {
-        return "FOR"
+        ret "FOR"
     }
     if text == "new" {
-        return "NEW"
+        ret "NEW"
     }
     if text == "let" {
-        return "LET"
+        ret "LET"
     }
     if text == "else" {
-        return "ELSE"
+        ret "ELSE"
     }
     if text == "type" {
-        return "TYPE"
+        ret "TYPE"
     }
     if text == "true" {
-        return "TRUE"
-    }
-    if text == "while" {
-        return "WHILE"
+        ret "TRUE"
     }
     if text == "break" {
-        return "BREAK"
+        ret "BREAK"
     }
     if text == "panic" {
-        return "PANIC"
+        ret "PANIC"
     }
     if text == "match" {
-        return "MATCH"
+        ret "MATCH"
     }
     if text == "false" {
-        return "FALSE"
+        ret "FALSE"
     }
-    if text == "return" {
-        return "RETURN"
+    if text == "ret" {
+        ret "RETURN"
     }
     if text == "assert" {
-        return "ASSERT"
+        ret "ASSERT"
     }
     if text == "struct" {
-        return "STRUCT"
+        ret "STRUCT"
     }
     if text == "continue" {
-        return "CONTINUE"
+        ret "CONTINUE"
     }
-    return "ID"
+    ret "ID"
 }
 fun decode_escape(e: u8): u8 {
     if e == 'n' {
-        return '\n'
+        ret '\n'
     }
     if e == 'r' {
-        return '\r'
+        ret '\r'
     }
     if e == 't' {
-        return u8(9)
+        ret u8(9)
     }
     if e == '\\' {
-        return u8(92)
+        ret u8(92)
     }
     if e == '"' {
-        return '"'
+        ret '"'
     }
     if e == '\'' {
-        return u8(39)
+        ret u8(39)
     }
     if e == '0' {
-        return u8(0)
+        ret u8(0)
     }
     panic "bad escape"
-        return u8(0)
+        ret u8(0)
 }
 
 fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
     let src_bytes = bytes(src)
     let buf = new u8[]
     let pos = start
-    while pos < end {
+    for pos < end {
         let c = src_bytes[pos]
         if c == '\n' || c == '\r' {
             panic "unterminated string"
@@ -196,38 +193,38 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
         push(buf, c)
         pos += 1
     }
-    return str(buf)
+    ret str(buf)
 }
 
 fun char_at(src: str, pos: i64): i64 {
     if pos < 0 || pos >= len(src) {
-        return 0
+        ret 0
     }
     let src_bytes = bytes(src)
-    return i64(src_bytes[pos])
+    ret i64(src_bytes[pos])
 }
 
 fun is_ascii_space(c: u8): i64 {
     if c == ' ' {
-        return 1
+        ret 1
     }
     if c >= u8(9) && c <= '\r' {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun trim_ascii(s: str): str {
     let s_bytes = bytes(s)
     let start = 0
     let end = len(s)
-    while start < end && is_ascii_space(s_bytes[start]) == 1 {
+    for start < end && is_ascii_space(s_bytes[start]) == 1 {
         start += 1
     }
-    while start < end && is_ascii_space(s_bytes[end - 1]) == 1 {
+    for start < end && is_ascii_space(s_bytes[end - 1]) == 1 {
         end -= 1
     }
-    return s[start:end]
+    ret s[start:end]
 }
 
 fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
@@ -236,7 +233,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
     let parens = 0
     let brackets = 0
     let braces = 0
-    while pos < n {
+    for pos < n {
         let c = src_bytes[pos]
         if c == '\n' || c == '\r' {
             panic "unterminated f-string expression"
@@ -245,7 +242,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             let quote = c
             pos += 1
             let found = 0
-            while found == 0 && pos < n {
+            for found == 0 && pos < n {
                 let q = src_bytes[pos]
                 if q == '\n' || q == '\r' {
                     panic "unterminated string in f-string expression"
@@ -288,7 +285,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                             } else {
                                 if c == '}' {
                                     if parens == 0 && brackets == 0 && braces == 0 {
-                                        return pos
+                                        ret pos
                                     }
                                     braces -= 1
                                     if braces < 0 {
@@ -304,7 +301,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
         }
     }
     panic "unterminated f-string expression"
-    return pos
+    ret pos
 }
 
 fun scan_fstring(src: str, start: i64, line: i64): Token {
@@ -314,7 +311,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
     let pos = start + 2
     let segment_start = pos
 
-    while pos < n {
+    for pos < n {
         let ch = src_bytes[pos]
         if ch == '\n' || ch == '\r' {
             panic "unterminated f-string literal"
@@ -328,7 +325,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
                     let dump_text = src[segment_start:pos]
                     push_fstring_text(parts, text, dump_text)
                 }
-                return make_fstring_token(parts, line)
+                ret make_fstring_token(parts, line)
             } else {
                 if ch == '}' {
                     panic "unexpected '}' in f-string literal"
@@ -357,7 +354,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
     }
     panic "unterminated f-string literal"
     let t = new Token {}
-    return t
+    ret t
 }
 
 
@@ -371,7 +368,7 @@ fun lex(src: str): Token[] {
     let line = 1
 
 
-    while pos < n {
+    for pos < n {
         let ch = src_bytes[pos]
         let consumed = 0
 
@@ -390,7 +387,7 @@ fun lex(src: str): Token[] {
         # ── comment # ──
         if consumed == 0 && ch == '#' {
             pos += 1
-            while pos < n && src_bytes[pos] != '\n' {
+            for pos < n && src_bytes[pos] != '\n' {
                 pos += 1
             }
             consumed = 1
@@ -400,7 +397,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && ch == 'f' && char_at(src, pos + 1) == 34 {
             let t = scan_fstring(src, pos, line)
             pos += 2
-            while pos < n && src_bytes[pos] != '"' {
+            for pos < n && src_bytes[pos] != '"' {
                 if src_bytes[pos] == '\\' {
                     pos += 2
                 } else {
@@ -425,7 +422,7 @@ fun lex(src: str): Token[] {
             let content_start = pos
             let buf = new u8[]
             let scanning = 1
-            while scanning == 1 && pos < n {
+            for scanning == 1 && pos < n {
                 if src_bytes[pos] == '"' {
                     scanning = 0
                 } else {
@@ -478,7 +475,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_digit(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_digit(src_bytes[pos]) == 1 {
+            for pos < n && is_digit(src_bytes[pos]) == 1 {
                 pos += 1
             }
             let text = src[start:pos]
@@ -490,7 +487,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_alpha(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_alnum(src_bytes[pos]) == 1 {
+            for pos < n && is_alnum(src_bytes[pos]) == 1 {
                 pos += 1
             }
             let text = src[start:pos]
@@ -726,7 +723,7 @@ fun lex(src: str): Token[] {
         }
     }
 
-    return tokens
+    ret tokens
 }
 
 
@@ -734,7 +731,7 @@ fun lex(src: str): Token[] {
 
 fun dump_line(line: i64, kind: str, dump_text: str): i64 {
     println(f"{line}\t{kind}\t{len(dump_text)}\t{dump_text}")
-    return 0
+    ret 0
 }
 
 fun dump_tokens(tokens: Token[]): i64 {
@@ -757,7 +754,7 @@ fun dump_tokens(tokens: Token[]): i64 {
             dump_line(t.line, t.kind, t.dump_text)
         }
     }
-    return 0
+    ret 0
 }
 
 
@@ -770,5 +767,5 @@ fun main(): i64 {
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
     dump_tokens(tokens)
-    return 0
+    ret 0
 }

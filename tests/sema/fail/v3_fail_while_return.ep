@@ -1,7 +1,7 @@
 # COMPILE_FAIL: function must return i64 on all paths
 
 fun main(): i64 {
-    while true {
-        return 1
+    for true {
+        ret 1
     }
 }

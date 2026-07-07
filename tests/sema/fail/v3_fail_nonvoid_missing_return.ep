@@ -2,6 +2,6 @@
 
 fun main(): i64 {
     if true {
-        return 1
+        ret 1
     }
 }

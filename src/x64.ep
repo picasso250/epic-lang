@@ -40,35 +40,35 @@ fun x64_operand_empty(): X64Operand {
     op.size = 8
     op.has_base = false
     op.has_symbol = false
-    return op
+    ret op
 }
 
 fun x64_reg(name: str): X64Operand {
     let op = x64_operand_empty()
     op.kind = "reg"
     op.name = name
-    return op
+    ret op
 }
 
 fun x64_imm(value: i64): X64Operand {
     let op = x64_operand_empty()
     op.kind = "imm"
     op.value = value
-    return op
+    ret op
 }
 
 fun x64_symbol(name: str): X64Operand {
     let op = x64_operand_empty()
     op.kind = "symbol"
     op.name = name
-    return op
+    ret op
 }
 
 fun x64_label_ref(name: str): X64Operand {
     let op = x64_operand_empty()
     op.kind = "label_ref"
     op.name = name
-    return op
+    ret op
 }
 
 fun x64_mem_base(base: str, disp: i64, size: i64): X64Operand {
@@ -78,7 +78,7 @@ fun x64_mem_base(base: str, disp: i64, size: i64): X64Operand {
     op.disp = disp
     op.size = size
     op.has_base = true
-    return op
+    ret op
 }
 
 fun x64_mem_symbol(symbol: str, size: i64): X64Operand {
@@ -87,7 +87,7 @@ fun x64_mem_symbol(symbol: str, size: i64): X64Operand {
     op.symbol = symbol
     op.size = size
     op.has_symbol = true
-    return op
+    ret op
 }
 
 fun x64_item_empty(kind: str): X64Item {
@@ -98,13 +98,13 @@ fun x64_item_empty(kind: str): X64Item {
     item.operands = new X64Operand[0]
     item.values = new i64[0]
     item.count = 0
-    return item
+    ret item
 }
 
 fun x64_program_empty(): X64Program {
     let program = new X64Program
     program.items = new X64Item[0]
-    return program
+    ret program
 }
 
 fun x64_add_global(program: X64Program, name: str): void {
@@ -171,103 +171,103 @@ fun x64_add_data_zero(program: X64Program, label: str, count: i64): void {
 
 fun x64_size_prefix(size: i64): str {
     if size == 1 {
-        return "byte "
+        ret "byte "
     }
-    return "qword "
+    ret "qword "
 }
 
 fun x64_mem_addr_text(op: X64Operand): str {
     if op.has_symbol {
-        return op.symbol
+        ret op.symbol
     }
     if op.disp == 0 {
-        return op.base
+        ret op.base
     }
     if op.disp > 0 {
-        return str_cat2(str_cat2(op.base, "+"), str(op.disp))
+        ret str_cat2(str_cat2(op.base, "+"), str(op.disp))
     }
-    return str_cat2(op.base, str(op.disp))
+    ret str_cat2(op.base, str(op.disp))
 }
 
 fun x64_operand_text(op: X64Operand): str {
     if op.kind == "reg" {
-        return op.name
+        ret op.name
     }
     if op.kind == "imm" {
-        return str(op.value)
+        ret str(op.value)
     }
     if op.kind == "symbol" {
-        return op.name
+        ret op.name
     }
     if op.kind == "label_ref" {
-        return op.name
+        ret op.name
     }
     if op.kind == "mem" {
-        return str_cat2(str_cat2(x64_size_prefix(op.size), "["), str_cat2(x64_mem_addr_text(op), "]"))
+        ret str_cat2(str_cat2(x64_size_prefix(op.size), "["), str_cat2(x64_mem_addr_text(op), "]"))
     }
-    return "<bad operand>"
+    ret "<bad operand>"
 }
 
 fun x64_operands_text(operands: X64Operand[]): str {
     let buf = make_str_buf()
     let i = 0
-    while i < len(operands) {
+    for i < len(operands) {
         if i > 0 {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, x64_operand_text(operands[i]))
         i = i + 1
     }
-    return str_buf_finish(buf)
+    ret str_buf_finish(buf)
 }
 
 fun x64_values_text(values: i64[]): str {
     let buf = make_str_buf()
     let i = 0
-    while i < len(values) {
+    for i < len(values) {
         if i > 0 {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, str(values[i]))
         i = i + 1
     }
-    return str_buf_finish(buf)
+    ret str_buf_finish(buf)
 }
 
 fun x64_item_text(item: X64Item): str {
     if item.kind == "global" {
-        return str_cat2(str_cat2("global ", item.name), "\n")
+        ret str_cat2(str_cat2("global ", item.name), "\n")
     }
     if item.kind == "extern" {
-        return str_cat2(str_cat2("extern ", item.name), "\n")
+        ret str_cat2(str_cat2("extern ", item.name), "\n")
     }
     if item.kind == "section" {
-        return str_cat2(str_cat2("section ", item.name), "\n")
+        ret str_cat2(str_cat2("section ", item.name), "\n")
     }
     if item.kind == "label" {
-        return str_cat2(str_cat2(item.name, ":"), "\n")
+        ret str_cat2(str_cat2(item.name, ":"), "\n")
     }
     if item.kind == "inst" {
         if len(item.operands) == 0 {
-            return str_cat2(str_cat2("    ", item.op), "\n")
+            ret str_cat2(str_cat2("    ", item.op), "\n")
         }
-        return str_cat2(str_cat2(str_cat2(str_cat2("    ", item.op), " "), x64_operands_text(item.operands)), "\n")
+        ret str_cat2(str_cat2(str_cat2(str_cat2("    ", item.op), " "), x64_operands_text(item.operands)), "\n")
     }
     if item.kind == "data_bytes" {
-        return str_cat2(str_cat2(str_cat2(item.name, ": db "), x64_values_text(item.values)), "\n")
+        ret str_cat2(str_cat2(str_cat2(item.name, ": db "), x64_values_text(item.values)), "\n")
     }
     if item.kind == "data_zero" {
-        return str_cat2(str_cat2(str_cat2(str_cat2(item.name, ": times "), str(item.count)), " db 0"), "\n")
+        ret str_cat2(str_cat2(str_cat2(str_cat2(item.name, ": times "), str(item.count)), " db 0"), "\n")
     }
-    return "<bad x64 item>\n"
+    ret "<bad x64 item>\n"
 }
 
 fun x64_program_text(program: X64Program): str {
     let buf = make_str_buf()
     let i = 0
-    while i < len(program.items) {
+    for i < len(program.items) {
         str_buf_extend(buf, x64_item_text(program.items[i]))
         i = i + 1
     }
-    return str_buf_finish(buf)
+    ret str_buf_finish(buf)
 }

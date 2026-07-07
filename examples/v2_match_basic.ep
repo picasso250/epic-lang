@@ -47,5 +47,5 @@ fun main(): i64 {
             print("else")
         }
     }
-    return 0
+    ret 0
 }

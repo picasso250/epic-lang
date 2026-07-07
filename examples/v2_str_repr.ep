@@ -28,5 +28,5 @@ fun main(): i64 {
     println(str('A'))
     println(str(new u8[] { u8(65), u8(66) }))
 
-    return 0
+    ret 0
 }

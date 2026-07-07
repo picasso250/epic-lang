@@ -1,4 +1,4 @@
 fun main(): i64 {
     let x = 1 + 2 * 3
-    return x
+    ret x
 }

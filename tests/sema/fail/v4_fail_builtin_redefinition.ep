@@ -1,8 +1,8 @@
 # COMPILE_FAIL: reserved builtin function name: len
 fun len(): i64 {
-    return 1
+    ret 1
 }
 
 fun main(): i64 {
-    return 0
+    ret 0
 }

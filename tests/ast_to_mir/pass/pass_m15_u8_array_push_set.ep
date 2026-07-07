@@ -2,5 +2,5 @@ fun main(): i64 {
     let b = new u8[]
     push(b, u8(255))
     b[0] = u8(7)
-    return i64(b[0])
+    ret i64(b[0])
 }

@@ -4,29 +4,29 @@
 fun __ep_str_eq(left: str, right: str): bool {
     let left_len = len(left)
     if left_len != len(right) {
-        return false
+        ret false
     }
     let left_bytes = bytes(left)
     let right_bytes = bytes(right)
     for i in 0:left_len {
         if left_bytes[i] != right_bytes[i] {
-            return false
+            ret false
         }
     }
-    return true
+    ret true
 }
 
 fun __ep_str_from_bool(value: bool): str {
     if value {
-        return "true"
+        ret "true"
     }
-    return "false"
+    ret "false"
 }
 
 
 fun __ep_str_from_i64(value: i64): str {
     if value == (0 - 9223372036854775807 - 1) {
-        return "-9223372036854775808"
+        ret "-9223372036854775808"
     }
     if value < 0 {
         let digits = bytes(__ep_str_from_u64(u64(0 - value)))
@@ -35,9 +35,9 @@ fun __ep_str_from_i64(value: i64): str {
         for i in 0:len(digits) {
             push(out, digits[i])
         }
-        return str(out)
+        ret str(out)
     }
-    return __ep_str_from_u64(u64(value))
+    ret __ep_str_from_u64(u64(value))
 }
 
 fun __ep_str_from_u64(value: u64): str {
@@ -46,7 +46,7 @@ fun __ep_str_from_u64(value: u64): str {
     if n == u64(0) {
         push(rev, '0')
     }
-    while n != u64(0) {
+    for n != u64(0) {
         let digit = n % u64(10)
         push(rev, u8(digit + u64(48)))
         n = n / u64(10)
@@ -54,11 +54,11 @@ fun __ep_str_from_u64(value: u64): str {
 
     let out = new u8[] {}
     let i = len(rev)
-    while i > 0 {
+    for i > 0 {
         i -= 1
         push(out, rev[i])
     }
-    return str(out)
+    ret str(out)
 }
 
 fun __ep_str_slice(s: str, start: i64, end: i64): str {
@@ -77,5 +77,5 @@ fun __ep_str_slice(s: str, start: i64, end: i64): str {
     for i in start:end {
         push(out, bytes_view[i])
     }
-    return str(out)
+    ret str(out)
 }

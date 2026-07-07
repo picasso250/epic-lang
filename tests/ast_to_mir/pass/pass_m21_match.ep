@@ -16,5 +16,5 @@ fun main(): i64 {
         "x": { print("S") }
         else: { print("N") }
     }
-    return 0
+    ret 0
 }

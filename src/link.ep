@@ -50,7 +50,7 @@ fun die_link(msg: str): void {
 }
 
 fun align_to(n: i64, a: i64): i64 {
-    return ((n + a - 1) / a) * a
+    ret ((n + a - 1) / a) * a
 }
 
 fun append_zero(buf: u8[], n: i64): void {
@@ -60,27 +60,27 @@ fun append_zero(buf: u8[], n: i64): void {
 }
 
 fun u16_le(buf: u8[], off: i64): u64 {
-    return u64(buf[off]) | (u64(buf[off + 1]) << 8)
+    ret u64(buf[off]) | (u64(buf[off + 1]) << 8)
 }
 
 fun u32_le(buf: u8[], off: i64): u64 {
-    return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
+    ret u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
 }
 
 fun u64_le(buf: u8[], off: i64): u64 {
-    return u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24) | (u64(buf[off + 4]) << 32) | (u64(buf[off + 5]) << 40) | (u64(buf[off + 6]) << 48) | (u64(buf[off + 7]) << 56)
+    ret u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24) | (u64(buf[off + 4]) << 32) | (u64(buf[off + 5]) << 40) | (u64(buf[off + 6]) << 48) | (u64(buf[off + 7]) << 56)
 }
 
 fun le16_as_i64(buf: u8[], off: i64): i64 {
-    return i64(u16_le(buf, off))
+    ret i64(u16_le(buf, off))
 }
 
 fun le32_as_i64(buf: u8[], off: i64): i64 {
-    return i64(u32_le(buf, off))
+    ret i64(u32_le(buf, off))
 }
 
 fun le64_as_i64(buf: u8[], off: i64): i64 {
-    return i64(u64_le(buf, off))
+    ret i64(u64_le(buf, off))
 }
 
 fun put_u16_le(buf: u8[], off: i64, x: u64): void {
@@ -146,13 +146,13 @@ fun str_cat_local(left: str, right: str): str {
     let out = new u8[]
     extend(out, bytes(left))
     extend(out, bytes(right))
-    return str(out)
+    ret str(out)
 }
 
 fun cstr_ready_path(s: str): str {
     let out = new u8[len(s) + 1]
     extend(out, bytes(s))
-    return str(out)
+    ret str(out)
 }
 
 fun append_name8(buf: u8[], name: str): void {
@@ -211,7 +211,7 @@ fun copy_bytes(src: u8[], off: i64, n: i64): u8[] {
     for i in 0:n {
         push(out, src[off + i])
     }
-    return out
+    ret out
 }
 
 fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64): str {
@@ -219,11 +219,11 @@ fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64): str {
     for i in 0:max_n {
         let b = src[off + i]
         if b == u8(0) {
-            return str(out)
+            ret str(out)
         }
         push(out, b)
     }
-    return str(out)
+    ret str(out)
 }
 
 fun find_text(s: str, needle: str): i64 {
@@ -231,10 +231,10 @@ fun find_text(s: str, needle: str): i64 {
     let pat = bytes(needle)
     let n = len(pat)
     if n == 0 {
-        return 0
+        ret 0
     }
     if len(hay) < n {
-        return -1
+        ret -1
     }
     for i in 0:(len(hay) - n + 1) {
         let ok = true
@@ -244,27 +244,27 @@ fun find_text(s: str, needle: str): i64 {
             }
         }
         if ok {
-            return i
+            ret i
         }
     }
-    return -1
+    ret -1
 }
 
 fun has_text(s: str, needle: str): i64 {
     if find_text(s, needle) >= 0 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun get_name_value(items: NameValue[], name: str): i64 {
     for i in 0:len(items) {
         let item = items[i]
         if item.name == name {
-            return item.value
+            ret item.value
         }
     }
-    return 0
+    ret 0
 }
 
 fun put_name_value(items: NameValue[], name: str, value: i64): void {
@@ -277,17 +277,17 @@ fun put_name_value(items: NameValue[], name: str, value: i64): void {
 fun contains_str(items: str[], name: str): i64 {
     for i in 0:len(items) {
         if items[i] == name {
-            return 1
+            ret 1
         }
     }
-    return 0
+    ret 0
 }
 
 fun sym_name(st: LinkState, sym: Symbol): str {
     if sym.name_off >= 0 {
-        return str_from_bytes_until_zero(st.strtab, sym.name_off, len(st.strtab) - sym.name_off)
+        ret str_from_bytes_until_zero(st.strtab, sym.name_off, len(st.strtab) - sym.name_off)
     }
-    return str_from_bytes_until_zero(st.data, sym.raw_off, 8)
+    ret str_from_bytes_until_zero(st.data, sym.raw_off, 8)
 }
 
 fun parse_sections(st: LinkState, nsects: i64): void {
@@ -307,7 +307,7 @@ fun parse_sections(st: LinkState, nsects: i64): void {
 
 fun parse_symbols(st: LinkState, symtab_off: i64, nsyms: i64): void {
     let i = 0
-    while i < nsyms {
+    for i < nsyms {
         let pos = symtab_off + i * 18
         let sym = new Symbol
         sym.raw_off = pos
@@ -341,9 +341,9 @@ fun parse_strtab(st: LinkState, symtab_off: i64, nsyms: i64): void {
 
 fun ascii_lower_byte(b: u8): u8 {
     if b >= u8(65) && b <= u8(90) {
-        return b + u8(32)
+        ret b + u8(32)
     }
-    return b
+    ret b
 }
 
 fun import_less_casefold(a: str, b: str): bool {
@@ -354,18 +354,18 @@ fun import_less_casefold(a: str, b: str): bool {
         n = len(bb)
     }
     let i = 0
-    while i < n {
+    for i < n {
         let ac = ascii_lower_byte(ab[i])
         let bc = ascii_lower_byte(bb[i])
         if ac < bc {
-            return true
+            ret true
         }
         if ac > bc {
-            return false
+            ret false
         }
         i += 1
     }
-    return len(ab) < len(bb)
+    ret len(ab) < len(bb)
 }
 
 fun sorted_imports(items: str[]): str[] {
@@ -386,7 +386,7 @@ fun sorted_imports(items: str[]): str[] {
         }
         out = next
     }
-    return out
+    ret out
 }
 
 fun collect_imports(st: LinkState): void {
@@ -421,64 +421,64 @@ fun collect_relocs(st: LinkState): void {
 
 fun kernel32_hint(name: str): i64 {
     if name == "CloseHandle" {
-        return 157
+        ret 157
     }
     if name == "CreateFileA" {
-        return 222
+        ret 222
     }
     if name == "CreateProcessA" {
-        return 253
+        ret 253
     }
     if name == "ExitProcess" {
-        return 390
+        ret 390
     }
     if name == "GetCommandLineA" {
-        return 511
+        ret 511
     }
     if name == "GetExitCodeProcess" {
-        return 615
+        ret 615
     }
     if name == "GetFileSize" {
-        return 631
+        ret 631
     }
     if name == "GetProcessHeap" {
-        return 740
+        ret 740
     }
     if name == "GetStdHandle" {
-        return 805
+        ret 805
     }
     if name == "GetTickCount64" {
-        return 846
+        ret 846
     }
     if name == "HeapAlloc" {
-        return 892
+        ret 892
     }
     if name == "lstrcmpA" {
-        return 985
+        ret 985
     }
     if name == "lstrlenA" {
-        return 991
+        ret 991
     }
     if name == "ReadFile" {
-        return 1193
+        ret 1193
     }
     if name == "SetFilePointer" {
-        return 1384
+        ret 1384
     }
     if name == "Sleep" {
-        return 1410
+        ret 1410
     }
     if name == "WaitForSingleObject" {
-        return 1573
+        ret 1573
     }
     if name == "WriteFile" {
-        return 1632
+        ret 1632
     }
-    return 0
+    ret 0
 }
 
 fun is_user32_import(name: str): bool {
-    return name == "MessageBoxA"
+    ret name == "MessageBoxA"
 }
 
 fun import_user32_count(st: LinkState): i64 {
@@ -488,27 +488,27 @@ fun import_user32_count(st: LinkState): i64 {
             n += 1
         }
     }
-    return n
+    ret n
 }
 
 fun import_kernel32_count(st: LinkState): i64 {
-    return len(st.imports) - import_user32_count(st)
+    ret len(st.imports) - import_user32_count(st)
 }
 
 fun import_dll_count(st: LinkState): i64 {
     if import_user32_count(st) > 0 {
-        return 2
+        ret 2
     }
     if len(st.imports) > 0 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 
 fun import_iat_dir_offset(st: LinkState): i64 {
     let dlls = import_dll_count(st)
     if dlls == 0 {
-        return 0
+        ret 0
     }
     let off = (dlls + 1) * 20
     off = align_to(off, 8)
@@ -522,7 +522,7 @@ fun import_iat_dir_offset(st: LinkState): i64 {
         off += (u + 1) * 8
     }
     off = align_to(off, 8)
-    return off
+    ret off
 }
 
 fun import_iat_dir_size(st: LinkState): i64 {
@@ -535,29 +535,29 @@ fun import_iat_dir_size(st: LinkState): i64 {
     if u > 0 {
         size += (u + 1) * 8
     }
-    return size
+    ret size
 }
 
 fun import_hint(name: str): i64 {
     if is_user32_import(name) {
-        return 0
+        ret 0
     }
-    return kernel32_hint(name)
+    ret kernel32_hint(name)
 }
 
 fun find_section(st: LinkState, needle: str): Section {
     for i in 0:len(st.sections) {
         let sec = st.sections[i]
         if has_text(sec.name, needle) == 1 {
-            return sec
+            ret sec
         }
     }
     die_link("missing section")
-    return new Section
+    ret new Section
 }
 
 fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void {
-    while len(text_sec.data) % 16 != 0 {
+    for len(text_sec.data) % 16 != 0 {
         push(text_sec.data, u8(204))
     }
     let thunk_base = text_rva + len(text_sec.data)
@@ -581,13 +581,13 @@ fun hint_size(name: str): i64 {
     if n % 2 != 0 {
         n += 1
     }
-    return n
+    ret n
 }
 
 fun build_idata(st: LinkState): void {
     st.idata = new u8[256]
     if len(st.imports) == 0 {
-        return
+        ret
     }
 
     let dll_count = import_dll_count(st)
@@ -600,28 +600,28 @@ fun build_idata(st: LinkState): void {
     let u_ilt = 0
     let k_iat = 0
     let u_iat = 0
-    while len(st.idata) % 8 != 0 {
+    for len(st.idata) % 8 != 0 {
         push(st.idata, u8(0))
     }
     if k_count > 0 {
         k_ilt = len(st.idata)
         append_zero(st.idata, (k_count + 1) * 8)
     }
-    while len(st.idata) % 8 != 0 {
+    for len(st.idata) % 8 != 0 {
         push(st.idata, u8(0))
     }
     if u_count > 0 {
         u_ilt = len(st.idata)
         append_zero(st.idata, (u_count + 1) * 8)
     }
-    while len(st.idata) % 8 != 0 {
+    for len(st.idata) % 8 != 0 {
         push(st.idata, u8(0))
     }
     if k_count > 0 {
         k_iat = len(st.idata)
         append_zero(st.idata, (k_count + 1) * 8)
     }
-    while len(st.idata) % 8 != 0 {
+    for len(st.idata) % 8 != 0 {
         push(st.idata, u8(0))
     }
     if u_count > 0 {
@@ -688,12 +688,12 @@ fun build_idata(st: LinkState): void {
 fun section_rva(st: LinkState, sec_index: i64): i64 {
     let sec = st.sections[sec_index]
     if has_text(sec.name, "text") == 1 {
-        return 4096
+        ret 4096
     }
     if has_text(sec.name, "data") == 1 {
-        return st.data_rva
+        ret st.data_rva
     }
-    return 0
+    ret 0
 }
 
 fun find_entry(st: LinkState): void {
@@ -704,7 +704,7 @@ fun find_entry(st: LinkState): void {
             let name = sym_name(st, sym)
             if name == "_start" {
                 st.entry_rva = section_rva(st, sym.section - 1) + sym.value
-                return
+                ret
             }
         }
     }
@@ -771,7 +771,7 @@ fun append_padded_section(buf: u8[], name: str, data: u8[]): void {
     if name == ".text" {
         pad = 204
     }
-    while len(buf) % 512 != 0 {
+    for len(buf) % 512 != 0 {
         push(buf, u8(pad))
     }
 }
@@ -856,7 +856,7 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
     }
     append_section_header(buf, ".data", st.data_rva, len(data_sec.data))
 
-    while len(buf) < headers_sz {
+    for len(buf) < headers_sz {
         push(buf, u8(0))
     }
 
@@ -878,7 +878,7 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
     append_padded_section(buf, ".data", data_sec.data)
 
     write_file(exe_path, buf)
-    return len(buf)
+    ret len(buf)
 }
 
 fun link_obj(obj_path: str, exe_path: str): i64 {
@@ -925,15 +925,15 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
     patch_thunks(st, text_sec)
     find_entry(st)
     patch_relocs(st, text_sec)
-    return write_pe(st, exe_path, text_sec, data_sec)
+    ret write_pe(st, exe_path, text_sec, data_sec)
 }
 
 fun default_out_path(obj_path: str): str {
     let dot = find_text(obj_path, ".obj")
     if dot >= 0 {
-        return str_cat_local(obj_path[0:dot], ".exe")
+        ret str_cat_local(obj_path[0:dot], ".exe")
     }
-    return str_cat_local(obj_path, ".exe")
+    ret str_cat_local(obj_path, ".exe")
 }
 
 fun main(): i64 {
@@ -943,7 +943,7 @@ fun main(): i64 {
     let obj_path = cstr_ready_path(argv[1])
     let exe_path = ""
     let i = 2
-    while i + 1 < len(argv) {
+    for i + 1 < len(argv) {
         if argv[i] == "-o" {
             exe_path = cstr_ready_path(argv[i + 1])
         }
@@ -958,5 +958,5 @@ fun main(): i64 {
     print(" (")
     print(str(sz))
     print(" bytes)\n")
-    return 0
+    ret 0
 }

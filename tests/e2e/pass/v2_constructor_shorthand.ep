@@ -9,5 +9,5 @@ fun main(): i64 {
     # constructor shorthand: new StructName → new StructName {}
     let b = new Box
     print(str(b.n))
-    return 0
+    ret 0
 }
