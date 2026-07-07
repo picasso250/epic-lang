@@ -54,8 +54,7 @@ fun machine_builder_empty(): MachineBuilder {
 }
 
 fun machine_die(msg: str): void {
-    println(str_cat2("machine error: ", msg))
-    exit(1)
+    panic str_cat2("machine error: ", msg)
 }
 
 fun machine_append_byte(out: i64[], value: i64): void {

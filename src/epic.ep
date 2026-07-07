@@ -5,8 +5,7 @@
 #
 
 fun epic_die(msg: str): void {
-    println(str_cat2("epic error: ", msg))
-    exit(1)
+    panic str_cat2("epic error: ", msg)
 }
 
 fun epic_obj_path(exe_path: str): str {
@@ -73,6 +72,12 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
     let panic_suffix = new i64[0]
     epic_push_bytes_i64(panic_suffix, bytes(": invalid cstr"))
     x64_add_data_bytes(x64, "_cstr_panic_suffix", panic_suffix)
+    let slice_oob = new i64[0]
+    epic_push_bytes_i64(slice_oob, bytes("runtime trap: slice oob"))
+    x64_add_data_bytes(x64, "_trap_slice_oob", slice_oob)
+    let null_deref = new i64[0]
+    epic_push_bytes_i64(null_deref, bytes("runtime trap: null deref"))
+    x64_add_data_bytes(x64, "_trap_null_deref", null_deref)
     let i = 0
     while i < len(program.globals) {
         if program.globals[i].has_init {

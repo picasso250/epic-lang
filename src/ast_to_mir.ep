@@ -57,8 +57,7 @@ fun mir_unreachable_flow(): MirBlockFlow {
 }
 
 fun ast_to_mir_die(msg: str): void {
-    println(f"AST-to-MIR error: {msg}")
-    exit(1)
+    panic str_cat2("AST-to-MIR error: ", msg)
 }
 
 fun mir_epic_type(type_name: str): str {
@@ -1769,8 +1768,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
 
 fun main(): void {
     if len(argv) < 2 {
-        println("usage: ast_to_mir <file>")
-        exit(1)
+        panic "usage: ast_to_mir <file>"
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)

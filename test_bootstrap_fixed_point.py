@@ -19,19 +19,34 @@ import sys
 import time
 
 
+def rel(path):
+    return os.path.relpath(path, SCRIPT_DIR).replace(os.sep, "/")
+
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
-SELF_OUT = os.path.join(BUILD_DIR, "epic", "src_epic.ep.exe")
-SOURCES = [
-    os.path.join("src", "epic.ep"),
-    os.path.join("src", "codegen_support.ep"),
-    os.path.join("src", "codegen.ep"),
-    os.path.join("src", "parser.ep"),
-    os.path.join("src", "lexer.ep"),
+RUNTIME_SOURCES = [
+    os.path.join("runtime", "str.ep"),
 ]
-TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "60"))
+COMPILER_SOURCES = [
+    os.path.join("src", "util.ep"),
+    os.path.join("src", "lexer.ep"),
+    os.path.join("src", "parser.ep"),
+    os.path.join("src", "sema.ep"),
+    os.path.join("src", "mir.ep"),
+    os.path.join("src", "mir_runtime.ep"),
+    os.path.join("src", "ast_to_mir.ep"),
+    os.path.join("src", "x64.ep"),
+    os.path.join("src", "mir_to_x64.ep"),
+    os.path.join("src", "x64_runtime.ep"),
+    os.path.join("src", "machine.ep"),
+    os.path.join("src", "coff.ep"),
+    os.path.join("src", "link.ep"),
+    os.path.join("src", "epic.ep"),
+]
+TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "240"))
 
 
 def run_checked(cmd, label):
@@ -55,8 +70,12 @@ def run_checked(cmd, label):
     if result.returncode != 0:
         raise RuntimeError(
             f"{label} failed with exit {result.returncode}\n"
-            + result.stdout[-4000:]
-            + result.stderr[-4000:]
+            + "cmd: " + " ".join(cmd) + "\n"
+            + f"stdout bytes: {len(result.stdout)} stderr bytes: {len(result.stderr)}\n"
+            + "--- stdout tail ---\n"
+            + result.stdout[-8000:]
+            + "\n--- stderr tail ---\n"
+            + result.stderr[-8000:]
         )
     elapsed = time.perf_counter() - start
     for line in result.stdout.splitlines():
@@ -66,45 +85,59 @@ def run_checked(cmd, label):
     return result
 
 
-def copy_self_out(name):
-    dst = os.path.join(BOOT_DIR, name)
-    if not os.path.exists(SELF_OUT):
-        raise RuntimeError(f"expected compiler output missing: {SELF_OUT}")
-    shutil.copyfile(SELF_OUT, dst)
-    return dst
-
-
-def main():
-    os.makedirs(BOOT_DIR, exist_ok=True)
-    os.makedirs(os.path.join(BUILD_DIR, "epic"), exist_ok=True)
-
-    epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
-    epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
-    epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
-    epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
-
+def build_with_python(output_path):
+    stage0_dir = os.path.join(BOOT_DIR, "stage0")
     run_checked(
         [
             sys.executable,
             EPICC,
             "--main",
             os.path.join("src", "epic.ep"),
-            *SOURCES,
+            *COMPILER_SOURCES,
             "--out-dir",
-            BOOT_DIR,
+            stage0_dir,
+            "--linker",
+            "py",
         ],
         "python -> epic-py",
     )
-    shutil.copyfile(os.path.join(BOOT_DIR, "src", "epic.exe"), epic_py)
+    produced = os.path.join(stage0_dir, "src", "epic.exe")
+    if not os.path.exists(produced):
+        raise RuntimeError(f"expected compiler output missing: {produced}")
+    shutil.copyfile(produced, output_path)
 
-    run_checked([epic_py, *SOURCES], "epic-py -> epic-epic")
-    copy_self_out("epic-epic.exe")
 
-    run_checked([epic_epic, *SOURCES], "epic-epic -> epic-epic-epic")
-    copy_self_out("epic-epic-epic.exe")
+def build_with_epic(compiler, output_path, label):
+    run_checked(
+        [
+            compiler,
+            *RUNTIME_SOURCES,
+            *COMPILER_SOURCES,
+            "--main",
+            os.path.join("src", "epic.ep"),
+            "-o",
+            rel(output_path),
+        ],
+        label,
+    )
+    if not os.path.exists(output_path):
+        raise RuntimeError(f"expected compiler output missing: {output_path}")
 
-    run_checked([epic_epic_epic, *SOURCES], "epic-epic-epic -> epic-epic-epic-epic")
-    copy_self_out("epic-epic-epic-epic.exe")
+
+def main():
+    if os.path.exists(BOOT_DIR):
+        shutil.rmtree(BOOT_DIR)
+    os.makedirs(BOOT_DIR, exist_ok=True)
+
+    epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
+    epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
+    epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
+    epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
+
+    build_with_python(epic_py)
+    build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
+    build_with_epic(epic_epic, epic_epic_epic, "epic-epic -> epic-epic-epic")
+    build_with_epic(epic_epic_epic, epic_epic_epic_epic, "epic-epic-epic -> epic-epic-epic-epic")
 
     checks = [(epic_epic, epic_epic_epic), (epic_epic_epic, epic_epic_epic_epic)]
     for left, right in checks:

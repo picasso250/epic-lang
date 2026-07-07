@@ -19,8 +19,7 @@ struct SemaState {
 }
 
 fun sema_die(msg: str): void {
-    println(f"Sema error: {msg}")
-    exit(1)
+    panic str_cat2("Sema error: ", msg)
 }
 
 fun sema_starts_with(s: str, prefix: str): bool {
@@ -1305,8 +1304,7 @@ fun make_sema_state(): SemaState {
 
 fun main(): void {
     if len(argv) < 2 {
-        println("usage: sema <file>")
-        exit(1)
+        panic "usage: sema <file>"
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)

@@ -37,8 +37,7 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
 }
 
 fun mir_to_x64_die(msg: str): void {
-    println(str_cat2("MIR-to-X64 error: ", msg))
-    exit(1)
+    panic str_cat2("MIR-to-X64 error: ", msg)
 }
 
 fun mir_to_x64_data_label(name: str): str {
@@ -532,6 +531,9 @@ fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction)
 }
 
 fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction): X64Program {
+    lower.value_slots = new MirToX64Slot[0]
+    lower.addr_slots = new MirToX64Slot[0]
+    lower.next_slot = 0
     lower.return_label = str_cat2(fn.name, ".__return")
     mir_to_x64_plan_slots(lower, fn)
     let frame = mir_to_x64_aligned_frame(lower)

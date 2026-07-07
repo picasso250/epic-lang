@@ -46,10 +46,7 @@ struct LinkState {
 }
 
 fun die_link(msg: str): void {
-    print("link.ep: ")
-    print(msg)
-    println()
-    os.kernel32.ExitProcess(1)
+    panic msg
 }
 
 fun align_to(n: i64, a: i64): i64 {
@@ -88,7 +85,7 @@ fun le64_as_i64(buf: u8[], off: i64): i64 {
 
 fun put_u16_le(buf: u8[], off: i64, x: u64): void {
     if x > u64(65535) {
-        os.kernel32.ExitProcess(1)
+        panic str_cat_local("put_u16_le overflow: ", str(x))
     }
     buf[off] = u8(x & u64(255))
     buf[off + 1] = u8((x >>> 8) & u64(255))
@@ -96,7 +93,7 @@ fun put_u16_le(buf: u8[], off: i64, x: u64): void {
 
 fun put_u32_le(buf: u8[], off: i64, x: u64): void {
     if x > u64(4294967295) {
-        os.kernel32.ExitProcess(1)
+        panic str_cat_local("put_u32_le overflow: ", str(x))
     }
     buf[off] = u8(x & u64(255))
     buf[off + 1] = u8((x >>> 8) & u64(255))
@@ -941,8 +938,7 @@ fun default_out_path(obj_path: str): str {
 
 fun main(): i64 {
     if len(argv) < 2 {
-        print("Usage: link.ep <file.obj> [-o out.exe]\n")
-        os.kernel32.ExitProcess(1)
+        panic "Usage: link.ep <file.obj> [-o out.exe]"
     }
     let obj_path = cstr_ready_path(argv[1])
     let exe_path = ""

@@ -24,8 +24,7 @@ fun coff_section_spec(name: str, size: i64, raw: i64, rel_off: i64): CoffSection
 }
 
 fun coff_die(msg: str): void {
-    println(str_cat2("coff error: ", msg))
-    exit(1)
+    panic str_cat2("coff error: ", msg)
 }
 
 fun coff_append_byte(buf: u8[], value: i64): void {

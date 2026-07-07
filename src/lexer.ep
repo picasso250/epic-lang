@@ -173,8 +173,7 @@ fun decode_escape(e: u8): u8 {
     if e == '0' {
         return u8(0)
     }
-    println("bad escape")
-    exit(1)
+    panic "bad escape"
         return u8(0)
 }
 
@@ -185,14 +184,12 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
     while pos < end {
         let c = src_bytes[pos]
         if c == '\n' || c == '\r' {
-            println("unterminated string")
-            exit(1)
+            panic "unterminated string"
         }
         if c == '\\' {
             pos += 1
             if pos >= end {
-                println("bad escape")
-                exit(1)
+                panic "bad escape"
             }
             c = decode_escape(src_bytes[pos])
         }
@@ -242,8 +239,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
     while pos < n {
         let c = src_bytes[pos]
         if c == '\n' || c == '\r' {
-            println("unterminated f-string expression")
-            exit(1)
+            panic "unterminated f-string expression"
         }
         if c == '"' || c == '\'' {
             let quote = c
@@ -252,8 +248,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             while found == 0 && pos < n {
                 let q = src_bytes[pos]
                 if q == '\n' || q == '\r' {
-                    println("unterminated string in f-string expression")
-                    exit(1)
+                    panic "unterminated string in f-string expression"
                 }
                 if q == '\\' {
                     pos += 2
@@ -267,8 +262,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                 }
             }
             if found == 0 {
-                println("unterminated string in f-string expression")
-                exit(1)
+                panic "unterminated string in f-string expression"
             }
         } else {
             if c == '(' {
@@ -277,8 +271,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                 if c == ')' {
                     parens -= 1
                     if parens < 0 {
-                        println("unbalanced ')' in f-string expression")
-                        exit(1)
+                        panic "unbalanced ')' in f-string expression"
                     }
                 } else {
                     if c == '[' {
@@ -287,8 +280,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                         if c == ']' {
                             brackets -= 1
                             if brackets < 0 {
-                                println("unbalanced ']' in f-string expression")
-                                exit(1)
+                                panic "unbalanced ']' in f-string expression"
                             }
                         } else {
                             if c == '{' {
@@ -300,8 +292,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
                                     }
                                     braces -= 1
                                     if braces < 0 {
-                                        println("unbalanced '}' in f-string expression")
-                                        exit(1)
+                                        panic "unbalanced '}' in f-string expression"
                                     }
                                 }
                             }
@@ -312,8 +303,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
             pos += 1
         }
     }
-    println("unterminated f-string expression")
-    exit(1)
+    panic "unterminated f-string expression"
     return pos
 }
 
@@ -327,8 +317,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
     while pos < n {
         let ch = src_bytes[pos]
         if ch == '\n' || ch == '\r' {
-            println("unterminated f-string literal")
-            exit(1)
+            panic "unterminated f-string literal"
         }
         if ch == '\\' {
             pos += 2
@@ -342,8 +331,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
                 return make_fstring_token(parts, line)
             } else {
                 if ch == '}' {
-                    println("unexpected '}' in f-string literal")
-                    exit(1)
+                    panic "unexpected '}' in f-string literal"
                 } else {
                     if ch == '{' {
                         if pos > segment_start {
@@ -355,8 +343,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
                         let expr_end = scan_fstring_expr_end(src, expr_start, line)
                         let expr = trim_ascii(src[expr_start:expr_end])
                         if len(expr) == 0 {
-                            println("empty f-string expression")
-                            exit(1)
+                            panic "empty f-string expression"
                         }
                         push_fstring_expr(parts, expr)
                         pos = expr_end + 1
@@ -368,8 +355,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
             }
         }
     }
-    println("unterminated f-string literal")
-    exit(1)
+    panic "unterminated f-string literal"
     let t = new Token {}
     return t
 }
@@ -445,14 +431,12 @@ fun lex(src: str): Token[] {
                 } else {
                     let c = src_bytes[pos]
                     if c == '\n' || c == '\r' {
-                        println("unterminated string")
-                        exit(1)
+                        panic "unterminated string"
                     }
                     if c == '\\' {
                         pos += 1
                         if pos >= n {
-                            println("bad escape")
-                            exit(1)
+                            panic "bad escape"
                         }
                         let e = src_bytes[pos]
                         c = decode_escape(e)
@@ -462,8 +446,7 @@ fun lex(src: str): Token[] {
                 }
             }
             if scanning == 1 {
-                println("unterminated string")
-                exit(1)
+                panic "unterminated string"
             }
             let text = str(buf)
             let dump_text = src[content_start:pos]
@@ -484,8 +467,7 @@ fun lex(src: str): Token[] {
             }
             pos += 1
             if pos >= n || src_bytes[pos] != '\'' {
-                println("bad char")
-                exit(1)
+                panic "bad char"
             }
             pos += 1
             push_token(tokens, "CHAR", str(ch_val), start_line)
@@ -725,8 +707,7 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == ';'  {
-            println("unexpected semicolon")
-            exit(1)
+            panic "unexpected semicolon"
         }
         if consumed == 0 && ch == ','  {
             push_token(tokens, "COMMA", ",", line)
@@ -784,8 +765,7 @@ fun dump_tokens(tokens: Token[]): i64 {
 
 fun main(): i64 {
     if len(argv) < 2 {
-        println("usage: lexer <file>")
-        exit(1)
+        panic "usage: lexer <file>"
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)

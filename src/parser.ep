@@ -152,16 +152,14 @@ fun advance(p: Parser): Token {
 }
 
 fun parse_error(line: i64, msg: str): i64 {
-    println(f"Parse error line {line}: {msg}")
-    exit(1)
+    panic str_cat2(str_cat2("Parse error line ", str(line)), str_cat2(": ", msg))
     return 1
 }
 
 fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
     if t.kind != kind {
-        println(f"Parse error line {t.line}: Expected {kind}, got {t.kind}('{t.text}')")
-        exit(1)
+        panic f"Parse error line {t.line}: Expected {kind}, got {t.kind}('{t.text}')"
     }
     return t
 }
@@ -1430,8 +1428,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
 
 fun main(): i64 {
     if len(argv) < 2 {
-        println("usage: parser <file>")
-        exit(1)
+        panic "usage: parser <file>"
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
