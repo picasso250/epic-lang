@@ -1,0 +1,84 @@
+==================
+basic program
+==================
+
+# EXIT: 0
+struct Point {
+    x: i64
+    y: i64
+}
+
+fun main(): void {
+    let p = new Point
+    p.x = 40 + 2
+    if p.x == 42 {
+        os.ExitProcess(0)
+    } else {
+        ret
+    }
+}
+
+---
+
+(source_file
+  (comment)
+  (struct_definition
+    name: (identifier)
+    (struct_field
+      name: (identifier)
+      type: (type
+        (identifier)))
+    (struct_field
+      name: (identifier)
+      type: (type
+        (identifier))))
+  (function_definition
+    name: (identifier)
+    (parameters)
+    return_type: (type
+      (identifier))
+    body: (block
+      (statement
+        (let_statement
+          name: (identifier)
+          value: (expression
+            (new_expression
+              type: (identifier)))))
+      (statement
+        (assignment_statement
+          left: (field_expression
+            object: (expression
+              (identifier))
+            field: (identifier))
+          right: (expression
+            (binary_expression
+              left: (expression
+                (number))
+              right: (expression
+                (number))))))
+      (statement
+        (if_statement
+          condition: (expression
+            (binary_expression
+              left: (expression
+                (field_expression
+                  object: (expression
+                    (identifier))
+                  field: (identifier)))
+              right: (expression
+                (number))))
+          consequence: (block
+            (statement
+              (expression_statement
+                (expression
+                  (call_expression
+                    function: (field_expression
+                      object: (expression
+                        (identifier))
+                      field: (identifier))
+                    (expression
+                      (number)))))))
+          alternative: (block
+            (statement
+              (return_statement))))))))
+
