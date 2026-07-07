@@ -729,9 +729,9 @@ fun mir_runtime_emit_ep_slice_u8_get(): MirFunction {
     return fn
 }
 
-fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
-    let fn = mir_function_empty("__ep_slice_i64_new", "ptr")
-    push(fn.params, mir_runtime_param("cap", "i64"))
+fun mir_runtime_emit_ep_slice_word_new(name: str, elem_type: str): MirFunction {
+    let fn = mir_function_empty(name, "ptr")
+    push(fn.params, mir_runtime_param("cap", elem_type))
     let b0 = mir_block_empty("entry")
     let f5_b0_i0_inst = mir_inst_empty()
     f5_b0_i0_inst.op = "call"
@@ -740,7 +740,7 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b0_i0_inst.result_type = "ptr"
     f5_b0_i0_inst.typ = "ptr"
     f5_b0_i0_inst.callee = "__epx_alloc"
-    let f5_b0_i0_op0 = mir_const_int("i64", 24)
+    let f5_b0_i0_op0 = mir_const_int(elem_type, 24)
     push(f5_b0_i0_inst.operands, f5_b0_i0_op0)
     push(b0.instructions, f5_b0_i0_inst)
     let f5_b0_i1_inst = mir_inst_empty()
@@ -749,9 +749,9 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b0_i1_inst.result_name = "icmp_eq1"
     f5_b0_i1_inst.result_type = "bool"
     f5_b0_i1_inst.typ = "bool"
-    let f5_b0_i1_op0 = mir_value_operand("i64", "cap")
+    let f5_b0_i1_op0 = mir_value_operand(elem_type, "cap")
     push(f5_b0_i1_inst.operands, f5_b0_i1_op0)
-    let f5_b0_i1_op1 = mir_const_int("i64", 0)
+    let f5_b0_i1_op1 = mir_const_int(elem_type, 0)
     push(f5_b0_i1_inst.operands, f5_b0_i1_op1)
     push(b0.instructions, f5_b0_i1_inst)
     let f5_b0_t_cond = mir_value_operand("bool", "icmp_eq1")
@@ -767,7 +767,7 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b1_i0_inst.typ = "ptr"
     let f5_b1_i0_op0 = mir_value_operand("ptr", "call0")
     push(f5_b1_i0_inst.operands, f5_b1_i0_op0)
-    let f5_b1_i0_op1 = mir_const_int("i64", 0)
+    let f5_b1_i0_op1 = mir_const_int(elem_type, 0)
     push(f5_b1_i0_inst.operands, f5_b1_i0_op1)
     push(b1.instructions, f5_b1_i0_inst)
     let f5_b1_i1_inst = mir_inst_empty()
@@ -785,33 +785,33 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b2_i0_inst.op = "add"
     f5_b2_i0_inst.has_result = true
     f5_b2_i0_inst.result_name = "add3"
-    f5_b2_i0_inst.result_type = "i64"
-    f5_b2_i0_inst.typ = "i64"
-    let f5_b2_i0_op0 = mir_value_operand("i64", "cap")
+    f5_b2_i0_inst.result_type = elem_type
+    f5_b2_i0_inst.typ = elem_type
+    let f5_b2_i0_op0 = mir_value_operand(elem_type, "cap")
     push(f5_b2_i0_inst.operands, f5_b2_i0_op0)
-    let f5_b2_i0_op1 = mir_value_operand("i64", "cap")
+    let f5_b2_i0_op1 = mir_value_operand(elem_type, "cap")
     push(f5_b2_i0_inst.operands, f5_b2_i0_op1)
     push(b2.instructions, f5_b2_i0_inst)
     let f5_b2_i1_inst = mir_inst_empty()
     f5_b2_i1_inst.op = "add"
     f5_b2_i1_inst.has_result = true
     f5_b2_i1_inst.result_name = "add4"
-    f5_b2_i1_inst.result_type = "i64"
-    f5_b2_i1_inst.typ = "i64"
-    let f5_b2_i1_op0 = mir_value_operand("i64", "add3")
+    f5_b2_i1_inst.result_type = elem_type
+    f5_b2_i1_inst.typ = elem_type
+    let f5_b2_i1_op0 = mir_value_operand(elem_type, "add3")
     push(f5_b2_i1_inst.operands, f5_b2_i1_op0)
-    let f5_b2_i1_op1 = mir_value_operand("i64", "add3")
+    let f5_b2_i1_op1 = mir_value_operand(elem_type, "add3")
     push(f5_b2_i1_inst.operands, f5_b2_i1_op1)
     push(b2.instructions, f5_b2_i1_inst)
     let f5_b2_i2_inst = mir_inst_empty()
     f5_b2_i2_inst.op = "add"
     f5_b2_i2_inst.has_result = true
     f5_b2_i2_inst.result_name = "add5"
-    f5_b2_i2_inst.result_type = "i64"
-    f5_b2_i2_inst.typ = "i64"
-    let f5_b2_i2_op0 = mir_value_operand("i64", "add4")
+    f5_b2_i2_inst.result_type = elem_type
+    f5_b2_i2_inst.typ = elem_type
+    let f5_b2_i2_op0 = mir_value_operand(elem_type, "add4")
     push(f5_b2_i2_inst.operands, f5_b2_i2_op0)
-    let f5_b2_i2_op1 = mir_value_operand("i64", "add4")
+    let f5_b2_i2_op1 = mir_value_operand(elem_type, "add4")
     push(f5_b2_i2_inst.operands, f5_b2_i2_op1)
     push(b2.instructions, f5_b2_i2_inst)
     let f5_b2_i3_inst = mir_inst_empty()
@@ -821,7 +821,7 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b2_i3_inst.result_type = "ptr"
     f5_b2_i3_inst.typ = "ptr"
     f5_b2_i3_inst.callee = "__epx_alloc"
-    let f5_b2_i3_op0 = mir_value_operand("i64", "add5")
+    let f5_b2_i3_op0 = mir_value_operand(elem_type, "add5")
     push(f5_b2_i3_inst.operands, f5_b2_i3_op0)
     push(b2.instructions, f5_b2_i3_inst)
     let f5_b2_i4_inst = mir_inst_empty()
@@ -832,7 +832,7 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b2_i4_inst.typ = "ptr"
     let f5_b2_i4_op0 = mir_value_operand("ptr", "call0")
     push(f5_b2_i4_inst.operands, f5_b2_i4_op0)
-    let f5_b2_i4_op1 = mir_const_int("i64", 0)
+    let f5_b2_i4_op1 = mir_const_int(elem_type, 0)
     push(f5_b2_i4_inst.operands, f5_b2_i4_op1)
     push(b2.instructions, f5_b2_i4_inst)
     let f5_b2_i5_inst = mir_inst_empty()
@@ -854,12 +854,12 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b3_i0_inst.typ = "ptr"
     let f5_b3_i0_op0 = mir_value_operand("ptr", "call0")
     push(f5_b3_i0_inst.operands, f5_b3_i0_op0)
-    let f5_b3_i0_op1 = mir_const_int("i64", 1)
+    let f5_b3_i0_op1 = mir_const_int(elem_type, 1)
     push(f5_b3_i0_inst.operands, f5_b3_i0_op1)
     push(b3.instructions, f5_b3_i0_inst)
     let f5_b3_i1_inst = mir_inst_empty()
     f5_b3_i1_inst.op = "store"
-    let f5_b3_i1_op0 = mir_const_int("i64", 0)
+    let f5_b3_i1_op0 = mir_const_int(elem_type, 0)
     push(f5_b3_i1_inst.operands, f5_b3_i1_op0)
     let f5_b3_i1_op1 = mir_value_operand("ptr", "gep8")
     push(f5_b3_i1_inst.operands, f5_b3_i1_op1)
@@ -872,12 +872,12 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     f5_b3_i2_inst.typ = "ptr"
     let f5_b3_i2_op0 = mir_value_operand("ptr", "call0")
     push(f5_b3_i2_inst.operands, f5_b3_i2_op0)
-    let f5_b3_i2_op1 = mir_const_int("i64", 2)
+    let f5_b3_i2_op1 = mir_const_int(elem_type, 2)
     push(f5_b3_i2_inst.operands, f5_b3_i2_op1)
     push(b3.instructions, f5_b3_i2_inst)
     let f5_b3_i3_inst = mir_inst_empty()
     f5_b3_i3_inst.op = "store"
-    let f5_b3_i3_op0 = mir_value_operand("i64", "cap")
+    let f5_b3_i3_op0 = mir_value_operand(elem_type, "cap")
     push(f5_b3_i3_inst.operands, f5_b3_i3_op0)
     let f5_b3_i3_op1 = mir_value_operand("ptr", "gep9")
     push(f5_b3_i3_inst.operands, f5_b3_i3_op1)
@@ -889,6 +889,10 @@ fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
     return fn
 }
 
+
+fun mir_runtime_emit_ep_slice_i64_new(): MirFunction {
+    return mir_runtime_emit_ep_slice_word_new("__ep_slice_i64_new", "i64")
+}
 fun mir_runtime_emit_ep_slice_i64_get(): MirFunction {
     let fn = mir_function_empty("__ep_slice_i64_get", "i64")
     push(fn.params, mir_runtime_param("arr", "ptr"))
@@ -1546,165 +1550,8 @@ fun mir_runtime_emit_ep_slice_i64_push(): MirFunction {
     return mir_runtime_emit_ep_slice_word_push("__ep_slice_i64_push", "i64")
 }
 fun mir_runtime_emit_ep_slice_ptr_new(): MirFunction {
-    let fn = mir_function_empty("__ep_slice_ptr_new", "ptr")
-    push(fn.params, mir_runtime_param("cap", "i64"))
-    let b0 = mir_block_empty("entry")
-    let f9_b0_i0_inst = mir_inst_empty()
-    f9_b0_i0_inst.op = "call"
-    f9_b0_i0_inst.has_result = true
-    f9_b0_i0_inst.result_name = "call0"
-    f9_b0_i0_inst.result_type = "ptr"
-    f9_b0_i0_inst.typ = "ptr"
-    f9_b0_i0_inst.callee = "__epx_alloc"
-    let f9_b0_i0_op0 = mir_const_int("i64", 24)
-    push(f9_b0_i0_inst.operands, f9_b0_i0_op0)
-    push(b0.instructions, f9_b0_i0_inst)
-    let f9_b0_i1_inst = mir_inst_empty()
-    f9_b0_i1_inst.op = "icmp.eq"
-    f9_b0_i1_inst.has_result = true
-    f9_b0_i1_inst.result_name = "icmp_eq1"
-    f9_b0_i1_inst.result_type = "bool"
-    f9_b0_i1_inst.typ = "bool"
-    let f9_b0_i1_op0 = mir_value_operand("i64", "cap")
-    push(f9_b0_i1_inst.operands, f9_b0_i1_op0)
-    let f9_b0_i1_op1 = mir_const_int("i64", 0)
-    push(f9_b0_i1_inst.operands, f9_b0_i1_op1)
-    push(b0.instructions, f9_b0_i1_inst)
-    let f9_b0_t_cond = mir_value_operand("bool", "icmp_eq1")
-    b0.terminator = mir_condbr(f9_b0_t_cond, "data_zero", "data_alloc")
-    b0.has_terminator = true
-    push(fn.blocks, b0)
-    let b1 = mir_block_empty("data_zero")
-    let f9_b1_i0_inst = mir_inst_empty()
-    f9_b1_i0_inst.op = "gep"
-    f9_b1_i0_inst.has_result = true
-    f9_b1_i0_inst.result_name = "gep2"
-    f9_b1_i0_inst.result_type = "ptr"
-    f9_b1_i0_inst.typ = "ptr"
-    let f9_b1_i0_op0 = mir_value_operand("ptr", "call0")
-    push(f9_b1_i0_inst.operands, f9_b1_i0_op0)
-    let f9_b1_i0_op1 = mir_const_int("i64", 0)
-    push(f9_b1_i0_inst.operands, f9_b1_i0_op1)
-    push(b1.instructions, f9_b1_i0_inst)
-    let f9_b1_i1_inst = mir_inst_empty()
-    f9_b1_i1_inst.op = "store"
-    let f9_b1_i1_op0 = mir_operand_null()
-    push(f9_b1_i1_inst.operands, f9_b1_i1_op0)
-    let f9_b1_i1_op1 = mir_value_operand("ptr", "gep2")
-    push(f9_b1_i1_inst.operands, f9_b1_i1_op1)
-    push(b1.instructions, f9_b1_i1_inst)
-    b1.terminator = mir_br("init")
-    b1.has_terminator = true
-    push(fn.blocks, b1)
-    let b2 = mir_block_empty("data_alloc")
-    let f9_b2_i0_inst = mir_inst_empty()
-    f9_b2_i0_inst.op = "add"
-    f9_b2_i0_inst.has_result = true
-    f9_b2_i0_inst.result_name = "add3"
-    f9_b2_i0_inst.result_type = "i64"
-    f9_b2_i0_inst.typ = "i64"
-    let f9_b2_i0_op0 = mir_value_operand("i64", "cap")
-    push(f9_b2_i0_inst.operands, f9_b2_i0_op0)
-    let f9_b2_i0_op1 = mir_value_operand("i64", "cap")
-    push(f9_b2_i0_inst.operands, f9_b2_i0_op1)
-    push(b2.instructions, f9_b2_i0_inst)
-    let f9_b2_i1_inst = mir_inst_empty()
-    f9_b2_i1_inst.op = "add"
-    f9_b2_i1_inst.has_result = true
-    f9_b2_i1_inst.result_name = "add4"
-    f9_b2_i1_inst.result_type = "i64"
-    f9_b2_i1_inst.typ = "i64"
-    let f9_b2_i1_op0 = mir_value_operand("i64", "add3")
-    push(f9_b2_i1_inst.operands, f9_b2_i1_op0)
-    let f9_b2_i1_op1 = mir_value_operand("i64", "add3")
-    push(f9_b2_i1_inst.operands, f9_b2_i1_op1)
-    push(b2.instructions, f9_b2_i1_inst)
-    let f9_b2_i2_inst = mir_inst_empty()
-    f9_b2_i2_inst.op = "add"
-    f9_b2_i2_inst.has_result = true
-    f9_b2_i2_inst.result_name = "add5"
-    f9_b2_i2_inst.result_type = "i64"
-    f9_b2_i2_inst.typ = "i64"
-    let f9_b2_i2_op0 = mir_value_operand("i64", "add4")
-    push(f9_b2_i2_inst.operands, f9_b2_i2_op0)
-    let f9_b2_i2_op1 = mir_value_operand("i64", "add4")
-    push(f9_b2_i2_inst.operands, f9_b2_i2_op1)
-    push(b2.instructions, f9_b2_i2_inst)
-    let f9_b2_i3_inst = mir_inst_empty()
-    f9_b2_i3_inst.op = "call"
-    f9_b2_i3_inst.has_result = true
-    f9_b2_i3_inst.result_name = "call6"
-    f9_b2_i3_inst.result_type = "ptr"
-    f9_b2_i3_inst.typ = "ptr"
-    f9_b2_i3_inst.callee = "__epx_alloc"
-    let f9_b2_i3_op0 = mir_value_operand("i64", "add5")
-    push(f9_b2_i3_inst.operands, f9_b2_i3_op0)
-    push(b2.instructions, f9_b2_i3_inst)
-    let f9_b2_i4_inst = mir_inst_empty()
-    f9_b2_i4_inst.op = "gep"
-    f9_b2_i4_inst.has_result = true
-    f9_b2_i4_inst.result_name = "gep7"
-    f9_b2_i4_inst.result_type = "ptr"
-    f9_b2_i4_inst.typ = "ptr"
-    let f9_b2_i4_op0 = mir_value_operand("ptr", "call0")
-    push(f9_b2_i4_inst.operands, f9_b2_i4_op0)
-    let f9_b2_i4_op1 = mir_const_int("i64", 0)
-    push(f9_b2_i4_inst.operands, f9_b2_i4_op1)
-    push(b2.instructions, f9_b2_i4_inst)
-    let f9_b2_i5_inst = mir_inst_empty()
-    f9_b2_i5_inst.op = "store"
-    let f9_b2_i5_op0 = mir_value_operand("ptr", "call6")
-    push(f9_b2_i5_inst.operands, f9_b2_i5_op0)
-    let f9_b2_i5_op1 = mir_value_operand("ptr", "gep7")
-    push(f9_b2_i5_inst.operands, f9_b2_i5_op1)
-    push(b2.instructions, f9_b2_i5_inst)
-    b2.terminator = mir_br("init")
-    b2.has_terminator = true
-    push(fn.blocks, b2)
-    let b3 = mir_block_empty("init")
-    let f9_b3_i0_inst = mir_inst_empty()
-    f9_b3_i0_inst.op = "gep"
-    f9_b3_i0_inst.has_result = true
-    f9_b3_i0_inst.result_name = "gep8"
-    f9_b3_i0_inst.result_type = "ptr"
-    f9_b3_i0_inst.typ = "ptr"
-    let f9_b3_i0_op0 = mir_value_operand("ptr", "call0")
-    push(f9_b3_i0_inst.operands, f9_b3_i0_op0)
-    let f9_b3_i0_op1 = mir_const_int("i64", 1)
-    push(f9_b3_i0_inst.operands, f9_b3_i0_op1)
-    push(b3.instructions, f9_b3_i0_inst)
-    let f9_b3_i1_inst = mir_inst_empty()
-    f9_b3_i1_inst.op = "store"
-    let f9_b3_i1_op0 = mir_const_int("i64", 0)
-    push(f9_b3_i1_inst.operands, f9_b3_i1_op0)
-    let f9_b3_i1_op1 = mir_value_operand("ptr", "gep8")
-    push(f9_b3_i1_inst.operands, f9_b3_i1_op1)
-    push(b3.instructions, f9_b3_i1_inst)
-    let f9_b3_i2_inst = mir_inst_empty()
-    f9_b3_i2_inst.op = "gep"
-    f9_b3_i2_inst.has_result = true
-    f9_b3_i2_inst.result_name = "gep9"
-    f9_b3_i2_inst.result_type = "ptr"
-    f9_b3_i2_inst.typ = "ptr"
-    let f9_b3_i2_op0 = mir_value_operand("ptr", "call0")
-    push(f9_b3_i2_inst.operands, f9_b3_i2_op0)
-    let f9_b3_i2_op1 = mir_const_int("i64", 2)
-    push(f9_b3_i2_inst.operands, f9_b3_i2_op1)
-    push(b3.instructions, f9_b3_i2_inst)
-    let f9_b3_i3_inst = mir_inst_empty()
-    f9_b3_i3_inst.op = "store"
-    let f9_b3_i3_op0 = mir_value_operand("i64", "cap")
-    push(f9_b3_i3_inst.operands, f9_b3_i3_op0)
-    let f9_b3_i3_op1 = mir_value_operand("ptr", "gep9")
-    push(f9_b3_i3_inst.operands, f9_b3_i3_op1)
-    push(b3.instructions, f9_b3_i3_inst)
-    let f9_b3_t_ret = mir_value_operand("ptr", "call0")
-    b3.terminator = mir_ret_value(f9_b3_t_ret)
-    b3.has_terminator = true
-    push(fn.blocks, b3)
-    return fn
+    return mir_runtime_emit_ep_slice_word_new("__ep_slice_ptr_new", "ptr")
 }
-
 fun mir_runtime_emit_ep_slice_ptr_get(): MirFunction {
     let fn = mir_function_empty("__ep_slice_ptr_get", "ptr")
     push(fn.params, mir_runtime_param("arr", "ptr"))
