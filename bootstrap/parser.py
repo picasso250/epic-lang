@@ -114,8 +114,6 @@ class Parser:
             self.expect("COLON")
             ptype = self.parse_type()
             params.append(Param(name=pname[1], type=ptype))
-            if len(params) > 4:
-                raise ParseError("functions may have at most 4 parameters in v0", pname[2])
             if not self.check("COMMA"):
                 break
         return params
@@ -510,8 +508,6 @@ class Parser:
             if self.check("LPAREN"):
                 args = self.parse_args()
                 self.expect("RPAREN")
-                if len(args) > 4:
-                    raise ParseError("function calls may have at most 4 arguments in v0", t[2])
                 node = CallNode(name=name, args=args, line=t[2])
             else:
                 node = VarNode(name=name, line=t[2])
@@ -531,8 +527,6 @@ class Parser:
                         elif isinstance(node, VarNode) and node.name == "os":
                             raise ParseError("WinAPI calls use os.<dll>.<Function>(...)", field[2])
                         else:
-                            if len(args) > 4:
-                                raise ParseError("function calls may have at most 4 arguments in v0", field[2])
                             raise ParseError("method calls are only supported for os.<dll>.* in v0", field[2])
                     else:
                         node = FieldAccessNode(object=node, field=field[1], line=field[2])

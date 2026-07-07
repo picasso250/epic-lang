@@ -52,9 +52,11 @@ class MirLower:
         if fn.name == "main":
             emit_startup_hook_call(self.x64)
         for idx, param in enumerate(fn.params):
-            if idx >= len(ARG_REGS):
-                raise MirLowerError(f"{fn.name}: more than four params are not supported")
-            self.x64.inst("mov", M("rbp", self.value_slots[param.name]), R(ARG_REGS[idx]))
+            if idx < len(ARG_REGS):
+                self.x64.inst("mov", M("rbp", self.value_slots[param.name]), R(ARG_REGS[idx]))
+            else:
+                self.x64.inst("mov", R("rax"), M("rbp", 16 + idx * 8))
+                self.x64.inst("mov", M("rbp", self.value_slots[param.name]), R("rax"))
         for block in fn.blocks:
             self.x64.label(self._block_label(fn, block.name))
             for inst in block.instructions:

@@ -550,10 +550,12 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     push(arg_regs, "r9")
     let i = 0
     while i < len(fn.params) {
-        if i >= len(arg_regs) {
-            mir_to_x64_die("more than four params are not supported")
+        if i < len(arg_regs) {
+            x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].name), 8), x64_reg(arg_regs[i]))
+        } else {
+            x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_mem_base("rbp", 16 + i * 8, 8))
+            x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].name), 8), x64_reg("rax"))
         }
-        x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].name), 8), x64_reg(arg_regs[i]))
         i = i + 1
     }
 
