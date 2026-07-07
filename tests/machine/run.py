@@ -30,13 +30,7 @@ AST_TO_MIR_PASS_DIR = ROOT / "tests" / "ast_to_mir" / "pass"
 EXAMPLE_CASES = sorted(EXAMPLES_DIR.glob("*.ep"))
 AST_TO_MIR_PASS_CASES = sorted(AST_TO_MIR_PASS_DIR.glob("*.ep"))
 USER_CASES = EXAMPLE_CASES + AST_TO_MIR_PASS_CASES
-EXPECTED_PASS = {
-    "examples/m1_exit.ep",
-    "examples/m20_comment.ep",
-    "examples/v4_exit_return_path.ep",
-    "tests/ast_to_mir/pass/pass_m1_exit.ep",
-    "tests/ast_to_mir/pass/pass_m2_return_i64.ep",
-}
+EXPECTED_PASS = {path.relative_to(ROOT).as_posix() for path in USER_CASES}
 
 
 def build_x64_fixture() -> X64Program:

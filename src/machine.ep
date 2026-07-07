@@ -150,6 +150,17 @@ fun machine_text_label_offset(b: MachineBuilder, name: str): i64 {
     return 0
 }
 
+fun machine_has_text_label(b: MachineBuilder, name: str): bool {
+    let i = 0
+    while i < len(b.text_label_names) {
+        if b.text_label_names[i] == name {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
 fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
     let f = new MachineFixup
     f.offset = offset
@@ -170,15 +181,24 @@ fun machine_patch_fixups(b: MachineBuilder): void {
     let i = 0
     while i < len(b.fixups) {
         if b.fixups[i].kind == "label" {
-            let target = machine_text_label_offset(b, b.fixups[i].label)
-            let disp = target - (b.fixups[i].offset + 4)
-            machine_patch_i32(b.text, b.fixups[i].offset, disp)
+            if machine_has_text_label(b, b.fixups[i].label) {
+                let target = machine_text_label_offset(b, b.fixups[i].label)
+                let disp = target - (b.fixups[i].offset + 4)
+                machine_patch_i32(b.text, b.fixups[i].offset, disp)
+            }
         }
         i = i + 1
     }
 }
 
 fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
+    let reg = machine_reg64(dst)
+    if imm < -2147483648 || imm > 2147483647 {
+        machine_rex(b, true, 0, reg / 8)
+        machine_append_byte(b.text, 184 + (reg & 7))
+        machine_append_u64(b.text, imm)
+        return
+    }
     if dst == "rax" {
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 199)
@@ -186,7 +206,6 @@ fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
         machine_append_i32(b.text, imm)
         return
     }
-    let reg = machine_reg64(dst)
     machine_rex(b, true, 0, reg / 8)
     machine_append_byte(b.text, 199)
     machine_modrm(b, 3, 0, reg)
@@ -245,6 +264,201 @@ fun machine_emit_call_symbol(b: MachineBuilder, symbol: str): void {
     machine_append_i32(b.text, 0)
 }
 
+
+fun machine_reg8(name: str): i64 {
+    if name == "al" { return 0 }
+    if name == "cl" { return 1 }
+    if name == "dl" { return 2 }
+    if name == "r8b" { return 8 }
+    if name == "r9b" { return 9 }
+    if name == "r10b" { return 10 }
+    if name == "r11b" { return 11 }
+    machine_die(str_cat2("unsupported reg8: ", name))
+    return 0
+}
+
+fun machine_is_reg8_name(name: str): bool {
+    if name == "al" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" {
+        return true
+    }
+    return false
+}
+
+fun machine_emit_mov_reg_mem(b: MachineBuilder, dst: str, base: str, disp: i64): void {
+    let d = machine_reg64(dst)
+    let base_code = machine_reg64(base)
+    machine_rex(b, true, d / 8, base_code / 8)
+    machine_append_byte(b.text, 139)
+    machine_mem_modrm(b, d, base, disp)
+}
+
+fun machine_emit_mov_mem_reg(b: MachineBuilder, base: str, disp: i64, src: str): void {
+    let base_code = machine_reg64(base)
+    if machine_is_reg8_name(src) {
+        let s8 = machine_reg8(src)
+        machine_rex(b, false, s8 / 8, base_code / 8)
+        machine_append_byte(b.text, 136)
+        machine_mem_modrm(b, s8, base, disp)
+        return
+    }
+    let s = machine_reg64(src)
+    machine_rex(b, true, s / 8, base_code / 8)
+    machine_append_byte(b.text, 137)
+    machine_mem_modrm(b, s, base, disp)
+}
+
+fun machine_emit_mov_mem_imm8(b: MachineBuilder, base: str, disp: i64, imm: i64): void {
+    let base_code = machine_reg64(base)
+    machine_rex(b, false, 0, base_code / 8)
+    machine_append_byte(b.text, 198)
+    machine_mem_modrm(b, 0, base, disp)
+    machine_append_byte(b.text, imm)
+}
+
+fun machine_emit_mov_mem_imm64(b: MachineBuilder, base: str, disp: i64, imm: i64): void {
+    let base_code = machine_reg64(base)
+    machine_rex(b, true, 0, base_code / 8)
+    machine_append_byte(b.text, 199)
+    machine_mem_modrm(b, 0, base, disp)
+    machine_append_i32(b.text, imm)
+}
+
+fun machine_emit_mov_reg_symbol(b: MachineBuilder, dst: str, symbol: str): void {
+    let d = machine_reg64(dst)
+    machine_rex(b, true, d / 8, 0)
+    machine_append_byte(b.text, 139)
+    machine_append_byte(b.text, 5 | ((d & 7) * 8))
+    machine_append_i32(b.text, 0)
+}
+
+fun machine_emit_mov_symbol_reg(b: MachineBuilder, symbol: str, src: str): void {
+    let s = machine_reg64(src)
+    machine_rex(b, true, s / 8, 0)
+    machine_append_byte(b.text, 137)
+    machine_append_byte(b.text, 5 | ((s & 7) * 8))
+    machine_append_i32(b.text, 0)
+}
+
+fun machine_emit_mov_symbol_reg8(b: MachineBuilder, symbol: str, src: str): void {
+    if src != "al" {
+        machine_die(str_cat2("unsupported symbol byte store register: ", src))
+    }
+    machine_append_byte(b.text, 136)
+    machine_append_byte(b.text, 5)
+    machine_append_i32(b.text, 0)
+}
+
+fun machine_emit_lea_base_disp(b: MachineBuilder, dst: str, base: str, disp: i64): void {
+    let d = machine_reg64(dst)
+    let base_code = machine_reg64(base)
+    machine_rex(b, true, d / 8, base_code / 8)
+    machine_append_byte(b.text, 141)
+    machine_mem_modrm(b, d, base, disp)
+}
+
+fun machine_emit_cmp_reg_reg(b: MachineBuilder, left: str, right: str): void {
+    let l = machine_reg64(left)
+    let r = machine_reg64(right)
+    machine_rex(b, true, r / 8, l / 8)
+    machine_append_byte(b.text, 57)
+    machine_modrm(b, 3, r, l)
+}
+
+fun machine_alu_opcode(op: str): i64 {
+    if op == "add" { return 1 }
+    if op == "sub" { return 41 }
+    if op == "and" { return 33 }
+    if op == "or" { return 9 }
+    if op == "xor" { return 49 }
+    machine_die(str_cat2("unsupported alu op: ", op))
+    return 0
+}
+
+fun machine_emit_reg_reg_alu(b: MachineBuilder, op: str, dst: str, src: str): void {
+    let d = machine_reg64(dst)
+    let s = machine_reg64(src)
+    machine_rex(b, true, s / 8, d / 8)
+    machine_append_byte(b.text, machine_alu_opcode(op))
+    machine_modrm(b, 3, s, d)
+}
+
+fun machine_emit_test_reg_reg(b: MachineBuilder, reg_name: str): void {
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, r / 8, r / 8)
+    machine_append_byte(b.text, 133)
+    machine_modrm(b, 3, r, r)
+}
+
+fun machine_emit_setcc(b: MachineBuilder, op: str): void {
+    let code = 0
+    if op == "sete" { code = 148 }
+    else if op == "setne" { code = 149 }
+    else if op == "setg" { code = 159 }
+    else if op == "setl" { code = 156 }
+    else if op == "setge" { code = 157 }
+    else if op == "setle" { code = 158 }
+    else if op == "seta" { code = 151 }
+    else if op == "setae" { code = 147 }
+    else if op == "setb" { code = 146 }
+    else if op == "setbe" { code = 150 }
+    else { machine_die(str_cat2("unsupported setcc: ", op)) }
+    machine_append_byte(b.text, 15)
+    machine_append_byte(b.text, code)
+    machine_append_byte(b.text, 192)
+}
+
+fun machine_emit_add_reg_imm(b: MachineBuilder, reg_name: str, imm: i64): void {
+    if machine_is_reg8_name(reg_name) {
+        let r8 = machine_reg8(reg_name)
+        machine_rex(b, false, 0, r8 / 8)
+        machine_append_byte(b.text, 128)
+        machine_modrm(b, 3, 0, r8)
+        machine_append_byte(b.text, imm)
+        return
+    }
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, 0, r / 8)
+    machine_append_byte(b.text, 131)
+    machine_modrm(b, 3, 0, r)
+    machine_append_byte(b.text, imm)
+}
+
+fun machine_emit_inc_dec(b: MachineBuilder, op: str, reg_name: str): void {
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, 0, r / 8)
+    machine_append_byte(b.text, 255)
+    if op == "inc" { machine_modrm(b, 3, 0, r) } else { machine_modrm(b, 3, 1, r) }
+}
+
+fun machine_emit_shift_rax_cl(b: MachineBuilder, op: str): void {
+    let ext = 0
+    if op == "shl" { ext = 4 }
+    else if op == "shr" { ext = 5 }
+    else if op == "sar" { ext = 7 }
+    else { machine_die(str_cat2("unsupported shift: ", op)) }
+    machine_rex(b, true, 0, 0)
+    machine_append_byte(b.text, 211)
+    machine_modrm(b, 3, ext, machine_reg64("rax"))
+}
+
+fun machine_emit_movsx_reg_mem8(b: MachineBuilder, dst: str, base: str, disp: i64): void {
+    let d = machine_reg64(dst)
+    let base_code = machine_reg64(base)
+    machine_rex(b, true, d / 8, base_code / 8)
+    machine_append_byte(b.text, 15)
+    machine_append_byte(b.text, 190)
+    machine_mem_modrm(b, d, base, disp)
+}
+
+fun machine_emit_movzx_reg_mem8(b: MachineBuilder, dst: str, base: str, disp: i64): void {
+    let d = machine_reg64(dst)
+    let base_code = machine_reg64(base)
+    machine_rex(b, true, d / 8, base_code / 8)
+    machine_append_byte(b.text, 15)
+    machine_append_byte(b.text, 182)
+    machine_mem_modrm(b, d, base, disp)
+}
+
 fun machine_emit_rsp_imm(b: MachineBuilder, op: str, imm: i64): void {
     machine_append_byte(b.text, 72)
     if imm >= 0 && imm <= 127 {
@@ -298,6 +512,106 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
     }
     if item.op == "call" && len(ops) == 1 && ops[0].kind == "symbol" {
         machine_emit_call_symbol(b, ops[0].name)
+        return
+    }
+    if item.op == "cqo" && len(ops) == 0 {
+        machine_append_byte(b.text, 72)
+        machine_append_byte(b.text, 153)
+        return
+    }
+    if item.op == "idiv" && len(ops) == 1 && machine_is_reg(ops[0], "rcx") {
+        machine_append_byte(b.text, 72)
+        machine_append_byte(b.text, 247)
+        machine_append_byte(b.text, 249)
+        return
+    }
+    if item.op == "div" && len(ops) == 1 && machine_is_reg(ops[0], "rcx") {
+        machine_append_byte(b.text, 72)
+        machine_append_byte(b.text, 247)
+        machine_append_byte(b.text, 241)
+        return
+    }
+    if item.op == "imul" && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "rcx") {
+        machine_append_byte(b.text, 72)
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, 175)
+        machine_append_byte(b.text, 193)
+        return
+    }
+    if item.op == "neg" && len(ops) == 1 && machine_is_reg(ops[0], "rax") {
+        machine_append_byte(b.text, 72)
+        machine_append_byte(b.text, 247)
+        machine_append_byte(b.text, 216)
+        return
+    }
+    if item.op == "cmp" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
+        machine_emit_cmp_reg_reg(b, ops[0].name, ops[1].name)
+        return
+    }
+    if (item.op == "add" || item.op == "sub" || item.op == "and" || item.op == "or" || item.op == "xor") && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
+        machine_emit_reg_reg_alu(b, item.op, ops[0].name, ops[1].name)
+        return
+    }
+    if item.op == "add" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
+        machine_emit_add_reg_imm(b, ops[0].name, ops[1].value)
+        return
+    }
+    if item.op == "test" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" && ops[0].name == ops[1].name {
+        machine_emit_test_reg_reg(b, ops[0].name)
+        return
+    }
+    if (item.op == "sete" || item.op == "setne" || item.op == "setg" || item.op == "setl" || item.op == "setge" || item.op == "setle" || item.op == "seta" || item.op == "setae" || item.op == "setb" || item.op == "setbe") && len(ops) == 1 && machine_is_reg(ops[0], "al") {
+        machine_emit_setcc(b, item.op)
+        return
+    }
+    if item.op == "movzx" && len(ops) == 2 && machine_is_reg(ops[0], "eax") && machine_is_reg(ops[1], "al") {
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, 182)
+        machine_append_byte(b.text, 192)
+        return
+    }
+    if item.op == "movzx" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base && ops[1].size == 1 {
+        machine_emit_movzx_reg_mem8(b, ops[0].name, ops[1].base, ops[1].disp)
+        return
+    }
+    if item.op == "movsx" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base && ops[1].size == 1 {
+        machine_emit_movsx_reg_mem8(b, ops[0].name, ops[1].base, ops[1].disp)
+        return
+    }
+    if (item.op == "shl" || item.op == "sar" || item.op == "shr") && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "cl") {
+        machine_emit_shift_rax_cl(b, item.op)
+        return
+    }
+    if (item.op == "inc" || item.op == "dec") && len(ops) == 1 && ops[0].kind == "reg" {
+        machine_emit_inc_dec(b, item.op, ops[0].name)
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base {
+        machine_emit_mov_reg_mem(b, ops[0].name, ops[1].base, ops[1].disp)
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_symbol {
+        machine_emit_mov_reg_symbol(b, ops[0].name, ops[1].symbol)
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_base && ops[1].kind == "reg" {
+        machine_emit_mov_mem_reg(b, ops[0].base, ops[0].disp, ops[1].name)
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_symbol && ops[1].kind == "reg" {
+        if machine_is_reg8_name(ops[1].name) {
+            machine_emit_mov_symbol_reg8(b, ops[0].symbol, ops[1].name)
+        } else {
+            machine_emit_mov_symbol_reg(b, ops[0].symbol, ops[1].name)
+        }
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_base && ops[1].kind == "imm" {
+        if ops[0].size == 1 { machine_emit_mov_mem_imm8(b, ops[0].base, ops[0].disp, ops[1].value) } else { machine_emit_mov_mem_imm64(b, ops[0].base, ops[0].disp, ops[1].value) }
+        return
+    }
+    if item.op == "lea" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base {
+        machine_emit_lea_base_disp(b, ops[0].name, ops[1].base, ops[1].disp)
         return
     }
     machine_die(str_cat2("unsupported instruction: ", item.op))
