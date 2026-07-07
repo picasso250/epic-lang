@@ -44,8 +44,9 @@ class MirHelperBuilder:
 
     def __init__(self, name: str, params: list[MirParam], ret_type):
         self.fn = MirFunction(name, params, ret_type)
-        self.entry = MirBlock("entry")
-        self.fn.blocks.append(self.entry)
+        self.entry_block = MirBlock("entry")
+        self.current_block = self.entry_block
+        self.fn.blocks.append(self.entry_block)
         self._value_counter = 0
 
     @staticmethod
@@ -79,7 +80,7 @@ class MirHelperBuilder:
         """Append a call and return the result value (or None if void)."""
         result = self.value(ret_type, "call") if ret_type != VOID else None
         inst = MirInst("call", self._ops(*args), result=result, type=ret_type, callee=callee)
-        self.entry.instructions.append(inst)
+        self.current_block.instructions.append(inst)
         return result
 
     def gep(self, source_type, base, indices, result_type=None):
@@ -88,7 +89,7 @@ class MirHelperBuilder:
             result_type = ptr()
         r = self.value(result_type, "gep")
         ops = self._ops(base) + self._ops(*indices)
-        self.entry.instructions.append(MirInst("gep", ops, result=r, type=source_type))
+        self.current_block.instructions.append(MirInst("gep", ops, result=r, type=source_type))
         return r
 
     def load(self, access_type, addr, result_type=None):
@@ -96,19 +97,19 @@ class MirHelperBuilder:
         if result_type is None:
             result_type = access_type
         r = self.value(result_type, "load")
-        self.entry.instructions.append(
+        self.current_block.instructions.append(
             MirInst("load", self._ops(addr), result=r, type=access_type)
         )
         return r
 
     def store(self, value, addr):
         """Append a store.  No result."""
-        self.entry.instructions.append(MirInst("store", self._ops(value, addr)))
+        self.current_block.instructions.append(MirInst("store", self._ops(value, addr)))
 
     def icmp(self, cond, left, right):
         """Append an icmp.<cond> and return the bool result value."""
         r = self.value(BOOL, "cmp")
-        self.entry.instructions.append(
+        self.current_block.instructions.append(
             MirInst(f"icmp.{cond}", self._ops(left, right), result=r, type=BOOL)
         )
         return r
@@ -116,7 +117,7 @@ class MirHelperBuilder:
     def binop(self, op, left, right):
         """Append an integer binary op (add/sub/and/…)."""
         r = self.value(I64, "binop")
-        self.entry.instructions.append(
+        self.current_block.instructions.append(
             MirInst(op, self._ops(left, right), result=r, type=I64)
         )
         return r
@@ -124,7 +125,7 @@ class MirHelperBuilder:
     def alloca(self, elem_type):
         """Append an alloca and return the address."""
         r = self.value(ptr(), "slot")
-        self.entry.instructions.append(MirInst("alloca", result=r, type=elem_type))
+        self.current_block.instructions.append(MirInst("alloca", result=r, type=elem_type))
         return r
 
     def gep_field(self, base, struct_name, field_index, result_type=None):
@@ -142,14 +143,26 @@ class MirHelperBuilder:
         return block
 
     def ret(self, value=None):
-        """Set ret terminator on entry.  Call this last."""
+        """Set ret terminator on the current insertion block."""
         if value is not None:
-            self.entry.terminator = Ret(value)
+            self.terminate(Ret(value))
         else:
-            self.entry.terminator = Ret()
+            self.terminate(Ret())
+
+    def set_block(self, block):
+        self.current_block = block
+        return block
+
+    def terminate(self, terminator):
+        self.current_block.terminator = terminator
 
     def br(self, target):
-        self.entry.terminator = Br(target.name if isinstance(target, MirBlock) else target)
+        self.terminate(Br(target.name if isinstance(target, MirBlock) else target))
+
+    def condbr(self, cond, then_target, else_target):
+        then_name = then_target.name if isinstance(then_target, MirBlock) else then_target
+        else_name = else_target.name if isinstance(else_target, MirBlock) else else_target
+        self.terminate(CondBr(cond, then_name, else_name))
 
 
 # ── Helper emitters ───────────────────────────────────────────────────────
@@ -220,12 +233,12 @@ def emit___ep_str_cat() -> MirFunction:
     done = b.new_block("done")
     b.br(left_check)
 
-    b.entry = left_check
+    b.set_block(left_check)
     i = b.load(I64, ValueOperand(i_slot))
     keep_left = b.icmp("slt", i, left_len)
-    b.entry.terminator = CondBr(ValueOperand(keep_left), left_body.name, right_init.name)
+    b.condbr(ValueOperand(keep_left), left_body.name, right_init.name)
 
-    b.entry = left_body
+    b.set_block(left_body)
     src_addr = b.gep(I8, left_data, [i])
     byte = b.load(I8, src_addr, result_type=I8)
     dst_addr = b.gep(I8, ValueOperand(result_data), [i])
@@ -234,16 +247,16 @@ def emit___ep_str_cat() -> MirFunction:
     b.store(next_i, ValueOperand(i_slot))
     b.br(left_check)
 
-    b.entry = right_init
+    b.set_block(right_init)
     b.store(b.const_i64(0), ValueOperand(i_slot))
     b.br(right_check)
 
-    b.entry = right_check
+    b.set_block(right_check)
     i = b.load(I64, ValueOperand(i_slot))
     keep_right = b.icmp("slt", i, right_len)
-    b.entry.terminator = CondBr(ValueOperand(keep_right), right_body.name, done.name)
+    b.condbr(ValueOperand(keep_right), right_body.name, done.name)
 
-    b.entry = right_body
+    b.set_block(right_body)
     src_addr = b.gep(I8, right_data, [i])
     byte = b.load(I8, src_addr, result_type=I8)
     dst_index = b.binop("add", left_len, i)
@@ -253,7 +266,7 @@ def emit___ep_str_cat() -> MirFunction:
     b.store(next_i, ValueOperand(i_slot))
     b.br(right_check)
 
-    b.entry = done
+    b.set_block(done)
     nul_addr = b.gep(I8, ValueOperand(result_data), [result_len])
     b.store(b.const_i8(0), nul_addr)
     b.ret(ValueOperand(result_str))
@@ -281,18 +294,18 @@ def emit_slice_u8_alloc() -> MirFunction:
     zero_block = b.new_block("data_zero")
     alloc_block = b.new_block("data_alloc")
     init_block = b.new_block("init")
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, alloc_block.name)
+    b.condbr(ValueOperand(cap_zero), zero_block.name, alloc_block.name)
 
-    b.entry = zero_block
+    b.set_block(zero_block)
     b.store(ConstNullOperand(), b.gep_field(ValueOperand(header_raw), "_slice_u8", 0))
-    b.entry.terminator = Br(init_block.name)
+    b.br(init_block.name)
 
-    b.entry = alloc_block
+    b.set_block(alloc_block)
     data_raw = b.call("__epx_alloc", [cap_val], ptr())
     b.store(data_raw, b.gep_field(ValueOperand(header_raw), "_slice_u8", 0))
-    b.entry.terminator = Br(init_block.name)
+    b.br(init_block.name)
 
-    b.entry = init_block
+    b.set_block(init_block)
     # header.len = len
     b.store(len_val, b.gep_field(ValueOperand(header_raw), "_slice_u8", 1))
     # header.cap = cap
@@ -324,15 +337,15 @@ def emit_slice_u8_get() -> MirFunction:
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
+    b.condbr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
     # check_high: idx < arr.len
-    b.entry = check_block
+    b.set_block(check_block)
     lt_len = b.icmp("slt", idx_val, arr_len)
-    b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
+    b.condbr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
     # ok: load byte
-    b.entry = ok_block
+    b.set_block(ok_block)
     data_addr = b.gep_field(arr_val, "_slice_u8", 0)
     data = b.load(ptr(), data_addr)
     byte_addr = b.gep(I8, data, [idx_val])
@@ -340,7 +353,7 @@ def emit_slice_u8_get() -> MirFunction:
     b.ret(ValueOperand(result))
 
     # fail: exit(1)
-    b.entry = fail_block
+    b.set_block(fail_block)
     b.call("ExitProcess", [b.const_i64(1)], VOID)
     b.ret(b.const_i64(0))  # dummy, unreachable
 
@@ -364,13 +377,13 @@ def emit_slice_word_new(name: str) -> MirFunction:
     zero_block = b.new_block("data_zero")
     alloc_block = b.new_block("data_alloc")
     init_block = b.new_block("init")
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, alloc_block.name)
+    b.condbr(ValueOperand(cap_zero), zero_block.name, alloc_block.name)
 
-    b.entry = zero_block
+    b.set_block(zero_block)
     b.store(ConstNullOperand(), b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(0)]))
     b.br(init_block)
 
-    b.entry = alloc_block
+    b.set_block(alloc_block)
     bytes_len = b.binop("add", cap_val, cap_val)
     bytes_len = b.binop("add", ValueOperand(bytes_len), ValueOperand(bytes_len))
     bytes_len = b.binop("add", ValueOperand(bytes_len), ValueOperand(bytes_len))
@@ -378,7 +391,7 @@ def emit_slice_word_new(name: str) -> MirFunction:
     b.store(data_raw, b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(0)]))
     b.br(init_block)
 
-    b.entry = init_block
+    b.set_block(init_block)
     b.store(b.const_i64(0), b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(1)]))
     b.store(cap_val, b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(2)]))
     b.ret(ValueOperand(header_raw))
@@ -403,20 +416,20 @@ def emit_slice_word_get(name: str, elem_type) -> MirFunction:
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
+    b.condbr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
-    b.entry = check_block
+    b.set_block(check_block)
     lt_len = b.icmp("slt", idx_val, arr_len)
-    b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
+    b.condbr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
-    b.entry = ok_block
+    b.set_block(ok_block)
     data_addr = b.gep(ptr(), arr_val, [b.const_i64(0)])
     data = b.load(ptr(), data_addr)
     elem_addr = b.gep(ptr(), data, [idx_val])
     result = b.load(elem_type, elem_addr)
     b.ret(ValueOperand(result))
 
-    b.entry = fail_block
+    b.set_block(fail_block)
     b.call("ExitProcess", [b.const_i64(1)], VOID)
     if elem_type.kind == "ptr":
         b.ret(ConstNullOperand())
@@ -448,20 +461,20 @@ def emit_slice_word_set(name: str, elem_type) -> MirFunction:
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
+    b.condbr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
-    b.entry = check_block
+    b.set_block(check_block)
     lt_len = b.icmp("slt", idx_val, arr_len)
-    b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
+    b.condbr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
-    b.entry = ok_block
+    b.set_block(ok_block)
     data_addr = b.gep(ptr(), arr_val, [b.const_i64(0)])
     data = b.load(ptr(), data_addr)
     elem_addr = b.gep(ptr(), data, [idx_val])
     b.store(val_val, elem_addr)
     b.ret()
 
-    b.entry = fail_block
+    b.set_block(fail_block)
     b.call("ExitProcess", [b.const_i64(1)], VOID)
     b.ret()
 
@@ -489,9 +502,9 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     need_grow = b.icmp("sge", old_len, old_cap)
     grow_block = b.new_block("grow")
     store_block = b.new_block("store")
-    b.entry.terminator = CondBr(ValueOperand(need_grow), grow_block.name, store_block.name)
+    b.condbr(ValueOperand(need_grow), grow_block.name, store_block.name)
 
-    b.entry = grow_block
+    b.set_block(grow_block)
     new_cap_slot = b.alloca(I64)
     new_data_slot = b.alloca(ptr())
     i_slot = b.alloca(I64)
@@ -499,9 +512,9 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     cap_zero = b.icmp("eq", old_cap, b.const_i64(0))
     zero_block = b.new_block("grow_zero")
     double_block = b.new_block("grow_double")
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, double_block.name)
+    b.condbr(ValueOperand(cap_zero), zero_block.name, double_block.name)
 
-    b.entry = zero_block
+    b.set_block(zero_block)
     nc0 = b.const_i64(4)
     b.store(nc0, ValueOperand(new_cap_slot))
     bytes0 = b.const_i64(32)
@@ -510,7 +523,7 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     copy_entry = b.new_block("copy_entry")
     b.br(copy_entry)
 
-    b.entry = double_block
+    b.set_block(double_block)
     nc1 = b.binop("add", old_cap, old_cap)
     b.store(nc1, ValueOperand(new_cap_slot))
     bytes1 = b.binop("add", ValueOperand(nc1), ValueOperand(nc1))
@@ -520,21 +533,21 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     b.store(nd1, ValueOperand(new_data_slot))
     b.br(copy_entry)
 
-    b.entry = copy_entry
+    b.set_block(copy_entry)
     old_data = b.load(ptr(), b.gep(ptr(), arr_val, [b.const_i64(0)]))
     new_data = b.load(ptr(), ValueOperand(new_data_slot))
     b.store(b.const_i64(0), ValueOperand(i_slot))
     copy_check = b.new_block("copy_check")
     b.br(copy_check)
 
-    b.entry = copy_check
+    b.set_block(copy_check)
     i = b.load(I64, ValueOperand(i_slot))
     cond = b.icmp("slt", i, old_len)
     copy_body = b.new_block("copy_body")
     swap_block = b.new_block("swap")
-    b.entry.terminator = CondBr(ValueOperand(cond), copy_body.name, swap_block.name)
+    b.condbr(ValueOperand(cond), copy_body.name, swap_block.name)
 
-    b.entry = copy_body
+    b.set_block(copy_body)
     old_elem_addr = b.gep(ptr(), old_data, [i])
     old_elem = b.load(elem_type, old_elem_addr)
     new_elem_addr = b.gep(ptr(), new_data, [i])
@@ -543,13 +556,13 @@ def emit_slice_word_push(name: str, elem_type) -> MirFunction:
     b.store(i_next, ValueOperand(i_slot))
     b.br(copy_check)
 
-    b.entry = swap_block
+    b.set_block(swap_block)
     b.store(new_data, b.gep(ptr(), arr_val, [b.const_i64(0)]))
     final_cap = b.load(I64, ValueOperand(new_cap_slot))
     b.store(final_cap, cap_addr)
     b.br(store_block)
 
-    b.entry = store_block
+    b.set_block(store_block)
     data = b.load(ptr(), b.gep(ptr(), arr_val, [b.const_i64(0)]))
     elem_addr = b.gep(ptr(), data, [old_len])
     b.store(val_val, elem_addr)
@@ -587,15 +600,15 @@ def emit_slice_u8_set() -> MirFunction:
     check_block = b.new_block("check_high")
     ok_block = b.new_block("ok")
     fail_block = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(ge_zero), check_block.name, fail_block.name)
+    b.condbr(ValueOperand(ge_zero), check_block.name, fail_block.name)
 
     # check_high: idx < arr.len
-    b.entry = check_block
+    b.set_block(check_block)
     lt_len = b.icmp("slt", idx_val, arr_len)
-    b.entry.terminator = CondBr(ValueOperand(lt_len), ok_block.name, fail_block.name)
+    b.condbr(ValueOperand(lt_len), ok_block.name, fail_block.name)
 
     # ok: store byte (truncate i64 to i8 via alloca roundtrip)
-    b.entry = ok_block
+    b.set_block(ok_block)
     trunc_slot = b.alloca(I64)
     b.store(val_val, ValueOperand(trunc_slot))
     byte_val = b.load(I8, ValueOperand(trunc_slot), result_type=I8)
@@ -607,7 +620,7 @@ def emit_slice_u8_set() -> MirFunction:
     b.ret()
 
     # fail: exit(1)
-    b.entry = fail_block
+    b.set_block(fail_block)
     b.call("ExitProcess", [b.const_i64(1)], VOID)
     b.ret()  # dummy, unreachable
 
@@ -643,10 +656,10 @@ def emit_slice_u8_push() -> MirFunction:
     need_grow = b.icmp("sge", old_len, old_cap)
     grow_block = b.new_block("grow")
     store_block = b.new_block("store")
-    b.entry.terminator = CondBr(ValueOperand(need_grow), grow_block.name, store_block.name)
+    b.condbr(ValueOperand(need_grow), grow_block.name, store_block.name)
 
     # grow: allocate slots for grow results, dispatch zero vs double
-    b.entry = grow_block
+    b.set_block(grow_block)
     new_cap_slot = b.alloca(I64)
     new_data_slot = b.alloca(ptr())
     i_slot = b.alloca(I64)
@@ -654,60 +667,60 @@ def emit_slice_u8_push() -> MirFunction:
     cap_zero = b.icmp("eq", old_cap, b.const_i64(0))
     zero_block = b.new_block("grow_zero")
     double_block = b.new_block("grow_double")
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), zero_block.name, double_block.name)
+    b.condbr(ValueOperand(cap_zero), zero_block.name, double_block.name)
 
     # grow_zero: new_cap = 4
-    b.entry = zero_block
+    b.set_block(zero_block)
     nc0 = b.const_i64(4)
     b.store(nc0, ValueOperand(new_cap_slot))
     nd0 = b.call("__epx_alloc", [nc0], ptr())
     b.store(nd0, ValueOperand(new_data_slot))
     copy_entry = b.new_block("copy_entry")
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
+    b.condbr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
 
     # grow_double: new_cap = old_cap * 2
-    b.entry = double_block
+    b.set_block(double_block)
     nc1 = b.binop("add", old_cap, old_cap)
     b.store(nc1, ValueOperand(new_cap_slot))
     nd1 = b.call("__epx_alloc", [nc1], ptr())
     b.store(nd1, ValueOperand(new_data_slot))
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
+    b.condbr(ValueOperand(cap_zero), copy_entry.name, copy_entry.name)
 
     # copy_entry: load data pointer, init copy loop
-    b.entry = copy_entry
+    b.set_block(copy_entry)
     old_data = b.load(ptr(), b.gep_field(arr_val, "_slice_u8", 0))
     new_data = b.load(ptr(), ValueOperand(new_data_slot))
     b.store(b.const_i64(0), ValueOperand(i_slot))
     copy_check = b.new_block("copy_check")
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_check.name, copy_check.name)
+    b.condbr(ValueOperand(cap_zero), copy_check.name, copy_check.name)
 
     # copy_check: loop condition i < old_len
-    b.entry = copy_check
+    b.set_block(copy_check)
     i = b.load(I64, ValueOperand(i_slot))
     cond = b.icmp("slt", i, old_len)
     copy_body = b.new_block("copy_body")
     swap_block = b.new_block("swap")
-    b.entry.terminator = CondBr(ValueOperand(cond), copy_body.name, swap_block.name)
+    b.condbr(ValueOperand(cond), copy_body.name, swap_block.name)
 
     # copy_body: copy one byte
-    b.entry = copy_body
+    b.set_block(copy_body)
     old_byte_addr = b.gep(I8, old_data, [i])
     old_byte = b.load(I8, old_byte_addr, result_type=I8)
     new_byte_addr = b.gep(I8, new_data, [i])
     b.store(ValueOperand(old_byte), new_byte_addr)
     i_next = b.binop("add", i, b.const_i64(1))
     b.store(i_next, ValueOperand(i_slot))
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), copy_check.name, copy_check.name)
+    b.condbr(ValueOperand(cap_zero), copy_check.name, copy_check.name)
 
     # swap: update arr.data and arr.cap
-    b.entry = swap_block
+    b.set_block(swap_block)
     b.store(new_data, b.gep_field(arr_val, "_slice_u8", 0))
     final_cap = b.load(I64, ValueOperand(new_cap_slot))
     b.store(final_cap, b.gep_field(arr_val, "_slice_u8", 2))
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), store_block.name, store_block.name)
+    b.condbr(ValueOperand(cap_zero), store_block.name, store_block.name)
 
     # store: write byte and update len
-    b.entry = store_block
+    b.set_block(store_block)
     trunc_slot = b.alloca(I64)
     b.store(val_val, ValueOperand(trunc_slot))
     byte_val = b.load(I8, ValueOperand(trunc_slot), result_type=I8)
@@ -751,17 +764,17 @@ def emit_slice_u8_slice() -> MirFunction:
     copy_body = b.new_block("copy_body")
     done_block = b.new_block("done")
     fail_block = b.new_block("fail")
-    b.entry.terminator = CondBr(ValueOperand(start_ok), check_order.name, fail_block.name)
+    b.condbr(ValueOperand(start_ok), check_order.name, fail_block.name)
 
-    b.entry = check_order
+    b.set_block(check_order)
     order_ok = b.icmp("sge", end_val, start_val)
-    b.entry.terminator = CondBr(ValueOperand(order_ok), check_len.name, fail_block.name)
+    b.condbr(ValueOperand(order_ok), check_len.name, fail_block.name)
 
-    b.entry = check_len
+    b.set_block(check_len)
     len_ok = b.icmp("sge", arr_len, end_val)
-    b.entry.terminator = CondBr(ValueOperand(len_ok), alloc_block.name, fail_block.name)
+    b.condbr(ValueOperand(len_ok), alloc_block.name, fail_block.name)
 
-    b.entry = alloc_block
+    b.set_block(alloc_block)
     slice_len = b.binop("sub", end_val, start_val)
     result_arr = b.call("__ep_slice_u8_alloc", [slice_len, slice_len], ptr())
     i_slot = b.alloca(I64)
@@ -771,12 +784,12 @@ def emit_slice_u8_slice() -> MirFunction:
     dst_data = b.load(ptr(), b.gep_field(ValueOperand(result_arr), "_slice_u8", 0))
     b.br(copy_check)
 
-    b.entry = copy_check
+    b.set_block(copy_check)
     i = b.load(I64, ValueOperand(i_slot))
     keep_copying = b.icmp("slt", i, slice_len)
-    b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, done_block.name)
+    b.condbr(ValueOperand(keep_copying), copy_body.name, done_block.name)
 
-    b.entry = copy_body
+    b.set_block(copy_body)
     src_byte_addr = b.gep(I8, src_start, [i])
     byte = b.load(I8, src_byte_addr, result_type=I8)
     dst_byte_addr = b.gep(I8, dst_data, [i])
@@ -785,10 +798,10 @@ def emit_slice_u8_slice() -> MirFunction:
     b.store(next_i, ValueOperand(i_slot))
     b.br(copy_check)
 
-    b.entry = done_block
+    b.set_block(done_block)
     b.ret(ValueOperand(result_arr))
 
-    b.entry = fail_block
+    b.set_block(fail_block)
     b.call("ExitProcess", [b.const_i64(1)], VOID)
     b.ret(ConstNullOperand())
 
@@ -819,19 +832,19 @@ def emit_extend_slice_u8() -> MirFunction:
     done = b.new_block("done")
     b.br(loop_check)
 
-    b.entry = loop_check
+    b.set_block(loop_check)
     i = b.load(I64, ValueOperand(i_slot))
     keep_copying = b.icmp("slt", i, src_len)
-    b.entry.terminator = CondBr(ValueOperand(keep_copying), loop_body.name, done.name)
+    b.condbr(ValueOperand(keep_copying), loop_body.name, done.name)
 
-    b.entry = loop_body
+    b.set_block(loop_body)
     byte = b.call("__ep_slice_u8_get", [src_val, i], I64)
     b.call("__ep_slice_u8_push", [dst_val, ValueOperand(byte)], VOID)
     next_i = b.binop("add", i, b.const_i64(1))
     b.store(next_i, ValueOperand(i_slot))
     b.br(loop_check)
 
-    b.entry = done
+    b.set_block(done)
     b.ret()
 
     return b.fn
@@ -900,35 +913,35 @@ def emit_map_str_word_get(name: str, map_type, value_type) -> MirFunction:
     miss = b.new_block("miss")
     b.br(loop_check)
 
-    b.entry = loop_check
+    b.set_block(loop_check)
     i = b.load(I64, ValueOperand(i_slot))
     in_range = b.icmp("slt", ValueOperand(i), ValueOperand(map_len))
-    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, miss.name)
+    b.condbr(ValueOperand(in_range), loop_body.name, miss.name)
 
-    b.entry = loop_body
+    b.set_block(loop_body)
     entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
     occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
     occ = b.load(I64, ValueOperand(occ_addr))
     occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
 
-    b.entry = key_check
+    b.set_block(key_check)
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
     entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.entry.terminator = CondBr(ValueOperand(keys_equal), found.name, next_block.name)
+    b.condbr(ValueOperand(keys_equal), found.name, next_block.name)
 
-    b.entry = found
+    b.set_block(found)
     value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
     result = b.load(value_type, ValueOperand(value_addr))
     b.ret(ValueOperand(result))
 
-    b.entry = next_block
+    b.set_block(next_block)
     next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
     b.store(ValueOperand(next_i), ValueOperand(i_slot))
     b.br(loop_check)
 
-    b.entry = miss
+    b.set_block(miss)
     b.ret(_map_zero_operand(value_type))
     return b.fn
 
@@ -958,33 +971,33 @@ def emit_map_str_word_has(name: str, map_type) -> MirFunction:
     no = b.new_block("no")
     b.br(loop_check)
 
-    b.entry = loop_check
+    b.set_block(loop_check)
     i = b.load(I64, ValueOperand(i_slot))
     in_range = b.icmp("slt", ValueOperand(i), ValueOperand(map_len))
-    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, no.name)
+    b.condbr(ValueOperand(in_range), loop_body.name, no.name)
 
-    b.entry = loop_body
+    b.set_block(loop_body)
     entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
     occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
     occ = b.load(I64, ValueOperand(occ_addr))
     occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
 
-    b.entry = key_check
+    b.set_block(key_check)
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
     entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.entry.terminator = CondBr(ValueOperand(keys_equal), yes.name, next_block.name)
+    b.condbr(ValueOperand(keys_equal), yes.name, next_block.name)
 
-    b.entry = yes
+    b.set_block(yes)
     b.ret(ConstBoolOperand(True))
 
-    b.entry = next_block
+    b.set_block(next_block)
     next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
     b.store(ValueOperand(next_i), ValueOperand(i_slot))
     b.br(loop_check)
 
-    b.entry = no
+    b.set_block(no)
     b.ret(ConstBoolOperand(False))
     return b.fn
 
@@ -1029,55 +1042,55 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     insert = b.new_block("insert")
     b.br(loop_check)
 
-    b.entry = loop_check
+    b.set_block(loop_check)
     i = b.load(I64, ValueOperand(i_slot))
     in_range = b.icmp("slt", ValueOperand(i), ValueOperand(old_len))
-    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, grow_check.name)
+    b.condbr(ValueOperand(in_range), loop_body.name, grow_check.name)
 
-    b.entry = loop_body
+    b.set_block(loop_body)
     entry = _map_entry_addr(b, ValueOperand(old_data), ValueOperand(i))
     occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
     occ = b.load(I64, ValueOperand(occ_addr))
     occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
 
-    b.entry = key_check
+    b.set_block(key_check)
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
     entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.entry.terminator = CondBr(ValueOperand(keys_equal), update.name, next_block.name)
+    b.condbr(ValueOperand(keys_equal), update.name, next_block.name)
 
-    b.entry = update
+    b.set_block(update)
     update_value_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(1)])
     b.store(val_val, ValueOperand(update_value_addr))
     b.ret()
 
-    b.entry = next_block
+    b.set_block(next_block)
     next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
     b.store(ValueOperand(next_i), ValueOperand(i_slot))
     b.br(loop_check)
 
-    b.entry = grow_check
+    b.set_block(grow_check)
     need_grow = b.icmp("sge", ValueOperand(old_len), ValueOperand(old_cap))
-    b.entry.terminator = CondBr(ValueOperand(need_grow), grow.name, insert.name)
+    b.condbr(ValueOperand(need_grow), grow.name, insert.name)
 
-    b.entry = grow
+    b.set_block(grow)
     new_cap_slot = b.alloca(I64)
     new_data_slot = b.alloca(ptr())
     copy_i_slot = b.alloca(I64)
     cap_zero = b.icmp("eq", ValueOperand(old_cap), b.const_i64(0))
-    b.entry.terminator = CondBr(ValueOperand(cap_zero), grow_zero.name, grow_double.name)
+    b.condbr(ValueOperand(cap_zero), grow_zero.name, grow_double.name)
 
-    b.entry = grow_zero
+    b.set_block(grow_zero)
     b.store(b.const_i64(4), ValueOperand(new_cap_slot))
     b.br(copy_init)
 
-    b.entry = grow_double
+    b.set_block(grow_double)
     doubled = b.binop("add", ValueOperand(old_cap), ValueOperand(old_cap))
     b.store(ValueOperand(doubled), ValueOperand(new_cap_slot))
     b.br(copy_init)
 
-    b.entry = copy_init
+    b.set_block(copy_init)
     new_cap = b.load(I64, ValueOperand(new_cap_slot))
     bytes_count = b.binop("mul", ValueOperand(new_cap), b.const_i64(24))
     new_data = b.call("__epx_alloc", [ValueOperand(bytes_count)], ptr())
@@ -1085,13 +1098,13 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     b.store(b.const_i64(0), ValueOperand(copy_i_slot))
     b.br(copy_check)
 
-    b.entry = copy_check
+    b.set_block(copy_check)
     copy_i = b.load(I64, ValueOperand(copy_i_slot))
     total_words = b.binop("mul", ValueOperand(old_len), b.const_i64(3))
     keep_copying = b.icmp("slt", ValueOperand(copy_i), ValueOperand(total_words))
-    b.entry.terminator = CondBr(ValueOperand(keep_copying), copy_body.name, swap.name)
+    b.condbr(ValueOperand(keep_copying), copy_body.name, swap.name)
 
-    b.entry = copy_body
+    b.set_block(copy_body)
     old_word_addr = b.gep(ptr(), ValueOperand(old_data), [ValueOperand(copy_i)])
     old_word = b.load(I64, ValueOperand(old_word_addr))
     new_data_for_copy = b.load(ptr(), ValueOperand(new_data_slot))
@@ -1101,14 +1114,14 @@ def emit_map_str_word_set(name: str, map_type, value_type) -> MirFunction:
     b.store(ValueOperand(copy_next), ValueOperand(copy_i_slot))
     b.br(copy_check)
 
-    b.entry = swap
+    b.set_block(swap)
     final_data = b.load(ptr(), ValueOperand(new_data_slot))
     b.store(ValueOperand(final_data), ValueOperand(data_addr))
     final_cap = b.load(I64, ValueOperand(new_cap_slot))
     b.store(ValueOperand(final_cap), ValueOperand(cap_addr))
     b.br(insert)
 
-    b.entry = insert
+    b.set_block(insert)
     data = b.load(ptr(), ValueOperand(data_addr))
     new_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(old_len))
     new_key_addr = b.gep(ptr(), ValueOperand(new_entry), [b.const_i64(0)])
@@ -1151,30 +1164,30 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
     no = b.new_block("no")
     b.br(loop_check)
 
-    b.entry = loop_check
+    b.set_block(loop_check)
     i = b.load(I64, ValueOperand(i_slot))
     in_range = b.icmp("slt", ValueOperand(i), ValueOperand(old_len))
-    b.entry.terminator = CondBr(ValueOperand(in_range), loop_body.name, no.name)
+    b.condbr(ValueOperand(in_range), loop_body.name, no.name)
 
-    b.entry = loop_body
+    b.set_block(loop_body)
     entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(i))
     occ_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(2)])
     occ = b.load(I64, ValueOperand(occ_addr))
     occupied = b.icmp("ne", ValueOperand(occ), b.const_i64(0))
-    b.entry.terminator = CondBr(ValueOperand(occupied), key_check.name, next_block.name)
+    b.condbr(ValueOperand(occupied), key_check.name, next_block.name)
 
-    b.entry = key_check
+    b.set_block(key_check)
     key_addr = b.gep(ptr(), ValueOperand(entry), [b.const_i64(0)])
     entry_key = b.load(ptr(), ValueOperand(key_addr))
     keys_equal = b.call("__ep_str_eq", [ValueOperand(entry_key), key_val], BOOL)
-    b.entry.terminator = CondBr(ValueOperand(keys_equal), found.name, next_block.name)
+    b.condbr(ValueOperand(keys_equal), found.name, next_block.name)
 
-    b.entry = found
+    b.set_block(found)
     last_index = b.binop("sub", ValueOperand(old_len), b.const_i64(1))
     same_entry = b.icmp("eq", ValueOperand(i), ValueOperand(last_index))
-    b.entry.terminator = CondBr(ValueOperand(same_entry), clear_last.name, copy_last.name)
+    b.condbr(ValueOperand(same_entry), clear_last.name, copy_last.name)
 
-    b.entry = copy_last
+    b.set_block(copy_last)
     last_entry = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
     # Copy key/value/occupied as raw words so i64/bool/str variants share code.
     last_key_addr = b.gep(ptr(), ValueOperand(last_entry), [b.const_i64(0)])
@@ -1191,7 +1204,7 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
     b.store(ValueOperand(last_occ_word), ValueOperand(cur_occ_addr))
     b.br(clear_last)
 
-    b.entry = clear_last
+    b.set_block(clear_last)
     last_entry_for_clear = _map_entry_addr(b, ValueOperand(data), ValueOperand(last_index))
     clear_key_addr = b.gep(ptr(), ValueOperand(last_entry_for_clear), [b.const_i64(0)])
     b.store(b.const_i64(0), ValueOperand(clear_key_addr))
@@ -1202,12 +1215,12 @@ def emit_map_str_word_del(name: str, map_type) -> MirFunction:
     b.store(ValueOperand(last_index), ValueOperand(len_addr))
     b.ret(ConstBoolOperand(True))
 
-    b.entry = next_block
+    b.set_block(next_block)
     next_i = b.binop("add", ValueOperand(i), b.const_i64(1))
     b.store(ValueOperand(next_i), ValueOperand(i_slot))
     b.br(loop_check)
 
-    b.entry = no
+    b.set_block(no)
     b.ret(ConstBoolOperand(False))
     return b.fn
 
