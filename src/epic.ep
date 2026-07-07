@@ -145,7 +145,7 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     epic_timing("machine object", machine_start, machine_stop)
 
     let coff_start = epic_now_ms()
-    let obj_bytes = coff_build_obj(machine)
+    let obj_bytes = coff_build_obj_timed(machine)
     let coff_stop = epic_now_ms()
     epic_timing("coff bytes", coff_start, coff_stop)
     let obj_path = epic_obj_path(exe_path)
