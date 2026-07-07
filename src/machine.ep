@@ -253,6 +253,10 @@ fun machine_str_i64_index_get_or_neg1(idx: MachineStrI64Index, key: str): i64 {
     return -1
 }
 
+fun machine_str_i64_index_has(idx: MachineStrI64Index, key: str): bool {
+    return machine_str_i64_index_find_pos(idx, key) >= 0
+}
+
 fun machine_str_i64_index_set(idx: MachineStrI64Index, key: str, value: i64): void {
     let names = idx.names
     let values = idx.values
@@ -840,9 +844,11 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.symbol_names = new str[0]
     obj.symbol_sections = new i64[0]
     obj.symbol_values = new i64[0]
+    let symbol_seen = machine_str_i64_index_empty()
     let i = 0
     while i < len(b.text_label_names) {
-        if !machine_has_symbol_name(obj.symbol_names, b.text_label_names[i]) {
+        if !machine_str_i64_index_has(symbol_seen, b.text_label_names[i]) {
+            machine_str_i64_index_set(symbol_seen, b.text_label_names[i], 1)
             push(obj.symbol_names, b.text_label_names[i])
             push(obj.symbol_sections, 1)
             push(obj.symbol_values, b.text_label_offsets[i])
@@ -851,7 +857,8 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     }
     i = 0
     while i < len(b.data_label_names) {
-        if !machine_has_symbol_name(obj.symbol_names, b.data_label_names[i]) {
+        if !machine_str_i64_index_has(symbol_seen, b.data_label_names[i]) {
+            machine_str_i64_index_set(symbol_seen, b.data_label_names[i], 1)
             push(obj.symbol_names, b.data_label_names[i])
             push(obj.symbol_sections, 2)
             push(obj.symbol_values, b.data_label_offsets[i])
@@ -859,9 +866,11 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
         i = i + 1
     }
     let externs = new str[0]
+    let extern_seen = machine_str_i64_index_empty()
     i = 0
     while i < len(b.text_reloc_names) {
-        if !machine_has_symbol_name(obj.symbol_names, b.text_reloc_names[i]) && !machine_has_symbol_name(externs, b.text_reloc_names[i]) {
+        if !machine_str_i64_index_has(symbol_seen, b.text_reloc_names[i]) && !machine_str_i64_index_has(extern_seen, b.text_reloc_names[i]) {
+            machine_str_i64_index_set(extern_seen, b.text_reloc_names[i], 1)
             push(externs, b.text_reloc_names[i])
         }
         i = i + 1
@@ -869,7 +878,8 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     let sorted_externs = machine_sorted_strings(externs)
     i = 0
     while i < len(sorted_externs) {
-        if !machine_has_symbol_name(obj.symbol_names, sorted_externs[i]) {
+        if !machine_str_i64_index_has(symbol_seen, sorted_externs[i]) {
+            machine_str_i64_index_set(symbol_seen, sorted_externs[i], 1)
             push(obj.symbol_names, sorted_externs[i])
             push(obj.symbol_sections, 0)
             push(obj.symbol_values, 0)
