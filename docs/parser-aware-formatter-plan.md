@@ -1,6 +1,6 @@
 # Parser-aware formatter plan
 
-目标：把 `epicfmt.py` 从 brace/text formatter 改成 parser-aware formatter，避免格式化生成当前语言 parser 不能接受的源码。
+目标：把 `tools/epicfmt.py` 从 brace/text formatter 改成 parser-aware formatter，避免格式化生成当前语言 parser 不能接受的源码。
 
 ## 原则
 
@@ -33,7 +33,7 @@
    - match pattern、struct init、array literal、f-string。
 
 5. Formatter 验证
-   - `epicfmt.py -w` 写入前先 parse formatted text。
+   - `python tools/epicfmt.py -w` 写入前先 parse formatted text。
    - 增加 formatter fixture 测试。
    - 对 `src/*.ep` 跑 formatter 后再跑：
      - `python test_examples_py.py`
