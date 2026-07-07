@@ -37,6 +37,17 @@ src/mir_runtime.ep builder emitters
 
 The immediate objective is smaller: prove whether this direction is worth pursuing.
 
+The primary decision driver is still compiler executable size, not architectural elegance by itself. MIR text infrastructure is expected to create future positive value for reviewability, fixtures, roundtrips, and optimizer testing, but the spike should not assume that value is guaranteed. Treat parser size and compile-time cost as real costs that must be measured.
+
+Because the MIR text parser has a fixed cost, do not judge the direction only after migrating a single helper. The first meaningful decision point is after migrating the complete word-slice group:
+
+```text
+__ep_slice_i64_new/get/set/push
+__ep_slice_ptr_new/get/set/push
+```
+
+At that point, executable size should be close to flat or smaller, fixed-point compile time should not regress materially, and the MIR text should be clearly easier to review than builder-style emitter code.
+
 ## Questions to answer
 
 The spike should answer these questions:
@@ -159,6 +170,10 @@ label operands
 
 Avoid supporting advanced syntax until needed.
 
+The parser should be deliberately narrow and fail-fast. It is an internal runtime-helper format, not a public MIR assembly language. Do not add syntax sugar, inference, optional annotations, or compatibility forms unless a migrated helper needs them.
+
+Prefer the existing MIR dump text as the canonical syntax. Python already has `bootstrap/mir.py` `text()` methods, and Epic already has `src/mir.ep` `mir_*_text` helpers / dump printing. The MIR text parser should accept that existing dump shape unless a concrete problem makes the dump format unreasonable as parser input. Any divergence from dump syntax should be explicitly documented and justified.
+
 ## Embedding strategy
 
 There are two possible ways to provide MIR text to the compiler.
@@ -223,22 +238,25 @@ Also create a runtime helper inventory table.
 
 ## Phase 1: Python-only MIR text parser spike
 
-Add a small Python parser first:
+Use the existing small Python MIR parser as the Python-side parser:
 
 ```text
-bootstrap/mir_text_parser.py
+bootstrap/mir_parser.py
 ```
+
+It already parses canonical MIR dump-style `MirProgram` text and is already wired into `bootstrap/mir_runtime_helpers.py` as an optional `runtime/mir/*.mir` override path. Do not add a second Python parser unless the existing one proves structurally wrong.
 
 Add one MIR text file or embedded test string:
 
 ```text
-runtime_mir/slice_i64_get.mir
+runtime/mir/slice_i64_get.mir
 ```
 
-The first parser API can be:
+The current Python parser API is:
 
 ```python
-parse_mir_text(text: str) -> list[MirFunction]
+parse_mir_text(text: str, filename: str = "<mir>") -> MirProgram
+parse_mir_file(path) -> MirProgram
 ```
 
 Initial validation should be structural:
@@ -286,17 +304,20 @@ The goal is not size reduction yet. The goal is correctness and a clean integrat
 
 ## Phase 3: Epic-side parser spike
 
-If the Python experiment is clean, implement the same subset parser in Epic:
+If the Python experiment is clean, implement the same subset parser in Epic. Python can use regular expressions, but Epic currently should not depend on regex. Prefer a tiny dedicated lexer plus parser:
 
 ```text
-src/mir_text_parser.ep
+src/mir_lexer.ep
+src/mir_parser.ep
 ```
 
 Possible API:
 
 ```epic
-fun parse_mir_text(text: str): MirFunction[]
+fun parse_mir_text(text: str): MirProgram
 ```
+
+The Epic parser should accept the same canonical dump-style syntax as the Python parser. Do not mechanically port the Python regex implementation; implement explicit tokenization and fail-fast parsing for the supported MIR subset. The Epic MIR lexer should be dedicated and tiny, not reused from the Epic source lexer. A line-oriented lexer/parser is acceptable and probably preferred for the first version. The Epic parser API may return `MirProgram` to match Python, but the first implementation should only parse `define` functions. Do not implement `import`, `declare`, `global`, or a full Epic-side `validate(program)` unless a runtime/mir fixture forces it. Prefer keeping Epic implementation simple and relying on existing end-to-end tests plus Python-side validation/tooling for deeper structural checks. Runtime helper `.mir` fixtures should contain `define` functions only in the first phase; do not put `declare`, `import`, or `global` records in `runtime/mir` unless the migration explicitly decides to widen the Epic parser.
 
 For the first self-hosted experiment, embed the MIR helper text as a string constant or a small generated string-returning function.
 
@@ -478,12 +499,12 @@ Add direct tests for migrated helpers.
 
 Do not connect MIR text to runtime injection immediately.
 
-First commit should only add:
+First commit should only add or update:
 
 ```text
-bootstrap/mir_text_parser.py
-runtime_mir/slice_i64_get.mir
-a small parser test
+parser tests for existing bootstrap/mir_parser.py
+runtime/mir/slice_i64_get.mir
+a small injection-path test
 ```
 
 Then inspect:

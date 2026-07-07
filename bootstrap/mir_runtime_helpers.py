@@ -1340,7 +1340,7 @@ def _parsed_runtime_helpers():
     helpers = {}
     if _RUNTIME_MIR_DIR.exists():
         for path in sorted(_RUNTIME_MIR_DIR.glob("*.mir")):
-            parsed = parse_mir_file(path)
+            parsed = parse_mir_file(path, validate_program=False)
             for fn in parsed.functions:
                 if fn.name in helpers:
                     raise RuntimeError(f"duplicate parsed MIR helper: {fn.name}")

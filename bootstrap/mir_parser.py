@@ -56,14 +56,15 @@ _SIMPLE_TYPES = {
 }
 
 
-def parse_mir_file(path):
-    return parse_mir_text(Path(path).read_text(encoding="utf-8"), filename=str(path))
+def parse_mir_file(path, validate_program=True):
+    return parse_mir_text(Path(path).read_text(encoding="utf-8"), filename=str(path), validate_program=validate_program)
 
 
-def parse_mir_text(text, filename="<mir>"):
+def parse_mir_text(text, filename="<mir>", validate_program=True):
     parser = _MirTextParser(text, filename)
     program = parser.parse_program()
-    validate(program)
+    if validate_program:
+        validate(program)
     return program
 
 
@@ -300,11 +301,12 @@ class _MirTextParser:
         return typ
 
     def _parse_type_prefix(self, text, line_no):
-        tokens = text.strip().split()
-        if not tokens:
+        raw_tokens = text.strip().split()
+        if not raw_tokens:
             self._error(line_no, "expected type")
+        tokens = [tok[:-1] if tok.endswith(",") else tok for tok in raw_tokens]
         typ, used = self._parse_type_tokens(tokens, 0, line_no)
-        return typ, " ".join(tokens[used:])
+        return typ, " ".join(raw_tokens[used:])
 
     def _parse_type_tokens(self, tokens, pos, line_no):
         tok = tokens[pos]
