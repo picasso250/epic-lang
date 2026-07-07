@@ -1,0 +1,359 @@
+#
+# Minimal self-hosted X64IR -> machine byte encoder.
+# First milestone: enough structured encoding for the X64IR fixture oracle.
+#
+
+struct MachineObject {
+    text: i64[]
+    data: i64[]
+}
+
+struct MachineFixup {
+    offset: i64
+    label: str
+    kind: str
+}
+
+struct MachineBuilder {
+    text: i64[]
+    data: i64[]
+    section: str
+    text_label_names: str[]
+    text_label_offsets: i64[]
+    data_label_names: str[]
+    data_label_offsets: i64[]
+    fixups: MachineFixup[]
+}
+
+fun machine_builder_empty(): MachineBuilder {
+    let b = new MachineBuilder
+    b.text = new i64[0]
+    b.data = new i64[0]
+    b.section = ""
+    b.text_label_names = new str[0]
+    b.text_label_offsets = new i64[0]
+    b.data_label_names = new str[0]
+    b.data_label_offsets = new i64[0]
+    b.fixups = new MachineFixup[0]
+    return b
+}
+
+fun machine_die(msg: str): void {
+    println(str_cat2("machine error: ", msg))
+    exit(1)
+}
+
+fun machine_append_byte(out: i64[], value: i64): void {
+    push(out, value & 255)
+}
+
+fun machine_u32_value(value: i64): i64 {
+    if value < 0 {
+        return value + 4294967296
+    }
+    return value
+}
+
+fun machine_append_i32(out: i64[], value: i64): void {
+    let v = machine_u32_value(value)
+    machine_append_byte(out, v)
+    machine_append_byte(out, v / 256)
+    machine_append_byte(out, v / 65536)
+    machine_append_byte(out, v / 16777216)
+}
+
+fun machine_append_u64(out: i64[], value: i64): void {
+    let v = value
+    machine_append_byte(out, v)
+    machine_append_byte(out, v / 256)
+    machine_append_byte(out, v / 65536)
+    machine_append_byte(out, v / 16777216)
+    machine_append_byte(out, v / 4294967296)
+    machine_append_byte(out, v / 1099511627776)
+    machine_append_byte(out, v / 281474976710656)
+    machine_append_byte(out, v / 72057594037927936)
+}
+
+fun machine_reg64(name: str): i64 {
+    if name == "rax" { return 0 }
+    if name == "rcx" { return 1 }
+    if name == "rdx" { return 2 }
+    if name == "rbx" { return 3 }
+    if name == "rsp" { return 4 }
+    if name == "rbp" { return 5 }
+    if name == "rsi" { return 6 }
+    if name == "rdi" { return 7 }
+    if name == "r8" { return 8 }
+    if name == "r9" { return 9 }
+    if name == "r10" { return 10 }
+    if name == "r11" { return 11 }
+    machine_die(str_cat2("unsupported reg64: ", name))
+    return 0
+}
+
+fun machine_is_reg(op: X64Operand, name: str): bool {
+    return op.kind == "reg" && op.name == name
+}
+
+fun machine_rex(b: MachineBuilder, w: bool, r: i64, rb: i64): void {
+    let value = 64
+    if w { value = value | 8 }
+    value = value | ((r & 1) * 4)
+    value = value | (rb & 1)
+    if value != 64 {
+        machine_append_byte(b.text, value)
+    }
+}
+
+fun machine_modrm(b: MachineBuilder, mod: i64, reg: i64, rm: i64): void {
+    machine_append_byte(b.text, ((mod & 3) * 64) | ((reg & 7) * 8) | (rm & 7))
+}
+
+fun machine_mem_modrm(b: MachineBuilder, reg_field: i64, base: str, disp: i64): void {
+    let base_code = machine_reg64(base)
+    let rm = base_code & 7
+    let mod = 0
+    if disp == 0 && rm != 5 {
+        mod = 0
+    } else if disp >= -128 && disp <= 127 {
+        mod = 1
+    } else {
+        mod = 2
+    }
+    if rm == 4 {
+        machine_modrm(b, mod, reg_field, 4)
+        machine_append_byte(b.text, 36)
+    } else {
+        machine_modrm(b, mod, reg_field, rm)
+    }
+    if mod == 1 {
+        machine_append_byte(b.text, disp)
+    } else if mod == 2 || (mod == 0 && rm == 5) {
+        machine_append_i32(b.text, disp)
+    }
+}
+
+fun machine_add_text_label(b: MachineBuilder, name: str): void {
+    push(b.text_label_names, name)
+    push(b.text_label_offsets, len(b.text))
+}
+
+fun machine_text_label_offset(b: MachineBuilder, name: str): i64 {
+    let i = 0
+    while i < len(b.text_label_names) {
+        if b.text_label_names[i] == name {
+            return b.text_label_offsets[i]
+        }
+        i = i + 1
+    }
+    machine_die(str_cat2("unknown text label: ", name))
+    return 0
+}
+
+fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
+    let f = new MachineFixup
+    f.offset = offset
+    f.label = label
+    f.kind = kind
+    push(b.fixups, f)
+}
+
+fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
+    let v = machine_u32_value(value)
+    out[offset] = v & 255
+    out[offset + 1] = (v / 256) & 255
+    out[offset + 2] = (v / 65536) & 255
+    out[offset + 3] = (v / 16777216) & 255
+}
+
+fun machine_patch_fixups(b: MachineBuilder): void {
+    let i = 0
+    while i < len(b.fixups) {
+        if b.fixups[i].kind == "label" {
+            let target = machine_text_label_offset(b, b.fixups[i].label)
+            let disp = target - (b.fixups[i].offset + 4)
+            machine_patch_i32(b.text, b.fixups[i].offset, disp)
+        }
+        i = i + 1
+    }
+}
+
+fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
+    if dst == "rax" {
+        machine_append_byte(b.text, 72)
+        machine_append_byte(b.text, 199)
+        machine_append_byte(b.text, 192)
+        machine_append_i32(b.text, imm)
+        return
+    }
+    let reg = machine_reg64(dst)
+    machine_rex(b, true, 0, reg / 8)
+    machine_append_byte(b.text, 199)
+    machine_modrm(b, 3, 0, reg)
+    machine_append_i32(b.text, imm)
+}
+
+fun machine_emit_mov_reg_reg(b: MachineBuilder, dst: str, src: str): void {
+    let d = machine_reg64(dst)
+    let s = machine_reg64(src)
+    machine_rex(b, true, s / 8, d / 8)
+    machine_append_byte(b.text, 137)
+    machine_modrm(b, 3, s, d)
+}
+
+fun machine_emit_cmp_reg_imm(b: MachineBuilder, reg_name: str, imm: i64): void {
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, 0, r / 8)
+    if imm >= -128 && imm <= 127 {
+        machine_append_byte(b.text, 131)
+        machine_modrm(b, 3, 7, r)
+        machine_append_byte(b.text, imm)
+    } else {
+        machine_append_byte(b.text, 129)
+        machine_modrm(b, 3, 7, r)
+        machine_append_i32(b.text, imm)
+    }
+}
+
+fun machine_emit_jump(b: MachineBuilder, op: str, label: str): void {
+    if op == "jmp" {
+        machine_append_byte(b.text, 233)
+    } else if op == "jz" {
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, 132)
+    } else if op == "jnz" {
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, 133)
+    } else {
+        machine_die(str_cat2("unsupported jump: ", op))
+    }
+    let off = len(b.text)
+    machine_append_i32(b.text, 0)
+    machine_add_fixup(b, off, label, "label")
+}
+
+fun machine_emit_lea_symbol(b: MachineBuilder, dst: str, symbol: str): void {
+    let d = machine_reg64(dst)
+    machine_rex(b, true, d / 8, 0)
+    machine_append_byte(b.text, 141)
+    machine_append_byte(b.text, 5 | ((d & 7) * 8))
+    machine_append_i32(b.text, 0)
+}
+
+fun machine_emit_call_symbol(b: MachineBuilder, symbol: str): void {
+    machine_append_byte(b.text, 232)
+    machine_append_i32(b.text, 0)
+}
+
+fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
+    let ops = item.operands
+    if item.op == "ret" && len(ops) == 0 {
+        machine_append_byte(b.text, 195)
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
+        machine_emit_mov_reg_imm(b, ops[0].name, ops[1].value)
+        return
+    }
+    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
+        machine_emit_mov_reg_reg(b, ops[0].name, ops[1].name)
+        return
+    }
+    if item.op == "cmp" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
+        machine_emit_cmp_reg_imm(b, ops[0].name, ops[1].value)
+        return
+    }
+    if (item.op == "jmp" || item.op == "jz" || item.op == "jnz") && len(ops) == 1 && ops[0].kind == "label_ref" {
+        machine_emit_jump(b, item.op, ops[0].name)
+        return
+    }
+    if item.op == "lea" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_symbol {
+        machine_emit_lea_symbol(b, ops[0].name, ops[1].symbol)
+        return
+    }
+    if item.op == "call" && len(ops) == 1 && ops[0].kind == "symbol" {
+        machine_emit_call_symbol(b, ops[0].name)
+        return
+    }
+    machine_die(str_cat2("unsupported instruction: ", item.op))
+}
+
+fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
+    if item.kind == "global" || item.kind == "extern" {
+        return
+    }
+    if item.kind == "section" {
+        b.section = item.name
+        return
+    }
+    if item.kind == "label" {
+        if b.section == ".text" {
+            machine_add_text_label(b, item.name)
+            return
+        }
+        if b.section == ".data" {
+            push(b.data_label_names, item.name)
+            push(b.data_label_offsets, len(b.data))
+            return
+        }
+        machine_die(str_cat2("label outside section: ", item.name))
+    }
+    if item.kind == "inst" {
+        if b.section != ".text" { machine_die(str_cat2("instruction outside .text: ", item.op)) }
+        machine_emit_inst(b, item)
+        return
+    }
+    if item.kind == "data_bytes" {
+        if b.section != ".data" { machine_die(str_cat2("data outside .data: ", item.name)) }
+        push(b.data_label_names, item.name)
+        push(b.data_label_offsets, len(b.data))
+        let i = 0
+        while i < len(item.values) {
+            machine_append_byte(b.data, item.values[i])
+            i = i + 1
+        }
+        return
+    }
+    if item.kind == "data_zero" {
+        if b.section != ".data" { machine_die(str_cat2("data outside .data: ", item.name)) }
+        push(b.data_label_names, item.name)
+        push(b.data_label_offsets, len(b.data))
+        let i = 0
+        while i < item.count {
+            machine_append_byte(b.data, 0)
+            i = i + 1
+        }
+        return
+    }
+    machine_die(str_cat2("unsupported item: ", item.kind))
+}
+
+fun machine_build_object(program: X64Program): MachineObject {
+    let b = machine_builder_empty()
+    let i = 0
+    while i < len(program.items) {
+        machine_emit_item(b, program.items[i])
+        i = i + 1
+    }
+    machine_patch_fixups(b)
+    let obj = new MachineObject
+    obj.text = b.text
+    obj.data = b.data
+    return obj
+}
+
+fun machine_print_bytes(label: str, values: i64[]): void {
+    println(label)
+    let i = 0
+    while i < len(values) {
+        println(str(values[i]))
+        i = i + 1
+    }
+}
+
+fun machine_print_object(obj: MachineObject): void {
+    machine_print_bytes("TEXT", obj.text)
+    machine_print_bytes("DATA", obj.data)
+}
+
+
