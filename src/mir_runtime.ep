@@ -4169,878 +4169,882 @@ fun mir_runtime_emit_ep_map_str_i64_get(): MirFunction {
     return fn
 }
 
-fun mir_runtime_emit_ep_map_str_i64_set(): MirFunction {
-    let fn = mir_function_empty("__ep_map_str_i64_set", "void")
+fun mir_runtime_emit_ep_map_str_word_set(name: str, value_type: str): MirFunction {
+    let fn = mir_function_empty(name, "void")
     push(fn.params, mir_runtime_param("map", "ptr"))
     push(fn.params, mir_runtime_param("key", "ptr"))
-    push(fn.params, mir_runtime_param("val", "i64"))
+    push(fn.params, mir_runtime_param("val", value_type))
     let b0 = mir_block_empty("entry")
-    let f21_b0_i0_inst = mir_inst_empty()
-    f21_b0_i0_inst.op = "gep"
-    f21_b0_i0_inst.has_result = true
-    f21_b0_i0_inst.result_name = "gep0"
-    f21_b0_i0_inst.result_type = "ptr"
-    f21_b0_i0_inst.typ = "ptr"
-    let f21_b0_i0_op0 = mir_value_operand("ptr", "map")
-    push(f21_b0_i0_inst.operands, f21_b0_i0_op0)
-    let f21_b0_i0_op1 = mir_const_int("i64", 1)
-    push(f21_b0_i0_inst.operands, f21_b0_i0_op1)
-    push(b0.instructions, f21_b0_i0_inst)
-    let f21_b0_i1_inst = mir_inst_empty()
-    f21_b0_i1_inst.op = "load"
-    f21_b0_i1_inst.has_result = true
-    f21_b0_i1_inst.result_name = "load1"
-    f21_b0_i1_inst.result_type = "i64"
-    f21_b0_i1_inst.typ = "i64"
-    let f21_b0_i1_op0 = mir_value_operand("ptr", "gep0")
-    push(f21_b0_i1_inst.operands, f21_b0_i1_op0)
-    push(b0.instructions, f21_b0_i1_inst)
-    let f21_b0_i2_inst = mir_inst_empty()
-    f21_b0_i2_inst.op = "gep"
-    f21_b0_i2_inst.has_result = true
-    f21_b0_i2_inst.result_name = "gep2"
-    f21_b0_i2_inst.result_type = "ptr"
-    f21_b0_i2_inst.typ = "ptr"
-    let f21_b0_i2_op0 = mir_value_operand("ptr", "map")
-    push(f21_b0_i2_inst.operands, f21_b0_i2_op0)
-    let f21_b0_i2_op1 = mir_const_int("i64", 2)
-    push(f21_b0_i2_inst.operands, f21_b0_i2_op1)
-    push(b0.instructions, f21_b0_i2_inst)
-    let f21_b0_i3_inst = mir_inst_empty()
-    f21_b0_i3_inst.op = "load"
-    f21_b0_i3_inst.has_result = true
-    f21_b0_i3_inst.result_name = "load3"
-    f21_b0_i3_inst.result_type = "i64"
-    f21_b0_i3_inst.typ = "i64"
-    let f21_b0_i3_op0 = mir_value_operand("ptr", "gep2")
-    push(f21_b0_i3_inst.operands, f21_b0_i3_op0)
-    push(b0.instructions, f21_b0_i3_inst)
-    let f21_b0_i4_inst = mir_inst_empty()
-    f21_b0_i4_inst.op = "gep"
-    f21_b0_i4_inst.has_result = true
-    f21_b0_i4_inst.result_name = "gep4"
-    f21_b0_i4_inst.result_type = "ptr"
-    f21_b0_i4_inst.typ = "ptr"
-    let f21_b0_i4_op0 = mir_value_operand("ptr", "map")
-    push(f21_b0_i4_inst.operands, f21_b0_i4_op0)
-    let f21_b0_i4_op1 = mir_const_int("i64", 0)
-    push(f21_b0_i4_inst.operands, f21_b0_i4_op1)
-    push(b0.instructions, f21_b0_i4_inst)
-    let f21_b0_i5_inst = mir_inst_empty()
-    f21_b0_i5_inst.op = "load"
-    f21_b0_i5_inst.has_result = true
-    f21_b0_i5_inst.result_name = "load5"
-    f21_b0_i5_inst.result_type = "ptr"
-    f21_b0_i5_inst.typ = "ptr"
-    let f21_b0_i5_op0 = mir_value_operand("ptr", "gep4")
-    push(f21_b0_i5_inst.operands, f21_b0_i5_op0)
-    push(b0.instructions, f21_b0_i5_inst)
-    let f21_b0_i6_inst = mir_inst_empty()
-    f21_b0_i6_inst.op = "call"
-    f21_b0_i6_inst.has_result = true
-    f21_b0_i6_inst.result_name = "call6"
-    f21_b0_i6_inst.result_type = "i64"
-    f21_b0_i6_inst.typ = "i64"
-    f21_b0_i6_inst.callee = "__ep_map_str_find_pos"
-    let f21_b0_i6_op0 = mir_value_operand("ptr", "map")
-    push(f21_b0_i6_inst.operands, f21_b0_i6_op0)
-    let f21_b0_i6_op1 = mir_value_operand("ptr", "key")
-    push(f21_b0_i6_inst.operands, f21_b0_i6_op1)
-    push(b0.instructions, f21_b0_i6_inst)
-    let f21_b0_i7_inst = mir_inst_empty()
-    f21_b0_i7_inst.op = "icmp.sge"
-    f21_b0_i7_inst.has_result = true
-    f21_b0_i7_inst.result_name = "icmp_sge7"
-    f21_b0_i7_inst.result_type = "bool"
-    f21_b0_i7_inst.typ = "bool"
-    let f21_b0_i7_op0 = mir_value_operand("i64", "call6")
-    push(f21_b0_i7_inst.operands, f21_b0_i7_op0)
-    let f21_b0_i7_op1 = mir_const_int("i64", 0)
-    push(f21_b0_i7_inst.operands, f21_b0_i7_op1)
-    push(b0.instructions, f21_b0_i7_inst)
-    let f21_b0_t_cond = mir_value_operand("bool", "icmp_sge7")
-    b0.terminator = mir_condbr(f21_b0_t_cond, "update", "insert_prep")
+    let f_map_set_b0_i0_inst = mir_inst_empty()
+    f_map_set_b0_i0_inst.op = "gep"
+    f_map_set_b0_i0_inst.has_result = true
+    f_map_set_b0_i0_inst.result_name = "gep0"
+    f_map_set_b0_i0_inst.result_type = "ptr"
+    f_map_set_b0_i0_inst.typ = "ptr"
+    let f_map_set_b0_i0_op0 = mir_value_operand("ptr", "map")
+    push(f_map_set_b0_i0_inst.operands, f_map_set_b0_i0_op0)
+    let f_map_set_b0_i0_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b0_i0_inst.operands, f_map_set_b0_i0_op1)
+    push(b0.instructions, f_map_set_b0_i0_inst)
+    let f_map_set_b0_i1_inst = mir_inst_empty()
+    f_map_set_b0_i1_inst.op = "load"
+    f_map_set_b0_i1_inst.has_result = true
+    f_map_set_b0_i1_inst.result_name = "load1"
+    f_map_set_b0_i1_inst.result_type = value_type
+    f_map_set_b0_i1_inst.typ = value_type
+    let f_map_set_b0_i1_op0 = mir_value_operand("ptr", "gep0")
+    push(f_map_set_b0_i1_inst.operands, f_map_set_b0_i1_op0)
+    push(b0.instructions, f_map_set_b0_i1_inst)
+    let f_map_set_b0_i2_inst = mir_inst_empty()
+    f_map_set_b0_i2_inst.op = "gep"
+    f_map_set_b0_i2_inst.has_result = true
+    f_map_set_b0_i2_inst.result_name = "gep2"
+    f_map_set_b0_i2_inst.result_type = "ptr"
+    f_map_set_b0_i2_inst.typ = "ptr"
+    let f_map_set_b0_i2_op0 = mir_value_operand("ptr", "map")
+    push(f_map_set_b0_i2_inst.operands, f_map_set_b0_i2_op0)
+    let f_map_set_b0_i2_op1 = mir_const_int(value_type, 2)
+    push(f_map_set_b0_i2_inst.operands, f_map_set_b0_i2_op1)
+    push(b0.instructions, f_map_set_b0_i2_inst)
+    let f_map_set_b0_i3_inst = mir_inst_empty()
+    f_map_set_b0_i3_inst.op = "load"
+    f_map_set_b0_i3_inst.has_result = true
+    f_map_set_b0_i3_inst.result_name = "load3"
+    f_map_set_b0_i3_inst.result_type = value_type
+    f_map_set_b0_i3_inst.typ = value_type
+    let f_map_set_b0_i3_op0 = mir_value_operand("ptr", "gep2")
+    push(f_map_set_b0_i3_inst.operands, f_map_set_b0_i3_op0)
+    push(b0.instructions, f_map_set_b0_i3_inst)
+    let f_map_set_b0_i4_inst = mir_inst_empty()
+    f_map_set_b0_i4_inst.op = "gep"
+    f_map_set_b0_i4_inst.has_result = true
+    f_map_set_b0_i4_inst.result_name = "gep4"
+    f_map_set_b0_i4_inst.result_type = "ptr"
+    f_map_set_b0_i4_inst.typ = "ptr"
+    let f_map_set_b0_i4_op0 = mir_value_operand("ptr", "map")
+    push(f_map_set_b0_i4_inst.operands, f_map_set_b0_i4_op0)
+    let f_map_set_b0_i4_op1 = mir_const_int(value_type, 0)
+    push(f_map_set_b0_i4_inst.operands, f_map_set_b0_i4_op1)
+    push(b0.instructions, f_map_set_b0_i4_inst)
+    let f_map_set_b0_i5_inst = mir_inst_empty()
+    f_map_set_b0_i5_inst.op = "load"
+    f_map_set_b0_i5_inst.has_result = true
+    f_map_set_b0_i5_inst.result_name = "load5"
+    f_map_set_b0_i5_inst.result_type = "ptr"
+    f_map_set_b0_i5_inst.typ = "ptr"
+    let f_map_set_b0_i5_op0 = mir_value_operand("ptr", "gep4")
+    push(f_map_set_b0_i5_inst.operands, f_map_set_b0_i5_op0)
+    push(b0.instructions, f_map_set_b0_i5_inst)
+    let f_map_set_b0_i6_inst = mir_inst_empty()
+    f_map_set_b0_i6_inst.op = "call"
+    f_map_set_b0_i6_inst.has_result = true
+    f_map_set_b0_i6_inst.result_name = "call6"
+    f_map_set_b0_i6_inst.result_type = value_type
+    f_map_set_b0_i6_inst.typ = value_type
+    f_map_set_b0_i6_inst.callee = "__ep_map_str_find_pos"
+    let f_map_set_b0_i6_op0 = mir_value_operand("ptr", "map")
+    push(f_map_set_b0_i6_inst.operands, f_map_set_b0_i6_op0)
+    let f_map_set_b0_i6_op1 = mir_value_operand("ptr", "key")
+    push(f_map_set_b0_i6_inst.operands, f_map_set_b0_i6_op1)
+    push(b0.instructions, f_map_set_b0_i6_inst)
+    let f_map_set_b0_i7_inst = mir_inst_empty()
+    f_map_set_b0_i7_inst.op = "icmp.sge"
+    f_map_set_b0_i7_inst.has_result = true
+    f_map_set_b0_i7_inst.result_name = "icmp_sge7"
+    f_map_set_b0_i7_inst.result_type = "bool"
+    f_map_set_b0_i7_inst.typ = "bool"
+    let f_map_set_b0_i7_op0 = mir_value_operand(value_type, "call6")
+    push(f_map_set_b0_i7_inst.operands, f_map_set_b0_i7_op0)
+    let f_map_set_b0_i7_op1 = mir_const_int(value_type, 0)
+    push(f_map_set_b0_i7_inst.operands, f_map_set_b0_i7_op1)
+    push(b0.instructions, f_map_set_b0_i7_inst)
+    let f_map_set_b0_t_cond = mir_value_operand("bool", "icmp_sge7")
+    b0.terminator = mir_condbr(f_map_set_b0_t_cond, "update", "insert_prep")
     b0.has_terminator = true
     push(fn.blocks, b0)
     let b1 = mir_block_empty("update")
-    let f21_b1_i0_inst = mir_inst_empty()
-    f21_b1_i0_inst.op = "add"
-    f21_b1_i0_inst.has_result = true
-    f21_b1_i0_inst.result_name = "add8"
-    f21_b1_i0_inst.result_type = "i64"
-    f21_b1_i0_inst.typ = "i64"
-    let f21_b1_i0_op0 = mir_value_operand("i64", "call6")
-    push(f21_b1_i0_inst.operands, f21_b1_i0_op0)
-    let f21_b1_i0_op1 = mir_value_operand("i64", "call6")
-    push(f21_b1_i0_inst.operands, f21_b1_i0_op1)
-    push(b1.instructions, f21_b1_i0_inst)
-    let f21_b1_i1_inst = mir_inst_empty()
-    f21_b1_i1_inst.op = "add"
-    f21_b1_i1_inst.has_result = true
-    f21_b1_i1_inst.result_name = "add9"
-    f21_b1_i1_inst.result_type = "i64"
-    f21_b1_i1_inst.typ = "i64"
-    let f21_b1_i1_op0 = mir_value_operand("i64", "add8")
-    push(f21_b1_i1_inst.operands, f21_b1_i1_op0)
-    let f21_b1_i1_op1 = mir_value_operand("i64", "call6")
-    push(f21_b1_i1_inst.operands, f21_b1_i1_op1)
-    push(b1.instructions, f21_b1_i1_inst)
-    let f21_b1_i2_inst = mir_inst_empty()
-    f21_b1_i2_inst.op = "gep"
-    f21_b1_i2_inst.has_result = true
-    f21_b1_i2_inst.result_name = "gep10"
-    f21_b1_i2_inst.result_type = "ptr"
-    f21_b1_i2_inst.typ = "ptr"
-    let f21_b1_i2_op0 = mir_value_operand("ptr", "load5")
-    push(f21_b1_i2_inst.operands, f21_b1_i2_op0)
-    let f21_b1_i2_op1 = mir_value_operand("i64", "add9")
-    push(f21_b1_i2_inst.operands, f21_b1_i2_op1)
-    push(b1.instructions, f21_b1_i2_inst)
-    let f21_b1_i3_inst = mir_inst_empty()
-    f21_b1_i3_inst.op = "gep"
-    f21_b1_i3_inst.has_result = true
-    f21_b1_i3_inst.result_name = "gep11"
-    f21_b1_i3_inst.result_type = "ptr"
-    f21_b1_i3_inst.typ = "ptr"
-    let f21_b1_i3_op0 = mir_value_operand("ptr", "gep10")
-    push(f21_b1_i3_inst.operands, f21_b1_i3_op0)
-    let f21_b1_i3_op1 = mir_const_int("i64", 1)
-    push(f21_b1_i3_inst.operands, f21_b1_i3_op1)
-    push(b1.instructions, f21_b1_i3_inst)
-    let f21_b1_i4_inst = mir_inst_empty()
-    f21_b1_i4_inst.op = "store"
-    let f21_b1_i4_op0 = mir_value_operand("i64", "val")
-    push(f21_b1_i4_inst.operands, f21_b1_i4_op0)
-    let f21_b1_i4_op1 = mir_value_operand("ptr", "gep11")
-    push(f21_b1_i4_inst.operands, f21_b1_i4_op1)
-    push(b1.instructions, f21_b1_i4_inst)
+    let f_map_set_b1_i0_inst = mir_inst_empty()
+    f_map_set_b1_i0_inst.op = "add"
+    f_map_set_b1_i0_inst.has_result = true
+    f_map_set_b1_i0_inst.result_name = "add8"
+    f_map_set_b1_i0_inst.result_type = value_type
+    f_map_set_b1_i0_inst.typ = value_type
+    let f_map_set_b1_i0_op0 = mir_value_operand(value_type, "call6")
+    push(f_map_set_b1_i0_inst.operands, f_map_set_b1_i0_op0)
+    let f_map_set_b1_i0_op1 = mir_value_operand(value_type, "call6")
+    push(f_map_set_b1_i0_inst.operands, f_map_set_b1_i0_op1)
+    push(b1.instructions, f_map_set_b1_i0_inst)
+    let f_map_set_b1_i1_inst = mir_inst_empty()
+    f_map_set_b1_i1_inst.op = "add"
+    f_map_set_b1_i1_inst.has_result = true
+    f_map_set_b1_i1_inst.result_name = "add9"
+    f_map_set_b1_i1_inst.result_type = value_type
+    f_map_set_b1_i1_inst.typ = value_type
+    let f_map_set_b1_i1_op0 = mir_value_operand(value_type, "add8")
+    push(f_map_set_b1_i1_inst.operands, f_map_set_b1_i1_op0)
+    let f_map_set_b1_i1_op1 = mir_value_operand(value_type, "call6")
+    push(f_map_set_b1_i1_inst.operands, f_map_set_b1_i1_op1)
+    push(b1.instructions, f_map_set_b1_i1_inst)
+    let f_map_set_b1_i2_inst = mir_inst_empty()
+    f_map_set_b1_i2_inst.op = "gep"
+    f_map_set_b1_i2_inst.has_result = true
+    f_map_set_b1_i2_inst.result_name = "gep10"
+    f_map_set_b1_i2_inst.result_type = "ptr"
+    f_map_set_b1_i2_inst.typ = "ptr"
+    let f_map_set_b1_i2_op0 = mir_value_operand("ptr", "load5")
+    push(f_map_set_b1_i2_inst.operands, f_map_set_b1_i2_op0)
+    let f_map_set_b1_i2_op1 = mir_value_operand(value_type, "add9")
+    push(f_map_set_b1_i2_inst.operands, f_map_set_b1_i2_op1)
+    push(b1.instructions, f_map_set_b1_i2_inst)
+    let f_map_set_b1_i3_inst = mir_inst_empty()
+    f_map_set_b1_i3_inst.op = "gep"
+    f_map_set_b1_i3_inst.has_result = true
+    f_map_set_b1_i3_inst.result_name = "gep11"
+    f_map_set_b1_i3_inst.result_type = "ptr"
+    f_map_set_b1_i3_inst.typ = "ptr"
+    let f_map_set_b1_i3_op0 = mir_value_operand("ptr", "gep10")
+    push(f_map_set_b1_i3_inst.operands, f_map_set_b1_i3_op0)
+    let f_map_set_b1_i3_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b1_i3_inst.operands, f_map_set_b1_i3_op1)
+    push(b1.instructions, f_map_set_b1_i3_inst)
+    let f_map_set_b1_i4_inst = mir_inst_empty()
+    f_map_set_b1_i4_inst.op = "store"
+    let f_map_set_b1_i4_op0 = mir_value_operand(value_type, "val")
+    push(f_map_set_b1_i4_inst.operands, f_map_set_b1_i4_op0)
+    let f_map_set_b1_i4_op1 = mir_value_operand("ptr", "gep11")
+    push(f_map_set_b1_i4_inst.operands, f_map_set_b1_i4_op1)
+    push(b1.instructions, f_map_set_b1_i4_inst)
     b1.terminator = mir_ret_void()
     b1.has_terminator = true
     push(fn.blocks, b1)
     let b2 = mir_block_empty("insert_prep")
-    let f21_b2_i0_inst = mir_inst_empty()
-    f21_b2_i0_inst.op = "alloca"
-    f21_b2_i0_inst.has_result = true
-    f21_b2_i0_inst.result_name = "alloca12"
-    f21_b2_i0_inst.result_type = "ptr"
-    f21_b2_i0_inst.typ = "i64"
-    push(b2.instructions, f21_b2_i0_inst)
-    let f21_b2_i1_inst = mir_inst_empty()
-    f21_b2_i1_inst.op = "sub"
-    f21_b2_i1_inst.has_result = true
-    f21_b2_i1_inst.result_name = "sub13"
-    f21_b2_i1_inst.result_type = "i64"
-    f21_b2_i1_inst.typ = "i64"
-    let f21_b2_i1_op0 = mir_const_int("i64", 0)
-    push(f21_b2_i1_inst.operands, f21_b2_i1_op0)
-    let f21_b2_i1_op1 = mir_value_operand("i64", "call6")
-    push(f21_b2_i1_inst.operands, f21_b2_i1_op1)
-    push(b2.instructions, f21_b2_i1_inst)
-    let f21_b2_i2_inst = mir_inst_empty()
-    f21_b2_i2_inst.op = "sub"
-    f21_b2_i2_inst.has_result = true
-    f21_b2_i2_inst.result_name = "sub14"
-    f21_b2_i2_inst.result_type = "i64"
-    f21_b2_i2_inst.typ = "i64"
-    let f21_b2_i2_op0 = mir_value_operand("i64", "sub13")
-    push(f21_b2_i2_inst.operands, f21_b2_i2_op0)
-    let f21_b2_i2_op1 = mir_const_int("i64", 1)
-    push(f21_b2_i2_inst.operands, f21_b2_i2_op1)
-    push(b2.instructions, f21_b2_i2_inst)
-    let f21_b2_i3_inst = mir_inst_empty()
-    f21_b2_i3_inst.op = "store"
-    let f21_b2_i3_op0 = mir_value_operand("i64", "sub14")
-    push(f21_b2_i3_inst.operands, f21_b2_i3_op0)
-    let f21_b2_i3_op1 = mir_value_operand("ptr", "alloca12")
-    push(f21_b2_i3_inst.operands, f21_b2_i3_op1)
-    push(b2.instructions, f21_b2_i3_inst)
-    let f21_b2_i4_inst = mir_inst_empty()
-    f21_b2_i4_inst.op = "icmp.sge"
-    f21_b2_i4_inst.has_result = true
-    f21_b2_i4_inst.result_name = "icmp_sge15"
-    f21_b2_i4_inst.result_type = "bool"
-    f21_b2_i4_inst.typ = "bool"
-    let f21_b2_i4_op0 = mir_value_operand("i64", "load1")
-    push(f21_b2_i4_inst.operands, f21_b2_i4_op0)
-    let f21_b2_i4_op1 = mir_value_operand("i64", "load3")
-    push(f21_b2_i4_inst.operands, f21_b2_i4_op1)
-    push(b2.instructions, f21_b2_i4_inst)
-    let f21_b2_t_cond = mir_value_operand("bool", "icmp_sge15")
-    b2.terminator = mir_condbr(f21_b2_t_cond, "grow", "shift_init")
+    let f_map_set_b2_i0_inst = mir_inst_empty()
+    f_map_set_b2_i0_inst.op = "alloca"
+    f_map_set_b2_i0_inst.has_result = true
+    f_map_set_b2_i0_inst.result_name = "alloca12"
+    f_map_set_b2_i0_inst.result_type = "ptr"
+    f_map_set_b2_i0_inst.typ = value_type
+    push(b2.instructions, f_map_set_b2_i0_inst)
+    let f_map_set_b2_i1_inst = mir_inst_empty()
+    f_map_set_b2_i1_inst.op = "sub"
+    f_map_set_b2_i1_inst.has_result = true
+    f_map_set_b2_i1_inst.result_name = "sub13"
+    f_map_set_b2_i1_inst.result_type = value_type
+    f_map_set_b2_i1_inst.typ = value_type
+    let f_map_set_b2_i1_op0 = mir_const_int(value_type, 0)
+    push(f_map_set_b2_i1_inst.operands, f_map_set_b2_i1_op0)
+    let f_map_set_b2_i1_op1 = mir_value_operand(value_type, "call6")
+    push(f_map_set_b2_i1_inst.operands, f_map_set_b2_i1_op1)
+    push(b2.instructions, f_map_set_b2_i1_inst)
+    let f_map_set_b2_i2_inst = mir_inst_empty()
+    f_map_set_b2_i2_inst.op = "sub"
+    f_map_set_b2_i2_inst.has_result = true
+    f_map_set_b2_i2_inst.result_name = "sub14"
+    f_map_set_b2_i2_inst.result_type = value_type
+    f_map_set_b2_i2_inst.typ = value_type
+    let f_map_set_b2_i2_op0 = mir_value_operand(value_type, "sub13")
+    push(f_map_set_b2_i2_inst.operands, f_map_set_b2_i2_op0)
+    let f_map_set_b2_i2_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b2_i2_inst.operands, f_map_set_b2_i2_op1)
+    push(b2.instructions, f_map_set_b2_i2_inst)
+    let f_map_set_b2_i3_inst = mir_inst_empty()
+    f_map_set_b2_i3_inst.op = "store"
+    let f_map_set_b2_i3_op0 = mir_value_operand(value_type, "sub14")
+    push(f_map_set_b2_i3_inst.operands, f_map_set_b2_i3_op0)
+    let f_map_set_b2_i3_op1 = mir_value_operand("ptr", "alloca12")
+    push(f_map_set_b2_i3_inst.operands, f_map_set_b2_i3_op1)
+    push(b2.instructions, f_map_set_b2_i3_inst)
+    let f_map_set_b2_i4_inst = mir_inst_empty()
+    f_map_set_b2_i4_inst.op = "icmp.sge"
+    f_map_set_b2_i4_inst.has_result = true
+    f_map_set_b2_i4_inst.result_name = "icmp_sge15"
+    f_map_set_b2_i4_inst.result_type = "bool"
+    f_map_set_b2_i4_inst.typ = "bool"
+    let f_map_set_b2_i4_op0 = mir_value_operand(value_type, "load1")
+    push(f_map_set_b2_i4_inst.operands, f_map_set_b2_i4_op0)
+    let f_map_set_b2_i4_op1 = mir_value_operand(value_type, "load3")
+    push(f_map_set_b2_i4_inst.operands, f_map_set_b2_i4_op1)
+    push(b2.instructions, f_map_set_b2_i4_inst)
+    let f_map_set_b2_t_cond = mir_value_operand("bool", "icmp_sge15")
+    b2.terminator = mir_condbr(f_map_set_b2_t_cond, "grow", "shift_init")
     b2.has_terminator = true
     push(fn.blocks, b2)
     let b3 = mir_block_empty("grow")
-    let f21_b3_i0_inst = mir_inst_empty()
-    f21_b3_i0_inst.op = "alloca"
-    f21_b3_i0_inst.has_result = true
-    f21_b3_i0_inst.result_name = "alloca16"
-    f21_b3_i0_inst.result_type = "ptr"
-    f21_b3_i0_inst.typ = "i64"
-    push(b3.instructions, f21_b3_i0_inst)
-    let f21_b3_i1_inst = mir_inst_empty()
-    f21_b3_i1_inst.op = "alloca"
-    f21_b3_i1_inst.has_result = true
-    f21_b3_i1_inst.result_name = "alloca17"
-    f21_b3_i1_inst.result_type = "ptr"
-    f21_b3_i1_inst.typ = "ptr"
-    push(b3.instructions, f21_b3_i1_inst)
-    let f21_b3_i2_inst = mir_inst_empty()
-    f21_b3_i2_inst.op = "alloca"
-    f21_b3_i2_inst.has_result = true
-    f21_b3_i2_inst.result_name = "alloca18"
-    f21_b3_i2_inst.result_type = "ptr"
-    f21_b3_i2_inst.typ = "i64"
-    push(b3.instructions, f21_b3_i2_inst)
-    let f21_b3_i3_inst = mir_inst_empty()
-    f21_b3_i3_inst.op = "icmp.eq"
-    f21_b3_i3_inst.has_result = true
-    f21_b3_i3_inst.result_name = "icmp_eq19"
-    f21_b3_i3_inst.result_type = "bool"
-    f21_b3_i3_inst.typ = "bool"
-    let f21_b3_i3_op0 = mir_value_operand("i64", "load3")
-    push(f21_b3_i3_inst.operands, f21_b3_i3_op0)
-    let f21_b3_i3_op1 = mir_const_int("i64", 0)
-    push(f21_b3_i3_inst.operands, f21_b3_i3_op1)
-    push(b3.instructions, f21_b3_i3_inst)
-    let f21_b3_t_cond = mir_value_operand("bool", "icmp_eq19")
-    b3.terminator = mir_condbr(f21_b3_t_cond, "grow_zero", "grow_double")
+    let f_map_set_b3_i0_inst = mir_inst_empty()
+    f_map_set_b3_i0_inst.op = "alloca"
+    f_map_set_b3_i0_inst.has_result = true
+    f_map_set_b3_i0_inst.result_name = "alloca16"
+    f_map_set_b3_i0_inst.result_type = "ptr"
+    f_map_set_b3_i0_inst.typ = value_type
+    push(b3.instructions, f_map_set_b3_i0_inst)
+    let f_map_set_b3_i1_inst = mir_inst_empty()
+    f_map_set_b3_i1_inst.op = "alloca"
+    f_map_set_b3_i1_inst.has_result = true
+    f_map_set_b3_i1_inst.result_name = "alloca17"
+    f_map_set_b3_i1_inst.result_type = "ptr"
+    f_map_set_b3_i1_inst.typ = "ptr"
+    push(b3.instructions, f_map_set_b3_i1_inst)
+    let f_map_set_b3_i2_inst = mir_inst_empty()
+    f_map_set_b3_i2_inst.op = "alloca"
+    f_map_set_b3_i2_inst.has_result = true
+    f_map_set_b3_i2_inst.result_name = "alloca18"
+    f_map_set_b3_i2_inst.result_type = "ptr"
+    f_map_set_b3_i2_inst.typ = value_type
+    push(b3.instructions, f_map_set_b3_i2_inst)
+    let f_map_set_b3_i3_inst = mir_inst_empty()
+    f_map_set_b3_i3_inst.op = "icmp.eq"
+    f_map_set_b3_i3_inst.has_result = true
+    f_map_set_b3_i3_inst.result_name = "icmp_eq19"
+    f_map_set_b3_i3_inst.result_type = "bool"
+    f_map_set_b3_i3_inst.typ = "bool"
+    let f_map_set_b3_i3_op0 = mir_value_operand(value_type, "load3")
+    push(f_map_set_b3_i3_inst.operands, f_map_set_b3_i3_op0)
+    let f_map_set_b3_i3_op1 = mir_const_int(value_type, 0)
+    push(f_map_set_b3_i3_inst.operands, f_map_set_b3_i3_op1)
+    push(b3.instructions, f_map_set_b3_i3_inst)
+    let f_map_set_b3_t_cond = mir_value_operand("bool", "icmp_eq19")
+    b3.terminator = mir_condbr(f_map_set_b3_t_cond, "grow_zero", "grow_double")
     b3.has_terminator = true
     push(fn.blocks, b3)
     let b4 = mir_block_empty("shift_init")
-    let f21_b4_i0_inst = mir_inst_empty()
-    f21_b4_i0_inst.op = "load"
-    f21_b4_i0_inst.has_result = true
-    f21_b4_i0_inst.result_name = "load34"
-    f21_b4_i0_inst.result_type = "ptr"
-    f21_b4_i0_inst.typ = "ptr"
-    let f21_b4_i0_op0 = mir_value_operand("ptr", "gep4")
-    push(f21_b4_i0_inst.operands, f21_b4_i0_op0)
-    push(b4.instructions, f21_b4_i0_inst)
-    let f21_b4_i1_inst = mir_inst_empty()
-    f21_b4_i1_inst.op = "alloca"
-    f21_b4_i1_inst.has_result = true
-    f21_b4_i1_inst.result_name = "alloca35"
-    f21_b4_i1_inst.result_type = "ptr"
-    f21_b4_i1_inst.typ = "i64"
-    push(b4.instructions, f21_b4_i1_inst)
-    let f21_b4_i2_inst = mir_inst_empty()
-    f21_b4_i2_inst.op = "store"
-    let f21_b4_i2_op0 = mir_value_operand("i64", "load1")
-    push(f21_b4_i2_inst.operands, f21_b4_i2_op0)
-    let f21_b4_i2_op1 = mir_value_operand("ptr", "alloca35")
-    push(f21_b4_i2_inst.operands, f21_b4_i2_op1)
-    push(b4.instructions, f21_b4_i2_inst)
+    let f_map_set_b4_i0_inst = mir_inst_empty()
+    f_map_set_b4_i0_inst.op = "load"
+    f_map_set_b4_i0_inst.has_result = true
+    f_map_set_b4_i0_inst.result_name = "load34"
+    f_map_set_b4_i0_inst.result_type = "ptr"
+    f_map_set_b4_i0_inst.typ = "ptr"
+    let f_map_set_b4_i0_op0 = mir_value_operand("ptr", "gep4")
+    push(f_map_set_b4_i0_inst.operands, f_map_set_b4_i0_op0)
+    push(b4.instructions, f_map_set_b4_i0_inst)
+    let f_map_set_b4_i1_inst = mir_inst_empty()
+    f_map_set_b4_i1_inst.op = "alloca"
+    f_map_set_b4_i1_inst.has_result = true
+    f_map_set_b4_i1_inst.result_name = "alloca35"
+    f_map_set_b4_i1_inst.result_type = "ptr"
+    f_map_set_b4_i1_inst.typ = value_type
+    push(b4.instructions, f_map_set_b4_i1_inst)
+    let f_map_set_b4_i2_inst = mir_inst_empty()
+    f_map_set_b4_i2_inst.op = "store"
+    let f_map_set_b4_i2_op0 = mir_value_operand(value_type, "load1")
+    push(f_map_set_b4_i2_inst.operands, f_map_set_b4_i2_op0)
+    let f_map_set_b4_i2_op1 = mir_value_operand("ptr", "alloca35")
+    push(f_map_set_b4_i2_inst.operands, f_map_set_b4_i2_op1)
+    push(b4.instructions, f_map_set_b4_i2_inst)
     b4.terminator = mir_br("shift_check")
     b4.has_terminator = true
     push(fn.blocks, b4)
     let b5 = mir_block_empty("grow_zero")
-    let f21_b5_i0_inst = mir_inst_empty()
-    f21_b5_i0_inst.op = "store"
-    let f21_b5_i0_op0 = mir_const_int("i64", 4)
-    push(f21_b5_i0_inst.operands, f21_b5_i0_op0)
-    let f21_b5_i0_op1 = mir_value_operand("ptr", "alloca16")
-    push(f21_b5_i0_inst.operands, f21_b5_i0_op1)
-    push(b5.instructions, f21_b5_i0_inst)
+    let f_map_set_b5_i0_inst = mir_inst_empty()
+    f_map_set_b5_i0_inst.op = "store"
+    let f_map_set_b5_i0_op0 = mir_const_int(value_type, 4)
+    push(f_map_set_b5_i0_inst.operands, f_map_set_b5_i0_op0)
+    let f_map_set_b5_i0_op1 = mir_value_operand("ptr", "alloca16")
+    push(f_map_set_b5_i0_inst.operands, f_map_set_b5_i0_op1)
+    push(b5.instructions, f_map_set_b5_i0_inst)
     b5.terminator = mir_br("copy_init")
     b5.has_terminator = true
     push(fn.blocks, b5)
     let b6 = mir_block_empty("grow_double")
-    let f21_b6_i0_inst = mir_inst_empty()
-    f21_b6_i0_inst.op = "add"
-    f21_b6_i0_inst.has_result = true
-    f21_b6_i0_inst.result_name = "add20"
-    f21_b6_i0_inst.result_type = "i64"
-    f21_b6_i0_inst.typ = "i64"
-    let f21_b6_i0_op0 = mir_value_operand("i64", "load3")
-    push(f21_b6_i0_inst.operands, f21_b6_i0_op0)
-    let f21_b6_i0_op1 = mir_value_operand("i64", "load3")
-    push(f21_b6_i0_inst.operands, f21_b6_i0_op1)
-    push(b6.instructions, f21_b6_i0_inst)
-    let f21_b6_i1_inst = mir_inst_empty()
-    f21_b6_i1_inst.op = "store"
-    let f21_b6_i1_op0 = mir_value_operand("i64", "add20")
-    push(f21_b6_i1_inst.operands, f21_b6_i1_op0)
-    let f21_b6_i1_op1 = mir_value_operand("ptr", "alloca16")
-    push(f21_b6_i1_inst.operands, f21_b6_i1_op1)
-    push(b6.instructions, f21_b6_i1_inst)
+    let f_map_set_b6_i0_inst = mir_inst_empty()
+    f_map_set_b6_i0_inst.op = "add"
+    f_map_set_b6_i0_inst.has_result = true
+    f_map_set_b6_i0_inst.result_name = "add20"
+    f_map_set_b6_i0_inst.result_type = value_type
+    f_map_set_b6_i0_inst.typ = value_type
+    let f_map_set_b6_i0_op0 = mir_value_operand(value_type, "load3")
+    push(f_map_set_b6_i0_inst.operands, f_map_set_b6_i0_op0)
+    let f_map_set_b6_i0_op1 = mir_value_operand(value_type, "load3")
+    push(f_map_set_b6_i0_inst.operands, f_map_set_b6_i0_op1)
+    push(b6.instructions, f_map_set_b6_i0_inst)
+    let f_map_set_b6_i1_inst = mir_inst_empty()
+    f_map_set_b6_i1_inst.op = "store"
+    let f_map_set_b6_i1_op0 = mir_value_operand(value_type, "add20")
+    push(f_map_set_b6_i1_inst.operands, f_map_set_b6_i1_op0)
+    let f_map_set_b6_i1_op1 = mir_value_operand("ptr", "alloca16")
+    push(f_map_set_b6_i1_inst.operands, f_map_set_b6_i1_op1)
+    push(b6.instructions, f_map_set_b6_i1_inst)
     b6.terminator = mir_br("copy_init")
     b6.has_terminator = true
     push(fn.blocks, b6)
     let b7 = mir_block_empty("copy_init")
-    let f21_b7_i0_inst = mir_inst_empty()
-    f21_b7_i0_inst.op = "load"
-    f21_b7_i0_inst.has_result = true
-    f21_b7_i0_inst.result_name = "load21"
-    f21_b7_i0_inst.result_type = "i64"
-    f21_b7_i0_inst.typ = "i64"
-    let f21_b7_i0_op0 = mir_value_operand("ptr", "alloca16")
-    push(f21_b7_i0_inst.operands, f21_b7_i0_op0)
-    push(b7.instructions, f21_b7_i0_inst)
-    let f21_b7_i1_inst = mir_inst_empty()
-    f21_b7_i1_inst.op = "mul"
-    f21_b7_i1_inst.has_result = true
-    f21_b7_i1_inst.result_name = "mul22"
-    f21_b7_i1_inst.result_type = "i64"
-    f21_b7_i1_inst.typ = "i64"
-    let f21_b7_i1_op0 = mir_value_operand("i64", "load21")
-    push(f21_b7_i1_inst.operands, f21_b7_i1_op0)
-    let f21_b7_i1_op1 = mir_const_int("i64", 24)
-    push(f21_b7_i1_inst.operands, f21_b7_i1_op1)
-    push(b7.instructions, f21_b7_i1_inst)
-    let f21_b7_i2_inst = mir_inst_empty()
-    f21_b7_i2_inst.op = "call"
-    f21_b7_i2_inst.has_result = true
-    f21_b7_i2_inst.result_name = "call23"
-    f21_b7_i2_inst.result_type = "ptr"
-    f21_b7_i2_inst.typ = "ptr"
-    f21_b7_i2_inst.callee = "__epx_alloc"
-    let f21_b7_i2_op0 = mir_value_operand("i64", "mul22")
-    push(f21_b7_i2_inst.operands, f21_b7_i2_op0)
-    push(b7.instructions, f21_b7_i2_inst)
-    let f21_b7_i3_inst = mir_inst_empty()
-    f21_b7_i3_inst.op = "store"
-    let f21_b7_i3_op0 = mir_value_operand("ptr", "call23")
-    push(f21_b7_i3_inst.operands, f21_b7_i3_op0)
-    let f21_b7_i3_op1 = mir_value_operand("ptr", "alloca17")
-    push(f21_b7_i3_inst.operands, f21_b7_i3_op1)
-    push(b7.instructions, f21_b7_i3_inst)
-    let f21_b7_i4_inst = mir_inst_empty()
-    f21_b7_i4_inst.op = "store"
-    let f21_b7_i4_op0 = mir_const_int("i64", 0)
-    push(f21_b7_i4_inst.operands, f21_b7_i4_op0)
-    let f21_b7_i4_op1 = mir_value_operand("ptr", "alloca18")
-    push(f21_b7_i4_inst.operands, f21_b7_i4_op1)
-    push(b7.instructions, f21_b7_i4_inst)
+    let f_map_set_b7_i0_inst = mir_inst_empty()
+    f_map_set_b7_i0_inst.op = "load"
+    f_map_set_b7_i0_inst.has_result = true
+    f_map_set_b7_i0_inst.result_name = "load21"
+    f_map_set_b7_i0_inst.result_type = value_type
+    f_map_set_b7_i0_inst.typ = value_type
+    let f_map_set_b7_i0_op0 = mir_value_operand("ptr", "alloca16")
+    push(f_map_set_b7_i0_inst.operands, f_map_set_b7_i0_op0)
+    push(b7.instructions, f_map_set_b7_i0_inst)
+    let f_map_set_b7_i1_inst = mir_inst_empty()
+    f_map_set_b7_i1_inst.op = "mul"
+    f_map_set_b7_i1_inst.has_result = true
+    f_map_set_b7_i1_inst.result_name = "mul22"
+    f_map_set_b7_i1_inst.result_type = value_type
+    f_map_set_b7_i1_inst.typ = value_type
+    let f_map_set_b7_i1_op0 = mir_value_operand(value_type, "load21")
+    push(f_map_set_b7_i1_inst.operands, f_map_set_b7_i1_op0)
+    let f_map_set_b7_i1_op1 = mir_const_int(value_type, 24)
+    push(f_map_set_b7_i1_inst.operands, f_map_set_b7_i1_op1)
+    push(b7.instructions, f_map_set_b7_i1_inst)
+    let f_map_set_b7_i2_inst = mir_inst_empty()
+    f_map_set_b7_i2_inst.op = "call"
+    f_map_set_b7_i2_inst.has_result = true
+    f_map_set_b7_i2_inst.result_name = "call23"
+    f_map_set_b7_i2_inst.result_type = "ptr"
+    f_map_set_b7_i2_inst.typ = "ptr"
+    f_map_set_b7_i2_inst.callee = "__epx_alloc"
+    let f_map_set_b7_i2_op0 = mir_value_operand(value_type, "mul22")
+    push(f_map_set_b7_i2_inst.operands, f_map_set_b7_i2_op0)
+    push(b7.instructions, f_map_set_b7_i2_inst)
+    let f_map_set_b7_i3_inst = mir_inst_empty()
+    f_map_set_b7_i3_inst.op = "store"
+    let f_map_set_b7_i3_op0 = mir_value_operand("ptr", "call23")
+    push(f_map_set_b7_i3_inst.operands, f_map_set_b7_i3_op0)
+    let f_map_set_b7_i3_op1 = mir_value_operand("ptr", "alloca17")
+    push(f_map_set_b7_i3_inst.operands, f_map_set_b7_i3_op1)
+    push(b7.instructions, f_map_set_b7_i3_inst)
+    let f_map_set_b7_i4_inst = mir_inst_empty()
+    f_map_set_b7_i4_inst.op = "store"
+    let f_map_set_b7_i4_op0 = mir_const_int(value_type, 0)
+    push(f_map_set_b7_i4_inst.operands, f_map_set_b7_i4_op0)
+    let f_map_set_b7_i4_op1 = mir_value_operand("ptr", "alloca18")
+    push(f_map_set_b7_i4_inst.operands, f_map_set_b7_i4_op1)
+    push(b7.instructions, f_map_set_b7_i4_inst)
     b7.terminator = mir_br("copy_check")
     b7.has_terminator = true
     push(fn.blocks, b7)
     let b8 = mir_block_empty("copy_check")
-    let f21_b8_i0_inst = mir_inst_empty()
-    f21_b8_i0_inst.op = "load"
-    f21_b8_i0_inst.has_result = true
-    f21_b8_i0_inst.result_name = "load24"
-    f21_b8_i0_inst.result_type = "i64"
-    f21_b8_i0_inst.typ = "i64"
-    let f21_b8_i0_op0 = mir_value_operand("ptr", "alloca18")
-    push(f21_b8_i0_inst.operands, f21_b8_i0_op0)
-    push(b8.instructions, f21_b8_i0_inst)
-    let f21_b8_i1_inst = mir_inst_empty()
-    f21_b8_i1_inst.op = "mul"
-    f21_b8_i1_inst.has_result = true
-    f21_b8_i1_inst.result_name = "mul25"
-    f21_b8_i1_inst.result_type = "i64"
-    f21_b8_i1_inst.typ = "i64"
-    let f21_b8_i1_op0 = mir_value_operand("i64", "load1")
-    push(f21_b8_i1_inst.operands, f21_b8_i1_op0)
-    let f21_b8_i1_op1 = mir_const_int("i64", 3)
-    push(f21_b8_i1_inst.operands, f21_b8_i1_op1)
-    push(b8.instructions, f21_b8_i1_inst)
-    let f21_b8_i2_inst = mir_inst_empty()
-    f21_b8_i2_inst.op = "icmp.slt"
-    f21_b8_i2_inst.has_result = true
-    f21_b8_i2_inst.result_name = "icmp_slt26"
-    f21_b8_i2_inst.result_type = "bool"
-    f21_b8_i2_inst.typ = "bool"
-    let f21_b8_i2_op0 = mir_value_operand("i64", "load24")
-    push(f21_b8_i2_inst.operands, f21_b8_i2_op0)
-    let f21_b8_i2_op1 = mir_value_operand("i64", "mul25")
-    push(f21_b8_i2_inst.operands, f21_b8_i2_op1)
-    push(b8.instructions, f21_b8_i2_inst)
-    let f21_b8_t_cond = mir_value_operand("bool", "icmp_slt26")
-    b8.terminator = mir_condbr(f21_b8_t_cond, "copy_body", "swap")
+    let f_map_set_b8_i0_inst = mir_inst_empty()
+    f_map_set_b8_i0_inst.op = "load"
+    f_map_set_b8_i0_inst.has_result = true
+    f_map_set_b8_i0_inst.result_name = "load24"
+    f_map_set_b8_i0_inst.result_type = value_type
+    f_map_set_b8_i0_inst.typ = value_type
+    let f_map_set_b8_i0_op0 = mir_value_operand("ptr", "alloca18")
+    push(f_map_set_b8_i0_inst.operands, f_map_set_b8_i0_op0)
+    push(b8.instructions, f_map_set_b8_i0_inst)
+    let f_map_set_b8_i1_inst = mir_inst_empty()
+    f_map_set_b8_i1_inst.op = "mul"
+    f_map_set_b8_i1_inst.has_result = true
+    f_map_set_b8_i1_inst.result_name = "mul25"
+    f_map_set_b8_i1_inst.result_type = value_type
+    f_map_set_b8_i1_inst.typ = value_type
+    let f_map_set_b8_i1_op0 = mir_value_operand(value_type, "load1")
+    push(f_map_set_b8_i1_inst.operands, f_map_set_b8_i1_op0)
+    let f_map_set_b8_i1_op1 = mir_const_int(value_type, 3)
+    push(f_map_set_b8_i1_inst.operands, f_map_set_b8_i1_op1)
+    push(b8.instructions, f_map_set_b8_i1_inst)
+    let f_map_set_b8_i2_inst = mir_inst_empty()
+    f_map_set_b8_i2_inst.op = "icmp.slt"
+    f_map_set_b8_i2_inst.has_result = true
+    f_map_set_b8_i2_inst.result_name = "icmp_slt26"
+    f_map_set_b8_i2_inst.result_type = "bool"
+    f_map_set_b8_i2_inst.typ = "bool"
+    let f_map_set_b8_i2_op0 = mir_value_operand(value_type, "load24")
+    push(f_map_set_b8_i2_inst.operands, f_map_set_b8_i2_op0)
+    let f_map_set_b8_i2_op1 = mir_value_operand(value_type, "mul25")
+    push(f_map_set_b8_i2_inst.operands, f_map_set_b8_i2_op1)
+    push(b8.instructions, f_map_set_b8_i2_inst)
+    let f_map_set_b8_t_cond = mir_value_operand("bool", "icmp_slt26")
+    b8.terminator = mir_condbr(f_map_set_b8_t_cond, "copy_body", "swap")
     b8.has_terminator = true
     push(fn.blocks, b8)
     let b9 = mir_block_empty("copy_body")
-    let f21_b9_i0_inst = mir_inst_empty()
-    f21_b9_i0_inst.op = "gep"
-    f21_b9_i0_inst.has_result = true
-    f21_b9_i0_inst.result_name = "gep27"
-    f21_b9_i0_inst.result_type = "ptr"
-    f21_b9_i0_inst.typ = "ptr"
-    let f21_b9_i0_op0 = mir_value_operand("ptr", "load5")
-    push(f21_b9_i0_inst.operands, f21_b9_i0_op0)
-    let f21_b9_i0_op1 = mir_value_operand("i64", "load24")
-    push(f21_b9_i0_inst.operands, f21_b9_i0_op1)
-    push(b9.instructions, f21_b9_i0_inst)
-    let f21_b9_i1_inst = mir_inst_empty()
-    f21_b9_i1_inst.op = "load"
-    f21_b9_i1_inst.has_result = true
-    f21_b9_i1_inst.result_name = "load28"
-    f21_b9_i1_inst.result_type = "i64"
-    f21_b9_i1_inst.typ = "i64"
-    let f21_b9_i1_op0 = mir_value_operand("ptr", "gep27")
-    push(f21_b9_i1_inst.operands, f21_b9_i1_op0)
-    push(b9.instructions, f21_b9_i1_inst)
-    let f21_b9_i2_inst = mir_inst_empty()
-    f21_b9_i2_inst.op = "load"
-    f21_b9_i2_inst.has_result = true
-    f21_b9_i2_inst.result_name = "load29"
-    f21_b9_i2_inst.result_type = "ptr"
-    f21_b9_i2_inst.typ = "ptr"
-    let f21_b9_i2_op0 = mir_value_operand("ptr", "alloca17")
-    push(f21_b9_i2_inst.operands, f21_b9_i2_op0)
-    push(b9.instructions, f21_b9_i2_inst)
-    let f21_b9_i3_inst = mir_inst_empty()
-    f21_b9_i3_inst.op = "gep"
-    f21_b9_i3_inst.has_result = true
-    f21_b9_i3_inst.result_name = "gep30"
-    f21_b9_i3_inst.result_type = "ptr"
-    f21_b9_i3_inst.typ = "ptr"
-    let f21_b9_i3_op0 = mir_value_operand("ptr", "load29")
-    push(f21_b9_i3_inst.operands, f21_b9_i3_op0)
-    let f21_b9_i3_op1 = mir_value_operand("i64", "load24")
-    push(f21_b9_i3_inst.operands, f21_b9_i3_op1)
-    push(b9.instructions, f21_b9_i3_inst)
-    let f21_b9_i4_inst = mir_inst_empty()
-    f21_b9_i4_inst.op = "store"
-    let f21_b9_i4_op0 = mir_value_operand("i64", "load28")
-    push(f21_b9_i4_inst.operands, f21_b9_i4_op0)
-    let f21_b9_i4_op1 = mir_value_operand("ptr", "gep30")
-    push(f21_b9_i4_inst.operands, f21_b9_i4_op1)
-    push(b9.instructions, f21_b9_i4_inst)
-    let f21_b9_i5_inst = mir_inst_empty()
-    f21_b9_i5_inst.op = "add"
-    f21_b9_i5_inst.has_result = true
-    f21_b9_i5_inst.result_name = "add31"
-    f21_b9_i5_inst.result_type = "i64"
-    f21_b9_i5_inst.typ = "i64"
-    let f21_b9_i5_op0 = mir_value_operand("i64", "load24")
-    push(f21_b9_i5_inst.operands, f21_b9_i5_op0)
-    let f21_b9_i5_op1 = mir_const_int("i64", 1)
-    push(f21_b9_i5_inst.operands, f21_b9_i5_op1)
-    push(b9.instructions, f21_b9_i5_inst)
-    let f21_b9_i6_inst = mir_inst_empty()
-    f21_b9_i6_inst.op = "store"
-    let f21_b9_i6_op0 = mir_value_operand("i64", "add31")
-    push(f21_b9_i6_inst.operands, f21_b9_i6_op0)
-    let f21_b9_i6_op1 = mir_value_operand("ptr", "alloca18")
-    push(f21_b9_i6_inst.operands, f21_b9_i6_op1)
-    push(b9.instructions, f21_b9_i6_inst)
+    let f_map_set_b9_i0_inst = mir_inst_empty()
+    f_map_set_b9_i0_inst.op = "gep"
+    f_map_set_b9_i0_inst.has_result = true
+    f_map_set_b9_i0_inst.result_name = "gep27"
+    f_map_set_b9_i0_inst.result_type = "ptr"
+    f_map_set_b9_i0_inst.typ = "ptr"
+    let f_map_set_b9_i0_op0 = mir_value_operand("ptr", "load5")
+    push(f_map_set_b9_i0_inst.operands, f_map_set_b9_i0_op0)
+    let f_map_set_b9_i0_op1 = mir_value_operand(value_type, "load24")
+    push(f_map_set_b9_i0_inst.operands, f_map_set_b9_i0_op1)
+    push(b9.instructions, f_map_set_b9_i0_inst)
+    let f_map_set_b9_i1_inst = mir_inst_empty()
+    f_map_set_b9_i1_inst.op = "load"
+    f_map_set_b9_i1_inst.has_result = true
+    f_map_set_b9_i1_inst.result_name = "load28"
+    f_map_set_b9_i1_inst.result_type = value_type
+    f_map_set_b9_i1_inst.typ = value_type
+    let f_map_set_b9_i1_op0 = mir_value_operand("ptr", "gep27")
+    push(f_map_set_b9_i1_inst.operands, f_map_set_b9_i1_op0)
+    push(b9.instructions, f_map_set_b9_i1_inst)
+    let f_map_set_b9_i2_inst = mir_inst_empty()
+    f_map_set_b9_i2_inst.op = "load"
+    f_map_set_b9_i2_inst.has_result = true
+    f_map_set_b9_i2_inst.result_name = "load29"
+    f_map_set_b9_i2_inst.result_type = "ptr"
+    f_map_set_b9_i2_inst.typ = "ptr"
+    let f_map_set_b9_i2_op0 = mir_value_operand("ptr", "alloca17")
+    push(f_map_set_b9_i2_inst.operands, f_map_set_b9_i2_op0)
+    push(b9.instructions, f_map_set_b9_i2_inst)
+    let f_map_set_b9_i3_inst = mir_inst_empty()
+    f_map_set_b9_i3_inst.op = "gep"
+    f_map_set_b9_i3_inst.has_result = true
+    f_map_set_b9_i3_inst.result_name = "gep30"
+    f_map_set_b9_i3_inst.result_type = "ptr"
+    f_map_set_b9_i3_inst.typ = "ptr"
+    let f_map_set_b9_i3_op0 = mir_value_operand("ptr", "load29")
+    push(f_map_set_b9_i3_inst.operands, f_map_set_b9_i3_op0)
+    let f_map_set_b9_i3_op1 = mir_value_operand(value_type, "load24")
+    push(f_map_set_b9_i3_inst.operands, f_map_set_b9_i3_op1)
+    push(b9.instructions, f_map_set_b9_i3_inst)
+    let f_map_set_b9_i4_inst = mir_inst_empty()
+    f_map_set_b9_i4_inst.op = "store"
+    let f_map_set_b9_i4_op0 = mir_value_operand(value_type, "load28")
+    push(f_map_set_b9_i4_inst.operands, f_map_set_b9_i4_op0)
+    let f_map_set_b9_i4_op1 = mir_value_operand("ptr", "gep30")
+    push(f_map_set_b9_i4_inst.operands, f_map_set_b9_i4_op1)
+    push(b9.instructions, f_map_set_b9_i4_inst)
+    let f_map_set_b9_i5_inst = mir_inst_empty()
+    f_map_set_b9_i5_inst.op = "add"
+    f_map_set_b9_i5_inst.has_result = true
+    f_map_set_b9_i5_inst.result_name = "add31"
+    f_map_set_b9_i5_inst.result_type = value_type
+    f_map_set_b9_i5_inst.typ = value_type
+    let f_map_set_b9_i5_op0 = mir_value_operand(value_type, "load24")
+    push(f_map_set_b9_i5_inst.operands, f_map_set_b9_i5_op0)
+    let f_map_set_b9_i5_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b9_i5_inst.operands, f_map_set_b9_i5_op1)
+    push(b9.instructions, f_map_set_b9_i5_inst)
+    let f_map_set_b9_i6_inst = mir_inst_empty()
+    f_map_set_b9_i6_inst.op = "store"
+    let f_map_set_b9_i6_op0 = mir_value_operand(value_type, "add31")
+    push(f_map_set_b9_i6_inst.operands, f_map_set_b9_i6_op0)
+    let f_map_set_b9_i6_op1 = mir_value_operand("ptr", "alloca18")
+    push(f_map_set_b9_i6_inst.operands, f_map_set_b9_i6_op1)
+    push(b9.instructions, f_map_set_b9_i6_inst)
     b9.terminator = mir_br("copy_check")
     b9.has_terminator = true
     push(fn.blocks, b9)
     let b10 = mir_block_empty("swap")
-    let f21_b10_i0_inst = mir_inst_empty()
-    f21_b10_i0_inst.op = "load"
-    f21_b10_i0_inst.has_result = true
-    f21_b10_i0_inst.result_name = "load32"
-    f21_b10_i0_inst.result_type = "ptr"
-    f21_b10_i0_inst.typ = "ptr"
-    let f21_b10_i0_op0 = mir_value_operand("ptr", "alloca17")
-    push(f21_b10_i0_inst.operands, f21_b10_i0_op0)
-    push(b10.instructions, f21_b10_i0_inst)
-    let f21_b10_i1_inst = mir_inst_empty()
-    f21_b10_i1_inst.op = "store"
-    let f21_b10_i1_op0 = mir_value_operand("ptr", "load32")
-    push(f21_b10_i1_inst.operands, f21_b10_i1_op0)
-    let f21_b10_i1_op1 = mir_value_operand("ptr", "gep4")
-    push(f21_b10_i1_inst.operands, f21_b10_i1_op1)
-    push(b10.instructions, f21_b10_i1_inst)
-    let f21_b10_i2_inst = mir_inst_empty()
-    f21_b10_i2_inst.op = "load"
-    f21_b10_i2_inst.has_result = true
-    f21_b10_i2_inst.result_name = "load33"
-    f21_b10_i2_inst.result_type = "i64"
-    f21_b10_i2_inst.typ = "i64"
-    let f21_b10_i2_op0 = mir_value_operand("ptr", "alloca16")
-    push(f21_b10_i2_inst.operands, f21_b10_i2_op0)
-    push(b10.instructions, f21_b10_i2_inst)
-    let f21_b10_i3_inst = mir_inst_empty()
-    f21_b10_i3_inst.op = "store"
-    let f21_b10_i3_op0 = mir_value_operand("i64", "load33")
-    push(f21_b10_i3_inst.operands, f21_b10_i3_op0)
-    let f21_b10_i3_op1 = mir_value_operand("ptr", "gep2")
-    push(f21_b10_i3_inst.operands, f21_b10_i3_op1)
-    push(b10.instructions, f21_b10_i3_inst)
+    let f_map_set_b10_i0_inst = mir_inst_empty()
+    f_map_set_b10_i0_inst.op = "load"
+    f_map_set_b10_i0_inst.has_result = true
+    f_map_set_b10_i0_inst.result_name = "load32"
+    f_map_set_b10_i0_inst.result_type = "ptr"
+    f_map_set_b10_i0_inst.typ = "ptr"
+    let f_map_set_b10_i0_op0 = mir_value_operand("ptr", "alloca17")
+    push(f_map_set_b10_i0_inst.operands, f_map_set_b10_i0_op0)
+    push(b10.instructions, f_map_set_b10_i0_inst)
+    let f_map_set_b10_i1_inst = mir_inst_empty()
+    f_map_set_b10_i1_inst.op = "store"
+    let f_map_set_b10_i1_op0 = mir_value_operand("ptr", "load32")
+    push(f_map_set_b10_i1_inst.operands, f_map_set_b10_i1_op0)
+    let f_map_set_b10_i1_op1 = mir_value_operand("ptr", "gep4")
+    push(f_map_set_b10_i1_inst.operands, f_map_set_b10_i1_op1)
+    push(b10.instructions, f_map_set_b10_i1_inst)
+    let f_map_set_b10_i2_inst = mir_inst_empty()
+    f_map_set_b10_i2_inst.op = "load"
+    f_map_set_b10_i2_inst.has_result = true
+    f_map_set_b10_i2_inst.result_name = "load33"
+    f_map_set_b10_i2_inst.result_type = value_type
+    f_map_set_b10_i2_inst.typ = value_type
+    let f_map_set_b10_i2_op0 = mir_value_operand("ptr", "alloca16")
+    push(f_map_set_b10_i2_inst.operands, f_map_set_b10_i2_op0)
+    push(b10.instructions, f_map_set_b10_i2_inst)
+    let f_map_set_b10_i3_inst = mir_inst_empty()
+    f_map_set_b10_i3_inst.op = "store"
+    let f_map_set_b10_i3_op0 = mir_value_operand(value_type, "load33")
+    push(f_map_set_b10_i3_inst.operands, f_map_set_b10_i3_op0)
+    let f_map_set_b10_i3_op1 = mir_value_operand("ptr", "gep2")
+    push(f_map_set_b10_i3_inst.operands, f_map_set_b10_i3_op1)
+    push(b10.instructions, f_map_set_b10_i3_inst)
     b10.terminator = mir_br("shift_init")
     b10.has_terminator = true
     push(fn.blocks, b10)
     let b11 = mir_block_empty("shift_check")
-    let f21_b11_i0_inst = mir_inst_empty()
-    f21_b11_i0_inst.op = "load"
-    f21_b11_i0_inst.has_result = true
-    f21_b11_i0_inst.result_name = "load36"
-    f21_b11_i0_inst.result_type = "i64"
-    f21_b11_i0_inst.typ = "i64"
-    let f21_b11_i0_op0 = mir_value_operand("ptr", "alloca35")
-    push(f21_b11_i0_inst.operands, f21_b11_i0_op0)
-    push(b11.instructions, f21_b11_i0_inst)
-    let f21_b11_i1_inst = mir_inst_empty()
-    f21_b11_i1_inst.op = "load"
-    f21_b11_i1_inst.has_result = true
-    f21_b11_i1_inst.result_name = "load37"
-    f21_b11_i1_inst.result_type = "i64"
-    f21_b11_i1_inst.typ = "i64"
-    let f21_b11_i1_op0 = mir_value_operand("ptr", "alloca12")
-    push(f21_b11_i1_inst.operands, f21_b11_i1_op0)
-    push(b11.instructions, f21_b11_i1_inst)
-    let f21_b11_i2_inst = mir_inst_empty()
-    f21_b11_i2_inst.op = "icmp.sgt"
-    f21_b11_i2_inst.has_result = true
-    f21_b11_i2_inst.result_name = "icmp_sgt38"
-    f21_b11_i2_inst.result_type = "bool"
-    f21_b11_i2_inst.typ = "bool"
-    let f21_b11_i2_op0 = mir_value_operand("i64", "load36")
-    push(f21_b11_i2_inst.operands, f21_b11_i2_op0)
-    let f21_b11_i2_op1 = mir_value_operand("i64", "load37")
-    push(f21_b11_i2_inst.operands, f21_b11_i2_op1)
-    push(b11.instructions, f21_b11_i2_inst)
-    let f21_b11_t_cond = mir_value_operand("bool", "icmp_sgt38")
-    b11.terminator = mir_condbr(f21_b11_t_cond, "shift_body", "write_entry")
+    let f_map_set_b11_i0_inst = mir_inst_empty()
+    f_map_set_b11_i0_inst.op = "load"
+    f_map_set_b11_i0_inst.has_result = true
+    f_map_set_b11_i0_inst.result_name = "load36"
+    f_map_set_b11_i0_inst.result_type = value_type
+    f_map_set_b11_i0_inst.typ = value_type
+    let f_map_set_b11_i0_op0 = mir_value_operand("ptr", "alloca35")
+    push(f_map_set_b11_i0_inst.operands, f_map_set_b11_i0_op0)
+    push(b11.instructions, f_map_set_b11_i0_inst)
+    let f_map_set_b11_i1_inst = mir_inst_empty()
+    f_map_set_b11_i1_inst.op = "load"
+    f_map_set_b11_i1_inst.has_result = true
+    f_map_set_b11_i1_inst.result_name = "load37"
+    f_map_set_b11_i1_inst.result_type = value_type
+    f_map_set_b11_i1_inst.typ = value_type
+    let f_map_set_b11_i1_op0 = mir_value_operand("ptr", "alloca12")
+    push(f_map_set_b11_i1_inst.operands, f_map_set_b11_i1_op0)
+    push(b11.instructions, f_map_set_b11_i1_inst)
+    let f_map_set_b11_i2_inst = mir_inst_empty()
+    f_map_set_b11_i2_inst.op = "icmp.sgt"
+    f_map_set_b11_i2_inst.has_result = true
+    f_map_set_b11_i2_inst.result_name = "icmp_sgt38"
+    f_map_set_b11_i2_inst.result_type = "bool"
+    f_map_set_b11_i2_inst.typ = "bool"
+    let f_map_set_b11_i2_op0 = mir_value_operand(value_type, "load36")
+    push(f_map_set_b11_i2_inst.operands, f_map_set_b11_i2_op0)
+    let f_map_set_b11_i2_op1 = mir_value_operand(value_type, "load37")
+    push(f_map_set_b11_i2_inst.operands, f_map_set_b11_i2_op1)
+    push(b11.instructions, f_map_set_b11_i2_inst)
+    let f_map_set_b11_t_cond = mir_value_operand("bool", "icmp_sgt38")
+    b11.terminator = mir_condbr(f_map_set_b11_t_cond, "shift_body", "write_entry")
     b11.has_terminator = true
     push(fn.blocks, b11)
     let b12 = mir_block_empty("shift_body")
-    let f21_b12_i0_inst = mir_inst_empty()
-    f21_b12_i0_inst.op = "load"
-    f21_b12_i0_inst.has_result = true
-    f21_b12_i0_inst.result_name = "load39"
-    f21_b12_i0_inst.result_type = "i64"
-    f21_b12_i0_inst.typ = "i64"
-    let f21_b12_i0_op0 = mir_value_operand("ptr", "alloca35")
-    push(f21_b12_i0_inst.operands, f21_b12_i0_op0)
-    push(b12.instructions, f21_b12_i0_inst)
-    let f21_b12_i1_inst = mir_inst_empty()
-    f21_b12_i1_inst.op = "sub"
-    f21_b12_i1_inst.has_result = true
-    f21_b12_i1_inst.result_name = "sub40"
-    f21_b12_i1_inst.result_type = "i64"
-    f21_b12_i1_inst.typ = "i64"
-    let f21_b12_i1_op0 = mir_value_operand("i64", "load39")
-    push(f21_b12_i1_inst.operands, f21_b12_i1_op0)
-    let f21_b12_i1_op1 = mir_const_int("i64", 1)
-    push(f21_b12_i1_inst.operands, f21_b12_i1_op1)
-    push(b12.instructions, f21_b12_i1_inst)
-    let f21_b12_i2_inst = mir_inst_empty()
-    f21_b12_i2_inst.op = "add"
-    f21_b12_i2_inst.has_result = true
-    f21_b12_i2_inst.result_name = "add41"
-    f21_b12_i2_inst.result_type = "i64"
-    f21_b12_i2_inst.typ = "i64"
-    let f21_b12_i2_op0 = mir_value_operand("i64", "sub40")
-    push(f21_b12_i2_inst.operands, f21_b12_i2_op0)
-    let f21_b12_i2_op1 = mir_value_operand("i64", "sub40")
-    push(f21_b12_i2_inst.operands, f21_b12_i2_op1)
-    push(b12.instructions, f21_b12_i2_inst)
-    let f21_b12_i3_inst = mir_inst_empty()
-    f21_b12_i3_inst.op = "add"
-    f21_b12_i3_inst.has_result = true
-    f21_b12_i3_inst.result_name = "add42"
-    f21_b12_i3_inst.result_type = "i64"
-    f21_b12_i3_inst.typ = "i64"
-    let f21_b12_i3_op0 = mir_value_operand("i64", "add41")
-    push(f21_b12_i3_inst.operands, f21_b12_i3_op0)
-    let f21_b12_i3_op1 = mir_value_operand("i64", "sub40")
-    push(f21_b12_i3_inst.operands, f21_b12_i3_op1)
-    push(b12.instructions, f21_b12_i3_inst)
-    let f21_b12_i4_inst = mir_inst_empty()
-    f21_b12_i4_inst.op = "gep"
-    f21_b12_i4_inst.has_result = true
-    f21_b12_i4_inst.result_name = "gep43"
-    f21_b12_i4_inst.result_type = "ptr"
-    f21_b12_i4_inst.typ = "ptr"
-    let f21_b12_i4_op0 = mir_value_operand("ptr", "load34")
-    push(f21_b12_i4_inst.operands, f21_b12_i4_op0)
-    let f21_b12_i4_op1 = mir_value_operand("i64", "add42")
-    push(f21_b12_i4_inst.operands, f21_b12_i4_op1)
-    push(b12.instructions, f21_b12_i4_inst)
-    let f21_b12_i5_inst = mir_inst_empty()
-    f21_b12_i5_inst.op = "add"
-    f21_b12_i5_inst.has_result = true
-    f21_b12_i5_inst.result_name = "add44"
-    f21_b12_i5_inst.result_type = "i64"
-    f21_b12_i5_inst.typ = "i64"
-    let f21_b12_i5_op0 = mir_value_operand("i64", "load39")
-    push(f21_b12_i5_inst.operands, f21_b12_i5_op0)
-    let f21_b12_i5_op1 = mir_value_operand("i64", "load39")
-    push(f21_b12_i5_inst.operands, f21_b12_i5_op1)
-    push(b12.instructions, f21_b12_i5_inst)
-    let f21_b12_i6_inst = mir_inst_empty()
-    f21_b12_i6_inst.op = "add"
-    f21_b12_i6_inst.has_result = true
-    f21_b12_i6_inst.result_name = "add45"
-    f21_b12_i6_inst.result_type = "i64"
-    f21_b12_i6_inst.typ = "i64"
-    let f21_b12_i6_op0 = mir_value_operand("i64", "add44")
-    push(f21_b12_i6_inst.operands, f21_b12_i6_op0)
-    let f21_b12_i6_op1 = mir_value_operand("i64", "load39")
-    push(f21_b12_i6_inst.operands, f21_b12_i6_op1)
-    push(b12.instructions, f21_b12_i6_inst)
-    let f21_b12_i7_inst = mir_inst_empty()
-    f21_b12_i7_inst.op = "gep"
-    f21_b12_i7_inst.has_result = true
-    f21_b12_i7_inst.result_name = "gep46"
-    f21_b12_i7_inst.result_type = "ptr"
-    f21_b12_i7_inst.typ = "ptr"
-    let f21_b12_i7_op0 = mir_value_operand("ptr", "load34")
-    push(f21_b12_i7_inst.operands, f21_b12_i7_op0)
-    let f21_b12_i7_op1 = mir_value_operand("i64", "add45")
-    push(f21_b12_i7_inst.operands, f21_b12_i7_op1)
-    push(b12.instructions, f21_b12_i7_inst)
-    let f21_b12_i8_inst = mir_inst_empty()
-    f21_b12_i8_inst.op = "gep"
-    f21_b12_i8_inst.has_result = true
-    f21_b12_i8_inst.result_name = "gep47"
-    f21_b12_i8_inst.result_type = "ptr"
-    f21_b12_i8_inst.typ = "ptr"
-    let f21_b12_i8_op0 = mir_value_operand("ptr", "gep43")
-    push(f21_b12_i8_inst.operands, f21_b12_i8_op0)
-    let f21_b12_i8_op1 = mir_const_int("i64", 0)
-    push(f21_b12_i8_inst.operands, f21_b12_i8_op1)
-    push(b12.instructions, f21_b12_i8_inst)
-    let f21_b12_i9_inst = mir_inst_empty()
-    f21_b12_i9_inst.op = "load"
-    f21_b12_i9_inst.has_result = true
-    f21_b12_i9_inst.result_name = "load48"
-    f21_b12_i9_inst.result_type = "i64"
-    f21_b12_i9_inst.typ = "i64"
-    let f21_b12_i9_op0 = mir_value_operand("ptr", "gep47")
-    push(f21_b12_i9_inst.operands, f21_b12_i9_op0)
-    push(b12.instructions, f21_b12_i9_inst)
-    let f21_b12_i10_inst = mir_inst_empty()
-    f21_b12_i10_inst.op = "gep"
-    f21_b12_i10_inst.has_result = true
-    f21_b12_i10_inst.result_name = "gep49"
-    f21_b12_i10_inst.result_type = "ptr"
-    f21_b12_i10_inst.typ = "ptr"
-    let f21_b12_i10_op0 = mir_value_operand("ptr", "gep46")
-    push(f21_b12_i10_inst.operands, f21_b12_i10_op0)
-    let f21_b12_i10_op1 = mir_const_int("i64", 0)
-    push(f21_b12_i10_inst.operands, f21_b12_i10_op1)
-    push(b12.instructions, f21_b12_i10_inst)
-    let f21_b12_i11_inst = mir_inst_empty()
-    f21_b12_i11_inst.op = "store"
-    let f21_b12_i11_op0 = mir_value_operand("i64", "load48")
-    push(f21_b12_i11_inst.operands, f21_b12_i11_op0)
-    let f21_b12_i11_op1 = mir_value_operand("ptr", "gep49")
-    push(f21_b12_i11_inst.operands, f21_b12_i11_op1)
-    push(b12.instructions, f21_b12_i11_inst)
-    let f21_b12_i12_inst = mir_inst_empty()
-    f21_b12_i12_inst.op = "gep"
-    f21_b12_i12_inst.has_result = true
-    f21_b12_i12_inst.result_name = "gep50"
-    f21_b12_i12_inst.result_type = "ptr"
-    f21_b12_i12_inst.typ = "ptr"
-    let f21_b12_i12_op0 = mir_value_operand("ptr", "gep43")
-    push(f21_b12_i12_inst.operands, f21_b12_i12_op0)
-    let f21_b12_i12_op1 = mir_const_int("i64", 1)
-    push(f21_b12_i12_inst.operands, f21_b12_i12_op1)
-    push(b12.instructions, f21_b12_i12_inst)
-    let f21_b12_i13_inst = mir_inst_empty()
-    f21_b12_i13_inst.op = "load"
-    f21_b12_i13_inst.has_result = true
-    f21_b12_i13_inst.result_name = "load51"
-    f21_b12_i13_inst.result_type = "i64"
-    f21_b12_i13_inst.typ = "i64"
-    let f21_b12_i13_op0 = mir_value_operand("ptr", "gep50")
-    push(f21_b12_i13_inst.operands, f21_b12_i13_op0)
-    push(b12.instructions, f21_b12_i13_inst)
-    let f21_b12_i14_inst = mir_inst_empty()
-    f21_b12_i14_inst.op = "gep"
-    f21_b12_i14_inst.has_result = true
-    f21_b12_i14_inst.result_name = "gep52"
-    f21_b12_i14_inst.result_type = "ptr"
-    f21_b12_i14_inst.typ = "ptr"
-    let f21_b12_i14_op0 = mir_value_operand("ptr", "gep46")
-    push(f21_b12_i14_inst.operands, f21_b12_i14_op0)
-    let f21_b12_i14_op1 = mir_const_int("i64", 1)
-    push(f21_b12_i14_inst.operands, f21_b12_i14_op1)
-    push(b12.instructions, f21_b12_i14_inst)
-    let f21_b12_i15_inst = mir_inst_empty()
-    f21_b12_i15_inst.op = "store"
-    let f21_b12_i15_op0 = mir_value_operand("i64", "load51")
-    push(f21_b12_i15_inst.operands, f21_b12_i15_op0)
-    let f21_b12_i15_op1 = mir_value_operand("ptr", "gep52")
-    push(f21_b12_i15_inst.operands, f21_b12_i15_op1)
-    push(b12.instructions, f21_b12_i15_inst)
-    let f21_b12_i16_inst = mir_inst_empty()
-    f21_b12_i16_inst.op = "gep"
-    f21_b12_i16_inst.has_result = true
-    f21_b12_i16_inst.result_name = "gep53"
-    f21_b12_i16_inst.result_type = "ptr"
-    f21_b12_i16_inst.typ = "ptr"
-    let f21_b12_i16_op0 = mir_value_operand("ptr", "gep43")
-    push(f21_b12_i16_inst.operands, f21_b12_i16_op0)
-    let f21_b12_i16_op1 = mir_const_int("i64", 2)
-    push(f21_b12_i16_inst.operands, f21_b12_i16_op1)
-    push(b12.instructions, f21_b12_i16_inst)
-    let f21_b12_i17_inst = mir_inst_empty()
-    f21_b12_i17_inst.op = "load"
-    f21_b12_i17_inst.has_result = true
-    f21_b12_i17_inst.result_name = "load54"
-    f21_b12_i17_inst.result_type = "i64"
-    f21_b12_i17_inst.typ = "i64"
-    let f21_b12_i17_op0 = mir_value_operand("ptr", "gep53")
-    push(f21_b12_i17_inst.operands, f21_b12_i17_op0)
-    push(b12.instructions, f21_b12_i17_inst)
-    let f21_b12_i18_inst = mir_inst_empty()
-    f21_b12_i18_inst.op = "gep"
-    f21_b12_i18_inst.has_result = true
-    f21_b12_i18_inst.result_name = "gep55"
-    f21_b12_i18_inst.result_type = "ptr"
-    f21_b12_i18_inst.typ = "ptr"
-    let f21_b12_i18_op0 = mir_value_operand("ptr", "gep46")
-    push(f21_b12_i18_inst.operands, f21_b12_i18_op0)
-    let f21_b12_i18_op1 = mir_const_int("i64", 2)
-    push(f21_b12_i18_inst.operands, f21_b12_i18_op1)
-    push(b12.instructions, f21_b12_i18_inst)
-    let f21_b12_i19_inst = mir_inst_empty()
-    f21_b12_i19_inst.op = "store"
-    let f21_b12_i19_op0 = mir_value_operand("i64", "load54")
-    push(f21_b12_i19_inst.operands, f21_b12_i19_op0)
-    let f21_b12_i19_op1 = mir_value_operand("ptr", "gep55")
-    push(f21_b12_i19_inst.operands, f21_b12_i19_op1)
-    push(b12.instructions, f21_b12_i19_inst)
-    let f21_b12_i20_inst = mir_inst_empty()
-    f21_b12_i20_inst.op = "sub"
-    f21_b12_i20_inst.has_result = true
-    f21_b12_i20_inst.result_name = "sub56"
-    f21_b12_i20_inst.result_type = "i64"
-    f21_b12_i20_inst.typ = "i64"
-    let f21_b12_i20_op0 = mir_value_operand("i64", "load39")
-    push(f21_b12_i20_inst.operands, f21_b12_i20_op0)
-    let f21_b12_i20_op1 = mir_const_int("i64", 1)
-    push(f21_b12_i20_inst.operands, f21_b12_i20_op1)
-    push(b12.instructions, f21_b12_i20_inst)
-    let f21_b12_i21_inst = mir_inst_empty()
-    f21_b12_i21_inst.op = "store"
-    let f21_b12_i21_op0 = mir_value_operand("i64", "sub56")
-    push(f21_b12_i21_inst.operands, f21_b12_i21_op0)
-    let f21_b12_i21_op1 = mir_value_operand("ptr", "alloca35")
-    push(f21_b12_i21_inst.operands, f21_b12_i21_op1)
-    push(b12.instructions, f21_b12_i21_inst)
+    let f_map_set_b12_i0_inst = mir_inst_empty()
+    f_map_set_b12_i0_inst.op = "load"
+    f_map_set_b12_i0_inst.has_result = true
+    f_map_set_b12_i0_inst.result_name = "load39"
+    f_map_set_b12_i0_inst.result_type = value_type
+    f_map_set_b12_i0_inst.typ = value_type
+    let f_map_set_b12_i0_op0 = mir_value_operand("ptr", "alloca35")
+    push(f_map_set_b12_i0_inst.operands, f_map_set_b12_i0_op0)
+    push(b12.instructions, f_map_set_b12_i0_inst)
+    let f_map_set_b12_i1_inst = mir_inst_empty()
+    f_map_set_b12_i1_inst.op = "sub"
+    f_map_set_b12_i1_inst.has_result = true
+    f_map_set_b12_i1_inst.result_name = "sub40"
+    f_map_set_b12_i1_inst.result_type = value_type
+    f_map_set_b12_i1_inst.typ = value_type
+    let f_map_set_b12_i1_op0 = mir_value_operand(value_type, "load39")
+    push(f_map_set_b12_i1_inst.operands, f_map_set_b12_i1_op0)
+    let f_map_set_b12_i1_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b12_i1_inst.operands, f_map_set_b12_i1_op1)
+    push(b12.instructions, f_map_set_b12_i1_inst)
+    let f_map_set_b12_i2_inst = mir_inst_empty()
+    f_map_set_b12_i2_inst.op = "add"
+    f_map_set_b12_i2_inst.has_result = true
+    f_map_set_b12_i2_inst.result_name = "add41"
+    f_map_set_b12_i2_inst.result_type = value_type
+    f_map_set_b12_i2_inst.typ = value_type
+    let f_map_set_b12_i2_op0 = mir_value_operand(value_type, "sub40")
+    push(f_map_set_b12_i2_inst.operands, f_map_set_b12_i2_op0)
+    let f_map_set_b12_i2_op1 = mir_value_operand(value_type, "sub40")
+    push(f_map_set_b12_i2_inst.operands, f_map_set_b12_i2_op1)
+    push(b12.instructions, f_map_set_b12_i2_inst)
+    let f_map_set_b12_i3_inst = mir_inst_empty()
+    f_map_set_b12_i3_inst.op = "add"
+    f_map_set_b12_i3_inst.has_result = true
+    f_map_set_b12_i3_inst.result_name = "add42"
+    f_map_set_b12_i3_inst.result_type = value_type
+    f_map_set_b12_i3_inst.typ = value_type
+    let f_map_set_b12_i3_op0 = mir_value_operand(value_type, "add41")
+    push(f_map_set_b12_i3_inst.operands, f_map_set_b12_i3_op0)
+    let f_map_set_b12_i3_op1 = mir_value_operand(value_type, "sub40")
+    push(f_map_set_b12_i3_inst.operands, f_map_set_b12_i3_op1)
+    push(b12.instructions, f_map_set_b12_i3_inst)
+    let f_map_set_b12_i4_inst = mir_inst_empty()
+    f_map_set_b12_i4_inst.op = "gep"
+    f_map_set_b12_i4_inst.has_result = true
+    f_map_set_b12_i4_inst.result_name = "gep43"
+    f_map_set_b12_i4_inst.result_type = "ptr"
+    f_map_set_b12_i4_inst.typ = "ptr"
+    let f_map_set_b12_i4_op0 = mir_value_operand("ptr", "load34")
+    push(f_map_set_b12_i4_inst.operands, f_map_set_b12_i4_op0)
+    let f_map_set_b12_i4_op1 = mir_value_operand(value_type, "add42")
+    push(f_map_set_b12_i4_inst.operands, f_map_set_b12_i4_op1)
+    push(b12.instructions, f_map_set_b12_i4_inst)
+    let f_map_set_b12_i5_inst = mir_inst_empty()
+    f_map_set_b12_i5_inst.op = "add"
+    f_map_set_b12_i5_inst.has_result = true
+    f_map_set_b12_i5_inst.result_name = "add44"
+    f_map_set_b12_i5_inst.result_type = value_type
+    f_map_set_b12_i5_inst.typ = value_type
+    let f_map_set_b12_i5_op0 = mir_value_operand(value_type, "load39")
+    push(f_map_set_b12_i5_inst.operands, f_map_set_b12_i5_op0)
+    let f_map_set_b12_i5_op1 = mir_value_operand(value_type, "load39")
+    push(f_map_set_b12_i5_inst.operands, f_map_set_b12_i5_op1)
+    push(b12.instructions, f_map_set_b12_i5_inst)
+    let f_map_set_b12_i6_inst = mir_inst_empty()
+    f_map_set_b12_i6_inst.op = "add"
+    f_map_set_b12_i6_inst.has_result = true
+    f_map_set_b12_i6_inst.result_name = "add45"
+    f_map_set_b12_i6_inst.result_type = value_type
+    f_map_set_b12_i6_inst.typ = value_type
+    let f_map_set_b12_i6_op0 = mir_value_operand(value_type, "add44")
+    push(f_map_set_b12_i6_inst.operands, f_map_set_b12_i6_op0)
+    let f_map_set_b12_i6_op1 = mir_value_operand(value_type, "load39")
+    push(f_map_set_b12_i6_inst.operands, f_map_set_b12_i6_op1)
+    push(b12.instructions, f_map_set_b12_i6_inst)
+    let f_map_set_b12_i7_inst = mir_inst_empty()
+    f_map_set_b12_i7_inst.op = "gep"
+    f_map_set_b12_i7_inst.has_result = true
+    f_map_set_b12_i7_inst.result_name = "gep46"
+    f_map_set_b12_i7_inst.result_type = "ptr"
+    f_map_set_b12_i7_inst.typ = "ptr"
+    let f_map_set_b12_i7_op0 = mir_value_operand("ptr", "load34")
+    push(f_map_set_b12_i7_inst.operands, f_map_set_b12_i7_op0)
+    let f_map_set_b12_i7_op1 = mir_value_operand(value_type, "add45")
+    push(f_map_set_b12_i7_inst.operands, f_map_set_b12_i7_op1)
+    push(b12.instructions, f_map_set_b12_i7_inst)
+    let f_map_set_b12_i8_inst = mir_inst_empty()
+    f_map_set_b12_i8_inst.op = "gep"
+    f_map_set_b12_i8_inst.has_result = true
+    f_map_set_b12_i8_inst.result_name = "gep47"
+    f_map_set_b12_i8_inst.result_type = "ptr"
+    f_map_set_b12_i8_inst.typ = "ptr"
+    let f_map_set_b12_i8_op0 = mir_value_operand("ptr", "gep43")
+    push(f_map_set_b12_i8_inst.operands, f_map_set_b12_i8_op0)
+    let f_map_set_b12_i8_op1 = mir_const_int(value_type, 0)
+    push(f_map_set_b12_i8_inst.operands, f_map_set_b12_i8_op1)
+    push(b12.instructions, f_map_set_b12_i8_inst)
+    let f_map_set_b12_i9_inst = mir_inst_empty()
+    f_map_set_b12_i9_inst.op = "load"
+    f_map_set_b12_i9_inst.has_result = true
+    f_map_set_b12_i9_inst.result_name = "load48"
+    f_map_set_b12_i9_inst.result_type = value_type
+    f_map_set_b12_i9_inst.typ = value_type
+    let f_map_set_b12_i9_op0 = mir_value_operand("ptr", "gep47")
+    push(f_map_set_b12_i9_inst.operands, f_map_set_b12_i9_op0)
+    push(b12.instructions, f_map_set_b12_i9_inst)
+    let f_map_set_b12_i10_inst = mir_inst_empty()
+    f_map_set_b12_i10_inst.op = "gep"
+    f_map_set_b12_i10_inst.has_result = true
+    f_map_set_b12_i10_inst.result_name = "gep49"
+    f_map_set_b12_i10_inst.result_type = "ptr"
+    f_map_set_b12_i10_inst.typ = "ptr"
+    let f_map_set_b12_i10_op0 = mir_value_operand("ptr", "gep46")
+    push(f_map_set_b12_i10_inst.operands, f_map_set_b12_i10_op0)
+    let f_map_set_b12_i10_op1 = mir_const_int(value_type, 0)
+    push(f_map_set_b12_i10_inst.operands, f_map_set_b12_i10_op1)
+    push(b12.instructions, f_map_set_b12_i10_inst)
+    let f_map_set_b12_i11_inst = mir_inst_empty()
+    f_map_set_b12_i11_inst.op = "store"
+    let f_map_set_b12_i11_op0 = mir_value_operand(value_type, "load48")
+    push(f_map_set_b12_i11_inst.operands, f_map_set_b12_i11_op0)
+    let f_map_set_b12_i11_op1 = mir_value_operand("ptr", "gep49")
+    push(f_map_set_b12_i11_inst.operands, f_map_set_b12_i11_op1)
+    push(b12.instructions, f_map_set_b12_i11_inst)
+    let f_map_set_b12_i12_inst = mir_inst_empty()
+    f_map_set_b12_i12_inst.op = "gep"
+    f_map_set_b12_i12_inst.has_result = true
+    f_map_set_b12_i12_inst.result_name = "gep50"
+    f_map_set_b12_i12_inst.result_type = "ptr"
+    f_map_set_b12_i12_inst.typ = "ptr"
+    let f_map_set_b12_i12_op0 = mir_value_operand("ptr", "gep43")
+    push(f_map_set_b12_i12_inst.operands, f_map_set_b12_i12_op0)
+    let f_map_set_b12_i12_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b12_i12_inst.operands, f_map_set_b12_i12_op1)
+    push(b12.instructions, f_map_set_b12_i12_inst)
+    let f_map_set_b12_i13_inst = mir_inst_empty()
+    f_map_set_b12_i13_inst.op = "load"
+    f_map_set_b12_i13_inst.has_result = true
+    f_map_set_b12_i13_inst.result_name = "load51"
+    f_map_set_b12_i13_inst.result_type = value_type
+    f_map_set_b12_i13_inst.typ = value_type
+    let f_map_set_b12_i13_op0 = mir_value_operand("ptr", "gep50")
+    push(f_map_set_b12_i13_inst.operands, f_map_set_b12_i13_op0)
+    push(b12.instructions, f_map_set_b12_i13_inst)
+    let f_map_set_b12_i14_inst = mir_inst_empty()
+    f_map_set_b12_i14_inst.op = "gep"
+    f_map_set_b12_i14_inst.has_result = true
+    f_map_set_b12_i14_inst.result_name = "gep52"
+    f_map_set_b12_i14_inst.result_type = "ptr"
+    f_map_set_b12_i14_inst.typ = "ptr"
+    let f_map_set_b12_i14_op0 = mir_value_operand("ptr", "gep46")
+    push(f_map_set_b12_i14_inst.operands, f_map_set_b12_i14_op0)
+    let f_map_set_b12_i14_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b12_i14_inst.operands, f_map_set_b12_i14_op1)
+    push(b12.instructions, f_map_set_b12_i14_inst)
+    let f_map_set_b12_i15_inst = mir_inst_empty()
+    f_map_set_b12_i15_inst.op = "store"
+    let f_map_set_b12_i15_op0 = mir_value_operand(value_type, "load51")
+    push(f_map_set_b12_i15_inst.operands, f_map_set_b12_i15_op0)
+    let f_map_set_b12_i15_op1 = mir_value_operand("ptr", "gep52")
+    push(f_map_set_b12_i15_inst.operands, f_map_set_b12_i15_op1)
+    push(b12.instructions, f_map_set_b12_i15_inst)
+    let f_map_set_b12_i16_inst = mir_inst_empty()
+    f_map_set_b12_i16_inst.op = "gep"
+    f_map_set_b12_i16_inst.has_result = true
+    f_map_set_b12_i16_inst.result_name = "gep53"
+    f_map_set_b12_i16_inst.result_type = "ptr"
+    f_map_set_b12_i16_inst.typ = "ptr"
+    let f_map_set_b12_i16_op0 = mir_value_operand("ptr", "gep43")
+    push(f_map_set_b12_i16_inst.operands, f_map_set_b12_i16_op0)
+    let f_map_set_b12_i16_op1 = mir_const_int(value_type, 2)
+    push(f_map_set_b12_i16_inst.operands, f_map_set_b12_i16_op1)
+    push(b12.instructions, f_map_set_b12_i16_inst)
+    let f_map_set_b12_i17_inst = mir_inst_empty()
+    f_map_set_b12_i17_inst.op = "load"
+    f_map_set_b12_i17_inst.has_result = true
+    f_map_set_b12_i17_inst.result_name = "load54"
+    f_map_set_b12_i17_inst.result_type = value_type
+    f_map_set_b12_i17_inst.typ = value_type
+    let f_map_set_b12_i17_op0 = mir_value_operand("ptr", "gep53")
+    push(f_map_set_b12_i17_inst.operands, f_map_set_b12_i17_op0)
+    push(b12.instructions, f_map_set_b12_i17_inst)
+    let f_map_set_b12_i18_inst = mir_inst_empty()
+    f_map_set_b12_i18_inst.op = "gep"
+    f_map_set_b12_i18_inst.has_result = true
+    f_map_set_b12_i18_inst.result_name = "gep55"
+    f_map_set_b12_i18_inst.result_type = "ptr"
+    f_map_set_b12_i18_inst.typ = "ptr"
+    let f_map_set_b12_i18_op0 = mir_value_operand("ptr", "gep46")
+    push(f_map_set_b12_i18_inst.operands, f_map_set_b12_i18_op0)
+    let f_map_set_b12_i18_op1 = mir_const_int(value_type, 2)
+    push(f_map_set_b12_i18_inst.operands, f_map_set_b12_i18_op1)
+    push(b12.instructions, f_map_set_b12_i18_inst)
+    let f_map_set_b12_i19_inst = mir_inst_empty()
+    f_map_set_b12_i19_inst.op = "store"
+    let f_map_set_b12_i19_op0 = mir_value_operand(value_type, "load54")
+    push(f_map_set_b12_i19_inst.operands, f_map_set_b12_i19_op0)
+    let f_map_set_b12_i19_op1 = mir_value_operand("ptr", "gep55")
+    push(f_map_set_b12_i19_inst.operands, f_map_set_b12_i19_op1)
+    push(b12.instructions, f_map_set_b12_i19_inst)
+    let f_map_set_b12_i20_inst = mir_inst_empty()
+    f_map_set_b12_i20_inst.op = "sub"
+    f_map_set_b12_i20_inst.has_result = true
+    f_map_set_b12_i20_inst.result_name = "sub56"
+    f_map_set_b12_i20_inst.result_type = value_type
+    f_map_set_b12_i20_inst.typ = value_type
+    let f_map_set_b12_i20_op0 = mir_value_operand(value_type, "load39")
+    push(f_map_set_b12_i20_inst.operands, f_map_set_b12_i20_op0)
+    let f_map_set_b12_i20_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b12_i20_inst.operands, f_map_set_b12_i20_op1)
+    push(b12.instructions, f_map_set_b12_i20_inst)
+    let f_map_set_b12_i21_inst = mir_inst_empty()
+    f_map_set_b12_i21_inst.op = "store"
+    let f_map_set_b12_i21_op0 = mir_value_operand(value_type, "sub56")
+    push(f_map_set_b12_i21_inst.operands, f_map_set_b12_i21_op0)
+    let f_map_set_b12_i21_op1 = mir_value_operand("ptr", "alloca35")
+    push(f_map_set_b12_i21_inst.operands, f_map_set_b12_i21_op1)
+    push(b12.instructions, f_map_set_b12_i21_inst)
     b12.terminator = mir_br("shift_check")
     b12.has_terminator = true
     push(fn.blocks, b12)
     let b13 = mir_block_empty("write_entry")
-    let f21_b13_i0_inst = mir_inst_empty()
-    f21_b13_i0_inst.op = "load"
-    f21_b13_i0_inst.has_result = true
-    f21_b13_i0_inst.result_name = "load57"
-    f21_b13_i0_inst.result_type = "i64"
-    f21_b13_i0_inst.typ = "i64"
-    let f21_b13_i0_op0 = mir_value_operand("ptr", "alloca12")
-    push(f21_b13_i0_inst.operands, f21_b13_i0_op0)
-    push(b13.instructions, f21_b13_i0_inst)
-    let f21_b13_i1_inst = mir_inst_empty()
-    f21_b13_i1_inst.op = "load"
-    f21_b13_i1_inst.has_result = true
-    f21_b13_i1_inst.result_name = "load58"
-    f21_b13_i1_inst.result_type = "ptr"
-    f21_b13_i1_inst.typ = "ptr"
-    let f21_b13_i1_op0 = mir_value_operand("ptr", "gep4")
-    push(f21_b13_i1_inst.operands, f21_b13_i1_op0)
-    push(b13.instructions, f21_b13_i1_inst)
-    let f21_b13_i2_inst = mir_inst_empty()
-    f21_b13_i2_inst.op = "add"
-    f21_b13_i2_inst.has_result = true
-    f21_b13_i2_inst.result_name = "add59"
-    f21_b13_i2_inst.result_type = "i64"
-    f21_b13_i2_inst.typ = "i64"
-    let f21_b13_i2_op0 = mir_value_operand("i64", "load57")
-    push(f21_b13_i2_inst.operands, f21_b13_i2_op0)
-    let f21_b13_i2_op1 = mir_value_operand("i64", "load57")
-    push(f21_b13_i2_inst.operands, f21_b13_i2_op1)
-    push(b13.instructions, f21_b13_i2_inst)
-    let f21_b13_i3_inst = mir_inst_empty()
-    f21_b13_i3_inst.op = "add"
-    f21_b13_i3_inst.has_result = true
-    f21_b13_i3_inst.result_name = "add60"
-    f21_b13_i3_inst.result_type = "i64"
-    f21_b13_i3_inst.typ = "i64"
-    let f21_b13_i3_op0 = mir_value_operand("i64", "add59")
-    push(f21_b13_i3_inst.operands, f21_b13_i3_op0)
-    let f21_b13_i3_op1 = mir_value_operand("i64", "load57")
-    push(f21_b13_i3_inst.operands, f21_b13_i3_op1)
-    push(b13.instructions, f21_b13_i3_inst)
-    let f21_b13_i4_inst = mir_inst_empty()
-    f21_b13_i4_inst.op = "gep"
-    f21_b13_i4_inst.has_result = true
-    f21_b13_i4_inst.result_name = "gep61"
-    f21_b13_i4_inst.result_type = "ptr"
-    f21_b13_i4_inst.typ = "ptr"
-    let f21_b13_i4_op0 = mir_value_operand("ptr", "load58")
-    push(f21_b13_i4_inst.operands, f21_b13_i4_op0)
-    let f21_b13_i4_op1 = mir_value_operand("i64", "add60")
-    push(f21_b13_i4_inst.operands, f21_b13_i4_op1)
-    push(b13.instructions, f21_b13_i4_inst)
-    let f21_b13_i5_inst = mir_inst_empty()
-    f21_b13_i5_inst.op = "gep"
-    f21_b13_i5_inst.has_result = true
-    f21_b13_i5_inst.result_name = "gep62"
-    f21_b13_i5_inst.result_type = "ptr"
-    f21_b13_i5_inst.typ = "ptr"
-    let f21_b13_i5_op0 = mir_value_operand("ptr", "gep61")
-    push(f21_b13_i5_inst.operands, f21_b13_i5_op0)
-    let f21_b13_i5_op1 = mir_const_int("i64", 0)
-    push(f21_b13_i5_inst.operands, f21_b13_i5_op1)
-    push(b13.instructions, f21_b13_i5_inst)
-    let f21_b13_i6_inst = mir_inst_empty()
-    f21_b13_i6_inst.op = "store"
-    let f21_b13_i6_op0 = mir_value_operand("ptr", "key")
-    push(f21_b13_i6_inst.operands, f21_b13_i6_op0)
-    let f21_b13_i6_op1 = mir_value_operand("ptr", "gep62")
-    push(f21_b13_i6_inst.operands, f21_b13_i6_op1)
-    push(b13.instructions, f21_b13_i6_inst)
-    let f21_b13_i7_inst = mir_inst_empty()
-    f21_b13_i7_inst.op = "gep"
-    f21_b13_i7_inst.has_result = true
-    f21_b13_i7_inst.result_name = "gep63"
-    f21_b13_i7_inst.result_type = "ptr"
-    f21_b13_i7_inst.typ = "ptr"
-    let f21_b13_i7_op0 = mir_value_operand("ptr", "gep61")
-    push(f21_b13_i7_inst.operands, f21_b13_i7_op0)
-    let f21_b13_i7_op1 = mir_const_int("i64", 1)
-    push(f21_b13_i7_inst.operands, f21_b13_i7_op1)
-    push(b13.instructions, f21_b13_i7_inst)
-    let f21_b13_i8_inst = mir_inst_empty()
-    f21_b13_i8_inst.op = "store"
-    let f21_b13_i8_op0 = mir_value_operand("i64", "val")
-    push(f21_b13_i8_inst.operands, f21_b13_i8_op0)
-    let f21_b13_i8_op1 = mir_value_operand("ptr", "gep63")
-    push(f21_b13_i8_inst.operands, f21_b13_i8_op1)
-    push(b13.instructions, f21_b13_i8_inst)
-    let f21_b13_i9_inst = mir_inst_empty()
-    f21_b13_i9_inst.op = "gep"
-    f21_b13_i9_inst.has_result = true
-    f21_b13_i9_inst.result_name = "gep64"
-    f21_b13_i9_inst.result_type = "ptr"
-    f21_b13_i9_inst.typ = "ptr"
-    let f21_b13_i9_op0 = mir_value_operand("ptr", "gep61")
-    push(f21_b13_i9_inst.operands, f21_b13_i9_op0)
-    let f21_b13_i9_op1 = mir_const_int("i64", 2)
-    push(f21_b13_i9_inst.operands, f21_b13_i9_op1)
-    push(b13.instructions, f21_b13_i9_inst)
-    let f21_b13_i10_inst = mir_inst_empty()
-    f21_b13_i10_inst.op = "store"
-    let f21_b13_i10_op0 = mir_const_int("i64", 1)
-    push(f21_b13_i10_inst.operands, f21_b13_i10_op0)
-    let f21_b13_i10_op1 = mir_value_operand("ptr", "gep64")
-    push(f21_b13_i10_inst.operands, f21_b13_i10_op1)
-    push(b13.instructions, f21_b13_i10_inst)
-    let f21_b13_i11_inst = mir_inst_empty()
-    f21_b13_i11_inst.op = "add"
-    f21_b13_i11_inst.has_result = true
-    f21_b13_i11_inst.result_name = "add65"
-    f21_b13_i11_inst.result_type = "i64"
-    f21_b13_i11_inst.typ = "i64"
-    let f21_b13_i11_op0 = mir_value_operand("i64", "load1")
-    push(f21_b13_i11_inst.operands, f21_b13_i11_op0)
-    let f21_b13_i11_op1 = mir_const_int("i64", 1)
-    push(f21_b13_i11_inst.operands, f21_b13_i11_op1)
-    push(b13.instructions, f21_b13_i11_inst)
-    let f21_b13_i12_inst = mir_inst_empty()
-    f21_b13_i12_inst.op = "store"
-    let f21_b13_i12_op0 = mir_value_operand("i64", "add65")
-    push(f21_b13_i12_inst.operands, f21_b13_i12_op0)
-    let f21_b13_i12_op1 = mir_value_operand("ptr", "gep0")
-    push(f21_b13_i12_inst.operands, f21_b13_i12_op1)
-    push(b13.instructions, f21_b13_i12_inst)
+    let f_map_set_b13_i0_inst = mir_inst_empty()
+    f_map_set_b13_i0_inst.op = "load"
+    f_map_set_b13_i0_inst.has_result = true
+    f_map_set_b13_i0_inst.result_name = "load57"
+    f_map_set_b13_i0_inst.result_type = value_type
+    f_map_set_b13_i0_inst.typ = value_type
+    let f_map_set_b13_i0_op0 = mir_value_operand("ptr", "alloca12")
+    push(f_map_set_b13_i0_inst.operands, f_map_set_b13_i0_op0)
+    push(b13.instructions, f_map_set_b13_i0_inst)
+    let f_map_set_b13_i1_inst = mir_inst_empty()
+    f_map_set_b13_i1_inst.op = "load"
+    f_map_set_b13_i1_inst.has_result = true
+    f_map_set_b13_i1_inst.result_name = "load58"
+    f_map_set_b13_i1_inst.result_type = "ptr"
+    f_map_set_b13_i1_inst.typ = "ptr"
+    let f_map_set_b13_i1_op0 = mir_value_operand("ptr", "gep4")
+    push(f_map_set_b13_i1_inst.operands, f_map_set_b13_i1_op0)
+    push(b13.instructions, f_map_set_b13_i1_inst)
+    let f_map_set_b13_i2_inst = mir_inst_empty()
+    f_map_set_b13_i2_inst.op = "add"
+    f_map_set_b13_i2_inst.has_result = true
+    f_map_set_b13_i2_inst.result_name = "add59"
+    f_map_set_b13_i2_inst.result_type = value_type
+    f_map_set_b13_i2_inst.typ = value_type
+    let f_map_set_b13_i2_op0 = mir_value_operand(value_type, "load57")
+    push(f_map_set_b13_i2_inst.operands, f_map_set_b13_i2_op0)
+    let f_map_set_b13_i2_op1 = mir_value_operand(value_type, "load57")
+    push(f_map_set_b13_i2_inst.operands, f_map_set_b13_i2_op1)
+    push(b13.instructions, f_map_set_b13_i2_inst)
+    let f_map_set_b13_i3_inst = mir_inst_empty()
+    f_map_set_b13_i3_inst.op = "add"
+    f_map_set_b13_i3_inst.has_result = true
+    f_map_set_b13_i3_inst.result_name = "add60"
+    f_map_set_b13_i3_inst.result_type = value_type
+    f_map_set_b13_i3_inst.typ = value_type
+    let f_map_set_b13_i3_op0 = mir_value_operand(value_type, "add59")
+    push(f_map_set_b13_i3_inst.operands, f_map_set_b13_i3_op0)
+    let f_map_set_b13_i3_op1 = mir_value_operand(value_type, "load57")
+    push(f_map_set_b13_i3_inst.operands, f_map_set_b13_i3_op1)
+    push(b13.instructions, f_map_set_b13_i3_inst)
+    let f_map_set_b13_i4_inst = mir_inst_empty()
+    f_map_set_b13_i4_inst.op = "gep"
+    f_map_set_b13_i4_inst.has_result = true
+    f_map_set_b13_i4_inst.result_name = "gep61"
+    f_map_set_b13_i4_inst.result_type = "ptr"
+    f_map_set_b13_i4_inst.typ = "ptr"
+    let f_map_set_b13_i4_op0 = mir_value_operand("ptr", "load58")
+    push(f_map_set_b13_i4_inst.operands, f_map_set_b13_i4_op0)
+    let f_map_set_b13_i4_op1 = mir_value_operand(value_type, "add60")
+    push(f_map_set_b13_i4_inst.operands, f_map_set_b13_i4_op1)
+    push(b13.instructions, f_map_set_b13_i4_inst)
+    let f_map_set_b13_i5_inst = mir_inst_empty()
+    f_map_set_b13_i5_inst.op = "gep"
+    f_map_set_b13_i5_inst.has_result = true
+    f_map_set_b13_i5_inst.result_name = "gep62"
+    f_map_set_b13_i5_inst.result_type = "ptr"
+    f_map_set_b13_i5_inst.typ = "ptr"
+    let f_map_set_b13_i5_op0 = mir_value_operand("ptr", "gep61")
+    push(f_map_set_b13_i5_inst.operands, f_map_set_b13_i5_op0)
+    let f_map_set_b13_i5_op1 = mir_const_int(value_type, 0)
+    push(f_map_set_b13_i5_inst.operands, f_map_set_b13_i5_op1)
+    push(b13.instructions, f_map_set_b13_i5_inst)
+    let f_map_set_b13_i6_inst = mir_inst_empty()
+    f_map_set_b13_i6_inst.op = "store"
+    let f_map_set_b13_i6_op0 = mir_value_operand("ptr", "key")
+    push(f_map_set_b13_i6_inst.operands, f_map_set_b13_i6_op0)
+    let f_map_set_b13_i6_op1 = mir_value_operand("ptr", "gep62")
+    push(f_map_set_b13_i6_inst.operands, f_map_set_b13_i6_op1)
+    push(b13.instructions, f_map_set_b13_i6_inst)
+    let f_map_set_b13_i7_inst = mir_inst_empty()
+    f_map_set_b13_i7_inst.op = "gep"
+    f_map_set_b13_i7_inst.has_result = true
+    f_map_set_b13_i7_inst.result_name = "gep63"
+    f_map_set_b13_i7_inst.result_type = "ptr"
+    f_map_set_b13_i7_inst.typ = "ptr"
+    let f_map_set_b13_i7_op0 = mir_value_operand("ptr", "gep61")
+    push(f_map_set_b13_i7_inst.operands, f_map_set_b13_i7_op0)
+    let f_map_set_b13_i7_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b13_i7_inst.operands, f_map_set_b13_i7_op1)
+    push(b13.instructions, f_map_set_b13_i7_inst)
+    let f_map_set_b13_i8_inst = mir_inst_empty()
+    f_map_set_b13_i8_inst.op = "store"
+    let f_map_set_b13_i8_op0 = mir_value_operand(value_type, "val")
+    push(f_map_set_b13_i8_inst.operands, f_map_set_b13_i8_op0)
+    let f_map_set_b13_i8_op1 = mir_value_operand("ptr", "gep63")
+    push(f_map_set_b13_i8_inst.operands, f_map_set_b13_i8_op1)
+    push(b13.instructions, f_map_set_b13_i8_inst)
+    let f_map_set_b13_i9_inst = mir_inst_empty()
+    f_map_set_b13_i9_inst.op = "gep"
+    f_map_set_b13_i9_inst.has_result = true
+    f_map_set_b13_i9_inst.result_name = "gep64"
+    f_map_set_b13_i9_inst.result_type = "ptr"
+    f_map_set_b13_i9_inst.typ = "ptr"
+    let f_map_set_b13_i9_op0 = mir_value_operand("ptr", "gep61")
+    push(f_map_set_b13_i9_inst.operands, f_map_set_b13_i9_op0)
+    let f_map_set_b13_i9_op1 = mir_const_int(value_type, 2)
+    push(f_map_set_b13_i9_inst.operands, f_map_set_b13_i9_op1)
+    push(b13.instructions, f_map_set_b13_i9_inst)
+    let f_map_set_b13_i10_inst = mir_inst_empty()
+    f_map_set_b13_i10_inst.op = "store"
+    let f_map_set_b13_i10_op0 = mir_const_int(value_type, 1)
+    push(f_map_set_b13_i10_inst.operands, f_map_set_b13_i10_op0)
+    let f_map_set_b13_i10_op1 = mir_value_operand("ptr", "gep64")
+    push(f_map_set_b13_i10_inst.operands, f_map_set_b13_i10_op1)
+    push(b13.instructions, f_map_set_b13_i10_inst)
+    let f_map_set_b13_i11_inst = mir_inst_empty()
+    f_map_set_b13_i11_inst.op = "add"
+    f_map_set_b13_i11_inst.has_result = true
+    f_map_set_b13_i11_inst.result_name = "add65"
+    f_map_set_b13_i11_inst.result_type = value_type
+    f_map_set_b13_i11_inst.typ = value_type
+    let f_map_set_b13_i11_op0 = mir_value_operand(value_type, "load1")
+    push(f_map_set_b13_i11_inst.operands, f_map_set_b13_i11_op0)
+    let f_map_set_b13_i11_op1 = mir_const_int(value_type, 1)
+    push(f_map_set_b13_i11_inst.operands, f_map_set_b13_i11_op1)
+    push(b13.instructions, f_map_set_b13_i11_inst)
+    let f_map_set_b13_i12_inst = mir_inst_empty()
+    f_map_set_b13_i12_inst.op = "store"
+    let f_map_set_b13_i12_op0 = mir_value_operand(value_type, "add65")
+    push(f_map_set_b13_i12_inst.operands, f_map_set_b13_i12_op0)
+    let f_map_set_b13_i12_op1 = mir_value_operand("ptr", "gep0")
+    push(f_map_set_b13_i12_inst.operands, f_map_set_b13_i12_op1)
+    push(b13.instructions, f_map_set_b13_i12_inst)
     b13.terminator = mir_ret_void()
     b13.has_terminator = true
     push(fn.blocks, b13)
     return fn
 }
 
+
+fun mir_runtime_emit_ep_map_str_i64_set(): MirFunction {
+    return mir_runtime_emit_ep_map_str_word_set("__ep_map_str_i64_set", "i64")
+}
 fun mir_runtime_emit_ep_map_str_i64_has(): MirFunction {
     let fn = mir_function_empty("__ep_map_str_i64_has", "bool")
     push(fn.params, mir_runtime_param("map", "ptr"))
@@ -5724,877 +5728,8 @@ fun mir_runtime_emit_ep_map_str_bool_get(): MirFunction {
 }
 
 fun mir_runtime_emit_ep_map_str_bool_set(): MirFunction {
-    let fn = mir_function_empty("__ep_map_str_bool_set", "void")
-    push(fn.params, mir_runtime_param("map", "ptr"))
-    push(fn.params, mir_runtime_param("key", "ptr"))
-    push(fn.params, mir_runtime_param("val", "bool"))
-    let b0 = mir_block_empty("entry")
-    let f26_b0_i0_inst = mir_inst_empty()
-    f26_b0_i0_inst.op = "gep"
-    f26_b0_i0_inst.has_result = true
-    f26_b0_i0_inst.result_name = "gep0"
-    f26_b0_i0_inst.result_type = "ptr"
-    f26_b0_i0_inst.typ = "ptr"
-    let f26_b0_i0_op0 = mir_value_operand("ptr", "map")
-    push(f26_b0_i0_inst.operands, f26_b0_i0_op0)
-    let f26_b0_i0_op1 = mir_const_int("i64", 1)
-    push(f26_b0_i0_inst.operands, f26_b0_i0_op1)
-    push(b0.instructions, f26_b0_i0_inst)
-    let f26_b0_i1_inst = mir_inst_empty()
-    f26_b0_i1_inst.op = "load"
-    f26_b0_i1_inst.has_result = true
-    f26_b0_i1_inst.result_name = "load1"
-    f26_b0_i1_inst.result_type = "i64"
-    f26_b0_i1_inst.typ = "i64"
-    let f26_b0_i1_op0 = mir_value_operand("ptr", "gep0")
-    push(f26_b0_i1_inst.operands, f26_b0_i1_op0)
-    push(b0.instructions, f26_b0_i1_inst)
-    let f26_b0_i2_inst = mir_inst_empty()
-    f26_b0_i2_inst.op = "gep"
-    f26_b0_i2_inst.has_result = true
-    f26_b0_i2_inst.result_name = "gep2"
-    f26_b0_i2_inst.result_type = "ptr"
-    f26_b0_i2_inst.typ = "ptr"
-    let f26_b0_i2_op0 = mir_value_operand("ptr", "map")
-    push(f26_b0_i2_inst.operands, f26_b0_i2_op0)
-    let f26_b0_i2_op1 = mir_const_int("i64", 2)
-    push(f26_b0_i2_inst.operands, f26_b0_i2_op1)
-    push(b0.instructions, f26_b0_i2_inst)
-    let f26_b0_i3_inst = mir_inst_empty()
-    f26_b0_i3_inst.op = "load"
-    f26_b0_i3_inst.has_result = true
-    f26_b0_i3_inst.result_name = "load3"
-    f26_b0_i3_inst.result_type = "i64"
-    f26_b0_i3_inst.typ = "i64"
-    let f26_b0_i3_op0 = mir_value_operand("ptr", "gep2")
-    push(f26_b0_i3_inst.operands, f26_b0_i3_op0)
-    push(b0.instructions, f26_b0_i3_inst)
-    let f26_b0_i4_inst = mir_inst_empty()
-    f26_b0_i4_inst.op = "gep"
-    f26_b0_i4_inst.has_result = true
-    f26_b0_i4_inst.result_name = "gep4"
-    f26_b0_i4_inst.result_type = "ptr"
-    f26_b0_i4_inst.typ = "ptr"
-    let f26_b0_i4_op0 = mir_value_operand("ptr", "map")
-    push(f26_b0_i4_inst.operands, f26_b0_i4_op0)
-    let f26_b0_i4_op1 = mir_const_int("i64", 0)
-    push(f26_b0_i4_inst.operands, f26_b0_i4_op1)
-    push(b0.instructions, f26_b0_i4_inst)
-    let f26_b0_i5_inst = mir_inst_empty()
-    f26_b0_i5_inst.op = "load"
-    f26_b0_i5_inst.has_result = true
-    f26_b0_i5_inst.result_name = "load5"
-    f26_b0_i5_inst.result_type = "ptr"
-    f26_b0_i5_inst.typ = "ptr"
-    let f26_b0_i5_op0 = mir_value_operand("ptr", "gep4")
-    push(f26_b0_i5_inst.operands, f26_b0_i5_op0)
-    push(b0.instructions, f26_b0_i5_inst)
-    let f26_b0_i6_inst = mir_inst_empty()
-    f26_b0_i6_inst.op = "call"
-    f26_b0_i6_inst.has_result = true
-    f26_b0_i6_inst.result_name = "call6"
-    f26_b0_i6_inst.result_type = "i64"
-    f26_b0_i6_inst.typ = "i64"
-    f26_b0_i6_inst.callee = "__ep_map_str_find_pos"
-    let f26_b0_i6_op0 = mir_value_operand("ptr", "map")
-    push(f26_b0_i6_inst.operands, f26_b0_i6_op0)
-    let f26_b0_i6_op1 = mir_value_operand("ptr", "key")
-    push(f26_b0_i6_inst.operands, f26_b0_i6_op1)
-    push(b0.instructions, f26_b0_i6_inst)
-    let f26_b0_i7_inst = mir_inst_empty()
-    f26_b0_i7_inst.op = "icmp.sge"
-    f26_b0_i7_inst.has_result = true
-    f26_b0_i7_inst.result_name = "icmp_sge7"
-    f26_b0_i7_inst.result_type = "bool"
-    f26_b0_i7_inst.typ = "bool"
-    let f26_b0_i7_op0 = mir_value_operand("i64", "call6")
-    push(f26_b0_i7_inst.operands, f26_b0_i7_op0)
-    let f26_b0_i7_op1 = mir_const_int("i64", 0)
-    push(f26_b0_i7_inst.operands, f26_b0_i7_op1)
-    push(b0.instructions, f26_b0_i7_inst)
-    let f26_b0_t_cond = mir_value_operand("bool", "icmp_sge7")
-    b0.terminator = mir_condbr(f26_b0_t_cond, "update", "insert_prep")
-    b0.has_terminator = true
-    push(fn.blocks, b0)
-    let b1 = mir_block_empty("update")
-    let f26_b1_i0_inst = mir_inst_empty()
-    f26_b1_i0_inst.op = "add"
-    f26_b1_i0_inst.has_result = true
-    f26_b1_i0_inst.result_name = "add8"
-    f26_b1_i0_inst.result_type = "i64"
-    f26_b1_i0_inst.typ = "i64"
-    let f26_b1_i0_op0 = mir_value_operand("i64", "call6")
-    push(f26_b1_i0_inst.operands, f26_b1_i0_op0)
-    let f26_b1_i0_op1 = mir_value_operand("i64", "call6")
-    push(f26_b1_i0_inst.operands, f26_b1_i0_op1)
-    push(b1.instructions, f26_b1_i0_inst)
-    let f26_b1_i1_inst = mir_inst_empty()
-    f26_b1_i1_inst.op = "add"
-    f26_b1_i1_inst.has_result = true
-    f26_b1_i1_inst.result_name = "add9"
-    f26_b1_i1_inst.result_type = "i64"
-    f26_b1_i1_inst.typ = "i64"
-    let f26_b1_i1_op0 = mir_value_operand("i64", "add8")
-    push(f26_b1_i1_inst.operands, f26_b1_i1_op0)
-    let f26_b1_i1_op1 = mir_value_operand("i64", "call6")
-    push(f26_b1_i1_inst.operands, f26_b1_i1_op1)
-    push(b1.instructions, f26_b1_i1_inst)
-    let f26_b1_i2_inst = mir_inst_empty()
-    f26_b1_i2_inst.op = "gep"
-    f26_b1_i2_inst.has_result = true
-    f26_b1_i2_inst.result_name = "gep10"
-    f26_b1_i2_inst.result_type = "ptr"
-    f26_b1_i2_inst.typ = "ptr"
-    let f26_b1_i2_op0 = mir_value_operand("ptr", "load5")
-    push(f26_b1_i2_inst.operands, f26_b1_i2_op0)
-    let f26_b1_i2_op1 = mir_value_operand("i64", "add9")
-    push(f26_b1_i2_inst.operands, f26_b1_i2_op1)
-    push(b1.instructions, f26_b1_i2_inst)
-    let f26_b1_i3_inst = mir_inst_empty()
-    f26_b1_i3_inst.op = "gep"
-    f26_b1_i3_inst.has_result = true
-    f26_b1_i3_inst.result_name = "gep11"
-    f26_b1_i3_inst.result_type = "ptr"
-    f26_b1_i3_inst.typ = "ptr"
-    let f26_b1_i3_op0 = mir_value_operand("ptr", "gep10")
-    push(f26_b1_i3_inst.operands, f26_b1_i3_op0)
-    let f26_b1_i3_op1 = mir_const_int("i64", 1)
-    push(f26_b1_i3_inst.operands, f26_b1_i3_op1)
-    push(b1.instructions, f26_b1_i3_inst)
-    let f26_b1_i4_inst = mir_inst_empty()
-    f26_b1_i4_inst.op = "store"
-    let f26_b1_i4_op0 = mir_value_operand("bool", "val")
-    push(f26_b1_i4_inst.operands, f26_b1_i4_op0)
-    let f26_b1_i4_op1 = mir_value_operand("ptr", "gep11")
-    push(f26_b1_i4_inst.operands, f26_b1_i4_op1)
-    push(b1.instructions, f26_b1_i4_inst)
-    b1.terminator = mir_ret_void()
-    b1.has_terminator = true
-    push(fn.blocks, b1)
-    let b2 = mir_block_empty("insert_prep")
-    let f26_b2_i0_inst = mir_inst_empty()
-    f26_b2_i0_inst.op = "alloca"
-    f26_b2_i0_inst.has_result = true
-    f26_b2_i0_inst.result_name = "alloca12"
-    f26_b2_i0_inst.result_type = "ptr"
-    f26_b2_i0_inst.typ = "i64"
-    push(b2.instructions, f26_b2_i0_inst)
-    let f26_b2_i1_inst = mir_inst_empty()
-    f26_b2_i1_inst.op = "sub"
-    f26_b2_i1_inst.has_result = true
-    f26_b2_i1_inst.result_name = "sub13"
-    f26_b2_i1_inst.result_type = "i64"
-    f26_b2_i1_inst.typ = "i64"
-    let f26_b2_i1_op0 = mir_const_int("i64", 0)
-    push(f26_b2_i1_inst.operands, f26_b2_i1_op0)
-    let f26_b2_i1_op1 = mir_value_operand("i64", "call6")
-    push(f26_b2_i1_inst.operands, f26_b2_i1_op1)
-    push(b2.instructions, f26_b2_i1_inst)
-    let f26_b2_i2_inst = mir_inst_empty()
-    f26_b2_i2_inst.op = "sub"
-    f26_b2_i2_inst.has_result = true
-    f26_b2_i2_inst.result_name = "sub14"
-    f26_b2_i2_inst.result_type = "i64"
-    f26_b2_i2_inst.typ = "i64"
-    let f26_b2_i2_op0 = mir_value_operand("i64", "sub13")
-    push(f26_b2_i2_inst.operands, f26_b2_i2_op0)
-    let f26_b2_i2_op1 = mir_const_int("i64", 1)
-    push(f26_b2_i2_inst.operands, f26_b2_i2_op1)
-    push(b2.instructions, f26_b2_i2_inst)
-    let f26_b2_i3_inst = mir_inst_empty()
-    f26_b2_i3_inst.op = "store"
-    let f26_b2_i3_op0 = mir_value_operand("i64", "sub14")
-    push(f26_b2_i3_inst.operands, f26_b2_i3_op0)
-    let f26_b2_i3_op1 = mir_value_operand("ptr", "alloca12")
-    push(f26_b2_i3_inst.operands, f26_b2_i3_op1)
-    push(b2.instructions, f26_b2_i3_inst)
-    let f26_b2_i4_inst = mir_inst_empty()
-    f26_b2_i4_inst.op = "icmp.sge"
-    f26_b2_i4_inst.has_result = true
-    f26_b2_i4_inst.result_name = "icmp_sge15"
-    f26_b2_i4_inst.result_type = "bool"
-    f26_b2_i4_inst.typ = "bool"
-    let f26_b2_i4_op0 = mir_value_operand("i64", "load1")
-    push(f26_b2_i4_inst.operands, f26_b2_i4_op0)
-    let f26_b2_i4_op1 = mir_value_operand("i64", "load3")
-    push(f26_b2_i4_inst.operands, f26_b2_i4_op1)
-    push(b2.instructions, f26_b2_i4_inst)
-    let f26_b2_t_cond = mir_value_operand("bool", "icmp_sge15")
-    b2.terminator = mir_condbr(f26_b2_t_cond, "grow", "shift_init")
-    b2.has_terminator = true
-    push(fn.blocks, b2)
-    let b3 = mir_block_empty("grow")
-    let f26_b3_i0_inst = mir_inst_empty()
-    f26_b3_i0_inst.op = "alloca"
-    f26_b3_i0_inst.has_result = true
-    f26_b3_i0_inst.result_name = "alloca16"
-    f26_b3_i0_inst.result_type = "ptr"
-    f26_b3_i0_inst.typ = "i64"
-    push(b3.instructions, f26_b3_i0_inst)
-    let f26_b3_i1_inst = mir_inst_empty()
-    f26_b3_i1_inst.op = "alloca"
-    f26_b3_i1_inst.has_result = true
-    f26_b3_i1_inst.result_name = "alloca17"
-    f26_b3_i1_inst.result_type = "ptr"
-    f26_b3_i1_inst.typ = "ptr"
-    push(b3.instructions, f26_b3_i1_inst)
-    let f26_b3_i2_inst = mir_inst_empty()
-    f26_b3_i2_inst.op = "alloca"
-    f26_b3_i2_inst.has_result = true
-    f26_b3_i2_inst.result_name = "alloca18"
-    f26_b3_i2_inst.result_type = "ptr"
-    f26_b3_i2_inst.typ = "i64"
-    push(b3.instructions, f26_b3_i2_inst)
-    let f26_b3_i3_inst = mir_inst_empty()
-    f26_b3_i3_inst.op = "icmp.eq"
-    f26_b3_i3_inst.has_result = true
-    f26_b3_i3_inst.result_name = "icmp_eq19"
-    f26_b3_i3_inst.result_type = "bool"
-    f26_b3_i3_inst.typ = "bool"
-    let f26_b3_i3_op0 = mir_value_operand("i64", "load3")
-    push(f26_b3_i3_inst.operands, f26_b3_i3_op0)
-    let f26_b3_i3_op1 = mir_const_int("i64", 0)
-    push(f26_b3_i3_inst.operands, f26_b3_i3_op1)
-    push(b3.instructions, f26_b3_i3_inst)
-    let f26_b3_t_cond = mir_value_operand("bool", "icmp_eq19")
-    b3.terminator = mir_condbr(f26_b3_t_cond, "grow_zero", "grow_double")
-    b3.has_terminator = true
-    push(fn.blocks, b3)
-    let b4 = mir_block_empty("shift_init")
-    let f26_b4_i0_inst = mir_inst_empty()
-    f26_b4_i0_inst.op = "load"
-    f26_b4_i0_inst.has_result = true
-    f26_b4_i0_inst.result_name = "load34"
-    f26_b4_i0_inst.result_type = "ptr"
-    f26_b4_i0_inst.typ = "ptr"
-    let f26_b4_i0_op0 = mir_value_operand("ptr", "gep4")
-    push(f26_b4_i0_inst.operands, f26_b4_i0_op0)
-    push(b4.instructions, f26_b4_i0_inst)
-    let f26_b4_i1_inst = mir_inst_empty()
-    f26_b4_i1_inst.op = "alloca"
-    f26_b4_i1_inst.has_result = true
-    f26_b4_i1_inst.result_name = "alloca35"
-    f26_b4_i1_inst.result_type = "ptr"
-    f26_b4_i1_inst.typ = "i64"
-    push(b4.instructions, f26_b4_i1_inst)
-    let f26_b4_i2_inst = mir_inst_empty()
-    f26_b4_i2_inst.op = "store"
-    let f26_b4_i2_op0 = mir_value_operand("i64", "load1")
-    push(f26_b4_i2_inst.operands, f26_b4_i2_op0)
-    let f26_b4_i2_op1 = mir_value_operand("ptr", "alloca35")
-    push(f26_b4_i2_inst.operands, f26_b4_i2_op1)
-    push(b4.instructions, f26_b4_i2_inst)
-    b4.terminator = mir_br("shift_check")
-    b4.has_terminator = true
-    push(fn.blocks, b4)
-    let b5 = mir_block_empty("grow_zero")
-    let f26_b5_i0_inst = mir_inst_empty()
-    f26_b5_i0_inst.op = "store"
-    let f26_b5_i0_op0 = mir_const_int("i64", 4)
-    push(f26_b5_i0_inst.operands, f26_b5_i0_op0)
-    let f26_b5_i0_op1 = mir_value_operand("ptr", "alloca16")
-    push(f26_b5_i0_inst.operands, f26_b5_i0_op1)
-    push(b5.instructions, f26_b5_i0_inst)
-    b5.terminator = mir_br("copy_init")
-    b5.has_terminator = true
-    push(fn.blocks, b5)
-    let b6 = mir_block_empty("grow_double")
-    let f26_b6_i0_inst = mir_inst_empty()
-    f26_b6_i0_inst.op = "add"
-    f26_b6_i0_inst.has_result = true
-    f26_b6_i0_inst.result_name = "add20"
-    f26_b6_i0_inst.result_type = "i64"
-    f26_b6_i0_inst.typ = "i64"
-    let f26_b6_i0_op0 = mir_value_operand("i64", "load3")
-    push(f26_b6_i0_inst.operands, f26_b6_i0_op0)
-    let f26_b6_i0_op1 = mir_value_operand("i64", "load3")
-    push(f26_b6_i0_inst.operands, f26_b6_i0_op1)
-    push(b6.instructions, f26_b6_i0_inst)
-    let f26_b6_i1_inst = mir_inst_empty()
-    f26_b6_i1_inst.op = "store"
-    let f26_b6_i1_op0 = mir_value_operand("i64", "add20")
-    push(f26_b6_i1_inst.operands, f26_b6_i1_op0)
-    let f26_b6_i1_op1 = mir_value_operand("ptr", "alloca16")
-    push(f26_b6_i1_inst.operands, f26_b6_i1_op1)
-    push(b6.instructions, f26_b6_i1_inst)
-    b6.terminator = mir_br("copy_init")
-    b6.has_terminator = true
-    push(fn.blocks, b6)
-    let b7 = mir_block_empty("copy_init")
-    let f26_b7_i0_inst = mir_inst_empty()
-    f26_b7_i0_inst.op = "load"
-    f26_b7_i0_inst.has_result = true
-    f26_b7_i0_inst.result_name = "load21"
-    f26_b7_i0_inst.result_type = "i64"
-    f26_b7_i0_inst.typ = "i64"
-    let f26_b7_i0_op0 = mir_value_operand("ptr", "alloca16")
-    push(f26_b7_i0_inst.operands, f26_b7_i0_op0)
-    push(b7.instructions, f26_b7_i0_inst)
-    let f26_b7_i1_inst = mir_inst_empty()
-    f26_b7_i1_inst.op = "mul"
-    f26_b7_i1_inst.has_result = true
-    f26_b7_i1_inst.result_name = "mul22"
-    f26_b7_i1_inst.result_type = "i64"
-    f26_b7_i1_inst.typ = "i64"
-    let f26_b7_i1_op0 = mir_value_operand("i64", "load21")
-    push(f26_b7_i1_inst.operands, f26_b7_i1_op0)
-    let f26_b7_i1_op1 = mir_const_int("i64", 24)
-    push(f26_b7_i1_inst.operands, f26_b7_i1_op1)
-    push(b7.instructions, f26_b7_i1_inst)
-    let f26_b7_i2_inst = mir_inst_empty()
-    f26_b7_i2_inst.op = "call"
-    f26_b7_i2_inst.has_result = true
-    f26_b7_i2_inst.result_name = "call23"
-    f26_b7_i2_inst.result_type = "ptr"
-    f26_b7_i2_inst.typ = "ptr"
-    f26_b7_i2_inst.callee = "__epx_alloc"
-    let f26_b7_i2_op0 = mir_value_operand("i64", "mul22")
-    push(f26_b7_i2_inst.operands, f26_b7_i2_op0)
-    push(b7.instructions, f26_b7_i2_inst)
-    let f26_b7_i3_inst = mir_inst_empty()
-    f26_b7_i3_inst.op = "store"
-    let f26_b7_i3_op0 = mir_value_operand("ptr", "call23")
-    push(f26_b7_i3_inst.operands, f26_b7_i3_op0)
-    let f26_b7_i3_op1 = mir_value_operand("ptr", "alloca17")
-    push(f26_b7_i3_inst.operands, f26_b7_i3_op1)
-    push(b7.instructions, f26_b7_i3_inst)
-    let f26_b7_i4_inst = mir_inst_empty()
-    f26_b7_i4_inst.op = "store"
-    let f26_b7_i4_op0 = mir_const_int("i64", 0)
-    push(f26_b7_i4_inst.operands, f26_b7_i4_op0)
-    let f26_b7_i4_op1 = mir_value_operand("ptr", "alloca18")
-    push(f26_b7_i4_inst.operands, f26_b7_i4_op1)
-    push(b7.instructions, f26_b7_i4_inst)
-    b7.terminator = mir_br("copy_check")
-    b7.has_terminator = true
-    push(fn.blocks, b7)
-    let b8 = mir_block_empty("copy_check")
-    let f26_b8_i0_inst = mir_inst_empty()
-    f26_b8_i0_inst.op = "load"
-    f26_b8_i0_inst.has_result = true
-    f26_b8_i0_inst.result_name = "load24"
-    f26_b8_i0_inst.result_type = "i64"
-    f26_b8_i0_inst.typ = "i64"
-    let f26_b8_i0_op0 = mir_value_operand("ptr", "alloca18")
-    push(f26_b8_i0_inst.operands, f26_b8_i0_op0)
-    push(b8.instructions, f26_b8_i0_inst)
-    let f26_b8_i1_inst = mir_inst_empty()
-    f26_b8_i1_inst.op = "mul"
-    f26_b8_i1_inst.has_result = true
-    f26_b8_i1_inst.result_name = "mul25"
-    f26_b8_i1_inst.result_type = "i64"
-    f26_b8_i1_inst.typ = "i64"
-    let f26_b8_i1_op0 = mir_value_operand("i64", "load1")
-    push(f26_b8_i1_inst.operands, f26_b8_i1_op0)
-    let f26_b8_i1_op1 = mir_const_int("i64", 3)
-    push(f26_b8_i1_inst.operands, f26_b8_i1_op1)
-    push(b8.instructions, f26_b8_i1_inst)
-    let f26_b8_i2_inst = mir_inst_empty()
-    f26_b8_i2_inst.op = "icmp.slt"
-    f26_b8_i2_inst.has_result = true
-    f26_b8_i2_inst.result_name = "icmp_slt26"
-    f26_b8_i2_inst.result_type = "bool"
-    f26_b8_i2_inst.typ = "bool"
-    let f26_b8_i2_op0 = mir_value_operand("i64", "load24")
-    push(f26_b8_i2_inst.operands, f26_b8_i2_op0)
-    let f26_b8_i2_op1 = mir_value_operand("i64", "mul25")
-    push(f26_b8_i2_inst.operands, f26_b8_i2_op1)
-    push(b8.instructions, f26_b8_i2_inst)
-    let f26_b8_t_cond = mir_value_operand("bool", "icmp_slt26")
-    b8.terminator = mir_condbr(f26_b8_t_cond, "copy_body", "swap")
-    b8.has_terminator = true
-    push(fn.blocks, b8)
-    let b9 = mir_block_empty("copy_body")
-    let f26_b9_i0_inst = mir_inst_empty()
-    f26_b9_i0_inst.op = "gep"
-    f26_b9_i0_inst.has_result = true
-    f26_b9_i0_inst.result_name = "gep27"
-    f26_b9_i0_inst.result_type = "ptr"
-    f26_b9_i0_inst.typ = "ptr"
-    let f26_b9_i0_op0 = mir_value_operand("ptr", "load5")
-    push(f26_b9_i0_inst.operands, f26_b9_i0_op0)
-    let f26_b9_i0_op1 = mir_value_operand("i64", "load24")
-    push(f26_b9_i0_inst.operands, f26_b9_i0_op1)
-    push(b9.instructions, f26_b9_i0_inst)
-    let f26_b9_i1_inst = mir_inst_empty()
-    f26_b9_i1_inst.op = "load"
-    f26_b9_i1_inst.has_result = true
-    f26_b9_i1_inst.result_name = "load28"
-    f26_b9_i1_inst.result_type = "i64"
-    f26_b9_i1_inst.typ = "i64"
-    let f26_b9_i1_op0 = mir_value_operand("ptr", "gep27")
-    push(f26_b9_i1_inst.operands, f26_b9_i1_op0)
-    push(b9.instructions, f26_b9_i1_inst)
-    let f26_b9_i2_inst = mir_inst_empty()
-    f26_b9_i2_inst.op = "load"
-    f26_b9_i2_inst.has_result = true
-    f26_b9_i2_inst.result_name = "load29"
-    f26_b9_i2_inst.result_type = "ptr"
-    f26_b9_i2_inst.typ = "ptr"
-    let f26_b9_i2_op0 = mir_value_operand("ptr", "alloca17")
-    push(f26_b9_i2_inst.operands, f26_b9_i2_op0)
-    push(b9.instructions, f26_b9_i2_inst)
-    let f26_b9_i3_inst = mir_inst_empty()
-    f26_b9_i3_inst.op = "gep"
-    f26_b9_i3_inst.has_result = true
-    f26_b9_i3_inst.result_name = "gep30"
-    f26_b9_i3_inst.result_type = "ptr"
-    f26_b9_i3_inst.typ = "ptr"
-    let f26_b9_i3_op0 = mir_value_operand("ptr", "load29")
-    push(f26_b9_i3_inst.operands, f26_b9_i3_op0)
-    let f26_b9_i3_op1 = mir_value_operand("i64", "load24")
-    push(f26_b9_i3_inst.operands, f26_b9_i3_op1)
-    push(b9.instructions, f26_b9_i3_inst)
-    let f26_b9_i4_inst = mir_inst_empty()
-    f26_b9_i4_inst.op = "store"
-    let f26_b9_i4_op0 = mir_value_operand("i64", "load28")
-    push(f26_b9_i4_inst.operands, f26_b9_i4_op0)
-    let f26_b9_i4_op1 = mir_value_operand("ptr", "gep30")
-    push(f26_b9_i4_inst.operands, f26_b9_i4_op1)
-    push(b9.instructions, f26_b9_i4_inst)
-    let f26_b9_i5_inst = mir_inst_empty()
-    f26_b9_i5_inst.op = "add"
-    f26_b9_i5_inst.has_result = true
-    f26_b9_i5_inst.result_name = "add31"
-    f26_b9_i5_inst.result_type = "i64"
-    f26_b9_i5_inst.typ = "i64"
-    let f26_b9_i5_op0 = mir_value_operand("i64", "load24")
-    push(f26_b9_i5_inst.operands, f26_b9_i5_op0)
-    let f26_b9_i5_op1 = mir_const_int("i64", 1)
-    push(f26_b9_i5_inst.operands, f26_b9_i5_op1)
-    push(b9.instructions, f26_b9_i5_inst)
-    let f26_b9_i6_inst = mir_inst_empty()
-    f26_b9_i6_inst.op = "store"
-    let f26_b9_i6_op0 = mir_value_operand("i64", "add31")
-    push(f26_b9_i6_inst.operands, f26_b9_i6_op0)
-    let f26_b9_i6_op1 = mir_value_operand("ptr", "alloca18")
-    push(f26_b9_i6_inst.operands, f26_b9_i6_op1)
-    push(b9.instructions, f26_b9_i6_inst)
-    b9.terminator = mir_br("copy_check")
-    b9.has_terminator = true
-    push(fn.blocks, b9)
-    let b10 = mir_block_empty("swap")
-    let f26_b10_i0_inst = mir_inst_empty()
-    f26_b10_i0_inst.op = "load"
-    f26_b10_i0_inst.has_result = true
-    f26_b10_i0_inst.result_name = "load32"
-    f26_b10_i0_inst.result_type = "ptr"
-    f26_b10_i0_inst.typ = "ptr"
-    let f26_b10_i0_op0 = mir_value_operand("ptr", "alloca17")
-    push(f26_b10_i0_inst.operands, f26_b10_i0_op0)
-    push(b10.instructions, f26_b10_i0_inst)
-    let f26_b10_i1_inst = mir_inst_empty()
-    f26_b10_i1_inst.op = "store"
-    let f26_b10_i1_op0 = mir_value_operand("ptr", "load32")
-    push(f26_b10_i1_inst.operands, f26_b10_i1_op0)
-    let f26_b10_i1_op1 = mir_value_operand("ptr", "gep4")
-    push(f26_b10_i1_inst.operands, f26_b10_i1_op1)
-    push(b10.instructions, f26_b10_i1_inst)
-    let f26_b10_i2_inst = mir_inst_empty()
-    f26_b10_i2_inst.op = "load"
-    f26_b10_i2_inst.has_result = true
-    f26_b10_i2_inst.result_name = "load33"
-    f26_b10_i2_inst.result_type = "i64"
-    f26_b10_i2_inst.typ = "i64"
-    let f26_b10_i2_op0 = mir_value_operand("ptr", "alloca16")
-    push(f26_b10_i2_inst.operands, f26_b10_i2_op0)
-    push(b10.instructions, f26_b10_i2_inst)
-    let f26_b10_i3_inst = mir_inst_empty()
-    f26_b10_i3_inst.op = "store"
-    let f26_b10_i3_op0 = mir_value_operand("i64", "load33")
-    push(f26_b10_i3_inst.operands, f26_b10_i3_op0)
-    let f26_b10_i3_op1 = mir_value_operand("ptr", "gep2")
-    push(f26_b10_i3_inst.operands, f26_b10_i3_op1)
-    push(b10.instructions, f26_b10_i3_inst)
-    b10.terminator = mir_br("shift_init")
-    b10.has_terminator = true
-    push(fn.blocks, b10)
-    let b11 = mir_block_empty("shift_check")
-    let f26_b11_i0_inst = mir_inst_empty()
-    f26_b11_i0_inst.op = "load"
-    f26_b11_i0_inst.has_result = true
-    f26_b11_i0_inst.result_name = "load36"
-    f26_b11_i0_inst.result_type = "i64"
-    f26_b11_i0_inst.typ = "i64"
-    let f26_b11_i0_op0 = mir_value_operand("ptr", "alloca35")
-    push(f26_b11_i0_inst.operands, f26_b11_i0_op0)
-    push(b11.instructions, f26_b11_i0_inst)
-    let f26_b11_i1_inst = mir_inst_empty()
-    f26_b11_i1_inst.op = "load"
-    f26_b11_i1_inst.has_result = true
-    f26_b11_i1_inst.result_name = "load37"
-    f26_b11_i1_inst.result_type = "i64"
-    f26_b11_i1_inst.typ = "i64"
-    let f26_b11_i1_op0 = mir_value_operand("ptr", "alloca12")
-    push(f26_b11_i1_inst.operands, f26_b11_i1_op0)
-    push(b11.instructions, f26_b11_i1_inst)
-    let f26_b11_i2_inst = mir_inst_empty()
-    f26_b11_i2_inst.op = "icmp.sgt"
-    f26_b11_i2_inst.has_result = true
-    f26_b11_i2_inst.result_name = "icmp_sgt38"
-    f26_b11_i2_inst.result_type = "bool"
-    f26_b11_i2_inst.typ = "bool"
-    let f26_b11_i2_op0 = mir_value_operand("i64", "load36")
-    push(f26_b11_i2_inst.operands, f26_b11_i2_op0)
-    let f26_b11_i2_op1 = mir_value_operand("i64", "load37")
-    push(f26_b11_i2_inst.operands, f26_b11_i2_op1)
-    push(b11.instructions, f26_b11_i2_inst)
-    let f26_b11_t_cond = mir_value_operand("bool", "icmp_sgt38")
-    b11.terminator = mir_condbr(f26_b11_t_cond, "shift_body", "write_entry")
-    b11.has_terminator = true
-    push(fn.blocks, b11)
-    let b12 = mir_block_empty("shift_body")
-    let f26_b12_i0_inst = mir_inst_empty()
-    f26_b12_i0_inst.op = "load"
-    f26_b12_i0_inst.has_result = true
-    f26_b12_i0_inst.result_name = "load39"
-    f26_b12_i0_inst.result_type = "i64"
-    f26_b12_i0_inst.typ = "i64"
-    let f26_b12_i0_op0 = mir_value_operand("ptr", "alloca35")
-    push(f26_b12_i0_inst.operands, f26_b12_i0_op0)
-    push(b12.instructions, f26_b12_i0_inst)
-    let f26_b12_i1_inst = mir_inst_empty()
-    f26_b12_i1_inst.op = "sub"
-    f26_b12_i1_inst.has_result = true
-    f26_b12_i1_inst.result_name = "sub40"
-    f26_b12_i1_inst.result_type = "i64"
-    f26_b12_i1_inst.typ = "i64"
-    let f26_b12_i1_op0 = mir_value_operand("i64", "load39")
-    push(f26_b12_i1_inst.operands, f26_b12_i1_op0)
-    let f26_b12_i1_op1 = mir_const_int("i64", 1)
-    push(f26_b12_i1_inst.operands, f26_b12_i1_op1)
-    push(b12.instructions, f26_b12_i1_inst)
-    let f26_b12_i2_inst = mir_inst_empty()
-    f26_b12_i2_inst.op = "add"
-    f26_b12_i2_inst.has_result = true
-    f26_b12_i2_inst.result_name = "add41"
-    f26_b12_i2_inst.result_type = "i64"
-    f26_b12_i2_inst.typ = "i64"
-    let f26_b12_i2_op0 = mir_value_operand("i64", "sub40")
-    push(f26_b12_i2_inst.operands, f26_b12_i2_op0)
-    let f26_b12_i2_op1 = mir_value_operand("i64", "sub40")
-    push(f26_b12_i2_inst.operands, f26_b12_i2_op1)
-    push(b12.instructions, f26_b12_i2_inst)
-    let f26_b12_i3_inst = mir_inst_empty()
-    f26_b12_i3_inst.op = "add"
-    f26_b12_i3_inst.has_result = true
-    f26_b12_i3_inst.result_name = "add42"
-    f26_b12_i3_inst.result_type = "i64"
-    f26_b12_i3_inst.typ = "i64"
-    let f26_b12_i3_op0 = mir_value_operand("i64", "add41")
-    push(f26_b12_i3_inst.operands, f26_b12_i3_op0)
-    let f26_b12_i3_op1 = mir_value_operand("i64", "sub40")
-    push(f26_b12_i3_inst.operands, f26_b12_i3_op1)
-    push(b12.instructions, f26_b12_i3_inst)
-    let f26_b12_i4_inst = mir_inst_empty()
-    f26_b12_i4_inst.op = "gep"
-    f26_b12_i4_inst.has_result = true
-    f26_b12_i4_inst.result_name = "gep43"
-    f26_b12_i4_inst.result_type = "ptr"
-    f26_b12_i4_inst.typ = "ptr"
-    let f26_b12_i4_op0 = mir_value_operand("ptr", "load34")
-    push(f26_b12_i4_inst.operands, f26_b12_i4_op0)
-    let f26_b12_i4_op1 = mir_value_operand("i64", "add42")
-    push(f26_b12_i4_inst.operands, f26_b12_i4_op1)
-    push(b12.instructions, f26_b12_i4_inst)
-    let f26_b12_i5_inst = mir_inst_empty()
-    f26_b12_i5_inst.op = "add"
-    f26_b12_i5_inst.has_result = true
-    f26_b12_i5_inst.result_name = "add44"
-    f26_b12_i5_inst.result_type = "i64"
-    f26_b12_i5_inst.typ = "i64"
-    let f26_b12_i5_op0 = mir_value_operand("i64", "load39")
-    push(f26_b12_i5_inst.operands, f26_b12_i5_op0)
-    let f26_b12_i5_op1 = mir_value_operand("i64", "load39")
-    push(f26_b12_i5_inst.operands, f26_b12_i5_op1)
-    push(b12.instructions, f26_b12_i5_inst)
-    let f26_b12_i6_inst = mir_inst_empty()
-    f26_b12_i6_inst.op = "add"
-    f26_b12_i6_inst.has_result = true
-    f26_b12_i6_inst.result_name = "add45"
-    f26_b12_i6_inst.result_type = "i64"
-    f26_b12_i6_inst.typ = "i64"
-    let f26_b12_i6_op0 = mir_value_operand("i64", "add44")
-    push(f26_b12_i6_inst.operands, f26_b12_i6_op0)
-    let f26_b12_i6_op1 = mir_value_operand("i64", "load39")
-    push(f26_b12_i6_inst.operands, f26_b12_i6_op1)
-    push(b12.instructions, f26_b12_i6_inst)
-    let f26_b12_i7_inst = mir_inst_empty()
-    f26_b12_i7_inst.op = "gep"
-    f26_b12_i7_inst.has_result = true
-    f26_b12_i7_inst.result_name = "gep46"
-    f26_b12_i7_inst.result_type = "ptr"
-    f26_b12_i7_inst.typ = "ptr"
-    let f26_b12_i7_op0 = mir_value_operand("ptr", "load34")
-    push(f26_b12_i7_inst.operands, f26_b12_i7_op0)
-    let f26_b12_i7_op1 = mir_value_operand("i64", "add45")
-    push(f26_b12_i7_inst.operands, f26_b12_i7_op1)
-    push(b12.instructions, f26_b12_i7_inst)
-    let f26_b12_i8_inst = mir_inst_empty()
-    f26_b12_i8_inst.op = "gep"
-    f26_b12_i8_inst.has_result = true
-    f26_b12_i8_inst.result_name = "gep47"
-    f26_b12_i8_inst.result_type = "ptr"
-    f26_b12_i8_inst.typ = "ptr"
-    let f26_b12_i8_op0 = mir_value_operand("ptr", "gep43")
-    push(f26_b12_i8_inst.operands, f26_b12_i8_op0)
-    let f26_b12_i8_op1 = mir_const_int("i64", 0)
-    push(f26_b12_i8_inst.operands, f26_b12_i8_op1)
-    push(b12.instructions, f26_b12_i8_inst)
-    let f26_b12_i9_inst = mir_inst_empty()
-    f26_b12_i9_inst.op = "load"
-    f26_b12_i9_inst.has_result = true
-    f26_b12_i9_inst.result_name = "load48"
-    f26_b12_i9_inst.result_type = "i64"
-    f26_b12_i9_inst.typ = "i64"
-    let f26_b12_i9_op0 = mir_value_operand("ptr", "gep47")
-    push(f26_b12_i9_inst.operands, f26_b12_i9_op0)
-    push(b12.instructions, f26_b12_i9_inst)
-    let f26_b12_i10_inst = mir_inst_empty()
-    f26_b12_i10_inst.op = "gep"
-    f26_b12_i10_inst.has_result = true
-    f26_b12_i10_inst.result_name = "gep49"
-    f26_b12_i10_inst.result_type = "ptr"
-    f26_b12_i10_inst.typ = "ptr"
-    let f26_b12_i10_op0 = mir_value_operand("ptr", "gep46")
-    push(f26_b12_i10_inst.operands, f26_b12_i10_op0)
-    let f26_b12_i10_op1 = mir_const_int("i64", 0)
-    push(f26_b12_i10_inst.operands, f26_b12_i10_op1)
-    push(b12.instructions, f26_b12_i10_inst)
-    let f26_b12_i11_inst = mir_inst_empty()
-    f26_b12_i11_inst.op = "store"
-    let f26_b12_i11_op0 = mir_value_operand("i64", "load48")
-    push(f26_b12_i11_inst.operands, f26_b12_i11_op0)
-    let f26_b12_i11_op1 = mir_value_operand("ptr", "gep49")
-    push(f26_b12_i11_inst.operands, f26_b12_i11_op1)
-    push(b12.instructions, f26_b12_i11_inst)
-    let f26_b12_i12_inst = mir_inst_empty()
-    f26_b12_i12_inst.op = "gep"
-    f26_b12_i12_inst.has_result = true
-    f26_b12_i12_inst.result_name = "gep50"
-    f26_b12_i12_inst.result_type = "ptr"
-    f26_b12_i12_inst.typ = "ptr"
-    let f26_b12_i12_op0 = mir_value_operand("ptr", "gep43")
-    push(f26_b12_i12_inst.operands, f26_b12_i12_op0)
-    let f26_b12_i12_op1 = mir_const_int("i64", 1)
-    push(f26_b12_i12_inst.operands, f26_b12_i12_op1)
-    push(b12.instructions, f26_b12_i12_inst)
-    let f26_b12_i13_inst = mir_inst_empty()
-    f26_b12_i13_inst.op = "load"
-    f26_b12_i13_inst.has_result = true
-    f26_b12_i13_inst.result_name = "load51"
-    f26_b12_i13_inst.result_type = "i64"
-    f26_b12_i13_inst.typ = "i64"
-    let f26_b12_i13_op0 = mir_value_operand("ptr", "gep50")
-    push(f26_b12_i13_inst.operands, f26_b12_i13_op0)
-    push(b12.instructions, f26_b12_i13_inst)
-    let f26_b12_i14_inst = mir_inst_empty()
-    f26_b12_i14_inst.op = "gep"
-    f26_b12_i14_inst.has_result = true
-    f26_b12_i14_inst.result_name = "gep52"
-    f26_b12_i14_inst.result_type = "ptr"
-    f26_b12_i14_inst.typ = "ptr"
-    let f26_b12_i14_op0 = mir_value_operand("ptr", "gep46")
-    push(f26_b12_i14_inst.operands, f26_b12_i14_op0)
-    let f26_b12_i14_op1 = mir_const_int("i64", 1)
-    push(f26_b12_i14_inst.operands, f26_b12_i14_op1)
-    push(b12.instructions, f26_b12_i14_inst)
-    let f26_b12_i15_inst = mir_inst_empty()
-    f26_b12_i15_inst.op = "store"
-    let f26_b12_i15_op0 = mir_value_operand("i64", "load51")
-    push(f26_b12_i15_inst.operands, f26_b12_i15_op0)
-    let f26_b12_i15_op1 = mir_value_operand("ptr", "gep52")
-    push(f26_b12_i15_inst.operands, f26_b12_i15_op1)
-    push(b12.instructions, f26_b12_i15_inst)
-    let f26_b12_i16_inst = mir_inst_empty()
-    f26_b12_i16_inst.op = "gep"
-    f26_b12_i16_inst.has_result = true
-    f26_b12_i16_inst.result_name = "gep53"
-    f26_b12_i16_inst.result_type = "ptr"
-    f26_b12_i16_inst.typ = "ptr"
-    let f26_b12_i16_op0 = mir_value_operand("ptr", "gep43")
-    push(f26_b12_i16_inst.operands, f26_b12_i16_op0)
-    let f26_b12_i16_op1 = mir_const_int("i64", 2)
-    push(f26_b12_i16_inst.operands, f26_b12_i16_op1)
-    push(b12.instructions, f26_b12_i16_inst)
-    let f26_b12_i17_inst = mir_inst_empty()
-    f26_b12_i17_inst.op = "load"
-    f26_b12_i17_inst.has_result = true
-    f26_b12_i17_inst.result_name = "load54"
-    f26_b12_i17_inst.result_type = "i64"
-    f26_b12_i17_inst.typ = "i64"
-    let f26_b12_i17_op0 = mir_value_operand("ptr", "gep53")
-    push(f26_b12_i17_inst.operands, f26_b12_i17_op0)
-    push(b12.instructions, f26_b12_i17_inst)
-    let f26_b12_i18_inst = mir_inst_empty()
-    f26_b12_i18_inst.op = "gep"
-    f26_b12_i18_inst.has_result = true
-    f26_b12_i18_inst.result_name = "gep55"
-    f26_b12_i18_inst.result_type = "ptr"
-    f26_b12_i18_inst.typ = "ptr"
-    let f26_b12_i18_op0 = mir_value_operand("ptr", "gep46")
-    push(f26_b12_i18_inst.operands, f26_b12_i18_op0)
-    let f26_b12_i18_op1 = mir_const_int("i64", 2)
-    push(f26_b12_i18_inst.operands, f26_b12_i18_op1)
-    push(b12.instructions, f26_b12_i18_inst)
-    let f26_b12_i19_inst = mir_inst_empty()
-    f26_b12_i19_inst.op = "store"
-    let f26_b12_i19_op0 = mir_value_operand("i64", "load54")
-    push(f26_b12_i19_inst.operands, f26_b12_i19_op0)
-    let f26_b12_i19_op1 = mir_value_operand("ptr", "gep55")
-    push(f26_b12_i19_inst.operands, f26_b12_i19_op1)
-    push(b12.instructions, f26_b12_i19_inst)
-    let f26_b12_i20_inst = mir_inst_empty()
-    f26_b12_i20_inst.op = "sub"
-    f26_b12_i20_inst.has_result = true
-    f26_b12_i20_inst.result_name = "sub56"
-    f26_b12_i20_inst.result_type = "i64"
-    f26_b12_i20_inst.typ = "i64"
-    let f26_b12_i20_op0 = mir_value_operand("i64", "load39")
-    push(f26_b12_i20_inst.operands, f26_b12_i20_op0)
-    let f26_b12_i20_op1 = mir_const_int("i64", 1)
-    push(f26_b12_i20_inst.operands, f26_b12_i20_op1)
-    push(b12.instructions, f26_b12_i20_inst)
-    let f26_b12_i21_inst = mir_inst_empty()
-    f26_b12_i21_inst.op = "store"
-    let f26_b12_i21_op0 = mir_value_operand("i64", "sub56")
-    push(f26_b12_i21_inst.operands, f26_b12_i21_op0)
-    let f26_b12_i21_op1 = mir_value_operand("ptr", "alloca35")
-    push(f26_b12_i21_inst.operands, f26_b12_i21_op1)
-    push(b12.instructions, f26_b12_i21_inst)
-    b12.terminator = mir_br("shift_check")
-    b12.has_terminator = true
-    push(fn.blocks, b12)
-    let b13 = mir_block_empty("write_entry")
-    let f26_b13_i0_inst = mir_inst_empty()
-    f26_b13_i0_inst.op = "load"
-    f26_b13_i0_inst.has_result = true
-    f26_b13_i0_inst.result_name = "load57"
-    f26_b13_i0_inst.result_type = "i64"
-    f26_b13_i0_inst.typ = "i64"
-    let f26_b13_i0_op0 = mir_value_operand("ptr", "alloca12")
-    push(f26_b13_i0_inst.operands, f26_b13_i0_op0)
-    push(b13.instructions, f26_b13_i0_inst)
-    let f26_b13_i1_inst = mir_inst_empty()
-    f26_b13_i1_inst.op = "load"
-    f26_b13_i1_inst.has_result = true
-    f26_b13_i1_inst.result_name = "load58"
-    f26_b13_i1_inst.result_type = "ptr"
-    f26_b13_i1_inst.typ = "ptr"
-    let f26_b13_i1_op0 = mir_value_operand("ptr", "gep4")
-    push(f26_b13_i1_inst.operands, f26_b13_i1_op0)
-    push(b13.instructions, f26_b13_i1_inst)
-    let f26_b13_i2_inst = mir_inst_empty()
-    f26_b13_i2_inst.op = "add"
-    f26_b13_i2_inst.has_result = true
-    f26_b13_i2_inst.result_name = "add59"
-    f26_b13_i2_inst.result_type = "i64"
-    f26_b13_i2_inst.typ = "i64"
-    let f26_b13_i2_op0 = mir_value_operand("i64", "load57")
-    push(f26_b13_i2_inst.operands, f26_b13_i2_op0)
-    let f26_b13_i2_op1 = mir_value_operand("i64", "load57")
-    push(f26_b13_i2_inst.operands, f26_b13_i2_op1)
-    push(b13.instructions, f26_b13_i2_inst)
-    let f26_b13_i3_inst = mir_inst_empty()
-    f26_b13_i3_inst.op = "add"
-    f26_b13_i3_inst.has_result = true
-    f26_b13_i3_inst.result_name = "add60"
-    f26_b13_i3_inst.result_type = "i64"
-    f26_b13_i3_inst.typ = "i64"
-    let f26_b13_i3_op0 = mir_value_operand("i64", "add59")
-    push(f26_b13_i3_inst.operands, f26_b13_i3_op0)
-    let f26_b13_i3_op1 = mir_value_operand("i64", "load57")
-    push(f26_b13_i3_inst.operands, f26_b13_i3_op1)
-    push(b13.instructions, f26_b13_i3_inst)
-    let f26_b13_i4_inst = mir_inst_empty()
-    f26_b13_i4_inst.op = "gep"
-    f26_b13_i4_inst.has_result = true
-    f26_b13_i4_inst.result_name = "gep61"
-    f26_b13_i4_inst.result_type = "ptr"
-    f26_b13_i4_inst.typ = "ptr"
-    let f26_b13_i4_op0 = mir_value_operand("ptr", "load58")
-    push(f26_b13_i4_inst.operands, f26_b13_i4_op0)
-    let f26_b13_i4_op1 = mir_value_operand("i64", "add60")
-    push(f26_b13_i4_inst.operands, f26_b13_i4_op1)
-    push(b13.instructions, f26_b13_i4_inst)
-    let f26_b13_i5_inst = mir_inst_empty()
-    f26_b13_i5_inst.op = "gep"
-    f26_b13_i5_inst.has_result = true
-    f26_b13_i5_inst.result_name = "gep62"
-    f26_b13_i5_inst.result_type = "ptr"
-    f26_b13_i5_inst.typ = "ptr"
-    let f26_b13_i5_op0 = mir_value_operand("ptr", "gep61")
-    push(f26_b13_i5_inst.operands, f26_b13_i5_op0)
-    let f26_b13_i5_op1 = mir_const_int("i64", 0)
-    push(f26_b13_i5_inst.operands, f26_b13_i5_op1)
-    push(b13.instructions, f26_b13_i5_inst)
-    let f26_b13_i6_inst = mir_inst_empty()
-    f26_b13_i6_inst.op = "store"
-    let f26_b13_i6_op0 = mir_value_operand("ptr", "key")
-    push(f26_b13_i6_inst.operands, f26_b13_i6_op0)
-    let f26_b13_i6_op1 = mir_value_operand("ptr", "gep62")
-    push(f26_b13_i6_inst.operands, f26_b13_i6_op1)
-    push(b13.instructions, f26_b13_i6_inst)
-    let f26_b13_i7_inst = mir_inst_empty()
-    f26_b13_i7_inst.op = "gep"
-    f26_b13_i7_inst.has_result = true
-    f26_b13_i7_inst.result_name = "gep63"
-    f26_b13_i7_inst.result_type = "ptr"
-    f26_b13_i7_inst.typ = "ptr"
-    let f26_b13_i7_op0 = mir_value_operand("ptr", "gep61")
-    push(f26_b13_i7_inst.operands, f26_b13_i7_op0)
-    let f26_b13_i7_op1 = mir_const_int("i64", 1)
-    push(f26_b13_i7_inst.operands, f26_b13_i7_op1)
-    push(b13.instructions, f26_b13_i7_inst)
-    let f26_b13_i8_inst = mir_inst_empty()
-    f26_b13_i8_inst.op = "store"
-    let f26_b13_i8_op0 = mir_value_operand("bool", "val")
-    push(f26_b13_i8_inst.operands, f26_b13_i8_op0)
-    let f26_b13_i8_op1 = mir_value_operand("ptr", "gep63")
-    push(f26_b13_i8_inst.operands, f26_b13_i8_op1)
-    push(b13.instructions, f26_b13_i8_inst)
-    let f26_b13_i9_inst = mir_inst_empty()
-    f26_b13_i9_inst.op = "gep"
-    f26_b13_i9_inst.has_result = true
-    f26_b13_i9_inst.result_name = "gep64"
-    f26_b13_i9_inst.result_type = "ptr"
-    f26_b13_i9_inst.typ = "ptr"
-    let f26_b13_i9_op0 = mir_value_operand("ptr", "gep61")
-    push(f26_b13_i9_inst.operands, f26_b13_i9_op0)
-    let f26_b13_i9_op1 = mir_const_int("i64", 2)
-    push(f26_b13_i9_inst.operands, f26_b13_i9_op1)
-    push(b13.instructions, f26_b13_i9_inst)
-    let f26_b13_i10_inst = mir_inst_empty()
-    f26_b13_i10_inst.op = "store"
-    let f26_b13_i10_op0 = mir_const_int("i64", 1)
-    push(f26_b13_i10_inst.operands, f26_b13_i10_op0)
-    let f26_b13_i10_op1 = mir_value_operand("ptr", "gep64")
-    push(f26_b13_i10_inst.operands, f26_b13_i10_op1)
-    push(b13.instructions, f26_b13_i10_inst)
-    let f26_b13_i11_inst = mir_inst_empty()
-    f26_b13_i11_inst.op = "add"
-    f26_b13_i11_inst.has_result = true
-    f26_b13_i11_inst.result_name = "add65"
-    f26_b13_i11_inst.result_type = "i64"
-    f26_b13_i11_inst.typ = "i64"
-    let f26_b13_i11_op0 = mir_value_operand("i64", "load1")
-    push(f26_b13_i11_inst.operands, f26_b13_i11_op0)
-    let f26_b13_i11_op1 = mir_const_int("i64", 1)
-    push(f26_b13_i11_inst.operands, f26_b13_i11_op1)
-    push(b13.instructions, f26_b13_i11_inst)
-    let f26_b13_i12_inst = mir_inst_empty()
-    f26_b13_i12_inst.op = "store"
-    let f26_b13_i12_op0 = mir_value_operand("i64", "add65")
-    push(f26_b13_i12_inst.operands, f26_b13_i12_op0)
-    let f26_b13_i12_op1 = mir_value_operand("ptr", "gep0")
-    push(f26_b13_i12_inst.operands, f26_b13_i12_op1)
-    push(b13.instructions, f26_b13_i12_inst)
-    b13.terminator = mir_ret_void()
-    b13.has_terminator = true
-    push(fn.blocks, b13)
-    return fn
+    return mir_runtime_emit_ep_map_str_word_set("__ep_map_str_bool_set", "bool")
 }
-
 fun mir_runtime_emit_ep_map_str_bool_has(): MirFunction {
     let fn = mir_function_empty("__ep_map_str_bool_has", "bool")
     push(fn.params, mir_runtime_param("map", "ptr"))
@@ -7278,877 +6413,8 @@ fun mir_runtime_emit_ep_map_str_str_get(): MirFunction {
 }
 
 fun mir_runtime_emit_ep_map_str_str_set(): MirFunction {
-    let fn = mir_function_empty("__ep_map_str_str_set", "void")
-    push(fn.params, mir_runtime_param("map", "ptr"))
-    push(fn.params, mir_runtime_param("key", "ptr"))
-    push(fn.params, mir_runtime_param("val", "ptr"))
-    let b0 = mir_block_empty("entry")
-    let f31_b0_i0_inst = mir_inst_empty()
-    f31_b0_i0_inst.op = "gep"
-    f31_b0_i0_inst.has_result = true
-    f31_b0_i0_inst.result_name = "gep0"
-    f31_b0_i0_inst.result_type = "ptr"
-    f31_b0_i0_inst.typ = "ptr"
-    let f31_b0_i0_op0 = mir_value_operand("ptr", "map")
-    push(f31_b0_i0_inst.operands, f31_b0_i0_op0)
-    let f31_b0_i0_op1 = mir_const_int("i64", 1)
-    push(f31_b0_i0_inst.operands, f31_b0_i0_op1)
-    push(b0.instructions, f31_b0_i0_inst)
-    let f31_b0_i1_inst = mir_inst_empty()
-    f31_b0_i1_inst.op = "load"
-    f31_b0_i1_inst.has_result = true
-    f31_b0_i1_inst.result_name = "load1"
-    f31_b0_i1_inst.result_type = "i64"
-    f31_b0_i1_inst.typ = "i64"
-    let f31_b0_i1_op0 = mir_value_operand("ptr", "gep0")
-    push(f31_b0_i1_inst.operands, f31_b0_i1_op0)
-    push(b0.instructions, f31_b0_i1_inst)
-    let f31_b0_i2_inst = mir_inst_empty()
-    f31_b0_i2_inst.op = "gep"
-    f31_b0_i2_inst.has_result = true
-    f31_b0_i2_inst.result_name = "gep2"
-    f31_b0_i2_inst.result_type = "ptr"
-    f31_b0_i2_inst.typ = "ptr"
-    let f31_b0_i2_op0 = mir_value_operand("ptr", "map")
-    push(f31_b0_i2_inst.operands, f31_b0_i2_op0)
-    let f31_b0_i2_op1 = mir_const_int("i64", 2)
-    push(f31_b0_i2_inst.operands, f31_b0_i2_op1)
-    push(b0.instructions, f31_b0_i2_inst)
-    let f31_b0_i3_inst = mir_inst_empty()
-    f31_b0_i3_inst.op = "load"
-    f31_b0_i3_inst.has_result = true
-    f31_b0_i3_inst.result_name = "load3"
-    f31_b0_i3_inst.result_type = "i64"
-    f31_b0_i3_inst.typ = "i64"
-    let f31_b0_i3_op0 = mir_value_operand("ptr", "gep2")
-    push(f31_b0_i3_inst.operands, f31_b0_i3_op0)
-    push(b0.instructions, f31_b0_i3_inst)
-    let f31_b0_i4_inst = mir_inst_empty()
-    f31_b0_i4_inst.op = "gep"
-    f31_b0_i4_inst.has_result = true
-    f31_b0_i4_inst.result_name = "gep4"
-    f31_b0_i4_inst.result_type = "ptr"
-    f31_b0_i4_inst.typ = "ptr"
-    let f31_b0_i4_op0 = mir_value_operand("ptr", "map")
-    push(f31_b0_i4_inst.operands, f31_b0_i4_op0)
-    let f31_b0_i4_op1 = mir_const_int("i64", 0)
-    push(f31_b0_i4_inst.operands, f31_b0_i4_op1)
-    push(b0.instructions, f31_b0_i4_inst)
-    let f31_b0_i5_inst = mir_inst_empty()
-    f31_b0_i5_inst.op = "load"
-    f31_b0_i5_inst.has_result = true
-    f31_b0_i5_inst.result_name = "load5"
-    f31_b0_i5_inst.result_type = "ptr"
-    f31_b0_i5_inst.typ = "ptr"
-    let f31_b0_i5_op0 = mir_value_operand("ptr", "gep4")
-    push(f31_b0_i5_inst.operands, f31_b0_i5_op0)
-    push(b0.instructions, f31_b0_i5_inst)
-    let f31_b0_i6_inst = mir_inst_empty()
-    f31_b0_i6_inst.op = "call"
-    f31_b0_i6_inst.has_result = true
-    f31_b0_i6_inst.result_name = "call6"
-    f31_b0_i6_inst.result_type = "i64"
-    f31_b0_i6_inst.typ = "i64"
-    f31_b0_i6_inst.callee = "__ep_map_str_find_pos"
-    let f31_b0_i6_op0 = mir_value_operand("ptr", "map")
-    push(f31_b0_i6_inst.operands, f31_b0_i6_op0)
-    let f31_b0_i6_op1 = mir_value_operand("ptr", "key")
-    push(f31_b0_i6_inst.operands, f31_b0_i6_op1)
-    push(b0.instructions, f31_b0_i6_inst)
-    let f31_b0_i7_inst = mir_inst_empty()
-    f31_b0_i7_inst.op = "icmp.sge"
-    f31_b0_i7_inst.has_result = true
-    f31_b0_i7_inst.result_name = "icmp_sge7"
-    f31_b0_i7_inst.result_type = "bool"
-    f31_b0_i7_inst.typ = "bool"
-    let f31_b0_i7_op0 = mir_value_operand("i64", "call6")
-    push(f31_b0_i7_inst.operands, f31_b0_i7_op0)
-    let f31_b0_i7_op1 = mir_const_int("i64", 0)
-    push(f31_b0_i7_inst.operands, f31_b0_i7_op1)
-    push(b0.instructions, f31_b0_i7_inst)
-    let f31_b0_t_cond = mir_value_operand("bool", "icmp_sge7")
-    b0.terminator = mir_condbr(f31_b0_t_cond, "update", "insert_prep")
-    b0.has_terminator = true
-    push(fn.blocks, b0)
-    let b1 = mir_block_empty("update")
-    let f31_b1_i0_inst = mir_inst_empty()
-    f31_b1_i0_inst.op = "add"
-    f31_b1_i0_inst.has_result = true
-    f31_b1_i0_inst.result_name = "add8"
-    f31_b1_i0_inst.result_type = "i64"
-    f31_b1_i0_inst.typ = "i64"
-    let f31_b1_i0_op0 = mir_value_operand("i64", "call6")
-    push(f31_b1_i0_inst.operands, f31_b1_i0_op0)
-    let f31_b1_i0_op1 = mir_value_operand("i64", "call6")
-    push(f31_b1_i0_inst.operands, f31_b1_i0_op1)
-    push(b1.instructions, f31_b1_i0_inst)
-    let f31_b1_i1_inst = mir_inst_empty()
-    f31_b1_i1_inst.op = "add"
-    f31_b1_i1_inst.has_result = true
-    f31_b1_i1_inst.result_name = "add9"
-    f31_b1_i1_inst.result_type = "i64"
-    f31_b1_i1_inst.typ = "i64"
-    let f31_b1_i1_op0 = mir_value_operand("i64", "add8")
-    push(f31_b1_i1_inst.operands, f31_b1_i1_op0)
-    let f31_b1_i1_op1 = mir_value_operand("i64", "call6")
-    push(f31_b1_i1_inst.operands, f31_b1_i1_op1)
-    push(b1.instructions, f31_b1_i1_inst)
-    let f31_b1_i2_inst = mir_inst_empty()
-    f31_b1_i2_inst.op = "gep"
-    f31_b1_i2_inst.has_result = true
-    f31_b1_i2_inst.result_name = "gep10"
-    f31_b1_i2_inst.result_type = "ptr"
-    f31_b1_i2_inst.typ = "ptr"
-    let f31_b1_i2_op0 = mir_value_operand("ptr", "load5")
-    push(f31_b1_i2_inst.operands, f31_b1_i2_op0)
-    let f31_b1_i2_op1 = mir_value_operand("i64", "add9")
-    push(f31_b1_i2_inst.operands, f31_b1_i2_op1)
-    push(b1.instructions, f31_b1_i2_inst)
-    let f31_b1_i3_inst = mir_inst_empty()
-    f31_b1_i3_inst.op = "gep"
-    f31_b1_i3_inst.has_result = true
-    f31_b1_i3_inst.result_name = "gep11"
-    f31_b1_i3_inst.result_type = "ptr"
-    f31_b1_i3_inst.typ = "ptr"
-    let f31_b1_i3_op0 = mir_value_operand("ptr", "gep10")
-    push(f31_b1_i3_inst.operands, f31_b1_i3_op0)
-    let f31_b1_i3_op1 = mir_const_int("i64", 1)
-    push(f31_b1_i3_inst.operands, f31_b1_i3_op1)
-    push(b1.instructions, f31_b1_i3_inst)
-    let f31_b1_i4_inst = mir_inst_empty()
-    f31_b1_i4_inst.op = "store"
-    let f31_b1_i4_op0 = mir_value_operand("ptr", "val")
-    push(f31_b1_i4_inst.operands, f31_b1_i4_op0)
-    let f31_b1_i4_op1 = mir_value_operand("ptr", "gep11")
-    push(f31_b1_i4_inst.operands, f31_b1_i4_op1)
-    push(b1.instructions, f31_b1_i4_inst)
-    b1.terminator = mir_ret_void()
-    b1.has_terminator = true
-    push(fn.blocks, b1)
-    let b2 = mir_block_empty("insert_prep")
-    let f31_b2_i0_inst = mir_inst_empty()
-    f31_b2_i0_inst.op = "alloca"
-    f31_b2_i0_inst.has_result = true
-    f31_b2_i0_inst.result_name = "alloca12"
-    f31_b2_i0_inst.result_type = "ptr"
-    f31_b2_i0_inst.typ = "i64"
-    push(b2.instructions, f31_b2_i0_inst)
-    let f31_b2_i1_inst = mir_inst_empty()
-    f31_b2_i1_inst.op = "sub"
-    f31_b2_i1_inst.has_result = true
-    f31_b2_i1_inst.result_name = "sub13"
-    f31_b2_i1_inst.result_type = "i64"
-    f31_b2_i1_inst.typ = "i64"
-    let f31_b2_i1_op0 = mir_const_int("i64", 0)
-    push(f31_b2_i1_inst.operands, f31_b2_i1_op0)
-    let f31_b2_i1_op1 = mir_value_operand("i64", "call6")
-    push(f31_b2_i1_inst.operands, f31_b2_i1_op1)
-    push(b2.instructions, f31_b2_i1_inst)
-    let f31_b2_i2_inst = mir_inst_empty()
-    f31_b2_i2_inst.op = "sub"
-    f31_b2_i2_inst.has_result = true
-    f31_b2_i2_inst.result_name = "sub14"
-    f31_b2_i2_inst.result_type = "i64"
-    f31_b2_i2_inst.typ = "i64"
-    let f31_b2_i2_op0 = mir_value_operand("i64", "sub13")
-    push(f31_b2_i2_inst.operands, f31_b2_i2_op0)
-    let f31_b2_i2_op1 = mir_const_int("i64", 1)
-    push(f31_b2_i2_inst.operands, f31_b2_i2_op1)
-    push(b2.instructions, f31_b2_i2_inst)
-    let f31_b2_i3_inst = mir_inst_empty()
-    f31_b2_i3_inst.op = "store"
-    let f31_b2_i3_op0 = mir_value_operand("i64", "sub14")
-    push(f31_b2_i3_inst.operands, f31_b2_i3_op0)
-    let f31_b2_i3_op1 = mir_value_operand("ptr", "alloca12")
-    push(f31_b2_i3_inst.operands, f31_b2_i3_op1)
-    push(b2.instructions, f31_b2_i3_inst)
-    let f31_b2_i4_inst = mir_inst_empty()
-    f31_b2_i4_inst.op = "icmp.sge"
-    f31_b2_i4_inst.has_result = true
-    f31_b2_i4_inst.result_name = "icmp_sge15"
-    f31_b2_i4_inst.result_type = "bool"
-    f31_b2_i4_inst.typ = "bool"
-    let f31_b2_i4_op0 = mir_value_operand("i64", "load1")
-    push(f31_b2_i4_inst.operands, f31_b2_i4_op0)
-    let f31_b2_i4_op1 = mir_value_operand("i64", "load3")
-    push(f31_b2_i4_inst.operands, f31_b2_i4_op1)
-    push(b2.instructions, f31_b2_i4_inst)
-    let f31_b2_t_cond = mir_value_operand("bool", "icmp_sge15")
-    b2.terminator = mir_condbr(f31_b2_t_cond, "grow", "shift_init")
-    b2.has_terminator = true
-    push(fn.blocks, b2)
-    let b3 = mir_block_empty("grow")
-    let f31_b3_i0_inst = mir_inst_empty()
-    f31_b3_i0_inst.op = "alloca"
-    f31_b3_i0_inst.has_result = true
-    f31_b3_i0_inst.result_name = "alloca16"
-    f31_b3_i0_inst.result_type = "ptr"
-    f31_b3_i0_inst.typ = "i64"
-    push(b3.instructions, f31_b3_i0_inst)
-    let f31_b3_i1_inst = mir_inst_empty()
-    f31_b3_i1_inst.op = "alloca"
-    f31_b3_i1_inst.has_result = true
-    f31_b3_i1_inst.result_name = "alloca17"
-    f31_b3_i1_inst.result_type = "ptr"
-    f31_b3_i1_inst.typ = "ptr"
-    push(b3.instructions, f31_b3_i1_inst)
-    let f31_b3_i2_inst = mir_inst_empty()
-    f31_b3_i2_inst.op = "alloca"
-    f31_b3_i2_inst.has_result = true
-    f31_b3_i2_inst.result_name = "alloca18"
-    f31_b3_i2_inst.result_type = "ptr"
-    f31_b3_i2_inst.typ = "i64"
-    push(b3.instructions, f31_b3_i2_inst)
-    let f31_b3_i3_inst = mir_inst_empty()
-    f31_b3_i3_inst.op = "icmp.eq"
-    f31_b3_i3_inst.has_result = true
-    f31_b3_i3_inst.result_name = "icmp_eq19"
-    f31_b3_i3_inst.result_type = "bool"
-    f31_b3_i3_inst.typ = "bool"
-    let f31_b3_i3_op0 = mir_value_operand("i64", "load3")
-    push(f31_b3_i3_inst.operands, f31_b3_i3_op0)
-    let f31_b3_i3_op1 = mir_const_int("i64", 0)
-    push(f31_b3_i3_inst.operands, f31_b3_i3_op1)
-    push(b3.instructions, f31_b3_i3_inst)
-    let f31_b3_t_cond = mir_value_operand("bool", "icmp_eq19")
-    b3.terminator = mir_condbr(f31_b3_t_cond, "grow_zero", "grow_double")
-    b3.has_terminator = true
-    push(fn.blocks, b3)
-    let b4 = mir_block_empty("shift_init")
-    let f31_b4_i0_inst = mir_inst_empty()
-    f31_b4_i0_inst.op = "load"
-    f31_b4_i0_inst.has_result = true
-    f31_b4_i0_inst.result_name = "load34"
-    f31_b4_i0_inst.result_type = "ptr"
-    f31_b4_i0_inst.typ = "ptr"
-    let f31_b4_i0_op0 = mir_value_operand("ptr", "gep4")
-    push(f31_b4_i0_inst.operands, f31_b4_i0_op0)
-    push(b4.instructions, f31_b4_i0_inst)
-    let f31_b4_i1_inst = mir_inst_empty()
-    f31_b4_i1_inst.op = "alloca"
-    f31_b4_i1_inst.has_result = true
-    f31_b4_i1_inst.result_name = "alloca35"
-    f31_b4_i1_inst.result_type = "ptr"
-    f31_b4_i1_inst.typ = "i64"
-    push(b4.instructions, f31_b4_i1_inst)
-    let f31_b4_i2_inst = mir_inst_empty()
-    f31_b4_i2_inst.op = "store"
-    let f31_b4_i2_op0 = mir_value_operand("i64", "load1")
-    push(f31_b4_i2_inst.operands, f31_b4_i2_op0)
-    let f31_b4_i2_op1 = mir_value_operand("ptr", "alloca35")
-    push(f31_b4_i2_inst.operands, f31_b4_i2_op1)
-    push(b4.instructions, f31_b4_i2_inst)
-    b4.terminator = mir_br("shift_check")
-    b4.has_terminator = true
-    push(fn.blocks, b4)
-    let b5 = mir_block_empty("grow_zero")
-    let f31_b5_i0_inst = mir_inst_empty()
-    f31_b5_i0_inst.op = "store"
-    let f31_b5_i0_op0 = mir_const_int("i64", 4)
-    push(f31_b5_i0_inst.operands, f31_b5_i0_op0)
-    let f31_b5_i0_op1 = mir_value_operand("ptr", "alloca16")
-    push(f31_b5_i0_inst.operands, f31_b5_i0_op1)
-    push(b5.instructions, f31_b5_i0_inst)
-    b5.terminator = mir_br("copy_init")
-    b5.has_terminator = true
-    push(fn.blocks, b5)
-    let b6 = mir_block_empty("grow_double")
-    let f31_b6_i0_inst = mir_inst_empty()
-    f31_b6_i0_inst.op = "add"
-    f31_b6_i0_inst.has_result = true
-    f31_b6_i0_inst.result_name = "add20"
-    f31_b6_i0_inst.result_type = "i64"
-    f31_b6_i0_inst.typ = "i64"
-    let f31_b6_i0_op0 = mir_value_operand("i64", "load3")
-    push(f31_b6_i0_inst.operands, f31_b6_i0_op0)
-    let f31_b6_i0_op1 = mir_value_operand("i64", "load3")
-    push(f31_b6_i0_inst.operands, f31_b6_i0_op1)
-    push(b6.instructions, f31_b6_i0_inst)
-    let f31_b6_i1_inst = mir_inst_empty()
-    f31_b6_i1_inst.op = "store"
-    let f31_b6_i1_op0 = mir_value_operand("i64", "add20")
-    push(f31_b6_i1_inst.operands, f31_b6_i1_op0)
-    let f31_b6_i1_op1 = mir_value_operand("ptr", "alloca16")
-    push(f31_b6_i1_inst.operands, f31_b6_i1_op1)
-    push(b6.instructions, f31_b6_i1_inst)
-    b6.terminator = mir_br("copy_init")
-    b6.has_terminator = true
-    push(fn.blocks, b6)
-    let b7 = mir_block_empty("copy_init")
-    let f31_b7_i0_inst = mir_inst_empty()
-    f31_b7_i0_inst.op = "load"
-    f31_b7_i0_inst.has_result = true
-    f31_b7_i0_inst.result_name = "load21"
-    f31_b7_i0_inst.result_type = "i64"
-    f31_b7_i0_inst.typ = "i64"
-    let f31_b7_i0_op0 = mir_value_operand("ptr", "alloca16")
-    push(f31_b7_i0_inst.operands, f31_b7_i0_op0)
-    push(b7.instructions, f31_b7_i0_inst)
-    let f31_b7_i1_inst = mir_inst_empty()
-    f31_b7_i1_inst.op = "mul"
-    f31_b7_i1_inst.has_result = true
-    f31_b7_i1_inst.result_name = "mul22"
-    f31_b7_i1_inst.result_type = "i64"
-    f31_b7_i1_inst.typ = "i64"
-    let f31_b7_i1_op0 = mir_value_operand("i64", "load21")
-    push(f31_b7_i1_inst.operands, f31_b7_i1_op0)
-    let f31_b7_i1_op1 = mir_const_int("i64", 24)
-    push(f31_b7_i1_inst.operands, f31_b7_i1_op1)
-    push(b7.instructions, f31_b7_i1_inst)
-    let f31_b7_i2_inst = mir_inst_empty()
-    f31_b7_i2_inst.op = "call"
-    f31_b7_i2_inst.has_result = true
-    f31_b7_i2_inst.result_name = "call23"
-    f31_b7_i2_inst.result_type = "ptr"
-    f31_b7_i2_inst.typ = "ptr"
-    f31_b7_i2_inst.callee = "__epx_alloc"
-    let f31_b7_i2_op0 = mir_value_operand("i64", "mul22")
-    push(f31_b7_i2_inst.operands, f31_b7_i2_op0)
-    push(b7.instructions, f31_b7_i2_inst)
-    let f31_b7_i3_inst = mir_inst_empty()
-    f31_b7_i3_inst.op = "store"
-    let f31_b7_i3_op0 = mir_value_operand("ptr", "call23")
-    push(f31_b7_i3_inst.operands, f31_b7_i3_op0)
-    let f31_b7_i3_op1 = mir_value_operand("ptr", "alloca17")
-    push(f31_b7_i3_inst.operands, f31_b7_i3_op1)
-    push(b7.instructions, f31_b7_i3_inst)
-    let f31_b7_i4_inst = mir_inst_empty()
-    f31_b7_i4_inst.op = "store"
-    let f31_b7_i4_op0 = mir_const_int("i64", 0)
-    push(f31_b7_i4_inst.operands, f31_b7_i4_op0)
-    let f31_b7_i4_op1 = mir_value_operand("ptr", "alloca18")
-    push(f31_b7_i4_inst.operands, f31_b7_i4_op1)
-    push(b7.instructions, f31_b7_i4_inst)
-    b7.terminator = mir_br("copy_check")
-    b7.has_terminator = true
-    push(fn.blocks, b7)
-    let b8 = mir_block_empty("copy_check")
-    let f31_b8_i0_inst = mir_inst_empty()
-    f31_b8_i0_inst.op = "load"
-    f31_b8_i0_inst.has_result = true
-    f31_b8_i0_inst.result_name = "load24"
-    f31_b8_i0_inst.result_type = "i64"
-    f31_b8_i0_inst.typ = "i64"
-    let f31_b8_i0_op0 = mir_value_operand("ptr", "alloca18")
-    push(f31_b8_i0_inst.operands, f31_b8_i0_op0)
-    push(b8.instructions, f31_b8_i0_inst)
-    let f31_b8_i1_inst = mir_inst_empty()
-    f31_b8_i1_inst.op = "mul"
-    f31_b8_i1_inst.has_result = true
-    f31_b8_i1_inst.result_name = "mul25"
-    f31_b8_i1_inst.result_type = "i64"
-    f31_b8_i1_inst.typ = "i64"
-    let f31_b8_i1_op0 = mir_value_operand("i64", "load1")
-    push(f31_b8_i1_inst.operands, f31_b8_i1_op0)
-    let f31_b8_i1_op1 = mir_const_int("i64", 3)
-    push(f31_b8_i1_inst.operands, f31_b8_i1_op1)
-    push(b8.instructions, f31_b8_i1_inst)
-    let f31_b8_i2_inst = mir_inst_empty()
-    f31_b8_i2_inst.op = "icmp.slt"
-    f31_b8_i2_inst.has_result = true
-    f31_b8_i2_inst.result_name = "icmp_slt26"
-    f31_b8_i2_inst.result_type = "bool"
-    f31_b8_i2_inst.typ = "bool"
-    let f31_b8_i2_op0 = mir_value_operand("i64", "load24")
-    push(f31_b8_i2_inst.operands, f31_b8_i2_op0)
-    let f31_b8_i2_op1 = mir_value_operand("i64", "mul25")
-    push(f31_b8_i2_inst.operands, f31_b8_i2_op1)
-    push(b8.instructions, f31_b8_i2_inst)
-    let f31_b8_t_cond = mir_value_operand("bool", "icmp_slt26")
-    b8.terminator = mir_condbr(f31_b8_t_cond, "copy_body", "swap")
-    b8.has_terminator = true
-    push(fn.blocks, b8)
-    let b9 = mir_block_empty("copy_body")
-    let f31_b9_i0_inst = mir_inst_empty()
-    f31_b9_i0_inst.op = "gep"
-    f31_b9_i0_inst.has_result = true
-    f31_b9_i0_inst.result_name = "gep27"
-    f31_b9_i0_inst.result_type = "ptr"
-    f31_b9_i0_inst.typ = "ptr"
-    let f31_b9_i0_op0 = mir_value_operand("ptr", "load5")
-    push(f31_b9_i0_inst.operands, f31_b9_i0_op0)
-    let f31_b9_i0_op1 = mir_value_operand("i64", "load24")
-    push(f31_b9_i0_inst.operands, f31_b9_i0_op1)
-    push(b9.instructions, f31_b9_i0_inst)
-    let f31_b9_i1_inst = mir_inst_empty()
-    f31_b9_i1_inst.op = "load"
-    f31_b9_i1_inst.has_result = true
-    f31_b9_i1_inst.result_name = "load28"
-    f31_b9_i1_inst.result_type = "i64"
-    f31_b9_i1_inst.typ = "i64"
-    let f31_b9_i1_op0 = mir_value_operand("ptr", "gep27")
-    push(f31_b9_i1_inst.operands, f31_b9_i1_op0)
-    push(b9.instructions, f31_b9_i1_inst)
-    let f31_b9_i2_inst = mir_inst_empty()
-    f31_b9_i2_inst.op = "load"
-    f31_b9_i2_inst.has_result = true
-    f31_b9_i2_inst.result_name = "load29"
-    f31_b9_i2_inst.result_type = "ptr"
-    f31_b9_i2_inst.typ = "ptr"
-    let f31_b9_i2_op0 = mir_value_operand("ptr", "alloca17")
-    push(f31_b9_i2_inst.operands, f31_b9_i2_op0)
-    push(b9.instructions, f31_b9_i2_inst)
-    let f31_b9_i3_inst = mir_inst_empty()
-    f31_b9_i3_inst.op = "gep"
-    f31_b9_i3_inst.has_result = true
-    f31_b9_i3_inst.result_name = "gep30"
-    f31_b9_i3_inst.result_type = "ptr"
-    f31_b9_i3_inst.typ = "ptr"
-    let f31_b9_i3_op0 = mir_value_operand("ptr", "load29")
-    push(f31_b9_i3_inst.operands, f31_b9_i3_op0)
-    let f31_b9_i3_op1 = mir_value_operand("i64", "load24")
-    push(f31_b9_i3_inst.operands, f31_b9_i3_op1)
-    push(b9.instructions, f31_b9_i3_inst)
-    let f31_b9_i4_inst = mir_inst_empty()
-    f31_b9_i4_inst.op = "store"
-    let f31_b9_i4_op0 = mir_value_operand("i64", "load28")
-    push(f31_b9_i4_inst.operands, f31_b9_i4_op0)
-    let f31_b9_i4_op1 = mir_value_operand("ptr", "gep30")
-    push(f31_b9_i4_inst.operands, f31_b9_i4_op1)
-    push(b9.instructions, f31_b9_i4_inst)
-    let f31_b9_i5_inst = mir_inst_empty()
-    f31_b9_i5_inst.op = "add"
-    f31_b9_i5_inst.has_result = true
-    f31_b9_i5_inst.result_name = "add31"
-    f31_b9_i5_inst.result_type = "i64"
-    f31_b9_i5_inst.typ = "i64"
-    let f31_b9_i5_op0 = mir_value_operand("i64", "load24")
-    push(f31_b9_i5_inst.operands, f31_b9_i5_op0)
-    let f31_b9_i5_op1 = mir_const_int("i64", 1)
-    push(f31_b9_i5_inst.operands, f31_b9_i5_op1)
-    push(b9.instructions, f31_b9_i5_inst)
-    let f31_b9_i6_inst = mir_inst_empty()
-    f31_b9_i6_inst.op = "store"
-    let f31_b9_i6_op0 = mir_value_operand("i64", "add31")
-    push(f31_b9_i6_inst.operands, f31_b9_i6_op0)
-    let f31_b9_i6_op1 = mir_value_operand("ptr", "alloca18")
-    push(f31_b9_i6_inst.operands, f31_b9_i6_op1)
-    push(b9.instructions, f31_b9_i6_inst)
-    b9.terminator = mir_br("copy_check")
-    b9.has_terminator = true
-    push(fn.blocks, b9)
-    let b10 = mir_block_empty("swap")
-    let f31_b10_i0_inst = mir_inst_empty()
-    f31_b10_i0_inst.op = "load"
-    f31_b10_i0_inst.has_result = true
-    f31_b10_i0_inst.result_name = "load32"
-    f31_b10_i0_inst.result_type = "ptr"
-    f31_b10_i0_inst.typ = "ptr"
-    let f31_b10_i0_op0 = mir_value_operand("ptr", "alloca17")
-    push(f31_b10_i0_inst.operands, f31_b10_i0_op0)
-    push(b10.instructions, f31_b10_i0_inst)
-    let f31_b10_i1_inst = mir_inst_empty()
-    f31_b10_i1_inst.op = "store"
-    let f31_b10_i1_op0 = mir_value_operand("ptr", "load32")
-    push(f31_b10_i1_inst.operands, f31_b10_i1_op0)
-    let f31_b10_i1_op1 = mir_value_operand("ptr", "gep4")
-    push(f31_b10_i1_inst.operands, f31_b10_i1_op1)
-    push(b10.instructions, f31_b10_i1_inst)
-    let f31_b10_i2_inst = mir_inst_empty()
-    f31_b10_i2_inst.op = "load"
-    f31_b10_i2_inst.has_result = true
-    f31_b10_i2_inst.result_name = "load33"
-    f31_b10_i2_inst.result_type = "i64"
-    f31_b10_i2_inst.typ = "i64"
-    let f31_b10_i2_op0 = mir_value_operand("ptr", "alloca16")
-    push(f31_b10_i2_inst.operands, f31_b10_i2_op0)
-    push(b10.instructions, f31_b10_i2_inst)
-    let f31_b10_i3_inst = mir_inst_empty()
-    f31_b10_i3_inst.op = "store"
-    let f31_b10_i3_op0 = mir_value_operand("i64", "load33")
-    push(f31_b10_i3_inst.operands, f31_b10_i3_op0)
-    let f31_b10_i3_op1 = mir_value_operand("ptr", "gep2")
-    push(f31_b10_i3_inst.operands, f31_b10_i3_op1)
-    push(b10.instructions, f31_b10_i3_inst)
-    b10.terminator = mir_br("shift_init")
-    b10.has_terminator = true
-    push(fn.blocks, b10)
-    let b11 = mir_block_empty("shift_check")
-    let f31_b11_i0_inst = mir_inst_empty()
-    f31_b11_i0_inst.op = "load"
-    f31_b11_i0_inst.has_result = true
-    f31_b11_i0_inst.result_name = "load36"
-    f31_b11_i0_inst.result_type = "i64"
-    f31_b11_i0_inst.typ = "i64"
-    let f31_b11_i0_op0 = mir_value_operand("ptr", "alloca35")
-    push(f31_b11_i0_inst.operands, f31_b11_i0_op0)
-    push(b11.instructions, f31_b11_i0_inst)
-    let f31_b11_i1_inst = mir_inst_empty()
-    f31_b11_i1_inst.op = "load"
-    f31_b11_i1_inst.has_result = true
-    f31_b11_i1_inst.result_name = "load37"
-    f31_b11_i1_inst.result_type = "i64"
-    f31_b11_i1_inst.typ = "i64"
-    let f31_b11_i1_op0 = mir_value_operand("ptr", "alloca12")
-    push(f31_b11_i1_inst.operands, f31_b11_i1_op0)
-    push(b11.instructions, f31_b11_i1_inst)
-    let f31_b11_i2_inst = mir_inst_empty()
-    f31_b11_i2_inst.op = "icmp.sgt"
-    f31_b11_i2_inst.has_result = true
-    f31_b11_i2_inst.result_name = "icmp_sgt38"
-    f31_b11_i2_inst.result_type = "bool"
-    f31_b11_i2_inst.typ = "bool"
-    let f31_b11_i2_op0 = mir_value_operand("i64", "load36")
-    push(f31_b11_i2_inst.operands, f31_b11_i2_op0)
-    let f31_b11_i2_op1 = mir_value_operand("i64", "load37")
-    push(f31_b11_i2_inst.operands, f31_b11_i2_op1)
-    push(b11.instructions, f31_b11_i2_inst)
-    let f31_b11_t_cond = mir_value_operand("bool", "icmp_sgt38")
-    b11.terminator = mir_condbr(f31_b11_t_cond, "shift_body", "write_entry")
-    b11.has_terminator = true
-    push(fn.blocks, b11)
-    let b12 = mir_block_empty("shift_body")
-    let f31_b12_i0_inst = mir_inst_empty()
-    f31_b12_i0_inst.op = "load"
-    f31_b12_i0_inst.has_result = true
-    f31_b12_i0_inst.result_name = "load39"
-    f31_b12_i0_inst.result_type = "i64"
-    f31_b12_i0_inst.typ = "i64"
-    let f31_b12_i0_op0 = mir_value_operand("ptr", "alloca35")
-    push(f31_b12_i0_inst.operands, f31_b12_i0_op0)
-    push(b12.instructions, f31_b12_i0_inst)
-    let f31_b12_i1_inst = mir_inst_empty()
-    f31_b12_i1_inst.op = "sub"
-    f31_b12_i1_inst.has_result = true
-    f31_b12_i1_inst.result_name = "sub40"
-    f31_b12_i1_inst.result_type = "i64"
-    f31_b12_i1_inst.typ = "i64"
-    let f31_b12_i1_op0 = mir_value_operand("i64", "load39")
-    push(f31_b12_i1_inst.operands, f31_b12_i1_op0)
-    let f31_b12_i1_op1 = mir_const_int("i64", 1)
-    push(f31_b12_i1_inst.operands, f31_b12_i1_op1)
-    push(b12.instructions, f31_b12_i1_inst)
-    let f31_b12_i2_inst = mir_inst_empty()
-    f31_b12_i2_inst.op = "add"
-    f31_b12_i2_inst.has_result = true
-    f31_b12_i2_inst.result_name = "add41"
-    f31_b12_i2_inst.result_type = "i64"
-    f31_b12_i2_inst.typ = "i64"
-    let f31_b12_i2_op0 = mir_value_operand("i64", "sub40")
-    push(f31_b12_i2_inst.operands, f31_b12_i2_op0)
-    let f31_b12_i2_op1 = mir_value_operand("i64", "sub40")
-    push(f31_b12_i2_inst.operands, f31_b12_i2_op1)
-    push(b12.instructions, f31_b12_i2_inst)
-    let f31_b12_i3_inst = mir_inst_empty()
-    f31_b12_i3_inst.op = "add"
-    f31_b12_i3_inst.has_result = true
-    f31_b12_i3_inst.result_name = "add42"
-    f31_b12_i3_inst.result_type = "i64"
-    f31_b12_i3_inst.typ = "i64"
-    let f31_b12_i3_op0 = mir_value_operand("i64", "add41")
-    push(f31_b12_i3_inst.operands, f31_b12_i3_op0)
-    let f31_b12_i3_op1 = mir_value_operand("i64", "sub40")
-    push(f31_b12_i3_inst.operands, f31_b12_i3_op1)
-    push(b12.instructions, f31_b12_i3_inst)
-    let f31_b12_i4_inst = mir_inst_empty()
-    f31_b12_i4_inst.op = "gep"
-    f31_b12_i4_inst.has_result = true
-    f31_b12_i4_inst.result_name = "gep43"
-    f31_b12_i4_inst.result_type = "ptr"
-    f31_b12_i4_inst.typ = "ptr"
-    let f31_b12_i4_op0 = mir_value_operand("ptr", "load34")
-    push(f31_b12_i4_inst.operands, f31_b12_i4_op0)
-    let f31_b12_i4_op1 = mir_value_operand("i64", "add42")
-    push(f31_b12_i4_inst.operands, f31_b12_i4_op1)
-    push(b12.instructions, f31_b12_i4_inst)
-    let f31_b12_i5_inst = mir_inst_empty()
-    f31_b12_i5_inst.op = "add"
-    f31_b12_i5_inst.has_result = true
-    f31_b12_i5_inst.result_name = "add44"
-    f31_b12_i5_inst.result_type = "i64"
-    f31_b12_i5_inst.typ = "i64"
-    let f31_b12_i5_op0 = mir_value_operand("i64", "load39")
-    push(f31_b12_i5_inst.operands, f31_b12_i5_op0)
-    let f31_b12_i5_op1 = mir_value_operand("i64", "load39")
-    push(f31_b12_i5_inst.operands, f31_b12_i5_op1)
-    push(b12.instructions, f31_b12_i5_inst)
-    let f31_b12_i6_inst = mir_inst_empty()
-    f31_b12_i6_inst.op = "add"
-    f31_b12_i6_inst.has_result = true
-    f31_b12_i6_inst.result_name = "add45"
-    f31_b12_i6_inst.result_type = "i64"
-    f31_b12_i6_inst.typ = "i64"
-    let f31_b12_i6_op0 = mir_value_operand("i64", "add44")
-    push(f31_b12_i6_inst.operands, f31_b12_i6_op0)
-    let f31_b12_i6_op1 = mir_value_operand("i64", "load39")
-    push(f31_b12_i6_inst.operands, f31_b12_i6_op1)
-    push(b12.instructions, f31_b12_i6_inst)
-    let f31_b12_i7_inst = mir_inst_empty()
-    f31_b12_i7_inst.op = "gep"
-    f31_b12_i7_inst.has_result = true
-    f31_b12_i7_inst.result_name = "gep46"
-    f31_b12_i7_inst.result_type = "ptr"
-    f31_b12_i7_inst.typ = "ptr"
-    let f31_b12_i7_op0 = mir_value_operand("ptr", "load34")
-    push(f31_b12_i7_inst.operands, f31_b12_i7_op0)
-    let f31_b12_i7_op1 = mir_value_operand("i64", "add45")
-    push(f31_b12_i7_inst.operands, f31_b12_i7_op1)
-    push(b12.instructions, f31_b12_i7_inst)
-    let f31_b12_i8_inst = mir_inst_empty()
-    f31_b12_i8_inst.op = "gep"
-    f31_b12_i8_inst.has_result = true
-    f31_b12_i8_inst.result_name = "gep47"
-    f31_b12_i8_inst.result_type = "ptr"
-    f31_b12_i8_inst.typ = "ptr"
-    let f31_b12_i8_op0 = mir_value_operand("ptr", "gep43")
-    push(f31_b12_i8_inst.operands, f31_b12_i8_op0)
-    let f31_b12_i8_op1 = mir_const_int("i64", 0)
-    push(f31_b12_i8_inst.operands, f31_b12_i8_op1)
-    push(b12.instructions, f31_b12_i8_inst)
-    let f31_b12_i9_inst = mir_inst_empty()
-    f31_b12_i9_inst.op = "load"
-    f31_b12_i9_inst.has_result = true
-    f31_b12_i9_inst.result_name = "load48"
-    f31_b12_i9_inst.result_type = "i64"
-    f31_b12_i9_inst.typ = "i64"
-    let f31_b12_i9_op0 = mir_value_operand("ptr", "gep47")
-    push(f31_b12_i9_inst.operands, f31_b12_i9_op0)
-    push(b12.instructions, f31_b12_i9_inst)
-    let f31_b12_i10_inst = mir_inst_empty()
-    f31_b12_i10_inst.op = "gep"
-    f31_b12_i10_inst.has_result = true
-    f31_b12_i10_inst.result_name = "gep49"
-    f31_b12_i10_inst.result_type = "ptr"
-    f31_b12_i10_inst.typ = "ptr"
-    let f31_b12_i10_op0 = mir_value_operand("ptr", "gep46")
-    push(f31_b12_i10_inst.operands, f31_b12_i10_op0)
-    let f31_b12_i10_op1 = mir_const_int("i64", 0)
-    push(f31_b12_i10_inst.operands, f31_b12_i10_op1)
-    push(b12.instructions, f31_b12_i10_inst)
-    let f31_b12_i11_inst = mir_inst_empty()
-    f31_b12_i11_inst.op = "store"
-    let f31_b12_i11_op0 = mir_value_operand("i64", "load48")
-    push(f31_b12_i11_inst.operands, f31_b12_i11_op0)
-    let f31_b12_i11_op1 = mir_value_operand("ptr", "gep49")
-    push(f31_b12_i11_inst.operands, f31_b12_i11_op1)
-    push(b12.instructions, f31_b12_i11_inst)
-    let f31_b12_i12_inst = mir_inst_empty()
-    f31_b12_i12_inst.op = "gep"
-    f31_b12_i12_inst.has_result = true
-    f31_b12_i12_inst.result_name = "gep50"
-    f31_b12_i12_inst.result_type = "ptr"
-    f31_b12_i12_inst.typ = "ptr"
-    let f31_b12_i12_op0 = mir_value_operand("ptr", "gep43")
-    push(f31_b12_i12_inst.operands, f31_b12_i12_op0)
-    let f31_b12_i12_op1 = mir_const_int("i64", 1)
-    push(f31_b12_i12_inst.operands, f31_b12_i12_op1)
-    push(b12.instructions, f31_b12_i12_inst)
-    let f31_b12_i13_inst = mir_inst_empty()
-    f31_b12_i13_inst.op = "load"
-    f31_b12_i13_inst.has_result = true
-    f31_b12_i13_inst.result_name = "load51"
-    f31_b12_i13_inst.result_type = "i64"
-    f31_b12_i13_inst.typ = "i64"
-    let f31_b12_i13_op0 = mir_value_operand("ptr", "gep50")
-    push(f31_b12_i13_inst.operands, f31_b12_i13_op0)
-    push(b12.instructions, f31_b12_i13_inst)
-    let f31_b12_i14_inst = mir_inst_empty()
-    f31_b12_i14_inst.op = "gep"
-    f31_b12_i14_inst.has_result = true
-    f31_b12_i14_inst.result_name = "gep52"
-    f31_b12_i14_inst.result_type = "ptr"
-    f31_b12_i14_inst.typ = "ptr"
-    let f31_b12_i14_op0 = mir_value_operand("ptr", "gep46")
-    push(f31_b12_i14_inst.operands, f31_b12_i14_op0)
-    let f31_b12_i14_op1 = mir_const_int("i64", 1)
-    push(f31_b12_i14_inst.operands, f31_b12_i14_op1)
-    push(b12.instructions, f31_b12_i14_inst)
-    let f31_b12_i15_inst = mir_inst_empty()
-    f31_b12_i15_inst.op = "store"
-    let f31_b12_i15_op0 = mir_value_operand("i64", "load51")
-    push(f31_b12_i15_inst.operands, f31_b12_i15_op0)
-    let f31_b12_i15_op1 = mir_value_operand("ptr", "gep52")
-    push(f31_b12_i15_inst.operands, f31_b12_i15_op1)
-    push(b12.instructions, f31_b12_i15_inst)
-    let f31_b12_i16_inst = mir_inst_empty()
-    f31_b12_i16_inst.op = "gep"
-    f31_b12_i16_inst.has_result = true
-    f31_b12_i16_inst.result_name = "gep53"
-    f31_b12_i16_inst.result_type = "ptr"
-    f31_b12_i16_inst.typ = "ptr"
-    let f31_b12_i16_op0 = mir_value_operand("ptr", "gep43")
-    push(f31_b12_i16_inst.operands, f31_b12_i16_op0)
-    let f31_b12_i16_op1 = mir_const_int("i64", 2)
-    push(f31_b12_i16_inst.operands, f31_b12_i16_op1)
-    push(b12.instructions, f31_b12_i16_inst)
-    let f31_b12_i17_inst = mir_inst_empty()
-    f31_b12_i17_inst.op = "load"
-    f31_b12_i17_inst.has_result = true
-    f31_b12_i17_inst.result_name = "load54"
-    f31_b12_i17_inst.result_type = "i64"
-    f31_b12_i17_inst.typ = "i64"
-    let f31_b12_i17_op0 = mir_value_operand("ptr", "gep53")
-    push(f31_b12_i17_inst.operands, f31_b12_i17_op0)
-    push(b12.instructions, f31_b12_i17_inst)
-    let f31_b12_i18_inst = mir_inst_empty()
-    f31_b12_i18_inst.op = "gep"
-    f31_b12_i18_inst.has_result = true
-    f31_b12_i18_inst.result_name = "gep55"
-    f31_b12_i18_inst.result_type = "ptr"
-    f31_b12_i18_inst.typ = "ptr"
-    let f31_b12_i18_op0 = mir_value_operand("ptr", "gep46")
-    push(f31_b12_i18_inst.operands, f31_b12_i18_op0)
-    let f31_b12_i18_op1 = mir_const_int("i64", 2)
-    push(f31_b12_i18_inst.operands, f31_b12_i18_op1)
-    push(b12.instructions, f31_b12_i18_inst)
-    let f31_b12_i19_inst = mir_inst_empty()
-    f31_b12_i19_inst.op = "store"
-    let f31_b12_i19_op0 = mir_value_operand("i64", "load54")
-    push(f31_b12_i19_inst.operands, f31_b12_i19_op0)
-    let f31_b12_i19_op1 = mir_value_operand("ptr", "gep55")
-    push(f31_b12_i19_inst.operands, f31_b12_i19_op1)
-    push(b12.instructions, f31_b12_i19_inst)
-    let f31_b12_i20_inst = mir_inst_empty()
-    f31_b12_i20_inst.op = "sub"
-    f31_b12_i20_inst.has_result = true
-    f31_b12_i20_inst.result_name = "sub56"
-    f31_b12_i20_inst.result_type = "i64"
-    f31_b12_i20_inst.typ = "i64"
-    let f31_b12_i20_op0 = mir_value_operand("i64", "load39")
-    push(f31_b12_i20_inst.operands, f31_b12_i20_op0)
-    let f31_b12_i20_op1 = mir_const_int("i64", 1)
-    push(f31_b12_i20_inst.operands, f31_b12_i20_op1)
-    push(b12.instructions, f31_b12_i20_inst)
-    let f31_b12_i21_inst = mir_inst_empty()
-    f31_b12_i21_inst.op = "store"
-    let f31_b12_i21_op0 = mir_value_operand("i64", "sub56")
-    push(f31_b12_i21_inst.operands, f31_b12_i21_op0)
-    let f31_b12_i21_op1 = mir_value_operand("ptr", "alloca35")
-    push(f31_b12_i21_inst.operands, f31_b12_i21_op1)
-    push(b12.instructions, f31_b12_i21_inst)
-    b12.terminator = mir_br("shift_check")
-    b12.has_terminator = true
-    push(fn.blocks, b12)
-    let b13 = mir_block_empty("write_entry")
-    let f31_b13_i0_inst = mir_inst_empty()
-    f31_b13_i0_inst.op = "load"
-    f31_b13_i0_inst.has_result = true
-    f31_b13_i0_inst.result_name = "load57"
-    f31_b13_i0_inst.result_type = "i64"
-    f31_b13_i0_inst.typ = "i64"
-    let f31_b13_i0_op0 = mir_value_operand("ptr", "alloca12")
-    push(f31_b13_i0_inst.operands, f31_b13_i0_op0)
-    push(b13.instructions, f31_b13_i0_inst)
-    let f31_b13_i1_inst = mir_inst_empty()
-    f31_b13_i1_inst.op = "load"
-    f31_b13_i1_inst.has_result = true
-    f31_b13_i1_inst.result_name = "load58"
-    f31_b13_i1_inst.result_type = "ptr"
-    f31_b13_i1_inst.typ = "ptr"
-    let f31_b13_i1_op0 = mir_value_operand("ptr", "gep4")
-    push(f31_b13_i1_inst.operands, f31_b13_i1_op0)
-    push(b13.instructions, f31_b13_i1_inst)
-    let f31_b13_i2_inst = mir_inst_empty()
-    f31_b13_i2_inst.op = "add"
-    f31_b13_i2_inst.has_result = true
-    f31_b13_i2_inst.result_name = "add59"
-    f31_b13_i2_inst.result_type = "i64"
-    f31_b13_i2_inst.typ = "i64"
-    let f31_b13_i2_op0 = mir_value_operand("i64", "load57")
-    push(f31_b13_i2_inst.operands, f31_b13_i2_op0)
-    let f31_b13_i2_op1 = mir_value_operand("i64", "load57")
-    push(f31_b13_i2_inst.operands, f31_b13_i2_op1)
-    push(b13.instructions, f31_b13_i2_inst)
-    let f31_b13_i3_inst = mir_inst_empty()
-    f31_b13_i3_inst.op = "add"
-    f31_b13_i3_inst.has_result = true
-    f31_b13_i3_inst.result_name = "add60"
-    f31_b13_i3_inst.result_type = "i64"
-    f31_b13_i3_inst.typ = "i64"
-    let f31_b13_i3_op0 = mir_value_operand("i64", "add59")
-    push(f31_b13_i3_inst.operands, f31_b13_i3_op0)
-    let f31_b13_i3_op1 = mir_value_operand("i64", "load57")
-    push(f31_b13_i3_inst.operands, f31_b13_i3_op1)
-    push(b13.instructions, f31_b13_i3_inst)
-    let f31_b13_i4_inst = mir_inst_empty()
-    f31_b13_i4_inst.op = "gep"
-    f31_b13_i4_inst.has_result = true
-    f31_b13_i4_inst.result_name = "gep61"
-    f31_b13_i4_inst.result_type = "ptr"
-    f31_b13_i4_inst.typ = "ptr"
-    let f31_b13_i4_op0 = mir_value_operand("ptr", "load58")
-    push(f31_b13_i4_inst.operands, f31_b13_i4_op0)
-    let f31_b13_i4_op1 = mir_value_operand("i64", "add60")
-    push(f31_b13_i4_inst.operands, f31_b13_i4_op1)
-    push(b13.instructions, f31_b13_i4_inst)
-    let f31_b13_i5_inst = mir_inst_empty()
-    f31_b13_i5_inst.op = "gep"
-    f31_b13_i5_inst.has_result = true
-    f31_b13_i5_inst.result_name = "gep62"
-    f31_b13_i5_inst.result_type = "ptr"
-    f31_b13_i5_inst.typ = "ptr"
-    let f31_b13_i5_op0 = mir_value_operand("ptr", "gep61")
-    push(f31_b13_i5_inst.operands, f31_b13_i5_op0)
-    let f31_b13_i5_op1 = mir_const_int("i64", 0)
-    push(f31_b13_i5_inst.operands, f31_b13_i5_op1)
-    push(b13.instructions, f31_b13_i5_inst)
-    let f31_b13_i6_inst = mir_inst_empty()
-    f31_b13_i6_inst.op = "store"
-    let f31_b13_i6_op0 = mir_value_operand("ptr", "key")
-    push(f31_b13_i6_inst.operands, f31_b13_i6_op0)
-    let f31_b13_i6_op1 = mir_value_operand("ptr", "gep62")
-    push(f31_b13_i6_inst.operands, f31_b13_i6_op1)
-    push(b13.instructions, f31_b13_i6_inst)
-    let f31_b13_i7_inst = mir_inst_empty()
-    f31_b13_i7_inst.op = "gep"
-    f31_b13_i7_inst.has_result = true
-    f31_b13_i7_inst.result_name = "gep63"
-    f31_b13_i7_inst.result_type = "ptr"
-    f31_b13_i7_inst.typ = "ptr"
-    let f31_b13_i7_op0 = mir_value_operand("ptr", "gep61")
-    push(f31_b13_i7_inst.operands, f31_b13_i7_op0)
-    let f31_b13_i7_op1 = mir_const_int("i64", 1)
-    push(f31_b13_i7_inst.operands, f31_b13_i7_op1)
-    push(b13.instructions, f31_b13_i7_inst)
-    let f31_b13_i8_inst = mir_inst_empty()
-    f31_b13_i8_inst.op = "store"
-    let f31_b13_i8_op0 = mir_value_operand("ptr", "val")
-    push(f31_b13_i8_inst.operands, f31_b13_i8_op0)
-    let f31_b13_i8_op1 = mir_value_operand("ptr", "gep63")
-    push(f31_b13_i8_inst.operands, f31_b13_i8_op1)
-    push(b13.instructions, f31_b13_i8_inst)
-    let f31_b13_i9_inst = mir_inst_empty()
-    f31_b13_i9_inst.op = "gep"
-    f31_b13_i9_inst.has_result = true
-    f31_b13_i9_inst.result_name = "gep64"
-    f31_b13_i9_inst.result_type = "ptr"
-    f31_b13_i9_inst.typ = "ptr"
-    let f31_b13_i9_op0 = mir_value_operand("ptr", "gep61")
-    push(f31_b13_i9_inst.operands, f31_b13_i9_op0)
-    let f31_b13_i9_op1 = mir_const_int("i64", 2)
-    push(f31_b13_i9_inst.operands, f31_b13_i9_op1)
-    push(b13.instructions, f31_b13_i9_inst)
-    let f31_b13_i10_inst = mir_inst_empty()
-    f31_b13_i10_inst.op = "store"
-    let f31_b13_i10_op0 = mir_const_int("i64", 1)
-    push(f31_b13_i10_inst.operands, f31_b13_i10_op0)
-    let f31_b13_i10_op1 = mir_value_operand("ptr", "gep64")
-    push(f31_b13_i10_inst.operands, f31_b13_i10_op1)
-    push(b13.instructions, f31_b13_i10_inst)
-    let f31_b13_i11_inst = mir_inst_empty()
-    f31_b13_i11_inst.op = "add"
-    f31_b13_i11_inst.has_result = true
-    f31_b13_i11_inst.result_name = "add65"
-    f31_b13_i11_inst.result_type = "i64"
-    f31_b13_i11_inst.typ = "i64"
-    let f31_b13_i11_op0 = mir_value_operand("i64", "load1")
-    push(f31_b13_i11_inst.operands, f31_b13_i11_op0)
-    let f31_b13_i11_op1 = mir_const_int("i64", 1)
-    push(f31_b13_i11_inst.operands, f31_b13_i11_op1)
-    push(b13.instructions, f31_b13_i11_inst)
-    let f31_b13_i12_inst = mir_inst_empty()
-    f31_b13_i12_inst.op = "store"
-    let f31_b13_i12_op0 = mir_value_operand("i64", "add65")
-    push(f31_b13_i12_inst.operands, f31_b13_i12_op0)
-    let f31_b13_i12_op1 = mir_value_operand("ptr", "gep0")
-    push(f31_b13_i12_inst.operands, f31_b13_i12_op1)
-    push(b13.instructions, f31_b13_i12_inst)
-    b13.terminator = mir_ret_void()
-    b13.has_terminator = true
-    push(fn.blocks, b13)
-    return fn
+    return mir_runtime_emit_ep_map_str_word_set("__ep_map_str_str_set", "ptr")
 }
-
 fun mir_runtime_emit_ep_map_str_str_has(): MirFunction {
     let fn = mir_function_empty("__ep_map_str_str_has", "bool")
     push(fn.params, mir_runtime_param("map", "ptr"))
