@@ -1381,45 +1381,6 @@ class MirCodegen:
             return self._emit_expr(expr)
         return self._emit_str_conversion(expr)
 
-    def _emit_str_conversion(self, expr):
-        source_type = self._resolved_type(expr)
-        typ = self._infer_type(expr)
-        if typ == et.STR:
-            return self._emit_expr(expr)
-        arg = self._emit_expr(expr)
-        if typ == et.BOOL:
-            result = self._inst("call", [arg], result_type=ptr(), type=ptr(), callee="__ep_str_from_bool")
-            return ValueOperand(result)
-        if self._is_u8_array_type(typ):
-            result = self._inst("call", [arg], result_type=ptr(), type=ptr(), callee="__ep_str_from_slice_u8")
-            return ValueOperand(result)
-        if source_type == et.U64:
-            result = self._inst("call", [arg], result_type=ptr(), type=ptr(), callee="__ep_str_from_u64")
-            return ValueOperand(result)
-        result = self._inst("call", [arg], result_type=ptr(), type=ptr(), callee="__ep_str_from_i64")
-        return ValueOperand(result)
-
-    def _emit_fstring(self, expr):
-        out = None
-        for kind, value in expr.parts:
-            if kind == "text":
-                if value:
-                    piece = SymbolOperand(ptr(), self._string_label(value))
-                else:
-                    continue
-            elif kind == "expr":
-                piece = self._emit_str_conversion(value)
-            else:
-                raise MirCodegenError(f"unsupported f-string part: {kind}")
-            if out is None:
-                out = piece
-            else:
-                result = self._inst("call", [out, piece], result_type=ptr(), type=ptr(), callee="__ep_str_cat")
-                out = ValueOperand(result)
-        if out is None:
-            return SymbolOperand(ptr(), self._string_label(""))
-        return out
-
     def _zero_value(self, typ):
         if typ.kind == "ptr":
             return ConstNullOperand()
