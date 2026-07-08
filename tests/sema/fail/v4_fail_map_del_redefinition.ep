@@ -1,0 +1,8 @@
+# COMPILE_FAIL: reserved builtin function name: map_del
+fun map_del(): i64 {
+    ret 1
+}
+
+fun main(): i64 {
+    ret 0
+}

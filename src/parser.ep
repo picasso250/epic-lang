@@ -113,20 +113,6 @@ fun is_upper_name(name: str): i64 {
     ret 0
 }
 
-let parser_reserved_funcs = new map[str]bool {
-    "len": true
-    "cap": true
-    "push": true
-    "extend": true
-    "bytes": true
-    "str": true
-    "map_has": true
-}
-
-fun parser_is_reserved_func(name: str): bool {
-    ret map_has(parser_reserved_funcs, name)
-}
-
 fun peek(p: Parser): Token {
     if p.pos < len(p.tokens) {
         ret p.tokens[p.pos]
@@ -272,9 +258,6 @@ fun parse_struct_def(p: Parser): AstNode {
 fun parse_fn_def(p: Parser): AstNode {
     expect(p, "FUN")
     let name = expect(p, "ID")
-    if parser_is_reserved_func(name.text) {
-        parse_error(name.line, f"reserved builtin function name: {name.text}")
-    }
     expect(p, "LPAREN")
     let params = parse_params(p)
     expect(p, "RPAREN")
