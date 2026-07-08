@@ -13,6 +13,18 @@ struct Holder {
     count: i64
 }
 
+
+struct SemLit {
+    value: i64
+}
+
+struct SemAdd {
+    left: i64
+    right: i64
+}
+
+type SemExpr = SemLit | SemAdd
+
 fun add(a: i64, b: i64): i64 {
     ret a + b
 }
@@ -112,13 +124,30 @@ fun use_control(limit: i64): i64 {
     }
 }
 
+
+fun use_adt(): i64 {
+    let e: SemExpr = new SemExpr(new SemAdd { left: 20, right: 22 })
+    let out = 0
+    match e {
+        SemLit lit: {
+            out = lit.value
+        }
+        SemAdd add_expr: {
+            out = add_expr.left + add_expr.right
+        }
+    }
+    ret out
+}
+
 fun main(): void {
     let a = use_scalars()
     let b = use_arrays_and_strings()
     let c = use_structs_and_maps()
     let d = use_control(8)
+    let e = use_adt()
     assert a >= 0, "a"
     assert b >= 0
-    println(str(a + b + c + d))
+    assert e == 42
+    println(str(a + b + c + d + e))
     ret
 }

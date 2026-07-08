@@ -7,6 +7,14 @@ Program
     StructField point : Point
     StructField bytes : u8[]
     StructField count : i64
+  StructDef SemLit
+    StructField value : i64
+  StructDef SemAdd
+    StructField left : i64
+    StructField right : i64
+  UnionDef SemExpr
+    UnionMember SemLit
+    UnionMember SemAdd
   FunDef add : i64
     Param a : i64
     Param b : i64
@@ -352,6 +360,34 @@ Program
               Binary + : i64
                 Var total : i64
                 Literal 1 : i64
+  FunDef use_adt : i64
+    Block
+      Let e : SemExpr
+        UnionInit SemExpr : SemExpr
+          StructInit SemAdd : SemAdd
+            InitField left
+              Literal 20 : i64
+            InitField right
+              Literal 22 : i64
+      Let out : i64
+        Literal 0 : i64
+      Match
+        Var e : SemExpr
+        MatchCase SemLit lit
+          Block
+            Assign out
+              FieldAccess value : i64
+                Var lit : SemLit
+        MatchCase SemAdd add_expr
+          Block
+            Assign out
+              Binary + : i64
+                FieldAccess left : i64
+                  Var add_expr : SemAdd
+                FieldAccess right : i64
+                  Var add_expr : SemAdd
+      Return
+        Var out : i64
   FunDef main : void
     Block
       Let a : i64
@@ -363,6 +399,8 @@ Program
       Let d : i64
         Call use_control : i64
           Literal 8 : i64
+      Let e : i64
+        Call use_adt : i64
       Assert
         Binary >= : bool
           Var a : i64
@@ -372,14 +410,20 @@ Program
         Binary >= : bool
           Var b : i64
           Literal 0 : i64
+      Assert
+        Binary == : bool
+          Var e : i64
+          Literal 42 : i64
       ExprStmt
         Call println : void
           Call str : str
             Binary + : i64
               Binary + : i64
                 Binary + : i64
-                  Var a : i64
-                  Var b : i64
-                Var c : i64
-              Var d : i64
+                  Binary + : i64
+                    Var a : i64
+                    Var b : i64
+                  Var c : i64
+                Var d : i64
+              Var e : i64
       Return

@@ -1,0 +1,7 @@
+# COMPILE_FAIL: field access expected struct, got union Expr; use match
+struct Leaf { value: i64 }
+type Expr = Leaf
+fun main(): void {
+    let e: Expr = new Expr(new Leaf { value: 1 })
+    println(str(e.value))
+}

@@ -1,0 +1,12 @@
+# COMPILE_FAIL: non-exhaustive match for Expr; missing Right
+struct Left { value: i64 }
+struct Right { value: i64 }
+type Expr = Left | Right
+fun main(): void {
+    let e: Expr = new Expr(new Left { value: 1 })
+    match e {
+        Left l: {
+            println(str(l.value))
+        }
+    }
+}

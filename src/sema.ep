@@ -9,6 +9,10 @@
 struct SemaState {
     struct_names: map[str]bool
     struct_fields: map[str]str
+    union_names: map[str]bool
+    union_member_count: map[str]i64
+    union_member_names: map[str]str
+    union_members: map[str]bool
     funcs_ret: map[str]str
     funcs_param_count: map[str]i64
     funcs_param_types: map[str]str
@@ -127,6 +131,9 @@ fun sema_type_name(st: SemaState, name: str): str {
     if st.struct_names.has(name) {
         ret name
     }
+    if st.union_names.has(name) {
+        ret name
+    }
     sema_die(f"unknown type {name}")
     ret ""
 }
@@ -148,6 +155,9 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
     }
     if sema_is_array(base_type) {
         sema_die(f"unknown field {sema_key2(base_type, field)}")
+    }
+    if st.union_names.has(base_type) {
+        sema_die(f"field access expected struct, got union {base_type}; use match")
     }
     let key = sema_key2(base_type, field)
     if st.struct_fields.has(key) == false {
@@ -361,10 +371,50 @@ fun sema_check_func_call_args(st: SemaState, name: str, args: AstNode[]): void {
     }
 }
 
+fun sema_union_members_text(st: SemaState, union_name: str): str {
+    let out = ""
+    let count = st.union_member_count[union_name]
+    for i in 0:count {
+        if i > 0 {
+            out = str_cat2(out, ", ")
+        }
+        out = str_cat2(out, st.union_member_names[sema_key_index(union_name, i)])
+    }
+    ret out
+}
+
+fun sema_union_missing_text(st: SemaState, union_name: str, seen: map[str]bool): str {
+    let out = ""
+    let count = st.union_member_count[union_name]
+    for i in 0:count {
+        let member = st.union_member_names[sema_key_index(union_name, i)]
+        if seen.has(member) == false {
+            if out != "" {
+                out = str_cat2(out, ", ")
+            }
+            out = str_cat2(out, member)
+        }
+    }
+    ret out
+}
+
 fun sema_build_types(st: SemaState, ast: AstNode): void {
     for i in 0:len(ast.structs) {
         let s = ast.structs[i]
         st.struct_names[s.name] = true
+    }
+    for i in 0:len(ast.unions) {
+        let u = ast.unions[i]
+        if st.struct_names.has(u.name) {
+            sema_die(f"type {u.name} conflicts with struct {u.name}")
+        }
+        if st.union_names.has(u.name) {
+            sema_die(f"duplicate type {u.name}")
+        }
+        if len(u.members) == 0 {
+            sema_die(f"union {u.name} requires at least one member")
+        }
+        st.union_names[u.name] = true
     }
     for i in 0:len(ast.structs) {
         let s = ast.structs[i]
@@ -378,6 +428,23 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
             f.resolved_type = sema_type_name(st, f.type_name)
             st.struct_fields[sema_key2(s.name, f.name)] = f.resolved_type
         }
+    }
+    for i in 0:len(ast.unions) {
+        let u = ast.unions[i]
+        let seen = new map[str]bool
+        for j in 0:len(u.members) {
+            let member = u.members[j]
+            if seen.has(member) {
+                sema_die(f"duplicate union member {sema_key2(u.name, member)}")
+            }
+            seen[member] = true
+            if st.struct_names.has(member) == false {
+                sema_die(f"union member {sema_key2(u.name, member)} must be a struct")
+            }
+            st.union_member_names[sema_key_index(u.name, j)] = member
+            st.union_members[sema_key2(u.name, member)] = true
+        }
+        st.union_member_count[u.name] = len(u.members)
     }
 }
 
@@ -453,6 +520,9 @@ fun sema_is_global_literal_init(node: AstNode): bool {
             }
         }
         ret true
+    }
+    if node.kind == "UnionInit" {
+        ret sema_is_global_literal_init(node.expr)
     }
     ret false
 }
@@ -636,6 +706,19 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             sema_check_assign(st, ft, f.value_expr, f"field {sema_key2(node.name, f.name)}")
         }
         ret sema_set_type(node, node.name)
+    }
+    if node.kind == "UnionInit" {
+        if st.union_names.has(node.type_name) == false {
+            sema_die(f"unknown union {node.type_name}")
+        }
+        let payload_type = sema_expr_type(st, node.expr)
+        if st.struct_names.has(payload_type) == false {
+            sema_die(f"new {node.type_name}(...) expected struct payload, got {payload_type}")
+        }
+        if st.union_members.has(sema_key2(node.type_name, payload_type)) == false {
+            sema_die(f"new {node.type_name}(...) expected one of {sema_union_members_text(st, node.type_name)}, got {payload_type}")
+        }
+        ret sema_set_type(node, node.type_name)
     }
     if node.kind == "MapInit" {
         let typ = sema_type_name(st, node.type_name)
@@ -1030,8 +1113,49 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
     }
     if node.kind == "Match" {
         let scrutinee = sema_expr_type(st, node.expr)
+        if st.union_names.has(scrutinee) {
+            let seen = new map[str]bool
+            for i in 0:len(node.fields) {
+                let c = node.fields[i]
+                if c.expr.kind != "" || c.variant_name == "" || c.binding_name == "" {
+                    sema_die(f"ADT match on {scrutinee} requires variant binding cases")
+                }
+                if st.union_members.has(sema_key2(scrutinee, c.variant_name)) == false {
+                    sema_die(f"{c.variant_name} is not a member of {scrutinee}")
+                }
+                if seen.has(c.variant_name) {
+                    sema_die(f"duplicate match case {c.variant_name}")
+                }
+                seen[c.variant_name] = true
+                c.resolved_type = c.variant_name
+                let had_old = st.locals.has(c.binding_name)
+                let old = ""
+                if had_old {
+                    old = st.locals[c.binding_name]
+                }
+                st.locals[c.binding_name] = c.variant_name
+                sema_block(st, c.body)
+                if had_old {
+                    st.locals[c.binding_name] = old
+                } else {
+                    st.locals.del(c.binding_name)
+                }
+            }
+            if node.else_block.kind != "" {
+                sema_block(st, node.else_block)
+            } else {
+                let missing = sema_union_missing_text(st, scrutinee, seen)
+                if missing != "" {
+                    sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
+                }
+            }
+            ret
+        }
         for i in 0:len(node.fields) {
             let c = node.fields[i]
+            if c.variant_name != "" || c.binding_name != "" {
+                sema_die("ADT match case requires union scrutinee")
+            }
             sema_check_assign(st, scrutinee, c.expr, "match pattern")
             sema_block(st, c.body)
         }
@@ -1153,6 +1277,7 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
         sema_indent(depth)
         println("Program")
         sema_dump_list(node.structs, depth + 1)
+        sema_dump_list(node.unions, depth + 1)
         sema_dump_list(node.globals, depth + 1)
         sema_dump_list(node.funcs, depth + 1)
         ret
@@ -1170,6 +1295,17 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
         print(node.name)
         sema_print_type(sema_need_type(node))
         println("")
+        ret
+    }
+    if node.kind == "UnionDef" {
+        sema_indent(depth)
+        print("UnionDef ")
+        println(node.name)
+        for i in 0:len(node.members) {
+            sema_indent(depth + 1)
+            print("UnionMember ")
+            println(node.members[i])
+        }
         ret
     }
     if node.kind == "FunDef" {
@@ -1307,8 +1443,15 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
     }
     if node.kind == "MatchCase" {
         sema_indent(depth)
-        println("MatchCase")
-        sema_dump_node(node.expr, depth + 1)
+        if node.variant_name != "" {
+            print("MatchCase ")
+            print(node.variant_name)
+            print(" ")
+            println(node.binding_name)
+        } else {
+            println("MatchCase")
+            sema_dump_node(node.expr, depth + 1)
+        }
         sema_dump_node(node.body, depth + 1)
         ret
     }
@@ -1438,6 +1581,14 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
         }
         ret
     }
+    if node.kind == "UnionInit" {
+        print("UnionInit ")
+        print(node.type_name)
+        sema_print_type(t)
+        println("")
+        sema_dump_node(node.expr, depth + 1)
+        ret
+    }
     sema_die(f"unsupported dump node {node.kind}")
 }
 
@@ -1445,6 +1596,10 @@ fun make_sema_state(): SemaState {
     let st = new SemaState
     st.struct_names = new map[str]bool
     st.struct_fields = new map[str]str
+    st.union_names = new map[str]bool
+    st.union_member_count = new map[str]i64
+    st.union_member_names = new map[str]str
+    st.union_members = new map[str]bool
     st.funcs_ret = new map[str]str
     st.funcs_param_count = new map[str]i64
     st.funcs_param_types = new map[str]str
