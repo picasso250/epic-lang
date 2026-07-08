@@ -15,11 +15,12 @@ struct MachineObject {
     symbol_values: i64[]
 }
 
-struct MachineFixup {
+struct MachineLabelFixup {
     offset: i64
     label: str
-    kind: str
 }
+
+type MachineFixup = MachineLabelFixup
 
 struct MachineBuilder {
     text: i64[]
@@ -176,11 +177,7 @@ fun machine_has_text_label(b: MachineBuilder, name: str): bool {
     ret machine_text_label_offset_or_neg1(b, name) >= 0
 }
 fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
-    let f = new MachineFixup
-    f.offset = offset
-    f.label = label
-    f.kind = kind
-    b.fixups.push(f)
+    b.fixups.push(new MachineFixup(new MachineLabelFixup { offset: offset, label: label }))
 }
 
 fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
@@ -255,13 +252,15 @@ fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
 fun machine_patch_fixups(b: MachineBuilder): void {
     let i = 0
     for i < len(b.fixups) {
-        if b.fixups[i].kind == "label" {
-            let target = machine_text_label_offset_or_neg1(b, b.fixups[i].label)
-            if target >= 0 {
-                let disp = target - (b.fixups[i].offset + 4)
-                machine_patch_i32(b.text, b.fixups[i].offset, disp)
-            } else {
-                machine_add_text_reloc(b, b.fixups[i].offset, b.fixups[i].label)
+        match b.fixups[i] {
+            MachineLabelFixup f: {
+                let target = machine_text_label_offset_or_neg1(b, f.label)
+                if target >= 0 {
+                    let disp = target - (f.offset + 4)
+                    machine_patch_i32(b.text, f.offset, disp)
+                } else {
+                    machine_add_text_reloc(b, f.offset, f.label)
+                }
             }
         }
         i = i + 1
