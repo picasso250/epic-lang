@@ -106,20 +106,27 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
     x64_add_data_bytes(x64, "_trap_null_deref", null_deref)
     let i = 0
     for i < len(program.globals) {
-        if mir_global_name(program.globals[i]) != "argv" {
-            let values = new i64[0]
-            if mir_global_has_init(program.globals[i]) {
-                if mir_global_type(program.globals[i]) == "ptr" {
-                    epic_push_bytes_i64(values, bytes(mir_global_init(program.globals[i])))
+        match program.globals[i] {
+            MirStringGlobal g: {
+                if g.name != "argv" {
+                    let values = new i64[0]
+                    epic_push_bytes_i64(values, bytes(g.init))
                     values.push(0)
-                    x64_add_data_bytes(x64, mir_to_x64_data_label(mir_global_name(program.globals[i])), values)
-                    x64_add_data_zero(x64, mir_to_x64_header_label(mir_global_name(program.globals[i])), 24)
-                } else {
-                    epic_push_u64_le(values, sema_parse_i64(mir_global_init(program.globals[i])))
-                    x64_add_data_bytes(x64, mir_global_name(program.globals[i]), values)
+                    x64_add_data_bytes(x64, mir_to_x64_data_label(g.name), values)
+                    x64_add_data_zero(x64, mir_to_x64_header_label(g.name), 24)
                 }
-            } else {
-                x64_add_data_zero(x64, mir_global_name(program.globals[i]), 8)
+            }
+            MirScalarGlobal g: {
+                if g.name != "argv" {
+                    let values = new i64[0]
+                    epic_push_u64_le(values, sema_parse_i64(g.init))
+                    x64_add_data_bytes(x64, g.name, values)
+                }
+            }
+            MirDeclGlobal g: {
+                if g.name != "argv" {
+                    x64_add_data_zero(x64, g.name, 8)
+                }
             }
         }
         i = i + 1

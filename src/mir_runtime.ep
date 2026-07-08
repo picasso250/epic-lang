@@ -10,7 +10,11 @@ fun mir_runtime_die(msg: str): void {
 fun mir_runtime_has_global(program: MirProgram, name: str): bool {
     let i = 0
     for i < len(program.globals) {
-        if mir_global_name(program.globals[i]) == name { ret true }
+        match program.globals[i] {
+            MirStringGlobal g: { if g.name == name { ret true } }
+            MirScalarGlobal g: { if g.name == name { ret true } }
+            MirDeclGlobal g: { if g.name == name { ret true } }
+        }
         i = i + 1
     }
     ret false

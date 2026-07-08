@@ -714,42 +714,6 @@ fun mir_global_scalar(name: str, typ: str, init: str): MirGlobal {
     ret new MirGlobal(new MirScalarGlobal { name: name, typ: typ, init: init })
 }
 
-fun mir_global_name(glob: MirGlobal): str {
-    match glob {
-        MirStringGlobal g: { ret g.name }
-        MirDeclGlobal g: { ret g.name }
-        MirScalarGlobal g: { ret g.name }
-    }
-    ret ""
-}
-
-fun mir_global_type(glob: MirGlobal): str {
-    match glob {
-        MirStringGlobal g: { ret "ptr" }
-        MirDeclGlobal g: { ret g.typ }
-        MirScalarGlobal g: { ret g.typ }
-    }
-    ret ""
-}
-
-fun mir_global_init(glob: MirGlobal): str {
-    match glob {
-        MirStringGlobal g: { ret g.init }
-        MirDeclGlobal g: { ret "" }
-        MirScalarGlobal g: { ret g.init }
-    }
-    ret ""
-}
-
-fun mir_global_has_init(glob: MirGlobal): bool {
-    match glob {
-        MirStringGlobal g: { ret true }
-        MirDeclGlobal g: { ret false }
-        MirScalarGlobal g: { ret true }
-    }
-    ret false
-}
-
 fun mir_struct_field(struct_name: str, field_type: str, field_index: i64): MirStructField {
     let field = new MirStructField
     field.struct_name = struct_name

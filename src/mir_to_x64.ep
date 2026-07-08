@@ -78,11 +78,21 @@ fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): 
 fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram): void {
     let i = 0
     for i < len(program.globals) {
-        if mir_global_name(program.globals[i]) != "argv" {
-            if mir_global_has_init(program.globals[i]) && mir_global_type(program.globals[i]) == "ptr" {
-                mir_to_x64_add_string_global(lower, mir_global_name(program.globals[i]), len(mir_global_init(program.globals[i])))
-            } else {
-                lower.global_names.push(mir_global_name(program.globals[i]))
+        match program.globals[i] {
+            MirStringGlobal g: {
+                if g.name != "argv" {
+                    mir_to_x64_add_string_global(lower, g.name, len(g.init))
+                }
+            }
+            MirScalarGlobal g: {
+                if g.name != "argv" {
+                    lower.global_names.push(g.name)
+                }
+            }
+            MirDeclGlobal g: {
+                if g.name != "argv" {
+                    lower.global_names.push(g.name)
+                }
             }
         }
         i = i + 1
