@@ -19,6 +19,9 @@ struct MirCodegenState {
     continue_targets: str[]
     break_targets: str[]
     struct_names: str[]
+    union_names: str[]
+    union_member_keys: str[]
+    union_member_tags: i64[]
     struct_field_keys: str[]
     struct_field_types: str[]
     struct_field_indexes: i64[]
@@ -172,6 +175,26 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstNode): void {
 
 fun mir_struct_key(struct_name: str, field_name: str): str {
     ret str_cat2(str_cat2(struct_name, "."), field_name)
+}
+
+fun mir_is_union_name(st: MirCodegenState, name: str): bool {
+    for i in 0:len(st.union_names) {
+        if st.union_names[i] == name {
+            ret true
+        }
+    }
+    ret false
+}
+
+fun mir_union_tag(st: MirCodegenState, union_name: str, member_name: str): i64 {
+    let key = mir_struct_key(union_name, member_name)
+    for i in 0:len(st.union_member_keys) {
+        if st.union_member_keys[i] == key {
+            ret st.union_member_tags[i]
+        }
+    }
+    ast_to_mir_die(f"unknown union member {key}")
+    ret 0
 }
 
 fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
@@ -394,12 +417,11 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     ret mir_value_operand(field_typ, result_name)
 }
 
-fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
-    st.current_block = block
+fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
     let size_ops = new MirOperand[0]
     size_ops.push(mir_operand_null())
     size_ops.push(mir_const_int("i64", 1))
-    let size_ptr = mir_make_gep(st, str_cat2("struct ", expr.name), size_ops)
+    let size_ptr = mir_make_gep(st, str_cat2("struct ", struct_name), size_ops)
     let size_i64 = mir_make_ptrtoint(st, size_ptr, "i64")
     let args = new MirOperand[0]
     args.push(size_i64)
@@ -408,7 +430,12 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): M
     call.callee = "__epx_alloc"
     call.operands = args
     mir_emit_inst(st, call)
-    let obj = mir_value_operand("ptr", call.result_name)
+    ret mir_value_operand("ptr", call.result_name)
+}
+
+fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+    st.current_block = block
+    let obj = mir_alloc_struct(st, expr.name)
     let i = 0
     for i < len(expr.fields) {
         let field = expr.fields[i]
@@ -418,6 +445,18 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstNode): M
         mir_emit_inst(st, mir_store(value_flow.value, addr))
         i = i + 1
     }
+    ret mir_value_flow(obj, st.current_block)
+}
+
+fun mir_emit_union_init(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+    st.current_block = block
+    let payload_flow = mir_emit_expr(st, st.current_block, expr.expr)
+    st.current_block = payload_flow.block
+    let obj = mir_alloc_struct(st, expr.type_name)
+    let tag_addr = mir_field_addr(st, obj, expr.type_name, "tag")
+    mir_emit_inst(st, mir_store(mir_const_int("i64", mir_union_tag(st, expr.type_name, expr.expr.resolved_type)), tag_addr))
+    let payload_addr = mir_field_addr(st, obj, expr.type_name, "payload")
+    mir_emit_inst(st, mir_store(payload_flow.value, payload_addr))
     ret mir_value_flow(obj, st.current_block)
 }
 
@@ -1075,6 +1114,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
     if expr.kind == "StructInit" {
         ret mir_emit_struct_init(st, st.current_block, expr)
     }
+    if expr.kind == "UnionInit" {
+        ret mir_emit_union_init(st, st.current_block, expr)
+    }
     if expr.kind == "FieldAccess" {
         let base_type = expr.object.resolved_type
         let struct_name = mir_layout_struct_name(st, base_type)
@@ -1296,8 +1338,101 @@ fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBloc
     ret mir_unreachable_flow()
 }
 
+fun mir_truncate_locals(st: MirCodegenState, count: i64): void {
+    let names = new str[0]
+    let addrs = new str[0]
+    let types = new str[0]
+    for i in 0:count {
+        names.push(st.local_names[i])
+        addrs.push(st.local_addr_names[i])
+        types.push(st.local_types[i])
+    }
+    st.local_names = names
+    st.local_addr_names = addrs
+    st.local_types = types
+}
+
+fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
+    st.current_block = block
+    let union_name = stmt.expr.resolved_type
+    let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
+    st.current_block = scrutinee_flow.block
+    let match_name = str_cat2("__match", str(st.value_counter))
+    let match_addr = mir_alloc_local(st, match_name, "ptr")
+    mir_emit_inst(st, mir_store(scrutinee_flow.value, match_addr))
+
+    let end_block = mir_new_block(st, "match.end")
+    let case_blocks = new MirBlock[0]
+    for i in 0:len(stmt.fields) {
+        case_blocks.push(mir_new_block(st, "match.case"))
+    }
+    let has_else = stmt.else_block.kind != ""
+    let else_block = end_block
+    if has_else {
+        else_block = mir_new_block(st, "match.else")
+    }
+    let next_blocks = new MirBlock[0]
+    for i in 0:len(stmt.fields) - 1 {
+        next_blocks.push(mir_new_block(st, "match.next"))
+    }
+
+    let check_block = st.current_block
+    for ci in 0:len(stmt.fields) {
+        st.current_block = check_block
+        let next_block = else_block
+        if ci < len(stmt.fields) - 1 {
+            next_block = next_blocks[ci]
+        }
+        let wrapper_name = mir_new_value(st, "load")
+        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", match_addr))
+        let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
+        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
+        cond.operands.push(tag)
+        cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, stmt.fields[ci].variant_name)))
+        mir_emit_inst(st, cond)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)
+        st.current_block.has_terminator = true
+        if ci < len(stmt.fields) - 1 {
+            check_block = next_blocks[ci]
+        }
+    }
+    if len(stmt.fields) == 0 {
+        st.current_block = check_block
+        st.current_block.terminator = mir_br(else_block.name)
+        st.current_block.has_terminator = true
+    }
+
+    for bi in 0:len(stmt.fields) {
+        st.current_block = case_blocks[bi]
+        let local_count = len(st.local_names)
+        let wrapper_name = mir_new_value(st, "load")
+        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", match_addr))
+        let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
+        let bind_addr = mir_alloc_local(st, stmt.fields[bi].binding_name, "ptr")
+        mir_emit_inst(st, mir_store(payload, bind_addr))
+        let case_flow = mir_emit_block(st, st.current_block, stmt.fields[bi].body)
+        mir_truncate_locals(st, local_count)
+        if case_flow.reachable {
+            case_flow.block.terminator = mir_br(end_block.name)
+            case_flow.block.has_terminator = true
+        }
+    }
+    if has_else {
+        let else_flow = mir_emit_block(st, else_block, stmt.else_block)
+        if else_flow.reachable {
+            else_flow.block.terminator = mir_br(end_block.name)
+            else_flow.block.has_terminator = true
+        }
+    }
+    st.current_block = end_block
+    ret mir_reachable_flow(end_block)
+}
+
 fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
     st.current_block = block
+    if mir_is_union_name(st, stmt.expr.resolved_type) {
+        ret mir_emit_union_match(st, block, stmt)
+    }
     let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = scrutinee_flow.block
     let match_name = str_cat2("__match", str(st.value_counter))
@@ -1819,6 +1954,9 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.continue_targets = new str[0]
     st.break_targets = new str[0]
     st.struct_names = new str[0]
+    st.union_names = new str[0]
+    st.union_member_keys = new str[0]
+    st.union_member_tags = new i64[0]
     st.struct_field_keys = new str[0]
     st.struct_field_types = new str[0]
     st.struct_field_indexes = new i64[0]
@@ -1840,6 +1978,23 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             fi2 = fi2 + 1
         }
         si = si + 1
+    }
+    for ui in 0:len(ast.unions) {
+        let union = ast.unions[ui]
+        st.union_names.push(union.name)
+        st.struct_names.push(union.name)
+        for mi2 in 0:len(union.members) {
+            st.union_member_keys.push(mir_struct_key(union.name, union.members[mi2]))
+            st.union_member_tags.push(mi2 + 1)
+        }
+        st.struct_field_keys.push(mir_struct_key(union.name, "tag"))
+        st.struct_field_types.push("i64")
+        st.struct_field_indexes.push(0)
+        mir_program_add_struct_field(st.program, union.name, "i64", 0)
+        st.struct_field_keys.push(mir_struct_key(union.name, "payload"))
+        st.struct_field_types.push("ptr")
+        st.struct_field_indexes.push(1)
+        mir_program_add_struct_field(st.program, union.name, "ptr", 1)
     }
 
     st.struct_names.push("str")
@@ -1888,6 +2043,9 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     for asi < len(ast.structs) {
         mir_register_slice_layout(st, str_cat2("_slice_", ast.structs[asi].name))
         asi = asi + 1
+    }
+    for aui in 0:len(ast.unions) {
+        mir_register_slice_layout(st, str_cat2("_slice_", ast.unions[aui].name))
     }
 
     let map_layouts = new str[0]
