@@ -106,20 +106,20 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
     x64_add_data_bytes(x64, "_trap_null_deref", null_deref)
     let i = 0
     for i < len(program.globals) {
-        if program.globals[i].name != "argv" {
+        if mir_global_name(program.globals[i]) != "argv" {
             let values = new i64[0]
-            if program.globals[i].has_init {
-                if program.globals[i].typ == "ptr" {
-                    epic_push_bytes_i64(values, bytes(program.globals[i].init))
+            if mir_global_has_init(program.globals[i]) {
+                if mir_global_type(program.globals[i]) == "ptr" {
+                    epic_push_bytes_i64(values, bytes(mir_global_init(program.globals[i])))
                     values.push(0)
-                    x64_add_data_bytes(x64, mir_to_x64_data_label(program.globals[i].name), values)
-                    x64_add_data_zero(x64, mir_to_x64_header_label(program.globals[i].name), 24)
+                    x64_add_data_bytes(x64, mir_to_x64_data_label(mir_global_name(program.globals[i])), values)
+                    x64_add_data_zero(x64, mir_to_x64_header_label(mir_global_name(program.globals[i])), 24)
                 } else {
-                    epic_push_u64_le(values, sema_parse_i64(program.globals[i].init))
-                    x64_add_data_bytes(x64, program.globals[i].name, values)
+                    epic_push_u64_le(values, sema_parse_i64(mir_global_init(program.globals[i])))
+                    x64_add_data_bytes(x64, mir_global_name(program.globals[i]), values)
                 }
             } else {
-                x64_add_data_zero(x64, program.globals[i].name, 8)
+                x64_add_data_zero(x64, mir_global_name(program.globals[i]), 8)
             }
         }
         i = i + 1
