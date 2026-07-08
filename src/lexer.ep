@@ -322,7 +322,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
 
 fun lex(src: str): Token[] {
     let src_bytes = bytes(src)
-    let tokens = new Token[4096]
+    let tokens = new Token[]
     let n = len(src)
     let pos = 0
     let line = 1

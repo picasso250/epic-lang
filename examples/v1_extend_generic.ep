@@ -5,7 +5,7 @@ struct Box {
 }
 
 fun main(): void {
-    let xs = new i64[1]
+    let xs = new i64[]
     push(xs, 1)
     push(xs, 2)
     let old_len = len(xs)
@@ -18,8 +18,8 @@ fun main(): void {
     b1.value = 5
     let b2 = new Box {}
     b2.value = 7
-    let left = new Box[1]
-    let right = new Box[1]
+    let left = new Box[]
+    let right = new Box[]
     push(left, b1)
     push(right, b2)
     let right_len = len(right)

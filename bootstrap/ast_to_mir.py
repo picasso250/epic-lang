@@ -477,6 +477,8 @@ class MirCodegen(MirFunctionBuilder):
                 self.inst("call", [base.value, index.value, value.value], type=VOID, callee="__ep_slice_u8_set")
             elif self._is_i64_array_type(base_type):
                 self.inst("call", [base.value, index.value, value.value], type=VOID, callee="__ep_slice_i64_set")
+            elif self._array_struct_elem(base_type) is not None:
+                self.inst("call", [base.value, index.value, value.value], type=VOID, callee="__ep_slice_ptr_set")
             else:
                 callee = self._map_helper(base_type, "set")
                 if callee is None:
@@ -1153,10 +1155,10 @@ class MirCodegen(MirFunctionBuilder):
             result = self.inst("call", [ConstIntOperand(I64, len(expr.values))], result_type=arr_type, type=ptr(), callee="__ep_slice_i64_new")
             arr = ValueOperand(result)
             block = self.current_block
-            for value_expr in expr.values:
+            for idx, value_expr in enumerate(expr.values):
                 value = self._emit_expr_from(block, value_expr)
                 self.set_block(value.block)
-                self.inst("call", [arr, value.value], type=VOID, callee="__ep_slice_i64_push")
+                self.inst("call", [arr, ConstIntOperand(I64, idx), value.value], type=VOID, callee="__ep_slice_i64_set")
                 block = self.current_block
             return ValueFlow(arr, self.current_block)
         if not self._is_u8_array_type(epic_type):
@@ -1182,7 +1184,7 @@ class MirCodegen(MirFunctionBuilder):
         epic_type = self._resolved_type(expr)
         arr_type = self._type(epic_type)
         if self._is_u8_array_type(epic_type):
-            result = self.inst("call", [ConstIntOperand(I64, 0), count], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_alloc")
+            result = self.inst("call", [count, count], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_alloc")
             return ValueFlow(ValueOperand(result), self.current_block)
         if self._is_i64_array_type(epic_type):
             result = self.inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_i64_new")

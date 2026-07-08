@@ -12,7 +12,7 @@
 # memory RMW. For large matrices (n > ~500, > 2MB), ikj would win due to
 # fewer cache misses. Try changing n to see the trade-off!
 #
-# Note: new T[n] creates capacity n but length 0, so we push elements to fill.
+# Note: new T[n] creates length n and capacity n, so elements can be assigned by index.
 
 struct Mat {
     data: i64[]
@@ -23,9 +23,6 @@ struct Mat {
 fun mat_new(rows: i64, cols: i64): Mat {
     let sz = rows * cols
     let data = new i64[sz]
-    for i in 0:sz {
-        push(data, 0)
-    }
     ret new Mat { data: data, rows: rows, cols: cols }
 }
 

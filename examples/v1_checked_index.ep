@@ -5,7 +5,6 @@ fun main(): void {
 
     let bs = bytes(s)
     let xs = new u8[4]
-    push(xs, 'x')
     xs[0] = 'i'
     let out = new u8[] { bs[0], xs[0], '!' }
     println(str(out))

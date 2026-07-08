@@ -7,7 +7,7 @@ fun main(): void {
     print(s[1:len(s)])
     print(s[0:2])
 
-    let xs = new u8[4]
+    let xs = new u8[]
     push(xs, 'x')
     push(xs, 'E')
     push(xs, 'i')

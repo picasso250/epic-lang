@@ -710,7 +710,7 @@ fun mir_emit_map_init(st: MirCodegenState, block: MirBlock, expr: AstNode): MirV
 fun mir_emit_empty_array(st: MirCodegenState, elem_type: str, count: MirOperand): MirOperand {
     let args = new MirOperand[0]
     if mir_is_u8_array_elem_type(elem_type) {
-        push(args, mir_const_int("i64", 0))
+        push(args, count)
         push(args, count)
         ret mir_emit_call_inst(st, "__ep_slice_u8_alloc", "ptr", args)
     }
@@ -770,13 +770,14 @@ fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstNode):
             push(args, elem_flow.value)
             mir_emit_call_inst(st, "__ep_slice_u8_set", "void", args)
         } else {
+            push(args, mir_const_int("i64", i))
             let elem_flow = mir_emit_expr(st, st.current_block, expr.args[i])
             st.current_block = elem_flow.block
             push(args, elem_flow.value)
             if mir_is_ptr_array_elem_type(st, expr.type_name) {
-                mir_emit_call_inst(st, "__ep_slice_ptr_push", "void", args)
+                mir_emit_call_inst(st, "__ep_slice_ptr_set", "void", args)
             } else {
-                mir_emit_call_inst(st, "__ep_slice_i64_push", "void", args)
+                mir_emit_call_inst(st, "__ep_slice_i64_set", "void", args)
             }
         }
         i = i + 1

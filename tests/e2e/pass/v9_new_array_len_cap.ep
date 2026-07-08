@@ -1,0 +1,23 @@
+# EXIT: 0
+# STDOUT: 3/3/0
+# STDOUT: 2/2/65
+# STDOUT: 1/1/7
+
+struct Cell {
+    value: i64
+}
+
+fun main(): void {
+    let xs = new i64[3]
+    println(f"{len(xs)}/{cap(xs)}/{xs[0]}")
+
+    let bs = new u8[2]
+    bs[0] = 'A'
+    println(f"{len(bs)}/{cap(bs)}/{bs[0]}")
+
+    let cells = new Cell[1]
+    cells[0] = new Cell {}
+    cells[0].value = 7
+    println(f"{len(cells)}/{cap(cells)}/{cells[0].value}")
+    exit(0)
+}

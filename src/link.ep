@@ -150,8 +150,9 @@ fun str_cat_local(left: str, right: str): str {
 }
 
 fun cstr_ready_path(s: str): str {
-    let out = new u8[len(s) + 1]
+    let out = new u8[]
     extend(out, bytes(s))
+    push(out, u8(0))
     ret str(out)
 }
 
@@ -209,13 +210,13 @@ fun append_dos_stub(buf: u8[]): void {
 fun copy_bytes(src: u8[], off: i64, n: i64): u8[] {
     let out = new u8[n]
     for i in 0:n {
-        push(out, src[off + i])
+        out[i] = src[off + i]
     }
     ret out
 }
 
 fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64): str {
-    let out = new u8[max_n]
+    let out = new u8[]
     for i in 0:max_n {
         let b = src[off + i]
         if b == u8(0) {
@@ -555,7 +556,7 @@ fun hint_size(name: str): i64 {
 }
 
 fun build_idata(st: LinkState): void {
-    st.idata = new u8[256]
+    st.idata = new u8[]
     if len(st.imports) == 0 {
         ret
     }
@@ -747,7 +748,7 @@ fun append_padded_section(buf: u8[], name: str, data: u8[]): void {
 }
 
 fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section): i64 {
-    let buf = new u8[4096]
+    let buf = new u8[]
     let num_sec = 2
     if len(st.idata) > 0 {
         num_sec = 3
@@ -854,14 +855,14 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
 fun link_obj(obj_path: str, exe_path: str): i64 {
     let st = new LinkState
     st.data = read_file(obj_path)
-    st.sections = new Section[8]
-    st.syms = new Symbol[128]
-    st.relocs = new Reloc[128]
-    st.strtab = new u8[1]
-    st.imports = new str[32]
-    st.thunk_rvas = new NameValue[32]
-    st.iat_offsets = new NameValue[32]
-    st.idata = new u8[1]
+    st.sections = new Section[]
+    st.syms = new Symbol[]
+    st.relocs = new Reloc[]
+    st.strtab = new u8[]
+    st.imports = new str[]
+    st.thunk_rvas = new NameValue[]
+    st.iat_offsets = new NameValue[]
+    st.idata = new u8[]
     st.idata_rva = 0
     st.data_rva = 0
     st.entry_rva = 4096

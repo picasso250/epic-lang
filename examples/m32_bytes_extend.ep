@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: hiabab
 fun main(): void {
-    let buf = new u8[1]
+    let buf = new u8[]
     extend(buf, bytes("hi"))
     print(str(buf))
 

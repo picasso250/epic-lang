@@ -7,7 +7,7 @@ struct Token {
 
 fun main(): void {
     let tokens = new Token[1]
-    push(tokens, new Token {})
+    tokens[0] = new Token {}
     tokens[0].kind = 100
     tokens[0].value = 50
     exit(tokens[0].kind + tokens[0].value)

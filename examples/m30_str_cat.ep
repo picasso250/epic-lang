@@ -4,7 +4,7 @@ fun main(): void {
     let a = "hello"
     let b = " "
     let c = "world"
-    let buf = new u8[len(a) + len(b) + len(c)]
+    let buf = new u8[]
     extend(buf, bytes(a))
     extend(buf, bytes(b))
     extend(buf, bytes(c))

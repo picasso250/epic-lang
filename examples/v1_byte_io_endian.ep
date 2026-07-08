@@ -42,22 +42,8 @@ fun put_u64_le(buf: u8[], off: i64, x: u64): void {
 
 fun main(): void {
     let buf = new u8[16]
-    push(buf, 'M')
-    push(buf, 'Z')
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
+    buf[0] = 'M'
+    buf[1] = 'Z' 
     put_u16_le(buf, 2, u64(4660))
     put_u32_le(buf, 4, u64(16909060))
     put_u64_le(buf, 8, u64(283686952306183))

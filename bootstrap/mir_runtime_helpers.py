@@ -311,6 +311,8 @@ def emit_slice_word_new(name: str) -> MirFunction:
     """Allocate a word-sized slice header.
 
     fn {name}(i64 %cap) -> ptr
+
+    The argument is both the initial length and capacity.
     """
     b = MirHelperBuilder(
         name,
@@ -339,7 +341,7 @@ def emit_slice_word_new(name: str) -> MirFunction:
     b.br(init_block)
 
     b.set_block(init_block)
-    b.store(b.const_i64(0), b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(1)]))
+    b.store(cap_val, b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(1)]))
     b.store(cap_val, b.gep(ptr(), ValueOperand(header_raw), [b.const_i64(2)]))
     b.ret(ValueOperand(header_raw))
 

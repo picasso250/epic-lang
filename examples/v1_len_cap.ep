@@ -1,11 +1,11 @@
-# EXIT: 34
+# EXIT: 41
 # STDOUT: 3
-# STDOUT: 2
+# STDOUT: 9
 fun main(): void {
     let s = "abc"
     let xs = new i64[9]
-    push(xs, 10)
-    push(xs, 20)
+    xs[0] = 10
+    xs[1] = 20
     println(str(len(s)))
     println(str(len(xs)))
     exit(len(s) + len(xs) + cap(xs) + xs[1])
