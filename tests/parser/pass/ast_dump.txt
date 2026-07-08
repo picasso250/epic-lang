@@ -221,7 +221,7 @@ Program
             ExprStmt
               Call println
                 String one
-        MatchCase
+        MatchCase _
           Block
             ExprStmt
               Call println
@@ -234,7 +234,7 @@ Program
             ExprStmt
               Call println
                 String a
-        MatchCase
+        MatchCase _
           Block
             ExprStmt
               Call println
@@ -247,7 +247,7 @@ Program
             ExprStmt
               Call println
                 String hello
-        MatchCase
+        MatchCase _
           Block
             ExprStmt
               Call println

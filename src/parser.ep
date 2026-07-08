@@ -1378,7 +1378,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         dump_list(node.fields, depth + 1)
         if node.else_block.kind != "" {
             indent(depth + 1)
-            println("MatchCase")
+            println("MatchCase _")
             dump_node(node.else_block, depth + 2)
         }
         ret 0

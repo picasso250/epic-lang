@@ -1300,7 +1300,7 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
         sema_dump_list(node.fields, depth + 1)
         if node.else_block.kind != "" {
             sema_indent(depth + 1)
-            println("MatchCase")
+            println("MatchCase _")
             sema_dump_node(node.else_block, depth + 2)
         }
         ret

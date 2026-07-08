@@ -21,6 +21,7 @@ class ProgramNode(ASTNode):
     funcs: list      # list[FunDefNode]
     structs: list    # list[StructDefNode]
     globals: list = field(default_factory=list)  # list[LetNode]
+    unions: list = field(default_factory=list)   # list[UnionDefNode]
 
 
 @dataclass
@@ -34,6 +35,12 @@ class StructField(ASTNode):
 class StructDefNode(ASTNode):
     name: str
     fields: list     # list[StructField]
+
+
+@dataclass
+class UnionDefNode(ASTNode):
+    name: str
+    members: list    # list[str], each a struct name
 
 
 @dataclass
@@ -158,12 +165,16 @@ class MatchCase(ASTNode):
     bindings: list
     body: 'BlockNode'
     is_else: bool = False
+    variant_name: str = ""
+    binding_name: str = ""
+    binding_type: Optional[EpicType] = None
 
 
 @dataclass
 class MatchNode(ASTNode):
     expr: ASTNode
     cases: list
+    union_name: str = ""
 
 
 @dataclass
@@ -288,6 +299,14 @@ class NewArrayNode(ASTNode):
 class StructInitNode(ASTNode):
     type_name: str
     fields: list
+    line: int = 0
+    resolved_type: Optional[EpicType] = None
+
+
+@dataclass
+class UnionInitNode(ASTNode):
+    type_name: str
+    payload: ASTNode
     line: int = 0
     resolved_type: Optional[EpicType] = None
 

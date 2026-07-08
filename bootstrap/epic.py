@@ -90,8 +90,10 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     funcs = []
     structs = []
     globals = []
+    unions = []
     seen_funcs = {}
     seen_structs = {}
+    seen_unions = {}
     found_main = False
     main_abs = os.path.abspath(main_path)
 
@@ -111,6 +113,14 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
 
         globals.extend(ast.globals)
 
+        for union in ast.unions:
+            if union.name in seen_unions:
+                raise RuntimeError(
+                    f"Duplicate type {union.name}: {input_path} and {seen_unions[union.name]}"
+                )
+            seen_unions[union.name] = input_path
+            unions.append(union)
+
         for func in ast.funcs:
             if func.name == "main" and not is_main_file:
                 continue
@@ -126,7 +136,7 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     if not found_main:
         raise RuntimeError(f"Main file has no main function: {main_path}")
 
-    return ProgramNode(funcs=funcs, structs=structs, globals=globals)
+    return ProgramNode(funcs=funcs, structs=structs, globals=globals, unions=unions)
 
 
 def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):

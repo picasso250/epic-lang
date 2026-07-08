@@ -555,6 +555,119 @@ fun main(): i64 {
         return
     raise AssertionError("expected duplicate method symbol error")
 
+
+def test_adt_struct_union_lowers_to_wrapper_and_payload_match():
+    source = """struct LiteralExpr {
+    value: str
+    line: i64
+}
+
+struct BinaryExpr {
+    op: str
+    left: Expr
+    right: Expr
+    line: i64
+}
+
+type Expr = LiteralExpr | BinaryExpr
+
+fun literal_value(x: LiteralExpr): str {
+    ret x.value
+}
+
+fun main(): void {
+    let e: Expr = new Expr(new LiteralExpr { value: "1", line: 1 })
+    match e {
+        LiteralExpr lit: {
+            print(literal_value(lit))
+        }
+        BinaryExpr b: {
+            print(b.op)
+        }
+    }
+}
+"""
+    ast = Parser(lex(source)).parse_program()
+    assert ast.unions[0].name == "Expr"
+    assert ast.unions[0].members == ["LiteralExpr", "BinaryExpr"]
+    typed = sema.analyze_program(ast)
+    prog = ast_to_mir(typed)
+    text = prog.text()
+    assert "gep struct Expr" in text
+    assert "call ptr __epx_alloc" in text
+    assert "i64 1" in text
+    assert "call ptr literal_value" in text
+
+
+def test_adt_match_must_be_exhaustive_without_default():
+    source = """struct LiteralExpr {
+    value: str
+}
+
+struct BinaryExpr {
+    op: str
+}
+
+type Expr = LiteralExpr | BinaryExpr
+
+fun main(): void {
+    let e: Expr = new Expr(new LiteralExpr { value: "1" })
+    match e {
+        LiteralExpr lit: {
+            print(lit.value)
+        }
+    }
+}
+"""
+    try:
+        sema.analyze_program(Parser(lex(source)).parse_program())
+    except sema.SemanticError as exc:
+        assert "non-exhaustive match for Expr; missing BinaryExpr" in str(exc)
+        return
+    raise AssertionError("expected non-exhaustive ADT match error")
+
+
+def test_adt_requires_explicit_wrapper_construction():
+    source = """struct LiteralExpr {
+    value: str
+}
+
+type Expr = LiteralExpr
+
+fun main(): void {
+    let e: Expr = new LiteralExpr { value: "1" }
+}
+"""
+    try:
+        sema.analyze_program(Parser(lex(source)).parse_program())
+    except sema.SemanticError as exc:
+        assert "let e expected Expr, got LiteralExpr" in str(exc)
+        return
+    raise AssertionError("expected explicit ADT wrapper construction error")
+
+
+def test_adt_single_wildcard_match_is_allowed():
+    source = """struct LiteralExpr {
+    value: str
+}
+
+type Expr = LiteralExpr
+
+fun main(): void {
+    let e: Expr = new Expr(new LiteralExpr { value: "1" })
+    match e {
+        _: {
+            print("ok")
+        }
+    }
+}
+"""
+    typed = sema.analyze_program(Parser(lex(source)).parse_program())
+    prog = ast_to_mir(typed)
+    text = prog.text()
+    assert "gep struct Expr" in text
+    assert "call void __ep_print_str" in text
+
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
@@ -571,6 +684,10 @@ def main():
     test_runtime_source_str_slice_lowers_as_epic_function()
     test_user_method_lowers_to_mangled_function_call()
     test_user_method_conflicts_with_mangled_function_name()
+    test_adt_struct_union_lowers_to_wrapper_and_payload_match()
+    test_adt_match_must_be_exhaustive_without_default()
+    test_adt_requires_explicit_wrapper_construction()
+    test_adt_single_wildcard_match_is_allowed()
     print("PASS test_mir")
 
 

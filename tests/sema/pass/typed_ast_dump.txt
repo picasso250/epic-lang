@@ -346,7 +346,7 @@ Program
           Block
             Return
               Var total : i64
-        MatchCase
+        MatchCase _
           Block
             Return
               Binary + : i64

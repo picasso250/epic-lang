@@ -84,6 +84,8 @@ class MirCodegen(MirFunctionBuilder):
         self.strings = {}
         self.string_counter = 0
         self.structs = {}
+        self.union_defs = {}
+        self.union_tags = {}
         self.loop_stack = []
 
     def emit_program(self, ast):
@@ -729,6 +731,8 @@ class MirCodegen(MirFunctionBuilder):
         return flow
 
     def _emit_match_from(self, in_block, stmt):
+        if getattr(stmt, "union_name", ""):
+            return self._emit_union_match_from(in_block, stmt)
         scrutinee = self._expr_from(in_block, stmt.expr)
         self.set_block(scrutinee.block)
         match_addr = self._alloc_local(f"__match{self.value_counter}", scrutinee.value.type)
@@ -780,6 +784,62 @@ class MirCodegen(MirFunctionBuilder):
     def _emit_match_bindings(self, match_addr, case):
         if not case.bindings:
             return
+
+    def _emit_union_match_from(self, in_block, stmt):
+        scrutinee = self._expr_from(in_block, stmt.expr)
+        self.set_block(scrutinee.block)
+        match_addr = self._alloc_local(f"__match{self.value_counter}", scrutinee.value.type)
+        self.inst("store", [scrutinee.value, ValueOperand(match_addr)])
+
+        union_name = stmt.union_name
+        end_block = self.new_block("match.end")
+        else_case = next((case for case in stmt.cases if case.is_else), None)
+        checks = [(case, self.new_block("match.case")) for case in stmt.cases if not case.is_else]
+        else_block = self.new_block("match.else") if else_case is not None else end_block
+
+        check_block = self.current_block
+        next_check_blocks = [self.new_block("match.next") for _ in checks[:-1]]
+        for idx, (case, case_block) in enumerate(checks):
+            self.set_block(check_block)
+            next_block = next_check_blocks[idx] if idx < len(checks) - 1 else else_block
+            wrapper = self.inst("load", [ValueOperand(match_addr)], result_type=ptr(), type=ptr())
+            tag = self._load_field(ValueOperand(wrapper), union_name, "tag", result_type=I64)
+            expected = ConstIntOperand(I64, self.union_tags[union_name][case.variant_name])
+            cond = self.inst("icmp.eq", [tag, expected], result_type=BOOL)
+            self.condbr(self.current_block, ValueOperand(cond), case_block.name, next_block.name)
+            if idx < len(checks) - 1:
+                check_block = next_check_blocks[idx]
+
+        if not checks:
+            self.br(check_block, else_block.name)
+
+        for case, case_block in checks:
+            self.set_block(case_block)
+            old_local = self.locals.get(case.binding_name)
+            old_type = self.local_types.get(case.binding_name)
+            had_old = case.binding_name in self.locals
+            wrapper = self.inst("load", [ValueOperand(match_addr)], result_type=ptr(), type=ptr())
+            payload = self._load_field(ValueOperand(wrapper), union_name, "payload", result_type=ptr())
+            bind_addr = self._alloc_local(case.binding_name, ptr())
+            self.inst("store", [payload, ValueOperand(bind_addr)])
+            self.locals[case.binding_name] = bind_addr
+            self.local_types[case.binding_name] = ptr()
+            case_flow = self._emit_block_from(self.current_block, case.body)
+            if had_old:
+                self.locals[case.binding_name] = old_local
+                self.local_types[case.binding_name] = old_type
+            else:
+                self.locals.pop(case.binding_name, None)
+                self.local_types.pop(case.binding_name, None)
+            if case_flow.reachable:
+                self.br(case_flow.block, end_block.name)
+
+        if else_case is not None:
+            else_flow = self._emit_block_from(else_block, else_case.body)
+            if else_flow.reachable:
+                self.br(else_flow.block, end_block.name)
+
+        return self._reachable(end_block)
 
     def _emit_expr(self, expr):
         return self._emit_expr_from(self.ensure_insertable(), expr).value
@@ -833,6 +893,8 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_slice_from(self.current_block, expr)
         if isinstance(expr, StructInitNode):
             return self._emit_struct_init_from(self.current_block, expr)
+        if isinstance(expr, UnionInitNode):
+            return self._emit_union_init_from(self.current_block, expr)
         if isinstance(expr, FieldAccessNode):
             return self._emit_field_access_from(self.current_block, expr)
         raise MirCodegenError(f"machine MIR does not support expr yet: {type(expr).__name__}")
@@ -1292,6 +1354,20 @@ class MirCodegen(MirFunctionBuilder):
             block = self.current_block
         return ValueFlow(obj, self.current_block)
 
+    def _emit_union_init_from(self, in_block, expr):
+        self.set_block(in_block)
+        if expr.type_name not in self.union_defs:
+            raise MirCodegenError(f"unknown union: {expr.type_name}")
+        payload_type = self._infer_type(expr.payload)
+        if payload_type.kind != "named" or payload_type.name not in self.union_tags[expr.type_name]:
+            raise MirCodegenError(f"invalid union payload for {expr.type_name}")
+        payload = self._emit_expr_from(self.current_block, expr.payload)
+        self.set_block(payload.block)
+        wrapper = self._alloc_struct(expr.type_name)
+        self._store_field(wrapper, expr.type_name, "tag", ConstIntOperand(I64, self.union_tags[expr.type_name][payload_type.name]))
+        self._store_field(wrapper, expr.type_name, "payload", payload.value)
+        return ValueFlow(wrapper, self.current_block)
+
     def _emit_field_access(self, expr):
         return self._emit_field_access_from(self.ensure_insertable(), expr).value
 
@@ -1450,6 +1526,8 @@ class MirCodegen(MirFunctionBuilder):
 
     def _compute_struct_layouts(self, ast):
         self.structs = {}
+        self.union_defs = {union.name: union.members for union in ast.unions}
+        self.union_tags = {union.name: {member: idx for idx, member in enumerate(union.members, start=1)} for union in ast.unions}
         for struct_name in ("str", "_slice_u8", "_slice_i64", "_slice_str"):
             self.structs[struct_name] = self._slice_layout(struct_name)
         for map_struct in ("_map_str_i64", "_map_str_bool", "_map_str_str"):
@@ -1460,6 +1538,8 @@ class MirCodegen(MirFunctionBuilder):
             )
         for struct_node in ast.structs:
             self.structs[struct_node.name] = MirStruct(struct_node.name, [], 0)
+        for union_node in ast.unions:
+            self.structs[union_node.name] = MirStruct(union_node.name, [], 0)
         for struct_node in ast.structs:
             fields = []
             offset = 0
@@ -1467,6 +1547,12 @@ class MirCodegen(MirFunctionBuilder):
                 fields.append((field.name, self._type(field.resolved_type), offset))
                 offset += 8
             self.structs[struct_node.name] = self._make_struct_layout(struct_node.name, fields, size=max(offset, 1))
+        for union_node in ast.unions:
+            self.structs[union_node.name] = self._make_struct_layout(
+                union_node.name,
+                [("tag", I64, 0), ("payload", ptr(), 8)],
+                size=16,
+            )
         for struct_name in list(self.structs):
             self.structs[f"_slice_{struct_name}"] = self._slice_layout(f"_slice_{struct_name}")
         self.program.structs = self.structs

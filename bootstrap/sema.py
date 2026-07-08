@@ -52,6 +52,9 @@ class SemanticAnalyzer:
     def __init__(self, program):
         self.program = program
         self.struct_names = {s.name for s in program.structs}
+        self.union_defs = {u.name: u.members for u in program.unions}
+        self.union_names = set(self.union_defs)
+        self.union_tags = {}
         self.struct_fields = {}
         self.func_sigs = {}
         self.globals = {}
@@ -61,6 +64,7 @@ class SemanticAnalyzer:
 
     def analyze(self):
         self._build_types()
+        self._build_unions()
         self._build_functions()
         self._build_globals()
         for fn in self.program.funcs:
@@ -77,6 +81,23 @@ class SemanticAnalyzer:
                 field.resolved_type = self._type_name(field.type)
                 fields[field.name] = field.resolved_type
             self.struct_fields[struct.name] = fields
+
+    def _build_unions(self):
+        for union in self.program.unions:
+            if union.name in self.struct_names:
+                self._fail_global(f"type {union.name} conflicts with struct {union.name}")
+            if not union.members:
+                self._fail_global(f"union {union.name} requires at least one member")
+            seen = set()
+            tags = {}
+            for idx, member in enumerate(union.members, start=1):
+                if member in seen:
+                    self._fail_global(f"duplicate union member {union.name}.{member}")
+                seen.add(member)
+                if member not in self.struct_names:
+                    self._fail_global(f"union member {union.name}.{member} must be a struct")
+                tags[member] = idx
+            self.union_tags[union.name] = tags
 
     def _build_functions(self):
         for fn in self.program.funcs:
@@ -111,6 +132,8 @@ class SemanticAnalyzer:
             return all(self._is_global_literal_init(key) and self._is_global_literal_init(value) for key, value in node.entries)
         if isinstance(node, StructInitNode):
             return all(self._is_global_literal_init(value) for _, value in node.fields)
+        if isinstance(node, UnionInitNode):
+            return self._is_global_literal_init(node.payload)
         return False
 
     def _build_globals(self):
@@ -251,6 +274,9 @@ class SemanticAnalyzer:
 
     def _analyze_match(self, stmt):
         scrutinee = self._expr(stmt.expr)
+        if scrutinee.type.kind == "named" and scrutinee.type.name in self.union_names:
+            self._analyze_union_match(stmt, scrutinee.type.name)
+            return
         seen_else = False
         for idx, case in enumerate(stmt.cases):
             if seen_else:
@@ -259,7 +285,44 @@ class SemanticAnalyzer:
                 seen_else = True
                 self._analyze_block(case.body)
                 continue
+            if case.variant_name or case.binding_name:
+                self._fail("ADT match case requires union scrutinee")
             self._analyze_match_case(scrutinee.type, case)
+
+    def _analyze_union_match(self, stmt, union_name):
+        stmt.union_name = union_name
+        members = set(self.union_defs[union_name])
+        seen = set()
+        seen_else = False
+        for case in stmt.cases:
+            if seen_else:
+                self._fail("match _ must be the final case")
+            if case.is_else:
+                seen_else = True
+                self._analyze_block(case.body)
+                continue
+            if case.pattern is not None:
+                self._fail(f"ADT match on {union_name} requires variant binding cases")
+            if not case.variant_name or not case.binding_name:
+                self._fail(f"ADT match on {union_name} requires variant binding cases")
+            if case.variant_name not in members:
+                self._fail(f"{case.variant_name} is not a member of {union_name}")
+            if case.variant_name in seen:
+                self._fail(f"duplicate match case {case.variant_name}")
+            seen.add(case.variant_name)
+            old = self.locals.get(case.binding_name)
+            had_old = case.binding_name in self.locals
+            case.binding_type = NAMED(case.variant_name)
+            self.locals[case.binding_name] = case.binding_type
+            self._analyze_block(case.body)
+            if had_old:
+                self.locals[case.binding_name] = old
+            else:
+                del self.locals[case.binding_name]
+        if not seen_else:
+            missing = [member for member in self.union_defs[union_name] if member not in seen]
+            if missing:
+                self._fail(f"non-exhaustive match for {union_name}; missing {', '.join(missing)}")
 
     def _analyze_match_case(self, scrutinee_type, case):
         if case.bindings:
@@ -329,6 +392,8 @@ class SemanticAnalyzer:
             return ExprInfo(ARRAY(elem))
         if isinstance(expr, StructInitNode):
             return self._struct_init_expr(expr)
+        if isinstance(expr, UnionInitNode):
+            return self._union_init_expr(expr)
         if isinstance(expr, MapInitNode):
             return self._map_init_expr(expr)
         self._fail(f"unsupported expression: {type(expr).__name__}")
@@ -512,6 +577,16 @@ class SemanticAnalyzer:
         self._check_named_fields(self.struct_fields[expr.type_name], expr.fields, expr.type_name)
         return ExprInfo(NAMED(expr.type_name))
 
+    def _union_init_expr(self, expr):
+        if expr.type_name not in self.union_names:
+            self._fail(f"unknown union {expr.type_name}")
+        payload = self._expr(expr.payload)
+        if payload.type.kind != "named" or payload.type.name not in self.struct_names:
+            self._fail(f"new {expr.type_name}(...) expected struct payload, got {payload.type}")
+        if payload.type.name not in self.union_defs[expr.type_name]:
+            self._fail(f"new {expr.type_name}(...) expected one of {', '.join(self.union_defs[expr.type_name])}, got {payload.type.name}")
+        return ExprInfo(NAMED(expr.type_name))
+
     def _map_init_expr(self, expr):
         typ = self._type_name(expr.type_name)
         if typ.kind == "map":
@@ -563,6 +638,8 @@ class SemanticAnalyzer:
         if base_type.kind == "named":
             fields = self.struct_fields.get(base_type.name)
             if fields is None:
+                if base_type.name in self.union_names:
+                    self._fail(f"field access expected struct, got union {base_type.name}; use match")
                 self._fail(f"field access expected struct, got {base_type}")
             if field not in fields:
                 self._fail(f"unknown field {base_type.name}.{field}")
@@ -597,7 +674,7 @@ class SemanticAnalyzer:
             return VOID
         if name == "str":
             return STR
-        if name in self.struct_names:
+        if name in self.struct_names or name in self.union_names:
             return NAMED(name)
         self._fail_global(f"unknown type {name}")
 
@@ -798,6 +875,9 @@ def assert_typed_program(program):
             for idx, (_, value) in enumerate(node.fields):
                 expr(value, f"{path}.fields[{idx}]")
             return
+        if isinstance(node, UnionInitNode):
+            expr(node.payload, f"{path}.payload")
+            return
         if isinstance(node, ArrayLiteralNode):
             for idx, value in enumerate(node.values):
                 expr(value, f"{path}.values[{idx}]")
@@ -871,7 +951,7 @@ def assert_typed_program(program):
         if isinstance(node, MatchNode):
             expr(node.expr, f"{path}.expr")
             for idx, case in enumerate(node.cases):
-                if not case.is_else:
+                if not case.is_else and case.pattern is not None:
                     expr(case.pattern, f"{path}.cases[{idx}].pattern")
                 block(case.body, f"{path}.cases[{idx}].body")
             return
@@ -911,6 +991,8 @@ def dump_typed_ast_lines(node, depth=0):
         emit("Program")
         for struct in node.structs:
             out.extend(dump_typed_ast_lines(struct, depth + 1))
+        for union in node.unions:
+            out.extend(dump_typed_ast_lines(union, depth + 1))
         for glob in node.globals:
             out.extend(dump_typed_ast_lines(glob, depth + 1))
         for func in node.funcs:
@@ -921,6 +1003,10 @@ def dump_typed_ast_lines(node, depth=0):
             out.extend(dump_typed_ast_lines(field, depth + 1))
     elif isinstance(node, StructField):
         emit(f"StructField {node.name}{_type_suffix(node)}")
+    elif isinstance(node, UnionDefNode):
+        emit(f"UnionDef {node.name}")
+        for member in node.members:
+            out.append(_dump_line(depth + 1, f"UnionMember {member}"))
     elif isinstance(node, FunDefNode):
         if node.method_name:
             emit(f"Method {node.receiver_type}.{node.method_name}{_type_suffix(node)}")
@@ -992,7 +1078,12 @@ def dump_typed_ast_lines(node, depth=0):
         for case in node.cases:
             out.extend(dump_typed_ast_lines(case, depth + 1))
     elif isinstance(node, MatchCase):
-        emit("MatchCase")
+        if node.is_else:
+            emit("MatchCase _")
+        elif node.variant_name:
+            emit(f"MatchCase {node.variant_name} {node.binding_name}")
+        else:
+            emit("MatchCase")
         if node.pattern is not None:
             out.extend(dump_typed_ast_lines(node.pattern, depth + 1))
         out.extend(dump_typed_ast_lines(node.body, depth + 1))
@@ -1056,6 +1147,9 @@ def dump_typed_ast_lines(node, depth=0):
         for field, value in node.fields:
             out.append(_dump_line(depth + 1, f"InitField {field}"))
             out.extend(dump_typed_ast_lines(value, depth + 2))
+    elif isinstance(node, UnionInitNode):
+        emit(f"UnionInit {node.type_name}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.payload, depth + 1))
     elif isinstance(node, ArrayLiteralNode):
         emit(f"ArrayLiteral : {node.elem_type}{_type_suffix(node)}")
         for value in node.values:

@@ -22,6 +22,12 @@ class Parser:
             return self.tokens[self.pos]
         return ("EOF", None, -1)
 
+    def peek_ahead(self, offset):
+        idx = self.pos + offset
+        if idx < len(self.tokens):
+            return self.tokens[idx]
+        return ("EOF", None, -1)
+
     def peek_kind(self, kind):
         return self.peek()[0] == kind
 
@@ -60,19 +66,22 @@ class Parser:
         funcs = []
         structs = []
         globals = []
+        unions = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "STRUCT", "LET"):
+        while self.peek()[0] in ("FUN", "STRUCT", "LET", "TYPE"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
             elif self.peek_kind("STRUCT"):
                 structs.append(self.parse_struct_def())
+            elif self.peek_kind("TYPE"):
+                unions.append(self.parse_union_def())
             else:
                 globals.append(self.parse_let_stmt())
             self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return ProgramNode(funcs=funcs, structs=structs, globals=globals)
+        return ProgramNode(funcs=funcs, structs=structs, globals=globals, unions=unions)
 
     # ── fun definition ─────────────────────────────────────────────────
 
@@ -90,6 +99,19 @@ class Parser:
             fields.append(StructField(name=fname[1], type=ftype))
         self.expect("RBRACE")
         return StructDefNode(name=name[1], fields=fields)
+
+    def parse_union_def(self):
+        self.expect("TYPE")
+        name = self.expect("ID")
+        self.expect("ASSIGN")
+        members = []
+        while True:
+            member = self.expect("ID")
+            members.append(member[1])
+            if not self.check("PIPE"):
+                break
+        self.expect_stmt_end()
+        return UnionDefNode(name=name[1], members=members)
 
     def parse_fn_def(self):
         self.expect("FUN")
@@ -362,6 +384,17 @@ class Parser:
                 self.expect("COLON")
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
+            elif self.peek_kind("ID") and self.peek()[1] == "_":
+                self.advance()
+                self.expect("COLON")
+                body = self.parse_block()
+                cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
+            elif self.peek_kind("ID") and self.peek_ahead(1)[0] == "ID" and self.peek_ahead(2)[0] == "COLON":
+                variant = self.expect("ID")
+                binding = self.expect("ID")
+                self.expect("COLON")
+                body = self.parse_block()
+                cases.append(MatchCase(pattern=None, bindings=[], body=body, variant_name=variant[1], binding_name=binding[1]))
             else:
                 pattern = self.parse_expr()
                 self.expect("COLON")
@@ -495,6 +528,10 @@ class Parser:
                 if count is None and self.check("LBRACE"):
                     return ArrayLiteralNode(elem_type=name, values=self.parse_brace_values(), line=t[2])
                 return NewArrayNode(elem_type=name, count=count, line=t[2])
+            if self.check("LPAREN"):
+                payload = self.parse_expr()
+                self.expect("RPAREN")
+                return UnionInitNode(type_name=name, payload=payload, line=t[2])
             if self.check("LBRACE"):
                 return StructInitNode(type_name=name, fields=self.parse_named_fields_after_lbrace(), line=t[2])
             return StructInitNode(type_name=name, fields=[], line=t[2])
@@ -649,6 +686,8 @@ def dump_ast_lines(node, depth=0):
         emit("Program")
         for struct in node.structs:
             out.extend(dump_ast_lines(struct, depth + 1))
+        for union in node.unions:
+            out.extend(dump_ast_lines(union, depth + 1))
         for glob in node.globals:
             out.extend(dump_ast_lines(glob, depth + 1))
         for func in node.funcs:
@@ -659,6 +698,10 @@ def dump_ast_lines(node, depth=0):
             out.extend(dump_ast_lines(field, depth + 1))
     elif isinstance(node, StructField):
         emit(f"StructField {node.name} : {node.type}")
+    elif isinstance(node, UnionDefNode):
+        emit(f"UnionDef {node.name}")
+        for member in node.members:
+            out.append(_dump_line(depth + 1, f"UnionMember {member}"))
     elif isinstance(node, FunDefNode):
         if node.method_name:
             emit(f"Method {node.receiver_type}.{node.method_name} : {node.ret_type}")
@@ -731,7 +774,12 @@ def dump_ast_lines(node, depth=0):
         for case in node.cases:
             out.extend(dump_ast_lines(case, depth + 1))
     elif isinstance(node, MatchCase):
-        emit("MatchCase")
+        if node.is_else:
+            emit("MatchCase _")
+        elif node.variant_name:
+            emit(f"MatchCase {node.variant_name} {node.binding_name}")
+        else:
+            emit("MatchCase")
         if node.pattern is not None:
             out.extend(dump_ast_lines(node.pattern, depth + 1))
         for field, bind in node.bindings:
@@ -797,6 +845,9 @@ def dump_ast_lines(node, depth=0):
         for field, value in node.fields:
             out.append(_dump_line(depth + 1, f"InitField {field}"))
             out.extend(dump_ast_lines(value, depth + 2))
+    elif isinstance(node, UnionInitNode):
+        emit(f"UnionInit {node.type_name}")
+        out.extend(dump_ast_lines(node.payload, depth + 1))
     elif isinstance(node, ArrayLiteralNode):
         emit(f"ArrayLiteral : {node.elem_type}")
         for value in node.values:
