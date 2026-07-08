@@ -15,6 +15,7 @@
 - 当前测试入口（按推荐顺序）：
   - `python tests/run.py`             # 模块级测试体系
   - `python test_examples_py.py`      # examples/ 正向学习示例
+  - `python test_bootstrap_fixed_point.py` # 自举 不动点
 - `examples/` 只放正向、典型、适合初学者学习的示例程序，不放负向测试。
 - 负向测试放 `tests/<module>/fail/`。
 - `test_*.py` 是可直接运行的脚本测试，不是 pytest 测试；不要把 `python -m pytest` 当作支持入口。
