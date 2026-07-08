@@ -12,30 +12,52 @@ struct FStringExprPart {
 
 type FStringPart = FStringTextPart | FStringExprPart
 
-struct Token {
+struct PlainToken {
     kind: str
     text: str
     dump_text: str
     line: i64
-    fstring_parts: FStringPart[]
 }
+
+struct FStringToken {
+    line: i64
+    parts: FStringPart[]
+}
+
+type Token = PlainToken | FStringToken
 
 # ── Token ───────────────────────────────────────────────────────────────
 
 fun make_token(kind: str, text: str, dump_text: str, line: i64): Token {
-    let t = new Token {}
-    t.kind = kind
-    t.text = text
-    t.dump_text = dump_text
-    t.line = line
-    t.fstring_parts = new FStringPart[]
-    ret t
+    ret new Token(new PlainToken { kind: kind, text: text, dump_text: dump_text, line: line })
 }
 
 fun make_fstring_token(parts: FStringPart[], line: i64): Token {
-    let t = make_token("FSTRING", "", "", line)
-    t.fstring_parts = parts
-    ret t
+    ret new Token(new FStringToken { line: line, parts: parts })
+}
+
+fun token_kind(t: Token): str {
+    match t {
+        PlainToken p: { ret p.kind }
+        FStringToken f: { ret "FSTRING" }
+    }
+    ret "<bad token>"
+}
+
+fun token_text(t: Token): str {
+    match t {
+        PlainToken p: { ret p.text }
+        FStringToken f: { ret "" }
+    }
+    ret ""
+}
+
+fun token_line(t: Token): i64 {
+    match t {
+        PlainToken p: { ret p.line }
+        FStringToken f: { ret f.line }
+    }
+    ret 0
 }
 
 fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
@@ -311,8 +333,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
         }
     }
     panic "unterminated f-string literal"
-    let t = new Token {}
-    ret t
+    ret make_token("EOF", "", "", line)
 }
 
 
@@ -694,22 +715,24 @@ fun dump_line(line: i64, kind: str, dump_text: str): i64 {
 
 fun dump_tokens(tokens: Token[]): i64 {
     for i in 0:len(tokens) {
-        let t = tokens[i]
-        if t.kind == "FSTRING" {
-            dump_line(t.line, "FSTRING_BEGIN", "")
-            for j in 0:len(t.fstring_parts) {
-                match t.fstring_parts[j] {
-                    FStringTextPart part: {
-                        dump_line(t.line, "FSTRING_TEXT", part.dump_text)
-                    }
-                    FStringExprPart part: {
-                        dump_line(t.line, "FSTRING_EXPR", part.dump_text)
+        match tokens[i] {
+            FStringToken t: {
+                dump_line(t.line, "FSTRING_BEGIN", "")
+                for j in 0:len(t.parts) {
+                    match t.parts[j] {
+                        FStringTextPart part: {
+                            dump_line(t.line, "FSTRING_TEXT", part.dump_text)
+                        }
+                        FStringExprPart part: {
+                            dump_line(t.line, "FSTRING_EXPR", part.dump_text)
+                        }
                     }
                 }
+                dump_line(t.line, "FSTRING_END", "")
             }
-            dump_line(t.line, "FSTRING_END", "")
-        } else {
-            dump_line(t.line, t.kind, t.dump_text)
+            PlainToken t: {
+                dump_line(t.line, t.kind, t.dump_text)
+            }
         }
     }
     ret 0
