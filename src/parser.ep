@@ -1117,15 +1117,15 @@ fun parse_map_init_entries(p: Parser, node: AstNode): AstNode {
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[0]
     for i in 0:len(parts) {
-        let part = parts[i]
-        if part.kind == "text" {
-            if len(part.text) > 0 {
-                let n = ast_node("FStringText")
-                n.value = part.text
-                out.push(n)
+        match parts[i] {
+            FStringTextPart part: {
+                if len(part.text) > 0 {
+                    let n = ast_node("FStringText")
+                    n.value = part.text
+                    out.push(n)
+                }
             }
-        } else {
-            if part.kind == "expr" {
+            FStringExprPart part: {
                 let tokens = lex(part.text)
                 let p = make_parser(tokens)
                 let expr = parse_expr(p)
@@ -1134,8 +1134,6 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
                     parse_error(line, "Unexpected token in f-string expression")
                 }
                 out.push(expr)
-            } else {
-                parse_error(line, "Expected f-string part")
             }
         }
     }

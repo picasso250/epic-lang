@@ -1,10 +1,16 @@
 #
 
-struct FStringPart {
-    kind: str
+struct FStringTextPart {
     text: str
     dump_text: str
 }
+
+struct FStringExprPart {
+    text: str
+    dump_text: str
+}
+
+type FStringPart = FStringTextPart | FStringExprPart
 
 struct Token {
     kind: str
@@ -52,21 +58,13 @@ fun push_string_token(tokens: Token[], text: str, dump_text: str, line: i64): i6
 
 fun push_fstring_text(parts: FStringPart[], text: str, dump_text: str): i64 {
     if len(text) > 0 {
-        let p = new FStringPart {}
-        p.kind = "text"
-        p.text = text
-        p.dump_text = dump_text
-        parts.push(p)
+        parts.push(new FStringPart(new FStringTextPart { text: text, dump_text: dump_text }))
     }
     ret 0
 }
 
 fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
-    let p = new FStringPart {}
-    p.kind = "expr"
-    p.text = text
-    p.dump_text = text
-    parts.push(p)
+    parts.push(new FStringPart(new FStringExprPart { text: text, dump_text: text }))
     ret 0
 }
 
@@ -700,11 +698,11 @@ fun dump_tokens(tokens: Token[]): i64 {
         if t.kind == "FSTRING" {
             dump_line(t.line, "FSTRING_BEGIN", "")
             for j in 0:len(t.fstring_parts) {
-                let part = t.fstring_parts[j]
-                if part.kind == "text" {
-                    dump_line(t.line, "FSTRING_TEXT", part.dump_text)
-                } else {
-                    if part.kind == "expr" {
+                match t.fstring_parts[j] {
+                    FStringTextPart part: {
+                        dump_line(t.line, "FSTRING_TEXT", part.dump_text)
+                    }
+                    FStringExprPart part: {
                         dump_line(t.line, "FSTRING_EXPR", part.dump_text)
                     }
                 }
