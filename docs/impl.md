@@ -168,6 +168,9 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 ### 降级说明 (Lowering Notes)
 
+- **用户方法 v1**：Parser 将 `fun (p: Parser) peek(): Token` 解析为带 receiver metadata 的函数定义，并占用内部符号 `Parser__peek`。Sema 对 `p.peek(args...)` 先求 receiver 类型；如果是用户 struct `Parser`，只查 `Parser__peek(p, args...)`，不 fallback 到 `peek(p, args...)`。普通函数名允许包含 `__`；mangled method symbol 与已有函数重复时，复用普通重复定义错误。
+- **方法边界**：第一版只支持用户 struct receiver，不支持 primitive / `str` / array / map receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 struct 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
+
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
 - **Map 降级**：Python reference compiler 将 `map[str]i64`、`map[str]bool`、`map[str]str` 降级为 str-keyed word map。entry 为 `{key, value, occupied}` 三个 word，key 比较调用 `__ep_str_eq`。`m[key] = value` 插入或覆盖，满时扩容。不存在的键查找返回值类型零值。`m.has(key)` 区分是否缺失，`m.del(key)` 使用 swap-delete 并返回是否删除成功。`new map[str]T { ... }` 降级为一次 map new 加按源码顺序执行的 map set。

@@ -213,6 +213,10 @@ after ADT removal and naming unification.
 - `match` literal switch only
 - Function-style builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `str` / `bytes` / `cstr` / `system`
 - Builtin container dot calls: `xs.push(x)` / `dst.extend(src)` / `m.has(key)` / `m.del(key)`
+- User methods v1: `fun (receiver: StructName) method(args...): Ret { ... }`; receiver type must be a user-defined struct.
+- User method lowering: `fun (p: Parser) peek(): Token` occupies the global symbol `Parser__peek`; `p.peek()` lowers to `Parser__peek(p)`.
+- Method calls do not support overloads, traits, inheritance, virtual dispatch, method values, generics, or fallback to `peek(p)`.
+- Ordinary function names may contain `__`; if a method-generated `Type__method` symbol duplicates an existing function, normal duplicate-definition checking rejects it.
 - String/byte-view builtins (retained temporarily): `len(s)` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; byte indexing goes through `bytes(s)[i]`; `str(bytes)` / `bytes(s)` are zero-copy identity casts; `cstr` remains an escape hatch
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`

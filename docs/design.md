@@ -65,6 +65,38 @@ fun main(): void {
 }
 ```
 
+### 用户方法 (User Methods)
+
+Epic 支持一个很小的用户方法语法，作为 receiver-first 调用形式：
+
+```epic
+struct Parser {
+    pos: i64
+}
+
+fun (p: Parser) peek(): Token {
+    ...
+}
+
+let tok = p.peek()
+```
+
+方法声明会被降低为普通全局函数符号：
+
+```text
+fun (p: Parser) peek(): Token  =>  Parser__peek(p: Parser): Token
+p.peek()                       =>  Parser__peek(p)
+```
+
+规则：
+
+- receiver 类型必须是用户定义的 `struct` 名称；第一版不支持 primitive、`str`、`T[]`、`map[str]T` receiver。
+- receiver 作为降低后函数的第一个参数；Epic 的结构体本来就是 heap-backed reference，没有 Go 风格的值 receiver / 指针 receiver 区分。
+- 不支持重载、继承、trait、virtual dispatch、method value、泛型方法或 fallback 到 `peek(p)`。
+- struct receiver 的 `p.peek(args...)` 只查找 `Parser__peek(p, args...)`。
+- 普通函数名允许包含 `__`，以兼容 runtime/helper 命名；method declaration 生成的 `Type__method` 如果与已有函数符号重复，按普通重复定义报错。
+- `os.<dll>.<Function>(...)` 和内置容器点调用仍由语义层优先识别；用户方法不覆盖这些内置点调用。
+
 从 `main` 末尾自然结束时以状态 `0` 退出。非零退出使用 `exit(code)`。
 
 ## 表达式与语句 (Expressions and Statements)
