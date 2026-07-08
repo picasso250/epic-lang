@@ -248,6 +248,15 @@ class FieldAccessNode(ASTNode):
 
 
 @dataclass
+class DotCallNode(ASTNode):
+    object: ASTNode
+    name: str
+    args: list      # list[ASTNode]
+    line: int = 0
+    resolved_type: Optional[EpicType] = None
+
+
+@dataclass
 class SubscriptNode(ASTNode):
     base: ASTNode
     index: ASTNode

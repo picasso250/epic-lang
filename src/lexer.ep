@@ -34,19 +34,19 @@ fun make_fstring_token(parts: FStringPart[], line: i64): Token {
 
 fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
     let t = make_token(kind, text, text, line)
-    push(tokens, t)
+    tokens.push(t)
     ret 0
 }
 
 fun push_newline_token(tokens: Token[], line: i64): i64 {
     let t = make_token("NEWLINE", "\n", "\\n", line)
-    push(tokens, t)
+    tokens.push(t)
     ret 0
 }
 
 fun push_string_token(tokens: Token[], text: str, dump_text: str, line: i64): i64 {
     let t = make_token("STRING", text, dump_text, line)
-    push(tokens, t)
+    tokens.push(t)
     ret 0
 }
 
@@ -56,7 +56,7 @@ fun push_fstring_text(parts: FStringPart[], text: str, dump_text: str): i64 {
         p.kind = "text"
         p.text = text
         p.dump_text = dump_text
-        push(parts, p)
+        parts.push(p)
     }
     ret 0
 }
@@ -66,7 +66,7 @@ fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
     p.kind = "expr"
     p.text = text
     p.dump_text = text
-    push(parts, p)
+    parts.push(p)
     ret 0
 }
 
@@ -109,7 +109,7 @@ let keyword_kinds = new map[str]str {
 }
 
 fun keyword_kind(text: str): str {
-    if map_has(keyword_kinds, text) {
+    if keyword_kinds.has(text) {
         ret keyword_kinds[text]
     }
     ret "ID"
@@ -156,7 +156,7 @@ fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
             }
             c = decode_escape(src_bytes[pos])
         }
-        push(buf, c)
+        buf.push(c)
         pos += 1
     }
     ret str(buf)
@@ -371,7 +371,7 @@ fun lex(src: str): Token[] {
             if pos < n && src_bytes[pos] == '"' {
                 pos += 1
             }
-            push(tokens, t)
+            tokens.push(t)
             consumed = 1
         }
 
@@ -398,7 +398,7 @@ fun lex(src: str): Token[] {
                         let e = src_bytes[pos]
                         c = decode_escape(e)
                     }
-                    push(buf, c)
+                    buf.push(c)
                     pos += 1
                 }
             }

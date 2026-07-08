@@ -60,7 +60,7 @@ fun machine_die(msg: str): void {
 }
 
 fun machine_append_byte(out: i64[], value: i64): void {
-    push(out, value & 255)
+    out.push(value & 255)
 }
 
 fun machine_u32_value(value: i64): i64 {
@@ -151,13 +151,13 @@ fun machine_mem_modrm(b: MachineBuilder, reg_field: i64, base: str, disp: i64): 
 
 fun machine_add_text_label(b: MachineBuilder, name: str): void {
     let offset = len(b.text)
-    push(b.text_label_names, name)
-    push(b.text_label_offsets, offset)
+    b.text_label_names.push(name)
+    b.text_label_offsets.push(offset)
     b.text_label_index[name] = offset
 }
 
 fun machine_text_label_offset_or_neg1(b: MachineBuilder, name: str): i64 {
-    if map_has(b.text_label_index, name) {
+    if b.text_label_index.has(name) {
         ret b.text_label_index[name]
     }
     ret -1
@@ -180,12 +180,12 @@ fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): vo
     f.offset = offset
     f.label = label
     f.kind = kind
-    push(b.fixups, f)
+    b.fixups.push(f)
 }
 
 fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
-    push(b.text_reloc_offsets, offset)
-    push(b.text_reloc_names, name)
+    b.text_reloc_offsets.push(offset)
+    b.text_reloc_names.push(name)
 }
 
 fun machine_has_symbol_name(names: str[], name: str): bool {
@@ -229,14 +229,14 @@ fun machine_sorted_strings(names: str[]): str[] {
         let j = 0
         for j < len(out) {
             if !inserted && machine_ascii_less(key, out[j]) {
-                push(next, key)
+                next.push(key)
                 inserted = true
             }
-            push(next, out[j])
+            next.push(out[j])
             j = j + 1
         }
         if !inserted {
-            push(next, key)
+            next.push(key)
         }
         out = next
         i = i + 1
@@ -722,8 +722,8 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             ret
         }
         if b.section == ".data" {
-            push(b.data_label_names, item.name)
-            push(b.data_label_offsets, len(b.data))
+            b.data_label_names.push(item.name)
+            b.data_label_offsets.push(len(b.data))
             ret
         }
         machine_die(str_cat2("label outside section: ", item.name))
@@ -735,8 +735,8 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
     }
     if item.kind == "data_bytes" {
         if b.section != ".data" { machine_die(str_cat2("data outside .data: ", item.name)) }
-        push(b.data_label_names, item.name)
-        push(b.data_label_offsets, len(b.data))
+        b.data_label_names.push(item.name)
+        b.data_label_offsets.push(len(b.data))
         let i = 0
         for i < len(item.values) {
             machine_append_byte(b.data, item.values[i])
@@ -746,8 +746,8 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
     }
     if item.kind == "data_zero" {
         if b.section != ".data" { machine_die(str_cat2("data outside .data: ", item.name)) }
-        push(b.data_label_names, item.name)
-        push(b.data_label_offsets, len(b.data))
+        b.data_label_names.push(item.name)
+        b.data_label_offsets.push(len(b.data))
         let i = 0
         for i < item.count {
             machine_append_byte(b.data, 0)
@@ -780,21 +780,21 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     let symbol_seen = new map[str]i64
     let i = 0
     for i < len(b.text_label_names) {
-        if !map_has(symbol_seen, b.text_label_names[i]) {
+        if !symbol_seen.has(b.text_label_names[i]) {
             symbol_seen[b.text_label_names[i]] = 1
-            push(obj.symbol_names, b.text_label_names[i])
-            push(obj.symbol_sections, 1)
-            push(obj.symbol_values, b.text_label_offsets[i])
+            obj.symbol_names.push(b.text_label_names[i])
+            obj.symbol_sections.push(1)
+            obj.symbol_values.push(b.text_label_offsets[i])
         }
         i = i + 1
     }
     i = 0
     for i < len(b.data_label_names) {
-        if !map_has(symbol_seen, b.data_label_names[i]) {
+        if !symbol_seen.has(b.data_label_names[i]) {
             symbol_seen[b.data_label_names[i]] = 1
-            push(obj.symbol_names, b.data_label_names[i])
-            push(obj.symbol_sections, 2)
-            push(obj.symbol_values, b.data_label_offsets[i])
+            obj.symbol_names.push(b.data_label_names[i])
+            obj.symbol_sections.push(2)
+            obj.symbol_values.push(b.data_label_offsets[i])
         }
         i = i + 1
     }
@@ -802,20 +802,20 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     let extern_seen = new map[str]i64
     i = 0
     for i < len(b.text_reloc_names) {
-        if !map_has(symbol_seen, b.text_reloc_names[i]) && !map_has(extern_seen, b.text_reloc_names[i]) {
+        if !symbol_seen.has(b.text_reloc_names[i]) && !extern_seen.has(b.text_reloc_names[i]) {
             extern_seen[b.text_reloc_names[i]] = 1
-            push(externs, b.text_reloc_names[i])
+            externs.push(b.text_reloc_names[i])
         }
         i = i + 1
     }
     let sorted_externs = machine_sorted_strings(externs)
     i = 0
     for i < len(sorted_externs) {
-        if !map_has(symbol_seen, sorted_externs[i]) {
+        if !symbol_seen.has(sorted_externs[i]) {
             symbol_seen[sorted_externs[i]] = 1
-            push(obj.symbol_names, sorted_externs[i])
-            push(obj.symbol_sections, 0)
-            push(obj.symbol_values, 0)
+            obj.symbol_names.push(sorted_externs[i])
+            obj.symbol_sections.push(0)
+            obj.symbol_values.push(0)
         }
         i = i + 1
     }

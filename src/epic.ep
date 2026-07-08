@@ -36,23 +36,23 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
         let is_main = input_paths[i] == main_path
         let si = 0
         for si < len(ast.structs) {
-            push(merged.structs, ast.structs[si])
+            merged.structs.push(ast.structs[si])
             si = si + 1
         }
         let gi = 0
         for gi < len(ast.globals) {
-            push(merged.globals, ast.globals[gi])
+            merged.globals.push(ast.globals[gi])
             gi = gi + 1
         }
         let fi = 0
         for fi < len(ast.funcs) {
             if ast.funcs[fi].name == "main" {
                 if is_main {
-                    push(merged.funcs, ast.funcs[fi])
+                    merged.funcs.push(ast.funcs[fi])
                     found_main = true
                 }
             } else {
-                push(merged.funcs, ast.funcs[fi])
+                merged.funcs.push(ast.funcs[fi])
             }
             fi = fi + 1
         }
@@ -67,7 +67,7 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
 fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
     let i = 0
     for i < len(bs) {
-        push(out, i64(bs[i]))
+        out.push(i64(bs[i]))
         i = i + 1
     }
 }
@@ -75,7 +75,7 @@ fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
 fun epic_push_u64_le(out: i64[], value: i64): void {
     let v = value
     for i in 0:8 {
-        push(out, v & 255)
+        out.push(v & 255)
         v = v / 256
     }
 }
@@ -85,7 +85,7 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
     x64_add_data_zero(x64, "_heap", 8)
     x64_add_data_zero(x64, "_argv", 8)
     let newline = new i64[0]
-    push(newline, 10)
+    newline.push(10)
     x64_add_data_bytes(x64, "_newline", newline)
     let panic_prefix = new i64[0]
     epic_push_bytes_i64(panic_prefix, bytes("panic line "))
@@ -106,7 +106,7 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
             if program.globals[i].has_init {
                 if program.globals[i].typ == "ptr" {
                     epic_push_bytes_i64(values, bytes(program.globals[i].init))
-                    push(values, 0)
+                    values.push(0)
                     x64_add_data_bytes(x64, mir_to_x64_data_label(program.globals[i].name), values)
                     x64_add_data_zero(x64, mir_to_x64_header_label(program.globals[i].name), 24)
                 } else {
@@ -226,7 +226,7 @@ fun main(): i64 {
             exe_path = argv[i + 1]
             i = i + 2
         } else {
-            push(inputs, argv[i])
+            inputs.push(argv[i])
             i = i + 1
         }
     }

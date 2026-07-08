@@ -170,7 +170,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
-- **Map 降级**：Python reference compiler 将 `map[str]i64`、`map[str]bool`、`map[str]str` 降级为 str-keyed word map。entry 为 `{key, value, occupied}` 三个 word，key 比较调用 `__ep_str_eq`。`m[key] = value` 插入或覆盖，满时扩容。不存在的键查找返回值类型零值。`map_has` 区分是否缺失，`map_del` 使用 swap-delete 并返回是否删除成功。`new map[str]T { ... }` 降级为一次 map new 加按源码顺序执行的 map set。
+- **Map 降级**：Python reference compiler 将 `map[str]i64`、`map[str]bool`、`map[str]str` 降级为 str-keyed word map。entry 为 `{key, value, occupied}` 三个 word，key 比较调用 `__ep_str_eq`。`m[key] = value` 插入或覆盖，满时扩容。不存在的键查找返回值类型零值。`m.has(key)` 区分是否缺失，`m.del(key)` 使用 swap-delete 并返回是否删除成功。`new map[str]T { ... }` 降级为一次 map new 加按源码顺序执行的 map set。
 
 ## 链接器 (Linker)
 
@@ -195,8 +195,8 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
 | `str_replace_char` | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
-| `push`             | 由 codegen 为动态数组发射                   | 公开 |
-| `extend`           | 字节数组用 `__ep_slice_u8_extend`；其他类型用复制循环 | 公开 |
+| `xs.push(x)`      | 由 codegen 为动态数组发射                   | 公开容器点调用 |
+| `dst.extend(src)`  | 字节数组用 `__ep_slice_u8_extend`；其他类型用复制循环 | 公开容器点调用，u8[] only |
 | `len` / `cap`      | 直接内联发射                                | 公开 |
 | 切片语法           | 字符串用 `__ep_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
 

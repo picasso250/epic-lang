@@ -118,7 +118,7 @@ let xs = new u8[]
 
 ### 复合赋值 (Compound Assignment)
 
-支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。（`str += str` 已删除。使用 `u8[]` + `extend` + `str(bytes)` 显式拼接。）
+支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。（`str += str` 已删除。使用 `u8[]` + `.extend(...)` + `str(bytes)` 显式拼接。）
 
 ### 控制流 (Control Flow)
 
@@ -130,6 +130,20 @@ let xs = new u8[]
 - `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。
 - `assert cond` / `assert cond, "消息"` — 始终启用，失败时退出。
+
+
+### 内置容器点调用 (Builtin Container Dot Calls)
+
+Epic 支持一小组内置容器点调用：
+
+```epic
+xs.push(x)
+dst.extend(src)
+let ok = m.has(key)
+let removed = m.del(key)
+```
+
+这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别 `os.*`、slice 和 map。
 
 ### 结构体初始化 (Struct Initialization)
 
@@ -199,10 +213,10 @@ let ids = new map[str]i64
 let names = new map[str]str { "main": "entry", "lib": "helper" }
 ids["main"] = 1
 let id = ids["main"]
-let ok = map_has(ids, "main")
+let ok = ids.has("main")
 ```
 
-键类型固定为 `str`。Python reference compiler 当前支持 `map[str]i64`、`map[str]bool`、`map[str]str`。不存在的键查找返回该值类型的零值；`map_has(m, key)` 区分是否存在；`map_del(m, key)` 删除键并返回是否真的删除了已有项。
+键类型固定为 `str`。Python reference compiler 当前支持 `map[str]i64`、`map[str]bool`、`map[str]str`。不存在的键查找返回该值类型的零值；`m.has(key)` 区分是否存在；`m.del(key)` 删除键并返回是否真的删除了已有项。
 
 Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `str` 表达式，`value` 按 `T` 做普通赋值兼容检查。初始化按源码顺序插入；重复 key 时后面的 entry 覆盖前面的值。`new map[str]T {}` 等价于空 map。
 
@@ -226,8 +240,8 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 |-----------------------|---------------------------------------------------|
 | `new T[]`             | 空数组，容量为 0                                  |
 | `new T[n]`            | 空数组，容量至少为 `n`                            |
-| `push(a, x)`          | 追加并扩容                                        |
-| `extend(dst: u8[], src: u8[])`    | 将一个字节数组的所有字节追加到另一个字节数组；其他类型使用 `for + push`               |
+| `a.push(x)`          | 追加并扩容                                        |
+| `dst.extend(src)`    | `dst` 和 `src` 均为 `u8[]`；将 `src` 的所有字节追加到 `dst`；其他类型使用 `for + `.push(...)``               |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
 | `cap(a)`              | 当前容量（推荐）                                  |
@@ -240,7 +254,7 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 
 > 注意：`s[i]` 已删除；按字节读取字符串必须显式写 `bytes(s)[i]`。`s[start:end]`、`==` / `!=` 仍是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
 >
-> 切片当前仅支持 str 和 u8[]；其他数组需要复制部分元素时使用 for + push。
+> 切片当前仅支持 str 和 u8[]；其他数组需要复制部分元素时使用 for + `.push(...)`。
 
 ```epic
 let a = s[start:end]
@@ -331,8 +345,8 @@ let source = str(read_file(path))
 | `str_trim`             | 自己写 `u8[]` 扫描；未来可提供 `s.trim()` 方法 |
 | `str_replace_char`     | 自己写 `u8[]` 扫描                          |
 | `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
-| `push(a: T[], x: T): void`             | 追加到动态数组                              |
-| `extend(dst: u8[], src: u8[]): void`     | 仅支持 u8[]；其他数组需要追加多个元素时使用 for + push                                |
+| `a.push(x)`             | 追加到动态数组                              |
+| `dst.extend(src)`     | 仅支持 u8[]；其他数组需要追加多个元素时使用 for + `.push(...)`                                |
 
 `cstr` 要求字符串内部数据指针非空、`len(s) >= 0`、`s[0:len(s)]` 不含 `0`，并且内部数据在 `len(s)` 位置以 `0` 结尾。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
 

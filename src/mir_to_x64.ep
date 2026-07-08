@@ -71,8 +71,8 @@ fun mir_to_x64_header_label(name: str): str {
 }
 
 fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): void {
-    push(lower.string_names, name)
-    push(lower.string_lengths, length)
+    lower.string_names.push(name)
+    lower.string_lengths.push(length)
 }
 
 fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram): void {
@@ -82,7 +82,7 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
             if program.globals[i].has_init && program.globals[i].typ == "ptr" {
                 mir_to_x64_add_string_global(lower, program.globals[i].name, len(program.globals[i].init))
             } else {
-                push(lower.global_names, program.globals[i].name)
+                lower.global_names.push(program.globals[i].name)
             }
         }
         i = i + 1
@@ -96,9 +96,9 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
     }
     i = 0
     for i < len(program.struct_fields) {
-        push(lower.struct_field_names, program.struct_fields[i].struct_name)
-        push(lower.struct_field_types, program.struct_fields[i].field_type)
-        push(lower.struct_field_indexes, program.struct_fields[i].field_index)
+        lower.struct_field_names.push(program.struct_fields[i].struct_name)
+        lower.struct_field_types.push(program.struct_fields[i].field_type)
+        lower.struct_field_indexes.push(program.struct_fields[i].field_index)
         i = i + 1
     }
 }
@@ -140,7 +140,7 @@ fun mir_to_x64_add_addr_slot(lower: MirToX64Lower, name: str): void {
 }
 
 fun mir_to_x64_find_slot(slots: map[str]i64, name: str): i64 {
-    if map_has(slots, name) {
+    if slots.has(name) {
         ret slots[name]
     }
     ret 0
@@ -437,10 +437,10 @@ fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
 
 fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
     let arg_regs = new str[0]
-    push(arg_regs, "rcx")
-    push(arg_regs, "rdx")
-    push(arg_regs, "r8")
-    push(arg_regs, "r9")
+    arg_regs.push("rcx")
+    arg_regs.push("rdx")
+    arg_regs.push("r8")
+    arg_regs.push("r9")
     let i = 0
     for i < len(inst.operands) && i < 4 {
         mir_to_x64_load_operand(lower, arg_regs[i], inst.operands[i])
@@ -608,10 +608,10 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
 
     let params_start = mir_to_x64_now_ms()
     let arg_regs = new str[0]
-    push(arg_regs, "rcx")
-    push(arg_regs, "rdx")
-    push(arg_regs, "r8")
-    push(arg_regs, "r9")
+    arg_regs.push("rcx")
+    arg_regs.push("rdx")
+    arg_regs.push("r8")
+    arg_regs.push("r9")
     let i = 0
     for i < len(fn.params) {
         if i < len(arg_regs) {

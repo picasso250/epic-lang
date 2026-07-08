@@ -55,7 +55,7 @@ fun align_to(n: i64, a: i64): i64 {
 
 fun append_zero(buf: u8[], n: i64): void {
     for i in 0:n {
-        push(buf, u8(0))
+        buf.push(u8(0))
     }
 }
 
@@ -139,20 +139,20 @@ fun append_u64(buf: u8[], x: i64): void {
 }
 
 fun append_str(buf: u8[], s: str): void {
-    extend(buf, bytes(s))
+    buf.extend(bytes(s))
 }
 
 fun str_cat_local(left: str, right: str): str {
     let out = new u8[]
-    extend(out, bytes(left))
-    extend(out, bytes(right))
+    out.extend(bytes(left))
+    out.extend(bytes(right))
     ret str(out)
 }
 
 fun cstr_ready_path(s: str): str {
     let out = new u8[]
-    extend(out, bytes(s))
-    push(out, u8(0))
+    out.extend(bytes(s))
+    out.push(u8(0))
     ret str(out)
 }
 
@@ -160,9 +160,9 @@ fun append_name8(buf: u8[], name: str): void {
     let bs = bytes(name)
     for i in 0:8 {
         if i < len(bs) {
-            push(buf, bs[i])
+            buf.push(bs[i])
         } else {
-            push(buf, u8(0))
+            buf.push(u8(0))
         }
     }
 }
@@ -172,39 +172,39 @@ fun set_u32(buf: u8[], off: i64, x: i64): void {
 }
 
 fun append_dos_stub(buf: u8[]): void {
-    push(buf, u8(77))
-    push(buf, u8(90))
-    push(buf, u8(120))
-    push(buf, u8(0))
-    push(buf, u8(1))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(4))
+    buf.push(u8(77))
+    buf.push(u8(90))
+    buf.push(u8(120))
+    buf.push(u8(0))
+    buf.push(u8(1))
+    buf.push(u8(0))
+    buf.push(u8(0))
+    buf.push(u8(0))
+    buf.push(u8(4))
     append_zero(buf, 15)
-    push(buf, u8(64))
+    buf.push(u8(64))
     append_zero(buf, 35)
-    push(buf, u8(120))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(0))
-    push(buf, u8(14))
-    push(buf, u8(31))
-    push(buf, u8(186))
-    push(buf, u8(14))
-    push(buf, u8(0))
-    push(buf, u8(180))
-    push(buf, u8(9))
-    push(buf, u8(205))
-    push(buf, u8(33))
-    push(buf, u8(184))
-    push(buf, u8(1))
-    push(buf, u8(76))
-    push(buf, u8(205))
-    push(buf, u8(33))
+    buf.push(u8(120))
+    buf.push(u8(0))
+    buf.push(u8(0))
+    buf.push(u8(0))
+    buf.push(u8(14))
+    buf.push(u8(31))
+    buf.push(u8(186))
+    buf.push(u8(14))
+    buf.push(u8(0))
+    buf.push(u8(180))
+    buf.push(u8(9))
+    buf.push(u8(205))
+    buf.push(u8(33))
+    buf.push(u8(184))
+    buf.push(u8(1))
+    buf.push(u8(76))
+    buf.push(u8(205))
+    buf.push(u8(33))
     append_str(buf, "This program cannot be run in DOS mode.$")
-    push(buf, u8(0))
-    push(buf, u8(0))
+    buf.push(u8(0))
+    buf.push(u8(0))
 }
 
 fun copy_bytes(src: u8[], off: i64, n: i64): u8[] {
@@ -222,7 +222,7 @@ fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64): str {
         if b == u8(0) {
             ret str(out)
         }
-        push(out, b)
+        out.push(b)
     }
     ret str(out)
 }
@@ -272,7 +272,7 @@ fun put_name_value(items: NameValue[], name: str, value: i64): void {
     let item = new NameValue
     item.name = name
     item.value = value
-    push(items, item)
+    items.push(item)
 }
 
 fun contains_str(items: str[], name: str): i64 {
@@ -302,7 +302,7 @@ fun parse_sections(st: LinkState, nsects: i64): void {
         sec.nrel = le16_as_i64(st.data, off + 32)
         sec.virtual_sz = sec.raw_sz
         sec.data = copy_bytes(st.data, sec.raw_off, sec.raw_sz)
-        push(st.sections, sec)
+        st.sections.push(sec)
     }
 }
 
@@ -319,7 +319,7 @@ fun parse_symbols(st: LinkState, symtab_off: i64, nsyms: i64): void {
         sym.value = le32_as_i64(st.data, pos + 8)
         sym.section = le16_as_i64(st.data, pos + 12)
         sym.aux = i64(st.data[pos + 17])
-        push(st.syms, sym)
+        st.syms.push(sym)
 
         for j in 0:sym.aux {
             let aux_sym = new Symbol
@@ -328,7 +328,7 @@ fun parse_symbols(st: LinkState, symtab_off: i64, nsyms: i64): void {
             aux_sym.value = 0
             aux_sym.section = 0 - 1
             aux_sym.aux = 0
-            push(st.syms, aux_sym)
+            st.syms.push(aux_sym)
         }
         i += 1 + sym.aux
     }
@@ -377,13 +377,13 @@ fun sorted_imports(items: str[]): str[] {
         let inserted = false
         for j in 0:len(out) {
             if !inserted && import_less_casefold(key, out[j]) {
-                push(next, key)
+                next.push(key)
                 inserted = true
             }
-            push(next, out[j])
+            next.push(out[j])
         }
         if !inserted {
-            push(next, key)
+            next.push(key)
         }
         out = next
     }
@@ -396,7 +396,7 @@ fun collect_imports(st: LinkState): void {
         if sym.section == 0 && sym.aux == 0 {
             let name = sym_name(st, sym)
             if len(name) > 0 && contains_str(st.imports, name) == 0 {
-                push(st.imports, name)
+                st.imports.push(name)
             }
         }
     }
@@ -414,7 +414,7 @@ fun collect_relocs(st: LinkState): void {
                 rel.si = si
                 rel.rva = le32_as_i64(st.data, rp)
                 rel.sym_i = sym_i
-                push(st.relocs, rel)
+                st.relocs.push(rel)
             }
         }
     }
@@ -442,7 +442,7 @@ let kernel32_import_hints = new map[str]i64 {
 }
 
 fun kernel32_hint(name: str): i64 {
-    if map_has(kernel32_import_hints, name) {
+    if kernel32_import_hints.has(name) {
         ret kernel32_import_hints[name]
     }
     ret 0
@@ -529,15 +529,15 @@ fun find_section(st: LinkState, needle: str): Section {
 
 fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void {
     for len(text_sec.data) % 16 != 0 {
-        push(text_sec.data, u8(204))
+        text_sec.data.push(u8(204))
     }
     let thunk_base = text_rva + len(text_sec.data)
     for i in 0:len(st.imports) {
         let name = st.imports[i]
         let rva = thunk_base + i * 16
         put_name_value(st.thunk_rvas, name, rva)
-        push(text_sec.data, u8(255))
-        push(text_sec.data, u8(37))
+        text_sec.data.push(u8(255))
+        text_sec.data.push(u8(37))
         append_zero(text_sec.data, 4)
         append_zero(text_sec.data, 10)
         for j in 0:10 {
@@ -572,28 +572,28 @@ fun build_idata(st: LinkState): void {
     let k_iat = 0
     let u_iat = 0
     for len(st.idata) % 8 != 0 {
-        push(st.idata, u8(0))
+        st.idata.push(u8(0))
     }
     if k_count > 0 {
         k_ilt = len(st.idata)
         append_zero(st.idata, (k_count + 1) * 8)
     }
     for len(st.idata) % 8 != 0 {
-        push(st.idata, u8(0))
+        st.idata.push(u8(0))
     }
     if u_count > 0 {
         u_ilt = len(st.idata)
         append_zero(st.idata, (u_count + 1) * 8)
     }
     for len(st.idata) % 8 != 0 {
-        push(st.idata, u8(0))
+        st.idata.push(u8(0))
     }
     if k_count > 0 {
         k_iat = len(st.idata)
         append_zero(st.idata, (k_count + 1) * 8)
     }
     for len(st.idata) % 8 != 0 {
-        push(st.idata, u8(0))
+        st.idata.push(u8(0))
     }
     if u_count > 0 {
         u_iat = len(st.idata)
@@ -608,9 +608,9 @@ fun build_idata(st: LinkState): void {
             let hint_rva = st.idata_rva + len(st.idata)
             append_u16(st.idata, import_hint(name))
             append_str(st.idata, name)
-            push(st.idata, u8(0))
+            st.idata.push(u8(0))
             if len(st.idata) % 2 != 0 {
-                push(st.idata, u8(0))
+                st.idata.push(u8(0))
             }
             put_u64_le(st.idata, k_ilt + ki * 8, u64(hint_rva))
             put_u64_le(st.idata, k_iat + ki * 8, u64(hint_rva))
@@ -624,9 +624,9 @@ fun build_idata(st: LinkState): void {
             let hint_rva = st.idata_rva + len(st.idata)
             append_u16(st.idata, import_hint(name))
             append_str(st.idata, name)
-            push(st.idata, u8(0))
+            st.idata.push(u8(0))
             if len(st.idata) % 2 != 0 {
-                push(st.idata, u8(0))
+                st.idata.push(u8(0))
             }
             put_u64_le(st.idata, u_ilt + ui * 8, u64(hint_rva))
             put_u64_le(st.idata, u_iat + ui * 8, u64(hint_rva))
@@ -639,7 +639,7 @@ fun build_idata(st: LinkState): void {
     if k_count > 0 {
         let dll_off = len(st.idata)
         append_str(st.idata, "KERNEL32.dll")
-        push(st.idata, u8(0))
+        st.idata.push(u8(0))
         put_u32_le(st.idata, desc * 20, u64(st.idata_rva + k_ilt))
         put_u32_le(st.idata, desc * 20 + 12, u64(st.idata_rva + dll_off))
         put_u32_le(st.idata, desc * 20 + 16, u64(st.idata_rva + k_iat))
@@ -648,7 +648,7 @@ fun build_idata(st: LinkState): void {
     if u_count > 0 {
         let dll_off = len(st.idata)
         append_str(st.idata, "USER32.dll")
-        push(st.idata, u8(0))
+        st.idata.push(u8(0))
         put_u32_le(st.idata, desc * 20, u64(st.idata_rva + u_ilt))
         put_u32_le(st.idata, desc * 20 + 12, u64(st.idata_rva + dll_off))
         put_u32_le(st.idata, desc * 20 + 16, u64(st.idata_rva + u_iat))
@@ -737,13 +737,13 @@ fun patch_section_raw(buf: u8[], index: i64, raw_pos: i64, raw_sz: i64): void {
 }
 
 fun append_padded_section(buf: u8[], name: str, data: u8[]): void {
-    extend(buf, data)
+    buf.extend(data)
     let pad = 0
     if name == ".text" {
         pad = 204
     }
     for len(buf) % 512 != 0 {
-        push(buf, u8(pad))
+        buf.push(u8(pad))
     }
 }
 
@@ -773,8 +773,8 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
     append_u16(buf, 34)
 
     append_u16(buf, 523)
-    push(buf, u8(14))
-    push(buf, u8(0))
+    buf.push(u8(14))
+    buf.push(u8(0))
     append_u32(buf, text_raw)
     append_u32(buf, data_raw + idata_raw)
     append_u32(buf, 0)
@@ -828,7 +828,7 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
     append_section_header(buf, ".data", st.data_rva, len(data_sec.data))
 
     for len(buf) < headers_sz {
-        push(buf, u8(0))
+        buf.push(u8(0))
     }
 
     let raw_pos = headers_sz

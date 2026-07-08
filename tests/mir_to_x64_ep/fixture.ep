@@ -4,7 +4,7 @@ fun add_param(fn: MirFunction, name: str, typ: str): void {
     let param = new MirParam
     param.name = name
     param.typ = typ
-    push(fn.params, param)
+    fn.params.push(param)
 }
 
 fun make_result_inst(op: str, result_name: str, left: MirOperand, right: MirOperand): MirInst {
@@ -17,8 +17,8 @@ fun make_result_inst(op: str, result_name: str, left: MirOperand, right: MirOper
         inst.result_type = "i64"
     }
     inst.has_result = true
-    push(inst.operands, left)
-    push(inst.operands, right)
+    inst.operands.push(left)
+    inst.operands.push(right)
     ret inst
 }
 
@@ -27,10 +27,10 @@ fun build_add1_function(): MirFunction {
     add_param(fn, "x", "i64")
 
     let block = mir_block_empty("entry")
-    push(block.instructions, make_result_inst("add", "r", mir_value_operand("i64", "x"), mir_const_int("i64", 1)))
+    block.instructions.push(make_result_inst("add", "r", mir_value_operand("i64", "x"), mir_const_int("i64", 1)))
     block.terminator = mir_ret_value(mir_value_operand("i64", "r"))
     block.has_terminator = true
-    push(fn.blocks, block)
+    fn.blocks.push(block)
     ret fn
 }
 
@@ -39,12 +39,12 @@ fun build_arith_mix_function(): MirFunction {
     add_param(fn, "x", "i64")
 
     let block = mir_block_empty("entry")
-    push(block.instructions, make_result_inst("sub", "a", mir_value_operand("i64", "x"), mir_const_int("i64", 2)))
-    push(block.instructions, make_result_inst("mul", "b", mir_value_operand("i64", "a"), mir_const_int("i64", 3)))
-    push(block.instructions, make_result_inst("and", "c", mir_value_operand("i64", "b"), mir_const_int("i64", 7)))
+    block.instructions.push(make_result_inst("sub", "a", mir_value_operand("i64", "x"), mir_const_int("i64", 2)))
+    block.instructions.push(make_result_inst("mul", "b", mir_value_operand("i64", "a"), mir_const_int("i64", 3)))
+    block.instructions.push(make_result_inst("and", "c", mir_value_operand("i64", "b"), mir_const_int("i64", 7)))
     block.terminator = mir_ret_value(mir_value_operand("i64", "c"))
     block.has_terminator = true
-    push(fn.blocks, block)
+    fn.blocks.push(block)
     ret fn
 }
 
@@ -54,20 +54,20 @@ fun build_max2_function(): MirFunction {
     add_param(fn, "y", "i64")
 
     let entry = mir_block_empty("entry")
-    push(entry.instructions, make_result_inst("icmp.sgt", "cond", mir_value_operand("i64", "x"), mir_value_operand("i64", "y")))
+    entry.instructions.push(make_result_inst("icmp.sgt", "cond", mir_value_operand("i64", "x"), mir_value_operand("i64", "y")))
     entry.terminator = mir_condbr(mir_value_operand("bool", "cond"), "then", "else")
     entry.has_terminator = true
-    push(fn.blocks, entry)
+    fn.blocks.push(entry)
 
     let then_block = mir_block_empty("then")
     then_block.terminator = mir_ret_value(mir_value_operand("i64", "x"))
     then_block.has_terminator = true
-    push(fn.blocks, then_block)
+    fn.blocks.push(then_block)
 
     let else_block = mir_block_empty("else")
     else_block.terminator = mir_ret_value(mir_value_operand("i64", "y"))
     else_block.has_terminator = true
-    push(fn.blocks, else_block)
+    fn.blocks.push(else_block)
     ret fn
 }
 

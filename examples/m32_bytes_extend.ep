@@ -2,11 +2,11 @@
 # STDOUT: hiabab
 fun main(): void {
     let buf = new u8[]
-    extend(buf, bytes("hi"))
+    buf.extend(bytes("hi"))
     print(str(buf))
 
     let xs = bytes("ab")
-    extend(xs, xs)
+    xs.extend(xs)
     print(str(xs))
     exit(0)
 }

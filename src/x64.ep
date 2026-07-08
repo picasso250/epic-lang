@@ -110,32 +110,32 @@ fun x64_program_empty(): X64Program {
 fun x64_add_global(program: X64Program, name: str): void {
     let item = x64_item_empty("global")
     item.name = name
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_add_extern(program: X64Program, name: str): void {
     let item = x64_item_empty("extern")
     item.name = name
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_add_section(program: X64Program, name: str): void {
     let item = x64_item_empty("section")
     item.name = name
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_add_label(program: X64Program, name: str): void {
     let item = x64_item_empty("label")
     item.name = name
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_add_inst(program: X64Program, op: str, operands: X64Operand[]): void {
     let item = x64_item_empty("inst")
     item.op = op
     item.operands = operands
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_add_inst0(program: X64Program, op: str): void {
@@ -144,14 +144,14 @@ fun x64_add_inst0(program: X64Program, op: str): void {
 
 fun x64_add_inst1(program: X64Program, op: str, a: X64Operand): void {
     let operands = new X64Operand[0]
-    push(operands, a)
+    operands.push(a)
     x64_add_inst(program, op, operands)
 }
 
 fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): void {
     let operands = new X64Operand[0]
-    push(operands, a)
-    push(operands, b)
+    operands.push(a)
+    operands.push(b)
     x64_add_inst(program, op, operands)
 }
 
@@ -159,14 +159,14 @@ fun x64_add_data_bytes(program: X64Program, label: str, values: i64[]): void {
     let item = x64_item_empty("data_bytes")
     item.name = label
     item.values = values
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_add_data_zero(program: X64Program, label: str, count: i64): void {
     let item = x64_item_empty("data_zero")
     item.name = label
     item.count = count
-    push(program.items, item)
+    program.items.push(item)
 }
 
 fun x64_size_prefix(size: i64): str {

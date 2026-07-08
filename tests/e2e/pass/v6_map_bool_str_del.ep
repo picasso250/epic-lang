@@ -5,15 +5,15 @@ fun main(): i64 {
     let flags = new map[str]bool
     flags["alpha"] = true
     let kb = new u8[]
-    extend(kb, bytes("alp"))
-    extend(kb, bytes("ha"))
+    kb.extend(bytes("alp"))
+    kb.extend(bytes("ha"))
     let dyn_key = str(kb)
-    assert(map_has(flags, dyn_key))
+    assert(flags.has(dyn_key))
     assert(flags[dyn_key] == true)
-    assert(map_del(flags, dyn_key))
-    assert(map_has(flags, "alpha") == false)
+    assert(flags.del(dyn_key))
+    assert(flags.has("alpha") == false)
     assert(flags["alpha"] == false)
-    assert(map_del(flags, "alpha") == false)
+    assert(flags.del("alpha") == false)
 
     flags["k0"] = true
     flags["k1"] = true
@@ -27,7 +27,7 @@ fun main(): i64 {
     names["b"] = "two"
     assert(names["a"] == "one")
     assert(names["b"] == "two")
-    assert(map_del(names, "a"))
+    assert(names.del("a"))
     assert(names["a"] == "")
     assert(names["b"] == "two")
 

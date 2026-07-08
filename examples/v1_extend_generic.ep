@@ -6,11 +6,11 @@ struct Box {
 
 fun main(): void {
     let xs = new i64[]
-    push(xs, 1)
-    push(xs, 2)
+    xs.push(1)
+    xs.push(2)
     let old_len = len(xs)
     for i in 0:old_len {
-        push(xs, xs[i])
+        xs.push(xs[i])
     }
     print(str(xs[0] + xs[1] + xs[2] + xs[3]))
 
@@ -20,11 +20,11 @@ fun main(): void {
     b2.value = 7
     let left = new Box[]
     let right = new Box[]
-    push(left, b1)
-    push(right, b2)
+    left.push(b1)
+    right.push(b2)
     let right_len = len(right)
     for i in 0:right_len {
-        push(left, right[i])
+        left.push(right[i])
     }
     print(str(left[0].value + left[1].value))
     exit(0)

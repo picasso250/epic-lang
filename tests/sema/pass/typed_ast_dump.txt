@@ -172,15 +172,15 @@ Program
       Let zs : u8[]
         NewArray : u8 : u8[]
       ExprStmt
-        Call push : void
+        DotCall push : void
           Var xs : i64[]
           Literal 4 : i64
       ExprStmt
-        Call push : void
+        DotCall push : void
           Var zs : u8[]
           Var first : u8
       ExprStmt
-        Call extend : void
+        DotCall extend : void
           Var zs : u8[]
           Var bs : u8[]
       Let n : i64
@@ -280,11 +280,11 @@ Program
         Var m : map[str]i64
         String two : str
       Let has_one : bool
-        Call map_has : bool
+        DotCall has : bool
           Var m : map[str]i64
           String one : str
       Let removed : bool
-        Call map_del : bool
+        DotCall del : bool
           Var m : map[str]i64
           String missing : str
       If

@@ -15,7 +15,7 @@ fun main(): i64 {
         "y": str(nums["b"])
     }
 
-    assert(map_has(nums, "a"))
+    assert(nums.has("a"))
     assert(nums["a"] == 3)
     assert(nums["b"] == 2)
     assert(flags["ready"])

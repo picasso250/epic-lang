@@ -39,9 +39,9 @@ fun sema_ends_with(s: str, suffix: str): bool {
 
 fun sema_key2(a: str, b: str): str {
     let out = new u8[]
-    extend(out, bytes(a))
-    push(out, '.')
-    extend(out, bytes(b))
+    out.extend(bytes(a))
+    out.push('.')
+    out.extend(bytes(b))
     ret str(out)
 }
 
@@ -124,7 +124,7 @@ fun sema_type_name(st: SemaState, name: str): str {
     if name == "bool" || name == "void" || name == "str" {
         ret name
     }
-    if map_has(st.struct_names, name) {
+    if st.struct_names.has(name) {
         ret name
     }
     sema_die(f"unknown type {name}")
@@ -132,10 +132,10 @@ fun sema_type_name(st: SemaState, name: str): str {
 }
 
 fun sema_lookup(st: SemaState, name: str): str {
-    if map_has(st.locals, name) {
+    if st.locals.has(name) {
         ret st.locals[name]
     }
-    if map_has(st.globals, name) {
+    if st.globals.has(name) {
         ret st.globals[name]
     }
     sema_die(f"undefined variable {name}")
@@ -150,8 +150,8 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
         sema_die(f"unknown field {sema_key2(base_type, field)}")
     }
     let key = sema_key2(base_type, field)
-    if map_has(st.struct_fields, key) == false {
-        if map_has(st.struct_names, base_type) == false {
+    if st.struct_fields.has(key) == false {
+        if st.struct_names.has(base_type) == false {
             sema_die(f"field access expected aggregate, got {base_type}")
         }
         sema_die(f"unknown field {key}")
@@ -363,7 +363,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
         let seen = new map[str]bool
         for j in 0:len(s.fields) {
             let f = s.fields[j]
-            if map_has(seen, f.name) {
+            if seen.has(f.name) {
                 sema_die(f"duplicate field {sema_key2(s.name, f.name)}")
             }
             seen[f.name] = true
@@ -568,6 +568,9 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
     if node.kind == "Call" {
         ret sema_set_type(node, sema_call_type(st, node))
     }
+    if node.kind == "DotCall" {
+        ret sema_set_type(node, sema_dot_call_type(st, node))
+    }
     if node.kind == "FieldAccess" {
         ret sema_set_type(node, sema_field_type(st, sema_expr_type(st, node.object), node.name))
     }
@@ -598,13 +601,13 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         ret sema_set_type(node, str_cat2(elem, "[]"))
     }
     if node.kind == "StructInit" {
-        if map_has(st.struct_names, node.name) == false {
+        if st.struct_names.has(node.name) == false {
             sema_die(f"unknown struct {node.name}")
         }
         let seen = new map[str]bool
         for i in 0:len(node.fields) {
             let f = node.fields[i]
-            if map_has(seen, f.name) {
+            if seen.has(f.name) {
                 sema_die(f"duplicate field initializer {sema_key2(node.name, f.name)}")
             }
             seen[f.name] = true
@@ -704,6 +707,45 @@ fun sema_os_call_type(st: SemaState, node: AstNode): str {
     ret ""
 }
 
+fun sema_dot_call_type(st: SemaState, node: AstNode): str {
+    if node.object.kind == "FieldAccess" && node.object.object.kind == "Var" && node.object.object.name == "os" {
+        let call = ast_node("Call")
+        call.name = node.name
+        call.args = node.args
+        call.type_name = "os"
+        call.dll = node.object.name
+        call.line = node.line
+        ret sema_os_call_type(st, call)
+    }
+    let receiver = sema_expr_type(st, node.object)
+    if sema_is_array(receiver) {
+        if node.name == "push" {
+            sema_check_arity("push", 1, node.args)
+            sema_check_assign(st, sema_array_elem(receiver), node.args[0], "push value")
+            ret "void"
+        }
+        if node.name == "extend" {
+            sema_check_arity("extend", 1, node.args)
+            let src = sema_expr_type(st, node.args[0])
+            if receiver != "u8[]" || src != "u8[]" {
+                sema_die("extend only supports u8[]")
+            }
+            ret "void"
+        }
+        sema_die(f"array type {receiver} has no method {node.name}")
+    }
+    if sema_is_map(receiver) {
+        if node.name == "has" || node.name == "del" {
+            sema_check_arity(node.name, 1, node.args)
+            sema_check_assign(st, "str", node.args[0], f"{node.name} key")
+            ret "bool"
+        }
+        sema_die(f"map type {receiver} has no method {node.name}")
+    }
+    sema_die("method calls are only supported for os.*, slices, and maps for now")
+    ret ""
+}
+
 fun sema_call_type(st: SemaState, node: AstNode): str {
     if node.type_name == "os" {
         ret sema_os_call_type(st, node)
@@ -799,33 +841,18 @@ fun sema_call_type(st: SemaState, node: AstNode): str {
         ret "i64"
     }
     if node.name == "push" {
-        sema_check_arity("push", 2, node.args)
-        let arr = sema_expr_type(st, node.args[0])
-        if sema_is_array(arr) == false {
-            sema_die(f"push expected array, got {arr}")
-        }
-        sema_check_assign(st, sema_array_elem(arr), node.args[1], "push value")
-        ret "void"
+        sema_die("push is removed from function-call surface; use xs.push(x)")
     }
     if node.name == "extend" {
-        sema_check_arity("extend", 2, node.args)
-        let dst = sema_expr_type(st, node.args[0])
-        let src = sema_expr_type(st, node.args[1])
-        if dst != "u8[]" || src != "u8[]" {
-            sema_die("extend only supports u8[]")
-        }
-        ret "void"
+        sema_die("extend is removed from function-call surface; use dst.extend(src)")
     }
-    if node.name == "map_has" || node.name == "map_del" {
-        sema_check_arity(node.name, 2, node.args)
-        let mt = sema_expr_type(st, node.args[0])
-        if sema_is_map(mt) == false {
-            sema_die(f"{node.name} expects map")
-        }
-        sema_check_assign(st, "str", node.args[1], f"{node.name} key")
-        ret "bool"
+    if node.name == "map_has" {
+        sema_die("map_has is removed from public surface; use m.has(key)")
     }
-    if map_has(st.funcs_ret, node.name) == false {
+    if node.name == "map_del" {
+        sema_die("map_del is removed from public surface; use m.del(key)")
+    }
+    if st.funcs_ret.has(node.name) == false {
         sema_die(f"unknown function {node.name}")
     }
     let expected_count = st.funcs_param_count[node.name]
@@ -1302,6 +1329,14 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
     if node.kind == "FieldAccess" {
         sema_print_expr_head("FieldAccess", node.name, t)
         sema_dump_node(node.object, depth + 1)
+        ret
+    }
+    if node.kind == "DotCall" {
+        sema_print_expr_head("DotCall", node.name, t)
+        if node.object.kind != "FieldAccess" || node.object.object.kind != "Var" || node.object.object.name != "os" {
+            sema_dump_node(node.object, depth + 1)
+        }
+        sema_dump_list(node.args, depth + 1)
         ret
     }
     if node.kind == "Subscript" {

@@ -819,6 +819,8 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_binary_from(self.current_block, expr)
         if isinstance(expr, CallNode):
             return self._emit_call_from(self.current_block, expr)
+        if isinstance(expr, DotCallNode):
+            return self._emit_dot_call_from(self.current_block, expr)
         if isinstance(expr, SubscriptNode):
             return self._emit_subscript_from(self.current_block, expr)
         if isinstance(expr, ArrayLiteralNode):
@@ -977,12 +979,8 @@ class MirCodegen(MirFunctionBuilder):
             "read_file",
             "write_file",
             "system",
-            "push",
             "len",
             "cap",
-            "extend",
-            "map_has",
-            "map_del",
         }
 
     def _emit_builtin(self, expr):
@@ -1097,6 +1095,47 @@ class MirCodegen(MirFunctionBuilder):
             result = self.inst("call", [base.value, key.value], result_type=BOOL, type=BOOL, callee=self._map_helper(map_type, op))
             return ValueFlow(ValueOperand(result), self.current_block)
         raise MirCodegenError(f"unsupported builtin call: {name}")
+
+    def _emit_dot_call_from(self, in_block, expr):
+        self.set_block(in_block)
+        if (
+            isinstance(expr.object, FieldAccessNode)
+            and isinstance(expr.object.object, VarNode)
+            and expr.object.object.name == "os"
+        ):
+            call = CallNode(name=expr.name, args=expr.args, namespace="os", dll=expr.object.field, line=expr.line)
+            return self._emit_os_call_from(self.current_block, call)
+        receiver_type = self._infer_type(expr.object)
+        if receiver_type.kind == "array":
+            if expr.name == "push":
+                dst = self._emit_expr_from(self.current_block, expr.object)
+                value = self._emit_expr_from(dst.block, expr.args[0])
+                self.set_block(value.block)
+                args = [dst.value, value.value]
+                if self._is_u8_array_type(receiver_type):
+                    self.inst("call", args, type=VOID, callee="__ep_slice_u8_push")
+                elif self._is_i64_array_type(receiver_type):
+                    self.inst("call", args, type=VOID, callee="__ep_slice_i64_push")
+                else:
+                    self.inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
+                return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
+            if expr.name == "extend":
+                dst = self._emit_expr_from(self.current_block, expr.object)
+                src = self._emit_expr_from(dst.block, expr.args[0])
+                self.set_block(src.block)
+                self.inst("call", [dst.value, src.value], type=VOID, callee="__ep_slice_u8_extend")
+                return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
+        if receiver_type.kind == "map":
+            if expr.name in ("has", "del"):
+                base = self._emit_expr_from(self.current_block, expr.object)
+                key = self._emit_expr_from(base.block, expr.args[0])
+                self.set_block(key.block)
+                helper = self._map_helper(receiver_type, expr.name)
+                if helper is None:
+                    raise MirCodegenError(f"{expr.name} expects map")
+                result = self.inst("call", [base.value, key.value], result_type=BOOL, type=BOOL, callee=helper)
+                return ValueFlow(ValueOperand(result), self.current_block)
+        raise MirCodegenError(f"unsupported dot call: {expr.name}")
 
     def _emit_user_call(self, expr):
         return self._emit_user_call_from(self.ensure_insertable(), expr).value

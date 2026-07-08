@@ -6,7 +6,7 @@ fun main(): i64 {
     if ids["main"] != 0 {
         ret 1
     }
-    if map_has(ids, "main") {
+    if ids.has("main") {
         ret 2
     }
 
@@ -17,13 +17,13 @@ fun main(): i64 {
     if ids["main"] != 101 {
         ret 3
     }
-    if map_has(ids, "main") == false {
+    if ids.has("main") == false {
         ret 4
     }
     if ids["zero"] != 0 {
         ret 5
     }
-    if map_has(ids, "zero") == false {
+    if ids.has("zero") == false {
         ret 6
     }
 

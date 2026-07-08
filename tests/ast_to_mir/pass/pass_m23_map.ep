@@ -3,8 +3,8 @@ fun main(): i64 {
     let ids = new map[str]i64 { "main": 1 }
     ids["main"] += 100
     if ids["main"] != 101 { ret 1 }
-    if map_has(ids, "main") == false { ret 2 }
-    if map_del(ids, "main") == false { ret 3 }
+    if ids.has("main") == false { ret 2 }
+    if ids.del("main") == false { ret 3 }
 
     let flags = new map[str]bool
     flags["ok"] = true

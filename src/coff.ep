@@ -28,7 +28,7 @@ fun coff_die(msg: str): void {
 }
 
 fun coff_append_byte(buf: u8[], value: i64): void {
-    push(buf, u8(value & 255))
+    buf.push(u8(value & 255))
 }
 
 fun coff_append_i64_bytes(buf: u8[], values: i64[]): void {
@@ -65,7 +65,7 @@ fun coff_append_name8(buf: u8[], name: str): void {
     let i = 0
     for i < 8 {
         if i < len(bs) {
-            push(buf, bs[i])
+            buf.push(bs[i])
         } else {
             coff_append_byte(buf, 0)
         }
@@ -82,7 +82,7 @@ fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
     let off = 4 + len(strings)
     coff_append_u32(buf, 0)
     coff_append_u32(buf, off)
-    extend(strings, bs)
+    strings.extend(bs)
     coff_append_byte(strings, 0)
 }
 
@@ -109,7 +109,7 @@ fun coff_symbol_index_build(obj: MachineObject): map[str]i64 {
 }
 
 fun coff_symbol_index_lookup(idx: map[str]i64, name: str): i64 {
-    if map_has(idx, name) {
+    if idx.has(name) {
         ret idx[name]
     }
     coff_die(str_cat2("unknown symbol: ", name))
@@ -212,9 +212,9 @@ fun coff_build_obj(obj: MachineObject): u8[] {
         i = i + 1
     }
 
-    extend(buf, symtab)
+    buf.extend(symtab)
     coff_append_u32(buf, 4 + len(strings))
-    extend(buf, strings)
+    buf.extend(strings)
     ret buf
 }
 
@@ -279,9 +279,9 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     coff_print_timing("relocs", reloc_start, reloc_stop)
 
     let final_start = coff_now_ms()
-    extend(buf, symtab)
+    buf.extend(symtab)
     coff_append_u32(buf, 4 + len(strings))
-    extend(buf, strings)
+    buf.extend(strings)
     let final_stop = coff_now_ms()
     coff_print_timing("final append", final_start, final_stop)
     println(f"  timing: coff counts: text={len(obj.text)} data={len(obj.data)} text_relocs={len(obj.text_reloc_offsets)} data_relocs={len(obj.data_reloc_offsets)} symbols={len(obj.symbol_names)} symtab={len(symtab)} strings={len(strings)} total={len(buf)}")

@@ -56,9 +56,9 @@ fun use_arrays_and_strings(): i64 {
     let xs = new i64[] { 1, 2, 3 }
     let ys = new u8[4]
     let zs = new u8[]
-    push(xs, 4)
-    push(zs, first)
-    extend(zs, bs)
+    xs.push(4)
+    zs.push(first)
+    zs.extend(bs)
     let n = len(xs)
     let c = cap(xs)
     xs[0] = add(xs[1], xs[2])
@@ -77,8 +77,8 @@ fun use_structs_and_maps(): i64 {
     let m = new map[str]i64 { "zero": 0, q.label: add(2, 5) }
     m["one"] = 1
     m["two"] = add(m["one"], 1)
-    let has_one = map_has(m, "one")
-    let removed = map_del(m, "missing")
+    let has_one = m.has("one")
+    let removed = m.del("missing")
     if has_one && !removed {
         ret m["two"] + h.count
     }

@@ -58,8 +58,8 @@ Current snapshot of functions handled specially by the active Python reference c
 |----------|---------|----------------|---------------------|------------|-------|
 | `len`    | ✓ (ln 482) | ✓ (auto handled) | ✓ (ln 299) | ✓ (ln 1011) | `str` and `array` |
 | `cap`    | ✓ (ln 488) | ✓ (auto handled) | ✓ (ln 302) | ✓ (ln 1023) | `array` only |
-| `push`   | ✓ (ln 468) | ✓ (ln 700) | ✓ (ln 305) | ✓ (ln 1056) | Array append |
-| `extend` | ✓ (ln 475) | ✓ (ln 707) | ✓ (ln 308) | ✓ (ln 1134) | u8[] only; use for + push for other types |
+| `xs.push(x)` | ✓ | ✓ | ✓ | ✓ | Array append dot call; old `push(xs,x)` removed |
+| `dst.extend(src)` | ✓ | ✓ | ✓ | ✓ | u8[] only dot call; old `extend(dst,src)` removed |
 
 ---
 
@@ -99,7 +99,7 @@ u8 is Epic's only byte type.
 
 | Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
-| `map_has` | ✓ (ln 494) | ✓ (ln 707) | ✓ (ln 335) | ✓ (ln 986) | Only `map[str]i64` path |
+| `m.has(k)` / `m.del(k)` | ✓ | ✓ | ✓ | ✓ | map[str]T dot calls; old `map_has`/`map_del` removed from public surface |
 
 ---
 
@@ -199,8 +199,8 @@ The self-hosted parser (`src/parser.ep` ln 299–337) reserves these names to pr
 user code from redefining them:
 
 ```
-len cap push extend bytes str str_new str_slice
-str_starts_with str_find map_has
+len cap bytes str str_new str_slice
+str_starts_with str_find push extend map_has map_del
 ```
 
 **But does NOT reserve:**

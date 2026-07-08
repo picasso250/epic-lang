@@ -20,7 +20,7 @@ fun main(): i64 {
     if nums[1] != 5 {
         ret 3
     }
-    if map_has(names, "if") == false {
+    if names.has("if") == false {
         ret 4
     }
     if names["fun"] != "FUN" {

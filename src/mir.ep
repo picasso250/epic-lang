@@ -178,15 +178,15 @@ fun mir_load(result_name: str, result_type: str, access_type: str, addr: MirOper
     inst.result_type = result_type
     inst.typ = access_type
     inst.has_result = true
-    push(inst.operands, addr)
+    inst.operands.push(addr)
     ret inst
 }
 
 fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
     let inst = mir_inst_empty()
     inst.op = "store"
-    push(inst.operands, value)
-    push(inst.operands, addr)
+    inst.operands.push(value)
+    inst.operands.push(addr)
     ret inst
 }
 
@@ -408,7 +408,7 @@ fun mir_struct_field(struct_name: str, field_type: str, field_index: i64): MirSt
 }
 
 fun mir_program_add_struct_field(program: MirProgram, struct_name: str, field_type: str, field_index: i64): void {
-    push(program.struct_fields, mir_struct_field(struct_name, field_type, field_index))
+    program.struct_fields.push(mir_struct_field(struct_name, field_type, field_index))
 }
 
 fun mir_program_empty(): MirProgram {

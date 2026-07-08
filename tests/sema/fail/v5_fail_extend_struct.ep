@@ -6,5 +6,5 @@ struct Box {
 fun main(): void {
     let a = new Box[1]
     let b = new Box[1]
-    extend(a, b)
+    a.extend(b)
 }

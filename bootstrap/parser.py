@@ -517,16 +517,7 @@ class Parser:
                     if self.check("LPAREN"):
                         args = self.parse_args()
                         self.expect("RPAREN")
-                        if (
-                            isinstance(node, FieldAccessNode)
-                            and isinstance(node.object, VarNode)
-                            and node.object.name == "os"
-                        ):
-                            node = CallNode(name=field[1], args=args, namespace="os", dll=node.field, line=field[2])
-                        elif isinstance(node, VarNode) and node.name == "os":
-                            raise ParseError("WinAPI calls use os.<dll>.<Function>(...)", field[2])
-                        else:
-                            raise ParseError("method calls are only supported for os.<dll>.* in v0", field[2])
+                        node = DotCallNode(object=node, name=field[1], args=args, line=field[2])
                     else:
                         node = FieldAccessNode(object=node, field=field[1], line=field[2])
                 elif self.check("LBRACKET"):
@@ -744,6 +735,11 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, CallNode):
         suffix = f" : {node.namespace}" if node.namespace else ""
         emit(f"Call {node.name}{suffix}")
+        for arg in node.args:
+            out.extend(dump_ast_lines(arg, depth + 1))
+    elif isinstance(node, DotCallNode):
+        emit(f"DotCall {node.name}")
+        out.extend(dump_ast_lines(node.object, depth + 1))
         for arg in node.args:
             out.extend(dump_ast_lines(arg, depth + 1))
     elif isinstance(node, BinaryNode):

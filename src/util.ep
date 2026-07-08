@@ -7,7 +7,7 @@ fun make_str_buf(): u8[] {
 }
 
 fun str_buf_extend(buf: u8[], s: str): void {
-    extend(buf, bytes(s))
+    buf.extend(bytes(s))
 }
 
 fun str_buf_finish(buf: u8[]): str {

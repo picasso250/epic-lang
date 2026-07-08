@@ -87,8 +87,8 @@ required_helpers: defer; unconditional injection stays for now
 | `write_file`  | Writes `u8[]`, returns `i64` |
 | `exit`        | Terminate process |
 | `len`/`cap`   | Length and capacity |
-| `push`        | Array append |
-| `extend`      | u8[] only; use for + push for other types |
+| `xs.push(x)` | Array append dot call |
+| `dst.extend(src)` | u8[] only dot call; use for + `.push(...)` for other types |
 | `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
 | `str(bytes)`  | `u8[]` to temporary `str` view; zero-copy identity cast |
 | `bytes(s)`    | temporary `str` view to `u8[]`; zero-copy identity cast |
@@ -101,7 +101,7 @@ required_helpers: defer; unconditional injection stays for now
 | `str_trim`    | Removed entirely; write byte scanning in Epic |
 | `str_replace_char` | Removed entirely; write byte scanning in Epic |
 | `system`      | Shell command (kept for now) |
-| `map_has`     | Map lookup (kept for now) |
+| `m.has(key)` / `m.del(key)` | Map existence/delete dot calls |
 
 ### Runtime Helpers (MIR-implemented)
 
@@ -127,8 +127,8 @@ These are unconditionally injected and considered part of the core runtime. Impl
 
 `map[str]T` is retained but not a priority feature. Lookup of non-existent keys
 returns zero value. The Python reference compiler currently supports
-`map[str]i64`, `map[str]bool`, and `map[str]str`, plus `map_has` and
-`map_del`.
+`map[str]i64`, `map[str]bool`, and `map[str]str`, plus `m.has(key)` and
+`m.del(key)`.
 
 ### OS Namespace
 
@@ -211,7 +211,8 @@ after ADT removal and naming unification.
 - `new S { ... }` allows partial field initialization: omitted scalar fields default to `0` / `false`, omitted reference fields default to null
 - Slice syntax `s[start:end]`
 - `match` literal switch only
-- Builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `push` / `extend` / `map_has` / `map_del`
+- Function-style builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `str` / `bytes` / `cstr` / `system`
+- Builtin container dot calls: `xs.push(x)` / `dst.extend(src)` / `m.has(key)` / `m.del(key)`
 - String/byte-view builtins (retained temporarily): `len(s)` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; byte indexing goes through `bytes(s)[i]`; `str(bytes)` / `bytes(s)` are zero-copy identity casts; `cstr` remains an escape hatch
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`
@@ -280,7 +281,7 @@ Completed:
 - The zero-copy shared-buffer behavior is covered by `examples/v5_zero_copy_str_bytes.ep`.
 - Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
   `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.
-- `extend` is byte-oriented and only supports `u8[]`.
+- `dst.extend(src)` is byte-oriented and only supports `u8[]`. Function-style `push`, `extend`, `map_has`, and `map_del` are removed from the public source surface.
 
 Remaining:
 - No retained `src/*.ep` source currently calls removed public string helpers. `src/link.ep` uses local `u8[]` byte scanning plus `str(n)`, and `src/parser.ep` no longer reserves `str_new`.

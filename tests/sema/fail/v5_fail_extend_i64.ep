@@ -2,5 +2,5 @@
 fun main(): void {
     let a = new i64[1]
     let b = new i64[1]
-    extend(a, b)
+    a.extend(b)
 }

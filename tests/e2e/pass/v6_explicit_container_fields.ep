@@ -8,7 +8,7 @@ struct S {
 }
 
 fun add_one(xs: i64[]): void {
-    push(xs, 1)
+    xs.push(1)
 }
 
 fun set_flag(flags: map[str]bool): void {
@@ -19,13 +19,13 @@ fun main(): i64 {
     let s = new S { xs: new i64[], flags: new map[str]bool, names: new map[str]str }
     assert(len(s.xs) == 0)
     assert(cap(s.xs) == 0)
-    push(s.xs, 7)
+    s.xs.push(7)
     add_one(s.xs)
     assert(len(s.xs) == 2)
     assert(s.xs[0] == 7)
     assert(s.xs[1] == 1)
 
-    assert(map_has(s.flags, "x") == false)
+    assert(s.flags.has("x") == false)
     s.flags["x"] = true
     set_flag(s.flags)
     assert(s.flags["x"] == true)
@@ -34,7 +34,7 @@ fun main(): i64 {
     assert(s.names["missing"] == "")
     s.names["a"] = "alpha"
     assert(s.names["a"] == "alpha")
-    assert(map_del(s.names, "a"))
+    assert(s.names.del("a"))
     assert(s.names["a"] == "")
 
     println("ok")

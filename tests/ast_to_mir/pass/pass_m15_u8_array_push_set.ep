@@ -1,6 +1,6 @@
 fun main(): i64 {
     let b = new u8[]
-    push(b, u8(255))
+    b.push(u8(255))
     b[0] = u8(7)
     ret i64(b[0])
 }

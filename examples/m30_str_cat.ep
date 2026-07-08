@@ -5,9 +5,9 @@ fun main(): void {
     let b = " "
     let c = "world"
     let buf = new u8[]
-    extend(buf, bytes(a))
-    extend(buf, bytes(b))
-    extend(buf, bytes(c))
+    buf.extend(bytes(a))
+    buf.extend(bytes(b))
+    buf.extend(bytes(c))
     println(str(buf))
     exit(0)
 }

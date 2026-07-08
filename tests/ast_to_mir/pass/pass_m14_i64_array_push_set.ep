@@ -1,6 +1,6 @@
 fun main(): i64 {
     let a = new i64[] { 1, 2 }
-    push(a, 3)
+    a.push(3)
     a[1] = a[0] + a[2]
     ret a[1]
 }

@@ -166,7 +166,7 @@ struct Point {
 fun main(): i64 {
     let p = new Point { y: 2, x: 1 }
     let xs = new i64[] { 4 }
-    push(xs, 5)
+    xs.push(5)
     ret xs[0]
 }
 """
@@ -348,7 +348,7 @@ def test_mir_helper_injection():
     check(
         """fun main(): i64 {
     let b = new u8[] { u8(1), u8(2) }
-    push(b, u8(3))
+    b.push(u8(3))
     ret len(b)
 }"""
     )
@@ -365,7 +365,7 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let a = new u8[] { u8(1), u8(2) }
     let b = new u8[] { u8(3), u8(4) }
-    extend(a, b)
+    a.extend(b)
     ret len(a)
 }"""
     )

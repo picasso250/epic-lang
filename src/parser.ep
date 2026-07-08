@@ -226,7 +226,7 @@ fun parse_params(p: Parser): AstNode[] {
         let param = ast_node("Param")
         param.name = pname.text
         param.type_name = ptype
-        push(params, param)
+        params.push(param)
         if check(p, "COMMA") == 0 {
             done = 1
         }
@@ -249,7 +249,7 @@ fun parse_struct_def(p: Parser): AstNode {
         let field = ast_node("StructField")
         field.name = fname.text
         field.type_name = ftype
-        push(node.fields, field)
+        node.fields.push(field)
     }
     expect(p, "RBRACE")
     ret node
@@ -278,11 +278,11 @@ fun parse_program(p: Parser): AstNode {
     skip_newlines(p)
     for peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 || peek_kind(p, "LET") == 1 {
         if peek_kind(p, "FUN") == 1 {
-            push(node.funcs, parse_fn_def(p))
+            node.funcs.push(parse_fn_def(p))
         } else if peek_kind(p, "STRUCT") == 1 {
-            push(node.structs, parse_struct_def(p))
+            node.structs.push(parse_struct_def(p))
         } else {
-            push(node.globals, parse_let_stmt(p))
+            node.globals.push(parse_let_stmt(p))
         }
         skip_newlines(p)
     }
@@ -302,7 +302,7 @@ fun parse_block(p: Parser): AstNode {
             let t = peek(p)
             parse_error(t.line, "Unexpected end of file in block")
         }
-        push(node.stmts, parse_stmt(p))
+        node.stmts.push(parse_stmt(p))
         skip_newlines(p)
     }
     expect(p, "RBRACE")
@@ -479,7 +479,7 @@ fun parse_if_stmt(p: Parser): AstNode {
         skip_newlines(p)
         if peek_kind(p, "IF") == 1 {
             let b = ast_node("Block")
-            push(b.stmts, parse_if_stmt(p))
+            b.stmts.push(parse_if_stmt(p))
             node.else_block = b
         } else {
             node.else_block = parse_block(p)
@@ -603,7 +603,7 @@ fun parse_match_stmt(p: Parser): AstNode {
             c.expr = parse_match_literal(p)
             expect(p, "COLON")
             c.body = parse_block(p)
-            push(node.fields, c)
+            node.fields.push(c)
         }
         skip_newlines(p)
     }
@@ -918,9 +918,9 @@ fun op_text(kind: str): str {
 fun parse_args(p: Parser): AstNode[] {
     let args = new AstNode[0]
     if peek_kind(p, "RPAREN") == 0 {
-        push(args, parse_expr(p))
+        args.push(parse_expr(p))
         for check(p, "COMMA") == 1 {
-            push(args, parse_expr(p))
+            args.push(parse_expr(p))
         }
     }
     ret args
@@ -939,7 +939,7 @@ fun parse_struct_init(p: Parser, name: Token): AstNode {
         field.name = field_name.text
         field.line = field_name.line
         field.value_expr = parse_expr(p)
-        push(node.fields, field)
+        node.fields.push(field)
         if check(p, "COMMA") == 1 {
             skip_newlines(p)
         } else {
@@ -967,7 +967,7 @@ fun parse_named_init_fields(p: Parser, node: AstNode): AstNode {
         field.name = field_name.text
         field.line = field_name.line
         field.value_expr = parse_expr(p)
-        push(node.fields, field)
+        node.fields.push(field)
         if check(p, "COMMA") == 1 {
             skip_newlines(p)
         } else {
@@ -992,7 +992,7 @@ fun parse_array_literal(p: Parser, name: Token): AstNode {
     expect(p, "LBRACE")
     skip_newlines(p)
     for peek_kind(p, "RBRACE") == 0 {
-        push(node.args, parse_expr(p))
+        node.args.push(parse_expr(p))
         if check(p, "COMMA") == 1 {
             skip_newlines(p)
         } else {
@@ -1014,9 +1014,9 @@ fun parse_map_init_entries(p: Parser, node: AstNode): AstNode {
     expect(p, "LBRACE")
     skip_newlines(p)
     for peek_kind(p, "RBRACE") == 0 {
-        push(node.map_keys, parse_expr(p))
+        node.map_keys.push(parse_expr(p))
         expect(p, "COLON")
-        push(node.map_values, parse_expr(p))
+        node.map_values.push(parse_expr(p))
         if check(p, "COMMA") == 1 {
             skip_newlines(p)
         } else {
@@ -1042,7 +1042,7 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
             if len(part.text) > 0 {
                 let n = ast_node("FStringText")
                 n.value = part.text
-                push(out, n)
+                out.push(n)
             }
         } else {
             if part.kind == "expr" {
@@ -1053,7 +1053,7 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
                     let t = peek(p)
                     parse_error(line, "Unexpected token in f-string expression")
                 }
-                push(out, expr)
+                out.push(expr)
             } else {
                 parse_error(line, "Expected f-string part")
             }
@@ -1069,19 +1069,10 @@ fun parse_postfix(p: Parser, node: AstNode): AstNode {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
             if check(p, "LPAREN") == 1 {
-                let n = ast_node("Call")
+                let n = ast_node("DotCall")
+                n.object = current
+                n.name = field.text
                 n.line = field.line
-                if current.kind == "FieldAccess" && current.object.kind == "Var" && current.object.name == "os" {
-                    n.name = field.text
-                    n.type_name = "os"
-                    n.dll = current.name
-                } else {
-                    if current.kind == "Var" && current.name == "os" {
-                        parse_error(field.line, "WinAPI calls use os.<dll>.<Function>(...)")
-                    } else {
-                        parse_error(field.line, "method calls are only supported for os.<dll>.*")
-                    }
-                }
                 n.args = parse_args(p)
                 expect(p, "RPAREN")
                 current = n

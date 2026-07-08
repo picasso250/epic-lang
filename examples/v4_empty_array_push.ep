@@ -14,30 +14,30 @@ fun main(): void {
     let buf1 = new u8[]
     assert(len(buf1) == 0)
     assert(cap(buf1) == 0)
-    extend(buf1, bytes(a))
+    buf1.extend(bytes(a))
     assert(cap(buf1) == 4)
-    push(buf1, ',')
-    extend(buf1, bytes(b))
+    buf1.push(',')
+    buf1.extend(bytes(b))
     print(str(buf1))
 
     let buf2 = new u8[]
-    push(buf2, ',')
-    extend(buf2, bytes(s))
-    push(buf2, ',')
-    extend(buf2, bytes(t))
+    buf2.push(',')
+    buf2.extend(bytes(s))
+    buf2.push(',')
+    buf2.extend(bytes(t))
     print(str(buf2))
 
     let buf3 = new u8[]
-    push(buf3, ',')
-    extend(buf3, bytes(neg))
+    buf3.push(',')
+    buf3.extend(bytes(neg))
     print(str(buf3))
 
     let nums = new i64[]
     assert(len(nums) == 0)
     assert(cap(nums) == 0)
-    push(nums, 40)
+    nums.push(40)
     assert(cap(nums) == 4)
-    push(nums, 2)
+    nums.push(2)
     assert(nums[0] + nums[1] == 42)
 
     let pairs = new Pair[]
@@ -45,7 +45,7 @@ fun main(): void {
     assert(cap(pairs) == 0)
     let p = new Pair {}
     p.value = 7
-    push(pairs, p)
+    pairs.push(p)
     assert(cap(pairs) == 4)
     assert(pairs[0].value == 7)
     exit(0)

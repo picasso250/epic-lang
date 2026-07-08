@@ -292,6 +292,8 @@ class SemanticAnalyzer:
             return self._binary_expr(expr)
         if isinstance(expr, CallNode):
             return self._call_expr(expr)
+        if isinstance(expr, DotCallNode):
+            return self._dot_call_expr(expr)
         if isinstance(expr, FieldAccessNode):
             return ExprInfo(self._field_type(self._expr(expr.object).type, expr.field))
         if isinstance(expr, SubscriptNode):
@@ -423,21 +425,9 @@ class SemanticAnalyzer:
             self._check_call_args(name, [STR], expr.args)
             return ExprInfo(I64)
         if name == "push":
-            self._check_arity(name, 2, expr.args)
-            arr = self._expr(expr.args[0])
-            if arr.type.kind != "array":
-                self._fail(f"push expected array, got {arr.type}")
-            self._check_assign(arr.type.elem, self._expr(expr.args[1]), "push value")
-            return ExprInfo(VOID)
+            self._fail("push is removed from function-call surface; use xs.push(x)")
         if name == "extend":
-            self._check_arity(name, 2, expr.args)
-            dst = self._expr(expr.args[0])
-            src = self._expr(expr.args[1])
-            if dst.type.kind != "array" or dst.type.elem != U8:
-                self._fail("extend only supports u8[]")
-            if src.type.kind != "array" or src.type.elem != U8:
-                self._fail("extend only supports u8[]")
-            return ExprInfo(VOID)
+            self._fail("extend is removed from function-call surface; use dst.extend(src)")
         if name == "len":
             self._check_arity(name, 1, expr.args)
             arg = self._expr(expr.args[0])
@@ -450,19 +440,46 @@ class SemanticAnalyzer:
             if arg.type.kind != "array":
                 self._fail(f"cap expected array, got {arg.type}")
             return ExprInfo(I64)
-        if name in ("map_has", "map_del"):
-            self._check_arity(name, 2, expr.args)
-            map_arg = self._expr(expr.args[0])
-            if map_arg.type.kind != "map":
-                self._fail(f"{name} expects map")
-            self._check_assign(STR, self._expr(expr.args[1]), f"{name} key")
-            return ExprInfo(BOOL)
+        if name == "map_has":
+            self._fail("map_has is removed from public surface; use m.has(key)")
+        if name == "map_del":
+            self._fail("map_del is removed from public surface; use m.del(key)")
 
         if name not in self.func_sigs:
             self._fail(f"unknown function {name}")
         params, ret = self.func_sigs[name]
         self._check_call_args(name, params, expr.args)
         return ExprInfo(ret)
+
+    def _dot_call_expr(self, expr):
+        if (
+            isinstance(expr.object, FieldAccessNode)
+            and isinstance(expr.object.object, VarNode)
+            and expr.object.object.name == "os"
+        ):
+            call = CallNode(name=expr.name, args=expr.args, namespace="os", dll=expr.object.field, line=expr.line)
+            return self._os_call(call)
+        receiver = self._expr(expr.object)
+        if receiver.type.kind == "array":
+            if expr.name == "push":
+                self._check_arity("push", 1, expr.args)
+                self._check_assign(receiver.type.elem, self._expr(expr.args[0]), "push value")
+                return ExprInfo(VOID)
+            if expr.name == "extend":
+                self._check_arity("extend", 1, expr.args)
+                src = self._expr(expr.args[0])
+                if receiver.type.elem != U8 or src.type.kind != "array" or src.type.elem != U8:
+                    self._fail("extend only supports u8[]")
+                return ExprInfo(VOID)
+            self._fail(f"array type {receiver.type} has no method {expr.name}")
+        if receiver.type.kind == "map":
+            if expr.name == "has" or expr.name == "del":
+                self._check_arity(expr.name, 1, expr.args)
+                self._check_assign(STR, self._expr(expr.args[0]), f"{expr.name} key")
+                return ExprInfo(BOOL)
+            self._fail(f"map type {receiver.type} has no method {expr.name}")
+        self._fail("method calls are only supported for os.*, slices, and maps for now")
+        return ExprInfo(VOID)
 
     def _os_call(self, expr):
         key = (expr.dll, expr.name)
@@ -651,11 +668,19 @@ class SemanticAnalyzer:
         return False
 
     def _is_terminating_call(self, expr):
-        if not isinstance(expr, CallNode):
-            return False
-        if not expr.namespace and expr.name == "exit":
-            return True
-        return expr.namespace == "os" and expr.dll == "kernel32" and expr.name == "ExitProcess"
+        if isinstance(expr, CallNode):
+            if not expr.namespace and expr.name == "exit":
+                return True
+            return expr.namespace == "os" and expr.dll == "kernel32" and expr.name == "ExitProcess"
+        if isinstance(expr, DotCallNode):
+            return (
+                expr.name == "ExitProcess"
+                and isinstance(expr.object, FieldAccessNode)
+                and expr.object.field == "kernel32"
+                and isinstance(expr.object.object, VarNode)
+                and expr.object.object.name == "os"
+            )
+        return False
 
     def _is_integer(self, typ):
         return typ.kind in self.INT_RANGES
@@ -716,6 +741,16 @@ def assert_typed_program(program):
                     expr(value, f"{path}.parts[{idx}]")
             return
         if isinstance(node, CallNode):
+            for idx, arg in enumerate(node.args):
+                expr(arg, f"{path}.args[{idx}]")
+            return
+        if isinstance(node, DotCallNode):
+            if not (
+                isinstance(node.object, FieldAccessNode)
+                and isinstance(node.object.object, VarNode)
+                and node.object.object.name == "os"
+            ):
+                expr(node.object, f"{path}.object")
             for idx, arg in enumerate(node.args):
                 expr(arg, f"{path}.args[{idx}]")
             return
@@ -966,6 +1001,11 @@ def dump_typed_ast_lines(node, depth=0):
     elif isinstance(node, CallNode):
         suffix = f" : {node.namespace}" if node.namespace else ""
         emit(f"Call {node.name}{suffix}{_type_suffix(node)}")
+        for arg in node.args:
+            out.extend(dump_typed_ast_lines(arg, depth + 1))
+    elif isinstance(node, DotCallNode):
+        emit(f"DotCall {node.name}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.object, depth + 1))
         for arg in node.args:
             out.extend(dump_typed_ast_lines(arg, depth + 1))
     elif isinstance(node, BinaryNode):
