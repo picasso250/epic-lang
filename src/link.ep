@@ -419,60 +419,30 @@ fun collect_relocs(st: LinkState): void {
     }
 }
 
+let kernel32_import_hints = new map[str]i64 {
+    "CloseHandle": 157
+    "CreateFileA": 222
+    "CreateProcessA": 253
+    "ExitProcess": 390
+    "GetCommandLineA": 511
+    "GetExitCodeProcess": 615
+    "GetFileSize": 631
+    "GetProcessHeap": 740
+    "GetStdHandle": 805
+    "GetTickCount64": 846
+    "HeapAlloc": 892
+    "lstrcmpA": 985
+    "lstrlenA": 991
+    "ReadFile": 1193
+    "SetFilePointer": 1384
+    "Sleep": 1410
+    "WaitForSingleObject": 1573
+    "WriteFile": 1632
+}
+
 fun kernel32_hint(name: str): i64 {
-    if name == "CloseHandle" {
-        ret 157
-    }
-    if name == "CreateFileA" {
-        ret 222
-    }
-    if name == "CreateProcessA" {
-        ret 253
-    }
-    if name == "ExitProcess" {
-        ret 390
-    }
-    if name == "GetCommandLineA" {
-        ret 511
-    }
-    if name == "GetExitCodeProcess" {
-        ret 615
-    }
-    if name == "GetFileSize" {
-        ret 631
-    }
-    if name == "GetProcessHeap" {
-        ret 740
-    }
-    if name == "GetStdHandle" {
-        ret 805
-    }
-    if name == "GetTickCount64" {
-        ret 846
-    }
-    if name == "HeapAlloc" {
-        ret 892
-    }
-    if name == "lstrcmpA" {
-        ret 985
-    }
-    if name == "lstrlenA" {
-        ret 991
-    }
-    if name == "ReadFile" {
-        ret 1193
-    }
-    if name == "SetFilePointer" {
-        ret 1384
-    }
-    if name == "Sleep" {
-        ret 1410
-    }
-    if name == "WaitForSingleObject" {
-        ret 1573
-    }
-    if name == "WriteFile" {
-        ret 1632
+    if map_has(kernel32_import_hints, name) {
+        ret kernel32_import_hints[name]
     }
     ret 0
 }
