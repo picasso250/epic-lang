@@ -7,6 +7,41 @@ Program
     StructField point : Point
     StructField bytes : u8[]
     StructField flags : map[str]bool
+  StructDef LiteralExpr
+    StructField value : str
+  StructDef BinaryExpr
+    StructField op : str
+    StructField left : Expr
+    StructField right : Expr
+  UnionDef Expr
+    UnionMember LiteralExpr
+    UnionMember BinaryExpr
+  FunDef adt_parser_surface : void
+    Block
+      Let e : Expr
+        UnionInit Expr
+          StructInit LiteralExpr
+            InitField value
+              String 1
+      Match
+        Var e
+        MatchCase LiteralExpr lit
+          Block
+            ExprStmt
+              Call println
+                FieldAccess value
+                  Var lit
+        MatchCase BinaryExpr b
+          Block
+            ExprStmt
+              Call println
+                FieldAccess op
+                  Var b
+        MatchCase _
+          Block
+            ExprStmt
+              Call println
+                String fallback
   FunDef helper : i64
     Param a : i64
     Param b : i64
