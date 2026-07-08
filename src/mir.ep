@@ -108,10 +108,6 @@ struct MirProgram {
     functions: MirFunction[]
 }
 
-fun mir_operand_empty(): MirOperand {
-    ret mir_operand_null()
-}
-
 fun mir_const_int(typ: str, value: i64): MirOperand {
     ret new MirOperand(new MirIntOperand { typ: typ, value: value })
 }
@@ -549,114 +545,6 @@ fun mir_terminator_kind_text(term: MirTerminator): str {
         }
     }
     ret "<bad terminator>"
-}
-
-fun mir_terminator_br_target(term: MirTerminator): str {
-    match term {
-        MirBrTerminator br: {
-            ret br.target
-        }
-        MirCondBrTerminator cond: {
-            ret ""
-        }
-        MirRetVoidTerminator rv: {
-            ret ""
-        }
-        MirRetValueTerminator rv: {
-            ret ""
-        }
-    }
-    ret ""
-}
-
-fun mir_terminator_cond_value(term: MirTerminator): MirOperand {
-    match term {
-        MirBrTerminator br: {
-            ret mir_operand_empty()
-        }
-        MirCondBrTerminator cond: {
-            ret cond.cond
-        }
-        MirRetVoidTerminator rv: {
-            ret mir_operand_empty()
-        }
-        MirRetValueTerminator rv: {
-            ret mir_operand_empty()
-        }
-    }
-    ret mir_operand_empty()
-}
-
-fun mir_terminator_then_target(term: MirTerminator): str {
-    match term {
-        MirBrTerminator br: {
-            ret ""
-        }
-        MirCondBrTerminator cond: {
-            ret cond.then_target
-        }
-        MirRetVoidTerminator rv: {
-            ret ""
-        }
-        MirRetValueTerminator rv: {
-            ret ""
-        }
-    }
-    ret ""
-}
-
-fun mir_terminator_else_target(term: MirTerminator): str {
-    match term {
-        MirBrTerminator br: {
-            ret ""
-        }
-        MirCondBrTerminator cond: {
-            ret cond.else_target
-        }
-        MirRetVoidTerminator rv: {
-            ret ""
-        }
-        MirRetValueTerminator rv: {
-            ret ""
-        }
-    }
-    ret ""
-}
-
-fun mir_terminator_has_value(term: MirTerminator): bool {
-    match term {
-        MirBrTerminator br: {
-            ret false
-        }
-        MirCondBrTerminator cond: {
-            ret false
-        }
-        MirRetVoidTerminator rv: {
-            ret false
-        }
-        MirRetValueTerminator rv: {
-            ret true
-        }
-    }
-    ret false
-}
-
-fun mir_terminator_ret_value(term: MirTerminator): MirOperand {
-    match term {
-        MirBrTerminator br: {
-            ret mir_operand_empty()
-        }
-        MirCondBrTerminator cond: {
-            ret mir_operand_empty()
-        }
-        MirRetVoidTerminator rv: {
-            ret mir_operand_empty()
-        }
-        MirRetValueTerminator rv: {
-            ret rv.value
-        }
-    }
-    ret mir_operand_empty()
 }
 
 fun mir_terminator_text(term: MirTerminator): str {

@@ -70,10 +70,6 @@ struct X64Program {
     items: X64Item[]
 }
 
-fun x64_operand_empty(): X64Operand {
-    ret x64_imm(0)
-}
-
 fun x64_reg(name: str): X64Operand {
     ret new X64Operand(new X64RegOperand { name: name })
 }
@@ -211,17 +207,6 @@ fun x64_operand_is_imm(op: X64Operand): bool { ret x64_operand_kind_text(op) == 
 fun x64_operand_is_symbol(op: X64Operand): bool { ret x64_operand_kind_text(op) == "symbol" }
 fun x64_operand_is_label_ref(op: X64Operand): bool { ret x64_operand_kind_text(op) == "label_ref" }
 fun x64_operand_is_mem(op: X64Operand): bool { ret x64_operand_kind_text(op) == "mem" }
-
-fun x64_item_empty(kind: str): X64Item {
-    if kind == "global" { ret new X64Item(new X64GlobalItem { name: "" }) }
-    if kind == "extern" { ret new X64Item(new X64ExternItem { name: "" }) }
-    if kind == "section" { ret new X64Item(new X64SectionItem { name: "" }) }
-    if kind == "label" { ret new X64Item(new X64LabelItem { name: "" }) }
-    if kind == "inst" { ret new X64Item(new X64InstItem { op: "", operands: new X64Operand[0] }) }
-    if kind == "data_bytes" { ret new X64Item(new X64DataBytesItem { name: "", values: new i64[0] }) }
-    if kind == "data_zero" { ret new X64Item(new X64DataZeroItem { name: "", count: 0 }) }
-    ret new X64Item(new X64SectionItem { name: "" })
-}
 
 fun x64_program_empty(): X64Program {
     let program = new X64Program
