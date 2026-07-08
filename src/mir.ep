@@ -4,13 +4,30 @@
 # first EP typed-AST -> MIR oracle comparison path.
 #
 
-struct MirOperand {
-    kind: str
+struct MirValueOperand {
     typ: str
     name: str
-    int_value: i64
-    bool_value: bool
 }
+
+struct MirIntOperand {
+    typ: str
+    value: i64
+}
+
+struct MirBoolOperand {
+    value: bool
+}
+
+struct MirNullOperand {
+    dummy: i64
+}
+
+struct MirSymbolOperand {
+    typ: str
+    name: str
+}
+
+type MirOperand = MirValueOperand | MirIntOperand | MirBoolOperand | MirNullOperand | MirSymbolOperand
 
 struct MirInst {
     op: str
@@ -70,80 +87,267 @@ struct MirProgram {
 }
 
 fun mir_operand_empty(): MirOperand {
-    let op = new MirOperand
-    op.kind = ""
-    op.typ = ""
-    op.name = ""
-    op.int_value = 0
-    op.bool_value = false
-    ret op
+    ret mir_operand_null()
 }
 
 fun mir_const_int(typ: str, value: i64): MirOperand {
-    let op = mir_operand_empty()
-    op.kind = "int"
-    op.typ = typ
-    op.int_value = value
-    ret op
+    ret new MirOperand(new MirIntOperand { typ: typ, value: value })
 }
 
 
 fun mir_operand_null(): MirOperand {
-    let op = mir_operand_empty()
-    op.kind = "null"
-    op.typ = "ptr"
-    ret op
+    ret new MirOperand(new MirNullOperand { dummy: 0 })
 }
 
 fun mir_const_bool(value: bool): MirOperand {
-    let op = mir_operand_empty()
-    op.kind = "bool"
-    op.typ = "bool"
-    op.bool_value = value
-    ret op
+    ret new MirOperand(new MirBoolOperand { value: value })
 }
 
 fun mir_value_operand(typ: str, name: str): MirOperand {
-    let op = mir_operand_empty()
-    op.kind = "value"
-    op.typ = typ
-    op.name = name
-    ret op
+    ret new MirOperand(new MirValueOperand { typ: typ, name: name })
 }
 
 fun mir_symbol_operand(typ: str, name: str): MirOperand {
-    let op = mir_operand_empty()
-    op.kind = "symbol"
-    op.typ = typ
-    op.name = name
-    ret op
+    ret new MirOperand(new MirSymbolOperand { typ: typ, name: name })
+}
+
+fun mir_operand_type(op: MirOperand): str {
+    match op {
+        MirValueOperand v: {
+            ret v.typ
+        }
+        MirIntOperand i: {
+            ret i.typ
+        }
+        MirBoolOperand b: {
+            ret "bool"
+        }
+        MirNullOperand n: {
+            ret "ptr"
+        }
+        MirSymbolOperand s: {
+            ret s.typ
+        }
+    }
+    ret ""
+}
+
+fun mir_operand_name(op: MirOperand): str {
+    match op {
+        MirValueOperand v: {
+            ret v.name
+        }
+        MirIntOperand i: {
+            ret ""
+        }
+        MirBoolOperand b: {
+            ret ""
+        }
+        MirNullOperand n: {
+            ret ""
+        }
+        MirSymbolOperand s: {
+            ret s.name
+        }
+    }
+    ret ""
+}
+
+fun mir_operand_int_value(op: MirOperand): i64 {
+    match op {
+        MirValueOperand v: {
+            ret 0
+        }
+        MirIntOperand i: {
+            ret i.value
+        }
+        MirBoolOperand b: {
+            ret 0
+        }
+        MirNullOperand n: {
+            ret 0
+        }
+        MirSymbolOperand s: {
+            ret 0
+        }
+    }
+    ret 0
+}
+
+fun mir_operand_bool_value(op: MirOperand): bool {
+    match op {
+        MirValueOperand v: {
+            ret false
+        }
+        MirIntOperand i: {
+            ret false
+        }
+        MirBoolOperand b: {
+            ret b.value
+        }
+        MirNullOperand n: {
+            ret false
+        }
+        MirSymbolOperand s: {
+            ret false
+        }
+    }
+    ret false
+}
+
+fun mir_operand_is_int(op: MirOperand): bool {
+    match op {
+        MirValueOperand v: {
+            ret false
+        }
+        MirIntOperand i: {
+            ret true
+        }
+        MirBoolOperand b: {
+            ret false
+        }
+        MirNullOperand n: {
+            ret false
+        }
+        MirSymbolOperand s: {
+            ret false
+        }
+    }
+    ret false
+}
+
+fun mir_operand_is_bool(op: MirOperand): bool {
+    match op {
+        MirValueOperand v: {
+            ret false
+        }
+        MirIntOperand i: {
+            ret false
+        }
+        MirBoolOperand b: {
+            ret true
+        }
+        MirNullOperand n: {
+            ret false
+        }
+        MirSymbolOperand s: {
+            ret false
+        }
+    }
+    ret false
+}
+
+fun mir_operand_is_null(op: MirOperand): bool {
+    match op {
+        MirValueOperand v: {
+            ret false
+        }
+        MirIntOperand i: {
+            ret false
+        }
+        MirBoolOperand b: {
+            ret false
+        }
+        MirNullOperand n: {
+            ret true
+        }
+        MirSymbolOperand s: {
+            ret false
+        }
+    }
+    ret false
+}
+
+fun mir_operand_is_value(op: MirOperand): bool {
+    match op {
+        MirValueOperand v: {
+            ret true
+        }
+        MirIntOperand i: {
+            ret false
+        }
+        MirBoolOperand b: {
+            ret false
+        }
+        MirNullOperand n: {
+            ret false
+        }
+        MirSymbolOperand s: {
+            ret false
+        }
+    }
+    ret false
+}
+
+fun mir_operand_is_symbol(op: MirOperand): bool {
+    match op {
+        MirValueOperand v: {
+            ret false
+        }
+        MirIntOperand i: {
+            ret false
+        }
+        MirBoolOperand b: {
+            ret false
+        }
+        MirNullOperand n: {
+            ret false
+        }
+        MirSymbolOperand s: {
+            ret true
+        }
+    }
+    ret false
+}
+
+fun mir_operand_kind_text(op: MirOperand): str {
+    match op {
+        MirValueOperand v: {
+            ret "value"
+        }
+        MirIntOperand i: {
+            ret "int"
+        }
+        MirBoolOperand b: {
+            ret "bool"
+        }
+        MirNullOperand n: {
+            ret "null"
+        }
+        MirSymbolOperand s: {
+            ret "symbol"
+        }
+    }
+    ret "<bad operand>"
 }
 
 fun mir_operand_text(op: MirOperand): str {
-    if op.kind == "value" {
-        ret str_cat2("%", op.name)
-    }
-    if op.kind == "int" {
-        ret str(op.int_value)
-    }
-    if op.kind == "bool" {
-        if op.bool_value {
-            ret "true"
+    match op {
+        MirValueOperand v: {
+            ret str_cat2("%", v.name)
         }
-        ret "false"
-    }
-    if op.kind == "null" {
-        ret "null"
-    }
-    if op.kind == "symbol" {
-        ret op.name
+        MirIntOperand i: {
+            ret str(i.value)
+        }
+        MirBoolOperand b: {
+            if b.value {
+                ret "true"
+            }
+            ret "false"
+        }
+        MirNullOperand n: {
+            ret "null"
+        }
+        MirSymbolOperand s: {
+            ret s.name
+        }
     }
     ret "<bad operand>"
 }
 
 fun mir_operand_typed_text(op: MirOperand): str {
     let buf = make_str_buf()
-    str_buf_extend(buf, op.typ)
+    str_buf_extend(buf, mir_operand_type(op))
     str_buf_extend(buf, " ")
     str_buf_extend(buf, mir_operand_text(op))
     ret str_buf_finish(buf)

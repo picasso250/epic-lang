@@ -550,7 +550,7 @@ fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstNode): MirVa
             st.current_block = piece_flow.block
             piece = piece_flow.value
         }
-        if piece.kind != "null" {
+        if mir_operand_is_null(piece) == false {
             if has_out == false {
                 out = piece
                 has_out = true
@@ -1436,7 +1436,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBloc
     let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = scrutinee_flow.block
     let match_name = str_cat2("__match", str(st.value_counter))
-    let match_addr = mir_alloc_local(st, match_name, scrutinee_flow.value.typ)
+    let match_addr = mir_alloc_local(st, match_name, mir_operand_type(scrutinee_flow.value))
     mir_emit_inst(st, mir_store(scrutinee_flow.value, match_addr))
 
     let end_block = mir_new_block(st, "match.end")
@@ -1467,11 +1467,11 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBloc
             next_block = next_blocks[ci]
         }
         let scrut_name = mir_new_value(st, "load")
-        mir_emit_inst(st, mir_load(scrut_name, scrutinee_flow.value.typ, scrutinee_flow.value.typ, match_addr))
+        mir_emit_inst(st, mir_load(scrut_name, mir_operand_type(scrutinee_flow.value), mir_operand_type(scrutinee_flow.value), match_addr))
         let pat_flow = mir_emit_expr(st, st.current_block, stmt.fields[ci].expr)
         st.current_block = pat_flow.block
         let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(mir_value_operand(scrutinee_flow.value.typ, scrut_name))
+        cond.operands.push(mir_value_operand(mir_operand_type(scrutinee_flow.value), scrut_name))
         cond.operands.push(pat_flow.value)
         mir_emit_inst(st, cond)
         st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)

@@ -198,45 +198,47 @@ fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
 }
 
 fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand): void {
-    if operand.kind == "int" {
-        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(operand.int_value))
+    if mir_operand_is_int(operand) {
+        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(mir_operand_int_value(operand)))
         ret
     }
-    if operand.kind == "bool" {
-        if operand.bool_value {
+    if mir_operand_is_bool(operand) {
+        if mir_operand_bool_value(operand) {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(1))
         } else {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
         }
         ret
     }
-    if operand.kind == "null" {
+    if mir_operand_is_null(operand) {
         x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
         ret
     }
-    if operand.kind == "value" {
-        let value_offset = mir_to_x64_find_slot(lower.value_slots, operand.name)
+    if mir_operand_is_value(operand) {
+        let name = mir_operand_name(operand)
+        let value_offset = mir_to_x64_find_slot(lower.value_slots, name)
         if value_offset != 0 {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_base("rbp", value_offset, 8))
             ret
         }
-        let addr_offset = mir_to_x64_find_slot(lower.addr_slots, operand.name)
+        let addr_offset = mir_to_x64_find_slot(lower.addr_slots, name)
         if addr_offset != 0 {
             x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_base("rbp", addr_offset, 8))
             ret
         }
-        mir_to_x64_die(str_cat2("unknown MIR value: ", operand.name))
+        mir_to_x64_die(str_cat2("unknown MIR value: ", name))
         ret
     }
-    if operand.kind == "symbol" {
-        if operand.name == "argv" {
+    if mir_operand_is_symbol(operand) {
+        let name = mir_operand_name(operand)
+        if name == "argv" {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_symbol("_argv", 8))
             ret
         }
-        let string_index = mir_to_x64_string_index(lower, operand.name)
+        let string_index = mir_to_x64_string_index(lower, name)
         if string_index >= 0 {
-            let data_label = mir_to_x64_data_label(operand.name)
-            let header_label = mir_to_x64_header_label(operand.name)
+            let data_label = mir_to_x64_data_label(name)
+            let header_label = mir_to_x64_header_label(name)
             x64_add_inst2(lower.x64, "lea", x64_reg("r11"), x64_mem_symbol(data_label, 8))
             x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(header_label, 8))
             x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 0, 8), x64_reg("r11"))
@@ -244,15 +246,15 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
             x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 8, 8), x64_reg("r11"))
             ret
         }
-        let global_index = mir_to_x64_global_index(lower, operand.name)
+        let global_index = mir_to_x64_global_index(lower, name)
         if global_index >= 0 {
-            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(operand.name, 8))
+            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(name, 8))
             ret
         }
-        mir_to_x64_die(str_cat2("unsupported symbol operand: ", operand.name))
+        mir_to_x64_die(str_cat2("unsupported symbol operand: ", name))
         ret
     }
-    mir_to_x64_die(str_cat2("unsupported operand: ", operand.kind))
+    mir_to_x64_die(str_cat2("unsupported operand: ", mir_operand_kind_text(operand)))
 }
 
 fun mir_to_x64_store_result(lower: MirToX64Lower, result_name: str, reg: str): void {
@@ -322,8 +324,8 @@ fun mir_to_x64_scale_rcx_by_8(lower: MirToX64Lower): void {
 }
 
 fun mir_to_x64_add_scaled_index(lower: MirToX64Lower, operand: MirOperand, scale: i64): void {
-    if operand.kind == "int" {
-        mir_to_x64_add_rax_imm(lower, operand.int_value * scale)
+    if mir_operand_is_int(operand) {
+        mir_to_x64_add_rax_imm(lower, mir_operand_int_value(operand) * scale)
         ret
     }
     mir_to_x64_load_operand(lower, "rcx", operand)
@@ -348,7 +350,7 @@ fun mir_to_x64_gep_scale(lower: MirToX64Lower, source_type: str): i64 {
 
 fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
     mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-    if inst.operands[0].kind != "null" {
+    if mir_operand_is_null(inst.operands[0]) == false {
         x64_add_inst2(lower.x64, "test", x64_reg("rax"), x64_reg("rax"))
         x64_add_inst1(lower.x64, "jz", x64_label_ref("__epx_null_deref"))
     }
@@ -358,10 +360,10 @@ fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
             mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
         } else if len(inst.operands) == 3 {
             mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
-            if inst.operands[2].kind != "int" {
+            if mir_operand_is_int(inst.operands[2]) == false {
                 mir_to_x64_die("struct field gep needs a constant field index")
             }
-            mir_to_x64_add_rax_imm(lower, mir_to_x64_struct_field_offset(lower, struct_name, inst.operands[2].int_value))
+            mir_to_x64_add_rax_imm(lower, mir_to_x64_struct_field_offset(lower, struct_name, mir_operand_int_value(inst.operands[2])))
         } else {
             mir_to_x64_die("struct gep needs one or two indices")
         }
@@ -473,7 +475,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
         x64_add_inst2(lower.x64, "test", x64_reg("rcx"), x64_reg("rcx"))
         x64_add_inst1(lower.x64, "jz", x64_label_ref("__epx_null_deref"))
-        if inst.operands[0].typ == "i8" {
+        if mir_operand_type(inst.operands[0]) == "i8" {
             x64_add_inst2(lower.x64, "mov", x64_mem_base("rcx", 0, 1), x64_reg("al"))
         } else {
             x64_add_inst2(lower.x64, "mov", x64_mem_base("rcx", 0, 8), x64_reg("rax"))
