@@ -127,22 +127,6 @@ fun mir_global_index(st: MirCodegenState, name: str): i64 {
     ret 0 - 1
 }
 
-fun mir_global_init_value(expr: AstNode): str {
-    if expr.kind == "Literal" || expr.kind == "Char" {
-        ret expr.value
-    }
-    if expr.kind == "Bool" {
-        ret expr.value
-    }
-    if expr.kind == "Call" {
-        if len(expr.args) == 1 {
-            ret mir_global_init_value(expr.args[0])
-        }
-    }
-    ast_to_mir_die("global initializer must be a scalar literal")
-    ret "0"
-}
-
 fun mir_add_global_lets(st: MirCodegenState, ast: AstNode): void {
     let i = 0
     for i < len(ast.globals) {
@@ -151,9 +135,39 @@ fun mir_add_global_lets(st: MirCodegenState, ast: AstNode): void {
         let label = mir_global_label(g.name)
         push(st.global_names, g.name)
         push(st.global_types, typ)
-        push(st.program.globals, mir_global_scalar(label, typ, mir_global_init_value(g.value_expr)))
+        push(st.program.globals, mir_global_decl(label, typ))
         i = i + 1
     }
+}
+
+fun mir_emit_global_init_function(st: MirCodegenState, ast: AstNode): void {
+    if len(ast.globals) == 0 {
+        ret
+    }
+    st.value_counter = 0
+    st.block_counter = 0
+    st.local_names = new str[0]
+    st.local_addr_names = new str[0]
+    st.local_types = new str[0]
+    st.continue_targets = new str[0]
+    st.break_targets = new str[0]
+    st.current_fn = mir_function_empty("__ep_global_init", "void")
+    st.current_block = mir_new_block(st, "entry")
+
+    let i = 0
+    for i < len(ast.globals) {
+        let g = ast.globals[i]
+        let value_flow = mir_emit_expr(st, st.current_block, g.value_expr)
+        st.current_block = value_flow.block
+        let addr = mir_symbol_operand("ptr", mir_global_label(g.name))
+        mir_emit_inst(st, mir_store(value_flow.value, addr))
+        i = i + 1
+    }
+    if st.current_block.has_terminator == false {
+        st.current_block.terminator = mir_ret_void()
+        st.current_block.has_terminator = true
+    }
+    push(st.program.functions, st.current_fn)
 }
 
 fun mir_struct_key(struct_name: str, field_name: str): str {
@@ -1812,6 +1826,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     }
 
     mir_add_global_lets(st, ast)
+    mir_emit_global_init_function(st, ast)
 
     let fi = 0
     for fi < len(ast.funcs) {

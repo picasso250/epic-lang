@@ -21,7 +21,8 @@ class MirLower:
         self.next_slot = 0
         self.return_label = None
         self.string_globals = {}
-        self.scalar_globals = set()
+        self.global_slots = set()
+        self.has_global_init = False
         self.scratch_slots = []
         self.label_counter = 0
 
@@ -31,7 +32,8 @@ class MirLower:
             self.x64.extern(imp.name)
         self.x64.section(".data")
         self.string_globals = emit_runtime_data(self.x64, self.program)
-        self.scalar_globals = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is not None and glob.type.kind != "ptr"}
+        self.global_slots = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is None}
+        self.has_global_init = any(fn.name == "__ep_global_init" for fn in self.program.functions)
         self.x64.section(".text")
         for fn in self.program.functions:
             self._lower_function(fn)
@@ -52,7 +54,7 @@ class MirLower:
         if frame:
             self.x64.inst("sub", R("rsp"), I(frame))
         if fn.name == "main":
-            emit_startup_hook_call(self.x64)
+            emit_startup_hook_call(self.x64, self.has_global_init)
         for idx, param in enumerate(fn.params):
             if idx < len(ARG_REGS):
                 self.x64.inst("mov", M("rbp", self.value_slots[param.name]), R(ARG_REGS[idx]))
@@ -225,7 +227,7 @@ class MirLower:
             if operand.name == "argv":
                 self.x64.inst("mov", R(reg), MS("_argv"))
                 return
-            if operand.name in self.scalar_globals:
+            if operand.name in self.global_slots:
                 self.x64.inst("lea", R(reg), MS(operand.name))
                 return
             if operand.name not in self.string_globals:

@@ -1,6 +1,0 @@
-# COMPILE_FAIL: global let greeting only supports scalar integer and bool types for now
-let greeting = "hello"
-
-fun main(): i64 {
-    ret 0
-}

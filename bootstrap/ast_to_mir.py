@@ -145,6 +145,7 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
         self.program.globals.append(MirGlobal("argv", ptr(), None))
         self._emit_global_lets(ast)
+        self._emit_global_init_function(ast)
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
         inject_all_mir_helpers(self.program)
@@ -1366,21 +1367,28 @@ class MirCodegen(MirFunctionBuilder):
     def _global_label(self, name):
         return f"__epg_{name}"
 
-    def _global_init_value(self, expr):
-        if isinstance(expr, (LiteralNode, CharNode)):
-            return expr.value
-        if isinstance(expr, BoolNode):
-            return 1 if expr.value else 0
-        if isinstance(expr, CallNode) and len(expr.args) == 1:
-            return self._global_init_value(expr.args[0])
-        raise MirCodegenError("global initializer must be a scalar literal")
-
     def _emit_global_lets(self, ast):
         for glob in ast.globals:
             typ = self._type(glob.resolved_type)
             label = self._global_label(glob.name)
             self.globals[glob.name] = typ
-            self.program.globals.append(MirGlobal(label, typ, self._global_init_value(glob.value)))
+            self.program.globals.append(MirGlobal(label, typ, None))
+
+    def _emit_global_init_function(self, ast):
+        if not ast.globals:
+            return
+        self.begin_function("__ep_global_init", [], VOID)
+        self.locals = {}
+        self.local_types = {}
+        entry = self.new_block("entry")
+        block = entry
+        for glob in ast.globals:
+            value = self._expr_from(block, glob.value)
+            self.set_block(value.block)
+            self.inst("store", [value.value, SymbolOperand(ptr(), self._global_label(glob.name))])
+            block = self.current_block
+        self.ret(block)
+        self.program.functions.append(self.fn)
 
     def _make_struct_layout(self, name, fields, size=None):
         layout_fields = [MirField(field_name, field_type, offset) for field_name, field_type, offset in fields]

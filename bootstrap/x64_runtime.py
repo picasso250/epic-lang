@@ -17,7 +17,9 @@ def emit_runtime_data(x64, program):
     for glob in program.globals:
         if glob.name == "argv":
             continue
-        if glob.type.kind == "ptr":
+        if glob.init is None:
+            x64.data_zero(glob.name, 8)
+        elif glob.type.kind == "ptr":
             data_label = _data_label(glob.name)
             header_label = _header_label(glob.name)
             values = list(glob.init.encode("ascii")) + [0]
@@ -30,9 +32,11 @@ def emit_runtime_data(x64, program):
     return string_globals
 
 
-def emit_startup_hook_call(x64):
+def emit_startup_hook_call(x64, has_global_init=False):
     x64.inst("sub", R("rsp"), I(32))
     x64.inst("call", Symbol("__epx_runtime_start"))
+    if has_global_init:
+        x64.inst("call", Symbol("__ep_global_init"))
     x64.inst("add", R("rsp"), I(32))
 
 

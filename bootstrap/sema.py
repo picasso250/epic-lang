@@ -92,14 +92,17 @@ class SemanticAnalyzer:
             fn.resolved_type = self._type_name(fn.ret_type)
             self.func_sigs[fn.name] = (params, fn.resolved_type)
 
-    def _is_global_scalar_type(self, typ):
-        return typ.kind in {"i64", "i32", "u64", "u32", "u8", "bool"}
-
-    def _is_global_scalar_init(self, node):
-        if isinstance(node, (LiteralNode, CharNode, BoolNode)):
+    def _is_global_literal_init(self, node):
+        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode)):
             return True
         if isinstance(node, CallNode):
-            return len(node.args) == 1 and self._is_global_scalar_init(node.args[0])
+            return node.name in {"u8", "i64", "u64", "i32", "u32", "bool"} and len(node.args) == 1 and self._is_global_literal_init(node.args[0])
+        if isinstance(node, ArrayLiteralNode):
+            return all(self._is_global_literal_init(value) for value in node.values)
+        if isinstance(node, MapInitNode):
+            return all(self._is_global_literal_init(key) and self._is_global_literal_init(value) for key, value in node.entries)
+        if isinstance(node, StructInitNode):
+            return all(self._is_global_literal_init(value) for _, value in node.fields)
         return False
 
     def _build_globals(self):
@@ -112,12 +115,8 @@ class SemanticAnalyzer:
                 target = value_info.type
             else:
                 self._check_assign(target, value_info, f"global let {glob.name}")
-            if not self._is_global_scalar_type(target):
-                self._fail_global(f"global let {glob.name} only supports scalar integer and bool types for now")
-            if not self._is_global_scalar_init(glob.value):
-                self._fail_global(f"global let {glob.name} requires a scalar literal initializer")
-            if isinstance(glob.value, CallNode) and glob.value.name not in {"u8", "i64", "u64", "i32", "u32", "bool"}:
-                self._fail_global(f"global let {glob.name} only allows scalar conversion initializers")
+            if not self._is_global_literal_init(glob.value):
+                self._fail_global(f"global let {glob.name} requires a literal initializer")
             glob.resolved_type = target
             self.globals[glob.name] = target
 
