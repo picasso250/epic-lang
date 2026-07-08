@@ -954,6 +954,21 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstNode): MirV
             ret mir_value_flow(mir_emit_call_inst(st, helper, "bool", args), st.current_block)
         }
     }
+    let method_symbol = str_cat2(str_cat2(receiver_type, "__"), expr.name)
+    for mi in 0:len(st.func_names) {
+        if st.func_names[mi] == method_symbol {
+            let args = new MirOperand[0]
+            let receiver_flow = mir_emit_expr(st, st.current_block, expr.object)
+            st.current_block = receiver_flow.block
+            args.push(receiver_flow.value)
+            for i in 0:len(expr.args) {
+                let arg_flow = mir_emit_expr(st, st.current_block, expr.args[i])
+                st.current_block = arg_flow.block
+                args.push(arg_flow.value)
+            }
+            ret mir_value_flow(mir_emit_call_inst(st, method_symbol, st.func_return_types[mi], args), st.current_block)
+        }
+    }
     ast_to_mir_die(f"unsupported dot call {expr.name}")
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }

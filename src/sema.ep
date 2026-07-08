@@ -353,6 +353,14 @@ fun sema_check_arity(name: str, expected: i64, args: AstNode[]): void {
     }
 }
 
+fun sema_check_func_call_args(st: SemaState, name: str, args: AstNode[]): void {
+    let expected_count = st.funcs_param_count[name]
+    sema_check_arity(name, expected_count, args)
+    for i in 0:expected_count {
+        sema_check_assign(st, st.funcs_param_types[sema_key_index(name, i)], args[i], f"{name} argument {i + 1}")
+    }
+}
+
 fun sema_build_types(st: SemaState, ast: AstNode): void {
     for i in 0:len(ast.structs) {
         let s = ast.structs[i]
@@ -376,6 +384,14 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
 fun sema_build_funcs(st: SemaState, ast: AstNode): void {
     for i in 0:len(ast.funcs) {
         let f = ast.funcs[i]
+        if st.funcs_ret.has(f.name) {
+            sema_die(f"duplicate function {f.name}")
+        }
+        if f.method_name != "" {
+            if st.struct_names.has(f.receiver_type) == false {
+                sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
+            }
+        }
         if sema_is_reserved_func(f.name) {
             sema_die(f"reserved builtin function name: {f.name}")
         }
@@ -389,6 +405,11 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                 sema_die(f"function {f.name} parameter {p.name} cannot have type void")
             }
             st.funcs_param_types[sema_key_index(f.name, j)] = p.resolved_type
+        }
+        if f.method_name != "" {
+            if len(f.params) == 0 || f.params[0].resolved_type != f.receiver_type {
+                sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
+            }
         }
     }
 }
@@ -742,7 +763,20 @@ fun sema_dot_call_type(st: SemaState, node: AstNode): str {
         }
         sema_die(f"map type {receiver} has no method {node.name}")
     }
-    sema_die("method calls are only supported for os.*, slices, and maps for now")
+    if st.struct_names.has(receiver) {
+        let method_symbol = str_cat2(str_cat2(receiver, "__"), node.name)
+        if st.funcs_ret.has(method_symbol) == false {
+            sema_die(f"type {receiver} has no method {node.name}; expected function {method_symbol}")
+        }
+        let args = new AstNode[0]
+        args.push(node.object)
+        for i in 0:len(node.args) {
+            args.push(node.args[i])
+        }
+        sema_check_func_call_args(st, method_symbol, args)
+        ret st.funcs_ret[method_symbol]
+    }
+    sema_die("method calls are only supported for os.*, slices, maps, and user structs for now")
     ret ""
 }
 
@@ -1140,8 +1174,15 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
     }
     if node.kind == "FunDef" {
         sema_indent(depth)
-        print("FunDef ")
-        print(node.name)
+        if node.method_name != "" {
+            print("Method ")
+            print(node.receiver_type)
+            print(".")
+            print(node.method_name)
+        } else {
+            print("FunDef ")
+            print(node.name)
+        }
         sema_print_type(sema_need_type(node))
         println("")
         sema_dump_list(node.params, depth + 1)
