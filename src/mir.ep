@@ -390,6 +390,15 @@ fun mir_global_decl(name: str, typ: str): MirGlobal {
     ret glob
 }
 
+fun mir_global_scalar(name: str, typ: str, init: str): MirGlobal {
+    let glob = new MirGlobal
+    glob.name = name
+    glob.typ = typ
+    glob.init = init
+    glob.has_init = true
+    ret glob
+}
+
 fun mir_struct_field(struct_name: str, field_type: str, field_index: i64): MirStructField {
     let field = new MirStructField
     field.struct_name = struct_name

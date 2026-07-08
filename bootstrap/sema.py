@@ -54,6 +54,7 @@ class SemanticAnalyzer:
         self.struct_names = {s.name for s in program.structs}
         self.struct_fields = {}
         self.func_sigs = {}
+        self.globals = {}
         self.locals = {}
         self.fn_name = None
         self.loop_depth = 0
@@ -61,6 +62,7 @@ class SemanticAnalyzer:
     def analyze(self):
         self._build_types()
         self._build_functions()
+        self._build_globals()
         for fn in self.program.funcs:
             self._analyze_function(fn)
         assert_typed_program(self.program)
@@ -89,6 +91,35 @@ class SemanticAnalyzer:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
             fn.resolved_type = self._type_name(fn.ret_type)
             self.func_sigs[fn.name] = (params, fn.resolved_type)
+
+    def _is_global_scalar_type(self, typ):
+        return typ.kind in {"i64", "i32", "u64", "u32", "u8", "bool"}
+
+    def _is_global_scalar_init(self, node):
+        if isinstance(node, (LiteralNode, CharNode, BoolNode)):
+            return True
+        if isinstance(node, CallNode):
+            return len(node.args) == 1 and self._is_global_scalar_init(node.args[0])
+        return False
+
+    def _build_globals(self):
+        for glob in self.program.globals:
+            if glob.value is None:
+                self._fail_global(f"global let {glob.name} requires an initializer")
+            target = self._type_name(glob.var_type) if glob.var_type else None
+            value_info = self._expr(glob.value)
+            if target is None:
+                target = value_info.type
+            else:
+                self._check_assign(target, value_info, f"global let {glob.name}")
+            if not self._is_global_scalar_type(target):
+                self._fail_global(f"global let {glob.name} only supports scalar integer and bool types for now")
+            if not self._is_global_scalar_init(glob.value):
+                self._fail_global(f"global let {glob.name} requires a scalar literal initializer")
+            if isinstance(glob.value, CallNode) and glob.value.name not in {"u8", "i64", "u64", "i32", "u32", "bool"}:
+                self._fail_global(f"global let {glob.name} only allows scalar conversion initializers")
+            glob.resolved_type = target
+            self.globals[glob.name] = target
 
     def _analyze_function(self, fn):
         self.fn_name = fn.name
@@ -589,9 +620,11 @@ class SemanticAnalyzer:
             self._fail(f"{context} expected integer, got {info.type}")
 
     def _lookup(self, name):
-        if name not in self.locals:
-            self._fail(f"undefined variable {name}")
-        return self.locals[name]
+        if name in self.locals:
+            return self.locals[name]
+        if name in self.globals:
+            return self.globals[name]
+        self._fail(f"undefined variable {name}")
 
     def _block_returns(self, block):
         for stmt in block.stmts:
@@ -829,6 +862,8 @@ def dump_typed_ast_lines(node, depth=0):
         emit("Program")
         for struct in node.structs:
             out.extend(dump_typed_ast_lines(struct, depth + 1))
+        for glob in node.globals:
+            out.extend(dump_typed_ast_lines(glob, depth + 1))
         for func in node.funcs:
             out.extend(dump_typed_ast_lines(func, depth + 1))
     elif isinstance(node, StructDefNode):

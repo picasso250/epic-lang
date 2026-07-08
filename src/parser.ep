@@ -15,6 +15,7 @@ struct AstNode {
 
     funcs: AstNode[]
     structs: AstNode[]
+    globals: AstNode[]
     fields: AstNode[]
     params: AstNode[]
     stmts: AstNode[]
@@ -63,6 +64,7 @@ fun ast_node(kind: str): AstNode {
     n.line = 0
     n.funcs = new AstNode[0]
     n.structs = new AstNode[0]
+    n.globals = new AstNode[0]
     n.fields = new AstNode[0]
     n.params = new AstNode[0]
     n.stmts = new AstNode[0]
@@ -282,11 +284,13 @@ fun parse_fn_def(p: Parser): AstNode {
 fun parse_program(p: Parser): AstNode {
     let node = ast_node("Program")
     skip_newlines(p)
-    for peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 {
+    for peek_kind(p, "FUN") == 1 || peek_kind(p, "STRUCT") == 1 || peek_kind(p, "LET") == 1 {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p))
-        } else {
+        } else if peek_kind(p, "STRUCT") == 1 {
             push(node.structs, parse_struct_def(p))
+        } else {
+            push(node.globals, parse_let_stmt(p))
         }
         skip_newlines(p)
     }
@@ -1400,6 +1404,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
     }
     println("")
     dump_list(node.structs, depth + 1)
+    dump_list(node.globals, depth + 1)
     dump_list(node.fields, depth + 1)
     dump_list(node.funcs, depth + 1)
     dump_list(node.params, depth + 1)

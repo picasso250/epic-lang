@@ -21,6 +21,7 @@ class MirLower:
         self.next_slot = 0
         self.return_label = None
         self.string_globals = {}
+        self.scalar_globals = set()
         self.scratch_slots = []
         self.label_counter = 0
 
@@ -30,6 +31,7 @@ class MirLower:
             self.x64.extern(imp.name)
         self.x64.section(".data")
         self.string_globals = emit_runtime_data(self.x64, self.program)
+        self.scalar_globals = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is not None and glob.type.kind != "ptr"}
         self.x64.section(".text")
         for fn in self.program.functions:
             self._lower_function(fn)
@@ -222,6 +224,9 @@ class MirLower:
         elif isinstance(operand, SymbolOperand):
             if operand.name == "argv":
                 self.x64.inst("mov", R(reg), MS("_argv"))
+                return
+            if operand.name in self.scalar_globals:
+                self.x64.inst("lea", R(reg), MS(operand.name))
                 return
             if operand.name not in self.string_globals:
                 raise MirLowerError(f"unsupported symbol operand: {operand.name}")

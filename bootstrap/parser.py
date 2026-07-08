@@ -59,17 +59,20 @@ class Parser:
     def parse_program(self):
         funcs = []
         structs = []
+        globals = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "STRUCT"):
+        while self.peek()[0] in ("FUN", "STRUCT", "LET"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
-            else:
+            elif self.peek_kind("STRUCT"):
                 structs.append(self.parse_struct_def())
+            else:
+                globals.append(self.parse_let_stmt())
             self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return ProgramNode(funcs=funcs, structs=structs)
+        return ProgramNode(funcs=funcs, structs=structs, globals=globals)
 
     # ── fun definition ─────────────────────────────────────────────────
 
@@ -633,6 +636,8 @@ def dump_ast_lines(node, depth=0):
         emit("Program")
         for struct in node.structs:
             out.extend(dump_ast_lines(struct, depth + 1))
+        for glob in node.globals:
+            out.extend(dump_ast_lines(glob, depth + 1))
         for func in node.funcs:
             out.extend(dump_ast_lines(func, depth + 1))
     elif isinstance(node, StructDefNode):

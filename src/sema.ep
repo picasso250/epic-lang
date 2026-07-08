@@ -12,6 +12,7 @@ struct SemaState {
     funcs_ret: map[str]str
     funcs_param_count: map[str]i64
     funcs_param_types: map[str]str
+    globals: map[str]str
     locals: map[str]str
     current_fn: str
     current_ret: str
@@ -131,10 +132,14 @@ fun sema_type_name(st: SemaState, name: str): str {
 }
 
 fun sema_lookup(st: SemaState, name: str): str {
-    if map_has(st.locals, name) == false {
-        sema_die(f"undefined variable {name}")
+    if map_has(st.locals, name) {
+        ret st.locals[name]
     }
-    ret st.locals[name]
+    if map_has(st.globals, name) {
+        ret st.globals[name]
+    }
+    sema_die(f"undefined variable {name}")
+    ret ""
 }
 
 fun sema_field_type(st: SemaState, base_type: str, field: str): str {
@@ -385,6 +390,58 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
             }
             st.funcs_param_types[sema_key_index(f.name, j)] = p.resolved_type
         }
+    }
+}
+
+fun sema_is_global_scalar_type(typ: str): bool {
+    ret sema_is_int(typ) || typ == "bool"
+}
+
+fun sema_is_global_scalar_init(node: AstNode): bool {
+    if node.kind == "Literal" || node.kind == "Char" || node.kind == "Bool" {
+        ret true
+    }
+    if node.kind == "Call" {
+        if len(node.args) != 1 {
+            ret false
+        }
+        ret sema_is_global_scalar_init(node.args[0])
+    }
+    ret false
+}
+
+fun sema_build_globals(st: SemaState, ast: AstNode): void {
+    for i in 0:len(ast.globals) {
+        let g = ast.globals[i]
+        if g.kind != "Let" {
+            sema_die("internal: expected top-level let")
+        }
+        if g.value_expr.kind == "" {
+            sema_die(f"global let {g.name} requires an initializer")
+        }
+        let target = ""
+        if g.type_name != "" {
+            target = sema_type_name(st, g.type_name)
+        }
+        let val = sema_expr_type(st, g.value_expr)
+        if target == "" {
+            target = val
+        } else {
+            sema_check_assign_info(target, val, g.value_expr, f"global let {g.name}")
+        }
+        if sema_is_global_scalar_type(target) == false {
+            sema_die(f"global let {g.name} only supports scalar integer and bool types for now")
+        }
+        if sema_is_global_scalar_init(g.value_expr) == false {
+            sema_die(f"global let {g.name} requires a scalar literal initializer")
+        }
+        if g.value_expr.kind == "Call" {
+            if g.value_expr.name != "u8" && g.value_expr.name != "i64" && g.value_expr.name != "u64" && g.value_expr.name != "i32" && g.value_expr.name != "u32" && g.value_expr.name != "bool" {
+                sema_die(f"global let {g.name} only allows scalar conversion initializers")
+            }
+        }
+        g.resolved_type = target
+        st.globals[g.name] = target
     }
 }
 
@@ -962,6 +1019,7 @@ fun sema_block_returns(block: AstNode): bool {
 fun sema_program(st: SemaState, ast: AstNode): void {
     sema_build_types(st, ast)
     sema_build_funcs(st, ast)
+    sema_build_globals(st, ast)
     for i in 0:len(ast.funcs) {
         let f = ast.funcs[i]
         sema_reset_locals(st)
@@ -1016,6 +1074,7 @@ fun sema_dump_node(node: AstNode, depth: i64): void {
         sema_indent(depth)
         println("Program")
         sema_dump_list(node.structs, depth + 1)
+        sema_dump_list(node.globals, depth + 1)
         sema_dump_list(node.funcs, depth + 1)
         ret
     }
@@ -1295,6 +1354,7 @@ fun make_sema_state(): SemaState {
     st.funcs_ret = new map[str]str
     st.funcs_param_count = new map[str]i64
     st.funcs_param_types = new map[str]str
+    st.globals = new map[str]str
     st.locals = new map[str]str { "argv": "str[]" }
     st.current_fn = ""
     st.current_ret = "void"

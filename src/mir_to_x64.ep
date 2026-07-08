@@ -14,6 +14,7 @@ struct MirToX64Lower {
     addr_slots: map[str]i64
     string_names: str[]
     string_lengths: i64[]
+    global_names: str[]
     struct_field_names: str[]
     struct_field_types: str[]
     struct_field_indexes: i64[]
@@ -37,6 +38,7 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.addr_slots = new map[str]i64
     lower.string_names = new str[0]
     lower.string_lengths = new i64[0]
+    lower.global_names = new str[0]
     lower.struct_field_names = new str[0]
     lower.struct_field_types = new str[0]
     lower.struct_field_indexes = new i64[0]
@@ -75,7 +77,11 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
     let i = 0
     for i < len(program.globals) {
         if program.globals[i].has_init {
-            mir_to_x64_add_string_global(lower, program.globals[i].name, len(program.globals[i].init))
+            if program.globals[i].typ == "ptr" {
+                mir_to_x64_add_string_global(lower, program.globals[i].name, len(program.globals[i].init))
+            } else {
+                push(lower.global_names, program.globals[i].name)
+            }
         }
         i = i + 1
     }
@@ -92,6 +98,17 @@ fun mir_to_x64_string_index(lower: MirToX64Lower, name: str): i64 {
     let i = 0
     for i < len(lower.string_names) {
         if lower.string_names[i] == name {
+            ret i
+        }
+        i = i + 1
+    }
+    ret 0 - 1
+}
+
+fun mir_to_x64_global_index(lower: MirToX64Lower, name: str): i64 {
+    let i = 0
+    for i < len(lower.global_names) {
+        if lower.global_names[i] == name {
             ret i
         }
         i = i + 1
@@ -216,6 +233,11 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
             x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 0, 8), x64_reg("r11"))
             x64_add_inst2(lower.x64, "mov", x64_reg("r11"), x64_imm(lower.string_lengths[string_index]))
             x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 8, 8), x64_reg("r11"))
+            ret
+        }
+        let global_index = mir_to_x64_global_index(lower, operand.name)
+        if global_index >= 0 {
+            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(operand.name, 8))
             ret
         }
         mir_to_x64_die(str_cat2("unsupported symbol operand: ", operand.name))

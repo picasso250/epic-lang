@@ -14,6 +14,8 @@ struct MirCodegenState {
     local_types: str[]
     func_names: str[]
     func_return_types: str[]
+    global_names: str[]
+    global_types: str[]
     continue_targets: str[]
     break_targets: str[]
     struct_names: str[]
@@ -108,6 +110,50 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
     }
     ast_to_mir_die(f"undefined variable: {name}")
     ret 0
+}
+
+fun mir_global_label(name: str): str {
+    ret str_cat2("__epg_", name)
+}
+
+fun mir_global_index(st: MirCodegenState, name: str): i64 {
+    let i = 0
+    for i < len(st.global_names) {
+        if st.global_names[i] == name {
+            ret i
+        }
+        i = i + 1
+    }
+    ret 0 - 1
+}
+
+fun mir_global_init_value(expr: AstNode): str {
+    if expr.kind == "Literal" || expr.kind == "Char" {
+        ret expr.value
+    }
+    if expr.kind == "Bool" {
+        ret expr.value
+    }
+    if expr.kind == "Call" {
+        if len(expr.args) == 1 {
+            ret mir_global_init_value(expr.args[0])
+        }
+    }
+    ast_to_mir_die("global initializer must be a scalar literal")
+    ret "0"
+}
+
+fun mir_add_global_lets(st: MirCodegenState, ast: AstNode): void {
+    let i = 0
+    for i < len(ast.globals) {
+        let g = ast.globals[i]
+        let typ = mir_epic_type(g.resolved_type)
+        let label = mir_global_label(g.name)
+        push(st.global_names, g.name)
+        push(st.global_types, typ)
+        push(st.program.globals, mir_global_scalar(label, typ, mir_global_init_value(g.value_expr)))
+        i = i + 1
+    }
 }
 
 fun mir_struct_key(struct_name: str, field_name: str): str {
@@ -850,6 +896,13 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         if expr.name == "argv" {
             ret mir_value_flow(mir_symbol_operand("ptr", "argv"), st.current_block)
         }
+        let gidx = mir_global_index(st, expr.name)
+        if gidx >= 0 {
+            let result_name = mir_new_value(st, "load")
+            let addr = mir_symbol_operand("ptr", mir_global_label(expr.name))
+            mir_emit_inst(st, mir_load(result_name, st.global_types[gidx], st.global_types[gidx], addr))
+            ret mir_value_flow(mir_value_operand(st.global_types[gidx], result_name), st.current_block)
+        }
         let idx = mir_local_index(st, expr.name)
         let result_name = mir_new_value(st, "load")
         let addr = mir_value_operand("ptr", st.local_addr_names[idx])
@@ -1409,9 +1462,15 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         ret mir_reachable_flow(st.current_block)
     }
     if stmt.kind == "Assign" {
-        let idx = mir_local_index(st, stmt.name)
         let value_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
         st.current_block = value_flow.block
+        let gidx = mir_global_index(st, stmt.name)
+        if gidx >= 0 {
+            let addr = mir_symbol_operand("ptr", mir_global_label(stmt.name))
+            mir_emit_inst(st, mir_store(value_flow.value, addr))
+            ret mir_reachable_flow(st.current_block)
+        }
+        let idx = mir_local_index(st, stmt.name)
         let addr = mir_value_operand("ptr", st.local_addr_names[idx])
         mir_emit_inst(st, mir_store(value_flow.value, addr))
         ret mir_reachable_flow(st.current_block)
@@ -1654,6 +1713,8 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.local_types = new str[0]
     st.func_names = new str[0]
     st.func_return_types = new str[0]
+    st.global_names = new str[0]
+    st.global_types = new str[0]
     st.continue_targets = new str[0]
     st.break_targets = new str[0]
     st.struct_names = new str[0]
@@ -1749,6 +1810,8 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 2)
         mi = mi + 1
     }
+
+    mir_add_global_lets(st, ast)
 
     let fi = 0
     for fi < len(ast.funcs) {

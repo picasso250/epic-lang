@@ -89,6 +89,7 @@ def _parse_file(input_path, verbose=True):
 def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     funcs = []
     structs = []
+    globals = []
     seen_funcs = {}
     seen_structs = {}
     found_main = False
@@ -108,6 +109,8 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
             seen_structs[struct.name] = input_path
             structs.append(struct)
 
+        globals.extend(ast.globals)
+
         for func in ast.funcs:
             if func.name == "main" and not is_main_file:
                 continue
@@ -123,7 +126,7 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     if not found_main:
         raise RuntimeError(f"Main file has no main function: {main_path}")
 
-    return ProgramNode(funcs=funcs, structs=structs)
+    return ProgramNode(funcs=funcs, structs=structs, globals=globals)
 
 
 def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
