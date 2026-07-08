@@ -33,14 +33,38 @@ struct X64MemSymbolOperand {
 
 type X64Operand = X64RegOperand | X64ImmOperand | X64SymbolOperand | X64LabelRefOperand | X64MemBaseOperand | X64MemSymbolOperand
 
-struct X64Item {
-    kind: str
+struct X64GlobalItem {
     name: str
+}
+
+struct X64ExternItem {
+    name: str
+}
+
+struct X64SectionItem {
+    name: str
+}
+
+struct X64LabelItem {
+    name: str
+}
+
+struct X64InstItem {
     op: str
     operands: X64Operand[]
+}
+
+struct X64DataBytesItem {
+    name: str
     values: i64[]
+}
+
+struct X64DataZeroItem {
+    name: str
     count: i64
 }
+
+type X64Item = X64GlobalItem | X64ExternItem | X64SectionItem | X64LabelItem | X64InstItem | X64DataBytesItem | X64DataZeroItem
 
 struct X64Program {
     items: X64Item[]
@@ -189,14 +213,14 @@ fun x64_operand_is_label_ref(op: X64Operand): bool { ret x64_operand_kind_text(o
 fun x64_operand_is_mem(op: X64Operand): bool { ret x64_operand_kind_text(op) == "mem" }
 
 fun x64_item_empty(kind: str): X64Item {
-    let item = new X64Item
-    item.kind = kind
-    item.name = ""
-    item.op = ""
-    item.operands = new X64Operand[0]
-    item.values = new i64[0]
-    item.count = 0
-    ret item
+    if kind == "global" { ret new X64Item(new X64GlobalItem { name: "" }) }
+    if kind == "extern" { ret new X64Item(new X64ExternItem { name: "" }) }
+    if kind == "section" { ret new X64Item(new X64SectionItem { name: "" }) }
+    if kind == "label" { ret new X64Item(new X64LabelItem { name: "" }) }
+    if kind == "inst" { ret new X64Item(new X64InstItem { op: "", operands: new X64Operand[0] }) }
+    if kind == "data_bytes" { ret new X64Item(new X64DataBytesItem { name: "", values: new i64[0] }) }
+    if kind == "data_zero" { ret new X64Item(new X64DataZeroItem { name: "", count: 0 }) }
+    ret new X64Item(new X64SectionItem { name: "" })
 }
 
 fun x64_program_empty(): X64Program {
@@ -206,34 +230,23 @@ fun x64_program_empty(): X64Program {
 }
 
 fun x64_add_global(program: X64Program, name: str): void {
-    let item = x64_item_empty("global")
-    item.name = name
-    program.items.push(item)
+    program.items.push(new X64Item(new X64GlobalItem { name: name }))
 }
 
 fun x64_add_extern(program: X64Program, name: str): void {
-    let item = x64_item_empty("extern")
-    item.name = name
-    program.items.push(item)
+    program.items.push(new X64Item(new X64ExternItem { name: name }))
 }
 
 fun x64_add_section(program: X64Program, name: str): void {
-    let item = x64_item_empty("section")
-    item.name = name
-    program.items.push(item)
+    program.items.push(new X64Item(new X64SectionItem { name: name }))
 }
 
 fun x64_add_label(program: X64Program, name: str): void {
-    let item = x64_item_empty("label")
-    item.name = name
-    program.items.push(item)
+    program.items.push(new X64Item(new X64LabelItem { name: name }))
 }
 
 fun x64_add_inst(program: X64Program, op: str, operands: X64Operand[]): void {
-    let item = x64_item_empty("inst")
-    item.op = op
-    item.operands = operands
-    program.items.push(item)
+    program.items.push(new X64Item(new X64InstItem { op: op, operands: operands }))
 }
 
 fun x64_add_inst0(program: X64Program, op: str): void {
@@ -254,17 +267,11 @@ fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): v
 }
 
 fun x64_add_data_bytes(program: X64Program, label: str, values: i64[]): void {
-    let item = x64_item_empty("data_bytes")
-    item.name = label
-    item.values = values
-    program.items.push(item)
+    program.items.push(new X64Item(new X64DataBytesItem { name: label, values: values }))
 }
 
 fun x64_add_data_zero(program: X64Program, label: str, count: i64): void {
-    let item = x64_item_empty("data_zero")
-    item.name = label
-    item.count = count
-    program.items.push(item)
+    program.items.push(new X64Item(new X64DataZeroItem { name: label, count: count }))
 }
 
 fun x64_size_prefix(size: i64): str {
@@ -332,30 +339,45 @@ fun x64_values_text(values: i64[]): str {
     ret str_buf_finish(buf)
 }
 
+fun x64_item_kind_text(item: X64Item): str {
+    match item {
+        X64GlobalItem it: { ret "global" }
+        X64ExternItem it: { ret "extern" }
+        X64SectionItem it: { ret "section" }
+        X64LabelItem it: { ret "label" }
+        X64InstItem it: { ret "inst" }
+        X64DataBytesItem it: { ret "data_bytes" }
+        X64DataZeroItem it: { ret "data_zero" }
+    }
+    ret "<bad item>"
+}
+
 fun x64_item_text(item: X64Item): str {
-    if item.kind == "global" {
-        ret str_cat2(str_cat2("global ", item.name), "\n")
-    }
-    if item.kind == "extern" {
-        ret str_cat2(str_cat2("extern ", item.name), "\n")
-    }
-    if item.kind == "section" {
-        ret str_cat2(str_cat2("section ", item.name), "\n")
-    }
-    if item.kind == "label" {
-        ret str_cat2(str_cat2(item.name, ":"), "\n")
-    }
-    if item.kind == "inst" {
-        if len(item.operands) == 0 {
-            ret str_cat2(str_cat2("    ", item.op), "\n")
+    match item {
+        X64GlobalItem it: {
+            ret str_cat2(str_cat2("global ", it.name), "\n")
         }
-        ret str_cat2(str_cat2(str_cat2(str_cat2("    ", item.op), " "), x64_operands_text(item.operands)), "\n")
-    }
-    if item.kind == "data_bytes" {
-        ret str_cat2(str_cat2(str_cat2(item.name, ": db "), x64_values_text(item.values)), "\n")
-    }
-    if item.kind == "data_zero" {
-        ret str_cat2(str_cat2(str_cat2(str_cat2(item.name, ": times "), str(item.count)), " db 0"), "\n")
+        X64ExternItem it: {
+            ret str_cat2(str_cat2("extern ", it.name), "\n")
+        }
+        X64SectionItem it: {
+            ret str_cat2(str_cat2("section ", it.name), "\n")
+        }
+        X64LabelItem it: {
+            ret str_cat2(str_cat2(it.name, ":"), "\n")
+        }
+        X64InstItem it: {
+            if len(it.operands) == 0 {
+                ret str_cat2(str_cat2("    ", it.op), "\n")
+            }
+            ret str_cat2(str_cat2(str_cat2(str_cat2("    ", it.op), " "), x64_operands_text(it.operands)), "\n")
+        }
+        X64DataBytesItem it: {
+            ret str_cat2(str_cat2(str_cat2(it.name, ": db "), x64_values_text(it.values)), "\n")
+        }
+        X64DataZeroItem it: {
+            ret str_cat2(str_cat2(str_cat2(str_cat2(it.name, ": times "), str(it.count)), " db 0"), "\n")
+        }
     }
     ret "<bad x64 item>\n"
 }
