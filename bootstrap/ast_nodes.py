@@ -11,9 +11,10 @@ from typing import Optional
 from epic_types import EpicType
 
 
+@dataclass(kw_only=True)
 class ASTNode:
     """Base class for all AST nodes."""
-    pass
+    line: int = 0
 
 
 @dataclass
@@ -56,7 +57,6 @@ class FunDefNode(ASTNode):
     params: list     # list[Param]
     ret_type: str
     body: 'BlockNode'
-    line: int
     resolved_type: Optional[EpicType] = None
     receiver_name: str = ""
     receiver_type: str = ""
@@ -73,7 +73,6 @@ class BlockNode(ASTNode):
 @dataclass
 class ReturnNode(ASTNode):
     expr: Optional[ASTNode]
-    line: int
 
 
 @dataclass
@@ -95,7 +94,6 @@ class AssignOpNode(ASTNode):
     op: str
     target: ASTNode
     value: ASTNode
-    line: int = 0
 
 
 @dataclass
@@ -129,12 +127,12 @@ class WhileNode(ASTNode):
 
 @dataclass
 class BreakNode(ASTNode):
-    line: int
+    pass
 
 
 @dataclass
 class ContinueNode(ASTNode):
-    line: int
+    pass
 
 
 @dataclass
@@ -149,14 +147,12 @@ class ForRangeNode(ASTNode):
 @dataclass
 class PanicNode(ASTNode):
     message: ASTNode
-    line: int
 
 
 @dataclass
 class AssertNode(ASTNode):
     cond: ASTNode
     message: Optional[ASTNode]
-    line: int
 
 
 @dataclass
@@ -187,42 +183,36 @@ class ExprStmtNode(ASTNode):
 @dataclass
 class LiteralNode(ASTNode):
     value: int
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class CharNode(ASTNode):
     value: int
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class BoolNode(ASTNode):
     value: int
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class StringNode(ASTNode):
     value: str
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class FStringNode(ASTNode):
     parts: list
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class VarNode(ASTNode):
     name: str
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -232,7 +222,6 @@ class CallNode(ASTNode):
     args: list      # list[ASTNode]
     namespace: str = ""
     dll: str = ""
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -241,7 +230,6 @@ class BinaryNode(ASTNode):
     op: str
     left: ASTNode
     right: ASTNode
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -249,7 +237,6 @@ class BinaryNode(ASTNode):
 class UnaryNode(ASTNode):
     op: str
     expr: ASTNode
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -257,7 +244,6 @@ class UnaryNode(ASTNode):
 class FieldAccessNode(ASTNode):
     object: ASTNode
     field: str
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -266,7 +252,6 @@ class DotCallNode(ASTNode):
     object: ASTNode
     name: str
     args: list      # list[ASTNode]
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -274,7 +259,6 @@ class DotCallNode(ASTNode):
 class SubscriptNode(ASTNode):
     base: ASTNode
     index: ASTNode
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -283,7 +267,6 @@ class SliceNode(ASTNode):
     base: ASTNode
     start: ASTNode
     end: ASTNode
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -291,7 +274,6 @@ class SliceNode(ASTNode):
 class NewArrayNode(ASTNode):
     elem_type: str
     count: Optional[ASTNode] = None
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -299,7 +281,6 @@ class NewArrayNode(ASTNode):
 class StructInitNode(ASTNode):
     type_name: str
     fields: list
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -307,7 +288,6 @@ class StructInitNode(ASTNode):
 class UnionInitNode(ASTNode):
     type_name: str
     payload: ASTNode
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -315,7 +295,6 @@ class UnionInitNode(ASTNode):
 class ArrayLiteralNode(ASTNode):
     elem_type: str
     values: list
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
@@ -323,7 +302,6 @@ class ArrayLiteralNode(ASTNode):
 class MapInitNode(ASTNode):
     type_name: str
     entries: list
-    line: int = 0
     resolved_type: Optional[EpicType] = None
 
 
