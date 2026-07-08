@@ -73,25 +73,19 @@ fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
 
 # ── Char predicates ─────────────────────────────────────────────────────
 
-fun is_alpha(c: u8): i64 {
+fun is_alpha(c: u8): bool {
     if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 
-fun is_alnum(c: u8): i64 {
-    if is_alpha(c) == 1 || (c >= '0' && c <= '9') {
-        ret 1
-    }
-    ret 0
+fun is_alnum(c: u8): bool {
+    ret is_alpha(c) || (c >= '0' && c <= '9')
 }
 
-fun is_digit(c: u8): i64 {
-    if c >= '0' && c <= '9' {
-        ret 1
-    }
-    ret 0
+fun is_digit(c: u8): bool {
+    ret c >= '0' && c <= '9'
 }
 
 let keyword_kinds = new map[str]str {
@@ -176,24 +170,18 @@ fun char_at(src: str, pos: i64): i64 {
     ret i64(src_bytes[pos])
 }
 
-fun is_ascii_space(c: u8): i64 {
-    if c == ' ' {
-        ret 1
-    }
-    if c >= u8(9) && c <= '\r' {
-        ret 1
-    }
-    ret 0
+fun is_ascii_space(c: u8): bool {
+    ret c == ' ' || (c >= u8(9) && c <= '\r')
 }
 
 fun trim_ascii(s: str): str {
     let s_bytes = bytes(s)
     let start = 0
     let end = len(s)
-    for start < end && is_ascii_space(s_bytes[start]) == 1 {
+    for start < end && is_ascii_space(s_bytes[start]) {
         start += 1
     }
-    for start < end && is_ascii_space(s_bytes[end - 1]) == 1 {
+    for start < end && is_ascii_space(s_bytes[end - 1]) {
         end -= 1
     }
     ret s[start:end]
@@ -444,10 +432,10 @@ fun lex(src: str): Token[] {
         }
 
         # ── number ──
-        if consumed == 0 && is_digit(ch) == 1 {
+        if consumed == 0 && is_digit(ch) {
             let start_line = line
             let start = pos
-            for pos < n && is_digit(src_bytes[pos]) == 1 {
+            for pos < n && is_digit(src_bytes[pos]) {
                 pos += 1
             }
             let text = src[start:pos]
@@ -456,10 +444,10 @@ fun lex(src: str): Token[] {
         }
 
         # ── identifier / keyword ──
-        if consumed == 0 && is_alpha(ch) == 1 {
+        if consumed == 0 && is_alpha(ch) {
             let start_line = line
             let start = pos
-            for pos < n && is_alnum(src_bytes[pos]) == 1 {
+            for pos < n && is_alnum(src_bytes[pos]) {
                 pos += 1
             }
             let text = src[start:pos]
