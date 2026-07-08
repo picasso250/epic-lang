@@ -94,57 +94,29 @@ fun is_digit(c: u8): i64 {
     ret 0
 }
 
+let keyword_kinds = new map[str]str {
+    "if": "IF"
+    "in": "IN"
+    "fun": "FUN"
+    "for": "FOR"
+    "new": "NEW"
+    "let": "LET"
+    "else": "ELSE"
+    "type": "TYPE"
+    "true": "TRUE"
+    "break": "BREAK"
+    "panic": "PANIC"
+    "match": "MATCH"
+    "false": "FALSE"
+    "ret": "RETURN"
+    "assert": "ASSERT"
+    "struct": "STRUCT"
+    "continue": "CONTINUE"
+}
+
 fun keyword_kind(text: str): str {
-    if text == "if" {
-        ret "IF"
-    }
-    if text == "in" {
-        ret "IN"
-    }
-    if text == "fun" {
-        ret "FUN"
-    }
-    if text == "for" {
-        ret "FOR"
-    }
-    if text == "new" {
-        ret "NEW"
-    }
-    if text == "let" {
-        ret "LET"
-    }
-    if text == "else" {
-        ret "ELSE"
-    }
-    if text == "type" {
-        ret "TYPE"
-    }
-    if text == "true" {
-        ret "TRUE"
-    }
-    if text == "break" {
-        ret "BREAK"
-    }
-    if text == "panic" {
-        ret "PANIC"
-    }
-    if text == "match" {
-        ret "MATCH"
-    }
-    if text == "false" {
-        ret "FALSE"
-    }
-    if text == "ret" {
-        ret "RETURN"
-    }
-    if text == "assert" {
-        ret "ASSERT"
-    }
-    if text == "struct" {
-        ret "STRUCT"
-    }
-    if text == "continue" {
-        ret "CONTINUE"
+    if map_has(keyword_kinds, text) {
+        ret keyword_kinds[text]
     }
     ret "ID"
 }
