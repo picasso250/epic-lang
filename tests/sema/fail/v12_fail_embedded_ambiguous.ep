@@ -1,0 +1,21 @@
+# COMPILE_FAIL: ambiguous field C.x
+struct A {
+    x: i64
+}
+
+struct B {
+    x: i64
+}
+
+struct C {
+    A
+    B
+}
+
+fun main(): i64 {
+    let a = new A { x: 1 }
+    let b = new B { x: 2 }
+    let c = new C { A: a, B: b }
+    ret c.x
+}
+

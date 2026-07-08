@@ -30,6 +30,7 @@ class StructField(ASTNode):
     name: str
     type: str
     resolved_type: Optional[EpicType] = None
+    embedded: bool = False
 
 
 @dataclass

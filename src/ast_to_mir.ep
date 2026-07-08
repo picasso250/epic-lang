@@ -25,6 +25,7 @@ struct MirCodegenState {
     struct_field_keys: str[]
     struct_field_types: str[]
     struct_field_indexes: i64[]
+    struct_field_embedded: i64[]
     string_values: str[]
     string_labels: str[]
     string_counter: i64
@@ -216,30 +217,90 @@ fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
     ret ""
 }
 
-fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64 {
+fun mir_direct_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64 {
     let key = mir_struct_key(struct_name, field_name)
-    let i = 0
-    for i < len(st.struct_field_keys) {
+    for i in 0:len(st.struct_field_keys) {
         if st.struct_field_keys[i] == key {
             ret st.struct_field_indexes[i]
         }
-        i = i + 1
     }
-    ast_to_mir_die(f"unknown struct field {key}")
+    ret 0 - 1
+}
+
+fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64 {
+    let idx = mir_direct_field_index(st, struct_name, field_name)
+    if idx >= 0 {
+        ret idx
+    }
+    ast_to_mir_die(f"unknown struct field {mir_struct_key(struct_name, field_name)}")
     ret 0
 }
 
-fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
+fun mir_direct_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
     let key = mir_struct_key(struct_name, field_name)
-    let i = 0
-    for i < len(st.struct_field_keys) {
+    for i in 0:len(st.struct_field_keys) {
         if st.struct_field_keys[i] == key {
             ret st.struct_field_types[i]
         }
-        i = i + 1
     }
-    ast_to_mir_die(f"unknown struct field {key}")
+    ret ""
+}
+
+fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
+    let typ = mir_direct_field_type(st, struct_name, field_name)
+    if typ != "" {
+        ret typ
+    }
+    ast_to_mir_die(f"unknown struct field {mir_struct_key(struct_name, field_name)}")
     ret "i64"
+}
+
+fun mir_is_embedded_field(st: MirCodegenState, struct_name: str, field_name: str): bool {
+    let key = mir_struct_key(struct_name, field_name)
+    for i in 0:len(st.struct_field_keys) {
+        if st.struct_field_keys[i] == key {
+            ret st.struct_field_embedded[i] != 0
+        }
+    }
+    ret false
+}
+
+fun mir_promoted_field_type_inner(st: MirCodegenState, struct_name: str, field_name: str, depth: i64): str {
+    if depth <= 0 {
+        ast_to_mir_die(f"embedded field cycle while resolving {mir_struct_key(struct_name, field_name)}")
+    }
+    let direct = mir_direct_field_type(st, struct_name, field_name)
+    if direct != "" {
+        ret direct
+    }
+    let found = ""
+    for i in 0:len(st.struct_field_keys) {
+        let prefix = str_cat2(struct_name, ".")
+        let key = st.struct_field_keys[i]
+        if len(key) > len(prefix) && key[0:len(prefix)] == prefix && st.struct_field_embedded[i] != 0 {
+            let embedded_type = st.struct_field_types[i]
+            if embedded_type == "ptr" {
+                let embedded_name = key[len(prefix):len(key)]
+                embedded_type = embedded_name
+            }
+            let candidate = mir_promoted_field_type_inner(st, embedded_type, field_name, depth - 1)
+            if candidate != "" {
+                if found != "" {
+                    ast_to_mir_die(f"ambiguous field {mir_struct_key(struct_name, field_name)}")
+                }
+                found = candidate
+            }
+        }
+    }
+    ret found
+}
+
+fun mir_promoted_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
+    let typ = mir_promoted_field_type_inner(st, struct_name, field_name, 64)
+    if typ == "" {
+        ast_to_mir_die(f"unknown struct field {mir_struct_key(struct_name, field_name)}")
+    }
+    ret typ
 }
 
 fun mir_func_return_type(st: MirCodegenState, name: str): str {
@@ -412,6 +473,49 @@ fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
 fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
     let field_typ = mir_field_type(st, struct_name, field_name)
     let addr = mir_field_addr(st, base, struct_name, field_name)
+    let result_name = mir_new_value(st, "load")
+    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
+    ret mir_value_operand(field_typ, result_name)
+}
+
+fun mir_promoted_field_addr_inner(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str, depth: i64): MirOperand {
+    if depth <= 0 {
+        ast_to_mir_die(f"embedded field cycle while resolving {mir_struct_key(struct_name, field_name)}")
+    }
+    if mir_direct_field_type(st, struct_name, field_name) != "" {
+        ret mir_field_addr(st, base, struct_name, field_name)
+    }
+    let found_count = 0
+    let found = mir_operand_null()
+    for i in 0:len(st.struct_field_keys) {
+        let prefix = str_cat2(struct_name, ".")
+        let key = st.struct_field_keys[i]
+        if len(key) > len(prefix) && key[0:len(prefix)] == prefix && st.struct_field_embedded[i] != 0 {
+            let embedded_name = key[len(prefix):len(key)]
+            let embedded_type = embedded_name
+            if mir_promoted_field_type_inner(st, embedded_type, field_name, depth - 1) != "" {
+                if found_count > 0 {
+                    ast_to_mir_die(f"ambiguous field {mir_struct_key(struct_name, field_name)}")
+                }
+                let embedded_obj = mir_load_field(st, base, struct_name, embedded_name)
+                found = mir_promoted_field_addr_inner(st, embedded_obj, embedded_type, field_name, depth - 1)
+                found_count = found_count + 1
+            }
+        }
+    }
+    if found_count == 0 {
+        ast_to_mir_die(f"unknown struct field {mir_struct_key(struct_name, field_name)}")
+    }
+    ret found
+}
+
+fun mir_promoted_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
+    ret mir_promoted_field_addr_inner(st, base, struct_name, field_name, 64)
+}
+
+fun mir_load_promoted_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
+    let field_typ = mir_promoted_field_type(st, struct_name, field_name)
+    let addr = mir_promoted_field_addr(st, base, struct_name, field_name)
     let result_name = mir_new_value(st, "load")
     mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
     ret mir_value_operand(field_typ, result_name)
@@ -1125,7 +1229,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         }
         let base_flow = mir_emit_expr(st, st.current_block, expr.object)
         st.current_block = base_flow.block
-        ret mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
+        ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, expr.name), st.current_block)
     }
     if expr.kind == "DotCall" {
         ret mir_emit_dot_call(st, block, expr)
@@ -1165,7 +1269,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             if struct_name == "" {
                 ast_to_mir_die("len/cap expects aggregate pointer")
             }
-            ret mir_value_flow(mir_load_field(st, base_flow.value, struct_name, expr.name), st.current_block)
+            ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, expr.name), st.current_block)
         }
         if expr.name == "cstr" {
             let args = new MirOperand[0]
@@ -1693,7 +1797,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         st.current_block = base_flow.block
         let value_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
         st.current_block = value_flow.block
-        let addr = mir_field_addr(st, base_flow.value, struct_name, stmt.name)
+        let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, stmt.name)
         mir_emit_inst(st, mir_store(value_flow.value, addr))
         ret mir_reachable_flow(st.current_block)
     }
@@ -1739,8 +1843,8 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             }
             let base_flow = mir_emit_expr(st, st.current_block, stmt.expr.object)
             st.current_block = base_flow.block
-            let addr = mir_field_addr(st, base_flow.value, struct_name, stmt.expr.name)
-            let field_typ = mir_field_type(st, struct_name, stmt.expr.name)
+            let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, stmt.expr.name)
+            let field_typ = mir_promoted_field_type(st, struct_name, stmt.expr.name)
             let result_name = mir_new_value(st, "load")
             mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
             let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
@@ -1926,14 +2030,17 @@ fun mir_register_slice_layout(st: MirCodegenState, name: str): void {
     st.struct_field_keys.push(mir_struct_key(name, "data"))
     st.struct_field_types.push("ptr")
     st.struct_field_indexes.push(0)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, name, "ptr", 0)
     st.struct_field_keys.push(mir_struct_key(name, "len"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(1)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, name, "i64", 1)
     st.struct_field_keys.push(mir_struct_key(name, "cap"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(2)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, name, "i64", 2)
 }
 
@@ -1960,6 +2067,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.struct_field_keys = new str[0]
     st.struct_field_types = new str[0]
     st.struct_field_indexes = new i64[0]
+    st.struct_field_embedded = new i64[0]
     st.string_values = new str[0]
     st.string_labels = new str[0]
     st.string_counter = 0
@@ -1974,6 +2082,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             let field_mir_type = mir_epic_type(sdef.fields[fi2].type_name)
             st.struct_field_types.push(field_mir_type)
             st.struct_field_indexes.push(fi2)
+            if sdef.fields[fi2].embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
             mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
             fi2 = fi2 + 1
         }
@@ -1990,10 +2099,12 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         st.struct_field_keys.push(mir_struct_key(union.name, "tag"))
         st.struct_field_types.push("i64")
         st.struct_field_indexes.push(0)
+        st.struct_field_embedded.push(0)
         mir_program_add_struct_field(st.program, union.name, "i64", 0)
         st.struct_field_keys.push(mir_struct_key(union.name, "payload"))
         st.struct_field_types.push("ptr")
         st.struct_field_indexes.push(1)
+        st.struct_field_embedded.push(0)
         mir_program_add_struct_field(st.program, union.name, "ptr", 1)
     }
 
@@ -2001,40 +2112,49 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.struct_field_keys.push(mir_struct_key("str", "data"))
     st.struct_field_types.push("ptr")
     st.struct_field_indexes.push(0)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "str", "ptr", 0)
     st.struct_field_keys.push(mir_struct_key("str", "len"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(1)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "str", "i64", 1)
     st.struct_field_keys.push(mir_struct_key("str", "cap"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(2)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "str", "i64", 2)
     st.struct_names.push("_slice_i64")
     st.struct_field_keys.push(mir_struct_key("_slice_i64", "data"))
     st.struct_field_types.push("ptr")
     st.struct_field_indexes.push(0)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "_slice_i64", "ptr", 0)
     st.struct_field_keys.push(mir_struct_key("_slice_i64", "len"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(1)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "_slice_i64", "i64", 1)
     st.struct_field_keys.push(mir_struct_key("_slice_i64", "cap"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(2)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "_slice_i64", "i64", 2)
     st.struct_names.push("_slice_u8")
     st.struct_field_keys.push(mir_struct_key("_slice_u8", "data"))
     st.struct_field_types.push("ptr")
     st.struct_field_indexes.push(0)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "_slice_u8", "ptr", 0)
     st.struct_field_keys.push(mir_struct_key("_slice_u8", "len"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(1)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "_slice_u8", "i64", 1)
     st.struct_field_keys.push(mir_struct_key("_slice_u8", "cap"))
     st.struct_field_types.push("i64")
     st.struct_field_indexes.push(2)
+    st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, "_slice_u8", "i64", 2)
 
     mir_register_slice_layout(st, "_slice_str")
@@ -2058,14 +2178,17 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "entries"))
         st.struct_field_types.push("ptr")
         st.struct_field_indexes.push(0)
+        st.struct_field_embedded.push(0)
         mir_program_add_struct_field(st.program, map_layouts[mi], "ptr", 0)
         st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "len"))
         st.struct_field_types.push("i64")
         st.struct_field_indexes.push(1)
+        st.struct_field_embedded.push(0)
         mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 1)
         st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "cap"))
         st.struct_field_types.push("i64")
         st.struct_field_indexes.push(2)
+        st.struct_field_embedded.push(0)
         mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 2)
         mi = mi + 1
     }

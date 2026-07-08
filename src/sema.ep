@@ -9,6 +9,9 @@
 struct SemaState {
     struct_names: map[str]bool
     struct_fields: map[str]str
+    struct_field_count: map[str]i64
+    struct_field_names: map[str]str
+    struct_field_embedded: map[str]bool
     union_names: map[str]bool
     union_member_count: map[str]i64
     union_member_names: map[str]str
@@ -149,6 +152,45 @@ fun sema_lookup(st: SemaState, name: str): str {
     ret ""
 }
 
+fun sema_direct_field_type(st: SemaState, base_type: str, field: str): str {
+    let key = sema_key2(base_type, field)
+    if st.struct_fields.has(key) == false {
+        sema_die(f"unknown field {key}")
+    }
+    ret st.struct_fields[key]
+}
+
+fun sema_promoted_field_type_inner(st: SemaState, base_type: str, field: str, depth: i64): str {
+    if depth <= 0 {
+        sema_die(f"embedded field cycle while resolving {sema_key2(base_type, field)}")
+    }
+    if st.struct_field_count.has(base_type) == false {
+        ret ""
+    }
+    let found = ""
+    for i in 0:st.struct_field_count[base_type] {
+        let embedded_name = st.struct_field_names[sema_key_index(base_type, i)]
+        let embedded_key = sema_key2(base_type, embedded_name)
+        if st.struct_field_embedded[embedded_key] {
+            let embedded_type = st.struct_fields[embedded_key]
+            let direct_key = sema_key2(embedded_type, field)
+            let candidate = ""
+            if st.struct_fields.has(direct_key) {
+                candidate = st.struct_fields[direct_key]
+            } else {
+                candidate = sema_promoted_field_type_inner(st, embedded_type, field, depth - 1)
+            }
+            if candidate != "" {
+                if found != "" {
+                    sema_die(f"ambiguous field {sema_key2(base_type, field)}")
+                }
+                found = candidate
+            }
+        }
+    }
+    ret found
+}
+
 fun sema_field_type(st: SemaState, base_type: str, field: str): str {
     if base_type == "str" {
         sema_die(f"unknown field str.{field}")
@@ -159,14 +201,19 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
     if st.union_names.has(base_type) {
         sema_die(f"field access expected struct, got union {base_type}; use match")
     }
-    let key = sema_key2(base_type, field)
-    if st.struct_fields.has(key) == false {
-        if st.struct_names.has(base_type) == false {
-            sema_die(f"field access expected aggregate, got {base_type}")
-        }
-        sema_die(f"unknown field {key}")
+    if st.struct_names.has(base_type) == false {
+        sema_die(f"field access expected aggregate, got {base_type}")
     }
-    ret st.struct_fields[key]
+    let key = sema_key2(base_type, field)
+    if st.struct_fields.has(key) {
+        ret st.struct_fields[key]
+    }
+    let promoted = sema_promoted_field_type_inner(st, base_type, field, 64)
+    if promoted != "" {
+        ret promoted
+    }
+    sema_die(f"unknown field {key}")
+    ret ""
 }
 
 fun sema_digit_value(c: u8): i64 {
@@ -419,6 +466,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
     for i in 0:len(ast.structs) {
         let s = ast.structs[i]
         let seen = new map[str]bool
+        st.struct_field_count[s.name] = len(s.fields)
         for j in 0:len(s.fields) {
             let f = s.fields[j]
             if seen.has(f.name) {
@@ -426,7 +474,13 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
             }
             seen[f.name] = true
             f.resolved_type = sema_type_name(st, f.type_name)
-            st.struct_fields[sema_key2(s.name, f.name)] = f.resolved_type
+            if f.embedded && st.struct_names.has(f.resolved_type) == false {
+                sema_die(f"embedded field {sema_key2(s.name, f.name)} must be a struct")
+            }
+            let key = sema_key2(s.name, f.name)
+            st.struct_fields[key] = f.resolved_type
+            st.struct_field_names[sema_key_index(s.name, j)] = f.name
+            st.struct_field_embedded[key] = f.embedded
         }
     }
     for i in 0:len(ast.unions) {
@@ -702,7 +756,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                 sema_die(f"duplicate field initializer {sema_key2(node.name, f.name)}")
             }
             seen[f.name] = true
-            let ft = sema_field_type(st, node.name, f.name)
+            let ft = sema_direct_field_type(st, node.name, f.name)
             sema_check_assign(st, ft, f.value_expr, f"field {sema_key2(node.name, f.name)}")
         }
         ret sema_set_type(node, node.name)
@@ -1596,6 +1650,9 @@ fun make_sema_state(): SemaState {
     let st = new SemaState
     st.struct_names = new map[str]bool
     st.struct_fields = new map[str]str
+    st.struct_field_count = new map[str]i64
+    st.struct_field_names = new map[str]str
+    st.struct_field_embedded = new map[str]bool
     st.union_names = new map[str]bool
     st.union_member_count = new map[str]i64
     st.union_member_names = new map[str]str

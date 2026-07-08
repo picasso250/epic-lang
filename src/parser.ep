@@ -17,6 +17,7 @@ struct AstNode {
     variant_name: str
     binding_name: str
     line: i64
+    embedded: bool
 
     funcs: AstNode[]
     structs: AstNode[]
@@ -74,6 +75,7 @@ fun ast_node(kind: str): AstNode {
     n.variant_name = ""
     n.binding_name = ""
     n.line = 0
+    n.embedded = false
     n.funcs = new AstNode[0]
     n.structs = new AstNode[0]
     n.globals = new AstNode[0]
@@ -253,12 +255,16 @@ fun parse_struct_def(p: Parser): AstNode {
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
         let fname = p.expect("ID")
-        p.expect("COLON")
-        let ftype = parse_type(p)
-        p.expect_stmt_end()
         let field = ast_node("StructField")
         field.name = token_text(fname)
-        field.type_name = ftype
+        field.line = token_line(fname)
+        if p.check("COLON") == 1 {
+            field.type_name = parse_type(p)
+        } else {
+            field.type_name = field.name
+            field.embedded = true
+        }
+        p.expect_stmt_end()
         node.fields.push(field)
     }
     p.expect("RBRACE")

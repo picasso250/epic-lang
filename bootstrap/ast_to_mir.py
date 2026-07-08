@@ -327,8 +327,59 @@ class MirCodegen(MirFunctionBuilder):
         value = self.inst("load", [addr], result_type=field_type, type=field_type)
         return ValueOperand(value)
 
+    def _promoted_field_layout(self, struct_name, field, seen=None):
+        if seen is None:
+            seen = set()
+        if struct_name in seen:
+            raise MirCodegenError(f"embedded field cycle while resolving {struct_name}.{field}")
+        seen.add(struct_name)
+        try:
+            layout = self.structs[struct_name].field(field)
+            seen.remove(struct_name)
+            return layout
+        except KeyError:
+            pass
+        found = None
+        for embedded_name in self.embedded_fields.get(struct_name, set()):
+            candidate = self._promoted_field_layout(embedded_name, field, seen)
+            if candidate is not None:
+                if found is not None:
+                    raise MirCodegenError(f"ambiguous field {struct_name}.{field}")
+                found = candidate
+        seen.remove(struct_name)
+        return found
+
+    def _promoted_field_addr(self, base, struct_name, field):
+        try:
+            self.structs[struct_name].field(field)
+            return self._field_addr(base, struct_name, field)
+        except KeyError:
+            pass
+        found = None
+        for embedded_name in self.embedded_fields.get(struct_name, set()):
+            if self._promoted_field_layout(embedded_name, field) is not None:
+                if found is not None:
+                    raise MirCodegenError(f"ambiguous field {struct_name}.{field}")
+                embedded_obj = self._load_field(base, struct_name, embedded_name)
+                found = self._promoted_field_addr(embedded_obj, embedded_name, field)
+        if found is None:
+            raise MirCodegenError(f"unknown field: {struct_name}.{field}")
+        return found
+
+    def _load_promoted_field(self, base, struct_name, field):
+        field_layout = self._promoted_field_layout(struct_name, field)
+        if field_layout is None:
+            raise MirCodegenError(f"unknown field: {struct_name}.{field}")
+        addr = self._promoted_field_addr(base, struct_name, field)
+        value = self.inst("load", [addr], result_type=field_layout.type, type=field_layout.type)
+        return ValueOperand(value)
+
     def _store_field(self, base, struct_name, field, value):
         addr = self._field_addr(base, struct_name, field)
+        self.inst("store", [value, addr])
+
+    def _store_promoted_field(self, base, struct_name, field, value):
+        addr = self._promoted_field_addr(base, struct_name, field)
         self.inst("store", [value, addr])
 
     def _layout_struct_name(self, typ):
@@ -467,7 +518,7 @@ class MirCodegen(MirFunctionBuilder):
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError("field assignment base must be a struct pointer")
-            self._store_field(base.value, struct_name, stmt.field, value.value)
+            self._store_promoted_field(base.value, struct_name, stmt.field, value.value)
             return self._reachable(self.current_block)
         elif isinstance(stmt, SubscriptAssignNode):
             base_type = self._infer_type(stmt.base)
@@ -506,8 +557,11 @@ class MirCodegen(MirFunctionBuilder):
                     raise MirCodegenError("compound field assignment base must be a struct pointer")
                 base = self._expr_from(in_block, stmt.target.object)
                 self.set_block(base.block)
-                addr = self._field_addr(base.value, struct_name, stmt.target.field)
-                field_type = self.structs[struct_name].field(stmt.target.field).type
+                addr = self._promoted_field_addr(base.value, struct_name, stmt.target.field)
+                field_layout = self._promoted_field_layout(struct_name, stmt.target.field)
+                if field_layout is None:
+                    raise MirCodegenError(f"unknown field: {struct_name}.{stmt.target.field}")
+                field_type = field_layout.type
                 current = self.inst("load", [addr], result_type=field_type, type=field_type)
                 rhs = self._expr_from(self.current_block, stmt.value)
                 self.set_block(rhs.block)
@@ -1376,11 +1430,10 @@ class MirCodegen(MirFunctionBuilder):
         base = self._emit_expr_from(in_block, expr.object)
         self.set_block(base.block)
         struct_name = self._layout_struct_name(base_type)
-        try:
-            field_type = self.structs[struct_name].field(expr.field).type
-        except KeyError as exc:
-            raise MirCodegenError(f"unknown field: {expr.field}") from exc
-        return ValueFlow(self._load_field(base.value, struct_name, expr.field, result_type=field_type), self.current_block)
+        field_layout = self._promoted_field_layout(struct_name, expr.field)
+        if field_layout is None:
+            raise MirCodegenError(f"unknown field: {expr.field}")
+        return ValueFlow(self._load_promoted_field(base.value, struct_name, expr.field), self.current_block)
 
     def _emit_os_call(self, expr):
         return self._emit_os_call_from(self.ensure_insertable(), expr).value
@@ -1526,6 +1579,7 @@ class MirCodegen(MirFunctionBuilder):
 
     def _compute_struct_layouts(self, ast):
         self.structs = {}
+        self.embedded_fields = {}
         self.union_defs = {union.name: union.members for union in ast.unions}
         self.union_tags = {union.name: {member: idx for idx, member in enumerate(union.members, start=1)} for union in ast.unions}
         for struct_name in ("str", "_slice_u8", "_slice_i64", "_slice_str"):
@@ -1542,10 +1596,14 @@ class MirCodegen(MirFunctionBuilder):
             self.structs[union_node.name] = MirStruct(union_node.name, [], 0)
         for struct_node in ast.structs:
             fields = []
+            embedded = set()
             offset = 0
             for field in struct_node.fields:
                 fields.append((field.name, self._type(field.resolved_type), offset))
+                if getattr(field, "embedded", False):
+                    embedded.add(field.name)
                 offset += 8
+            self.embedded_fields[struct_node.name] = embedded
             self.structs[struct_node.name] = self._make_struct_layout(struct_node.name, fields, size=max(offset, 1))
         for union_node in ast.unions:
             self.structs[union_node.name] = self._make_struct_layout(
