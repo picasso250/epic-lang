@@ -108,7 +108,7 @@ fun machine_reg64(name: str): i64 {
 }
 
 fun machine_is_reg(op: X64Operand, name: str): bool {
-    ret op.kind == "reg" && op.name == name
+    ret x64_operand_is_reg(op) && x64_operand_name(op) == name
 }
 
 fun machine_rex(b: MachineBuilder, w: bool, r: i64, rb: i64): void {
@@ -577,32 +577,32 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
         machine_append_byte(b.text, 195)
         ret
     }
-    if (item.op == "sub" || item.op == "add") && len(ops) == 2 && machine_is_reg(ops[0], "rsp") && ops[1].kind == "imm" {
-        machine_emit_rsp_imm(b, item.op, ops[1].value)
+    if (item.op == "sub" || item.op == "add") && len(ops) == 2 && machine_is_reg(ops[0], "rsp") && x64_operand_is_imm(ops[1]) {
+        machine_emit_rsp_imm(b, item.op, x64_operand_value(ops[1]))
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
-        machine_emit_mov_reg_imm(b, ops[0].name, ops[1].value)
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_imm(ops[1]) {
+        machine_emit_mov_reg_imm(b, x64_operand_name(ops[0]), x64_operand_value(ops[1]))
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
-        machine_emit_mov_reg_reg(b, ops[0].name, ops[1].name)
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_reg(ops[1]) {
+        machine_emit_mov_reg_reg(b, x64_operand_name(ops[0]), x64_operand_name(ops[1]))
         ret
     }
-    if item.op == "cmp" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
-        machine_emit_cmp_reg_imm(b, ops[0].name, ops[1].value)
+    if item.op == "cmp" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_imm(ops[1]) {
+        machine_emit_cmp_reg_imm(b, x64_operand_name(ops[0]), x64_operand_value(ops[1]))
         ret
     }
-    if (item.op == "jmp" || item.op == "jz" || item.op == "jnz" || item.op == "jl" || item.op == "jge" || item.op == "jle") && len(ops) == 1 && ops[0].kind == "label_ref" {
-        machine_emit_jump(b, item.op, ops[0].name)
+    if (item.op == "jmp" || item.op == "jz" || item.op == "jnz" || item.op == "jl" || item.op == "jge" || item.op == "jle") && len(ops) == 1 && x64_operand_is_label_ref(ops[0]) {
+        machine_emit_jump(b, item.op, x64_operand_name(ops[0]))
         ret
     }
-    if item.op == "lea" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_symbol {
-        machine_emit_lea_symbol(b, ops[0].name, ops[1].symbol)
+    if item.op == "lea" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_symbol(ops[1]) {
+        machine_emit_lea_symbol(b, x64_operand_name(ops[0]), x64_operand_symbol_name(ops[1]))
         ret
     }
-    if item.op == "call" && len(ops) == 1 && ops[0].kind == "symbol" {
-        machine_emit_call_symbol(b, ops[0].name)
+    if item.op == "call" && len(ops) == 1 && x64_operand_is_symbol(ops[0]) {
+        machine_emit_call_symbol(b, x64_operand_name(ops[0]))
         ret
     }
     if item.op == "cqo" && len(ops) == 0 {
@@ -635,20 +635,20 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
         machine_append_byte(b.text, 216)
         ret
     }
-    if item.op == "cmp" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
-        machine_emit_cmp_reg_reg(b, ops[0].name, ops[1].name)
+    if item.op == "cmp" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_reg(ops[1]) {
+        machine_emit_cmp_reg_reg(b, x64_operand_name(ops[0]), x64_operand_name(ops[1]))
         ret
     }
-    if (item.op == "add" || item.op == "sub" || item.op == "and" || item.op == "or" || item.op == "xor") && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" {
-        machine_emit_reg_reg_alu(b, item.op, ops[0].name, ops[1].name)
+    if (item.op == "add" || item.op == "sub" || item.op == "and" || item.op == "or" || item.op == "xor") && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_reg(ops[1]) {
+        machine_emit_reg_reg_alu(b, item.op, x64_operand_name(ops[0]), x64_operand_name(ops[1]))
         ret
     }
-    if item.op == "add" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "imm" {
-        machine_emit_add_reg_imm(b, ops[0].name, ops[1].value)
+    if item.op == "add" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_imm(ops[1]) {
+        machine_emit_add_reg_imm(b, x64_operand_name(ops[0]), x64_operand_value(ops[1]))
         ret
     }
-    if item.op == "test" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "reg" && ops[0].name == ops[1].name {
-        machine_emit_test_reg_reg(b, ops[0].name)
+    if item.op == "test" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_reg(ops[1]) && x64_operand_name(ops[0]) == x64_operand_name(ops[1]) {
+        machine_emit_test_reg_reg(b, x64_operand_name(ops[0]))
         ret
     }
     if (item.op == "sete" || item.op == "setne" || item.op == "setg" || item.op == "setl" || item.op == "setge" || item.op == "setle" || item.op == "seta" || item.op == "setae" || item.op == "setb" || item.op == "setbe") && len(ops) == 1 && machine_is_reg(ops[0], "al") {
@@ -661,48 +661,48 @@ fun machine_emit_inst(b: MachineBuilder, item: X64Item): void {
         machine_append_byte(b.text, 192)
         ret
     }
-    if item.op == "movzx" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base && ops[1].size == 1 {
-        machine_emit_movzx_reg_mem8(b, ops[0].name, ops[1].base, ops[1].disp)
+    if item.op == "movzx" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_base(ops[1]) && x64_operand_size(ops[1]) == 1 {
+        machine_emit_movzx_reg_mem8(b, x64_operand_name(ops[0]), x64_operand_base(ops[1]), x64_operand_disp(ops[1]))
         ret
     }
-    if item.op == "movsx" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base && ops[1].size == 1 {
-        machine_emit_movsx_reg_mem8(b, ops[0].name, ops[1].base, ops[1].disp)
+    if item.op == "movsx" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_base(ops[1]) && x64_operand_size(ops[1]) == 1 {
+        machine_emit_movsx_reg_mem8(b, x64_operand_name(ops[0]), x64_operand_base(ops[1]), x64_operand_disp(ops[1]))
         ret
     }
     if (item.op == "shl" || item.op == "sar" || item.op == "shr") && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "cl") {
         machine_emit_shift_rax_cl(b, item.op)
         ret
     }
-    if (item.op == "inc" || item.op == "dec") && len(ops) == 1 && ops[0].kind == "reg" {
-        machine_emit_inc_dec(b, item.op, ops[0].name)
+    if (item.op == "inc" || item.op == "dec") && len(ops) == 1 && x64_operand_is_reg(ops[0]) {
+        machine_emit_inc_dec(b, item.op, x64_operand_name(ops[0]))
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base {
-        machine_emit_mov_reg_mem(b, ops[0].name, ops[1].base, ops[1].disp)
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_base(ops[1]) {
+        machine_emit_mov_reg_mem(b, x64_operand_name(ops[0]), x64_operand_base(ops[1]), x64_operand_disp(ops[1]))
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_symbol {
-        machine_emit_mov_reg_symbol(b, ops[0].name, ops[1].symbol)
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_symbol(ops[1]) {
+        machine_emit_mov_reg_symbol(b, x64_operand_name(ops[0]), x64_operand_symbol_name(ops[1]))
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_base && ops[1].kind == "reg" {
-        machine_emit_mov_mem_reg(b, ops[0].base, ops[0].disp, ops[1].name)
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_mem(ops[0]) && x64_operand_has_base(ops[0]) && x64_operand_is_reg(ops[1]) {
+        machine_emit_mov_mem_reg(b, x64_operand_base(ops[0]), x64_operand_disp(ops[0]), x64_operand_name(ops[1]))
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_symbol && ops[1].kind == "reg" {
-        if machine_is_reg8_name(ops[1].name) {
-            machine_emit_mov_symbol_reg8(b, ops[0].symbol, ops[1].name)
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_mem(ops[0]) && x64_operand_has_symbol(ops[0]) && x64_operand_is_reg(ops[1]) {
+        if machine_is_reg8_name(x64_operand_name(ops[1])) {
+            machine_emit_mov_symbol_reg8(b, x64_operand_symbol_name(ops[0]), x64_operand_name(ops[1]))
         } else {
-            machine_emit_mov_symbol_reg(b, ops[0].symbol, ops[1].name)
+            machine_emit_mov_symbol_reg(b, x64_operand_symbol_name(ops[0]), x64_operand_name(ops[1]))
         }
         ret
     }
-    if item.op == "mov" && len(ops) == 2 && ops[0].kind == "mem" && ops[0].has_base && ops[1].kind == "imm" {
-        if ops[0].size == 1 { machine_emit_mov_mem_imm8(b, ops[0].base, ops[0].disp, ops[1].value) } else { machine_emit_mov_mem_imm64(b, ops[0].base, ops[0].disp, ops[1].value) }
+    if item.op == "mov" && len(ops) == 2 && x64_operand_is_mem(ops[0]) && x64_operand_has_base(ops[0]) && x64_operand_is_imm(ops[1]) {
+        if x64_operand_size(ops[0]) == 1 { machine_emit_mov_mem_imm8(b, x64_operand_base(ops[0]), x64_operand_disp(ops[0]), x64_operand_value(ops[1])) } else { machine_emit_mov_mem_imm64(b, x64_operand_base(ops[0]), x64_operand_disp(ops[0]), x64_operand_value(ops[1])) }
         ret
     }
-    if item.op == "lea" && len(ops) == 2 && ops[0].kind == "reg" && ops[1].kind == "mem" && ops[1].has_base {
-        machine_emit_lea_base_disp(b, ops[0].name, ops[1].base, ops[1].disp)
+    if item.op == "lea" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_base(ops[1]) {
+        machine_emit_lea_base_disp(b, x64_operand_name(ops[0]), x64_operand_base(ops[1]), x64_operand_disp(ops[1]))
         ret
     }
     machine_die(str_cat2("unsupported instruction: ", item.op))

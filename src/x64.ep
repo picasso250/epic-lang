@@ -4,17 +4,34 @@
 # machine encoding belong to later bootstrap stages.
 #
 
-struct X64Operand {
-    kind: str
+struct X64RegOperand {
     name: str
+}
+
+struct X64ImmOperand {
     value: i64
+}
+
+struct X64SymbolOperand {
+    name: str
+}
+
+struct X64LabelRefOperand {
+    name: str
+}
+
+struct X64MemBaseOperand {
     base: str
     disp: i64
+    size: i64
+}
+
+struct X64MemSymbolOperand {
     symbol: str
     size: i64
-    has_base: bool
-    has_symbol: bool
 }
+
+type X64Operand = X64RegOperand | X64ImmOperand | X64SymbolOperand | X64LabelRefOperand | X64MemBaseOperand | X64MemSymbolOperand
 
 struct X64Item {
     kind: str
@@ -30,65 +47,146 @@ struct X64Program {
 }
 
 fun x64_operand_empty(): X64Operand {
-    let op = new X64Operand
-    op.kind = ""
-    op.name = ""
-    op.value = 0
-    op.base = ""
-    op.disp = 0
-    op.symbol = ""
-    op.size = 8
-    op.has_base = false
-    op.has_symbol = false
-    ret op
+    ret x64_imm(0)
 }
 
 fun x64_reg(name: str): X64Operand {
-    let op = x64_operand_empty()
-    op.kind = "reg"
-    op.name = name
-    ret op
+    ret new X64Operand(new X64RegOperand { name: name })
 }
 
 fun x64_imm(value: i64): X64Operand {
-    let op = x64_operand_empty()
-    op.kind = "imm"
-    op.value = value
-    ret op
+    ret new X64Operand(new X64ImmOperand { value: value })
 }
 
 fun x64_symbol(name: str): X64Operand {
-    let op = x64_operand_empty()
-    op.kind = "symbol"
-    op.name = name
-    ret op
+    ret new X64Operand(new X64SymbolOperand { name: name })
 }
 
 fun x64_label_ref(name: str): X64Operand {
-    let op = x64_operand_empty()
-    op.kind = "label_ref"
-    op.name = name
-    ret op
+    ret new X64Operand(new X64LabelRefOperand { name: name })
 }
 
 fun x64_mem_base(base: str, disp: i64, size: i64): X64Operand {
-    let op = x64_operand_empty()
-    op.kind = "mem"
-    op.base = base
-    op.disp = disp
-    op.size = size
-    op.has_base = true
-    ret op
+    ret new X64Operand(new X64MemBaseOperand { base: base, disp: disp, size: size })
 }
 
 fun x64_mem_symbol(symbol: str, size: i64): X64Operand {
-    let op = x64_operand_empty()
-    op.kind = "mem"
-    op.symbol = symbol
-    op.size = size
-    op.has_symbol = true
-    ret op
+    ret new X64Operand(new X64MemSymbolOperand { symbol: symbol, size: size })
 }
+
+fun x64_operand_kind_text(op: X64Operand): str {
+    match op {
+        X64RegOperand r: { ret "reg" }
+        X64ImmOperand i: { ret "imm" }
+        X64SymbolOperand s: { ret "symbol" }
+        X64LabelRefOperand l: { ret "label_ref" }
+        X64MemBaseOperand m: { ret "mem" }
+        X64MemSymbolOperand m: { ret "mem" }
+    }
+    ret "<bad operand>"
+}
+
+fun x64_operand_name(op: X64Operand): str {
+    match op {
+        X64RegOperand r: { ret r.name }
+        X64ImmOperand i: { ret "" }
+        X64SymbolOperand s: { ret s.name }
+        X64LabelRefOperand l: { ret l.name }
+        X64MemBaseOperand m: { ret "" }
+        X64MemSymbolOperand m: { ret "" }
+    }
+    ret ""
+}
+
+fun x64_operand_value(op: X64Operand): i64 {
+    match op {
+        X64RegOperand r: { ret 0 }
+        X64ImmOperand i: { ret i.value }
+        X64SymbolOperand s: { ret 0 }
+        X64LabelRefOperand l: { ret 0 }
+        X64MemBaseOperand m: { ret 0 }
+        X64MemSymbolOperand m: { ret 0 }
+    }
+    ret 0
+}
+
+fun x64_operand_base(op: X64Operand): str {
+    match op {
+        X64RegOperand r: { ret "" }
+        X64ImmOperand i: { ret "" }
+        X64SymbolOperand s: { ret "" }
+        X64LabelRefOperand l: { ret "" }
+        X64MemBaseOperand m: { ret m.base }
+        X64MemSymbolOperand m: { ret "" }
+    }
+    ret ""
+}
+
+fun x64_operand_disp(op: X64Operand): i64 {
+    match op {
+        X64RegOperand r: { ret 0 }
+        X64ImmOperand i: { ret 0 }
+        X64SymbolOperand s: { ret 0 }
+        X64LabelRefOperand l: { ret 0 }
+        X64MemBaseOperand m: { ret m.disp }
+        X64MemSymbolOperand m: { ret 0 }
+    }
+    ret 0
+}
+
+fun x64_operand_symbol_name(op: X64Operand): str {
+    match op {
+        X64RegOperand r: { ret "" }
+        X64ImmOperand i: { ret "" }
+        X64SymbolOperand s: { ret "" }
+        X64LabelRefOperand l: { ret "" }
+        X64MemBaseOperand m: { ret "" }
+        X64MemSymbolOperand m: { ret m.symbol }
+    }
+    ret ""
+}
+
+fun x64_operand_size(op: X64Operand): i64 {
+    match op {
+        X64RegOperand r: { ret 8 }
+        X64ImmOperand i: { ret 8 }
+        X64SymbolOperand s: { ret 8 }
+        X64LabelRefOperand l: { ret 8 }
+        X64MemBaseOperand m: { ret m.size }
+        X64MemSymbolOperand m: { ret m.size }
+    }
+    ret 8
+}
+
+fun x64_operand_has_base(op: X64Operand): bool {
+    match op {
+        X64RegOperand r: { ret false }
+        X64ImmOperand i: { ret false }
+        X64SymbolOperand s: { ret false }
+        X64LabelRefOperand l: { ret false }
+        X64MemBaseOperand m: { ret true }
+        X64MemSymbolOperand m: { ret false }
+    }
+    ret false
+}
+
+fun x64_operand_has_symbol(op: X64Operand): bool {
+    match op {
+        X64RegOperand r: { ret false }
+        X64ImmOperand i: { ret false }
+        X64SymbolOperand s: { ret false }
+        X64LabelRefOperand l: { ret false }
+        X64MemBaseOperand m: { ret false }
+        X64MemSymbolOperand m: { ret true }
+    }
+    ret false
+}
+
+fun x64_operand_is_reg(op: X64Operand): bool { ret x64_operand_kind_text(op) == "reg" }
+fun x64_operand_is_imm(op: X64Operand): bool { ret x64_operand_kind_text(op) == "imm" }
+fun x64_operand_is_symbol(op: X64Operand): bool { ret x64_operand_kind_text(op) == "symbol" }
+fun x64_operand_is_label_ref(op: X64Operand): bool { ret x64_operand_kind_text(op) == "label_ref" }
+fun x64_operand_is_mem(op: X64Operand): bool { ret x64_operand_kind_text(op) == "mem" }
 
 fun x64_item_empty(kind: str): X64Item {
     let item = new X64Item
@@ -177,33 +275,33 @@ fun x64_size_prefix(size: i64): str {
 }
 
 fun x64_mem_addr_text(op: X64Operand): str {
-    if op.has_symbol {
-        ret op.symbol
+    match op {
+        X64RegOperand r: { ret "<bad mem>" }
+        X64ImmOperand i: { ret "<bad mem>" }
+        X64SymbolOperand s: { ret "<bad mem>" }
+        X64LabelRefOperand l: { ret "<bad mem>" }
+        X64MemBaseOperand m: {
+            if m.disp == 0 {
+                ret m.base
+            }
+            if m.disp > 0 {
+                ret str_cat2(str_cat2(m.base, "+"), str(m.disp))
+            }
+            ret str_cat2(m.base, str(m.disp))
+        }
+        X64MemSymbolOperand m: { ret m.symbol }
     }
-    if op.disp == 0 {
-        ret op.base
-    }
-    if op.disp > 0 {
-        ret str_cat2(str_cat2(op.base, "+"), str(op.disp))
-    }
-    ret str_cat2(op.base, str(op.disp))
+    ret "<bad mem>"
 }
 
 fun x64_operand_text(op: X64Operand): str {
-    if op.kind == "reg" {
-        ret op.name
-    }
-    if op.kind == "imm" {
-        ret str(op.value)
-    }
-    if op.kind == "symbol" {
-        ret op.name
-    }
-    if op.kind == "label_ref" {
-        ret op.name
-    }
-    if op.kind == "mem" {
-        ret str_cat2(str_cat2(x64_size_prefix(op.size), "["), str_cat2(x64_mem_addr_text(op), "]"))
+    match op {
+        X64RegOperand r: { ret r.name }
+        X64ImmOperand i: { ret str(i.value) }
+        X64SymbolOperand s: { ret s.name }
+        X64LabelRefOperand l: { ret l.name }
+        X64MemBaseOperand m: { ret str_cat2(str_cat2(x64_size_prefix(m.size), "["), str_cat2(x64_mem_addr_text(op), "]")) }
+        X64MemSymbolOperand m: { ret str_cat2(str_cat2(x64_size_prefix(m.size), "["), str_cat2(x64_mem_addr_text(op), "]")) }
     }
     ret "<bad operand>"
 }
