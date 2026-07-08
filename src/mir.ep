@@ -39,14 +39,25 @@ struct MirInst {
     has_result: bool
 }
 
-struct MirTerminator {
-    kind: str
-    value: MirOperand
+struct MirBrTerminator {
     target: str
+}
+
+struct MirCondBrTerminator {
+    cond: MirOperand
     then_target: str
     else_target: str
-    has_value: bool
 }
+
+struct MirRetVoidTerminator {
+    dummy: i64
+}
+
+struct MirRetValueTerminator {
+    value: MirOperand
+}
+
+type MirTerminator = MirBrTerminator | MirCondBrTerminator | MirRetVoidTerminator | MirRetValueTerminator
 
 struct MirBlock {
     name: str
@@ -496,64 +507,168 @@ fun mir_inst_text(inst: MirInst): str {
 }
 
 fun mir_br(target: str): MirTerminator {
-    let term = new MirTerminator
-    term.kind = "br"
-    term.value = mir_operand_empty()
-    term.target = target
-    term.then_target = ""
-    term.else_target = ""
-    term.has_value = false
-    ret term
+    ret new MirTerminator(new MirBrTerminator { target: target })
 }
 
 fun mir_condbr(cond: MirOperand, then_target: str, else_target: str): MirTerminator {
-    let term = new MirTerminator
-    term.kind = "condbr"
-    term.value = cond
-    term.target = ""
-    term.then_target = then_target
-    term.else_target = else_target
-    term.has_value = true
-    ret term
+    ret new MirTerminator(new MirCondBrTerminator { cond: cond, then_target: then_target, else_target: else_target })
 }
 
 fun mir_ret_void(): MirTerminator {
-    let term = new MirTerminator
-    term.kind = "ret"
-    term.value = mir_operand_empty()
-    term.target = ""
-    term.then_target = ""
-    term.else_target = ""
-    term.has_value = false
-    ret term
+    ret new MirTerminator(new MirRetVoidTerminator { dummy: 0 })
 }
 
 fun mir_ret_value(value: MirOperand): MirTerminator {
-    let term = mir_ret_void()
-    term.has_value = true
-    term.value = value
-    ret term
+    ret new MirTerminator(new MirRetValueTerminator { value: value })
+}
+
+fun mir_terminator_kind_text(term: MirTerminator): str {
+    match term {
+        MirBrTerminator br: {
+            ret "br"
+        }
+        MirCondBrTerminator cond: {
+            ret "condbr"
+        }
+        MirRetVoidTerminator rv: {
+            ret "ret"
+        }
+        MirRetValueTerminator rv: {
+            ret "ret"
+        }
+    }
+    ret "<bad terminator>"
+}
+
+fun mir_terminator_br_target(term: MirTerminator): str {
+    match term {
+        MirBrTerminator br: {
+            ret br.target
+        }
+        MirCondBrTerminator cond: {
+            ret ""
+        }
+        MirRetVoidTerminator rv: {
+            ret ""
+        }
+        MirRetValueTerminator rv: {
+            ret ""
+        }
+    }
+    ret ""
+}
+
+fun mir_terminator_cond_value(term: MirTerminator): MirOperand {
+    match term {
+        MirBrTerminator br: {
+            ret mir_operand_empty()
+        }
+        MirCondBrTerminator cond: {
+            ret cond.cond
+        }
+        MirRetVoidTerminator rv: {
+            ret mir_operand_empty()
+        }
+        MirRetValueTerminator rv: {
+            ret mir_operand_empty()
+        }
+    }
+    ret mir_operand_empty()
+}
+
+fun mir_terminator_then_target(term: MirTerminator): str {
+    match term {
+        MirBrTerminator br: {
+            ret ""
+        }
+        MirCondBrTerminator cond: {
+            ret cond.then_target
+        }
+        MirRetVoidTerminator rv: {
+            ret ""
+        }
+        MirRetValueTerminator rv: {
+            ret ""
+        }
+    }
+    ret ""
+}
+
+fun mir_terminator_else_target(term: MirTerminator): str {
+    match term {
+        MirBrTerminator br: {
+            ret ""
+        }
+        MirCondBrTerminator cond: {
+            ret cond.else_target
+        }
+        MirRetVoidTerminator rv: {
+            ret ""
+        }
+        MirRetValueTerminator rv: {
+            ret ""
+        }
+    }
+    ret ""
+}
+
+fun mir_terminator_has_value(term: MirTerminator): bool {
+    match term {
+        MirBrTerminator br: {
+            ret false
+        }
+        MirCondBrTerminator cond: {
+            ret false
+        }
+        MirRetVoidTerminator rv: {
+            ret false
+        }
+        MirRetValueTerminator rv: {
+            ret true
+        }
+    }
+    ret false
+}
+
+fun mir_terminator_ret_value(term: MirTerminator): MirOperand {
+    match term {
+        MirBrTerminator br: {
+            ret mir_operand_empty()
+        }
+        MirCondBrTerminator cond: {
+            ret mir_operand_empty()
+        }
+        MirRetVoidTerminator rv: {
+            ret mir_operand_empty()
+        }
+        MirRetValueTerminator rv: {
+            ret rv.value
+        }
+    }
+    ret mir_operand_empty()
 }
 
 fun mir_terminator_text(term: MirTerminator): str {
-    if term.kind == "br" {
-        ret str_cat2("br label %", term.target)
-    }
-    if term.kind == "condbr" {
-        let buf = make_str_buf()
-        str_buf_extend(buf, "condbr ")
-        str_buf_extend(buf, mir_operand_typed_text(term.value))
-        str_buf_extend(buf, ", label %")
-        str_buf_extend(buf, term.then_target)
-        str_buf_extend(buf, ", label %")
-        str_buf_extend(buf, term.else_target)
-        ret str_buf_finish(buf)
-    }
-    if term.kind == "ret" {
-        if term.has_value {
-            ret str_cat2("ret ", mir_operand_typed_text(term.value))
+    match term {
+        MirBrTerminator br: {
+            ret str_cat2("br label %", br.target)
         }
-        ret "ret void"
+        MirCondBrTerminator cond: {
+            let buf = make_str_buf()
+            str_buf_extend(buf, "condbr ")
+            str_buf_extend(buf, mir_operand_typed_text(cond.cond))
+            str_buf_extend(buf, ", label %")
+            str_buf_extend(buf, cond.then_target)
+            str_buf_extend(buf, ", label %")
+            str_buf_extend(buf, cond.else_target)
+            ret str_buf_finish(buf)
+        }
+        MirRetVoidTerminator rv: {
+            ret "ret void"
+        }
+        MirRetValueTerminator rv: {
+            ret str_cat2("ret ", mir_operand_typed_text(rv.value))
+        }
     }
     ret "<bad terminator>"
 }

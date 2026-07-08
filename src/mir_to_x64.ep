@@ -536,35 +536,41 @@ fun mir_to_x64_emit_startup_hook_call(lower: MirToX64Lower): void {
 }
 
 fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTerminator): void {
-    if term.kind == "br" {
-        x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(fn, term.target)))
-        ret
-    }
-    if term.kind == "condbr" {
-        mir_to_x64_load_operand(lower, "rax", term.value)
-        x64_add_inst2(lower.x64, "test", x64_reg("rax"), x64_reg("rax"))
-        x64_add_inst1(lower.x64, "jnz", x64_label_ref(mir_to_x64_block_label(fn, term.then_target)))
-        x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(fn, term.else_target)))
-        ret
-    }
-    if term.kind == "ret" {
-        if term.has_value {
-            mir_to_x64_load_operand(lower, "rax", term.value)
+    match term {
+        MirBrTerminator br: {
+            x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(fn, br.target)))
+            ret
         }
-        if fn.name == "main" {
-            if term.has_value {
-                x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_reg("rax"))
-            } else {
+        MirCondBrTerminator cond: {
+            mir_to_x64_load_operand(lower, "rax", cond.cond)
+            x64_add_inst2(lower.x64, "test", x64_reg("rax"), x64_reg("rax"))
+            x64_add_inst1(lower.x64, "jnz", x64_label_ref(mir_to_x64_block_label(fn, cond.then_target)))
+            x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(fn, cond.else_target)))
+            ret
+        }
+        MirRetVoidTerminator rv: {
+            if fn.name == "main" {
                 x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_imm(0))
+                x64_add_inst2(lower.x64, "sub", x64_reg("rsp"), x64_imm(32))
+                x64_add_inst1(lower.x64, "call", x64_symbol("ExitProcess"))
+            } else {
+                x64_add_inst1(lower.x64, "jmp", x64_label_ref(lower.return_label))
             }
-            x64_add_inst2(lower.x64, "sub", x64_reg("rsp"), x64_imm(32))
-            x64_add_inst1(lower.x64, "call", x64_symbol("ExitProcess"))
-        } else {
-            x64_add_inst1(lower.x64, "jmp", x64_label_ref(lower.return_label))
+            ret
         }
-        ret
+        MirRetValueTerminator rv: {
+            mir_to_x64_load_operand(lower, "rax", rv.value)
+            if fn.name == "main" {
+                x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_reg("rax"))
+                x64_add_inst2(lower.x64, "sub", x64_reg("rsp"), x64_imm(32))
+                x64_add_inst1(lower.x64, "call", x64_symbol("ExitProcess"))
+            } else {
+                x64_add_inst1(lower.x64, "jmp", x64_label_ref(lower.return_label))
+            }
+            ret
+        }
     }
-    mir_to_x64_die(str_cat2("unsupported MIR terminator: ", term.kind))
+    mir_to_x64_die(str_cat2("unsupported MIR terminator: ", mir_terminator_kind_text(term)))
 }
 
 fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction): X64Program {
