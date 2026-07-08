@@ -147,12 +147,35 @@ _slice_T = {
 
 用户结构体字段使用固定的 8 字节槽位。字段偏移为 `index * 8`。结构体大小为 `field_count * 8`。`u8` 和 `bool` 字段在其 8 字节槽位内加载/存储一个字节。
 
-### ADT (代数数据类型, Algebraic Data Types) — 已移除
+### ADT (Algebraic Data Types)
 
-> **⚠ 历史特性 (Historical)**  
-> ADT 已从 Epic 自举核心移除。详见 [`self-host-core.md`](self-host-core.md)。
->
-> 旧实现使用 16 字节 header（tag + payload pointer），已从 Python reference compiler 中清除。
+ADT v1 使用 struct union lowering：
+
+```text
+Expr wrapper:
+  tag
+  payload pointer
+
+payload:
+  user-defined struct instance
+```
+
+编译器流程：
+
+1. 收集所有 struct 定义。
+2. 收集 `type Name = A | B | C` union 定义。
+3. 验证 union member 都是 struct。
+4. 为 wrapper 生成 tag namespace。
+5. `new Expr(payload)` 生成 wrapper。
+6. ADT `match` 根据 wrapper tag 分派，并绑定 payload struct。
+
+不支持：
+
+- primitive union member
+- implicit boxing
+- tag 访问
+- union extension
+- variant-specific constructor namespace
 
 ## 代码生成模型 (Codegen Model)
 

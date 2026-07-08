@@ -14,8 +14,8 @@ or **deferred** for later decision.
 ## Decision Model
 
 ```
-ADT:            remove (not in core)
-match:          keep literal switch only; remove ADT match
+ADT:            planned as struct union (v1 design)
+match:          keep literal switch and add ADT match later
 str:            temporary u8[]-layout alias; public surface contracted
 naming:         unify, but only after ADT removal
 required_helpers: defer; unconditional injection stays for now
@@ -145,7 +145,9 @@ FFI arguments are `i64`; C strings require explicit `cstr(...)`.
 
 ### ADT (Algebraic Data Types)
 
-ADT is **not** part of the self-hosting core. The following are removed:
+ADT is planned as a closed struct union feature. It is not implemented in the self-hosting core yet.
+
+The v1 model:
 
 | Feature | Reason |
 |---------|--------|

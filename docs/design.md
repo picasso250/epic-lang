@@ -206,17 +206,53 @@ let bs = new u8[] { 65, 66, 67 }
 
 分配一个动态数组，其 `len` 和 `cap` 等于元素个数。`new T[n]` 分配一个空数组，容量至少为 `n` 个元素。
 
-### ADT (代数数据类型, Algebraic Data Types) — 已移除
+### ADT (代数数据类型, Algebraic Data Types)
 
-> **⚠ 历史特性 (Historical)**  
-> ADT（代数数据类型）已从 Epic 自举核心移除。详见 [`self-host-core.md`](self-host-core.md)。
->
-> 移除内容包括：`type` 定义、变体初始化 `new A.V { ... }`、ADT match payload binding。
-> `match` 字面量分支保留。
+Epic 的 ADT v1 采用 **struct union** 模型：
 
-### Match (模式匹配) — 仅保留字面量分支
+```epic
+struct LiteralExpr {
+    value: str
+    line: i64
+}
 
-> **⚠ ADT match 已移除**：ADT 变体分支已随 ADT 一同移除。匹配 payload binding 不再支持。详见 [`self-host-core.md`](self-host-core.md)。
+struct BinaryExpr {
+    op: str
+    left: Expr
+    right: Expr
+    line: i64
+}
+
+type Expr = LiteralExpr | BinaryExpr
+```
+
+规则：
+
+- union member 必须是用户定义的 `struct`。
+- ADT 是封闭集合，定义后不能扩展。
+- 不支持 primitive 直接作为 union member。
+- 不支持隐式 struct -> ADT 转换。
+- 构造必须显式：`new Expr(new LiteralExpr { ... })`。
+- `Expr` 是独立 heap-backed wrapper 类型，构造后的静态类型就是 `Expr`，不保留内部 variant 类型信息。
+- 不开放 tag/kind/is API，ADT 只能通过 `match` 解包。
+- `match` 必须覆盖全部 variant，或者提供 `_` 分支。
+- payload 仍然是普通 struct，可以作为函数参数类型。
+- 不支持 union extension。
+
+`match` 使用 struct variant 名称进行匹配：
+
+```epic
+match e {
+    LiteralExpr lit: {
+        print(lit.value)
+    }
+    BinaryExpr b: {
+        print(b.op)
+    }
+    _: {
+    }
+}
+```
 
 `match` 是一个语句。支持字面量分支。
 
