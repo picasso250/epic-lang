@@ -113,9 +113,18 @@ fun is_upper_name(name: str): i64 {
     ret 0
 }
 
+let parser_reserved_funcs = new map[str]bool {
+    "len": true
+    "cap": true
+    "push": true
+    "extend": true
+    "bytes": true
+    "str": true
+    "map_has": true
+}
+
 fun parser_is_reserved_func(name: str): bool {
-    let reserved = new map[str]bool { "len": true, "cap": true, "push": true, "extend": true, "bytes": true, "str": true, "map_has": true }
-    ret map_has(reserved, name)
+    ret map_has(parser_reserved_funcs, name)
 }
 
 fun peek(p: Parser): Token {
