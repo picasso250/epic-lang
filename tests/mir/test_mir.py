@@ -502,6 +502,59 @@ def test_runtime_source_str_slice_lowers_as_epic_function():
     assert "invalid string slice" in text
 
 
+
+def test_user_method_lowers_to_mangled_function_call():
+    source = """struct Counter {
+    value: i64
+}
+
+fun (c: Counter) add(delta: i64): i64 {
+    ret c.value + delta
+}
+
+fun main(): i64 {
+    let c = new Counter { value: 40 }
+    ret c.add(2)
+}
+"""
+    ast = Parser(lex(source)).parse_program()
+    method = ast.funcs[0]
+    assert method.name == "Counter__add"
+    assert method.method_name == "add"
+    assert method.receiver_name == "c"
+    assert method.receiver_type == "Counter"
+    typed = sema.analyze_program(ast)
+    prog = ast_to_mir(typed)
+    text = prog.text()
+    assert "define i64 @Counter__add(ptr %c, i64 %delta)" in text
+    assert "call i64 Counter__add" in text
+
+
+def test_user_method_conflicts_with_mangled_function_name():
+    source = """struct Counter {
+    value: i64
+}
+
+fun Counter__add(c: Counter, delta: i64): i64 {
+    ret c.value + delta
+}
+
+fun (c: Counter) add(delta: i64): i64 {
+    ret c.value + delta
+}
+
+fun main(): i64 {
+    let c = new Counter { value: 1 }
+    ret c.add(2)
+}
+"""
+    try:
+        sema.analyze_program(Parser(lex(source)).parse_program())
+    except sema.SemanticError as exc:
+        assert "duplicate function Counter__add" in str(exc)
+        return
+    raise AssertionError("expected duplicate method symbol error")
+
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
@@ -516,6 +569,8 @@ def main():
     test_runtime_source_str_from_i64_lowers_as_epic_function()
     test_runtime_source_str_from_u64_lowers_as_epic_function()
     test_runtime_source_str_slice_lowers_as_epic_function()
+    test_user_method_lowers_to_mangled_function_call()
+    test_user_method_conflicts_with_mangled_function_name()
     print("PASS test_mir")
 
 

@@ -1135,6 +1135,10 @@ class MirCodegen(MirFunctionBuilder):
                     raise MirCodegenError(f"{expr.name} expects map")
                 result = self.inst("call", [base.value, key.value], result_type=BOOL, type=BOOL, callee=helper)
                 return ValueFlow(ValueOperand(result), self.current_block)
+        if receiver_type.kind == "named":
+            method_symbol = f"{receiver_type.name}__{expr.name}"
+            call = CallNode(name=method_symbol, args=[expr.object] + expr.args, line=expr.line)
+            return self._emit_user_call_from(self.current_block, call)
         raise MirCodegenError(f"unsupported dot call: {expr.name}")
 
     def _emit_user_call(self, expr):

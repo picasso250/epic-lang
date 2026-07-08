@@ -93,19 +93,41 @@ class Parser:
 
     def parse_fn_def(self):
         self.expect("FUN")
-        name = self.expect("ID")
+        receiver_name = ""
+        receiver_type = ""
+        method_name = ""
+        if self.peek_kind("LPAREN"):
+            self.expect("LPAREN")
+            receiver = self.expect("ID")
+            self.expect("COLON")
+            receiver_type = self.parse_type()
+            self.expect("RPAREN")
+            name = self.expect("ID")
+            receiver_name = receiver[1]
+            method_name = name[1]
+            symbol_name = f"{receiver_type}__{method_name}"
+            line = name[2]
+            params = [Param(name=receiver_name, type=receiver_type)]
+        else:
+            name = self.expect("ID")
+            symbol_name = name[1]
+            line = name[2]
+            params = []
         self.expect("LPAREN")
-        params = self.parse_params()
+        params.extend(self.parse_params())
         self.expect("RPAREN")
         self.expect("COLON")
         ret_type = self.parse_type()
         body = self.parse_block()
         return FunDefNode(
-            name=name[1],
+            name=symbol_name,
             params=params,
             ret_type=ret_type,
             body=body,
-            line=name[2],
+            line=line,
+            receiver_name=receiver_name,
+            receiver_type=receiver_type,
+            method_name=method_name,
         )
 
     def parse_params(self):
@@ -638,7 +660,10 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, StructField):
         emit(f"StructField {node.name} : {node.type}")
     elif isinstance(node, FunDefNode):
-        emit(f"FunDef {node.name} : {node.ret_type}")
+        if node.method_name:
+            emit(f"Method {node.receiver_type}.{node.method_name} : {node.ret_type}")
+        else:
+            emit(f"FunDef {node.name} : {node.ret_type}")
         for param in node.params:
             out.extend(dump_ast_lines(param, depth + 1))
         out.extend(dump_ast_lines(node.body, depth + 1))

@@ -51,6 +51,9 @@ class FunDefNode(ASTNode):
     body: 'BlockNode'
     line: int
     resolved_type: Optional[EpicType] = None
+    receiver_name: str = ""
+    receiver_type: str = ""
+    method_name: str = ""
 
 
 @dataclass

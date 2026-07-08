@@ -80,6 +80,11 @@ class SemanticAnalyzer:
 
     def _build_functions(self):
         for fn in self.program.funcs:
+            if fn.name in self.func_sigs:
+                self._fail_global(f"duplicate function {fn.name}")
+            if fn.method_name:
+                if fn.receiver_type not in self.struct_names:
+                    self._fail_global(f"method receiver must be a user-defined struct, got {fn.receiver_type}")
             params = []
             for param in fn.params:
                 param.resolved_type = self._type_name(param.type)
@@ -87,6 +92,9 @@ class SemanticAnalyzer:
                 if typ == VOID:
                     self._fail_global(f"function {fn.name} parameter {param.name} cannot have type void")
                 params.append(typ)
+            if fn.method_name:
+                if not params or params[0] != NAMED(fn.receiver_type):
+                    self._fail_global(f"method {fn.receiver_type}.{fn.method_name} receiver mismatch")
             if fn.name in BUILTIN_FUNCTIONS or fn.name in PSEUDO_BUILTINS:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
             fn.resolved_type = self._type_name(fn.ret_type)
@@ -478,7 +486,14 @@ class SemanticAnalyzer:
                 self._check_assign(STR, self._expr(expr.args[0]), f"{expr.name} key")
                 return ExprInfo(BOOL)
             self._fail(f"map type {receiver.type} has no method {expr.name}")
-        self._fail("method calls are only supported for os.*, slices, and maps for now")
+        if receiver.type.kind == "named":
+            method_symbol = f"{receiver.type.name}__{expr.name}"
+            if method_symbol not in self.func_sigs:
+                self._fail(f"type {receiver.type.name} has no method {expr.name}; expected function {method_symbol}")
+            params, ret = self.func_sigs[method_symbol]
+            self._check_call_args(method_symbol, params, [expr.object] + expr.args)
+            return ExprInfo(ret)
+        self._fail("method calls are only supported for os.*, slices, maps, and user structs for now")
         return ExprInfo(VOID)
 
     def _os_call(self, expr):
@@ -907,7 +922,10 @@ def dump_typed_ast_lines(node, depth=0):
     elif isinstance(node, StructField):
         emit(f"StructField {node.name}{_type_suffix(node)}")
     elif isinstance(node, FunDefNode):
-        emit(f"FunDef {node.name}{_type_suffix(node)}")
+        if node.method_name:
+            emit(f"Method {node.receiver_type}.{node.method_name}{_type_suffix(node)}")
+        else:
+            emit(f"FunDef {node.name}{_type_suffix(node)}")
         for param in node.params:
             out.extend(dump_typed_ast_lines(param, depth + 1))
         out.extend(dump_typed_ast_lines(node.body, depth + 1))
