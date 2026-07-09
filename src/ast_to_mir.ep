@@ -132,20 +132,27 @@ fun mir_global_index(st: MirCodegenState, name: str): i64 {
     ret 0 - 1
 }
 
-fun mir_add_global_lets(st: MirCodegenState, ast: AstNode): void {
+
+fun mir_add_global_lets(st: MirCodegenState, ast: AstProgram): void {
     let i = 0
     for i < len(ast.globals) {
-        let g = ast.globals[i]
-        let typ = mir_epic_type(ast_resolved_type(g))
-        let label = mir_global_label(g.name)
-        st.global_names.push(g.name)
-        st.global_types.push(typ)
-        st.program.globals.push(mir_global_decl(label, typ))
+        match ast.globals[i] {
+            AstLet g: {
+                let typ = mir_epic_type(g.AstMeta.resolved_type)
+                let label = mir_global_label(g.name)
+                st.global_names.push(g.name)
+                st.global_types.push(typ)
+                st.program.globals.push(mir_global_decl(label, typ))
+            }
+            _: { ast_to_mir_die("internal: expected top-level let") }
+        }
         i = i + 1
     }
 }
 
-fun mir_emit_global_init_function(st: MirCodegenState, ast: AstNode): void {
+
+
+fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
     if len(ast.globals) == 0 {
         ret
     }
@@ -161,11 +168,15 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstNode): void {
 
     let i = 0
     for i < len(ast.globals) {
-        let g = ast.globals[i]
-        let value_flow = mir_emit_expr(st, st.current_block, g.value_expr)
-        st.current_block = value_flow.block
-        let addr = mir_symbol_operand("ptr", mir_global_label(g.name))
-        mir_emit_inst(st, mir_store(value_flow.value, addr))
+        match ast.globals[i] {
+            AstLet g: {
+                let value_flow = mir_emit_expr(st, st.current_block, g.value_expr)
+                st.current_block = value_flow.block
+                let addr = mir_symbol_operand("ptr", mir_global_label(g.name))
+                mir_emit_inst(st, mir_store(value_flow.value, addr))
+            }
+            _: { ast_to_mir_die("internal: expected top-level let") }
+        }
         i = i + 1
     }
     if st.current_block.has_terminator == false {
@@ -174,6 +185,7 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstNode): void {
     }
     st.program.functions.push(st.current_fn)
 }
+
 
 fun mir_struct_key(struct_name: str, field_name: str): str {
     ret str_cat2(str_cat2(struct_name, "."), field_name)
@@ -2294,7 +2306,8 @@ fun mir_param(name: str, typ: str): MirParam {
     ret p
 }
 
-fun mir_emit_function(st: MirCodegenState, fn_ast: AstNode): MirFunction {
+
+fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     st.value_counter = 0
     st.block_counter = 0
     st.local_names = new str[0]
@@ -2302,11 +2315,16 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstNode): MirFunction {
     st.local_types = new str[0]
     st.continue_targets = new str[0]
     st.break_targets = new str[0]
-    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(ast_resolved_type(fn_ast)))
+    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(fn_ast.AstMeta.resolved_type))
 
     let pi = 0
     for pi < len(fn_ast.params) {
-        st.current_fn.params.push(mir_param(fn_ast.params[pi].name, mir_epic_type(ast_resolved_type(fn_ast.params[pi]))))
+        match fn_ast.params[pi] {
+            AstParam param: {
+                st.current_fn.params.push(mir_param(param.name, mir_epic_type(param.AstMeta.resolved_type)))
+            }
+            _: { ast_to_mir_die("internal: expected function parameter") }
+        }
         pi = pi + 1
     }
 
@@ -2335,6 +2353,7 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstNode): MirFunction {
     ret st.current_fn
 }
 
+
 fun mir_register_slice_layout(st: MirCodegenState, name: str): void {
     st.struct_names.push(name)
     st.struct_field_keys.push(mir_struct_key(name, "data"))
@@ -2353,6 +2372,7 @@ fun mir_register_slice_layout(st: MirCodegenState, name: str): void {
     st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, name, "i64", 2)
 }
+
 
 fun mir_ast_to_mir(ast: AstNode): MirProgram {
     let st = new MirCodegenState
@@ -2383,146 +2403,183 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.string_labels = new str[0]
     st.string_counter = 0
 
-    let si = 0
-    for si < len(ast.structs) {
-        let sdef = ast.structs[si]
-        st.struct_names.push(sdef.name)
-        let fi2 = 0
-        for fi2 < len(sdef.fields) {
-            st.struct_field_keys.push(mir_struct_key(sdef.name, sdef.fields[fi2].name))
-            let field_mir_type = mir_epic_type(sdef.fields[fi2].type_name)
-            st.struct_field_types.push(field_mir_type)
-            st.struct_field_indexes.push(fi2)
-            if sdef.fields[fi2].embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
-            mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
-            fi2 = fi2 + 1
+    match ast {
+        AstProgram program: {
+            let si = 0
+            for si < len(program.structs) {
+                match program.structs[si] {
+                    AstStructDef sdef: {
+                        st.struct_names.push(sdef.name)
+                        let fi2 = 0
+                        for fi2 < len(sdef.fields) {
+                            match sdef.fields[fi2] {
+                                AstStructField field: {
+                                    st.struct_field_keys.push(mir_struct_key(sdef.name, field.name))
+                                    let field_mir_type = mir_epic_type(field.type_name)
+                                    st.struct_field_types.push(field_mir_type)
+                                    st.struct_field_indexes.push(fi2)
+                                    if field.embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
+                                    mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
+                                }
+                                _: { ast_to_mir_die("internal: expected struct field") }
+                            }
+                            fi2 = fi2 + 1
+                        }
+                    }
+                    _: { ast_to_mir_die("internal: expected top-level struct") }
+                }
+                si = si + 1
+            }
+            for ui in 0:len(program.unions) {
+                match program.unions[ui] {
+                    AstUnionDef union: {
+                        st.union_names.push(union.name)
+                        st.struct_names.push(union.name)
+                        for mi2 in 0:len(union.members) {
+                            st.union_member_keys.push(mir_struct_key(union.name, union.members[mi2]))
+                            st.union_member_tags.push(mi2 + 1)
+                            st.union_member_names.push(union.members[mi2])
+                        }
+                        st.struct_field_keys.push(mir_struct_key(union.name, "tag"))
+                        st.struct_field_types.push("i64")
+                        st.struct_field_indexes.push(0)
+                        st.struct_field_embedded.push(0)
+                        mir_program_add_struct_field(st.program, union.name, "i64", 0)
+                        st.struct_field_keys.push(mir_struct_key(union.name, "payload"))
+                        st.struct_field_types.push("ptr")
+                        st.struct_field_indexes.push(1)
+                        st.struct_field_embedded.push(0)
+                        mir_program_add_struct_field(st.program, union.name, "ptr", 1)
+                    }
+                    _: { ast_to_mir_die("internal: expected top-level union") }
+                }
+            }
+
+            st.struct_names.push("str")
+            st.struct_field_keys.push(mir_struct_key("str", "data"))
+            st.struct_field_types.push("ptr")
+            st.struct_field_indexes.push(0)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "str", "ptr", 0)
+            st.struct_field_keys.push(mir_struct_key("str", "len"))
+            st.struct_field_types.push("i64")
+            st.struct_field_indexes.push(1)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "str", "i64", 1)
+            st.struct_field_keys.push(mir_struct_key("str", "cap"))
+            st.struct_field_types.push("i64")
+            st.struct_field_indexes.push(2)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "str", "i64", 2)
+            st.struct_names.push("_slice_i64")
+            st.struct_field_keys.push(mir_struct_key("_slice_i64", "data"))
+            st.struct_field_types.push("ptr")
+            st.struct_field_indexes.push(0)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "_slice_i64", "ptr", 0)
+            st.struct_field_keys.push(mir_struct_key("_slice_i64", "len"))
+            st.struct_field_types.push("i64")
+            st.struct_field_indexes.push(1)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "_slice_i64", "i64", 1)
+            st.struct_field_keys.push(mir_struct_key("_slice_i64", "cap"))
+            st.struct_field_types.push("i64")
+            st.struct_field_indexes.push(2)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "_slice_i64", "i64", 2)
+            st.struct_names.push("_slice_u8")
+            st.struct_field_keys.push(mir_struct_key("_slice_u8", "data"))
+            st.struct_field_types.push("ptr")
+            st.struct_field_indexes.push(0)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "_slice_u8", "ptr", 0)
+            st.struct_field_keys.push(mir_struct_key("_slice_u8", "len"))
+            st.struct_field_types.push("i64")
+            st.struct_field_indexes.push(1)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "_slice_u8", "i64", 1)
+            st.struct_field_keys.push(mir_struct_key("_slice_u8", "cap"))
+            st.struct_field_types.push("i64")
+            st.struct_field_indexes.push(2)
+            st.struct_field_embedded.push(0)
+            mir_program_add_struct_field(st.program, "_slice_u8", "i64", 2)
+
+            mir_register_slice_layout(st, "_slice_str")
+            mir_register_slice_layout(st, "_slice_ptr")
+            let asi = 0
+            for asi < len(program.structs) {
+                match program.structs[asi] {
+                    AstStructDef sdef: { mir_register_slice_layout(st, str_cat2("_slice_", sdef.name)) }
+                    _: { ast_to_mir_die("internal: expected top-level struct") }
+                }
+                asi = asi + 1
+            }
+            for aui in 0:len(program.unions) {
+                match program.unions[aui] {
+                    AstUnionDef union: { mir_register_slice_layout(st, str_cat2("_slice_", union.name)) }
+                    _: { ast_to_mir_die("internal: expected top-level union") }
+                }
+            }
+
+            let map_layouts = new str[0]
+            map_layouts.push("_map_str_i64")
+            map_layouts.push("_map_str_bool")
+            map_layouts.push("_map_str_str")
+            let mi = 0
+            for mi < len(map_layouts) {
+                st.struct_names.push(map_layouts[mi])
+                st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "entries"))
+                st.struct_field_types.push("ptr")
+                st.struct_field_indexes.push(0)
+                st.struct_field_embedded.push(0)
+                mir_program_add_struct_field(st.program, map_layouts[mi], "ptr", 0)
+                st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "len"))
+                st.struct_field_types.push("i64")
+                st.struct_field_indexes.push(1)
+                st.struct_field_embedded.push(0)
+                mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 1)
+                st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "cap"))
+                st.struct_field_types.push("i64")
+                st.struct_field_indexes.push(2)
+                st.struct_field_embedded.push(0)
+                mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 2)
+                mi = mi + 1
+            }
+
+            mir_add_global_lets(st, program)
+            mir_emit_global_init_function(st, program)
+
+            let fi = 0
+            for fi < len(program.funcs) {
+                match program.funcs[fi] {
+                    AstFunDef fn: {
+                        st.func_names.push(fn.name)
+                        st.func_return_types.push(mir_epic_type(fn.AstMeta.resolved_type))
+                    }
+                    _: { ast_to_mir_die("internal: expected function definition") }
+                }
+                fi = fi + 1
+            }
+
+            let i = 0
+            for i < len(program.funcs) {
+                match program.funcs[i] {
+                    AstFunDef fn_ast: {
+                        let fn = mir_emit_function(st, fn_ast)
+                        st.program.functions.push(fn)
+                    }
+                    _: { ast_to_mir_die("internal: expected function definition") }
+                }
+                i = i + 1
+            }
+            ret st.program
         }
-        si = si + 1
+        _: {}
     }
-    for ui in 0:len(ast.unions) {
-        let union = ast.unions[ui]
-        st.union_names.push(union.name)
-        st.struct_names.push(union.name)
-        for mi2 in 0:len(union.members) {
-            st.union_member_keys.push(mir_struct_key(union.name, union.members[mi2]))
-            st.union_member_tags.push(mi2 + 1)
-            st.union_member_names.push(union.members[mi2])
-        }
-        st.struct_field_keys.push(mir_struct_key(union.name, "tag"))
-        st.struct_field_types.push("i64")
-        st.struct_field_indexes.push(0)
-        st.struct_field_embedded.push(0)
-        mir_program_add_struct_field(st.program, union.name, "i64", 0)
-        st.struct_field_keys.push(mir_struct_key(union.name, "payload"))
-        st.struct_field_types.push("ptr")
-        st.struct_field_indexes.push(1)
-        st.struct_field_embedded.push(0)
-        mir_program_add_struct_field(st.program, union.name, "ptr", 1)
-    }
-
-    st.struct_names.push("str")
-    st.struct_field_keys.push(mir_struct_key("str", "data"))
-    st.struct_field_types.push("ptr")
-    st.struct_field_indexes.push(0)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "str", "ptr", 0)
-    st.struct_field_keys.push(mir_struct_key("str", "len"))
-    st.struct_field_types.push("i64")
-    st.struct_field_indexes.push(1)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "str", "i64", 1)
-    st.struct_field_keys.push(mir_struct_key("str", "cap"))
-    st.struct_field_types.push("i64")
-    st.struct_field_indexes.push(2)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "str", "i64", 2)
-    st.struct_names.push("_slice_i64")
-    st.struct_field_keys.push(mir_struct_key("_slice_i64", "data"))
-    st.struct_field_types.push("ptr")
-    st.struct_field_indexes.push(0)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "_slice_i64", "ptr", 0)
-    st.struct_field_keys.push(mir_struct_key("_slice_i64", "len"))
-    st.struct_field_types.push("i64")
-    st.struct_field_indexes.push(1)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "_slice_i64", "i64", 1)
-    st.struct_field_keys.push(mir_struct_key("_slice_i64", "cap"))
-    st.struct_field_types.push("i64")
-    st.struct_field_indexes.push(2)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "_slice_i64", "i64", 2)
-    st.struct_names.push("_slice_u8")
-    st.struct_field_keys.push(mir_struct_key("_slice_u8", "data"))
-    st.struct_field_types.push("ptr")
-    st.struct_field_indexes.push(0)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "_slice_u8", "ptr", 0)
-    st.struct_field_keys.push(mir_struct_key("_slice_u8", "len"))
-    st.struct_field_types.push("i64")
-    st.struct_field_indexes.push(1)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "_slice_u8", "i64", 1)
-    st.struct_field_keys.push(mir_struct_key("_slice_u8", "cap"))
-    st.struct_field_types.push("i64")
-    st.struct_field_indexes.push(2)
-    st.struct_field_embedded.push(0)
-    mir_program_add_struct_field(st.program, "_slice_u8", "i64", 2)
-
-    mir_register_slice_layout(st, "_slice_str")
-    mir_register_slice_layout(st, "_slice_ptr")
-    let asi = 0
-    for asi < len(ast.structs) {
-        mir_register_slice_layout(st, str_cat2("_slice_", ast.structs[asi].name))
-        asi = asi + 1
-    }
-    for aui in 0:len(ast.unions) {
-        mir_register_slice_layout(st, str_cat2("_slice_", ast.unions[aui].name))
-    }
-
-    let map_layouts = new str[0]
-    map_layouts.push("_map_str_i64")
-    map_layouts.push("_map_str_bool")
-    map_layouts.push("_map_str_str")
-    let mi = 0
-    for mi < len(map_layouts) {
-        st.struct_names.push(map_layouts[mi])
-        st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "entries"))
-        st.struct_field_types.push("ptr")
-        st.struct_field_indexes.push(0)
-        st.struct_field_embedded.push(0)
-        mir_program_add_struct_field(st.program, map_layouts[mi], "ptr", 0)
-        st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "len"))
-        st.struct_field_types.push("i64")
-        st.struct_field_indexes.push(1)
-        st.struct_field_embedded.push(0)
-        mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 1)
-        st.struct_field_keys.push(mir_struct_key(map_layouts[mi], "cap"))
-        st.struct_field_types.push("i64")
-        st.struct_field_indexes.push(2)
-        st.struct_field_embedded.push(0)
-        mir_program_add_struct_field(st.program, map_layouts[mi], "i64", 2)
-        mi = mi + 1
-    }
-
-    mir_add_global_lets(st, ast)
-    mir_emit_global_init_function(st, ast)
-
-    let fi = 0
-    for fi < len(ast.funcs) {
-        st.func_names.push(ast.funcs[fi].name)
-        st.func_return_types.push(mir_epic_type(ast_resolved_type(ast.funcs[fi])))
-        fi = fi + 1
-    }
-
-    let i = 0
-    for i < len(ast.funcs) {
-        let fn = mir_emit_function(st, ast.funcs[i])
-        st.program.functions.push(fn)
-        i = i + 1
-    }
+    ast_to_mir_die("internal: expected program")
     ret st.program
 }
+
 
 fun main(): void {
     if len(argv) < 2 {
