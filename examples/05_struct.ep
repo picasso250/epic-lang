@@ -1,8 +1,15 @@
 # EXIT: 0
 # STDOUT: 42
+# STDOUT: answer
+# STDOUT: 43
 struct Point {
     x: i64
     y: i64
+}
+
+struct NamedPoint {
+    Point
+    name: str
 }
 
 fun (p: Point) sum(): i64 {
@@ -12,5 +19,10 @@ fun (p: Point) sum(): i64 {
 fun main(): i64 {
     let p = new Point { x: 40, y: 2 }
     println(str(p.sum()))
+
+    let named = new NamedPoint { Point: p, name: "answer" }
+    println(named.name)
+    named.x += 1
+    println(str(named.x + named.y))
     ret 0
 }
