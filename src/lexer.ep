@@ -719,11 +719,11 @@ fun dump_line(line: i64, kind: str, dump_text: str): i64 {
 }
 
 fun dump_tokens(tokens: Token[]): i64 {
-    for i in 0:len(tokens) {
+    for i in tokens {
         match tokens[i] {
             FStringToken t: {
                 dump_line(t.line, "FSTRING_BEGIN", "")
-                for j in 0:len(t.parts) {
+                for j in t.parts {
                     match t.parts[j] {
                         FStringTextPart part: {
                             dump_line(t.line, "FSTRING_TEXT", part.dump_text)

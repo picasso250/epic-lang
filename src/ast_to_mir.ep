@@ -192,7 +192,7 @@ fun mir_struct_key(struct_name: str, field_name: str): str {
 }
 
 fun mir_is_union_name(st: MirCodegenState, name: str): bool {
-    for i in 0:len(st.union_names) {
+    for i in st.union_names {
         if st.union_names[i] == name {
             ret true
         }
@@ -202,7 +202,7 @@ fun mir_is_union_name(st: MirCodegenState, name: str): bool {
 
 fun mir_union_tag(st: MirCodegenState, union_name: str, member_name: str): i64 {
     let key = mir_struct_key(union_name, member_name)
-    for i in 0:len(st.union_member_keys) {
+    for i in st.union_member_keys {
         if st.union_member_keys[i] == key {
             ret st.union_member_tags[i]
         }
@@ -232,7 +232,7 @@ fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
 
 fun mir_direct_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64 {
     let key = mir_struct_key(struct_name, field_name)
-    for i in 0:len(st.struct_field_keys) {
+    for i in st.struct_field_keys {
         if st.struct_field_keys[i] == key {
             ret st.struct_field_indexes[i]
         }
@@ -251,7 +251,7 @@ fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64
 
 fun mir_direct_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
     let key = mir_struct_key(struct_name, field_name)
-    for i in 0:len(st.struct_field_keys) {
+    for i in st.struct_field_keys {
         if st.struct_field_keys[i] == key {
             ret st.struct_field_types[i]
         }
@@ -270,7 +270,7 @@ fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str 
 
 fun mir_is_embedded_field(st: MirCodegenState, struct_name: str, field_name: str): bool {
     let key = mir_struct_key(struct_name, field_name)
-    for i in 0:len(st.struct_field_keys) {
+    for i in st.struct_field_keys {
         if st.struct_field_keys[i] == key {
             ret st.struct_field_embedded[i] != 0
         }
@@ -287,7 +287,7 @@ fun mir_promoted_field_type_inner(st: MirCodegenState, struct_name: str, field_n
         ret direct
     }
     let found = ""
-    for i in 0:len(st.struct_field_keys) {
+    for i in st.struct_field_keys {
         let prefix = str_cat2(struct_name, ".")
         let key = st.struct_field_keys[i]
         if len(key) > len(prefix) && key[0:len(prefix)] == prefix && st.struct_field_embedded[i] != 0 {
@@ -500,7 +500,7 @@ fun mir_promoted_field_addr_inner(st: MirCodegenState, base: MirOperand, struct_
     }
     let found_count = 0
     let found = mir_operand_null()
-    for i in 0:len(st.struct_field_keys) {
+    for i in st.struct_field_keys {
         let prefix = str_cat2(struct_name, ".")
         let key = st.struct_field_keys[i]
         if len(key) > len(prefix) && key[0:len(prefix)] == prefix && st.struct_field_embedded[i] != 0 {
@@ -537,7 +537,7 @@ fun mir_load_promoted_field(st: MirCodegenState, base: MirOperand, struct_name: 
 fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
     let out = new str[0]
     let prefix = str_cat2(union_name, ".")
-    for i in 0:len(st.union_member_keys) {
+    for i in st.union_member_keys {
         let key = st.union_member_keys[i]
         if len(key) > len(prefix) && key[0:len(prefix)] == prefix {
             out.push(st.union_member_names[i])
@@ -549,7 +549,7 @@ fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
 fun mir_union_common_embedded_field_type(st: MirCodegenState, union_name: str, field_name: str): str {
     let members = mir_union_member_names(st, union_name)
     let found = ""
-    for i in 0:len(members) {
+    for i in members {
         let candidate = ""
         if mir_is_embedded_field(st, members[i], field_name) {
             candidate = mir_field_type(st, members[i], field_name)
@@ -603,7 +603,7 @@ fun mir_union_has_common_embedded_field(st: MirCodegenState, union_name: str, fi
     if len(members) == 0 {
         ret false
     }
-    for i in 0:len(members) {
+    for i in members {
         if mir_is_embedded_field(st, members[i], field_name) == false && mir_promoted_field_type_inner(st, members[i], field_name, 64) == "" {
             ret false
         }
@@ -614,7 +614,7 @@ fun mir_union_has_common_embedded_field(st: MirCodegenState, union_name: str, fi
 fun mir_union_partial_field_type(st: MirCodegenState, union_name: str, field_name: str): str {
     let members = mir_union_member_names(st, union_name)
     let found = ""
-    for i in 0:len(members) {
+    for i in members {
         let candidate = mir_direct_field_type(st, members[i], field_name)
         if candidate != "" {
             if found != "" && found != candidate {
@@ -632,7 +632,7 @@ fun mir_union_partial_field_type(st: MirCodegenState, union_name: str, field_nam
 fun mir_union_partial_field_members(st: MirCodegenState, union_name: str, field_name: str): str[] {
     let out = new str[0]
     let members = mir_union_member_names(st, union_name)
-    for i in 0:len(members) {
+    for i in members {
         if mir_direct_field_type(st, members[i], field_name) != "" {
             out.push(members[i])
         }
@@ -646,7 +646,7 @@ fun mir_union_partial_field_members(st: MirCodegenState, union_name: str, field_
 fun mir_emit_union_field_has(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirOperand {
     let members = mir_union_partial_field_members(st, union_name, field_name)
     let result = mir_const_bool(false)
-    for i in 0:len(members) {
+    for i in members {
         let tag = mir_load_field(st, union_value, union_name, "tag")
         let cond = mir_make_result_inst(st, "icmp.eq", "bool")
         cond.operands.push(tag)
@@ -674,7 +674,7 @@ fun mir_load_union_partial_field(st: MirCodegenState, union_value: MirOperand, u
     let members = mir_union_partial_field_members(st, union_name, field_name)
     let end_block = mir_new_block(st, "union.field.end")
     let case_blocks = new MirBlock[0]
-    for i in 0:len(members) {
+    for i in members {
         case_blocks.push(mir_new_block(st, "union.field.case"))
     }
     let next_blocks = new MirBlock[0]
@@ -682,7 +682,7 @@ fun mir_load_union_partial_field(st: MirCodegenState, union_value: MirOperand, u
         next_blocks.push(mir_new_block(st, "union.field.next"))
     }
     let check_block = st.current_block
-    for ci in 0:len(members) {
+    for ci in members {
         st.current_block = check_block
         let next_block = end_block
         if ci < len(members) - 1 {
@@ -701,7 +701,7 @@ fun mir_load_union_partial_field(st: MirCodegenState, union_value: MirOperand, u
             check_block = next_blocks[ci]
         }
     }
-    for bi in 0:len(members) {
+    for bi in members {
         st.current_block = case_blocks[bi]
         let wrapper_name = mir_new_value(st, "load")
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
@@ -723,7 +723,7 @@ fun mir_store_union_partial_field(st: MirCodegenState, union_value: MirOperand, 
     let members = mir_union_partial_field_members(st, union_name, field_name)
     let end_block = mir_new_block(st, "union.field.end")
     let case_blocks = new MirBlock[0]
-    for i in 0:len(members) {
+    for i in members {
         case_blocks.push(mir_new_block(st, "union.field.case"))
     }
     let next_blocks = new MirBlock[0]
@@ -731,7 +731,7 @@ fun mir_store_union_partial_field(st: MirCodegenState, union_value: MirOperand, 
         next_blocks.push(mir_new_block(st, "union.field.next"))
     }
     let check_block = st.current_block
-    for ci in 0:len(members) {
+    for ci in members {
         st.current_block = check_block
         let next_block = end_block
         if ci < len(members) - 1 {
@@ -750,7 +750,7 @@ fun mir_store_union_partial_field(st: MirCodegenState, union_value: MirOperand, 
             check_block = next_blocks[ci]
         }
     }
-    for bi in 0:len(members) {
+    for bi in members {
         st.current_block = case_blocks[bi]
         let wrapper_name = mir_new_value(st, "load")
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
@@ -777,7 +777,7 @@ fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOp
     let members = mir_union_member_names(st, union_name)
     let end_block = mir_new_block(st, "union.field.end")
     let case_blocks = new MirBlock[0]
-    for i in 0:len(members) {
+    for i in members {
         case_blocks.push(mir_new_block(st, "union.field.case"))
     }
     let next_blocks = new MirBlock[0]
@@ -785,7 +785,7 @@ fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOp
         next_blocks.push(mir_new_block(st, "union.field.next"))
     }
     let check_block = st.current_block
-    for ci in 0:len(members) {
+    for ci in members {
         st.current_block = check_block
         let next_block = end_block
         if ci < len(members) - 1 {
@@ -809,7 +809,7 @@ fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOp
         st.current_block.terminator = mir_br(end_block.name)
         st.current_block.has_terminator = true
     }
-    for bi in 0:len(members) {
+    for bi in members {
         st.current_block = case_blocks[bi]
         let wrapper_name = mir_new_value(st, "load")
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
@@ -1469,13 +1469,13 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
         }
     }
     let method_symbol = str_cat2(str_cat2(receiver_type, "__"), expr.name)
-    for mi in 0:len(st.func_names) {
+    for mi in st.func_names {
         if st.func_names[mi] == method_symbol {
             let args = new MirOperand[0]
             let receiver_flow = mir_emit_expr(st, st.current_block, expr.object)
             st.current_block = receiver_flow.block
             args.push(receiver_flow.value)
-            for i in 0:len(expr.args) {
+            for i in expr.args {
                 let arg_flow = mir_emit_expr(st, st.current_block, expr.args[i])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
@@ -1879,7 +1879,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
 
     let end_block = mir_new_block(st, "match.end")
     let case_blocks = new MirBlock[0]
-    for i in 0:len(stmt.fields) {
+    for i in stmt.fields {
         case_blocks.push(mir_new_block(st, "match.case"))
     }
     let has_else = ast_kind(stmt.else_block) != ""
@@ -1893,7 +1893,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
     }
 
     let check_block = st.current_block
-    for ci in 0:len(stmt.fields) {
+    for ci in stmt.fields {
         st.current_block = check_block
         let next_block = else_block
         if ci < len(stmt.fields) - 1 {
@@ -1918,7 +1918,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
         st.current_block.has_terminator = true
     }
 
-    for bi in 0:len(stmt.fields) {
+    for bi in stmt.fields {
         st.current_block = case_blocks[bi]
         let local_count = len(st.local_names)
         let wrapper_name = mir_new_value(st, "load")
@@ -2705,12 +2705,12 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 }
                 si = si + 1
             }
-            for ui in 0:len(program.unions) {
+            for ui in program.unions {
                 match program.unions[ui] {
                     AstUnionDef union: {
                         st.union_names.push(union.name)
                         st.struct_names.push(union.name)
-                        for mi2 in 0:len(union.members) {
+                        for mi2 in union.members {
                             st.union_member_keys.push(mir_struct_key(union.name, union.members[mi2]))
                             st.union_member_tags.push(mi2 + 1)
                             st.union_member_names.push(union.members[mi2])
@@ -2789,7 +2789,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 }
                 asi = asi + 1
             }
-            for aui in 0:len(program.unions) {
+            for aui in program.unions {
                 match program.unions[aui] {
                     AstUnionDef union: { mir_register_slice_layout(st, str_cat2("_slice_", union.name)) }
                     _: { ast_to_mir_die("internal: expected top-level union") }

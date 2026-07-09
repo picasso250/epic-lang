@@ -378,7 +378,7 @@ fun sema_digit_value(c: u8): i64 {
 fun sema_parse_i64(s: str): i64 {
     let bs = bytes(s)
     let n = 0
-    for i in 0:len(bs) {
+    for i in bs {
         n = n * 10 + sema_digit_value(bs[i])
     }
     ret n
@@ -393,7 +393,7 @@ fun sema_decimal_gt(a: str, b: str): bool {
     }
     let ab = bytes(a)
     let bb = bytes(b)
-    for i in 0:len(ab) {
+    for i in ab {
         if ab[i] > bb[i] {
             ret true
         }
@@ -601,7 +601,7 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: map[str]bool):
 fun sema_build_types(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
-            for i in 0:len(program.structs) {
+            for i in program.structs {
                 match program.structs[i] {
                     AstStructDef s: {
                         st.struct_names[s.name] = true
@@ -609,7 +609,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                     _: { sema_die("internal: expected top-level struct") }
                 }
             }
-            for i in 0:len(program.unions) {
+            for i in program.unions {
                 match program.unions[i] {
                     AstUnionDef u: {
                         if st.struct_names.has(u.name) {
@@ -626,12 +626,12 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                     _: { sema_die("internal: expected top-level union") }
                 }
             }
-            for i in 0:len(program.structs) {
+            for i in program.structs {
                 match program.structs[i] {
                     AstStructDef s: {
                         let seen = new map[str]bool
                         st.struct_field_count[s.name] = len(s.fields)
-                        for j in 0:len(s.fields) {
+                        for j in s.fields {
                             match s.fields[j] {
                                 AstStructField f: {
                                     if seen.has(f.name) {
@@ -654,11 +654,11 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                     _: { sema_die("internal: expected top-level struct") }
                 }
             }
-            for i in 0:len(program.unions) {
+            for i in program.unions {
                 match program.unions[i] {
                     AstUnionDef u: {
                         let seen = new map[str]bool
-                        for j in 0:len(u.members) {
+                        for j in u.members {
                             let member = u.members[j]
                             if seen.has(member) {
                                 sema_die(f"duplicate union member {sema_key2(u.name, member)}")
@@ -687,7 +687,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
 fun sema_build_funcs(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
-            for i in 0:len(program.funcs) {
+            for i in program.funcs {
                 match program.funcs[i] {
                     AstFunDef f: {
                         if st.funcs_ret.has(f.name) {
@@ -704,7 +704,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                         f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
                         st.funcs_ret[f.name] = f.AstMeta.resolved_type
                         st.funcs_param_count[f.name] = len(f.params)
-                        for j in 0:len(f.params) {
+                        for j in f.params {
                             match f.params[j] {
                                 AstParam p: {
                                     p.AstMeta.resolved_type = sema_type_name(st, p.source_type)
@@ -755,7 +755,7 @@ fun sema_is_global_literal_init(node: AstNode): bool {
             ret sema_is_global_literal_init(n.args[0])
         }
         AstArrayLiteral n: {
-            for i in 0:len(n.args) {
+            for i in n.args {
                 if sema_is_global_literal_init(n.args[i]) == false {
                     ret false
                 }
@@ -763,7 +763,7 @@ fun sema_is_global_literal_init(node: AstNode): bool {
             ret true
         }
         AstMapInit n: {
-            for i in 0:len(n.map_keys) {
+            for i in n.map_keys {
                 if sema_is_global_literal_init(n.map_keys[i]) == false {
                     ret false
                 }
@@ -774,7 +774,7 @@ fun sema_is_global_literal_init(node: AstNode): bool {
             ret true
         }
         AstStructInit n: {
-            for i in 0:len(n.fields) {
+            for i in n.fields {
                 match n.fields[i] {
                     AstInitField f: {
                         if sema_is_global_literal_init(f.value_expr) == false {
@@ -799,7 +799,7 @@ fun sema_is_global_literal_init(node: AstNode): bool {
 fun sema_build_globals(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
-            for i in 0:len(program.globals) {
+            for i in program.globals {
                 match program.globals[i] {
                     AstLet g: {
                         match g.value_expr {
@@ -873,7 +873,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, "str")
         }
         AstFString n: {
-            for i in 0:len(n.fields) {
+            for i in n.fields {
                 let part = n.fields[i]
                 match part {
                     AstFStringText text: {}
@@ -978,7 +978,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         AstArrayLiteral n: {
             let elem = sema_type_name(st, n.elem_type)
-            for i in 0:len(n.args) {
+            for i in n.args {
                 sema_check_assign(st, elem, n.args[i], "array literal element")
             }
             ret sema_set_type(node, str_cat2(elem, "[]"))
@@ -988,7 +988,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                 sema_die(f"unknown struct {n.name}")
             }
             let seen = new map[str]bool
-            for i in 0:len(n.fields) {
+            for i in n.fields {
                 let f = n.fields[i]
                 if seen.has(f.name) {
                     sema_die(f"duplicate field initializer {sema_key2(n.name, f.name)}")
@@ -1019,7 +1019,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                 if len(n.map_keys) != len(n.map_values) {
                     sema_die("internal map initializer entry mismatch")
                 }
-                for i in 0:len(n.map_keys) {
+                for i in n.map_keys {
                     sema_check_assign(st, "str", n.map_keys[i], "map init key")
                     sema_check_assign(st, value_type, n.map_values[i], "map init value")
                 }
@@ -1163,7 +1163,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         }
         let args = new AstNode[0]
         args.push(node.object)
-        for i in 0:len(node.args) {
+        for i in node.args {
             args.push(node.args[i])
         }
         sema_check_func_call_args(st, method_symbol, args)
@@ -1488,7 +1488,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             let scrutinee = sema_expr_type(st, n.expr)
             if st.union_names.has(scrutinee) {
                 let seen = new map[str]bool
-                for i in 0:len(n.fields) {
+                for i in n.fields {
                     let c = n.fields[i]
                     if ast_kind(c.expr) != "" || c.variant_name == "" || c.binding_name == "" {
                         sema_die(f"ADT match on {scrutinee} requires variant binding cases")
@@ -1525,7 +1525,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 }
                 ret
             }
-            for i in 0:len(n.fields) {
+            for i in n.fields {
                 let c = n.fields[i]
                 if c.variant_name != "" || c.binding_name != "" {
                     sema_die("ADT match case requires union scrutinee")
@@ -1547,7 +1547,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
 
 
 fun sema_block(st: SemaState, block: AstNode): void {
-    for i in 0:len(block.stmts) {
+    for i in block.stmts {
         sema_stmt(st, block.stmts[i])
     }
 }
@@ -1587,7 +1587,7 @@ fun sema_stmt_returns(node: AstNode): bool {
                 AstEmpty e: { ret false }
                 _: {}
             }
-            for i in 0:len(stmt.fields) {
+            for i in stmt.fields {
                 match stmt.fields[i] {
                     AstMatchCase c: {
                         if sema_block_returns(c.body) == false {
@@ -1608,7 +1608,7 @@ fun sema_stmt_returns(node: AstNode): bool {
 
 
 fun sema_block_returns(block: AstNode): bool {
-    for i in 0:len(block.stmts) {
+    for i in block.stmts {
         if sema_stmt_returns(block.stmts[i]) {
             ret true
         }
@@ -1621,13 +1621,13 @@ fun sema_program(st: SemaState, ast: AstNode): void {
     sema_build_funcs(st, ast)
     sema_build_globals(st, ast)
     let funcs = ast_funcs(ast)
-    for i in 0:len(funcs) {
+    for i in funcs {
         let f = funcs[i]
         sema_reset_locals(st)
         st.current_fn = f.name
         st.current_ret = ast_resolved_type(f)
         st.loop_depth = 0
-        for j in 0:len(f.params) {
+        for j in f.params {
             let p = f.params[j]
             st.locals[p.name] = ast_resolved_type(p)
         }

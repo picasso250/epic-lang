@@ -1413,7 +1413,7 @@ fun parse_fn_def(p: Parser): AstNode {
     }
     p.expect("LPAREN")
     let more_params = parse_params(p)
-    for i in 0:len(more_params) {
+    for i in more_params {
         params.push(more_params[i])
     }
     p.expect("RPAREN")
@@ -2243,7 +2243,7 @@ fun parse_map_init_entries(p: Parser, node: AstNode): AstNode {
 
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[0]
-    for i in 0:len(parts) {
+    for i in parts {
         match parts[i] {
             FStringTextPart part: {
                 if len(part.text) > 0 {
@@ -2556,7 +2556,7 @@ fun indent(n: i64): i64 {
 }
 
 fun dump_list(nodes: AstNode[], depth: i64): i64 {
-    for i in 0:len(nodes) {
+    for i in nodes {
         dump_node(nodes[i], depth)
     }
     ret 0
@@ -2679,7 +2679,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             indent(depth)
             print("UnionDef ")
             println(n.name)
-            for i in 0:len(n.members) {
+            for i in n.members {
                 indent(depth + 1)
                 print("UnionMember ")
                 println(n.members[i])
@@ -2701,7 +2701,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             print(type_expr_text(n.source_type))
             dump_print_resolved_suffix(node)
             println("")
-            for i in 0:len(n.map_keys) {
+            for i in n.map_keys {
                 indent(depth + 1)
                 println("Key")
                 dump_node(n.map_keys[i], depth + 2)
