@@ -877,10 +877,10 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, left)
         }
         AstCall n: {
-            ret sema_set_type(node, sema_call_type(st, node))
+            ret sema_set_type(node, sema_call_type(st, n))
         }
         AstDotCall n: {
-            ret sema_set_type(node, sema_dot_call_type(st, node))
+            ret sema_set_type(node, sema_dot_call_type(st, n))
         }
         AstFieldAccess n: {
             ret sema_set_type(node, sema_field_access_type(st, n.object, n.name))
@@ -969,7 +969,8 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
 }
 
 
-fun sema_check_os_call(st: SemaState, node: AstNode, count: i64, ret_type: str): str {
+
+fun sema_check_os_call(st: SemaState, node: AstCall, count: i64, ret_type: str): str {
     sema_check_arity(f"os.{node.dll}.{node.name}", count, node.args)
     for i in 0:count {
         sema_check_assign(st, "i64", node.args[i], f"os.{node.dll}.{node.name} argument {i + 1}")
@@ -977,7 +978,9 @@ fun sema_check_os_call(st: SemaState, node: AstNode, count: i64, ret_type: str):
     ret ret_type
 }
 
-fun sema_os_call_type(st: SemaState, node: AstNode): str {
+
+
+fun sema_os_call_type(st: SemaState, node: AstCall): str {
     if node.dll != "kernel32" && node.dll != "user32" {
         sema_die(f"unsupported os dll os.{node.dll}")
     }
@@ -1041,15 +1044,22 @@ fun sema_os_call_type(st: SemaState, node: AstNode): str {
     ret ""
 }
 
-fun sema_dot_call_type(st: SemaState, node: AstNode): str {
-    if ast_kind(node.object) == "FieldAccess" && ast_kind(node.object.object) == "Var" && node.object.object.name == "os" {
-        let call = ast_node("Call")
-        call.name = node.name
-        call.args = node.args
-        call.type_name = "os"
-        call.dll = node.object.name
-        ast_set_line(call, ast_line(node))
-        ret sema_os_call_type(st, call)
+
+
+fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
+    match node.object {
+        AstFieldAccess field: {
+            match field.object {
+                AstVar receiver: {
+                    if receiver.name == "os" {
+                        let call = new AstCall { AstMeta: node.AstMeta, name: node.name, args: node.args, type_name: "os", dll: field.name }
+                        ret sema_os_call_type(st, call)
+                    }
+                }
+                _: {}
+            }
+        }
+        _: {}
     }
     let receiver = sema_expr_type(st, node.object)
     if sema_is_array(receiver) {
@@ -1093,7 +1103,8 @@ fun sema_dot_call_type(st: SemaState, node: AstNode): str {
     ret ""
 }
 
-fun sema_call_type(st: SemaState, node: AstNode): str {
+
+fun sema_call_type(st: SemaState, node: AstCall): str {
     if node.type_name == "os" {
         ret sema_os_call_type(st, node)
     }
@@ -1209,6 +1220,7 @@ fun sema_call_type(st: SemaState, node: AstNode): str {
     }
     ret st.funcs_ret[node.name]
 }
+
 
 fun sema_lvalue_type(st: SemaState, node: AstNode): str {
     if ast_kind(node) == "Var" {

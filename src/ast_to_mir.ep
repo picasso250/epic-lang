@@ -1217,7 +1217,8 @@ fun mir_os_call_return_type(dll: str, name: str): str {
     ret "i64"
 }
 
-fun mir_emit_os_call(st: MirCodegenState, expr: AstNode): MirValueFlow {
+
+fun mir_emit_os_call(st: MirCodegenState, expr: AstCall): MirValueFlow {
     let args = new MirOperand[0]
     let i = 0
     for i < len(expr.args) {
@@ -1229,6 +1230,7 @@ fun mir_emit_os_call(st: MirCodegenState, expr: AstNode): MirValueFlow {
     let ret_type = mir_os_call_return_type(expr.dll, expr.name)
     ret mir_value_flow(mir_emit_call_inst(st, expr.name, ret_type, args), st.current_block)
 }
+
 
 fun mir_emit_short_circuit(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
@@ -1295,16 +1297,22 @@ fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstNode): Mir
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
 
-fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+
+fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): MirValueFlow {
     st.current_block = block
-    if ast_kind(expr.object) == "FieldAccess" && ast_kind(expr.object.object) == "Var" && expr.object.object.name == "os" {
-        let call = ast_node("Call")
-        call.name = expr.name
-        call.args = expr.args
-        call.type_name = "os"
-        call.dll = expr.object.name
-        ast_set_line(call, ast_line(expr))
-        ret mir_emit_os_call(st, call)
+    match expr.object {
+        AstFieldAccess field: {
+            match field.object {
+                AstVar receiver: {
+                    if receiver.name == "os" {
+                        let call = new AstCall { AstMeta: expr.AstMeta, name: expr.name, args: expr.args, type_name: "os", dll: field.name }
+                        ret mir_emit_os_call(st, call)
+                    }
+                }
+                _: {}
+            }
+        }
+        _: {}
     }
     let receiver_type = ast_resolved_type(expr.object)
     if mir_is_array_type(receiver_type) {
@@ -1373,6 +1381,7 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstNode): MirV
     ast_to_mir_die(f"unsupported dot call {expr.name}")
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
+
 
 
 fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
@@ -1509,11 +1518,11 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, n.name), st.current_block)
         }
         AstDotCall n: {
-            ret mir_emit_dot_call(st, block, expr)
+            ret mir_emit_dot_call(st, block, n)
         }
         AstCall n: {
             if n.type_name == "os" {
-                ret mir_emit_os_call(st, expr)
+                ret mir_emit_os_call(st, n)
             }
             if n.type_name != "" {
                 ast_to_mir_die(f"unsupported namespaced call: {n.type_name}.{n.name}")
