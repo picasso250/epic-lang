@@ -1,9 +1,9 @@
 #
 # Epic self-hosted semantic typed dump.
 #
-# TODO self-host sema: replace string type names with a TypeInfo struct before
-# feeding typed sema output into MIR/codegen. String names are kept in this
-# catch-up pass to make the Python reference behavior easier to mirror.
+# Type names are stored as canonical strings in typed AST dumps for oracle
+# comparison, but construction and structural queries go through parser.ep's
+# epic_type_* helpers instead of ad hoc string slicing.
 #
 
 struct SemaState {
@@ -81,20 +81,6 @@ fun ast_kind(node: AstNode): str {
     }
     ret ""
 }
-fun sema_starts_with(s: str, prefix: str): bool {
-    if len(s) < len(prefix) {
-        ret false
-    }
-    ret s[0:len(prefix)] == prefix
-}
-
-fun sema_ends_with(s: str, suffix: str): bool {
-    if len(s) < len(suffix) {
-        ret false
-    }
-    ret s[len(s) - len(suffix):len(s)] == suffix
-}
-
 fun sema_key2(a: str, b: str): str {
     let out = new u8[]
     out.extend(bytes(a))
@@ -120,29 +106,29 @@ fun sema_need_type(node: AstNode): str {
 }
 
 fun sema_is_int(t: str): bool {
-    ret t == "i64" || t == "u64" || t == "i32" || t == "u32" || t == "u8"
+    ret epic_type_is_int(t)
 }
 
 fun sema_is_array(t: str): bool {
-    ret sema_ends_with(t, "[]")
+    ret epic_type_is_array(t)
 }
 
 fun sema_is_map(t: str): bool {
-    ret sema_starts_with(t, "map[str]")
+    ret epic_type_is_map(t)
 }
 
 fun sema_array_elem(t: str): str {
     if sema_is_array(t) == false {
         sema_die("expected array type")
     }
-    ret t[0:len(t) - 2]
+    ret epic_type_array_elem(t)
 }
 
 fun sema_map_value(t: str): str {
     if sema_is_map(t) == false {
         sema_die("expected map type")
     }
-    ret t[8:len(t)]
+    ret epic_type_map_value(t)
 }
 
 fun sema_is_reserved_func(name: str): bool {
@@ -163,18 +149,18 @@ fun sema_type_name(st: SemaState, name: str): str {
         ret "void"
     }
     if sema_is_array(name) {
-        let elem = sema_type_name(st, name[0:len(name) - 2])
+        let elem = sema_type_name(st, sema_array_elem(name))
         if elem == "void" {
             sema_die("array element type cannot be void")
         }
-        ret str_cat2(elem, "[]")
+        ret epic_type_array_of(elem)
     }
     if sema_is_map(name) {
         let value = sema_type_name(st, sema_map_value(name))
         if value != "i64" && value != "bool" && value != "str" {
             sema_die(f"only map[str]i64, map[str]bool, and map[str]str are supported, got {name}")
         }
-        ret str_cat2("map[str]", value)
+        ret epic_type_map_of(value)
     }
     if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" {
         ret name
@@ -841,7 +827,7 @@ fun sema_build_globals(st: SemaState, ast: AstNode): void {
 
 
 fun sema_reset_locals(st: SemaState): void {
-    st.locals = new map[str]str { "argv": "str[]" }
+    st.locals = new map[str]str { "argv": epic_type_array_of("str") }
 }
 
 fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode): str {
@@ -1634,7 +1620,7 @@ fun make_sema_state(): SemaState {
     st.funcs_param_count = new map[str]i64
     st.funcs_param_types = new map[str]str
     st.globals = new map[str]str
-    st.locals = new map[str]str { "argv": "str[]" }
+    st.locals = new map[str]str { "argv": epic_type_array_of("str") }
     st.partial_field_guards = new map[str]str
     st.current_fn = ""
     st.current_ret = "void"

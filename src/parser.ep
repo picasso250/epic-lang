@@ -12,6 +12,54 @@ fun ast_meta(): AstMeta {
     ret new AstMeta { resolved_type: "" }
 }
 
+fun epic_type_is_int(t: str): bool {
+    ret t == "i64" || t == "u64" || t == "i32" || t == "u32" || t == "u8"
+}
+
+fun epic_type_starts_with(s: str, prefix: str): bool {
+    if len(s) < len(prefix) {
+        ret false
+    }
+    ret s[0:len(prefix)] == prefix
+}
+
+fun epic_type_ends_with(s: str, suffix: str): bool {
+    if len(s) < len(suffix) {
+        ret false
+    }
+    ret s[len(s) - len(suffix):len(s)] == suffix
+}
+
+fun epic_type_array_of(elem: str): str {
+    ret str_cat2(elem, "[]")
+}
+
+fun epic_type_map_of(value: str): str {
+    ret str_cat2("map[str]", value)
+}
+
+fun epic_type_is_array(t: str): bool {
+    ret epic_type_ends_with(t, "[]")
+}
+
+fun epic_type_is_map(t: str): bool {
+    ret epic_type_starts_with(t, "map[str]")
+}
+
+fun epic_type_array_elem(t: str): str {
+    if epic_type_is_array(t) == false {
+        panic str_cat2("internal type error: expected array type, got ", t)
+    }
+    ret t[0:len(t) - 2]
+}
+
+fun epic_type_map_value(t: str): str {
+    if epic_type_is_map(t) == false {
+        panic str_cat2("internal type error: expected map type, got ", t)
+    }
+    ret t[8:len(t)]
+}
+
 struct AstEmpty {
     AstMeta
 }
@@ -1177,15 +1225,14 @@ fun parse_type(p: Parser): str {
         }
         p.expect("RBRACKET")
         let value_type = parse_type(p)
-        ret str_cat2("map[str]", value_type)
+        ret epic_type_map_of(value_type)
     }
-    let buf = make_str_buf()
-    str_buf_extend(buf, token_text(t))
+    let typ = token_text(t)
     for p.check("LBRACKET") == 1 {
         p.expect("RBRACKET")
-        str_buf_extend(buf, "[]")
+        typ = epic_type_array_of(typ)
     }
-    ret str_buf_finish(buf)
+    ret typ
 }
 
 fun parse_params(p: Parser): AstNode[] {
@@ -2160,7 +2207,7 @@ fun parse_primary(p: Parser): AstNode {
             }
             p.expect("RBRACKET")
             let n = ast_node("MapInit")
-            ast_set_type_name(n, str_cat2("map[str]", parse_type(p)))
+            ast_set_type_name(n, epic_type_map_of(parse_type(p)))
             ast_set_line(n, token_line(t))
             if p.peek_kind("LBRACE") == 1 {
                 ret parse_map_init_entries(p, n)

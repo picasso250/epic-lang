@@ -978,10 +978,10 @@ fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstFString): Mi
 }
 
 fun mir_array_elem_type(type_name: str): str {
-    if len(type_name) >= 2 && type_name[len(type_name) - 2:len(type_name)] == "[]" {
-        ret type_name[0:len(type_name) - 2]
+    if epic_type_is_array(type_name) == false {
+        ret ""
     }
-    ret ""
+    ret epic_type_array_elem(type_name)
 }
 
 fun mir_is_i64_array_elem_type(elem_type: str): bool {
@@ -1044,13 +1044,17 @@ fun mir_slice_struct_name(st: MirCodegenState, type_name: str): str {
 }
 
 fun mir_map_suffix(type_name: str): str {
-    if type_name == "map[str]i64" {
+    if epic_type_is_map(type_name) == false {
+        ret ""
+    }
+    let value = epic_type_map_value(type_name)
+    if value == "i64" {
         ret "i64"
     }
-    if type_name == "map[str]bool" {
+    if value == "bool" {
         ret "bool"
     }
-    if type_name == "map[str]str" {
+    if value == "str" {
         ret "str"
     }
     ret ""
