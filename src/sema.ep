@@ -592,78 +592,62 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
             for i in program.structs {
-                match program.structs[i] {
-                    AstStructDef s: {
-                        st.struct_names[s.name] = true
-                    }
-                    _: { sema_die("internal: expected top-level struct") }
-                }
+                let s = program.structs[i]
+                st.struct_names[s.name] = true
             }
             for i in program.unions {
-                match program.unions[i] {
-                    AstUnionDef u: {
-                        if st.struct_names.has(u.name) {
-                            sema_die(f"type {u.name} conflicts with struct {u.name}")
-                        }
-                        if st.union_names.has(u.name) {
-                            sema_die(f"duplicate type {u.name}")
-                        }
-                        if len(u.members) == 0 {
-                            sema_die(f"union {u.name} requires at least one member")
-                        }
-                        st.union_names[u.name] = true
-                    }
-                    _: { sema_die("internal: expected top-level union") }
+                let u = program.unions[i]
+                if st.struct_names.has(u.name) {
+                    sema_die(f"type {u.name} conflicts with struct {u.name}")
                 }
+                if st.union_names.has(u.name) {
+                    sema_die(f"duplicate type {u.name}")
+                }
+                if len(u.members) == 0 {
+                    sema_die(f"union {u.name} requires at least one member")
+                }
+                st.union_names[u.name] = true
             }
             for i in program.structs {
-                match program.structs[i] {
-                    AstStructDef s: {
-                        let seen = new map[str]bool
-                        st.struct_field_count[s.name] = len(s.fields)
-                        for j in s.fields {
-                            match s.fields[j] {
-                                AstStructField f: {
-                                    if seen.has(f.name) {
-                                        sema_die(f"duplicate field {sema_key2(s.name, f.name)}")
-                                    }
-                                    seen[f.name] = true
-                                    f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
-                                    if f.embedded && st.struct_names.has(f.AstMeta.resolved_type) == false {
-                                        sema_die(f"embedded field {sema_key2(s.name, f.name)} must be a struct")
-                                    }
-                                    let key = sema_key2(s.name, f.name)
-                                    st.struct_fields[key] = f.AstMeta.resolved_type
-                                    st.struct_field_names[sema_key_index(s.name, j)] = f.name
-                                    st.struct_field_embedded[key] = f.embedded
-                                }
-                                _: { sema_die("internal: expected struct field") }
+                let s = program.structs[i]
+                let seen = new map[str]bool
+                st.struct_field_count[s.name] = len(s.fields)
+                for j in s.fields {
+                    match s.fields[j] {
+                        AstStructField f: {
+                            if seen.has(f.name) {
+                                sema_die(f"duplicate field {sema_key2(s.name, f.name)}")
                             }
+                            seen[f.name] = true
+                            f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
+                            if f.embedded && st.struct_names.has(f.AstMeta.resolved_type) == false {
+                                sema_die(f"embedded field {sema_key2(s.name, f.name)} must be a struct")
+                            }
+                            let key = sema_key2(s.name, f.name)
+                            st.struct_fields[key] = f.AstMeta.resolved_type
+                            st.struct_field_names[sema_key_index(s.name, j)] = f.name
+                            st.struct_field_embedded[key] = f.embedded
                         }
+                        _: { sema_die("internal: expected struct field") }
                     }
-                    _: { sema_die("internal: expected top-level struct") }
                 }
             }
             for i in program.unions {
-                match program.unions[i] {
-                    AstUnionDef u: {
-                        let seen = new map[str]bool
-                        for j in u.members {
-                            let member = u.members[j]
-                            if seen.has(member) {
-                                sema_die(f"duplicate union member {sema_key2(u.name, member)}")
-                            }
-                            seen[member] = true
-                            if st.struct_names.has(member) == false {
-                                sema_die(f"union member {sema_key2(u.name, member)} must be a struct")
-                            }
-                            st.union_member_names[sema_key_index(u.name, j)] = member
-                            st.union_members[sema_key2(u.name, member)] = true
-                        }
-                        st.union_member_count[u.name] = len(u.members)
+                let u = program.unions[i]
+                let seen = new map[str]bool
+                for j in u.members {
+                    let member = u.members[j]
+                    if seen.has(member) {
+                        sema_die(f"duplicate union member {sema_key2(u.name, member)}")
                     }
-                    _: { sema_die("internal: expected top-level union") }
+                    seen[member] = true
+                    if st.struct_names.has(member) == false {
+                        sema_die(f"union member {sema_key2(u.name, member)} must be a struct")
+                    }
+                    st.union_member_names[sema_key_index(u.name, j)] = member
+                    st.union_members[sema_key2(u.name, member)] = true
                 }
+                st.union_member_count[u.name] = len(u.members)
             }
             ret
         }
@@ -678,46 +662,42 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
             for i in program.funcs {
-                match program.funcs[i] {
-                    AstFunDef f: {
-                        if st.funcs_ret.has(f.name) {
-                            sema_die(f"duplicate function {f.name}")
-                        }
-                        if f.method_name != "" {
-                            if st.struct_names.has(f.receiver_type) == false {
-                                sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
-                            }
-                        }
-                        if sema_is_reserved_func(f.name) {
-                            sema_die(f"reserved builtin function name: {f.name}")
-                        }
-                        f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
-                        st.funcs_ret[f.name] = f.AstMeta.resolved_type
-                        st.funcs_param_count[f.name] = len(f.params)
-                        for j in f.params {
-                            match f.params[j] {
-                                AstParam p: {
-                                    p.AstMeta.resolved_type = sema_type_name(st, p.source_type)
-                                    if p.AstMeta.resolved_type == "void" {
-                                        sema_die(f"function {f.name} parameter {p.name} cannot have type void")
-                                    }
-                                    st.funcs_param_types[sema_key_index(f.name, j)] = p.AstMeta.resolved_type
-                                }
-                                _: { sema_die("internal: expected function parameter") }
-                            }
-                        }
-                        if f.method_name != "" {
-                            match f.params[0] {
-                                AstParam receiver: {
-                                    if len(f.params) == 0 || receiver.AstMeta.resolved_type != f.receiver_type {
-                                        sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
-                                    }
-                                }
-                                _: { sema_die("internal: expected method receiver parameter") }
-                            }
-                        }
+                let f = program.funcs[i]
+                if st.funcs_ret.has(f.name) {
+                    sema_die(f"duplicate function {f.name}")
+                }
+                if f.method_name != "" {
+                    if st.struct_names.has(f.receiver_type) == false {
+                        sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
                     }
-                    _: { sema_die("internal: expected function definition") }
+                }
+                if sema_is_reserved_func(f.name) {
+                    sema_die(f"reserved builtin function name: {f.name}")
+                }
+                f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
+                st.funcs_ret[f.name] = f.AstMeta.resolved_type
+                st.funcs_param_count[f.name] = len(f.params)
+                for j in f.params {
+                    match f.params[j] {
+                        AstParam p: {
+                            p.AstMeta.resolved_type = sema_type_name(st, p.source_type)
+                            if p.AstMeta.resolved_type == "void" {
+                                sema_die(f"function {f.name} parameter {p.name} cannot have type void")
+                            }
+                            st.funcs_param_types[sema_key_index(f.name, j)] = p.AstMeta.resolved_type
+                        }
+                        _: { sema_die("internal: expected function parameter") }
+                    }
+                }
+                if f.method_name != "" {
+                    match f.params[0] {
+                        AstParam receiver: {
+                            if len(f.params) == 0 || receiver.AstMeta.resolved_type != f.receiver_type {
+                                sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
+                            }
+                        }
+                        _: { sema_die("internal: expected method receiver parameter") }
+                    }
                 }
             }
             ret
@@ -790,32 +770,28 @@ fun sema_build_globals(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
             for i in program.globals {
-                match program.globals[i] {
-                    AstLet g: {
-                        match g.value_expr {
-                            AstEmpty e: {
-                                sema_die(f"global let {g.name} requires an initializer")
-                            }
-                            _: {}
-                        }
-                        let target = ""
-                        if type_expr_is_missing(g.source_type) == false {
-                            target = sema_type_name(st, g.source_type)
-                        }
-                        let val = sema_expr_type(st, g.value_expr)
-                        if target == "" {
-                            target = val
-                        } else {
-                            sema_check_assign_info(target, val, g.value_expr, f"global let {g.name}")
-                        }
-                        if sema_is_global_literal_init(g.value_expr) == false {
-                            sema_die(f"global let {g.name} requires a literal initializer")
-                        }
-                        g.AstMeta.resolved_type = target
-                        st.globals[g.name] = target
+                let g = program.globals[i]
+                match g.value_expr {
+                    AstEmpty e: {
+                        sema_die(f"global let {g.name} requires an initializer")
                     }
-                    _: { sema_die("internal: expected top-level let") }
+                    _: {}
                 }
+                let target = ""
+                if type_expr_is_missing(g.source_type) == false {
+                    target = sema_type_name(st, g.source_type)
+                }
+                let val = sema_expr_type(st, g.value_expr)
+                if target == "" {
+                    target = val
+                } else {
+                    sema_check_assign_info(target, val, g.value_expr, f"global let {g.name}")
+                }
+                if sema_is_global_literal_init(g.value_expr) == false {
+                    sema_die(f"global let {g.name} requires a literal initializer")
+                }
+                g.AstMeta.resolved_type = target
+                st.globals[g.name] = target
             }
             ret
         }
@@ -1591,7 +1567,7 @@ fun sema_program(st: SemaState, ast: AstNode): void {
         let f = funcs[i]
         sema_reset_locals(st)
         st.current_fn = f.name
-        st.current_ret = ast_resolved_type(f)
+        st.current_ret = f.AstMeta.resolved_type
         st.loop_depth = 0
         for j in f.params {
             let p = f.params[j]

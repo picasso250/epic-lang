@@ -180,45 +180,45 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
 
 ## Pattern 3: homogeneous `AstNode[]` without element narrowing
 
-Some lists are truly heterogeneous, for example call arguments or block statements. Other lists are represented as `AstNode[]` but are semantically homogeneous:
+Some lists are truly heterogeneous, for example call arguments or block statements. Other lists are semantically homogeneous and should be represented with the narrowest element type practical.
 
-- `program.funcs` contains `AstFunDef`.
-- `program.structs` contains `AstStructDef`.
-- `program.globals` contains `AstLet`.
+`AstProgram` top-level buckets are already narrow:
+
+- `program.funcs` is `AstFunDef[]`.
+- `program.structs` is `AstStructDef[]`.
+- `program.globals` is `AstLet[]`.
+- `program.unions` is `AstUnionDef[]`.
+
+This pattern still applies to remaining homogeneous `AstNode[]` lists:
+
 - `struct.fields` contains `AstStructField`.
 - `match.fields` contains `AstMatchCase`.
 
 Bad shape:
 
 ```epic
-let funcs = ast_funcs(ast)
-for i in 0:len(funcs) {
-    let f = funcs[i]
-    st.current_fn = f.name
-    sema_block(st, f.body)
+for i in program.funcs {
+    match program.funcs[i] {
+        AstFunDef f: {
+            st.current_fn = f.name
+            sema_block(st, f.body)
+        }
+        _: { sema_die("internal: expected function definition") }
+    }
 }
 ```
 
 Better shape:
 
 ```epic
-match ast {
-    AstProgram program: {
-        for i in 0:len(program.funcs) {
-            match program.funcs[i] {
-                AstFunDef f: {
-                    st.current_fn = f.name
-                    sema_block(st, f.body)
-                }
-                _: { sema_die("internal: expected function definition") }
-            }
-        }
-    }
-    _: { sema_die("internal: expected program") }
+for i in program.funcs {
+    let f = program.funcs[i]
+    st.current_fn = f.name
+    sema_block(st, f.body)
 }
 ```
 
-The wrapper is still an `AstNode`, but all field access inside the loop uses the concrete payload.
+Once a container field has a concrete element type, downstream code should trust that type instead of re-matching every element.
 
 ## Pattern 4: uniform union projection still using tag dispatch
 

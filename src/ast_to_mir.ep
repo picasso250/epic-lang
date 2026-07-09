@@ -136,16 +136,12 @@ fun mir_global_index(st: MirCodegenState, name: str): i64 {
 fun mir_add_global_lets(st: MirCodegenState, ast: AstProgram): void {
     let i = 0
     for i < len(ast.globals) {
-        match ast.globals[i] {
-            AstLet g: {
-                let typ = mir_epic_type(g.AstMeta.resolved_type)
-                let label = mir_global_label(g.name)
-                st.global_names.push(g.name)
-                st.global_types.push(typ)
-                st.program.globals.push(mir_global_decl(label, typ))
-            }
-            _: { ast_to_mir_die("internal: expected top-level let") }
-        }
+        let g = ast.globals[i]
+        let typ = mir_epic_type(g.AstMeta.resolved_type)
+        let label = mir_global_label(g.name)
+        st.global_names.push(g.name)
+        st.global_types.push(typ)
+        st.program.globals.push(mir_global_decl(label, typ))
         i = i + 1
     }
 }
@@ -168,15 +164,11 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
 
     let i = 0
     for i < len(ast.globals) {
-        match ast.globals[i] {
-            AstLet g: {
-                let value_flow = mir_emit_expr(st, st.current_block, g.value_expr)
-                st.current_block = value_flow.block
-                let addr = mir_symbol_operand("ptr", mir_global_label(g.name))
-                mir_emit_inst(st, mir_store(value_flow.value, addr))
-            }
-            _: { ast_to_mir_die("internal: expected top-level let") }
-        }
+        let g = ast.globals[i]
+        let value_flow = mir_emit_expr(st, st.current_block, g.value_expr)
+        st.current_block = value_flow.block
+        let addr = mir_symbol_operand("ptr", mir_global_label(g.name))
+        mir_emit_inst(st, mir_store(value_flow.value, addr))
         i = i + 1
     }
     if st.current_block.has_terminator == false {
@@ -2684,53 +2676,46 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
         AstProgram program: {
             let si = 0
             for si < len(program.structs) {
-                match program.structs[si] {
-                    AstStructDef sdef: {
-                        st.struct_names.push(sdef.name)
-                        let fi2 = 0
-                        for fi2 < len(sdef.fields) {
-                            match sdef.fields[fi2] {
-                                AstStructField field: {
-                                    st.struct_field_keys.push(mir_struct_key(sdef.name, field.name))
-                                    let field_mir_type = mir_epic_type(field.AstMeta.resolved_type)
-                                    st.struct_field_types.push(field_mir_type)
-                                    st.struct_field_indexes.push(fi2)
-                                    if field.embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
-                                    mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
-                                }
-                                _: { ast_to_mir_die("internal: expected struct field") }
-                            }
-                            fi2 = fi2 + 1
+                let sdef = program.structs[si]
+                st.struct_names.push(sdef.name)
+                let fi2 = 0
+                for fi2 < len(sdef.fields) {
+                    match sdef.fields[fi2] {
+                        AstStructField field: {
+                            st.struct_field_keys.push(mir_struct_key(sdef.name, field.name))
+                            let field_mir_type = mir_epic_type(field.AstMeta.resolved_type)
+                            st.struct_field_types.push(field_mir_type)
+                            st.struct_field_indexes.push(fi2)
+                            if field.embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
+                            mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
                         }
+                        _: { ast_to_mir_die("internal: expected struct field") }
                     }
-                    _: { ast_to_mir_die("internal: expected top-level struct") }
+                    fi2 = fi2 + 1
                 }
                 si = si + 1
             }
             for ui in program.unions {
-                match program.unions[ui] {
-                    AstUnionDef union: {
-                        st.union_names.push(union.name)
-                        st.struct_names.push(union.name)
-                        for mi2 in union.members {
-                            st.union_member_keys.push(mir_struct_key(union.name, union.members[mi2]))
-                            st.union_member_tags.push(mi2 + 1)
-                            st.union_member_names.push(union.members[mi2])
-                        }
-                        st.struct_field_keys.push(mir_struct_key(union.name, "tag"))
-                        st.struct_field_types.push("i64")
-                        st.struct_field_indexes.push(0)
-                        st.struct_field_embedded.push(0)
-                        mir_program_add_struct_field(st.program, union.name, "i64", 0)
-                        st.struct_field_keys.push(mir_struct_key(union.name, "payload"))
-                        st.struct_field_types.push("ptr")
-                        st.struct_field_indexes.push(1)
-                        st.struct_field_embedded.push(0)
-                        mir_program_add_struct_field(st.program, union.name, "ptr", 1)
-                    }
-                    _: { ast_to_mir_die("internal: expected top-level union") }
+                let union = program.unions[ui]
+                st.union_names.push(union.name)
+                st.struct_names.push(union.name)
+                for mi2 in union.members {
+                    st.union_member_keys.push(mir_struct_key(union.name, union.members[mi2]))
+                    st.union_member_tags.push(mi2 + 1)
+                    st.union_member_names.push(union.members[mi2])
                 }
+                st.struct_field_keys.push(mir_struct_key(union.name, "tag"))
+                st.struct_field_types.push("i64")
+                st.struct_field_indexes.push(0)
+                st.struct_field_embedded.push(0)
+                mir_program_add_struct_field(st.program, union.name, "i64", 0)
+                st.struct_field_keys.push(mir_struct_key(union.name, "payload"))
+                st.struct_field_types.push("ptr")
+                st.struct_field_indexes.push(1)
+                st.struct_field_embedded.push(0)
+                mir_program_add_struct_field(st.program, union.name, "ptr", 1)
             }
+
 
             st.struct_names.push("str")
             st.struct_field_keys.push(mir_struct_key("str", "data"))
@@ -2785,18 +2770,15 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             mir_register_slice_layout(st, "_slice_ptr")
             let asi = 0
             for asi < len(program.structs) {
-                match program.structs[asi] {
-                    AstStructDef sdef: { mir_register_slice_layout(st, str_cat2("_slice_", sdef.name)) }
-                    _: { ast_to_mir_die("internal: expected top-level struct") }
-                }
+                let sdef = program.structs[asi]
+                mir_register_slice_layout(st, str_cat2("_slice_", sdef.name))
                 asi = asi + 1
             }
             for aui in program.unions {
-                match program.unions[aui] {
-                    AstUnionDef union: { mir_register_slice_layout(st, str_cat2("_slice_", union.name)) }
-                    _: { ast_to_mir_die("internal: expected top-level union") }
-                }
+                let union = program.unions[aui]
+                mir_register_slice_layout(st, str_cat2("_slice_", union.name))
             }
+
 
             let map_layouts = new str[0]
             map_layouts.push("_map_str_i64")
@@ -2829,25 +2811,17 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
 
             let fi = 0
             for fi < len(program.funcs) {
-                match program.funcs[fi] {
-                    AstFunDef fn: {
-                        st.func_names.push(fn.name)
-                        st.func_return_types.push(mir_epic_type(fn.AstMeta.resolved_type))
-                    }
-                    _: { ast_to_mir_die("internal: expected function definition") }
-                }
+                let fn = program.funcs[fi]
+                st.func_names.push(fn.name)
+                st.func_return_types.push(mir_epic_type(fn.AstMeta.resolved_type))
                 fi = fi + 1
             }
 
             let i = 0
             for i < len(program.funcs) {
-                match program.funcs[i] {
-                    AstFunDef fn_ast: {
-                        let fn = mir_emit_function(st, fn_ast)
-                        st.program.functions.push(fn)
-                    }
-                    _: { ast_to_mir_die("internal: expected function definition") }
-                }
+                let fn_ast = program.funcs[i]
+                let fn = mir_emit_function(st, fn_ast)
+                st.program.functions.push(fn)
                 i = i + 1
             }
             ret st.program

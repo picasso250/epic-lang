@@ -1,6 +1,6 @@
 #
 # Epic v2 parser.
-# TODO dogfood: migrate output to print/println/f-strings and bare `new Type` to `new Type {}`.
+# TODO dogfood: migrate output to print/println/f-strings and bare new Type to new Type {}.
 #
 
 fun epic_type_is_int(t: str): bool {
@@ -118,10 +118,10 @@ struct AstEmpty {
 
 struct AstProgram {
     AstMeta
-    funcs: AstNode[]
-    structs: AstNode[]
-    globals: AstNode[]
-    unions: AstNode[]
+    funcs: AstFunDef[]
+    structs: AstStructDef[]
+    globals: AstLet[]
+    unions: AstUnionDef[]
 }
 
 struct AstStructDef {
@@ -402,7 +402,7 @@ fun ast_new_empty(): AstNode {
 }
 
 fun ast_new_program(): AstNode {
-    ret new AstNode(new AstProgram { AstMeta: ast_meta(), funcs: new AstNode[0], structs: new AstNode[0], globals: new AstNode[0], unions: new AstNode[0] })
+    ret new AstNode(new AstProgram { AstMeta: ast_meta(), funcs: new AstFunDef[0], structs: new AstStructDef[0], globals: new AstLet[0], unions: new AstUnionDef[0] })
 }
 
 fun ast_new_struct_def(): AstNode {
@@ -646,15 +646,15 @@ fun ast_set_line(node: AstNode, value: i64): void { node.AstMeta.line = value }
 fun ast_resolved_type(node: AstNode): str { ret node.AstMeta.resolved_type }
 fun ast_set_resolved_type(node: AstNode, value: str): void { node.AstMeta.resolved_type = value }
 
-fun ast_funcs(node: AstNode): AstNode[] {
+fun ast_funcs(node: AstNode): AstFunDef[] {
     match node {
         AstProgram n: { ret n.funcs }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstFunDef[0]
 }
 
-fun ast_set_funcs(node: AstNode, value: AstNode[]): void {
+fun ast_set_funcs(node: AstNode, value: AstFunDef[]): void {
     match node {
         AstProgram n: { n.funcs = value
             ret
@@ -664,15 +664,15 @@ fun ast_set_funcs(node: AstNode, value: AstNode[]): void {
     ast_bad_field("funcs")
 }
 
-fun ast_structs(node: AstNode): AstNode[] {
+fun ast_structs(node: AstNode): AstStructDef[] {
     match node {
         AstProgram n: { ret n.structs }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstStructDef[0]
 }
 
-fun ast_set_structs(node: AstNode, value: AstNode[]): void {
+fun ast_set_structs(node: AstNode, value: AstStructDef[]): void {
     match node {
         AstProgram n: { n.structs = value
             ret
@@ -682,15 +682,15 @@ fun ast_set_structs(node: AstNode, value: AstNode[]): void {
     ast_bad_field("structs")
 }
 
-fun ast_globals(node: AstNode): AstNode[] {
+fun ast_globals(node: AstNode): AstLet[] {
     match node {
         AstProgram n: { ret n.globals }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstLet[0]
 }
 
-fun ast_set_globals(node: AstNode, value: AstNode[]): void {
+fun ast_set_globals(node: AstNode, value: AstLet[]): void {
     match node {
         AstProgram n: { n.globals = value
             ret
@@ -700,15 +700,15 @@ fun ast_set_globals(node: AstNode, value: AstNode[]): void {
     ast_bad_field("globals")
 }
 
-fun ast_unions(node: AstNode): AstNode[] {
+fun ast_unions(node: AstNode): AstUnionDef[] {
     match node {
         AstProgram n: { ret n.unions }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstUnionDef[0]
 }
 
-fun ast_set_unions(node: AstNode, value: AstNode[]): void {
+fun ast_set_unions(node: AstNode, value: AstUnionDef[]): void {
     match node {
         AstProgram n: { n.unions = value
             ret
@@ -1884,13 +1884,29 @@ fun (p: Parser) parse_program(): AstNode {
     p.skip_newlines()
     for p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("LET") == 1 || p.peek_kind("TYPE") == 1 {
         if p.peek_kind("FUN") == 1 {
-            ast_funcs(node).push(p.parse_fn_def())
+            let item = p.parse_fn_def()
+            match item {
+                AstFunDef f: { ast_funcs(node).push(f) }
+                _: { parse_error(ast_line(item), "internal: expected function definition") }
+            }
         } else if p.peek_kind("STRUCT") == 1 {
-            ast_structs(node).push(p.parse_struct_def())
+            let item = p.parse_struct_def()
+            match item {
+                AstStructDef st: { ast_structs(node).push(st) }
+                _: { parse_error(ast_line(item), "internal: expected struct definition") }
+            }
         } else if p.peek_kind("TYPE") == 1 {
-            ast_unions(node).push(p.parse_union_def())
+            let item = p.parse_union_def()
+            match item {
+                AstUnionDef u: { ast_unions(node).push(u) }
+                _: { parse_error(ast_line(item), "internal: expected union definition") }
+            }
         } else {
-            ast_globals(node).push(p.parse_let_stmt())
+            let item = p.parse_let_stmt()
+            match item {
+                AstLet g: { ast_globals(node).push(g) }
+                _: { parse_error(ast_line(item), "internal: expected global let") }
+            }
         }
         p.skip_newlines()
     }
@@ -3036,11 +3052,7 @@ fun dump_node_tail(node: AstNode, depth: i64, is_string: bool): i64 {
     }
     dump_print_resolved_suffix(node)
     println("")
-    dump_list(ast_structs(node), depth + 1)
-    dump_list(ast_unions(node), depth + 1)
-    dump_list(ast_globals(node), depth + 1)
     dump_list(ast_fields(node), depth + 1)
-    dump_list(ast_funcs(node), depth + 1)
     dump_list(ast_params(node), depth + 1)
     dump_node(ast_body(node), depth + 1)
     dump_list(ast_stmts(node), depth + 1)
@@ -3074,6 +3086,23 @@ fun dump_node_generic(node: AstNode, depth: i64, kind: str, is_string: bool): i6
 fun dump_node(node: AstNode, depth: i64): i64 {
     match node {
         AstEmpty n: { ret 0 }
+        AstProgram n: {
+            indent(depth)
+            println("Program")
+            for i in n.structs {
+                dump_node(new AstNode(n.structs[i]), depth + 1)
+            }
+            for i in n.unions {
+                dump_node(new AstNode(n.unions[i]), depth + 1)
+            }
+            for i in n.globals {
+                dump_node(new AstNode(n.globals[i]), depth + 1)
+            }
+            for i in n.funcs {
+                dump_node(new AstNode(n.funcs[i]), depth + 1)
+            }
+            ret 0
+        }
         AstMatch n: {
             indent(depth)
             println("Match")
@@ -3151,7 +3180,6 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             }
             ret dump_node_generic(node, depth, "FunDef", false)
         }
-        AstProgram n: { ret dump_node_generic(node, depth, "Program", false) }
         AstStructDef n: { ret dump_node_generic(node, depth, "StructDef", false) }
         AstParam n: { ret dump_node_generic(node, depth, "Param", false) }
         AstStructField n: { ret dump_node_generic(node, depth, "StructField", false) }
