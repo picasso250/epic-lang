@@ -144,6 +144,11 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_map_str_str_set", MirSignature([ptr(), ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_map_str_str_has", MirSignature([ptr(), ptr()], BOOL)))
         self.program.externs.append(MirExtern("__ep_map_str_str_del", MirSignature([ptr(), ptr()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_ptr_new", MirSignature([], ptr())))
+        self.program.externs.append(MirExtern("__ep_map_str_ptr_get", MirSignature([ptr(), ptr()], ptr())))
+        self.program.externs.append(MirExtern("__ep_map_str_ptr_set", MirSignature([ptr(), ptr(), ptr()], VOID)))
+        self.program.externs.append(MirExtern("__ep_map_str_ptr_has", MirSignature([ptr(), ptr()], BOOL)))
+        self.program.externs.append(MirExtern("__ep_map_str_ptr_del", MirSignature([ptr(), ptr()], BOOL)))
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__ep_debug_i64", MirSignature([I64], VOID)))
@@ -206,12 +211,7 @@ class MirCodegen(MirFunctionBuilder):
             if elem is not None and elem.kind == "named":
                 return ptr()
         if typ.kind == "map":
-            if typ.elem == et.I64:
-                return ptr()
-            if typ.elem == et.BOOL:
-                return ptr()
-            if typ.elem == et.STR:
-                return ptr()
+            return ptr()
         if typ.kind == "named":
             return ptr()
         if typ.kind == "ptr":
@@ -564,6 +564,10 @@ class MirCodegen(MirFunctionBuilder):
             return "bool"
         if typ.elem == et.STR:
             return "str"
+        if typ.elem in (et.U64, et.I32, et.U32, et.U8):
+            return "i64"
+        if typ.elem is not None and typ.elem.kind in ("named", "array", "map", "ptr"):
+            return "ptr"
         return None
 
     def _map_value_type(self, typ):
@@ -572,7 +576,7 @@ class MirCodegen(MirFunctionBuilder):
             return I64
         if suffix == "bool":
             return BOOL
-        if suffix == "str":
+        if suffix in ("str", "ptr"):
             return ptr()
         return None
 
@@ -1763,7 +1767,7 @@ class MirCodegen(MirFunctionBuilder):
         self.union_tags = {union.name: {member: idx for idx, member in enumerate(union.members, start=1)} for union in ast.unions}
         for struct_name in ("str", "_slice_u8", "_slice_i64", "_slice_str"):
             self.structs[struct_name] = self._slice_layout(struct_name)
-        for map_struct in ("_map_str_i64", "_map_str_bool", "_map_str_str"):
+        for map_struct in ("_map_str_i64", "_map_str_bool", "_map_str_str", "_map_str_ptr"):
             self.structs[map_struct] = self._make_struct_layout(
                 map_struct,
                 [("entries", ptr(), 0), ("len", I64, 8), ("cap", I64, 16)],

@@ -99,7 +99,7 @@ u8 is Epic's only byte type.
 
 | Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
-| `m.has(k)` / `m.del(k)` | ✓ | ✓ | ✓ | ✓ | map[str]T dot calls; old `map_has`/`map_del` removed from public surface |
+| `m.has(k)` / `m.del(k)` | ✓ | ✓ | ✓ | ✓ | map[str]T dot calls; missing-key read panics; old `map_has`/`map_del` removed from public surface |
 
 ---
 
@@ -167,6 +167,7 @@ symbols used by the Python backend.
 | `__ep_str_from_slice_u8` | view/convert `_slice_u8` as `str` |
 | `__ep_str_from_bool` | convert `bool` to a static runtime string |
 | `__ep_str_eq` | compare two strings for equality |
+| `__ep_runtime_panic` | print runtime panic text and exit with status 1 |
 | `__ep_str_cat` | concatenate two strings |
 | `__ep_str_slice` | copy a half-open string slice |
 | `__ep_slice_u8_alloc` | allocate initialized-capacity byte array |

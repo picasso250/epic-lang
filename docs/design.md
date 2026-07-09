@@ -284,7 +284,7 @@ let id = ids["main"]
 let ok = ids.has("main")
 ```
 
-键类型固定为 `str`。Python reference compiler 当前支持 `map[str]i64`、`map[str]bool`、`map[str]str`。不存在的键查找返回该值类型的零值；`m.has(key)` 区分是否存在；`m.del(key)` 删除键并返回是否真的删除了已有项。
+键类型固定为 `str`，value 类型支持任意非 `void` 的当前语言类型。`m[key]` 读取要求 key 已存在；缺失 key 会触发 runtime panic。`m.has(key)` 用于判断是否存在；`m.del(key)` 删除键并返回是否真的删除了已有项。`m[key] = value` 是 insert-or-update。
 
 Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `str` 表达式，`value` 按 `T` 做普通赋值兼容检查。初始化按源码顺序插入；重复 key 时后面的 entry 覆盖前面的值。`new map[str]T {}` 等价于空 map。
 

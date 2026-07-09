@@ -12,7 +12,6 @@ fun main(): i64 {
     assert(flags[dyn_key] == true)
     assert(flags.del(dyn_key))
     assert(flags.has("alpha") == false)
-    assert(flags["alpha"] == false)
     assert(flags.del("alpha") == false)
 
     flags["k0"] = true
@@ -28,7 +27,7 @@ fun main(): i64 {
     assert(names["a"] == "one")
     assert(names["b"] == "two")
     assert(names.del("a"))
-    assert(names["a"] == "")
+    assert(names.has("a") == false)
     assert(names["b"] == "two")
 
     println("ok")

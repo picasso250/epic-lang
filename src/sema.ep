@@ -157,8 +157,8 @@ fun sema_type_name(st: SemaState, name: str): str {
     }
     if sema_is_map(name) {
         let value = sema_type_name(st, sema_map_value(name))
-        if value != "i64" && value != "bool" && value != "str" {
-            sema_die(f"only map[str]i64, map[str]bool, and map[str]str are supported, got {name}")
+        if value == "void" {
+            sema_die("map value type cannot be void")
         }
         ret epic_type_map_of(value)
     }

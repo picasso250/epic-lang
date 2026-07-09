@@ -8,6 +8,15 @@ entry:
   ret ptr %input
 }
 
+define void @__ep_runtime_panic(ptr %msg) {
+entry:
+  call void __ep_print_str(ptr str.runtime.panic.prefix)
+  call void __ep_print_str(ptr %msg)
+  call void __ep_print_newline()
+  call void ExitProcess(i64 1)
+  ret void
+}
+
 define ptr @__ep_str_cat(ptr %left, ptr %right) {
 entry:
   %gep0: ptr = gep struct str, ptr %left, i64 0, i32 1
@@ -115,7 +124,7 @@ ok:
   ret i64 %load7
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret i64 0
 }
 
@@ -166,7 +175,7 @@ ok:
   ret i64 %load7
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret i64 0
 }
 
@@ -189,7 +198,7 @@ ok:
   ret void
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret void
 }
 
@@ -334,7 +343,7 @@ ok:
   ret ptr %load7
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret ptr null
 }
 
@@ -357,7 +366,7 @@ ok:
   ret void
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret void
 }
 
@@ -598,7 +607,7 @@ done:
   ret ptr %call6
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret ptr null
 }
 
@@ -770,6 +779,7 @@ found:
   ret i64 %load8
 
 miss:
+  call void __ep_runtime_panic(ptr str.runtime.map.missing)
   ret i64 0
 }
 
@@ -1001,6 +1011,7 @@ found:
   ret bool %load8
 
 miss:
+  call void __ep_runtime_panic(ptr str.runtime.map.missing)
   ret bool false
 }
 
@@ -1232,6 +1243,7 @@ found:
   ret ptr %load8
 
 miss:
+  call void __ep_runtime_panic(ptr str.runtime.map.missing)
   ret ptr str.runtime.empty
 }
 
@@ -1432,6 +1444,36 @@ clear_last:
   store i64 0, ptr %gep33
   store i64 %sub6, ptr %gep0
   ret bool true
+}
+
+define ptr @__ep_map_str_ptr_new() {
+entry:
+  %call0: ptr = call ptr __ep_map_str_str_new()
+  ret ptr %call0
+}
+
+define ptr @__ep_map_str_ptr_get(ptr %map, ptr %key) {
+entry:
+  %call0: ptr = call ptr __ep_map_str_str_get(ptr %map, ptr %key)
+  ret ptr %call0
+}
+
+define void @__ep_map_str_ptr_set(ptr %map, ptr %key, ptr %val) {
+entry:
+  call void __ep_map_str_str_set(ptr %map, ptr %key, ptr %val)
+  ret void
+}
+
+define bool @__ep_map_str_ptr_has(ptr %map, ptr %key) {
+entry:
+  %call0: bool = call bool __ep_map_str_str_has(ptr %map, ptr %key)
+  ret bool %call0
+}
+
+define bool @__ep_map_str_ptr_del(ptr %map, ptr %key) {
+entry:
+  %call0: bool = call bool __ep_map_str_str_del(ptr %map, ptr %key)
+  ret bool %call0
 }
 
 define void @__ep_debug_i64(i64 %value) {

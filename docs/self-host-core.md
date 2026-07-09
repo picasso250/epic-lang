@@ -125,10 +125,10 @@ These are unconditionally injected and considered part of the core runtime. MIR 
 
 ### Map
 
-`map[str]T` is retained but not a priority feature. Lookup of non-existent keys
-returns zero value. The Python reference compiler currently supports
-`map[str]i64`, `map[str]bool`, and `map[str]str`, plus `m.has(key)` and
-`m.del(key)`.
+`map[str]T` is retained but not a priority feature. Value type `T` may be any
+non-`void` current language type. Lookup of non-existent keys triggers runtime
+panic; use `m.has(key)` before reading when absence is possible. `m[key] = value`
+inserts or updates, and `m.del(key)` returns whether a key was removed.
 
 ### OS Namespace
 

@@ -800,8 +800,8 @@ class SemanticAnalyzer:
             return ARRAY(elem)
         if name.kind == "map":
             value = self._type_name(name.elem)
-            if value not in (I64, BOOL, STR):
-                self._fail_global(f"only map[str]i64, map[str]bool, and map[str]str are supported, got {name}")
+            if value == VOID:
+                self._fail_global("map value type cannot be void")
             return MAP(value)
         if name.kind == "ptr":
             return PTR(self._type_name(name.elem))

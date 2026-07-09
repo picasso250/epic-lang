@@ -31,11 +31,11 @@ fun main(): i64 {
     assert(s.flags["x"] == true)
     assert(s.flags["from_fn"] == true)
 
-    assert(s.names["missing"] == "")
+    assert(s.names.has("missing") == false)
     s.names["a"] = "alpha"
     assert(s.names["a"] == "alpha")
     assert(s.names.del("a"))
-    assert(s.names["a"] == "")
+    assert(s.names.has("a") == false)
 
     println("ok")
     ret 0

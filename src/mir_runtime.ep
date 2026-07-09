@@ -401,6 +401,9 @@ fun mir_inject_all_runtime_helpers(program: MirProgram): void {
     mir_runtime_add_global(program, "str.runtime.bool.true", "true")
     mir_runtime_add_global(program, "str.runtime.bool.false", "false")
     mir_runtime_add_global(program, "str.runtime.empty", "")
+    mir_runtime_add_global(program, "str.runtime.panic.prefix", "runtime panic: ")
+    mir_runtime_add_global(program, "str.runtime.slice.oob", "slice index out of bounds")
+    mir_runtime_add_global(program, "str.runtime.map.missing", "map missing key")
     let texts = mir_runtime_helper_texts()
     let i = 0
     for i < len(texts) {

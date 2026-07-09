@@ -11,6 +11,7 @@ from mir_parser import parse_mir_file
 IMPLEMENTED_MIR_HELPERS = (
     "__ep_slice_u8_from_str",
     "__ep_str_from_slice_u8",
+    "__ep_runtime_panic",
     "__ep_str_cat",
     "__ep_slice_u8_alloc",
     "__ep_slice_u8_get",
@@ -45,6 +46,11 @@ IMPLEMENTED_MIR_HELPERS = (
     "__ep_map_str_str_set",
     "__ep_map_str_str_has",
     "__ep_map_str_str_del",
+    "__ep_map_str_ptr_new",
+    "__ep_map_str_ptr_get",
+    "__ep_map_str_ptr_set",
+    "__ep_map_str_ptr_has",
+    "__ep_map_str_ptr_del",
     "__ep_debug_i64",
 )
 
@@ -53,6 +59,9 @@ _RUNTIME_STRING_GLOBALS = (
     ("str.runtime.bool.true", "true"),
     ("str.runtime.bool.false", "false"),
     ("str.runtime.empty", ""),
+    ("str.runtime.panic.prefix", "runtime panic: "),
+    ("str.runtime.slice.oob", "slice index out of bounds"),
+    ("str.runtime.map.missing", "map missing key"),
 )
 
 

@@ -216,7 +216,7 @@ fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
     if slice_name != "" {
         ret slice_name
     }
-    let map_suffix = mir_map_suffix(type_name)
+    let map_suffix = mir_map_suffix(st, type_name)
     if map_suffix != "" {
         ret str_cat2("_map_str_", map_suffix)
     }
@@ -1056,7 +1056,7 @@ fun mir_slice_struct_name(st: MirCodegenState, type_name: str): str {
     ret ""
 }
 
-fun mir_map_suffix(type_name: str): str {
+fun mir_map_suffix(st: MirCodegenState, type_name: str): str {
     if epic_type_is_map(type_name) == false {
         ret ""
     }
@@ -1070,25 +1070,31 @@ fun mir_map_suffix(type_name: str): str {
     if value == "str" {
         ret "str"
     }
+    if value == "u64" || value == "i32" || value == "u32" || value == "u8" {
+        ret "i64"
+    }
+    if epic_type_is_array(value) || epic_type_is_map(value) || mir_is_struct_name(st, value) {
+        ret "ptr"
+    }
     ret ""
 }
 
-fun mir_map_value_type(type_name: str): str {
-    let suffix = mir_map_suffix(type_name)
+fun mir_map_value_type(st: MirCodegenState, type_name: str): str {
+    let suffix = mir_map_suffix(st, type_name)
     if suffix == "i64" {
         ret "i64"
     }
     if suffix == "bool" {
         ret "bool"
     }
-    if suffix == "str" {
+    if suffix == "str" || suffix == "ptr" {
         ret "ptr"
     }
     ret ""
 }
 
-fun mir_map_helper(type_name: str, op: str): str {
-    let suffix = mir_map_suffix(type_name)
+fun mir_map_helper(st: MirCodegenState, type_name: str, op: str): str {
+    let suffix = mir_map_suffix(st, type_name)
     if suffix == "" {
         ret ""
     }
@@ -1152,8 +1158,8 @@ fun mir_emit_slice(st: MirCodegenState, block: MirBlock, expr: AstSlice): MirVal
 
 fun mir_emit_map_init(st: MirCodegenState, block: MirBlock, expr: AstMapInit): MirValueFlow {
     st.current_block = block
-    let new_helper = mir_map_helper(expr.AstMeta.resolved_type, "new")
-    let set_helper = mir_map_helper(expr.AstMeta.resolved_type, "set")
+    let new_helper = mir_map_helper(st, expr.AstMeta.resolved_type, "new")
+    let set_helper = mir_map_helper(st, expr.AstMeta.resolved_type, "set")
     if new_helper == "" || set_helper == "" {
         ast_to_mir_die(f"unsupported map init target: {expr.type_name}")
     }
@@ -1343,9 +1349,9 @@ fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstSubscript)
     let args = new MirOperand[0]
     args.push(base_flow.value)
     args.push(index_flow.value)
-    let map_value_type = mir_map_value_type(base_type)
+    let map_value_type = mir_map_value_type(st, base_type)
     if map_value_type != "" {
-        ret mir_value_flow(mir_emit_call_inst(st, mir_map_helper(base_type, "get"), map_value_type, args), st.current_block)
+        ret mir_value_flow(mir_emit_call_inst(st, mir_map_helper(st, base_type, "get"), map_value_type, args), st.current_block)
     }
     if mir_is_u8_array_type(base_type) {
         ret mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", args), st.current_block)
@@ -1414,9 +1420,9 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
             ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
         }
     }
-    if mir_map_value_type(receiver_type) != "" {
+    if mir_map_value_type(st, receiver_type) != "" {
         if expr.name == "has" || expr.name == "del" {
-            let helper = mir_map_helper(receiver_type, expr.name)
+            let helper = mir_map_helper(st, receiver_type, expr.name)
             if helper == "" {
                 ast_to_mir_die(f"{expr.name} expects map")
             }
@@ -1734,9 +1740,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             if n.name == "map_has" || n.name == "map_del" {
                 let map_type = ast_resolved_type(n.args[0])
-                let helper = mir_map_helper(map_type, "has")
+                let helper = mir_map_helper(st, map_type, "has")
                 if n.name == "map_del" {
-                    helper = mir_map_helper(map_type, "del")
+                    helper = mir_map_helper(st, map_type, "del")
                 }
                 if helper == "" {
                     ast_to_mir_die(f"{n.name} expects map")
@@ -2135,7 +2141,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             args.push(dst_flow.value)
             args.push(index_flow.value)
             args.push(value_flow.value)
-            let map_set_helper = mir_map_helper(base_type, "set")
+            let map_set_helper = mir_map_helper(st, base_type, "set")
             if map_set_helper != "" {
                 mir_emit_call_inst(st, map_set_helper, "void", args)
             } else {
@@ -2242,9 +2248,9 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     get_args.push(dst_flow.value)
                     get_args.push(index_flow.value)
                     let current = mir_const_int("i64", 0)
-                    let map_value_type = mir_map_value_type(base_type)
+                    let map_value_type = mir_map_value_type(st, base_type)
                     if map_value_type != "" {
-                        current = mir_emit_call_inst(st, mir_map_helper(base_type, "get"), map_value_type, get_args)
+                        current = mir_emit_call_inst(st, mir_map_helper(st, base_type, "get"), map_value_type, get_args)
                     } else {
                         if mir_is_u8_array_type(base_type) {
                             current = mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", get_args)
@@ -2268,7 +2274,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     set_args.push(dst_flow.value)
                     set_args.push(index_flow.value)
                     set_args.push(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type))
-                    let map_set_helper2 = mir_map_helper(base_type, "set")
+                    let map_set_helper2 = mir_map_helper(st, base_type, "set")
                     if map_set_helper2 != "" {
                         mir_emit_call_inst(st, map_set_helper2, "void", set_args)
                     } else {
@@ -2585,6 +2591,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             map_layouts.push("_map_str_i64")
             map_layouts.push("_map_str_bool")
             map_layouts.push("_map_str_str")
+            map_layouts.push("_map_str_ptr")
             let mi = 0
             for mi < len(map_layouts) {
                 st.struct_names.push(map_layouts[mi])

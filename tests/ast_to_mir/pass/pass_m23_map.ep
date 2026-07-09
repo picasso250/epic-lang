@@ -1,4 +1,8 @@
-# MIR-CODEGEN: map new/get/set/has/del for i64, bool, and str maps.
+# MIR-CODEGEN: map new/get/set/has/del for word, bool, str, and pointer maps.
+struct Box {
+    value: i64
+}
+
 fun main(): i64 {
     let ids = new map[str]i64 { "main": 1 }
     ids["main"] += 100
@@ -12,5 +16,8 @@ fun main(): i64 {
 
     let names = new map[str]str { "a": "one" }
     if names["a"] != "one" { ret 5 }
+    let boxes = new map[str]Box
+    boxes["b"] = new Box { value: 9 }
+    if boxes["b"].value != 9 { ret 6 }
     ret 0
 }
