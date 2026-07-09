@@ -1,0 +1,21 @@
+struct Box {
+    value: i64
+}
+
+fun main(): void {
+    let nums = new i64[] { 1, 2 }
+    let more = new i64[] { 3 }
+    nums.extend(more)
+
+    let words = new str[]
+    words.push("a")
+    let more_words = new str[]
+    more_words.push("b")
+    words.extend(more_words)
+
+    let boxes = new Box[]
+    boxes.push(new Box { value: 1 })
+    let more_boxes = new Box[]
+    more_boxes.push(new Box { value: 2 })
+    boxes.extend(more_boxes)
+}

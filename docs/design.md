@@ -309,7 +309,7 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 | `new T[]`             | 空数组，容量为 0                                  |
 | `new T[n]`            | 空数组，容量至少为 `n`                            |
 | `a.push(x)`          | 追加并扩容                                        |
-| `dst.extend(src)`    | `dst` 和 `src` 均为 `u8[]`；将 `src` 的所有字节追加到 `dst`；其他类型使用 `for + `.push(...)``               |
+| `dst.extend(src)`    | `dst` 和 `src` 必须是相同元素类型的 `T[]`；将 `src` 的当前元素追加到 `dst` |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
 | `cap(a)`              | 当前容量（推荐）                                  |
@@ -414,7 +414,7 @@ let source = str(read_file(path))
 | `str_replace_char`     | 自己写 `u8[]` 扫描                          |
 | `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
 | `a.push(x)`             | 追加到动态数组                              |
-| `dst.extend(src)`     | 仅支持 u8[]；其他数组需要追加多个元素时使用 for + `.push(...)`                                |
+| `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |
 
 `cstr` 要求字符串内部数据指针非空、`len(s) >= 0`、`s[0:len(s)]` 不含 `0`，并且内部数据在 `len(s)` 位置以 `0` 结尾。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
 

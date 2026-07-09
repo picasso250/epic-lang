@@ -1,6 +1,6 @@
-# COMPILE_FAIL: extend only supports u8[]
+# COMPILE_FAIL: extend expects an array with the same element type
 fun main(): void {
     let a = new i64[1]
-    let b = new i64[1]
+    let b = new u8[1]
     a.extend(b)
 }

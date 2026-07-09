@@ -1,10 +1,14 @@
-# COMPILE_FAIL: extend only supports u8[]
+# COMPILE_FAIL: extend expects an array with the same element type
 struct Box {
+    value: i64
+}
+
+struct Other {
     value: i64
 }
 
 fun main(): void {
     let a = new Box[1]
-    let b = new Box[1]
+    let b = new Other[1]
     a.extend(b)
 }

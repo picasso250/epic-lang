@@ -1,0 +1,34 @@
+# EXIT: 0
+# STDOUT: 6
+# STDOUT: abab
+# STDOUT: 5
+struct Box {
+    value: i64
+}
+
+fun main(): void {
+    let nums = new i64[] { 1, 2 }
+    let more = new i64[] { 3 }
+    nums.extend(more)
+    nums.extend(nums)
+    println(str(len(nums)))
+
+    let words = new str[]
+    words.push("a")
+    let more_words = new str[]
+    more_words.push("b")
+    words.extend(more_words)
+    words.extend(words)
+    print(words[0])
+    print(words[1])
+    print(words[2])
+    println(words[3])
+
+    let boxes = new Box[]
+    boxes.push(new Box { value: 2 })
+    let more_boxes = new Box[]
+    more_boxes.push(new Box { value: 3 })
+    boxes.extend(more_boxes)
+    println(str(boxes[0].value + boxes[1].value))
+    exit(0)
+}

@@ -263,6 +263,30 @@ swap:
   br label %store
 }
 
+define void @__ep_slice_i64_extend(ptr %dst, ptr %src) {
+entry:
+  %gep0: ptr = gep ptr, ptr %src, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %alloca2: ptr = alloca i64
+  store i64 0, ptr %alloca2
+  br label %loop_check
+
+loop_check:
+  %load3: i64 = load i64, ptr %alloca2
+  %icmp_slt4: bool = icmp.slt i64 %load3, i64 %load1
+  condbr bool %icmp_slt4, label %loop_body, label %done
+
+loop_body:
+  %call5: i64 = call i64 __ep_slice_i64_get(ptr %src, i64 %load3)
+  call void __ep_slice_i64_push(ptr %dst, i64 %call5)
+  %add6: i64 = add i64 %load3, i64 1
+  store i64 %add6, ptr %alloca2
+  br label %loop_check
+
+done:
+  ret void
+}
+
 define ptr @__ep_slice_ptr_new(i64 %cap) {
 entry:
   %call0: ptr = call ptr __epx_alloc(i64 24)
@@ -405,6 +429,30 @@ swap:
   %load25: i64 = load i64, ptr %alloca5
   store i64 %load25, ptr %gep2
   br label %store
+}
+
+define void @__ep_slice_ptr_extend(ptr %dst, ptr %src) {
+entry:
+  %gep0: ptr = gep ptr, ptr %src, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %alloca2: ptr = alloca i64
+  store i64 0, ptr %alloca2
+  br label %loop_check
+
+loop_check:
+  %load3: i64 = load i64, ptr %alloca2
+  %icmp_slt4: bool = icmp.slt i64 %load3, i64 %load1
+  condbr bool %icmp_slt4, label %loop_body, label %done
+
+loop_body:
+  %call5: ptr = call ptr __ep_slice_ptr_get(ptr %src, i64 %load3)
+  call void __ep_slice_ptr_push(ptr %dst, ptr %call5)
+  %add6: i64 = add i64 %load3, i64 1
+  store i64 %add6, ptr %alloca2
+  br label %loop_check
+
+done:
+  ret void
 }
 
 define void @__ep_slice_u8_set(ptr %arr, i64 %idx, i64 %val) {

@@ -1026,6 +1026,19 @@ fun mir_is_ptr_array_type(st: MirCodegenState, type_name: str): bool {
     ret mir_is_ptr_array_elem_type(st, mir_array_elem_type(type_name))
 }
 
+fun mir_array_extend_helper(st: MirCodegenState, type_name: str): str {
+    if mir_is_u8_array_type(type_name) {
+        ret "__ep_slice_u8_extend"
+    }
+    if mir_is_i64_array_type(type_name) {
+        ret "__ep_slice_i64_extend"
+    }
+    if mir_is_ptr_array_type(st, type_name) {
+        ret "__ep_slice_ptr_extend"
+    }
+    ret ""
+}
+
 fun mir_slice_struct_name(st: MirCodegenState, type_name: str): str {
     if mir_is_u8_array_type(type_name) {
         ret "_slice_u8"
@@ -1386,6 +1399,10 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
             ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
         }
         if expr.name == "extend" {
+            let helper = mir_array_extend_helper(st, receiver_type)
+            if helper == "" {
+                ast_to_mir_die("extend expects supported array type")
+            }
             let dst_flow = mir_emit_expr(st, st.current_block, expr.object)
             st.current_block = dst_flow.block
             let src_flow = mir_emit_expr(st, st.current_block, expr.args[0])
@@ -1393,7 +1410,7 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
             let args = new MirOperand[0]
             args.push(dst_flow.value)
             args.push(src_flow.value)
-            mir_emit_call_inst(st, "__ep_slice_u8_extend", "void", args)
+            mir_emit_call_inst(st, helper, "void", args)
             ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
         }
     }
@@ -1700,6 +1717,11 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
             }
             if n.name == "extend" {
+                let base_type = ast_resolved_type(n.args[0])
+                let helper = mir_array_extend_helper(st, base_type)
+                if helper == "" {
+                    ast_to_mir_die("extend expects supported array type")
+                }
                 let dst_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = dst_flow.block
                 let src_flow = mir_emit_expr(st, st.current_block, n.args[1])
@@ -1707,7 +1729,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 let args = new MirOperand[0]
                 args.push(dst_flow.value)
                 args.push(src_flow.value)
-                mir_emit_call_inst(st, "__ep_slice_u8_extend", "void", args)
+                mir_emit_call_inst(st, helper, "void", args)
                 ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
             }
             if n.name == "map_has" || n.name == "map_del" {

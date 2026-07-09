@@ -580,8 +580,8 @@ class SemanticAnalyzer:
             if expr.name == "extend":
                 self._check_arity("extend", 1, expr.args)
                 src = self._expr(expr.args[0])
-                if receiver.type.elem != U8 or src.type.kind != "array" or src.type.elem != U8:
-                    self._fail("extend only supports u8[]")
+                if src.type.kind != "array" or src.type.elem != receiver.type.elem:
+                    self._fail("extend expects an array with the same element type")
                 return ExprInfo(VOID)
             self._fail(f"array type {receiver.type} has no method {expr.name}")
         if receiver.type.kind == "map":

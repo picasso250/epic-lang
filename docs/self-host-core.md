@@ -88,7 +88,7 @@ required_helpers: defer; unconditional injection stays for now
 | `exit`        | Terminate process |
 | `len`/`cap`   | Length and capacity |
 | `xs.push(x)` | Array append dot call |
-| `dst.extend(src)` | u8[] only dot call; use for + `.push(...)` for other types |
+| `dst.extend(src)` | dot call for arrays with the same element type |
 | `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
 | `str(bytes)`  | `u8[]` to temporary `str` view; zero-copy identity cast |
 | `bytes(s)`    | temporary `str` view to `u8[]`; zero-copy identity cast |
@@ -121,7 +121,7 @@ These are unconditionally injected and considered part of the core runtime. MIR 
 - `__ep_slice_u8_slice` — byte array slice copy
 - `__ep_slice_i64_get` — bounds-checked i64 array read
 - `__ep_slice_i64_set` — bounds-checked i64 array write
-- `__ep_slice_u8_extend` — byte array append
+- `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` — array append
 
 ### Map
 
@@ -287,7 +287,7 @@ Completed:
 - The zero-copy shared-buffer behavior is covered by `tests/e2e/pass/v5_zero_copy_str_bytes.ep`.
 - Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
   `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.
-- `dst.extend(src)` is byte-oriented and only supports `u8[]`. Function-style `push`, `extend`, `map_has`, and `map_del` are removed from the public source surface.
+- `dst.extend(src)` appends arrays with the same element type. Function-style `push`, `extend`, `map_has`, and `map_del` are removed from the public source surface.
 
 Remaining:
 - No retained `src/*.ep` source currently calls removed public string helpers. `src/link.ep` uses local `u8[]` byte scanning plus `str(n)`, and `src/parser.ep` no longer reserves `str_new`.

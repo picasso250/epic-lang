@@ -1128,8 +1128,8 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         if node.name == "extend" {
             sema_check_arity("extend", 1, node.args)
             let src = sema_expr_type(st, node.args[0])
-            if receiver != "u8[]" || src != "u8[]" {
-                sema_die("extend only supports u8[]")
+            if sema_is_array(src) == false || sema_array_elem(src) != sema_array_elem(receiver) {
+                sema_die("extend expects an array with the same element type")
             }
             ret "void"
         }

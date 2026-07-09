@@ -232,7 +232,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `str_replace_char` | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `xs.push(x)`      | 由 codegen 为动态数组发射                   | 公开容器点调用 |
-| `dst.extend(src)`  | 字节数组用 `__ep_slice_u8_extend`；其他类型用复制循环 | 公开容器点调用，u8[] only |
+| `dst.extend(src)`  | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_extend`、`__ep_slice_i64_extend`、`__ep_slice_ptr_extend` | 公开容器点调用 |
 | `len` / `cap`      | 直接内联发射                                | 公开 |
 | 切片语法           | 字符串用 `__ep_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
 

@@ -122,10 +122,12 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_slice_i64_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_i64_set", MirSignature([ptr(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_i64_push", MirSignature([ptr(), I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_i64_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_set", MirSignature([ptr(), I64, ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_push", MirSignature([ptr(), ptr()], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_ptr_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_map_str_i64_new", MirSignature([], ptr())))
         self.program.externs.append(MirExtern("__ep_map_str_i64_get", MirSignature([ptr(), ptr()], I64)))
@@ -591,6 +593,15 @@ class MirCodegen(MirFunctionBuilder):
 
     def _is_ptr_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "ptr"
+
+    def _array_extend_helper(self, typ):
+        if self._is_u8_array_type(typ):
+            return "__ep_slice_u8_extend"
+        if self._is_i64_array_type(typ):
+            return "__ep_slice_i64_extend"
+        if self._array_struct_elem(typ) is not None:
+            return "__ep_slice_ptr_extend"
+        return None
 
     def _emit_block(self, block):
         flow = self._emit_block_from(self.ensure_insertable(), block)
@@ -1351,12 +1362,13 @@ class MirCodegen(MirFunctionBuilder):
             return ValueFlow(self._load_field(base.value, struct_name, name, result_type=I64), self.current_block)
         if name == "extend":
             dst_type = self._infer_type(expr.args[0])
-            if not self._is_u8_array_type(dst_type):
-                raise MirCodegenError("extend only supports u8[]")
+            helper = self._array_extend_helper(dst_type)
+            if helper is None:
+                raise MirCodegenError("extend expects supported array type")
             dst = self._emit_expr_from(self.current_block, expr.args[0])
             src = self._emit_expr_from(dst.block, expr.args[1])
             self.set_block(src.block)
-            self.inst("call", [dst.value, src.value], type=VOID, callee="__ep_slice_u8_extend")
+            self.inst("call", [dst.value, src.value], type=VOID, callee=helper)
             return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
         if name in ("map_has", "map_del"):
             map_type = self._infer_type(expr.args[0])
@@ -1394,10 +1406,13 @@ class MirCodegen(MirFunctionBuilder):
                     self.inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
                 return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
             if expr.name == "extend":
+                helper = self._array_extend_helper(receiver_type)
+                if helper is None:
+                    raise MirCodegenError("extend expects supported array type")
                 dst = self._emit_expr_from(self.current_block, expr.object)
                 src = self._emit_expr_from(dst.block, expr.args[0])
                 self.set_block(src.block)
-                self.inst("call", [dst.value, src.value], type=VOID, callee="__ep_slice_u8_extend")
+                self.inst("call", [dst.value, src.value], type=VOID, callee=helper)
                 return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
         if receiver_type.kind == "map":
             if expr.name in ("has", "del"):
