@@ -19,7 +19,7 @@
 
 ### 优先级 2：MIR helper 迁移（部分完成，剩余为底层 runtime glue）
 
-语言层 helper 大多已迁移到 `bootstrap/mir_runtime_helpers.py`，并通过 `MirFunction` 注入：
+语言层 helper 大多已迁移到 `runtime/mir/helpers.mir`，并由 `bootstrap/mir_runtime_helpers.py` 解析后注入：
 
 - str/bytes：`__ep_str_from_bool`、`__ep_str_from_slice_u8`、`__ep_slice_u8_from_str`、`__ep_str_eq`、`__ep_str_cat`、`__ep_str_slice`、`__ep_str_get`、`__ep_str_find`
 - slice：`__ep_slice_u8_*`、`__ep_slice_i64_*`、`__ep_slice_ptr_*`

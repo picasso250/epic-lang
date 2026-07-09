@@ -2,9 +2,8 @@
 """Write the single-file MIR runtime helper bundle.
 
 The self-hosted compiler reads runtime/mir/helpers.mir at compile time, so the
-bundle is committed.  The Python helper builders remain the mechanical source
-for builder-backed helpers; helper text that has no builder can be preserved
-from an existing bundle or a temporary split .mir source while migrating.
+bundle is committed. Helper bodies are MIR text; this script normalizes their
+order and can merge temporary split .mir sources into the committed bundle.
 """
 
 from __future__ import annotations
@@ -18,7 +17,6 @@ BUNDLE = RUNTIME_MIR_DIR / "helpers.mir"
 
 sys.path.insert(0, str(ROOT / "bootstrap"))
 
-from mir import MirProgram  # noqa: E402
 from mir_parser import parse_mir_file  # noqa: E402
 import mir_runtime_helpers as runtime  # noqa: E402
 
@@ -49,12 +47,9 @@ def _load_text_sources() -> dict[str, object]:
 
 def build_bundle_text() -> str:
     text_sources = _load_text_sources()
-    builder_program = MirProgram()
     functions = []
     for name in runtime.IMPLEMENTED_MIR_HELPERS:
-        if name in runtime._HELPER_EMITTERS:
-            functions.append(runtime._HELPER_EMITTERS[name](builder_program))
-        elif name in text_sources:
+        if name in text_sources:
             functions.append(text_sources[name])
         else:
             raise RuntimeError(f"no source for MIR runtime helper: {name}")

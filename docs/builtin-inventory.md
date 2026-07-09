@@ -177,7 +177,7 @@ symbols used by the Python backend.
 | `__ep_slice_u8_slice` | copy a half-open byte-array slice |
 | `__ep_slice_u8_extend` | append one byte array into another |
 
-These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`. Python and self-hosted compilers both load the committed bundle at `runtime/mir/helpers.mir`; run `python scripts/write_mir_runtime_bundle.py` after changing builder-backed helper bodies.
+These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`. Python and self-hosted compilers both load the committed bundle at `runtime/mir/helpers.mir`; run `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text to normalize bundle order.
 
 > `__ep_str_slice`, `__ep_str_cat`
 > in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `==`, `!=`
