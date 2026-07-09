@@ -525,7 +525,8 @@ fun main(): i64 {
     assert method.name == "Counter__add"
     assert method.method_name == "add"
     assert method.receiver_name == "c"
-    assert method.receiver_type == "Counter"
+    assert method.receiver_type.kind == "named"
+    assert method.receiver_type.name == "Counter"
     typed = sema.analyze_program(ast)
     prog = ast_to_mir(typed)
     text = prog.text()

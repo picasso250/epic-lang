@@ -50,6 +50,14 @@ class SemanticAnalyzer:
         ("user32", "MessageBoxA"): ([I64, I64, I64, I64], I64),
     }
 
+    INTEGER_CONVERSIONS = {
+        "i64": I64,
+        "u64": U64,
+        "i32": I32,
+        "u32": U32,
+        "u8": U8,
+    }
+
     def __init__(self, program):
         self.program = program
         self.struct_names = {s.name for s in program.structs}
@@ -113,7 +121,7 @@ class SemanticAnalyzer:
             if fn.name in self.func_sigs:
                 self._fail_global(f"duplicate function {fn.name}")
             if fn.method_name:
-                if fn.receiver_type not in self.struct_names:
+                if fn.receiver_type.kind != "named" or fn.receiver_type.name not in self.struct_names:
                     self._fail_global(f"method receiver must be a user-defined struct, got {fn.receiver_type}")
             params = []
             for param in fn.params:
@@ -123,7 +131,7 @@ class SemanticAnalyzer:
                     self._fail_global(f"function {fn.name} parameter {param.name} cannot have type void")
                 params.append(typ)
             if fn.method_name:
-                if not params or params[0] != NAMED(fn.receiver_type):
+                if not params or params[0] != fn.receiver_type:
                     self._fail_global(f"method {fn.receiver_type}.{fn.method_name} receiver mismatch")
             if fn.name in BUILTIN_FUNCTIONS or fn.name in PSEUDO_BUILTINS:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
@@ -505,11 +513,11 @@ class SemanticAnalyzer:
         if name == "cstr":
             self._check_call_args(name, [STR], expr.args)
             return ExprInfo(I64)
-        if name in ("i64", "u64", "i32", "u32", "u8"):
+        if name in self.INTEGER_CONVERSIONS:
             self._check_arity(name, 1, expr.args)
             arg = self._expr(expr.args[0])
             self._expect_integer(arg, f"{name} argument")
-            return ExprInfo(self._type_name(name))
+            return ExprInfo(self.INTEGER_CONVERSIONS[name])
         if name == "bool":
             self._check_arity(name, 1, expr.args)
             arg = self._expr(expr.args[0])
@@ -781,35 +789,28 @@ class SemanticAnalyzer:
         self._fail(f"field access expected aggregate, got {base_type}")
 
     def _type_name(self, name):
-        if isinstance(name, EpicType):
-            return name
         if name is None:
             return VOID
-        if name.endswith("[]"):
-            return ARRAY(self._type_name(name[:-2]))
-        if name.startswith("map[str]"):
-            value = self._type_name(name[len("map[str]"):])
+        if not isinstance(name, EpicType):
+            self._fail_global(f"internal parser produced non-EpicType type: {name}")
+        if name.kind == "array":
+            elem = self._type_name(name.elem)
+            if elem == VOID:
+                self._fail_global("array element type cannot be void")
+            return ARRAY(elem)
+        if name.kind == "map":
+            value = self._type_name(name.elem)
             if value not in (I64, BOOL, STR):
                 self._fail_global(f"only map[str]i64, map[str]bool, and map[str]str are supported, got {name}")
             return MAP(value)
-        if name == "i64":
-            return I64
-        if name == "u64":
-            return U64
-        if name == "i32":
-            return I32
-        if name == "u32":
-            return U32
-        if name == "u8":
-            return U8
-        if name == "bool":
-            return BOOL
-        if name == "void":
-            return VOID
-        if name == "str":
-            return STR
-        if name in self.struct_names or name in self.union_names:
-            return NAMED(name)
+        if name.kind == "ptr":
+            return PTR(self._type_name(name.elem))
+        if name.kind == "named":
+            if name.name in self.struct_names or name.name in self.union_names:
+                return name
+            self._fail_global(f"unknown type {name}")
+        if name in (I64, U64, I32, U32, I8, U8, BOOL, VOID, STR):
+            return name
         self._fail_global(f"unknown type {name}")
 
     def _check_str_convertible(self, info, context):

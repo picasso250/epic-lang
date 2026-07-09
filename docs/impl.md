@@ -40,6 +40,9 @@ parse/merge -> semantic analysis -> MIR -> X64IR -> machine obj -> link
 `tools/nasm.exe`。旧 Python asm 后端已归档到 tag
 `python-asm-archive-2026-07-02`，需要排查历史行为时从该 tag 对比。
 
+Python parser 直接在 AST 声明位置保存 `EpicType`，语义分析只负责校验和补齐
+`resolved_type`，后端不再接受旧的字符串类型协议。
+
 `src/` 下只保留仍活跃的 Epic-written compiler modules/tools。旧 `src/epic.ep` driver 依赖已删除的 NASM codegen 线，已从 active source 中移除；Python reference compiler 的 MIR -> X64IR -> machine backend 是当前默认编译管线。
 
 ### 构造器简写 (Constructor Shorthand)

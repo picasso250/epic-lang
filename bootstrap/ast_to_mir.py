@@ -178,33 +178,11 @@ class MirCodegen(MirFunctionBuilder):
         return self.fn
 
     def _type(self, typ):
-        if isinstance(typ, et.EpicType):
-            return self._epic_type(typ)
         if typ is None:
             raise MirCodegenError("missing resolved type")
-        if typ == "void":
-            return VOID
-        if typ in ("i64", "u64", "i32", "u32", "u8", "bool"):
-            return BOOL if typ == "bool" else I64
-        if typ == "&str":
-            return ptr()
-        if typ in ("u8[]", "&_slice_u8"):
-            return ptr()
-        if typ in ("i64[]", "u64[]", "i32[]", "u32[]", "&_slice_i64"):
-            return ptr()
-        if typ in ("map[str]i64", "&_map_str_i64"):
-            return ptr()
-        if typ in ("map[str]bool", "&_map_str_bool"):
-            return ptr()
-        if typ in ("map[str]str", "&_map_str_str"):
-            return ptr()
-        if isinstance(typ, str) and typ.endswith("[]") and typ[:-2] in self.structs:
-            return ptr()
-        if typ in self.structs:
-            return ptr()
-        if isinstance(typ, str) and typ.startswith("&") and typ[1:] in self.structs:
-            return ptr()
-        raise MirCodegenError(f"machine MIR does not support type yet: {typ}")
+        if not isinstance(typ, et.EpicType):
+            raise MirCodegenError(f"internal parser produced non-EpicType type: {typ}")
+        return self._epic_type(typ)
 
     def _epic_type(self, typ):
         if typ == et.VOID:

@@ -28,7 +28,7 @@ class ProgramNode(ASTNode):
 @dataclass
 class StructField(ASTNode):
     name: str
-    type: str
+    type: EpicType
     resolved_type: Optional[EpicType] = None
     embedded: bool = False
 
@@ -48,7 +48,7 @@ class UnionDefNode(ASTNode):
 @dataclass
 class Param(ASTNode):
     name: str
-    type: str
+    type: EpicType
     resolved_type: Optional[EpicType] = None
 
 
@@ -56,11 +56,11 @@ class Param(ASTNode):
 class FunDefNode(ASTNode):
     name: str
     params: list     # list[Param]
-    ret_type: str
+    ret_type: EpicType
     body: 'BlockNode'
     resolved_type: Optional[EpicType] = None
     receiver_name: str = ""
-    receiver_type: str = ""
+    receiver_type: Optional[EpicType] = None
     method_name: str = ""
 
 
@@ -79,7 +79,7 @@ class ReturnNode(ASTNode):
 @dataclass
 class LetNode(ASTNode):
     name: str
-    var_type: Optional[str] = None
+    var_type: Optional[EpicType] = None
     value: Optional[ASTNode] = None
     resolved_type: Optional[EpicType] = None
 
@@ -294,7 +294,7 @@ class SliceNode(ASTNode):
 
 @dataclass
 class NewArrayNode(ASTNode):
-    elem_type: str
+    elem_type: EpicType
     count: Optional[ASTNode] = None
     resolved_type: Optional[EpicType] = None
 
@@ -315,14 +315,14 @@ class UnionInitNode(ASTNode):
 
 @dataclass
 class ArrayLiteralNode(ASTNode):
-    elem_type: str
+    elem_type: EpicType
     values: list
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
 class MapInitNode(ASTNode):
-    type_name: str
+    type_name: EpicType
     entries: list
     resolved_type: Optional[EpicType] = None
 

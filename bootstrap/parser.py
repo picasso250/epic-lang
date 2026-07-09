@@ -4,6 +4,7 @@ Consumes tokens from lexer, produces AST dataclass nodes.
 """
 
 from ast_nodes import *
+from epic_types import ARRAY, BOOL, I32, I64, MAP, NAMED, STR, U32, U64, U8, VOID
 
 
 class ParseError(Exception):
@@ -97,7 +98,7 @@ class Parser:
                 ftype = self.parse_type()
                 embedded = False
             else:
-                ftype = fname[1]
+                ftype = self._type_atom(fname[1])
                 embedded = True
             self.expect_stmt_end()
             fields.append(StructField(name=fname[1], type=ftype, line=fname[2], embedded=embedded))
@@ -120,18 +121,20 @@ class Parser:
     def parse_fn_def(self):
         self.expect("FUN")
         receiver_name = ""
-        receiver_type = ""
+        receiver_type = None
         method_name = ""
         if self.peek_kind("LPAREN"):
             self.expect("LPAREN")
             receiver = self.expect("ID")
             self.expect("COLON")
             receiver_type = self.parse_type()
+            if receiver_type.kind != "named":
+                raise ParseError(f"method receiver must be a named type, got {receiver_type}", receiver[2])
             self.expect("RPAREN")
             name = self.expect("ID")
             receiver_name = receiver[1]
             method_name = name[1]
-            symbol_name = f"{receiver_type}__{method_name}"
+            symbol_name = f"{receiver_type.name}__{method_name}"
             line = name[2]
             params = [Param(name=receiver_name, type=receiver_type)]
         else:
@@ -175,16 +178,37 @@ class Parser:
             self.expect("LBRACKET")
             key = self.expect("ID")
             self.expect("RBRACKET")
+            if key[1] != "str":
+                raise ParseError(f"only map[str]T is supported, got map[{key[1]}]", key[2])
             value = self.parse_type()
-            return f"map[{key[1]}]{value}"
+            return MAP(value)
         t = self.advance()
         if t[0] in ("ID",):
-            typ = t[1]
+            typ = self._type_atom(t[1])
             while self.check("LBRACKET"):
                 self.expect("RBRACKET")
-                typ = f"{typ}[]"
+                typ = ARRAY(typ)
             return typ
         raise ParseError(f"Expected type, got {t[0]}({t[1]})", t[2])
+
+    def _type_atom(self, name):
+        if name == "i64":
+            return I64
+        if name == "u64":
+            return U64
+        if name == "i32":
+            return I32
+        if name == "u32":
+            return U32
+        if name == "u8":
+            return U8
+        if name == "bool":
+            return BOOL
+        if name == "void":
+            return VOID
+        if name == "str":
+            return STR
+        return NAMED(name)
 
     # ── block ─────────────────────────────────────────────────────────
 
@@ -519,8 +543,10 @@ class Parser:
                 self.expect("LBRACKET")
                 key = self.expect("ID")
                 self.expect("RBRACKET")
+                if key[1] != "str":
+                    raise ParseError(f"only map[str]T is supported, got map[{key[1]}]", key[2])
                 value = self.parse_type()
-                type_name = f"map[{key[1]}]{value}"
+                type_name = MAP(value)
                 entries = self.parse_map_entries_after_lbrace() if self.check("LBRACE") else []
                 return MapInitNode(type_name=type_name, entries=entries, line=t[2])
             name = t[1]
@@ -530,8 +556,8 @@ class Parser:
                     count = self.parse_expr()
                 self.expect("RBRACKET")
                 if count is None and self.check("LBRACE"):
-                    return ArrayLiteralNode(elem_type=name, values=self.parse_brace_values(), line=t[2])
-                return NewArrayNode(elem_type=name, count=count, line=t[2])
+                    return ArrayLiteralNode(elem_type=self._type_atom(name), values=self.parse_brace_values(), line=t[2])
+                return NewArrayNode(elem_type=self._type_atom(name), count=count, line=t[2])
             if self.check("LPAREN"):
                 payload = self.parse_expr()
                 self.expect("RPAREN")
@@ -563,7 +589,7 @@ class Parser:
             if self.peek_kind("LBRACKET") and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "RBRACKET":
                 self.advance()
                 self.advance()
-                elem_type = name
+                elem_type = self._type_atom(name)
                 if self.check("LBRACE"):
                     return ArrayLiteralNode(elem_type=elem_type, values=self.parse_brace_values(), line=t[2])
                 raise ParseError("Expected array literal after type[]", t[2])
