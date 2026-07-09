@@ -106,7 +106,7 @@ For correctness and fixed-point validation, use the normal test entry points:
 
 ```powershell
 python tests/run.py
-python test_examples_py.py
+python test_examples.py
 python test_bootstrap_fixed_point.py
 ```
 
