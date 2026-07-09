@@ -21,6 +21,7 @@ from ast_nodes import ProgramNode
 from lexer import LexError, dump_tokens, lex
 from parser import ParseError, Parser, dump_ast_text
 from sema import SemanticError, analyze_program, dump_typed_ast_text
+from x64 import X64DataBytes, X64DataZero, X64Inst, X64Label
 
 # ── paths ────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,6 +40,52 @@ def _now():
 
 def _print_timing(label, start):
     print(f"  timing: {label}: {_now() - start:.3f}s", flush=True)
+
+
+def _print_mir_stats(program):
+    blocks = 0
+    insts = 0
+    terms = 0
+    max_fn_insts = 0
+    max_fn_name = ""
+    for fn in program.functions:
+        fn_insts = 0
+        blocks += len(fn.blocks)
+        for block in fn.blocks:
+            fn_insts += len(block.instructions)
+            insts += len(block.instructions)
+            if block.terminator is not None:
+                terms += 1
+        if fn_insts > max_fn_insts:
+            max_fn_insts = fn_insts
+            max_fn_name = fn.name
+    print(
+        "  stats: mir "
+        + f"funcs={len(program.functions)} blocks={blocks} insts={insts} "
+        + f"terms={terms} globals={len(program.globals)} structs={len(program.structs)} "
+        + f"max_fn={max_fn_name}:{max_fn_insts}",
+        flush=True,
+    )
+
+
+def _print_x64_stats(program, asm_text):
+    insts = 0
+    labels = 0
+    data_items = 0
+    for item in program.items:
+        if isinstance(item, X64Inst):
+            insts += 1
+        elif isinstance(item, X64Label):
+            labels += 1
+        elif isinstance(item, (X64DataBytes, X64DataZero)):
+            data_items += 1
+    asm_lines = asm_text.count("\n")
+    print(
+        "  stats: x64 "
+        + f"items={len(program.items)} insts={insts} labels={labels} "
+        + f"data={data_items} asm_lines={asm_lines} asm_bytes={len(asm_text.encode('utf-8'))}",
+        flush=True,
+    )
 
 
 def _link_with_python(obj_path, exe_path):
@@ -156,10 +203,19 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
 
     print(f"[3/5] Compiling → {asm_path}")
     stage_start = _now()
+    mir_start = _now()
     mir_program = ast_to_mir(ast)
+    _print_timing("ast->mir", mir_start)
+    _print_mir_stats(mir_program)
+    x64_start = _now()
     machine_program = lower_mir_to_x64(mir_program)
+    _print_timing("mir->x64", x64_start)
+    text_start = _now()
+    asm_text = machine_program.text()
+    _print_timing("x64 text", text_start)
+    _print_x64_stats(machine_program, asm_text)
     with open(asm_path, "w", encoding="utf-8", newline="\n") as out:
-        out.write(machine_program.text())
+        out.write(asm_text)
     _print_timing("emit machine", stage_start)
 
     print(f"[4/5] Assembling → {obj_path}")
