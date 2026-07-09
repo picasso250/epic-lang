@@ -65,7 +65,7 @@ src/link.ep              # Epic 链接器（独立工具，不属于编译器不
 当前 Python reference compiler 验收检查：
 
 ```powershell
-python test_examples_py.py
+python test_examples.py
 python tests/mir/run.py
 python tests/x64/run.py
 ```

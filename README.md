@@ -124,7 +124,7 @@ Recommended test entry points from the repository root:
 
 ```powershell
 python tests/run.py                    # module-level compiler tests
-python test_examples_py.py             # examples/ positive learning programs
+python test_examples.py             # examples/ positive learning programs
 python test_bootstrap_fixed_point.py   # self-hosting fixed-point check
 ```
 
@@ -147,7 +147,7 @@ Examples live under `examples/` and are intended to be positive, typical program
 that help new readers learn the current language.
 
 ```powershell
-python test_examples_py.py
+python test_examples.py
 ```
 
 Individual examples can be compiled through the Python reference compiler. Build

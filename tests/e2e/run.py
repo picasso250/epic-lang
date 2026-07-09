@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
 """
-tests/e2e/run.py — End-to-end MVP test runner.
+tests/e2e/run.py — End-to-end test runner.
 
-Scans tests/e2e/pass/*.ep and tests/e2e/fail/*.ep, reusing the run_test
-function from test_examples_py.py.
-
-tests/e2e/pass/*.ep:
-  Expected to compile successfully (and optionally run, checking # EXIT / # STDOUT).
-
-tests/e2e/fail/*.ep:
-  Two categories:
-  1. # COMPILE_FAIL: expected text — compile must fail with matching text.
-  2. # EXIT: non-zero / # STDOUT: ... — run-time failure scenarios.
+Scans tests/e2e/pass/*.ep and tests/e2e/fail/*.ep, using the shared Epic case
+runner from tests/ep_runner.py.
 """
 
 import os
@@ -19,34 +11,30 @@ import subprocess
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))  # repo root (up from tests/e2e/ -> tests/ -> repo)
+TESTS_DIR = os.path.dirname(SCRIPT_DIR)
+ROOT_DIR = os.path.dirname(TESTS_DIR)
+sys.path.insert(0, TESTS_DIR)
 
-# Import run_test from the legacy test_examples_py
-sys.path.insert(0, ROOT_DIR)
-import test_examples_py
+import ep_runner
 
 PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
 FAIL_DIR = os.path.join(SCRIPT_DIR, "fail")
 
 
-def run_cases(search_dir, label):
+def run_cases(search_dir):
     if not os.path.isdir(search_dir):
         return 0, 0, 0
 
-    passed = 0
-    failed = 0
-    skipped = 0
-
+    passed = failed = skipped = 0
     for ep_name in sorted(os.listdir(search_dir)):
         if not ep_name.endswith(".ep"):
             continue
 
         ep_path = os.path.join(search_dir, ep_name)
-
         try:
-            ok, detail = test_examples_py.run_test(ep_path, linker="py")
+            ok, detail = ep_runner.run_python_case(ep_path, linker="py", root_dir=ROOT_DIR)
         except subprocess.TimeoutExpired:
-            ok, detail = False, "TIMEOUT (compile >30s)"
+            ok, detail = False, "TIMEOUT"
         except Exception as e:
             ok, detail = False, f"exception: {e}"
 
@@ -65,18 +53,16 @@ def run_cases(search_dir, label):
 
 
 def main():
-    total_passed = 0
-    total_failed = 0
-    total_skipped = 0
+    total_passed = total_failed = total_skipped = 0
 
     print("  e2e/pass:")
-    p, f, s = run_cases(PASS_DIR, "pass")
+    p, f, s = run_cases(PASS_DIR)
     total_passed += p
     total_failed += f
     total_skipped += s
 
     print("  e2e/fail:")
-    p, f, s = run_cases(FAIL_DIR, "fail")
+    p, f, s = run_cases(FAIL_DIR)
     total_passed += p
     total_failed += f
     total_skipped += s

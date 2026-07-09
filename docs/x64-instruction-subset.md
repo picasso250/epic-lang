@@ -337,7 +337,7 @@ Current files:
 - `tests/mir/test_mir.py`: MIR text and validation smoke test。
 - `tests/x64/test_x64_layers.py`: X64 pretty print, MIR-to-X64 function lowering, and
   X64-to-machine bytes/fixups。
-- `test_examples_py.py`: executable-level acceptance for the Python machine backend。
+- `test_examples.py`: executable-level acceptance for the Python machine backend。
 
 The lower layers should stay small. Do not use full examples to test a single
 encoding rule; use a tiny X64Program with one or two labels and one relocation.
