@@ -98,13 +98,6 @@ fun sema_set_type(node: AstNode, typ: str): str {
     ret typ
 }
 
-fun sema_need_type(node: AstNode): str {
-    if ast_resolved_type(node) == "" {
-        sema_die(f"internal typed AST missing resolved_type for {ast_kind(node)}")
-    }
-    ret ast_resolved_type(node)
-}
-
 fun sema_is_int(t: str): bool {
     ret epic_type_is_int(t)
 }
@@ -260,13 +253,6 @@ fun sema_union_common_embedded_field_type(st: SemaState, union_name: str, field:
         sema_die(f"union {union_name} has no common embedded field {field}")
     }
     ret found
-}
-
-fun sema_field_guard_key(object: AstNode, field: str): str {
-    if ast_kind(object) == "Var" {
-        ret sema_key2(ast_name(object), field)
-    }
-    ret ""
 }
 
 fun sema_is_reference_type(st: SemaState, typ: str): bool {
