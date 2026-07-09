@@ -1161,7 +1161,7 @@ fun mir_emit_map_init(st: MirCodegenState, block: MirBlock, expr: AstMapInit): M
     let new_helper = mir_map_helper(st, expr.AstMeta.resolved_type, "new")
     let set_helper = mir_map_helper(st, expr.AstMeta.resolved_type, "set")
     if new_helper == "" || set_helper == "" {
-        ast_to_mir_die(f"unsupported map init target: {expr.type_name}")
+        ast_to_mir_die(f"unsupported map init target: {type_expr_text(expr.source_type)}")
     }
     let args0 = new MirOperand[0]
     let map_value = mir_emit_call_inst(st, new_helper, "ptr", args0)
@@ -1225,19 +1225,20 @@ fun mir_emit_new_array(st: MirCodegenState, block: MirBlock, expr: AstNewArray):
         st.current_block = count_flow.block
         count = count_flow.value
     }
-    let arr = mir_emit_empty_array(st, expr.type_name, count)
+    let arr = mir_emit_empty_array(st, epic_type_array_elem(expr.AstMeta.resolved_type), count)
     ret mir_value_flow(arr, st.current_block)
 }
 
 fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstArrayLiteral): MirValueFlow {
     st.current_block = block
     let count = mir_const_int("i64", len(expr.args))
-    let arr = mir_emit_array_literal_storage(st, expr.type_name, count)
+    let elem_type = epic_type_array_elem(expr.AstMeta.resolved_type)
+    let arr = mir_emit_array_literal_storage(st, elem_type, count)
     let i = 0
     for i < len(expr.args) {
         let args = new MirOperand[0]
         args.push(arr)
-        if mir_is_u8_array_elem_type(expr.type_name) {
+        if mir_is_u8_array_elem_type(elem_type) {
             args.push(mir_const_int("i64", i))
             let elem_flow = mir_emit_expr(st, st.current_block, expr.args[i])
             st.current_block = elem_flow.block
@@ -1248,7 +1249,7 @@ fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstArrayL
             let elem_flow = mir_emit_expr(st, st.current_block, expr.args[i])
             st.current_block = elem_flow.block
             args.push(elem_flow.value)
-            if mir_is_ptr_array_elem_type(st, expr.type_name) {
+            if mir_is_ptr_array_elem_type(st, elem_type) {
                 mir_emit_call_inst(st, "__ep_slice_ptr_set", "void", args)
             } else {
                 mir_emit_call_inst(st, "__ep_slice_i64_set", "void", args)
@@ -2481,7 +2482,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                             match sdef.fields[fi2] {
                                 AstStructField field: {
                                     st.struct_field_keys.push(mir_struct_key(sdef.name, field.name))
-                                    let field_mir_type = mir_epic_type(field.type_name)
+                                    let field_mir_type = mir_epic_type(field.AstMeta.resolved_type)
                                     st.struct_field_types.push(field_mir_type)
                                     st.struct_field_indexes.push(fi2)
                                     if field.embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }

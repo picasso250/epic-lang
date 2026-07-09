@@ -144,23 +144,9 @@ fun sema_is_reserved_func(name: str): bool {
     ret false
 }
 
-fun sema_type_name(st: SemaState, name: str): str {
+fun sema_type_atom(st: SemaState, name: str): str {
     if name == "" {
         ret "void"
-    }
-    if sema_is_array(name) {
-        let elem = sema_type_name(st, sema_array_elem(name))
-        if elem == "void" {
-            sema_die("array element type cannot be void")
-        }
-        ret epic_type_array_of(elem)
-    }
-    if sema_is_map(name) {
-        let value = sema_type_name(st, sema_map_value(name))
-        if value == "void" {
-            sema_die("map value type cannot be void")
-        }
-        ret epic_type_map_of(value)
     }
     if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" {
         ret name
@@ -175,6 +161,28 @@ fun sema_type_name(st: SemaState, name: str): str {
         ret name
     }
     sema_die(f"unknown type {name}")
+    ret ""
+}
+
+fun sema_type_name(st: SemaState, typ: TypeExpr): str {
+    match typ {
+        TypeMissing n: { ret "void" }
+        TypeName n: { ret sema_type_atom(st, n.name) }
+        TypeArray n: {
+            let elem = sema_type_name(st, n.elem)
+            if elem == "void" {
+                sema_die("array element type cannot be void")
+            }
+            ret epic_type_array_of(elem)
+        }
+        TypeMap n: {
+            let value = sema_type_name(st, n.value)
+            if value == "void" {
+                sema_die("map value type cannot be void")
+            }
+            ret epic_type_map_of(value)
+        }
+    }
     ret ""
 }
 
@@ -629,7 +637,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                                         sema_die(f"duplicate field {sema_key2(s.name, f.name)}")
                                     }
                                     seen[f.name] = true
-                                    f.AstMeta.resolved_type = sema_type_name(st, f.type_name)
+                                    f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
                                     if f.embedded && st.struct_names.has(f.AstMeta.resolved_type) == false {
                                         sema_die(f"embedded field {sema_key2(s.name, f.name)} must be a struct")
                                     }
@@ -692,13 +700,13 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                         if sema_is_reserved_func(f.name) {
                             sema_die(f"reserved builtin function name: {f.name}")
                         }
-                        f.AstMeta.resolved_type = sema_type_name(st, f.type_name)
+                        f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
                         st.funcs_ret[f.name] = f.AstMeta.resolved_type
                         st.funcs_param_count[f.name] = len(f.params)
                         for j in 0:len(f.params) {
                             match f.params[j] {
                                 AstParam p: {
-                                    p.AstMeta.resolved_type = sema_type_name(st, p.type_name)
+                                    p.AstMeta.resolved_type = sema_type_name(st, p.source_type)
                                     if p.AstMeta.resolved_type == "void" {
                                         sema_die(f"function {f.name} parameter {p.name} cannot have type void")
                                     }
@@ -800,8 +808,8 @@ fun sema_build_globals(st: SemaState, ast: AstNode): void {
                             _: {}
                         }
                         let target = ""
-                        if g.type_name != "" {
-                            target = sema_type_name(st, g.type_name)
+                        if type_expr_is_missing(g.source_type) == false {
+                            target = sema_type_name(st, g.source_type)
                         }
                         let val = sema_expr_type(st, g.value_expr)
                         if target == "" {
@@ -958,7 +966,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, base)
         }
         AstNewArray n: {
-            let elem = sema_type_name(st, n.type_name)
+            let elem = sema_type_name(st, n.elem_type)
             match n.count {
                 AstEmpty e: {}
                 _: {
@@ -968,7 +976,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, str_cat2(elem, "[]"))
         }
         AstArrayLiteral n: {
-            let elem = sema_type_name(st, n.type_name)
+            let elem = sema_type_name(st, n.elem_type)
             for i in 0:len(n.args) {
                 sema_check_assign(st, elem, n.args[i], "array literal element")
             }
@@ -1004,7 +1012,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, n.type_name)
         }
         AstMapInit n: {
-            let typ = sema_type_name(st, n.type_name)
+            let typ = sema_type_name(st, n.source_type)
             if sema_is_map(typ) {
                 let value_type = sema_map_value(typ)
                 if len(n.map_keys) != len(n.map_values) {
@@ -1208,7 +1216,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "u8" {
         sema_check_arity(node.name, 1, node.args)
         sema_expect_int(st, node.args[0], f"{node.name} argument")
-        ret sema_type_name(st, node.name)
+        ret sema_type_atom(st, node.name)
     }
     if node.name == "bool" {
         sema_check_arity("bool", 1, node.args)
@@ -1301,8 +1309,8 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 _: {}
             }
             let target = ""
-            if n.type_name != "" {
-                target = sema_type_name(st, n.type_name)
+            if type_expr_is_missing(n.source_type) == false {
+                target = sema_type_name(st, n.source_type)
             }
             let val = sema_expr_type(st, n.value_expr)
             if target == "" {
