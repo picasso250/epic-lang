@@ -217,6 +217,8 @@ Once the parser knows a child has a concrete type, keep that type until the valu
 
 The same rule applies to AST constructors. `ast_new_*` should return the concrete payload type, not `AstNode`. Wrap with `new AstNode(payload)` only at heterogeneous boundaries such as block statements, expression operands, call arguments, and optional expression fields.
 
+Single-use AST constructors should usually be deleted and replaced with direct struct literals at the construction site. Keep only constructors that are reused or encode a real semantic sentinel, such as common default block/param/literal builders.
+
 ## Pattern 4: uniform union projection still using tag dispatch
 
 Bad generated shape:
