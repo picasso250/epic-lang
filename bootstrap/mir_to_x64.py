@@ -52,7 +52,7 @@ class MirLower:
         self.x64.inst("push", R("rbp"))
         self.x64.inst("mov", R("rbp"), R("rsp"))
         if frame:
-            self.x64.inst("sub", R("rsp"), I(frame))
+            self._emit_stack_alloc(frame)
         if fn.name == "main":
             emit_startup_hook_call(self.x64, self.has_global_init)
         for idx, param in enumerate(fn.params):
@@ -71,6 +71,18 @@ class MirLower:
             self.x64.inst("add", R("rsp"), I(frame))
         self.x64.inst("pop", R("rbp"))
         self.x64.inst("ret")
+
+    def _emit_stack_alloc(self, size):
+        if size < 4096:
+            self.x64.inst("sub", R("rsp"), I(size))
+            return
+        remaining = size
+        while remaining > 0:
+            step = 4096 if remaining > 4096 else remaining
+            self.x64.inst("sub", R("rsp"), I(step))
+            self.x64.inst("mov", R("r11"), M("rsp"))
+            self.x64.inst("mov", M("rsp"), R("r11"))
+            remaining -= step
 
     def _plan_slots(self, fn):
         for param in fn.params:
