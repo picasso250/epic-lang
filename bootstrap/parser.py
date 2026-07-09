@@ -649,11 +649,16 @@ class Parser:
 
     def parse_brace_values(self):
         values = []
-        if not self.peek_kind("RBRACE"):
-            while True:
-                values.append(self.parse_expr())
-                if not self.check("COMMA"):
-                    break
+        self.skip_newlines()
+        while not self.peek_kind("RBRACE"):
+            values.append(self.parse_expr())
+            if self.check("COMMA"):
+                self.skip_newlines()
+            elif self.peek_kind("NEWLINE"):
+                self.skip_newlines()
+            elif not self.peek_kind("RBRACE"):
+                t = self.peek()
+                raise ParseError("Expected comma or newline in array literal", t[2])
         self.expect("RBRACE")
         return values
 

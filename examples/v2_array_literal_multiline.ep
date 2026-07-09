@@ -1,0 +1,9 @@
+# EXIT: 12
+fun main(): i64 {
+    let xs = new i64[] {
+        2
+        4
+        6
+    }
+    ret xs[0] + xs[1] + xs[2]
+}
