@@ -570,6 +570,34 @@ fun mir_union_common_embedded_field_type(st: MirCodegenState, union_name: str, f
     ret found
 }
 
+fun mir_uniform_direct_embedded_field_member(st: MirCodegenState, union_name: str, field_name: str): str {
+    let members = mir_union_member_names(st, union_name)
+    if len(members) == 0 {
+        ret ""
+    }
+    let first_member = members[0]
+    if mir_is_embedded_field(st, first_member, field_name) == false {
+        ret ""
+    }
+    let first_type = mir_direct_field_type(st, first_member, field_name)
+    let first_index = mir_direct_field_index(st, first_member, field_name)
+    if first_type == "" || first_index < 0 {
+        ret ""
+    }
+    for i in 1:len(members) {
+        if mir_is_embedded_field(st, members[i], field_name) == false {
+            ret ""
+        }
+        if mir_direct_field_type(st, members[i], field_name) != first_type {
+            ret ""
+        }
+        if mir_direct_field_index(st, members[i], field_name) != first_index {
+            ret ""
+        }
+    }
+    ret first_member
+}
+
 fun mir_union_has_common_embedded_field(st: MirCodegenState, union_name: str, field_name: str): bool {
     let members = mir_union_member_names(st, union_name)
     if len(members) == 0 {
@@ -737,6 +765,12 @@ fun mir_store_union_partial_field(st: MirCodegenState, union_value: MirOperand, 
 
 fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirValueFlow {
     let field_typ = mir_union_common_embedded_field_type(st, union_name, field_name)
+    let uniform_member = mir_uniform_direct_embedded_field_member(st, union_name, field_name)
+    if uniform_member != "" {
+        let payload = mir_load_field(st, union_value, union_name, "payload")
+        let value = mir_load_field(st, payload, uniform_member, field_name)
+        ret mir_value_flow(value, st.current_block)
+    }
     let wrapper_addr = mir_alloc_local(st, "__union_field", "ptr")
     mir_emit_inst(st, mir_store(union_value, wrapper_addr))
     let result_addr = mir_alloc_local(st, "__union_field_result", field_typ)

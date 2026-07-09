@@ -391,6 +391,30 @@ class MirCodegen(MirFunctionBuilder):
             raise MirCodegenError(f"union {union_name} has no common embedded field {field}")
         return found
 
+    def _uniform_direct_embedded_field_member(self, union_name, field):
+        members = list(self.union_defs.get(union_name, []))
+        if not members:
+            return None
+        first_member = members[0]
+        if field not in self.embedded_fields.get(first_member, set()):
+            return None
+        try:
+            first_layout = self.structs[first_member].field(field)
+            first_index = self.structs[first_member].field_index(field)
+        except KeyError:
+            return None
+        for member in members[1:]:
+            if field not in self.embedded_fields.get(member, set()):
+                return None
+            try:
+                layout = self.structs[member].field(field)
+                index = self.structs[member].field_index(field)
+            except KeyError:
+                return None
+            if layout.type != first_layout.type or index != first_index:
+                return None
+        return first_member
+
     def _union_partial_field_members(self, union_name, field):
         members = []
         found = None
@@ -478,6 +502,10 @@ class MirCodegen(MirFunctionBuilder):
 
     def _load_union_common_embedded_field(self, union_value, union_name, field):
         field_layout = self._union_common_embedded_field_layout(union_name, field)
+        uniform_member = self._uniform_direct_embedded_field_member(union_name, field)
+        if uniform_member is not None:
+            payload = self._load_field(union_value, union_name, "payload")
+            return self._load_field(payload, uniform_member, field, result_type=field_layout.type)
         wrapper_addr = self._alloc_local("__union_field", ptr())
         self.inst("store", [union_value, ValueOperand(wrapper_addr)])
         result_addr = self._alloc_local("__union_field_result", field_layout.type)
