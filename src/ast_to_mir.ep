@@ -2588,12 +2588,8 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
 
     let pi = 0
     for pi < len(fn_ast.params) {
-        match fn_ast.params[pi] {
-            AstParam param: {
-                st.current_fn.params.push(mir_param(param.name, mir_epic_type(param.AstMeta.resolved_type)))
-            }
-            _: { ast_to_mir_die("internal: expected function parameter") }
-        }
+        let param = fn_ast.params[pi]
+        st.current_fn.params.push(mir_param(param.name, mir_epic_type(param.AstMeta.resolved_type)))
         pi = pi + 1
     }
 
@@ -2680,17 +2676,13 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 st.struct_names.push(sdef.name)
                 let fi2 = 0
                 for fi2 < len(sdef.fields) {
-                    match sdef.fields[fi2] {
-                        AstStructField field: {
-                            st.struct_field_keys.push(mir_struct_key(sdef.name, field.name))
-                            let field_mir_type = mir_epic_type(field.AstMeta.resolved_type)
-                            st.struct_field_types.push(field_mir_type)
-                            st.struct_field_indexes.push(fi2)
-                            if field.embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
-                            mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
-                        }
-                        _: { ast_to_mir_die("internal: expected struct field") }
-                    }
+                    let field = sdef.fields[fi2]
+                    st.struct_field_keys.push(mir_struct_key(sdef.name, field.name))
+                    let field_mir_type = mir_epic_type(field.AstMeta.resolved_type)
+                    st.struct_field_types.push(field_mir_type)
+                    st.struct_field_indexes.push(fi2)
+                    if field.embedded { st.struct_field_embedded.push(1) } else { st.struct_field_embedded.push(0) }
+                    mir_program_add_struct_field(st.program, sdef.name, field_mir_type, fi2)
                     fi2 = fi2 + 1
                 }
                 si = si + 1

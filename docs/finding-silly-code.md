@@ -182,43 +182,36 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
 
 Some lists are truly heterogeneous, for example call arguments or block statements. Other lists are semantically homogeneous and should be represented with the narrowest element type practical.
 
-`AstProgram` top-level buckets are already narrow:
+The core AST buckets and homogeneous child lists are narrow:
 
 - `program.funcs` is `AstFunDef[]`.
 - `program.structs` is `AstStructDef[]`.
 - `program.globals` is `AstLet[]`.
 - `program.unions` is `AstUnionDef[]`.
+- `struct.fields` is `AstStructField[]`.
+- `fun.params` is `AstParam[]`.
+- `match.fields` is `AstMatchCase[]`.
+- `struct_init.fields` is `AstInitField[]`.
 
-This pattern still applies to remaining homogeneous `AstNode[]` lists:
-
-- `struct.fields` contains `AstStructField`.
-- `match.fields` contains `AstMatchCase`.
+Keep `AstNode[]` for truly heterogeneous lists, such as block statements, call arguments, array literal expressions, f-string parts, and map keys/values.
 
 Bad shape:
 
 ```epic
-for i in program.funcs {
-    match program.funcs[i] {
-        AstFunDef f: {
-            st.current_fn = f.name
-            sema_block(st, f.body)
-        }
-        _: { sema_die("internal: expected function definition") }
-    }
-}
+let field = ast_new_struct_field()
+ast_set_name(field, token_text(fname))
+ast_fields(node).push(field)
 ```
 
 Better shape:
 
 ```epic
-for i in program.funcs {
-    let f = program.funcs[i]
-    st.current_fn = f.name
-    sema_block(st, f.body)
-}
+let field = ast_new_struct_field()
+field.name = token_text(fname)
+node.fields.push(field)
 ```
 
-Once a container field has a concrete element type, downstream code should trust that type instead of re-matching every element.
+Once the parser knows a child has a concrete type, keep that type until the value actually crosses into a heterogeneous AST position. Downstream code should trust concrete container element types instead of re-matching every element.
 
 ## Pattern 4: uniform union projection still using tag dispatch
 
