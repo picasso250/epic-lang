@@ -1,9 +1,9 @@
 """Minimal text MIR parser for runtime helper files.
 
-This parser is intentionally small: it parses the text MIR subset we keep under
-runtime/mir and produces the existing MIR object model. Text sigils are syntax
-only: module symbols may be written with @, locals are written with %, and both
-are stored raw in the object model.
+This parser is intentionally small: it parses the text MIR subset used by the
+runtime/mir/helpers.mir bundle and produces the existing MIR object model. Text
+sigils are syntax only: module symbols may be written with @, locals are written
+with %, and both are stored raw in the object model.
 """
 
 from __future__ import annotations

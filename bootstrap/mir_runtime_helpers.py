@@ -1,10 +1,7 @@
-"""MIR runtime helpers — MirFunction implementations for selected builtins.
+"""MIR runtime helpers loaded from the committed runtime MIR bundle.
 
-Each helper is a hand-coded MirFunction that replaces an x64-backed runtime
-helper.  They use existing MIR ops (call/gep/load/store/ret) and call existing
-x64 primitives (notably __epx_alloc).  The codegen pipeline injects all
-implemented helpers, and the lowering pipeline emits them through the normal
-_lower_function path.
+The runtime helper bodies live in ``runtime/mir/helpers.mir`` so the Python and
+self-hosted compilers consume the same helper text during development.
 """
 
 from pathlib import Path
@@ -1332,7 +1329,7 @@ _RUNTIME_STRING_GLOBALS = (
 )
 
 
-_RUNTIME_MIR_DIR = Path(__file__).resolve().parent.parent / "runtime" / "mir"
+_RUNTIME_MIR_BUNDLE = Path(__file__).resolve().parent.parent / "runtime" / "mir" / "helpers.mir"
 _PARSED_HELPERS = None
 
 
@@ -1340,14 +1337,22 @@ def _parsed_runtime_helpers():
     global _PARSED_HELPERS
     if _PARSED_HELPERS is not None:
         return _PARSED_HELPERS
+    if not _RUNTIME_MIR_BUNDLE.exists():
+        raise RuntimeError(
+            f"missing MIR runtime helper bundle: {_RUNTIME_MIR_BUNDLE}; "
+            "run scripts/write_mir_runtime_bundle.py"
+        )
     helpers = {}
-    if _RUNTIME_MIR_DIR.exists():
-        for path in sorted(_RUNTIME_MIR_DIR.glob("*.mir")):
-            parsed = parse_mir_file(path, validate_program=False)
-            for fn in parsed.functions:
-                if fn.name in helpers:
-                    raise RuntimeError(f"duplicate parsed MIR helper: {fn.name}")
-                helpers[fn.name] = fn
+    parsed = parse_mir_file(_RUNTIME_MIR_BUNDLE, validate_program=False)
+    for fn in parsed.functions:
+        if fn.name in helpers:
+            raise RuntimeError(f"duplicate parsed MIR helper: {fn.name}")
+        helpers[fn.name] = fn
+    expected = set(IMPLEMENTED_MIR_HELPERS)
+    missing = [name for name in IMPLEMENTED_MIR_HELPERS if name not in helpers]
+    extra = sorted(name for name in helpers if name not in expected)
+    if missing or extra:
+        raise RuntimeError(f"MIR runtime helper bundle mismatch: missing={missing}, extra={extra}")
     _PARSED_HELPERS = helpers
     return helpers
 
@@ -1367,8 +1372,5 @@ def inject_all_mir_helpers(program: MirProgram) -> None:
 
     parsed_helpers = _parsed_runtime_helpers()
     for name in IMPLEMENTED_MIR_HELPERS:
-        if name in parsed_helpers:
-            program.functions.append(parsed_helpers[name])
-        else:
-            program.functions.append(_HELPER_EMITTERS[name](program))
+        program.functions.append(parsed_helpers[name])
 

@@ -387,9 +387,11 @@ MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
-ordinary `MirFunction`s injected by `bootstrap/mir_runtime_helpers.py`; they no
-longer have same-named x64 fallback bodies. Remaining x64 labels and function
-bodies are hand-written in `mir_to_x64.py` `_emit_*()` methods.
+ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
+`bootstrap/mir_runtime_helpers.py` in the Python compiler and `src/mir_runtime.ep`
+in the self-hosted compiler. They no longer have same-named x64 fallback bodies.
+Remaining x64 labels and function bodies are hand-written in `mir_to_x64.py`
+`_emit_*()` methods.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md` and `docs/self-host-core.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.
 

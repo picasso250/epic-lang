@@ -105,7 +105,7 @@ required_helpers: defer; unconditional injection stays for now
 
 ### Runtime Helpers (MIR-implemented)
 
-These are unconditionally injected and considered part of the core runtime. Implementation ownership is split between Python MIR builders, Epic runtime source, and optional text MIR files; helper bodies are not mechanically migrated to `runtime/mir/*.mir` when another representation is clearer:
+These are unconditionally injected and considered part of the core runtime. MIR helper bodies used by both compilers live in the committed bundle `runtime/mir/helpers.mir`; update it with `python scripts/write_mir_runtime_bundle.py` after changing builder-backed helpers:
 
 - `__ep_slice_u8_from_str` — str to `_slice_u8`
 - `__ep_str_from_slice_u8` — `_slice_u8` to str

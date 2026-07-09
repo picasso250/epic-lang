@@ -222,20 +222,22 @@ entry:
     assert fn.text().startswith("define ptr @main(ptr %arg)")
 
 
-def test_runtime_mir_file_parses_without_local_validation():
-    path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "slice_i64_get.mir"))
+def test_runtime_mir_bundle_parses_without_local_validation():
+    runtime_mir_dir = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir"))
+    path = runtime_mir_dir / "helpers.mir"
+    assert sorted(p.name for p in runtime_mir_dir.glob("*.mir")) == ["helpers.mir"]
     text = path.read_text(encoding="utf-8")
     try:
         parse_mir_text(text, filename=str(path))
     except MirValidationError as exc:
-        assert "callee is not callable: ExitProcess" in str(exc), str(exc)
+        assert "callee is not callable" in str(exc), str(exc)
     else:
-        raise AssertionError("runtime helper .mir should not need local extern declarations")
+        raise AssertionError("runtime helper bundle should not need local extern declarations")
 
     program = parse_mir_file(path, validate_program=False)
-    assert len(program.functions) == 1
-    assert program.functions[0].name == "__ep_slice_i64_get"
-    assert program.functions[0].text() == text.strip()
+    assert [fn.name for fn in program.functions] == list(IMPLEMENTED_MIR_HELPERS)
+    parsed_fn = next(fn for fn in program.functions if fn.name == "__ep_slice_i64_get")
+    assert parsed_fn.text() in text
 
 
 def test_mir_helper_injection():
@@ -312,8 +314,9 @@ def test_mir_helper_injection():
 }"""
     )
 
-    parsed_helper_path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "slice_i64_get.mir"))
-    parsed_helper_text = parsed_helper_path.read_text(encoding="utf-8").strip()
+    parsed_helper_path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "helpers.mir"))
+    parsed_helper_program = parse_mir_file(parsed_helper_path, validate_program=False)
+    parsed_helper_text = next(fn for fn in parsed_helper_program.functions if fn.name == "__ep_slice_i64_get").text()
     parsed_prog = check(
         """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
@@ -675,7 +678,7 @@ def main():
     test_codegen_emits_target_mir_only_for_aggregates()
     test_mir_parser_rejects_unsigned_integer_types()
     test_mir_parser_strips_text_sigils()
-    test_runtime_mir_file_parses_without_local_validation()
+    test_runtime_mir_bundle_parses_without_local_validation()
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()
     test_runtime_source_str_from_bool_lowers_as_epic_function()

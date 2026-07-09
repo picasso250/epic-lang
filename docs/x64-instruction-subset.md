@@ -361,10 +361,10 @@ are injected as ordinary
 
 Remaining hand-written x64 helper bodies live in `bootstrap/x64_runtime.py`, not on `MirLower`. Public `__ep_*` helper symbols are semantic-layer entry points; hand-written x64 implementations use `__epx_*` primitive symbols. Current public wrappers tail-jump to the matching primitive so frontend/codegen call sites stay stable while individual helpers migrate to MIR or Epic runtime source.
 
-Recommended next step: do not mechanically move Python-builder MIR helper bodies into
-`runtime/mir/*.mir`. Prefer Epic runtime source for readable library logic,
-Python builders for templated helper families, and text MIR only for low-level
-helpers where auditability outweighs verbosity. Continue replacing `__ep_*` wrappers with MIR/Epic implementations one family at a time; keep only true machine/runtime primitives such as heap setup, process startup, OS calls, and traps in `x64_runtime.py` as `__epx_*`.
+MIR helper bodies are bundled in `runtime/mir/helpers.mir` so the Python and self-hosted
+compilers consume the same runtime text. Continue replacing `__ep_*` wrappers with MIR/Epic
+implementations one family at a time; keep only true machine/runtime primitives such as heap
+setup, process startup, OS calls, and traps in `x64_runtime.py` as `__epx_*`.
 
 ### 8.2 X64Program validator exists
 
