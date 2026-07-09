@@ -71,6 +71,7 @@ def brace_delta(line: str) -> tuple[int, int]:
 def format_text(text: str, indent_width: int = 4) -> str:
     indent = 0
     out: list[str] = []
+    prev_blank = False
 
     for raw_line in text.splitlines(keepends=True):
         if raw_line.endswith("\r\n"):
@@ -85,7 +86,9 @@ def format_text(text: str, indent_width: int = 4) -> str:
 
         content = line.lstrip(" \t")
         if content == "":
-            out.append(newline)
+            if not prev_blank:
+                out.append(newline)
+            prev_blank = True
             continue
 
         content = line.lstrip(" \t")
@@ -93,6 +96,7 @@ def format_text(text: str, indent_width: int = 4) -> str:
         line_indent = max(0, indent - leading_closes)
         out.append(" " * (line_indent * indent_width) + content + newline)
         indent = max(0, indent + delta)
+        prev_blank = False
 
     return "".join(out)
 

@@ -587,7 +587,6 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: map[str]bool):
     ret out
 }
 
-
 fun sema_build_types(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
@@ -652,8 +651,6 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
     sema_die("internal: expected program")
 }
 
-
-
 fun sema_build_funcs(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
@@ -697,8 +694,6 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
     }
     sema_die("internal: expected program")
 }
-
-
 
 fun sema_is_global_literal_init(node: AstNode): bool {
     match node {
@@ -751,8 +746,6 @@ fun sema_is_global_literal_init(node: AstNode): bool {
     ret false
 }
 
-
-
 fun sema_build_globals(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
@@ -787,7 +780,6 @@ fun sema_build_globals(st: SemaState, ast: AstNode): void {
     sema_die("internal: expected program")
 }
 
-
 fun sema_reset_locals(st: SemaState): void {
     st.locals = new map[str]str { "argv": epic_type_array_of("str") }
 }
@@ -808,7 +800,6 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     sema_die(f"subscript expected array, map, or pointer, got {base}")
     ret ""
 }
-
 
 fun sema_expr_type(st: SemaState, node: AstNode): str {
     match node {
@@ -987,8 +978,6 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
     ret ""
 }
 
-
-
 fun sema_check_os_call(st: SemaState, node: AstCall, count: i64, ret_type: str): str {
     sema_check_arity(f"os.{node.dll}.{node.name}", count, node.args)
     for i in 0:count {
@@ -996,8 +985,6 @@ fun sema_check_os_call(st: SemaState, node: AstCall, count: i64, ret_type: str):
     }
     ret ret_type
 }
-
-
 
 fun sema_os_call_type(st: SemaState, node: AstCall): str {
     if node.dll != "kernel32" && node.dll != "user32" {
@@ -1063,8 +1050,6 @@ fun sema_os_call_type(st: SemaState, node: AstCall): str {
     ret ""
 }
 
-
-
 fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
     match node.object {
         AstFieldAccess field: {
@@ -1125,7 +1110,6 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
     sema_die("method calls are only supported for os.*, slices, maps, and user structs for now")
     ret ""
 }
-
 
 fun sema_call_type(st: SemaState, node: AstCall): str {
     if node.type_name == "os" {
@@ -1247,7 +1231,6 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     ret st.funcs_ret[node.name]
 }
 
-
 fun sema_lvalue_type(st: SemaState, node: AstNode): str {
     if ast_kind(node) == "Var" {
         ret sema_set_type(node, sema_lookup(st, ast_name(node)))
@@ -1258,7 +1241,6 @@ fun sema_lvalue_type(st: SemaState, node: AstNode): str {
     sema_die(f"unsupported assignment target {ast_kind(node)}")
     ret ""
 }
-
 
 fun sema_stmt(st: SemaState, node: AstNode): void {
     match node {
@@ -1471,13 +1453,11 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
     }
 }
 
-
 fun sema_block(st: SemaState, block: AstBlock): void {
     for i in block.stmts {
         sema_stmt(st, block.stmts[i])
     }
 }
-
 
 fun sema_expr_is_exit(node: AstNode): bool {
     match node {
@@ -1491,8 +1471,6 @@ fun sema_expr_is_exit(node: AstNode): bool {
     }
     ret false
 }
-
-
 
 fun sema_stmt_returns(node: AstNode): bool {
     match node {
@@ -1523,7 +1501,6 @@ fun sema_stmt_returns(node: AstNode): bool {
     }
     ret false
 }
-
 
 fun sema_block_returns(block: AstBlock): bool {
     for i in block.stmts {

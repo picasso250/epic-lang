@@ -132,7 +132,6 @@ fun mir_global_index(st: MirCodegenState, name: str): i64 {
     ret 0 - 1
 }
 
-
 fun mir_add_global_lets(st: MirCodegenState, ast: AstProgram): void {
     let i = 0
     for i < len(ast.globals) {
@@ -145,8 +144,6 @@ fun mir_add_global_lets(st: MirCodegenState, ast: AstProgram): void {
         i = i + 1
     }
 }
-
-
 
 fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
     if len(ast.globals) == 0 {
@@ -177,7 +174,6 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
     }
     st.program.functions.push(st.current_fn)
 }
-
 
 fun mir_struct_key(struct_name: str, field_name: str): str {
     ret str_cat2(str_cat2(struct_name, "."), field_name)
@@ -860,8 +856,6 @@ fun mir_emit_union_init(st: MirCodegenState, block: MirBlock, expr: AstUnionInit
     ret mir_value_flow(obj, st.current_block)
 }
 
-
-
 fun mir_trunc_uint_value(st: MirCodegenState, value: MirOperand, mask: i64): MirOperand {
     let inst = mir_make_result_inst(st, "and", "i64")
     inst.operands.push(value)
@@ -1299,7 +1293,6 @@ fun mir_os_call_return_type(dll: str, name: str): str {
     ret "i64"
 }
 
-
 fun mir_emit_os_call(st: MirCodegenState, expr: AstCall): MirValueFlow {
     let args = new MirOperand[0]
     let i = 0
@@ -1312,7 +1305,6 @@ fun mir_emit_os_call(st: MirCodegenState, expr: AstCall): MirValueFlow {
     let ret_type = mir_os_call_return_type(expr.dll, expr.name)
     ret mir_value_flow(mir_emit_call_inst(st, expr.name, ret_type, args), st.current_block)
 }
-
 
 fun mir_emit_short_circuit(st: MirCodegenState, block: MirBlock, expr: AstBinary): MirValueFlow {
     st.current_block = block
@@ -1378,7 +1370,6 @@ fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstSubscript)
     ast_to_mir_die(f"unsupported subscript base type {base_type}")
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
-
 
 fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): MirValueFlow {
     st.current_block = block
@@ -1478,8 +1469,6 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
     ast_to_mir_die(f"unsupported dot call {expr.name}")
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
-
-
 
 fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
@@ -1812,7 +1801,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
     }
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
-
 
 fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirBlockFlow {
     st.current_block = block
@@ -2314,7 +2302,6 @@ fun mir_emit_while(st: MirCodegenState, block: MirBlock, stmt: AstWhile): MirBlo
     ret mir_reachable_flow(end_block)
 }
 
-
 fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
     st.current_block = block
     match stmt {
@@ -2550,7 +2537,6 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
     ret mir_unreachable_flow()
 }
 
-
 fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
     let current = block
     let i = 0
@@ -2574,7 +2560,6 @@ fun mir_param(name: str, typ: str): MirParam {
     p.typ = typ
     ret p
 }
-
 
 fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     st.value_counter = 0
@@ -2618,7 +2603,6 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     ret st.current_fn
 }
 
-
 fun mir_register_slice_layout(st: MirCodegenState, name: str): void {
     st.struct_names.push(name)
     st.struct_field_keys.push(mir_struct_key(name, "data"))
@@ -2637,7 +2621,6 @@ fun mir_register_slice_layout(st: MirCodegenState, name: str): void {
     st.struct_field_embedded.push(0)
     mir_program_add_struct_field(st.program, name, "i64", 2)
 }
-
 
 fun mir_ast_to_mir(ast: AstNode): MirProgram {
     let st = new MirCodegenState
@@ -2708,7 +2691,6 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 mir_program_add_struct_field(st.program, union.name, "ptr", 1)
             }
 
-
             st.struct_names.push("str")
             st.struct_field_keys.push(mir_struct_key("str", "data"))
             st.struct_field_types.push("ptr")
@@ -2771,7 +2753,6 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 mir_register_slice_layout(st, str_cat2("_slice_", union.name))
             }
 
-
             let map_layouts = new str[0]
             map_layouts.push("_map_str_i64")
             map_layouts.push("_map_str_bool")
@@ -2823,7 +2804,6 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     ast_to_mir_die("internal: expected program")
     ret st.program
 }
-
 
 fun main(): void {
     if len(argv) < 2 {

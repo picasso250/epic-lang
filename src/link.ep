@@ -118,7 +118,6 @@ fun append_u16(buf: u8[], x: i64): void {
     put_u16_le(buf, off, u64(x))
 }
 
-
 fun put_u32_bits_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & u64(255))
     buf[off + 1] = u8((x >>> 8) & u64(255))

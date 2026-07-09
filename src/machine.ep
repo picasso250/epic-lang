@@ -351,7 +351,6 @@ fun machine_emit_call_symbol(b: MachineBuilder, symbol: str): void {
     machine_append_i32(b.text, 0)
 }
 
-
 fun machine_reg8(name: str): i64 {
     if name == "al" { ret 0 }
     if name == "cl" { ret 1 }
@@ -876,6 +875,4 @@ fun machine_print_object(obj: MachineObject): void {
     machine_print_bytes("TEXT", obj.text)
     machine_print_bytes("DATA", obj.data)
 }
-
-
 

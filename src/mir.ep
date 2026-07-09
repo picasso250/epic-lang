@@ -112,7 +112,6 @@ fun mir_const_int(typ: str, value: i64): MirOperand {
     ret new MirOperand(new MirIntOperand { typ: typ, value: value })
 }
 
-
 fun mir_operand_null(): MirOperand {
     ret new MirOperand(new MirNullOperand { dummy: 0 })
 }
@@ -420,8 +419,6 @@ fun mir_call(callee: str, ret_type: str, args: MirOperand[]): MirInst {
     inst.operands = args
     ret inst
 }
-
-
 
 fun mir_inst_result_prefix(inst: MirInst, buf: u8[]): void {
     if inst.has_result {

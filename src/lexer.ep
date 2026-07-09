@@ -90,7 +90,6 @@ fun push_fstring_expr(parts: FStringPart[], text: str): i64 {
     ret 0
 }
 
-
 # ── Char predicates ─────────────────────────────────────────────────────
 
 fun is_alpha(c: u8): bool {
@@ -157,7 +156,7 @@ fun decode_escape(e: u8): u8 {
         ret u8(0)
     }
     panic "bad escape"
-        ret u8(0)
+    ret u8(0)
 }
 
 fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
@@ -336,7 +335,6 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
     ret make_token("EOF", "", "", line)
 }
 
-
 # ── Lexer ───────────────────────────────────────────────────────────────
 
 fun lex(src: str): Token[] {
@@ -345,7 +343,6 @@ fun lex(src: str): Token[] {
     let n = len(src)
     let pos = 0
     let line = 1
-
 
     for pos < n {
         let ch = src_bytes[pos]
@@ -710,7 +707,6 @@ fun lex(src: str): Token[] {
     ret tokens
 }
 
-
 # ── Dump ────────────────────────────────────────────────────────────────
 
 fun dump_line(line: i64, kind: str, dump_text: str): i64 {
@@ -742,7 +738,6 @@ fun dump_tokens(tokens: Token[]): i64 {
     }
     ret 0
 }
-
 
 # ── Main ────────────────────────────────────────────────────────────────
 

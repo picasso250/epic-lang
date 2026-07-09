@@ -145,7 +145,6 @@ fun mir_to_x64_global_index(lower: MirToX64Lower, name: str): i64 {
     ret 0 - 1
 }
 
-
 fun mir_to_x64_slot(lower: MirToX64Lower): i64 {
     lower.next_slot = lower.next_slot + 8
     ret 0 - lower.next_slot
