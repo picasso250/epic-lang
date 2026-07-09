@@ -319,8 +319,11 @@ def main():
     parser.add_argument("example", nargs="?", help="exact example name or .ep path")
     parser.add_argument("--linker", choices=["lld", "py"], default="py",
                         help="Which linker to use (default: py)")
-    parser.add_argument("--self-hosted", action="store_true",
-                        help="Build src/epic.ep with Python, then use that EP compiler for examples")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--py-only", action="store_true",
+                      help="Run examples with the Python reference compiler only (default)")
+    mode.add_argument("--self-hosted", action="store_true",
+                      help="Build src/epic.ep with Python, then use that EP compiler for examples")
     args = parser.parse_args()
 
     ep_path = resolve_example(args.example)

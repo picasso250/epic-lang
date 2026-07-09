@@ -582,7 +582,10 @@ class Parser:
                         self.expect("RPAREN")
                         node = DotCallNode(object=node, name=field[1], args=args, line=field[2])
                     else:
-                        node = FieldAccessNode(object=node, field=field[1], line=field[2])
+                        if self.check("QUESTION"):
+                            node = FieldHasNode(object=node, field=field[1], line=field[2])
+                        else:
+                            node = FieldAccessNode(object=node, field=field[1], line=field[2])
                 elif self.check("LBRACKET"):
                     if self.check("COLON"):
                         raise ParseError("slice requires explicit start and end")
@@ -611,7 +614,7 @@ class Parser:
         for kind, value, _dump_value in parts:
             if kind == "text":
                 if value:
-                    parsed.append((kind, value))
+                    parsed.append(FStringTextPart(value))
                 continue
             if kind == "expr":
                 from lexer import lex
@@ -620,7 +623,7 @@ class Parser:
                 if p.peek()[0] != "EOF":
                     t = p.peek()
                     raise ParseError(f"Unexpected token {t[0]}('{t[1]}') in f-string expression", line)
-                parsed.append((kind, expr))
+                parsed.append(FStringExprPart(expr))
                 continue
             raise ParseError(f"Unknown f-string part {kind}", line)
         return parsed
@@ -802,11 +805,11 @@ def dump_ast_lines(node, depth=0):
         emit(f"String {node.value}")
     elif isinstance(node, FStringNode):
         emit("FString")
-        for kind, value in node.parts:
-            if kind == "text":
-                emit(f"  FStringText {value}")
-            else:
-                out.extend(dump_ast_lines(value, depth + 1))
+        for part in node.parts:
+            if isinstance(part, FStringTextPart):
+                emit(f"  FStringText {part.value}")
+            elif isinstance(part, FStringExprPart):
+                out.extend(dump_ast_lines(part.expr, depth + 1))
     elif isinstance(node, VarNode):
         emit(f"Var {node.name}")
     elif isinstance(node, CallNode):
@@ -828,6 +831,9 @@ def dump_ast_lines(node, depth=0):
         out.extend(dump_ast_lines(node.expr, depth + 1))
     elif isinstance(node, FieldAccessNode):
         emit(f"FieldAccess {node.field}")
+        out.extend(dump_ast_lines(node.object, depth + 1))
+    elif isinstance(node, FieldHasNode):
+        emit(f"FieldHas {node.field}")
         out.extend(dump_ast_lines(node.object, depth + 1))
     elif isinstance(node, SubscriptNode):
         emit("Subscript")

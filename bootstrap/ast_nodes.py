@@ -205,9 +205,23 @@ class StringNode(ASTNode):
     resolved_type: Optional[EpicType] = None
 
 
+class FStringPart:
+    pass
+
+
+@dataclass
+class FStringTextPart(FStringPart):
+    value: str
+
+
+@dataclass
+class FStringExprPart(FStringPart):
+    expr: ASTNode
+
+
 @dataclass
 class FStringNode(ASTNode):
-    parts: list
+    parts: list[FStringPart]
     resolved_type: Optional[EpicType] = None
 
 
@@ -243,6 +257,13 @@ class UnaryNode(ASTNode):
 
 @dataclass
 class FieldAccessNode(ASTNode):
+    object: ASTNode
+    field: str
+    resolved_type: Optional[EpicType] = None
+
+
+@dataclass
+class FieldHasNode(ASTNode):
     object: ASTNode
     field: str
     resolved_type: Optional[EpicType] = None

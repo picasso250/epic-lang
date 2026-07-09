@@ -69,6 +69,7 @@ TOKEN_SPEC = [
     ("RBRACE",    r'\}'),
     ("COMMA",     r','),
     ("COLON",     r':'),
+    ("QUESTION",  r'\?'),
     ("CHAR",      r"'(?:\\[nrt\\\\\"'0]|[^\\'\n\r])'"),
     ("STRING",    r'"(?:\\[nrt\\\\\"\'0]|[^\\\"\n\r])*"'),
     ("COMMENT",   r'#[^\n]*'),

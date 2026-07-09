@@ -60,6 +60,7 @@ class SemanticAnalyzer:
         self.func_sigs = {}
         self.globals = {}
         self.locals = {}
+        self.partial_field_guards = {}
         self.fn_name = None
         self.loop_depth = 0
 
@@ -186,7 +187,7 @@ class SemanticAnalyzer:
             self._check_assign(target, self._expr(stmt.value), f"assignment to {stmt.name}")
             return
         if isinstance(stmt, FieldSetNode):
-            target = self._field_type(self._expr(stmt.object).type, stmt.field)
+            target = self._field_access_type(stmt.object, stmt.field)
             self._check_assign(target, self._expr(stmt.value), f"assignment to field {stmt.field}")
             return
         if isinstance(stmt, SubscriptAssignNode):
@@ -198,7 +199,22 @@ class SemanticAnalyzer:
             return
         if isinstance(stmt, IfNode):
             self._expect_bool(self._expr(stmt.cond), "if condition")
+            guard_key = None
+            old_guard = None
+            had_old_guard = False
+            if isinstance(stmt.cond, FieldHasNode):
+                guard_key = self._field_guard_key(stmt.cond.object, stmt.cond.field)
+                if guard_key is None:
+                    self._fail("field existence guard requires a variable receiver")
+                old_guard = self.partial_field_guards.get(guard_key)
+                had_old_guard = guard_key in self.partial_field_guards
+                self.partial_field_guards[guard_key] = self._union_partial_field_type(self._expr(stmt.cond.object).type.name, stmt.cond.field)
             self._analyze_block(stmt.then_block)
+            if guard_key is not None:
+                if had_old_guard:
+                    self.partial_field_guards[guard_key] = old_guard
+                else:
+                    del self.partial_field_guards[guard_key]
             if stmt.else_block is not None:
                 self._analyze_block(stmt.else_block)
             return
@@ -358,9 +374,9 @@ class SemanticAnalyzer:
         if isinstance(expr, StringNode):
             return ExprInfo(STR)
         if isinstance(expr, FStringNode):
-            for kind, value in expr.parts:
-                if kind == "expr":
-                    self._check_str_convertible(self._expr(value), "f-string expression")
+            for part in expr.parts:
+                if isinstance(part, FStringExprPart):
+                    self._check_str_convertible(self._expr(part.expr), "f-string expression")
             return ExprInfo(STR)
         if isinstance(expr, VarNode):
             return ExprInfo(self._lookup(expr.name))
@@ -373,7 +389,9 @@ class SemanticAnalyzer:
         if isinstance(expr, DotCallNode):
             return self._dot_call_expr(expr)
         if isinstance(expr, FieldAccessNode):
-            return ExprInfo(self._field_type(self._expr(expr.object).type, expr.field))
+            return ExprInfo(self._field_access_type(expr.object, expr.field))
+        if isinstance(expr, FieldHasNode):
+            return ExprInfo(self._field_has_type(expr))
         if isinstance(expr, SubscriptNode):
             return ExprInfo(self._subscript_type(expr.base, expr.index))
         if isinstance(expr, SliceNode):
@@ -669,15 +687,71 @@ class SemanticAnalyzer:
     def _union_common_embedded_field_type(self, union_name, field):
         found = None
         for member in self.union_defs[union_name]:
-            if field not in self.struct_embedded_fields.get(member, set()):
-                self._fail(f"union {union_name} has no common embedded field {field}")
-            candidate = self.struct_fields[member][field]
+            if field in self.struct_embedded_fields.get(member, set()):
+                candidate = self.struct_fields[member][field]
+            else:
+                candidate = self._promoted_field_type(member, field)
+                if candidate is None:
+                    self._fail(f"union {union_name} has no common embedded field {field}")
             if found is not None and candidate != found:
                 self._fail(f"union {union_name} embedded field {field} has inconsistent types")
             found = candidate
         if found is None:
             self._fail(f"union {union_name} has no common embedded field {field}")
         return found
+
+    def _field_guard_key(self, object_expr, field):
+        if isinstance(object_expr, VarNode):
+            return f"{object_expr.name}.{field}"
+        return None
+
+    def _union_partial_field_type(self, union_name, field):
+        found = None
+        for member in self.union_defs[union_name]:
+            fields = self.struct_fields.get(member, {})
+            if field not in fields:
+                continue
+            candidate = fields[field]
+            if found is not None and candidate != found:
+                self._fail(f"union {union_name} field {field} has inconsistent types")
+            found = candidate
+        if found is None:
+            self._fail(f"union {union_name} has no variant field {field}")
+        return found
+
+    def _union_partial_or_promoted_field_type(self, union_name, field):
+        found = None
+        for member in self.union_defs[union_name]:
+            fields = self.struct_fields.get(member, {})
+            if field in fields:
+                candidate = fields[field]
+            else:
+                candidate = self._promoted_field_type(member, field)
+                if candidate is None:
+                    continue
+            if found is not None and candidate != found:
+                self._fail(f"union {union_name} field {field} has inconsistent types")
+            found = candidate
+        if found is None:
+            self._fail(f"union {union_name} has no variant field {field}")
+        return found
+
+    def _field_has_type(self, expr):
+        base = self._expr(expr.object).type
+        if base.kind != "named" or base.name not in self.union_names:
+            self._fail(f"field existence guard expected union, got {base}")
+        if self._field_guard_key(expr.object, expr.field) is None:
+            self._fail("field existence guard requires a variable receiver")
+        self._union_partial_field_type(base.name, expr.field)
+        return BOOL
+
+    def _field_access_type(self, object_expr, field):
+        base_type = self._expr(object_expr).type
+        if base_type.kind == "named" and base_type.name in self.union_names:
+            guard_key = self._field_guard_key(object_expr, field)
+            if guard_key is not None and guard_key in self.partial_field_guards:
+                return self.partial_field_guards[guard_key]
+        return self._field_type(base_type, field)
 
     def _field_type(self, base_type, field):
         if base_type == STR:
@@ -688,6 +762,8 @@ class SemanticAnalyzer:
             fields = self.struct_fields.get(base_type.name)
             if fields is None:
                 if base_type.name in self.union_names:
+                    if base_type.name == "AstNode":
+                        return self._union_partial_or_promoted_field_type(base_type.name, field)
                     return self._union_common_embedded_field_type(base_type.name, field)
                 self._fail(f"field access expected struct, got {base_type}")
             if field in fields:
@@ -880,9 +956,9 @@ def assert_typed_program(program):
         if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode, VarNode)):
             return
         if isinstance(node, FStringNode):
-            for idx, (kind, value) in enumerate(node.parts):
-                if kind == "expr":
-                    expr(value, f"{path}.parts[{idx}]")
+            for idx, part in enumerate(node.parts):
+                if isinstance(part, FStringExprPart):
+                    expr(part.expr, f"{path}.parts[{idx}]")
             return
         if isinstance(node, CallNode):
             for idx, arg in enumerate(node.args):
@@ -906,6 +982,9 @@ def assert_typed_program(program):
             expr(node.expr, f"{path}.expr")
             return
         if isinstance(node, FieldAccessNode):
+            expr(node.object, f"{path}.object")
+            return
+        if isinstance(node, FieldHasNode):
             expr(node.object, f"{path}.object")
             return
         if isinstance(node, SubscriptNode):
@@ -1152,11 +1231,11 @@ def dump_typed_ast_lines(node, depth=0):
         emit(f"String {node.value}{_type_suffix(node)}")
     elif isinstance(node, FStringNode):
         emit(f"FString{_type_suffix(node)}")
-        for kind, value in node.parts:
-            if kind == "text":
-                emit(f"  FStringText {value}")
-            else:
-                out.extend(dump_typed_ast_lines(value, depth + 1))
+        for part in node.parts:
+            if isinstance(part, FStringTextPart):
+                emit(f"  FStringText {part.value}")
+            elif isinstance(part, FStringExprPart):
+                out.extend(dump_typed_ast_lines(part.expr, depth + 1))
     elif isinstance(node, VarNode):
         emit(f"Var {node.name}{_type_suffix(node)}")
     elif isinstance(node, CallNode):
@@ -1178,6 +1257,9 @@ def dump_typed_ast_lines(node, depth=0):
         out.extend(dump_typed_ast_lines(node.expr, depth + 1))
     elif isinstance(node, FieldAccessNode):
         emit(f"FieldAccess {node.field}{_type_suffix(node)}")
+        out.extend(dump_typed_ast_lines(node.object, depth + 1))
+    elif isinstance(node, FieldHasNode):
+        emit(f"FieldHas {node.field}{_type_suffix(node)}")
         out.extend(dump_typed_ast_lines(node.object, depth + 1))
     elif isinstance(node, SubscriptNode):
         emit(f"Subscript{_type_suffix(node)}")
