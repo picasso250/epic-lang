@@ -9,7 +9,7 @@ fun main(): i64 {
     if a { ret 1 }
     else { ret 2 }
     for false { break }
-    for i in 0..10 { continue }
+    for i in 0:10 { continue }
     struct Point {
         x: i64
         y: i64
