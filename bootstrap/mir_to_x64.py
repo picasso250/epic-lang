@@ -25,6 +25,10 @@ class MirLower:
         self.has_global_init = False
         self.scratch_slots = []
         self.label_counter = 0
+        self.temp_value_slots = set()
+        self.block_local_use_counts = {}
+        self.reusable_value_names = set()
+        self.free_value_slots = []
 
     def lower(self):
         self.x64.global_("_start")
@@ -44,6 +48,10 @@ class MirLower:
         self.value_slots = {}
         self.addr_slots = {}
         self.next_slot = 0
+        self.temp_value_slots = set()
+        self.block_local_use_counts = {}
+        self.reusable_value_names = set()
+        self.free_value_slots = []
         self.return_label = f"{fn.name}.__return"
         self._plan_slots(fn)
         label = "_start" if fn.name == "main" else fn.name
@@ -87,13 +95,105 @@ class MirLower:
     def _plan_slots(self, fn):
         for param in fn.params:
             self.value_slots[param.name] = self._slot()
+        self.reusable_value_names = self._find_reusable_value_names(fn)
         for block in fn.blocks:
+            self.block_local_use_counts = self._count_block_local_uses(block)
             for inst in block.instructions:
                 if inst.op == "alloca":
                     self.addr_slots[inst.result.name] = self._slot()
-                elif inst.result is not None:
-                    self.value_slots[inst.result.name] = self._slot()
+                    continue
+                self._release_operands(inst.operands)
+                if inst.result is not None:
+                    if inst.result.name in self.reusable_value_names:
+                        slot = self._reuse_or_alloc_slot()
+                        self.temp_value_slots.add(inst.result.name)
+                    else:
+                        slot = self._slot()
+                    self.value_slots[inst.result.name] = slot
+                    if self.block_local_use_counts.get(inst.result.name, 0) == 0:
+                        self._release_value_name(inst.result.name)
+            self._release_terminator(block.terminator)
         self.scratch_slots = [self._slot() for _ in range(8)]
+
+    def _find_reusable_value_names(self, fn):
+        defs = {}
+        uses = {}
+        for block in fn.blocks:
+            for inst in block.instructions:
+                if inst.result is not None and inst.op != "alloca":
+                    defs[inst.result.name] = block.name
+                for operand in inst.operands:
+                    self._record_operand_use(uses, operand, block.name)
+            self._record_terminator_uses(uses, block.terminator, block.name)
+        reusable = set()
+        for name, block_name in defs.items():
+            use_blocks = uses.get(name, set())
+            if len(use_blocks) == 0 or use_blocks == {block_name}:
+                reusable.add(name)
+        return reusable
+
+    def _record_operand_use(self, uses, operand, block_name):
+        if not isinstance(operand, ValueOperand):
+            return
+        name = operand.value.name
+        if name not in uses:
+            uses[name] = set()
+        uses[name].add(block_name)
+
+    def _record_terminator_uses(self, uses, term, block_name):
+        if isinstance(term, CondBr):
+            self._record_operand_use(uses, term.cond, block_name)
+        elif isinstance(term, Ret) and term.value is not None:
+            self._record_operand_use(uses, term.value, block_name)
+
+    def _count_block_local_uses(self, block):
+        counts = {}
+        for inst in block.instructions:
+            for operand in inst.operands:
+                if isinstance(operand, ValueOperand) and operand.value.name in self.reusable_value_names:
+                    name = operand.value.name
+                    counts[name] = counts.get(name, 0) + 1
+        if isinstance(block.terminator, CondBr):
+            operand = block.terminator.cond
+            if isinstance(operand, ValueOperand) and operand.value.name in self.reusable_value_names:
+                name = operand.value.name
+                counts[name] = counts.get(name, 0) + 1
+        elif isinstance(block.terminator, Ret) and block.terminator.value is not None:
+            operand = block.terminator.value
+            if isinstance(operand, ValueOperand) and operand.value.name in self.reusable_value_names:
+                name = operand.value.name
+                counts[name] = counts.get(name, 0) + 1
+        return counts
+
+    def _reuse_or_alloc_slot(self):
+        if self.free_value_slots:
+            return self.free_value_slots.pop()
+        return self._slot()
+
+    def _release_operands(self, operands):
+        for operand in operands:
+            if not isinstance(operand, ValueOperand):
+                continue
+            name = operand.value.name
+            remaining = self.block_local_use_counts.get(name, 0)
+            if remaining <= 0:
+                continue
+            remaining -= 1
+            self.block_local_use_counts[name] = remaining
+            if remaining == 0:
+                self._release_value_name(name)
+
+    def _release_terminator(self, term):
+        if isinstance(term, CondBr):
+            self._release_operands([term.cond])
+        elif isinstance(term, Ret) and term.value is not None:
+            self._release_operands([term.value])
+
+    def _release_value_name(self, name):
+        if name not in self.temp_value_slots:
+            return
+        self.temp_value_slots.remove(name)
+        self.free_value_slots.append(self.value_slots[name])
 
     def _slot(self):
         self.next_slot += 8
