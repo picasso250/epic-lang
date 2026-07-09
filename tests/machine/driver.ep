@@ -4,7 +4,7 @@ fun machine_dump_user_program(path: str): void {
     let src = str(read_file(path))
     let tokens = lex(src)
     let p = make_parser(tokens)
-    let ast = parse_program(p)
+    let ast = p.parse_program()
     let st = make_sema_state()
     sema_program(st, ast)
     let mir = mir_ast_to_mir(ast)

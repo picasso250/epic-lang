@@ -8,7 +8,7 @@ fun main(): void {
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
     let p = make_parser(tokens)
-    let ast = parse_program(p)
+    let ast = p.parse_program()
     let st = make_sema_state()
     sema_program(st, ast)
     let mir = mir_ast_to_mir(ast)

@@ -24,7 +24,7 @@ fun epic_parse_file(path: str): AstNode {
     let src = str(read_file(cstr_ready_path(path)))
     let tokens = lex(src)
     let p = make_parser(tokens)
-    ret parse_program(p)
+    ret p.parse_program()
 }
 
 fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
