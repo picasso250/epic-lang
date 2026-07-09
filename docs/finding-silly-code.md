@@ -344,3 +344,14 @@ Examples of “probably real work”:
 - runtime helper emission.
 
 At that point, switch from “silly code” cleanup to normal profiling, data-structure design, or backend optimization.
+
+### Pattern 4: string keys hiding structured layout
+
+Bad shape:
+
+```epic
+let key = str_cat2(str_cat2(struct_name, "."), field_name)
+struct_field_keys.push(key)
+```
+
+If the key is only encoding multiple known fields, introduce a small record instead. Prefer `MirStructFieldLayout { struct_name, field_name, field_type, field_index, embedded }` over parallel arrays keyed by `"Struct.field"` strings. String labels are fine for diagnostics, but they should not be the internal representation of typed layout data.
