@@ -666,6 +666,19 @@ class SemanticAnalyzer:
         seen.remove(struct_name)
         return found
 
+    def _union_common_embedded_field_type(self, union_name, field):
+        found = None
+        for member in self.union_defs[union_name]:
+            if field not in self.struct_embedded_fields.get(member, set()):
+                self._fail(f"union {union_name} has no common embedded field {field}")
+            candidate = self.struct_fields[member][field]
+            if found is not None and candidate != found:
+                self._fail(f"union {union_name} embedded field {field} has inconsistent types")
+            found = candidate
+        if found is None:
+            self._fail(f"union {union_name} has no common embedded field {field}")
+        return found
+
     def _field_type(self, base_type, field):
         if base_type == STR:
             self._fail(f"unknown field str.{field}")
@@ -675,7 +688,7 @@ class SemanticAnalyzer:
             fields = self.struct_fields.get(base_type.name)
             if fields is None:
                 if base_type.name in self.union_names:
-                    self._fail(f"field access expected struct, got union {base_type.name}; use match")
+                    return self._union_common_embedded_field_type(base_type.name, field)
                 self._fail(f"field access expected struct, got {base_type}")
             if field in fields:
                 return fields[field]

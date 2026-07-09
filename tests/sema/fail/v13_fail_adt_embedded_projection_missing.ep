@@ -1,0 +1,17 @@
+# COMPILE_FAIL: union Node has no common embedded field Meta
+struct Meta {
+    line: i64
+}
+struct Leaf {
+    Meta
+    value: i64
+}
+struct Pair {
+    value: i64
+}
+type Node = Leaf | Pair
+fun main(): i64 {
+    let m = new Meta { line: 1 }
+    let n: Node = new Node(new Leaf { Meta: m, value: 1 })
+    ret n.Meta.line
+}

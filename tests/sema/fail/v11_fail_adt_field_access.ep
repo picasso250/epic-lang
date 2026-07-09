@@ -1,4 +1,4 @@
-# COMPILE_FAIL: field access expected struct, got union Expr; use match
+# COMPILE_FAIL: union Expr has no common embedded field value
 struct Leaf { value: i64 }
 type Expr = Leaf
 fun main(): void {
