@@ -45,61 +45,30 @@ run fixed point
 
 ## How to measure
 
-Use a small script from the repository root. The exact script changes with the active compiler pipeline, but it should print at least:
+Use the checked-in triage tool from the repository root:
+
+```powershell
+python tools/mir_top_funcs.py --top 40
+```
+
+It prints:
 
 - parse/sema/AST-to-MIR timings;
 - total MIR blocks and instructions;
 - the largest MIR functions by instruction count;
-- x64 lowering time, items, instructions, labels, and data items.
+- x64 lowering time, items, instructions, labels, data items, and asm bytes.
 
-A typical measurement script imports the Python reference pipeline:
+For before/after comparisons, save a baseline and compare against it:
 
-```python
-import os, sys, time
-root = os.getcwd()
-sys.path.insert(0, os.path.join(root, "bootstrap"))
-sys.path.insert(0, root)
-from epic import _merge_programs
-from sema import analyze_program
-from ast_to_mir import ast_to_mir
-from mir_to_x64 import lower_mir_to_x64
-from x64 import X64Inst, X64Label, X64DataBytes, X64DataZero
+```powershell
+python tools/mir_top_funcs.py --json build/before.json
+python tools/mir_top_funcs.py --compare build/before.json
+```
 
-src = [os.path.join("src", x) for x in [
-    "util.ep", "lexer.ep", "parser.ep", "sema.ep", "mir.ep", "mir_runtime.ep",
-    "ast_to_mir.ep", "x64.ep", "mir_to_x64.ep", "x64_runtime.ep",
-    "machine.ep", "coff.ep", "link.ep", "epic.ep",
-]]
+For quick iteration where x64 size is not needed:
 
-t0 = time.perf_counter()
-ast = _merge_programs(src, os.path.join("src", "epic.ep"), verbose=False)
-t1 = time.perf_counter()
-ast = analyze_program(ast)
-t2 = time.perf_counter()
-mir = ast_to_mir(ast)
-t3 = time.perf_counter()
-
-blocks = sum(len(fn.blocks) for fn in mir.functions)
-insts = sum(len(b.instructions) for fn in mir.functions for b in fn.blocks)
-terms = sum(1 for fn in mir.functions for b in fn.blocks if b.terminator is not None)
-print(f"timing parse_merge={t1-t0:.3f} sema={t2-t1:.3f} ast_to_mir={t3-t2:.3f}")
-print(f"MIR funcs={len(mir.functions)} blocks={blocks} insts={insts} terms={terms} globals={len(mir.globals)} structs={len(mir.structs)}")
-
-rows = []
-for fn in mir.functions:
-    rows.append((sum(len(b.instructions) for b in fn.blocks), len(fn.blocks), fn.name))
-print("top functions:")
-for inst_count, block_count, name in sorted(rows, reverse=True)[:40]:
-    print(f"{inst_count:6d} insts {block_count:5d} blocks {name}")
-
-t4 = time.perf_counter()
-x64 = lower_mir_to_x64(mir)
-t5 = time.perf_counter()
-items = len(x64.items)
-inst = sum(isinstance(i, X64Inst) for i in x64.items)
-labels = sum(isinstance(i, X64Label) for i in x64.items)
-data = sum(isinstance(i, (X64DataBytes, X64DataZero)) for i in x64.items)
-print(f"x64 lower seconds={t5-t4:.3f} items={items} insts={inst} labels={labels} data={data}")
+```powershell
+python tools/mir_top_funcs.py --no-x64 --top 60
 ```
 
 For correctness and fixed-point validation, use the normal test entry points:
