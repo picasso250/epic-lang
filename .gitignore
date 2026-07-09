@@ -8,7 +8,7 @@ __pycache__/
 *.pyc
 
 # Binary tools (see README for setup)
-tools/
+tools/*.exe
 
 # Zed editor - generated grammar files (compiled WASM)
 editors/zed/grammars/
