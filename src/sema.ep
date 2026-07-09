@@ -790,172 +790,184 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     ret ""
 }
 
+
 fun sema_expr_type(st: SemaState, node: AstNode): str {
-    if ast_kind(node) == "Literal" {
-        sema_check_decimal_i64_literal(node.value, "integer")
-        ret sema_set_type(node, "i64")
-    }
-    if ast_kind(node) == "Char" {
-        ret sema_set_type(node, "u8")
-    }
-    if ast_kind(node) == "Bool" {
-        ret sema_set_type(node, "bool")
-    }
-    if ast_kind(node) == "String" {
-        ret sema_set_type(node, "str")
-    }
-    if ast_kind(node) == "FString" {
-        for i in 0:len(node.fields) {
-            let part = node.fields[i]
-            if ast_kind(part) != "FStringText" {
-                sema_check_str_convertible(sema_expr_type(st, part), "f-string expression")
-            }
-        }
-        ret sema_set_type(node, "str")
-    }
-    if ast_kind(node) == "Var" {
-        ret sema_set_type(node, sema_lookup(st, node.name))
-    }
-    if ast_kind(node) == "Unary" {
-        let inner = sema_expr_type(st, node.expr)
-        if node.op == "!" {
-            if inner != "bool" {
-                sema_die(f"unary ! expected bool, got {inner}")
-            }
-            ret sema_set_type(node, "bool")
-        }
-        if node.op == "-" || node.op == "~" {
-            if sema_is_int(inner) == false {
-                sema_die(f"unary {node.op} expected integer, got {inner}")
-            }
+    match node {
+        AstLiteral n: {
+            sema_check_decimal_i64_literal(n.value, "integer")
             ret sema_set_type(node, "i64")
         }
-        sema_die(f"unsupported unary operator {node.op}")
-    }
-    if ast_kind(node) == "Binary" {
-        let left = sema_expr_type(st, node.left)
-        let right = sema_expr_type(st, node.right)
-        if node.op == "&&" || node.op == "||" {
-            if left != "bool" {
-                sema_die(f"{node.op} expected bool, got {left}")
-            }
-            if right != "bool" {
-                sema_die(f"{node.op} expected bool, got {right}")
-            }
+        AstChar n: {
+            ret sema_set_type(node, "u8")
+        }
+        AstBool n: {
             ret sema_set_type(node, "bool")
         }
-        if node.op == "+" && left == "str" && right == "str" {
-            sema_die("string concatenation is removed; use u8[] + extend + str(bytes)")
+        AstString n: {
+            ret sema_set_type(node, "str")
         }
-        if node.op == "==" || node.op == "!=" || node.op == "<" || node.op == ">" || node.op == "<=" || node.op == ">=" {
-            if sema_is_int(left) && sema_is_int(right) {
-                if left != right {
-                    sema_die(f"comparison expected {left}, got {right}; use an explicit conversion")
+        AstFString n: {
+            for i in 0:len(n.fields) {
+                let part = n.fields[i]
+                match part {
+                    AstFStringText text: {}
+                    _: {
+                        sema_check_str_convertible(sema_expr_type(st, part), "f-string expression")
+                    }
+                }
+            }
+            ret sema_set_type(node, "str")
+        }
+        AstVar n: {
+            ret sema_set_type(node, sema_lookup(st, n.name))
+        }
+        AstUnary n: {
+            let inner = sema_expr_type(st, n.expr)
+            if n.op == "!" {
+                if inner != "bool" {
+                    sema_die(f"unary ! expected bool, got {inner}")
                 }
                 ret sema_set_type(node, "bool")
             }
-            sema_check_assign_info(left, right, node.right, "comparison")
-            ret sema_set_type(node, "bool")
+            if n.op == "-" || n.op == "~" {
+                if sema_is_int(inner) == false {
+                    sema_die(f"unary {n.op} expected integer, got {inner}")
+                }
+                ret sema_set_type(node, "i64")
+            }
+            sema_die(f"unsupported unary operator {n.op}")
         }
-        if sema_is_int(left) == false {
-            sema_die(f"operator {node.op} left expected integer, got {left}")
-        }
-        if sema_is_int(right) == false {
-            sema_die(f"operator {node.op} right expected integer, got {right}")
-        }
-        if node.op == "<<" || node.op == ">>" || node.op == ">>>" {
+        AstBinary n: {
+            let left = sema_expr_type(st, n.left)
+            let right = sema_expr_type(st, n.right)
+            if n.op == "&&" || n.op == "||" {
+                if left != "bool" {
+                    sema_die(f"{n.op} expected bool, got {left}")
+                }
+                if right != "bool" {
+                    sema_die(f"{n.op} expected bool, got {right}")
+                }
+                ret sema_set_type(node, "bool")
+            }
+            if n.op == "+" && left == "str" && right == "str" {
+                sema_die("string concatenation is removed; use u8[] + extend + str(bytes)")
+            }
+            if n.op == "==" || n.op == "!=" || n.op == "<" || n.op == ">" || n.op == "<=" || n.op == ">=" {
+                if sema_is_int(left) && sema_is_int(right) {
+                    if left != right {
+                        sema_die(f"comparison expected {left}, got {right}; use an explicit conversion")
+                    }
+                    ret sema_set_type(node, "bool")
+                }
+                sema_check_assign_info(left, right, n.right, "comparison")
+                ret sema_set_type(node, "bool")
+            }
+            if sema_is_int(left) == false {
+                sema_die(f"operator {n.op} left expected integer, got {left}")
+            }
+            if sema_is_int(right) == false {
+                sema_die(f"operator {n.op} right expected integer, got {right}")
+            }
+            if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                ret sema_set_type(node, left)
+            }
+            if left != right {
+                sema_die(f"operator {n.op} expected matching integer types, got {left} and {right}; use an explicit conversion")
+            }
             ret sema_set_type(node, left)
         }
-        if left != right {
-            sema_die(f"operator {node.op} expected matching integer types, got {left} and {right}; use an explicit conversion")
+        AstCall n: {
+            ret sema_set_type(node, sema_call_type(st, node))
         }
-        ret sema_set_type(node, left)
-    }
-    if ast_kind(node) == "Call" {
-        ret sema_set_type(node, sema_call_type(st, node))
-    }
-    if ast_kind(node) == "DotCall" {
-        ret sema_set_type(node, sema_dot_call_type(st, node))
-    }
-    if ast_kind(node) == "FieldAccess" {
-        ret sema_set_type(node, sema_field_access_type(st, node.object, node.name))
-    }
-    if ast_kind(node) == "FieldHas" {
-        ret sema_set_type(node, sema_field_has_type(st, node))
-    }
-    if ast_kind(node) == "Subscript" {
-        ret sema_set_type(node, sema_subscript_type(st, node.base, node.index))
-    }
-    if ast_kind(node) == "Slice" {
-        let base = sema_expr_type(st, node.base)
-        if base != "str" && (sema_is_array(base) == false || sema_array_elem(base) != "u8") {
-            sema_die("slice only supports str and u8[]")
+        AstDotCall n: {
+            ret sema_set_type(node, sema_dot_call_type(st, node))
         }
-        sema_expect_int(st, node.start, "slice start")
-        sema_expect_int(st, node.end, "slice end")
-        ret sema_set_type(node, base)
-    }
-    if ast_kind(node) == "NewArray" {
-        let elem = sema_type_name(st, node.type_name)
-        if ast_kind(node.count) != "" {
-            sema_expect_int(st, node.count, "array length")
+        AstFieldAccess n: {
+            ret sema_set_type(node, sema_field_access_type(st, n.object, n.name))
         }
-        ret sema_set_type(node, str_cat2(elem, "[]"))
-    }
-    if ast_kind(node) == "ArrayLiteral" {
-        let elem = sema_type_name(st, node.type_name)
-        for i in 0:len(node.args) {
-            sema_check_assign(st, elem, node.args[i], "array literal element")
+        AstFieldHas n: {
+            ret sema_set_type(node, sema_field_has_type(st, node))
         }
-        ret sema_set_type(node, str_cat2(elem, "[]"))
-    }
-    if ast_kind(node) == "StructInit" {
-        if st.struct_names.has(node.name) == false {
-            sema_die(f"unknown struct {node.name}")
+        AstSubscript n: {
+            ret sema_set_type(node, sema_subscript_type(st, n.base, n.index))
         }
-        let seen = new map[str]bool
-        for i in 0:len(node.fields) {
-            let f = node.fields[i]
-            if seen.has(f.name) {
-                sema_die(f"duplicate field initializer {sema_key2(node.name, f.name)}")
+        AstSlice n: {
+            let base = sema_expr_type(st, n.base)
+            if base != "str" && (sema_is_array(base) == false || sema_array_elem(base) != "u8") {
+                sema_die("slice only supports str and u8[]")
             }
-            seen[f.name] = true
-            let ft = sema_direct_field_type(st, node.name, f.name)
-            sema_check_assign(st, ft, f.value_expr, f"field {sema_key2(node.name, f.name)}")
+            sema_expect_int(st, n.start, "slice start")
+            sema_expect_int(st, n.end, "slice end")
+            ret sema_set_type(node, base)
         }
-        ret sema_set_type(node, node.name)
-    }
-    if ast_kind(node) == "UnionInit" {
-        if st.union_names.has(node.type_name) == false {
-            sema_die(f"unknown union {node.type_name}")
-        }
-        let payload_type = sema_expr_type(st, node.expr)
-        if st.struct_names.has(payload_type) == false {
-            sema_die(f"new {node.type_name}(...) expected struct payload, got {payload_type}")
-        }
-        if st.union_members.has(sema_key2(node.type_name, payload_type)) == false {
-            sema_die(f"new {node.type_name}(...) expected one of {sema_union_members_text(st, node.type_name)}, got {payload_type}")
-        }
-        ret sema_set_type(node, node.type_name)
-    }
-    if ast_kind(node) == "MapInit" {
-        let typ = sema_type_name(st, node.type_name)
-        if sema_is_map(typ) {
-            let value_type = sema_map_value(typ)
-            if len(node.map_keys) != len(node.map_values) {
-                sema_die("internal map initializer entry mismatch")
+        AstNewArray n: {
+            let elem = sema_type_name(st, n.type_name)
+            match n.count {
+                AstEmpty e: {}
+                _: {
+                    sema_expect_int(st, n.count, "array length")
+                }
             }
-            for i in 0:len(node.map_keys) {
-                sema_check_assign(st, "str", node.map_keys[i], "map init key")
-                sema_check_assign(st, value_type, node.map_values[i], "map init value")
-            }
-            ret sema_set_type(node, typ)
+            ret sema_set_type(node, str_cat2(elem, "[]"))
         }
-        sema_die(f"new expected map, got {typ}")
+        AstArrayLiteral n: {
+            let elem = sema_type_name(st, n.type_name)
+            for i in 0:len(n.args) {
+                sema_check_assign(st, elem, n.args[i], "array literal element")
+            }
+            ret sema_set_type(node, str_cat2(elem, "[]"))
+        }
+        AstStructInit n: {
+            if st.struct_names.has(n.name) == false {
+                sema_die(f"unknown struct {n.name}")
+            }
+            let seen = new map[str]bool
+            for i in 0:len(n.fields) {
+                let f = n.fields[i]
+                if seen.has(f.name) {
+                    sema_die(f"duplicate field initializer {sema_key2(n.name, f.name)}")
+                }
+                seen[f.name] = true
+                let ft = sema_direct_field_type(st, n.name, f.name)
+                sema_check_assign(st, ft, f.value_expr, f"field {sema_key2(n.name, f.name)}")
+            }
+            ret sema_set_type(node, n.name)
+        }
+        AstUnionInit n: {
+            if st.union_names.has(n.type_name) == false {
+                sema_die(f"unknown union {n.type_name}")
+            }
+            let payload_type = sema_expr_type(st, n.expr)
+            if st.struct_names.has(payload_type) == false {
+                sema_die(f"new {n.type_name}(...) expected struct payload, got {payload_type}")
+            }
+            if st.union_members.has(sema_key2(n.type_name, payload_type)) == false {
+                sema_die(f"new {n.type_name}(...) expected one of {sema_union_members_text(st, n.type_name)}, got {payload_type}")
+            }
+            ret sema_set_type(node, n.type_name)
+        }
+        AstMapInit n: {
+            let typ = sema_type_name(st, n.type_name)
+            if sema_is_map(typ) {
+                let value_type = sema_map_value(typ)
+                if len(n.map_keys) != len(n.map_values) {
+                    sema_die("internal map initializer entry mismatch")
+                }
+                for i in 0:len(n.map_keys) {
+                    sema_check_assign(st, "str", n.map_keys[i], "map init key")
+                    sema_check_assign(st, value_type, n.map_values[i], "map init value")
+                }
+                ret sema_set_type(node, typ)
+            }
+            sema_die(f"new expected map, got {typ}")
+        }
+        _: {
+            sema_die(f"unsupported expression: {ast_kind(node)}")
+        }
     }
-    sema_die(f"unsupported expression: {ast_kind(node)}")
     ret ""
 }
+
 
 fun sema_check_os_call(st: SemaState, node: AstNode, count: i64, ret_type: str): str {
     sema_check_arity(f"os.{node.dll}.{node.name}", count, node.args)
@@ -1209,202 +1221,224 @@ fun sema_lvalue_type(st: SemaState, node: AstNode): str {
     ret ""
 }
 
+
 fun sema_stmt(st: SemaState, node: AstNode): void {
-    if ast_kind(node) == "Let" {
-        if ast_kind(node.value_expr) == "" {
-            sema_die(f"let {node.name} requires an initializer")
-        }
-        let target = ""
-        if node.type_name != "" {
-            target = sema_type_name(st, node.type_name)
-        }
-        let val = sema_expr_type(st, node.value_expr)
-        if target == "" {
-            target = val
+    match node {
+        AstLet n: {
+            match n.value_expr {
+                AstEmpty e: {
+                    sema_die(f"let {n.name} requires an initializer")
+                }
+                _: {}
+            }
+            let target = ""
+            if n.type_name != "" {
+                target = sema_type_name(st, n.type_name)
+            }
+            let val = sema_expr_type(st, n.value_expr)
+            if target == "" {
+                target = val
+                if target == "void" {
+                    sema_die(f"let {n.name} cannot infer void")
+                }
+            } else {
+                sema_check_assign_info(target, val, n.value_expr, f"let {n.name}")
+            }
             if target == "void" {
-                sema_die(f"let {node.name} cannot infer void")
+                sema_die(f"let {n.name} cannot have type void")
             }
-        } else {
-            sema_check_assign_info(target, val, node.value_expr, f"let {node.name}")
+            ast_set_resolved_type(node, target)
+            st.locals[n.name] = target
+            ret
         }
-        if target == "void" {
-            sema_die(f"let {node.name} cannot have type void")
+        AstAssign n: {
+            sema_check_assign(st, sema_lookup(st, n.name), n.value_expr, f"assignment to {n.name}")
+            ret
         }
-        ast_set_resolved_type(node, target)
-        st.locals[node.name] = target
-        ret
-    }
-    if ast_kind(node) == "Assign" {
-        sema_check_assign(st, sema_lookup(st, node.name), node.value_expr, f"assignment to {node.name}")
-        ret
-    }
-    if ast_kind(node) == "FieldSet" {
-        let target = sema_field_access_type(st, node.object, node.name)
-        sema_check_assign(st, target, node.value_expr, f"assignment to field {node.name}")
-        ret
-    }
-    if ast_kind(node) == "SubscriptAssign" {
-        sema_check_assign(st, sema_subscript_type(st, node.base, node.index), node.value_expr, "subscript assignment")
-        ret
-    }
-    if ast_kind(node) == "AssignOp" {
-        let target = sema_lvalue_type(st, node.expr)
-        let rhs = sema_expr_type(st, node.value_expr)
-        if node.op == "+" && target == "str" {
-            sema_die("string += is removed; use u8[] + extend instead")
+        AstFieldSet n: {
+            let target = sema_field_access_type(st, n.object, n.name)
+            sema_check_assign(st, target, n.value_expr, f"assignment to field {n.name}")
+            ret
         }
-        if sema_is_int(target) == false {
-            sema_die(f"compound assignment expected integer target, got {target}")
+        AstSubscriptAssign n: {
+            sema_check_assign(st, sema_subscript_type(st, n.base, n.index), n.value_expr, "subscript assignment")
+            ret
         }
-        if sema_is_int(rhs) == false {
-            sema_die(f"compound assignment value expected integer, got {rhs}")
-        }
-        if target != rhs {
-            sema_die(f"compound assignment expected matching integer types, got {target} and {rhs}; use an explicit conversion")
-        }
-        ret
-    }
-    if ast_kind(node) == "ExprStmt" {
-        sema_expr_type(st, node.expr)
-        ret
-    }
-    if ast_kind(node) == "Return" {
-        if st.current_ret == "void" {
-            if ast_kind(node.expr) != "" {
-                sema_die(f"return expected void, got {sema_expr_type(st, node.expr)}")
+        AstAssignOp n: {
+            let target = sema_lvalue_type(st, n.expr)
+            let rhs = sema_expr_type(st, n.value_expr)
+            if n.op == "+" && target == "str" {
+                sema_die("string += is removed; use u8[] + extend instead")
+            }
+            if sema_is_int(target) == false {
+                sema_die(f"compound assignment expected integer target, got {target}")
+            }
+            if sema_is_int(rhs) == false {
+                sema_die(f"compound assignment value expected integer, got {rhs}")
+            }
+            if target != rhs {
+                sema_die(f"compound assignment expected matching integer types, got {target} and {rhs}; use an explicit conversion")
             }
             ret
         }
-        if ast_kind(node.expr) == "" {
-            sema_die(f"return expected {st.current_ret}, got void")
+        AstExprStmt n: {
+            sema_expr_type(st, n.expr)
+            ret
         }
-        sema_check_assign(st, st.current_ret, node.expr, "return")
-        ret
-    }
-    if ast_kind(node) == "If" {
-        sema_expect_bool(st, node.expr, "if condition")
-        let guard_key = ""
-        let old_guard = ""
-        let had_old_guard = false
-        if ast_kind(node.expr) == "FieldHas" {
-            guard_key = sema_field_guard_key(ast_object(node.expr), ast_name(node.expr))
-            if guard_key == "" {
-                sema_die("field existence guard requires a variable receiver")
+        AstReturn n: {
+            if st.current_ret == "void" {
+                match n.expr {
+                    AstEmpty e: {}
+                    _: {
+                        sema_die(f"return expected void, got {sema_expr_type(st, n.expr)}")
+                    }
+                }
+                ret
             }
-            had_old_guard = st.partial_field_guards.has(guard_key)
-            if had_old_guard {
-                old_guard = st.partial_field_guards[guard_key]
+            match n.expr {
+                AstEmpty e: {
+                    sema_die(f"return expected {st.current_ret}, got void")
+                }
+                _: {}
             }
-            st.partial_field_guards[guard_key] = sema_union_partial_field_type(st, ast_resolved_type(ast_object(node.expr)), ast_name(node.expr))
+            sema_check_assign(st, st.current_ret, n.expr, "return")
+            ret
         }
-        sema_block(st, node.then_block)
-        if guard_key != "" {
-            if had_old_guard {
-                st.partial_field_guards[guard_key] = old_guard
-            } else {
-                st.partial_field_guards.del(guard_key)
+        AstIf n: {
+            sema_expect_bool(st, n.expr, "if condition")
+            let guard_key = ""
+            let old_guard = ""
+            let had_old_guard = false
+            match n.expr {
+                AstFieldHas guard: {
+                    guard_key = sema_field_guard_key(guard.object, guard.name)
+                    if guard_key == "" {
+                        sema_die("field existence guard requires a variable receiver")
+                    }
+                    had_old_guard = st.partial_field_guards.has(guard_key)
+                    if had_old_guard {
+                        old_guard = st.partial_field_guards[guard_key]
+                    }
+                    st.partial_field_guards[guard_key] = sema_union_partial_field_type(st, ast_resolved_type(guard.object), guard.name)
+                }
+                _: {}
             }
-        }
-        if ast_kind(node.else_block) != "" {
-            sema_block(st, node.else_block)
-        }
-        ret
-    }
-    if ast_kind(node) == "While" {
-        sema_expect_bool(st, node.expr, "for condition")
-        st.loop_depth += 1
-        sema_block(st, node.body)
-        st.loop_depth -= 1
-        ret
-    }
-    if ast_kind(node) == "For" {
-        sema_expect_int(st, node.start, "for range start")
-        sema_expect_int(st, node.end, "for range end")
-        ast_set_resolved_type(node, "i64")
-        st.locals[node.name] = "i64"
-        st.loop_depth += 1
-        sema_block(st, node.body)
-        st.loop_depth -= 1
-        ret
-    }
-    if ast_kind(node) == "Break" {
-        if st.loop_depth == 0 {
-            sema_die("break outside loop")
-        }
-        ret
-    }
-    if ast_kind(node) == "Continue" {
-        if st.loop_depth == 0 {
-            sema_die("continue outside loop")
-        }
-        ret
-    }
-    if ast_kind(node) == "Assert" {
-        sema_expect_bool(st, node.expr, "assert condition")
-        if ast_kind(node.value_expr) != "" {
-            sema_expr_type(st, node.value_expr)
-        }
-        ret
-    }
-    if ast_kind(node) == "Panic" {
-        sema_expr_type(st, node.expr)
-        ret
-    }
-    if ast_kind(node) == "Match" {
-        let scrutinee = sema_expr_type(st, node.expr)
-        if st.union_names.has(scrutinee) {
-            let seen = new map[str]bool
-            for i in 0:len(node.fields) {
-                let c = node.fields[i]
-                if ast_kind(c.expr) != "" || c.variant_name == "" || c.binding_name == "" {
-                    sema_die(f"ADT match on {scrutinee} requires variant binding cases")
-                }
-                if st.union_members.has(sema_key2(scrutinee, c.variant_name)) == false {
-                    sema_die(f"{c.variant_name} is not a member of {scrutinee}")
-                }
-                if seen.has(c.variant_name) {
-                    sema_die(f"duplicate match case {c.variant_name}")
-                }
-                seen[c.variant_name] = true
-                ast_set_resolved_type(c, c.variant_name)
-                let had_old = st.locals.has(c.binding_name)
-                let old = ""
-                if had_old {
-                    old = st.locals[c.binding_name]
-                }
-                st.locals[c.binding_name] = c.variant_name
-                sema_block(st, c.body)
-                if had_old {
-                    st.locals[c.binding_name] = old
+            sema_block(st, n.then_block)
+            if guard_key != "" {
+                if had_old_guard {
+                    st.partial_field_guards[guard_key] = old_guard
                 } else {
-                    st.locals.del(c.binding_name)
+                    st.partial_field_guards.del(guard_key)
                 }
             }
-            if ast_kind(node.else_block) != "" {
-                sema_block(st, node.else_block)
-            } else {
-                let missing = sema_union_missing_text(st, scrutinee, seen)
-                if missing != "" {
-                    sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
-                }
+            match n.else_block {
+                AstEmpty e: {}
+                _: { sema_block(st, n.else_block) }
             }
             ret
         }
-        for i in 0:len(node.fields) {
-            let c = node.fields[i]
-            if c.variant_name != "" || c.binding_name != "" {
-                sema_die("ADT match case requires union scrutinee")
+        AstWhile n: {
+            sema_expect_bool(st, n.expr, "for condition")
+            st.loop_depth += 1
+            sema_block(st, n.body)
+            st.loop_depth -= 1
+            ret
+        }
+        AstFor n: {
+            sema_expect_int(st, n.start, "for range start")
+            sema_expect_int(st, n.end, "for range end")
+            ast_set_resolved_type(node, "i64")
+            st.locals[n.name] = "i64"
+            st.loop_depth += 1
+            sema_block(st, n.body)
+            st.loop_depth -= 1
+            ret
+        }
+        AstBreak n: {
+            if st.loop_depth == 0 {
+                sema_die("break outside loop")
             }
-            sema_check_assign(st, scrutinee, c.expr, "match pattern")
-            sema_block(st, c.body)
+            ret
         }
-        if ast_kind(node.else_block) != "" {
-            sema_block(st, node.else_block)
+        AstContinue n: {
+            if st.loop_depth == 0 {
+                sema_die("continue outside loop")
+            }
+            ret
         }
-        ret
+        AstAssert n: {
+            sema_expect_bool(st, n.expr, "assert condition")
+            match n.value_expr {
+                AstEmpty e: {}
+                _: { sema_expr_type(st, n.value_expr) }
+            }
+            ret
+        }
+        AstPanic n: {
+            sema_expr_type(st, n.expr)
+            ret
+        }
+        AstMatch n: {
+            let scrutinee = sema_expr_type(st, n.expr)
+            if st.union_names.has(scrutinee) {
+                let seen = new map[str]bool
+                for i in 0:len(n.fields) {
+                    let c = n.fields[i]
+                    if ast_kind(c.expr) != "" || c.variant_name == "" || c.binding_name == "" {
+                        sema_die(f"ADT match on {scrutinee} requires variant binding cases")
+                    }
+                    if st.union_members.has(sema_key2(scrutinee, c.variant_name)) == false {
+                        sema_die(f"{c.variant_name} is not a member of {scrutinee}")
+                    }
+                    if seen.has(c.variant_name) {
+                        sema_die(f"duplicate match case {c.variant_name}")
+                    }
+                    seen[c.variant_name] = true
+                    ast_set_resolved_type(c, c.variant_name)
+                    let had_old = st.locals.has(c.binding_name)
+                    let old = ""
+                    if had_old {
+                        old = st.locals[c.binding_name]
+                    }
+                    st.locals[c.binding_name] = c.variant_name
+                    sema_block(st, c.body)
+                    if had_old {
+                        st.locals[c.binding_name] = old
+                    } else {
+                        st.locals.del(c.binding_name)
+                    }
+                }
+                match n.else_block {
+                    AstEmpty e: {
+                        let missing = sema_union_missing_text(st, scrutinee, seen)
+                        if missing != "" {
+                            sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
+                        }
+                    }
+                    _: { sema_block(st, n.else_block) }
+                }
+                ret
+            }
+            for i in 0:len(n.fields) {
+                let c = n.fields[i]
+                if c.variant_name != "" || c.binding_name != "" {
+                    sema_die("ADT match case requires union scrutinee")
+                }
+                sema_check_assign(st, scrutinee, c.expr, "match pattern")
+                sema_block(st, c.body)
+            }
+            match n.else_block {
+                AstEmpty e: {}
+                _: { sema_block(st, n.else_block) }
+            }
+            ret
+        }
+        _: {
+            sema_die(f"unsupported statement: {ast_kind(node)}")
+        }
     }
-    sema_die(f"unsupported statement: {ast_kind(node)}")
 }
+
 
 fun sema_block(st: SemaState, block: AstNode): void {
     for i in 0:len(block.stmts) {

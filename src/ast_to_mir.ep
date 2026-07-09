@@ -1374,311 +1374,319 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstNode): MirV
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
 
+
 fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
-    if ast_kind(expr) == "Literal" {
-        ret mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)
-    }
-    if ast_kind(expr) == "Char" {
-        ret mir_value_flow(mir_const_int("i64", sema_parse_i64(expr.value)), st.current_block)
-    }
-    if ast_kind(expr) == "Bool" {
-        ret mir_value_flow(mir_const_bool(expr.value == "true" || expr.value == "1"), st.current_block)
-    }
-    if ast_kind(expr) == "String" {
-        ret mir_value_flow(mir_symbol_operand("ptr", mir_string_label(st, expr.value)), st.current_block)
-    }
-    if ast_kind(expr) == "FString" {
-        ret mir_emit_fstring(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "Var" {
-        if expr.name == "argv" {
-            ret mir_value_flow(mir_symbol_operand("ptr", "argv"), st.current_block)
+    match expr {
+        AstLiteral n: {
+            ret mir_value_flow(mir_const_int("i64", sema_parse_i64(n.value)), st.current_block)
         }
-        let gidx = mir_global_index(st, expr.name)
-        if gidx >= 0 {
+        AstChar n: {
+            ret mir_value_flow(mir_const_int("i64", sema_parse_i64(n.value)), st.current_block)
+        }
+        AstBool n: {
+            ret mir_value_flow(mir_const_bool(n.value == "true" || n.value == "1"), st.current_block)
+        }
+        AstString n: {
+            ret mir_value_flow(mir_symbol_operand("ptr", mir_string_label(st, n.value)), st.current_block)
+        }
+        AstFString n: {
+            ret mir_emit_fstring(st, st.current_block, expr)
+        }
+        AstVar n: {
+            if n.name == "argv" {
+                ret mir_value_flow(mir_symbol_operand("ptr", "argv"), st.current_block)
+            }
+            let gidx = mir_global_index(st, n.name)
+            if gidx >= 0 {
+                let result_name = mir_new_value(st, "load")
+                let addr = mir_symbol_operand("ptr", mir_global_label(n.name))
+                mir_emit_inst(st, mir_load(result_name, st.global_types[gidx], st.global_types[gidx], addr))
+                ret mir_value_flow(mir_value_operand(st.global_types[gidx], result_name), st.current_block)
+            }
+            let idx = mir_local_index(st, n.name)
             let result_name = mir_new_value(st, "load")
-            let addr = mir_symbol_operand("ptr", mir_global_label(expr.name))
-            mir_emit_inst(st, mir_load(result_name, st.global_types[gidx], st.global_types[gidx], addr))
-            ret mir_value_flow(mir_value_operand(st.global_types[gidx], result_name), st.current_block)
+            let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+            mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
+            ret mir_value_flow(mir_value_operand(st.local_types[idx], result_name), st.current_block)
         }
-        let idx = mir_local_index(st, expr.name)
-        let result_name = mir_new_value(st, "load")
-        let addr = mir_value_operand("ptr", st.local_addr_names[idx])
-        mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
-        ret mir_value_flow(mir_value_operand(st.local_types[idx], result_name), st.current_block)
-    }
-    if ast_kind(expr) == "Unary" {
-        let inner_flow = mir_emit_expr(st, st.current_block, expr.expr)
-        st.current_block = inner_flow.block
-        if expr.op == "-" {
-            let inst = mir_make_result_inst(st, "sub", "i64")
-            inst.operands.push(mir_const_int("i64", 0))
-            inst.operands.push(inner_flow.value)
-            mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_value_operand("i64", inst.result_name), st.current_block)
-        }
-        if expr.op == "!" {
-            let inst = mir_make_result_inst(st, "not", "bool")
-            inst.operands.push(inner_flow.value)
-            mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_value_operand("bool", inst.result_name), st.current_block)
-        }
-        ast_to_mir_die(f"unsupported unary op {expr.op}")
-    }
-    if ast_kind(expr) == "Binary" {
-        if expr.op == "&&" || expr.op == "||" {
-            ret mir_emit_short_circuit(st, st.current_block, expr)
-        }
-        let left_flow = mir_emit_expr(st, st.current_block, expr.left)
-        st.current_block = left_flow.block
-        let right_flow = mir_emit_expr(st, st.current_block, expr.right)
-        st.current_block = right_flow.block
-        if ast_resolved_type(expr.left) == "str" && ast_resolved_type(expr.right) == "str" && (expr.op == "==" || expr.op == "!=") {
-            let args = new MirOperand[0]
-            args.push(left_flow.value)
-            args.push(right_flow.value)
-            let eq = mir_emit_call_inst(st, "__ep_str_eq", "bool", args)
-            if expr.op == "!=" {
-                let not_inst = mir_make_result_inst(st, "not", "bool")
-                not_inst.operands.push(eq)
-                mir_emit_inst(st, not_inst)
-                ret mir_value_flow(mir_value_operand("bool", not_inst.result_name), st.current_block)
+        AstUnary n: {
+            let inner_flow = mir_emit_expr(st, st.current_block, n.expr)
+            st.current_block = inner_flow.block
+            if n.op == "-" {
+                let inst = mir_make_result_inst(st, "sub", "i64")
+                inst.operands.push(mir_const_int("i64", 0))
+                inst.operands.push(inner_flow.value)
+                mir_emit_inst(st, inst)
+                ret mir_value_flow(mir_value_operand("i64", inst.result_name), st.current_block)
             }
-            ret mir_value_flow(eq, st.current_block)
-        }
-        let op = mir_binary_op(expr.op, ast_resolved_type(expr.left))
-        let result_type = mir_op_result_type(op)
-        if expr.op == "<<" || expr.op == ">>" || expr.op == ">>>" {
-            mir_emit_shift_count_check(st, right_flow.value, ast_resolved_type(expr.left), ast_line(expr))
-        }
-        let inst = mir_make_result_inst(st, op, result_type)
-        inst.operands.push(left_flow.value)
-        inst.operands.push(right_flow.value)
-        mir_emit_inst(st, inst)
-        ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), ast_resolved_type(expr)), st.current_block)
-    }
-    if ast_kind(expr) == "NewArray" {
-        ret mir_emit_new_array(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "ArrayLiteral" {
-        ret mir_emit_array_literal(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "Subscript" {
-        ret mir_emit_subscript(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "Slice" {
-        ret mir_emit_slice(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "MapInit" {
-        ret mir_emit_map_init(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "StructInit" {
-        ret mir_emit_struct_init(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "UnionInit" {
-        ret mir_emit_union_init(st, st.current_block, expr)
-    }
-    if ast_kind(expr) == "FieldHas" {
-        let base_type = ast_resolved_type(expr.object)
-        let base_flow = mir_emit_expr(st, st.current_block, expr.object)
-        st.current_block = base_flow.block
-        if mir_is_union_name(st, base_type) == false {
-            ast_to_mir_die("field existence guard base must be union")
-        }
-        ret mir_value_flow(mir_emit_union_field_has(st, base_flow.value, base_type, expr.name), st.current_block)
-    }
-    if ast_kind(expr) == "FieldAccess" {
-        let base_type = ast_resolved_type(expr.object)
-        let base_flow = mir_emit_expr(st, st.current_block, expr.object)
-        st.current_block = base_flow.block
-        if mir_is_union_name(st, base_type) {
-            if mir_union_has_common_embedded_field(st, base_type, expr.name) {
-                ret mir_load_union_common_embedded_field(st, base_flow.value, base_type, expr.name)
+            if n.op == "!" {
+                let inst = mir_make_result_inst(st, "not", "bool")
+                inst.operands.push(inner_flow.value)
+                mir_emit_inst(st, inst)
+                ret mir_value_flow(mir_value_operand("bool", inst.result_name), st.current_block)
             }
-            ret mir_load_union_partial_field(st, base_flow.value, base_type, expr.name)
+            ast_to_mir_die(f"unsupported unary op {n.op}")
         }
-        let struct_name = mir_layout_struct_name(st, base_type)
-        if struct_name == "" {
-            ast_to_mir_die("field access base must be struct")
-        }
-        ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, expr.name), st.current_block)
-    }
-    if ast_kind(expr) == "DotCall" {
-        ret mir_emit_dot_call(st, block, expr)
-    }
-    if ast_kind(expr) == "Call" {
-        if expr.type_name == "os" {
-            ret mir_emit_os_call(st, expr)
-        }
-        if expr.type_name != "" {
-            ast_to_mir_die(f"unsupported namespaced call: {expr.type_name}.{expr.name}")
-        }
-        if expr.name == "println" {
-            if len(expr.args) == 1 {
+        AstBinary n: {
+            if n.op == "&&" || n.op == "||" {
+                ret mir_emit_short_circuit(st, st.current_block, expr)
+            }
+            let left_flow = mir_emit_expr(st, st.current_block, n.left)
+            st.current_block = left_flow.block
+            let right_flow = mir_emit_expr(st, st.current_block, n.right)
+            st.current_block = right_flow.block
+            let left_type = ast_resolved_type(n.left)
+            let right_type = ast_resolved_type(n.right)
+            if left_type == "str" && right_type == "str" && (n.op == "==" || n.op == "!=") {
                 let args = new MirOperand[0]
-                let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
+                args.push(left_flow.value)
+                args.push(right_flow.value)
+                let eq = mir_emit_call_inst(st, "__ep_str_eq", "bool", args)
+                if n.op == "!=" {
+                    let not_inst = mir_make_result_inst(st, "not", "bool")
+                    not_inst.operands.push(eq)
+                    mir_emit_inst(st, not_inst)
+                    ret mir_value_flow(mir_value_operand("bool", not_inst.result_name), st.current_block)
+                }
+                ret mir_value_flow(eq, st.current_block)
+            }
+            let op = mir_binary_op(n.op, left_type)
+            let result_type = mir_op_result_type(op)
+            if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                mir_emit_shift_count_check(st, right_flow.value, left_type, n.AstMeta.line)
+            }
+            let inst = mir_make_result_inst(st, op, result_type)
+            inst.operands.push(left_flow.value)
+            inst.operands.push(right_flow.value)
+            mir_emit_inst(st, inst)
+            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), n.AstMeta.resolved_type), st.current_block)
+        }
+        AstNewArray n: {
+            ret mir_emit_new_array(st, st.current_block, expr)
+        }
+        AstArrayLiteral n: {
+            ret mir_emit_array_literal(st, st.current_block, expr)
+        }
+        AstSubscript n: {
+            ret mir_emit_subscript(st, st.current_block, expr)
+        }
+        AstSlice n: {
+            ret mir_emit_slice(st, st.current_block, expr)
+        }
+        AstMapInit n: {
+            ret mir_emit_map_init(st, st.current_block, expr)
+        }
+        AstStructInit n: {
+            ret mir_emit_struct_init(st, st.current_block, expr)
+        }
+        AstUnionInit n: {
+            ret mir_emit_union_init(st, st.current_block, expr)
+        }
+        AstFieldHas n: {
+            let base_type = ast_resolved_type(n.object)
+            let base_flow = mir_emit_expr(st, st.current_block, n.object)
+            st.current_block = base_flow.block
+            if mir_is_union_name(st, base_type) == false {
+                ast_to_mir_die("field existence guard base must be union")
+            }
+            ret mir_value_flow(mir_emit_union_field_has(st, base_flow.value, base_type, n.name), st.current_block)
+        }
+        AstFieldAccess n: {
+            let base_type = ast_resolved_type(n.object)
+            let base_flow = mir_emit_expr(st, st.current_block, n.object)
+            st.current_block = base_flow.block
+            if mir_is_union_name(st, base_type) {
+                if mir_union_has_common_embedded_field(st, base_type, n.name) {
+                    ret mir_load_union_common_embedded_field(st, base_flow.value, base_type, n.name)
+                }
+                ret mir_load_union_partial_field(st, base_flow.value, base_type, n.name)
+            }
+            let struct_name = mir_layout_struct_name(st, base_type)
+            if struct_name == "" {
+                ast_to_mir_die("field access base must be struct")
+            }
+            ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, n.name), st.current_block)
+        }
+        AstDotCall n: {
+            ret mir_emit_dot_call(st, block, expr)
+        }
+        AstCall n: {
+            if n.type_name == "os" {
+                ret mir_emit_os_call(st, expr)
+            }
+            if n.type_name != "" {
+                ast_to_mir_die(f"unsupported namespaced call: {n.type_name}.{n.name}")
+            }
+            if n.name == "println" {
+                if len(n.args) == 1 {
+                    let args = new MirOperand[0]
+                    let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                    st.current_block = arg_flow.block
+                    args.push(arg_flow.value)
+                    mir_emit_call_inst(st, "__ep_print_str", "void", args)
+                }
+                let nl_args = new MirOperand[0]
+                mir_emit_call_inst(st, "__ep_print_newline", "void", nl_args)
+                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
+            }
+            if n.name == "print" {
+                let args = new MirOperand[0]
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
                 mir_emit_call_inst(st, "__ep_print_str", "void", args)
+                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
             }
-            let nl_args = new MirOperand[0]
-            mir_emit_call_inst(st, "__ep_print_newline", "void", nl_args)
-            ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-        }
-        if expr.name == "print" {
-            let args = new MirOperand[0]
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            args.push(arg_flow.value)
-            mir_emit_call_inst(st, "__ep_print_str", "void", args)
-            ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-        }
-        if expr.name == "len" || expr.name == "cap" {
-            let base_type = ast_resolved_type(expr.args[0])
-            let base_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = base_flow.block
-            let struct_name = mir_layout_struct_name(st, base_type)
-            if struct_name == "" {
-                ast_to_mir_die("len/cap expects aggregate pointer")
+            if n.name == "len" || n.name == "cap" {
+                let base_type = ast_resolved_type(n.args[0])
+                let base_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = base_flow.block
+                let struct_name = mir_layout_struct_name(st, base_type)
+                if struct_name == "" {
+                    ast_to_mir_die("len/cap expects aggregate pointer")
+                }
+                ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, n.name), st.current_block)
             }
-            ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, expr.name), st.current_block)
-        }
-        if expr.name == "cstr" {
-            let args = new MirOperand[0]
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            args.push(arg_flow.value)
-            args.push(mir_const_int("i64", ast_line(expr)))
-            ret mir_value_flow(mir_emit_call_inst(st, "__ep_cstr", "i64", args), st.current_block)
-        }
-        if expr.name == "i64" || expr.name == "u64" || expr.name == "bool" {
-            ret mir_emit_expr(st, st.current_block, expr.args[0])
-        }
-        if expr.name == "u8" {
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 255), st.current_block)
-        }
-        if expr.name == "u32" {
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 4294967295), st.current_block)
-        }
-        if expr.name == "i32" {
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            ret mir_value_flow(mir_trunc_i32_value(st, arg_flow.value), st.current_block)
-        }
-        if expr.name == "str" {
-            ret mir_emit_str_conversion(st, st.current_block, expr.args[0])
-        }
-        if expr.name == "bytes" {
-            let args = new MirOperand[0]
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            args.push(arg_flow.value)
-            ret mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_from_str", "ptr", args), st.current_block)
-        }
-        if expr.name == "read_file" {
-            let args = new MirOperand[0]
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            args.push(arg_flow.value)
-            args.push(mir_const_int("i64", ast_line(expr)))
-            ret mir_value_flow(mir_emit_call_inst(st, "__ep_read_file", "ptr", args), st.current_block)
-        }
-        if expr.name == "write_file" {
+            if n.name == "cstr" {
+                let args = new MirOperand[0]
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                args.push(arg_flow.value)
+                args.push(mir_const_int("i64", n.AstMeta.line))
+                ret mir_value_flow(mir_emit_call_inst(st, "__ep_cstr", "i64", args), st.current_block)
+            }
+            if n.name == "i64" || n.name == "u64" || n.name == "bool" {
+                ret mir_emit_expr(st, st.current_block, n.args[0])
+            }
+            if n.name == "u8" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 255), st.current_block)
+            }
+            if n.name == "u32" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 4294967295), st.current_block)
+            }
+            if n.name == "i32" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                ret mir_value_flow(mir_trunc_i32_value(st, arg_flow.value), st.current_block)
+            }
+            if n.name == "str" {
+                ret mir_emit_str_conversion(st, st.current_block, n.args[0])
+            }
+            if n.name == "bytes" {
+                let args = new MirOperand[0]
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                args.push(arg_flow.value)
+                ret mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_from_str", "ptr", args), st.current_block)
+            }
+            if n.name == "read_file" {
+                let args = new MirOperand[0]
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                args.push(arg_flow.value)
+                args.push(mir_const_int("i64", n.AstMeta.line))
+                ret mir_value_flow(mir_emit_call_inst(st, "__ep_read_file", "ptr", args), st.current_block)
+            }
+            if n.name == "write_file" {
+                let args = new MirOperand[0]
+                let i = 0
+                for i < len(n.args) {
+                    let arg_flow = mir_emit_expr(st, st.current_block, n.args[i])
+                    st.current_block = arg_flow.block
+                    args.push(arg_flow.value)
+                    i = i + 1
+                }
+                args.push(mir_const_int("i64", n.AstMeta.line))
+                ret mir_value_flow(mir_emit_call_inst(st, "__ep_write_file", "i64", args), st.current_block)
+            }
+            if n.name == "system" {
+                let args = new MirOperand[0]
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                args.push(arg_flow.value)
+                args.push(mir_const_int("i64", n.AstMeta.line))
+                ret mir_value_flow(mir_emit_call_inst(st, "__ep_system_cmd", "i64", args), st.current_block)
+            }
+            if n.name == "exit" {
+                let args = new MirOperand[0]
+                let code_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = code_flow.block
+                args.push(code_flow.value)
+                mir_emit_inst(st, mir_call("ExitProcess", "void", args))
+                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
+            }
+            if n.name == "push" {
+                let base_type = ast_resolved_type(n.args[0])
+                let dst_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = dst_flow.block
+                let args = new MirOperand[0]
+                args.push(dst_flow.value)
+                let value_flow = mir_emit_expr(st, st.current_block, n.args[1])
+                st.current_block = value_flow.block
+                args.push(value_flow.value)
+                if mir_is_u8_array_type(base_type) {
+                    mir_emit_call_inst(st, "__ep_slice_u8_push", "void", args)
+                } else {
+                    if mir_is_ptr_array_type(st, base_type) {
+                        mir_emit_call_inst(st, "__ep_slice_ptr_push", "void", args)
+                    } else {
+                        mir_emit_call_inst(st, "__ep_slice_i64_push", "void", args)
+                    }
+                }
+                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
+            }
+            if n.name == "extend" {
+                let dst_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = dst_flow.block
+                let src_flow = mir_emit_expr(st, st.current_block, n.args[1])
+                st.current_block = src_flow.block
+                let args = new MirOperand[0]
+                args.push(dst_flow.value)
+                args.push(src_flow.value)
+                mir_emit_call_inst(st, "__ep_slice_u8_extend", "void", args)
+                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
+            }
+            if n.name == "map_has" || n.name == "map_del" {
+                let map_type = ast_resolved_type(n.args[0])
+                let helper = mir_map_helper(map_type, "has")
+                if n.name == "map_del" {
+                    helper = mir_map_helper(map_type, "del")
+                }
+                if helper == "" {
+                    ast_to_mir_die(f"{n.name} expects map")
+                }
+                let base_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = base_flow.block
+                let key_flow = mir_emit_expr(st, st.current_block, n.args[1])
+                st.current_block = key_flow.block
+                let args = new MirOperand[0]
+                args.push(base_flow.value)
+                args.push(key_flow.value)
+                ret mir_value_flow(mir_emit_call_inst(st, helper, "bool", args), st.current_block)
+            }
+            let ret_type = mir_func_return_type(st, n.name)
             let args = new MirOperand[0]
             let i = 0
-            for i < len(expr.args) {
-                let arg_flow = mir_emit_expr(st, st.current_block, expr.args[i])
+            for i < len(n.args) {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[i])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
                 i = i + 1
             }
-            args.push(mir_const_int("i64", ast_line(expr)))
-            ret mir_value_flow(mir_emit_call_inst(st, "__ep_write_file", "i64", args), st.current_block)
+            ret mir_value_flow(mir_emit_call_inst(st, n.name, ret_type, args), st.current_block)
         }
-        if expr.name == "system" {
-            let args = new MirOperand[0]
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = arg_flow.block
-            args.push(arg_flow.value)
-            args.push(mir_const_int("i64", ast_line(expr)))
-            ret mir_value_flow(mir_emit_call_inst(st, "__ep_system_cmd", "i64", args), st.current_block)
+        _: {
+            ast_to_mir_die(f"unsupported expr {ast_kind(expr)}")
         }
-        if expr.name == "exit" {
-            let args = new MirOperand[0]
-            let code_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = code_flow.block
-            args.push(code_flow.value)
-            mir_emit_inst(st, mir_call("ExitProcess", "void", args))
-            ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-        }
-        if expr.name == "push" {
-            let base_type = ast_resolved_type(expr.args[0])
-            let dst_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = dst_flow.block
-            let args = new MirOperand[0]
-            args.push(dst_flow.value)
-            let value_flow = mir_emit_expr(st, st.current_block, expr.args[1])
-            st.current_block = value_flow.block
-            args.push(value_flow.value)
-            if mir_is_u8_array_type(base_type) {
-                mir_emit_call_inst(st, "__ep_slice_u8_push", "void", args)
-            } else {
-                if mir_is_ptr_array_type(st, base_type) {
-                    mir_emit_call_inst(st, "__ep_slice_ptr_push", "void", args)
-                } else {
-                    mir_emit_call_inst(st, "__ep_slice_i64_push", "void", args)
-                }
-            }
-            ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-        }
-        if expr.name == "extend" {
-            let dst_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = dst_flow.block
-            let src_flow = mir_emit_expr(st, st.current_block, expr.args[1])
-            st.current_block = src_flow.block
-            let args = new MirOperand[0]
-            args.push(dst_flow.value)
-            args.push(src_flow.value)
-            mir_emit_call_inst(st, "__ep_slice_u8_extend", "void", args)
-            ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-        }
-        if expr.name == "map_has" || expr.name == "map_del" {
-            let map_type = ast_resolved_type(expr.args[0])
-            let helper = mir_map_helper(map_type, "has")
-            if expr.name == "map_del" {
-                helper = mir_map_helper(map_type, "del")
-            }
-            if helper == "" {
-                ast_to_mir_die(f"{expr.name} expects map")
-            }
-            let base_flow = mir_emit_expr(st, st.current_block, expr.args[0])
-            st.current_block = base_flow.block
-            let key_flow = mir_emit_expr(st, st.current_block, expr.args[1])
-            st.current_block = key_flow.block
-            let args = new MirOperand[0]
-            args.push(base_flow.value)
-            args.push(key_flow.value)
-            ret mir_value_flow(mir_emit_call_inst(st, helper, "bool", args), st.current_block)
-        }
-        let ret_type = mir_func_return_type(st, expr.name)
-        let args = new MirOperand[0]
-        let i = 0
-        for i < len(expr.args) {
-            let arg_flow = mir_emit_expr(st, st.current_block, expr.args[i])
-            st.current_block = arg_flow.block
-            args.push(arg_flow.value)
-            i = i + 1
-        }
-        ret mir_value_flow(mir_emit_call_inst(st, expr.name, ret_type, args), st.current_block)
     }
-    ast_to_mir_die(f"unsupported expr {ast_kind(expr)}")
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
+
 
 fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
     st.current_block = block
@@ -2018,224 +2026,240 @@ fun mir_emit_while(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBloc
     ret mir_reachable_flow(end_block)
 }
 
+
 fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
     st.current_block = block
-    if ast_kind(stmt) == "ExprStmt" {
-        let value_flow = mir_emit_expr(st, st.current_block, stmt.expr)
-        ret mir_reachable_flow(value_flow.block)
-    }
-    if ast_kind(stmt) == "Let" {
-        let typ = mir_epic_type(ast_resolved_type(stmt))
-        let addr = mir_alloc_local(st, stmt.name, typ)
-        let value_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-        st.current_block = value_flow.block
-        mir_emit_inst(st, mir_store(value_flow.value, addr))
-        ret mir_reachable_flow(st.current_block)
-    }
-    if ast_kind(stmt) == "SubscriptAssign" {
-        let base_type = ast_resolved_type(stmt.base)
-        let dst_flow = mir_emit_expr(st, st.current_block, stmt.base)
-        st.current_block = dst_flow.block
-        let index_flow = mir_emit_expr(st, st.current_block, stmt.index)
-        st.current_block = index_flow.block
-        let value_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-        st.current_block = value_flow.block
-        let args = new MirOperand[0]
-        args.push(dst_flow.value)
-        args.push(index_flow.value)
-        args.push(value_flow.value)
-        let map_set_helper = mir_map_helper(base_type, "set")
-        if map_set_helper != "" {
-            mir_emit_call_inst(st, map_set_helper, "void", args)
-        } else {
-            if mir_is_u8_array_type(base_type) {
-                mir_emit_call_inst(st, "__ep_slice_u8_set", "void", args)
-            } else {
-                if mir_is_ptr_array_type(st, base_type) {
-                    mir_emit_call_inst(st, "__ep_slice_ptr_set", "void", args)
-                } else {
-                    mir_emit_call_inst(st, "__ep_slice_i64_set", "void", args)
-                }
-            }
+    match stmt {
+        AstExprStmt n: {
+            let value_flow = mir_emit_expr(st, st.current_block, n.expr)
+            ret mir_reachable_flow(value_flow.block)
         }
-        ret mir_reachable_flow(st.current_block)
-    }
-    if ast_kind(stmt) == "FieldSet" {
-        let base_type = ast_resolved_type(stmt.object)
-        let base_flow = mir_emit_expr(st, st.current_block, stmt.object)
-        st.current_block = base_flow.block
-        let value_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-        st.current_block = value_flow.block
-        if mir_is_union_name(st, base_type) {
-            mir_store_union_partial_field(st, base_flow.value, base_type, stmt.name, value_flow.value)
-            ret mir_reachable_flow(st.current_block)
-        }
-        let struct_name = mir_layout_struct_name(st, base_type)
-        if struct_name == "" {
-            ast_to_mir_die("field assignment base must be struct")
-        }
-        let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, stmt.name)
-        mir_emit_inst(st, mir_store(value_flow.value, addr))
-        ret mir_reachable_flow(st.current_block)
-    }
-    if ast_kind(stmt) == "Assign" {
-        let value_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-        st.current_block = value_flow.block
-        let gidx = mir_global_index(st, stmt.name)
-        if gidx >= 0 {
-            let addr = mir_symbol_operand("ptr", mir_global_label(stmt.name))
+        AstLet n: {
+            let typ = mir_epic_type(n.AstMeta.resolved_type)
+            let addr = mir_alloc_local(st, n.name, typ)
+            let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
+            st.current_block = value_flow.block
             mir_emit_inst(st, mir_store(value_flow.value, addr))
             ret mir_reachable_flow(st.current_block)
         }
-        let idx = mir_local_index(st, stmt.name)
-        let addr = mir_value_operand("ptr", st.local_addr_names[idx])
-        mir_emit_inst(st, mir_store(value_flow.value, addr))
-        ret mir_reachable_flow(st.current_block)
-    }
-    if ast_kind(stmt) == "AssignOp" {
-        if ast_kind(stmt.expr) == "Var" {
-            let idx = mir_local_index(st, stmt.expr.name)
-            let result_name = mir_new_value(st, "load")
-            let addr = mir_value_operand("ptr", st.local_addr_names[idx])
-            mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
-            let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-            st.current_block = rhs_flow.block
-            let op = mir_binary_op(stmt.op, ast_resolved_type(stmt.expr))
-            let result_type = mir_op_result_type(op)
-            if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
-                mir_emit_shift_count_check(st, rhs_flow.value, ast_resolved_type(stmt.expr), ast_line(stmt))
+        AstSubscriptAssign n: {
+            let base_type = ast_resolved_type(n.base)
+            let dst_flow = mir_emit_expr(st, st.current_block, n.base)
+            st.current_block = dst_flow.block
+            let index_flow = mir_emit_expr(st, st.current_block, n.index)
+            st.current_block = index_flow.block
+            let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
+            st.current_block = value_flow.block
+            let args = new MirOperand[0]
+            args.push(dst_flow.value)
+            args.push(index_flow.value)
+            args.push(value_flow.value)
+            let map_set_helper = mir_map_helper(base_type, "set")
+            if map_set_helper != "" {
+                mir_emit_call_inst(st, map_set_helper, "void", args)
+            } else {
+                if mir_is_u8_array_type(base_type) {
+                    mir_emit_call_inst(st, "__ep_slice_u8_set", "void", args)
+                } else {
+                    if mir_is_ptr_array_type(st, base_type) {
+                        mir_emit_call_inst(st, "__ep_slice_ptr_set", "void", args)
+                    } else {
+                        mir_emit_call_inst(st, "__ep_slice_i64_set", "void", args)
+                    }
+                }
             }
-            let inst = mir_make_result_inst(st, op, result_type)
-            inst.operands.push(mir_value_operand(st.local_types[idx], result_name))
-            inst.operands.push(rhs_flow.value)
-            mir_emit_inst(st, inst)
-            mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), ast_resolved_type(stmt.expr)), addr))
             ret mir_reachable_flow(st.current_block)
         }
-        if ast_kind(stmt.expr) == "FieldAccess" {
-            let base_type = ast_resolved_type(stmt.expr.object)
+        AstFieldSet n: {
+            let base_type = ast_resolved_type(n.object)
+            let base_flow = mir_emit_expr(st, st.current_block, n.object)
+            st.current_block = base_flow.block
+            let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
+            st.current_block = value_flow.block
+            if mir_is_union_name(st, base_type) {
+                mir_store_union_partial_field(st, base_flow.value, base_type, n.name, value_flow.value)
+                ret mir_reachable_flow(st.current_block)
+            }
             let struct_name = mir_layout_struct_name(st, base_type)
             if struct_name == "" {
-                ast_to_mir_die("compound field assignment base must be struct")
+                ast_to_mir_die("field assignment base must be struct")
             }
-            let base_flow = mir_emit_expr(st, st.current_block, stmt.expr.object)
-            st.current_block = base_flow.block
-            let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, stmt.expr.name)
-            let field_typ = mir_promoted_field_type(st, struct_name, stmt.expr.name)
-            let result_name = mir_new_value(st, "load")
-            mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
-            let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-            st.current_block = rhs_flow.block
-            let op = mir_binary_op(stmt.op, ast_resolved_type(stmt.expr))
-            let result_type = mir_op_result_type(op)
-            if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
-                mir_emit_shift_count_check(st, rhs_flow.value, ast_resolved_type(stmt.expr), ast_line(stmt))
-            }
-            let inst = mir_make_result_inst(st, op, result_type)
-            inst.operands.push(mir_value_operand(field_typ, result_name))
-            inst.operands.push(rhs_flow.value)
-            mir_emit_inst(st, inst)
-            mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), ast_resolved_type(stmt.expr)), addr))
+            let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, n.name)
+            mir_emit_inst(st, mir_store(value_flow.value, addr))
             ret mir_reachable_flow(st.current_block)
         }
-        if ast_kind(stmt.expr) == "Subscript" {
-            let base_type = ast_resolved_type(stmt.expr.base)
-            let dst_flow = mir_emit_expr(st, st.current_block, stmt.expr.base)
-            st.current_block = dst_flow.block
-            let index_flow = mir_emit_expr(st, st.current_block, stmt.expr.index)
-            st.current_block = index_flow.block
-            let get_args = new MirOperand[0]
-            get_args.push(dst_flow.value)
-            get_args.push(index_flow.value)
-            let current = mir_const_int("i64", 0)
-            let map_value_type = mir_map_value_type(base_type)
-            if map_value_type != "" {
-                current = mir_emit_call_inst(st, mir_map_helper(base_type, "get"), map_value_type, get_args)
-            } else {
-                if mir_is_u8_array_type(base_type) {
-                    current = mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", get_args)
-                } else {
-                    current = mir_emit_call_inst(st, "__ep_slice_i64_get", "i64", get_args)
-                }
-            }
-            let rhs_flow = mir_emit_expr(st, st.current_block, stmt.value_expr)
-            st.current_block = rhs_flow.block
-            let op = mir_binary_op(stmt.op, ast_resolved_type(stmt.expr))
-            let result_type = mir_op_result_type(op)
-            if stmt.op == "<<" || stmt.op == ">>" || stmt.op == ">>>" {
-                mir_emit_shift_count_check(st, rhs_flow.value, ast_resolved_type(stmt.expr), ast_line(stmt))
-            }
-            let inst = mir_make_result_inst(st, op, result_type)
-            inst.operands.push(current)
-            inst.operands.push(rhs_flow.value)
-            mir_emit_inst(st, inst)
-            let set_args = new MirOperand[0]
-            set_args.push(dst_flow.value)
-            set_args.push(index_flow.value)
-            set_args.push(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), ast_resolved_type(stmt.expr)))
-            let map_set_helper2 = mir_map_helper(base_type, "set")
-            if map_set_helper2 != "" {
-                mir_emit_call_inst(st, map_set_helper2, "void", set_args)
-            } else {
-                if mir_is_u8_array_type(base_type) {
-                    mir_emit_call_inst(st, "__ep_slice_u8_set", "void", set_args)
-                } else {
-                    mir_emit_call_inst(st, "__ep_slice_i64_set", "void", set_args)
-                }
-            }
-            ret mir_reachable_flow(st.current_block)
-        }
-        ast_to_mir_die("unsupported compound assignment target")
-        ret mir_unreachable_flow()
-    }
-    if ast_kind(stmt) == "If" {
-        ret mir_emit_if(st, st.current_block, stmt)
-    }
-    if ast_kind(stmt) == "Assert" {
-        ret mir_emit_assert(st, st.current_block, stmt)
-    }
-    if ast_kind(stmt) == "Panic" {
-        ret mir_emit_panic(st, st.current_block, stmt)
-    }
-    if ast_kind(stmt) == "Match" {
-        ret mir_emit_match(st, st.current_block, stmt)
-    }
-    if ast_kind(stmt) == "While" {
-        ret mir_emit_while(st, st.current_block, stmt)
-    }
-    if ast_kind(stmt) == "For" {
-        ret mir_emit_for(st, st.current_block, stmt)
-    }
-    if ast_kind(stmt) == "Break" {
-        if len(st.break_targets) == 0 {
-            ast_to_mir_die("break outside loop")
-        }
-        st.current_block.terminator = mir_br(st.break_targets[len(st.break_targets) - 1])
-        st.current_block.has_terminator = true
-        ret mir_unreachable_flow()
-    }
-    if ast_kind(stmt) == "Continue" {
-        if len(st.continue_targets) == 0 {
-            ast_to_mir_die("continue outside loop")
-        }
-        st.current_block.terminator = mir_br(st.continue_targets[len(st.continue_targets) - 1])
-        st.current_block.has_terminator = true
-        ret mir_unreachable_flow()
-    }
-    if ast_kind(stmt) == "Return" {
-        if ast_kind(stmt.expr) == "" {
-            st.current_block.terminator = mir_ret_void()
-        } else {
-            let value_flow = mir_emit_expr(st, st.current_block, stmt.expr)
+        AstAssign n: {
+            let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
             st.current_block = value_flow.block
-            st.current_block.terminator = mir_ret_value(value_flow.value)
+            let gidx = mir_global_index(st, n.name)
+            if gidx >= 0 {
+                let addr = mir_symbol_operand("ptr", mir_global_label(n.name))
+                mir_emit_inst(st, mir_store(value_flow.value, addr))
+                ret mir_reachable_flow(st.current_block)
+            }
+            let idx = mir_local_index(st, n.name)
+            let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+            mir_emit_inst(st, mir_store(value_flow.value, addr))
+            ret mir_reachable_flow(st.current_block)
         }
-        st.current_block.has_terminator = true
-        ret mir_unreachable_flow()
+        AstAssignOp n: {
+            match n.expr {
+                AstVar target: {
+                    let idx = mir_local_index(st, target.name)
+                    let result_name = mir_new_value(st, "load")
+                    let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+                    mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
+                    let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
+                    st.current_block = rhs_flow.block
+                    let target_type = target.AstMeta.resolved_type
+                    let op = mir_binary_op(n.op, target_type)
+                    let result_type = mir_op_result_type(op)
+                    if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.AstMeta.line)
+                    }
+                    let inst = mir_make_result_inst(st, op, result_type)
+                    inst.operands.push(mir_value_operand(st.local_types[idx], result_name))
+                    inst.operands.push(rhs_flow.value)
+                    mir_emit_inst(st, inst)
+                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type), addr))
+                    ret mir_reachable_flow(st.current_block)
+                }
+                AstFieldAccess target: {
+                    let base_type = ast_resolved_type(target.object)
+                    let struct_name = mir_layout_struct_name(st, base_type)
+                    if struct_name == "" {
+                        ast_to_mir_die("compound field assignment base must be struct")
+                    }
+                    let base_flow = mir_emit_expr(st, st.current_block, target.object)
+                    st.current_block = base_flow.block
+                    let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, target.name)
+                    let field_typ = mir_promoted_field_type(st, struct_name, target.name)
+                    let result_name = mir_new_value(st, "load")
+                    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
+                    let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
+                    st.current_block = rhs_flow.block
+                    let target_type = target.AstMeta.resolved_type
+                    let op = mir_binary_op(n.op, target_type)
+                    let result_type = mir_op_result_type(op)
+                    if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.AstMeta.line)
+                    }
+                    let inst = mir_make_result_inst(st, op, result_type)
+                    inst.operands.push(mir_value_operand(field_typ, result_name))
+                    inst.operands.push(rhs_flow.value)
+                    mir_emit_inst(st, inst)
+                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type), addr))
+                    ret mir_reachable_flow(st.current_block)
+                }
+                AstSubscript target: {
+                    let base_type = ast_resolved_type(target.base)
+                    let dst_flow = mir_emit_expr(st, st.current_block, target.base)
+                    st.current_block = dst_flow.block
+                    let index_flow = mir_emit_expr(st, st.current_block, target.index)
+                    st.current_block = index_flow.block
+                    let get_args = new MirOperand[0]
+                    get_args.push(dst_flow.value)
+                    get_args.push(index_flow.value)
+                    let current = mir_const_int("i64", 0)
+                    let map_value_type = mir_map_value_type(base_type)
+                    if map_value_type != "" {
+                        current = mir_emit_call_inst(st, mir_map_helper(base_type, "get"), map_value_type, get_args)
+                    } else {
+                        if mir_is_u8_array_type(base_type) {
+                            current = mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", get_args)
+                        } else {
+                            current = mir_emit_call_inst(st, "__ep_slice_i64_get", "i64", get_args)
+                        }
+                    }
+                    let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
+                    st.current_block = rhs_flow.block
+                    let target_type = target.AstMeta.resolved_type
+                    let op = mir_binary_op(n.op, target_type)
+                    let result_type = mir_op_result_type(op)
+                    if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.AstMeta.line)
+                    }
+                    let inst = mir_make_result_inst(st, op, result_type)
+                    inst.operands.push(current)
+                    inst.operands.push(rhs_flow.value)
+                    mir_emit_inst(st, inst)
+                    let set_args = new MirOperand[0]
+                    set_args.push(dst_flow.value)
+                    set_args.push(index_flow.value)
+                    set_args.push(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type))
+                    let map_set_helper2 = mir_map_helper(base_type, "set")
+                    if map_set_helper2 != "" {
+                        mir_emit_call_inst(st, map_set_helper2, "void", set_args)
+                    } else {
+                        if mir_is_u8_array_type(base_type) {
+                            mir_emit_call_inst(st, "__ep_slice_u8_set", "void", set_args)
+                        } else {
+                            mir_emit_call_inst(st, "__ep_slice_i64_set", "void", set_args)
+                        }
+                    }
+                    ret mir_reachable_flow(st.current_block)
+                }
+                _: {
+                    ast_to_mir_die("unsupported compound assignment target")
+                }
+            }
+            ret mir_unreachable_flow()
+        }
+        AstIf n: {
+            ret mir_emit_if(st, st.current_block, stmt)
+        }
+        AstAssert n: {
+            ret mir_emit_assert(st, st.current_block, stmt)
+        }
+        AstPanic n: {
+            ret mir_emit_panic(st, st.current_block, stmt)
+        }
+        AstMatch n: {
+            ret mir_emit_match(st, st.current_block, stmt)
+        }
+        AstWhile n: {
+            ret mir_emit_while(st, st.current_block, stmt)
+        }
+        AstFor n: {
+            ret mir_emit_for(st, st.current_block, stmt)
+        }
+        AstBreak n: {
+            if len(st.break_targets) == 0 {
+                ast_to_mir_die("break outside loop")
+            }
+            st.current_block.terminator = mir_br(st.break_targets[len(st.break_targets) - 1])
+            st.current_block.has_terminator = true
+            ret mir_unreachable_flow()
+        }
+        AstContinue n: {
+            if len(st.continue_targets) == 0 {
+                ast_to_mir_die("continue outside loop")
+            }
+            st.current_block.terminator = mir_br(st.continue_targets[len(st.continue_targets) - 1])
+            st.current_block.has_terminator = true
+            ret mir_unreachable_flow()
+        }
+        AstReturn n: {
+            match n.expr {
+                AstEmpty e: {
+                    st.current_block.terminator = mir_ret_void()
+                }
+                _: {
+                    let value_flow = mir_emit_expr(st, st.current_block, n.expr)
+                    st.current_block = value_flow.block
+                    st.current_block.terminator = mir_ret_value(value_flow.value)
+                }
+            }
+            st.current_block.has_terminator = true
+            ret mir_unreachable_flow()
+        }
+        _: {
+            ast_to_mir_die(f"unsupported stmt {ast_kind(stmt)}")
+        }
     }
-    ast_to_mir_die(f"unsupported stmt {ast_kind(stmt)}")
     ret mir_unreachable_flow()
 }
+
 
 fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstNode): MirBlockFlow {
     let current = block
