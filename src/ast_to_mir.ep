@@ -184,10 +184,6 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
     st.program.functions.push(st.current_fn)
 }
 
-fun mir_field_label(struct_name: str, field_name: str): str {
-    ret str_cat2(str_cat2(struct_name, "."), field_name)
-}
-
 fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, field_index: i64, embedded: bool): MirStructFieldLayout {
     ret new MirStructFieldLayout { struct_name: struct_name, field_name: field_name, field_type: field_type, field_index: field_index, embedded: embedded }
 }
@@ -224,7 +220,7 @@ fun mir_union_tag(st: MirCodegenState, union_name: str, member_name: str): i64 {
             ret member.tag
         }
     }
-    ast_to_mir_die(f"unknown union member {mir_field_label(union_name, member_name)}")
+    ast_to_mir_die(f"unknown union member {union_name}.{member_name}")
     ret 0
 }
 
@@ -262,7 +258,7 @@ fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64
     if idx >= 0 {
         ret idx
     }
-    ast_to_mir_die(f"unknown struct field {mir_field_label(struct_name, field_name)}")
+    ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
     ret 0
 }
 
@@ -281,7 +277,7 @@ fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str 
     if typ != "" {
         ret typ
     }
-    ast_to_mir_die(f"unknown struct field {mir_field_label(struct_name, field_name)}")
+    ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
     ret "i64"
 }
 
@@ -297,7 +293,7 @@ fun mir_is_embedded_field(st: MirCodegenState, struct_name: str, field_name: str
 
 fun mir_promoted_field_type_inner(st: MirCodegenState, struct_name: str, field_name: str, depth: i64): str {
     if depth <= 0 {
-        ast_to_mir_die(f"embedded field cycle while resolving {mir_field_label(struct_name, field_name)}")
+        ast_to_mir_die(f"embedded field cycle while resolving {struct_name}.{field_name}")
     }
     let direct = mir_direct_field_type(st, struct_name, field_name)
     if direct != "" {
@@ -314,7 +310,7 @@ fun mir_promoted_field_type_inner(st: MirCodegenState, struct_name: str, field_n
             let candidate = mir_promoted_field_type_inner(st, embedded_type, field_name, depth - 1)
             if candidate != "" {
                 if found != "" {
-                    ast_to_mir_die(f"ambiguous field {mir_field_label(struct_name, field_name)}")
+                    ast_to_mir_die(f"ambiguous field {struct_name}.{field_name}")
                 }
                 found = candidate
             }
@@ -326,7 +322,7 @@ fun mir_promoted_field_type_inner(st: MirCodegenState, struct_name: str, field_n
 fun mir_promoted_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
     let typ = mir_promoted_field_type_inner(st, struct_name, field_name, 64)
     if typ == "" {
-        ast_to_mir_die(f"unknown struct field {mir_field_label(struct_name, field_name)}")
+        ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
     }
     ret typ
 }
@@ -508,7 +504,7 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
 
 fun mir_promoted_field_addr_inner(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str, depth: i64): MirOperand {
     if depth <= 0 {
-        ast_to_mir_die(f"embedded field cycle while resolving {mir_field_label(struct_name, field_name)}")
+        ast_to_mir_die(f"embedded field cycle while resolving {struct_name}.{field_name}")
     }
     if mir_direct_field_type(st, struct_name, field_name) != "" {
         ret mir_field_addr(st, base, struct_name, field_name)
@@ -525,7 +521,7 @@ fun mir_promoted_field_addr_inner(st: MirCodegenState, base: MirOperand, struct_
             }
             if mir_promoted_field_type_inner(st, embedded_type, field_name, depth - 1) != "" {
                 if found_count > 0 {
-                    ast_to_mir_die(f"ambiguous field {mir_field_label(struct_name, field_name)}")
+                    ast_to_mir_die(f"ambiguous field {struct_name}.{field_name}")
                 }
                 let embedded_obj = mir_load_field(st, base, struct_name, embedded_name)
                 found = mir_promoted_field_addr_inner(st, embedded_obj, embedded_type, field_name, depth - 1)
@@ -534,7 +530,7 @@ fun mir_promoted_field_addr_inner(st: MirCodegenState, base: MirOperand, struct_
         }
     }
     if found_count == 0 {
-        ast_to_mir_die(f"unknown struct field {mir_field_label(struct_name, field_name)}")
+        ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
     }
     ret found
 }
