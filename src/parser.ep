@@ -602,15 +602,6 @@ fun ast_funcs(node: AstNode): AstFunDef[] {
     ret new AstFunDef[0]
 }
 
-fun ast_set_funcs(node: AstNode, value: AstFunDef[]): void {
-    match node {
-        AstProgram n: { n.funcs = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("funcs")
-}
 
 fun ast_structs(node: AstNode): AstStructDef[] {
     match node {
@@ -620,15 +611,6 @@ fun ast_structs(node: AstNode): AstStructDef[] {
     ret new AstStructDef[0]
 }
 
-fun ast_set_structs(node: AstNode, value: AstStructDef[]): void {
-    match node {
-        AstProgram n: { n.structs = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("structs")
-}
 
 fun ast_globals(node: AstNode): AstLet[] {
     match node {
@@ -638,15 +620,6 @@ fun ast_globals(node: AstNode): AstLet[] {
     ret new AstLet[0]
 }
 
-fun ast_set_globals(node: AstNode, value: AstLet[]): void {
-    match node {
-        AstProgram n: { n.globals = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("globals")
-}
 
 fun ast_unions(node: AstNode): AstUnionDef[] {
     match node {
@@ -656,15 +629,6 @@ fun ast_unions(node: AstNode): AstUnionDef[] {
     ret new AstUnionDef[0]
 }
 
-fun ast_set_unions(node: AstNode, value: AstUnionDef[]): void {
-    match node {
-        AstProgram n: { n.unions = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("unions")
-}
 
 fun ast_name(node: AstNode): str {
     match node {
@@ -802,16 +766,6 @@ fun ast_members(node: AstNode): str[] {
     ret new str[0]
 }
 
-fun ast_set_members(node: AstNode, value: str[]): void {
-    match node {
-        AstUnionDef n: {
-            n.members = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("members")
-}
 
 fun ast_params(node: AstNode): AstNode[] {
     match node {
@@ -832,14 +786,6 @@ fun ast_set_params(node: AstNode, value: AstNode[]): void {
     ast_bad_field("params")
 }
 
-fun ast_type_name(node: AstNode): str {
-    match node {
-        AstCall n: { ret n.type_name }
-        AstUnionInit n: { ret n.type_name }
-        else: {}
-    }
-    ret ""
-}
 
 fun ast_set_type_name(node: AstNode, value: str): void {
     match node {
@@ -944,13 +890,6 @@ fun ast_set_body(node: AstNode, value: AstNode): void {
     ast_bad_field("body")
 }
 
-fun ast_receiver_name(node: AstNode): str {
-    match node {
-        AstFunDef n: { ret n.receiver_name }
-        else: {}
-    }
-    ret ""
-}
 
 fun ast_set_receiver_name(node: AstNode, value: str): void {
     match node {
@@ -963,13 +902,6 @@ fun ast_set_receiver_name(node: AstNode, value: str): void {
     ast_bad_field("receiver_name")
 }
 
-fun ast_receiver_type(node: AstNode): str {
-    match node {
-        AstFunDef n: { ret n.receiver_type }
-        else: {}
-    }
-    ret ""
-}
 
 fun ast_set_receiver_type(node: AstNode, value: str): void {
     match node {
@@ -982,13 +914,6 @@ fun ast_set_receiver_type(node: AstNode, value: str): void {
     ast_bad_field("receiver_type")
 }
 
-fun ast_method_name(node: AstNode): str {
-    match node {
-        AstFunDef n: { ret n.method_name }
-        else: {}
-    }
-    ret ""
-}
 
 fun ast_set_method_name(node: AstNode, value: str): void {
     match node {
@@ -1001,13 +926,6 @@ fun ast_set_method_name(node: AstNode, value: str): void {
     ast_bad_field("method_name")
 }
 
-fun ast_embedded(node: AstNode): bool {
-    match node {
-        AstStructField n: { ret n.embedded }
-        else: {}
-    }
-    ret false
-}
 
 fun ast_set_embedded(node: AstNode, value: bool): void {
     match node {
@@ -1028,16 +946,6 @@ fun ast_stmts(node: AstNode): AstNode[] {
     ret new AstNode[0]
 }
 
-fun ast_set_stmts(node: AstNode, value: AstNode[]): void {
-    match node {
-        AstBlock n: {
-            n.stmts = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("stmts")
-}
 
 fun ast_value_expr(node: AstNode): AstNode {
     match node {
@@ -1383,13 +1291,6 @@ fun ast_set_source(node: AstNode, value: AstNode): void {
     ast_bad_field("source")
 }
 
-fun ast_variant_name(node: AstNode): str {
-    match node {
-        AstMatchCase n: { ret n.variant_name }
-        else: {}
-    }
-    ret ""
-}
 
 fun ast_set_variant_name(node: AstNode, value: str): void {
     match node {
@@ -1402,13 +1303,6 @@ fun ast_set_variant_name(node: AstNode, value: str): void {
     ast_bad_field("variant_name")
 }
 
-fun ast_binding_name(node: AstNode): str {
-    match node {
-        AstMatchCase n: { ret n.binding_name }
-        else: {}
-    }
-    ret ""
-}
 
 fun ast_set_binding_name(node: AstNode, value: str): void {
     match node {
@@ -1554,16 +1448,6 @@ fun ast_map_keys(node: AstNode): AstNode[] {
     ret new AstNode[0]
 }
 
-fun ast_set_map_keys(node: AstNode, value: AstNode[]): void {
-    match node {
-        AstMapInit n: {
-            n.map_keys = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("map_keys")
-}
 
 fun ast_map_values(node: AstNode): AstNode[] {
     match node {
@@ -1573,16 +1457,6 @@ fun ast_map_values(node: AstNode): AstNode[] {
     ret new AstNode[0]
 }
 
-fun ast_set_map_values(node: AstNode, value: AstNode[]): void {
-    match node {
-        AstMapInit n: {
-            n.map_values = value
-            ret
-        }
-        else: {}
-    }
-    ast_bad_field("map_values")
-}
 
 struct Parser {
     tokens: Token[]
@@ -1629,19 +1503,6 @@ fun (p: Parser) peek_kind(kind: str): i64 {
     ret 0
 }
 
-fun (p: Parser) peek_empty_braces(): i64 {
-    if p.peek_kind("LBRACE") == 0 {
-        ret 0
-    }
-    let i = p.pos + 1
-    for i < len(p.tokens) && token_kind(p.tokens[i]) == "NEWLINE" {
-        i += 1
-    }
-    if i < len(p.tokens) && token_kind(p.tokens[i]) == "RBRACE" {
-        ret 1
-    }
-    ret 0
-}
 
 fun (p: Parser) advance(): Token {
     let t = p.peek()
@@ -2201,31 +2062,9 @@ fun (p: Parser) parse_match_stmt(): AstNode {
     ret node
 }
 
-fun var_node(name: str): AstNode {
-    let n = ast_new_var()
-    ast_set_name(n, name)
-    ret n
-}
 
-fun lit_node(value: str): AstNode {
-    let n = ast_new_literal()
-    ast_set_value(n, value)
-    ret n
-}
 
-fun let_node(name: str, value: AstNode): AstNode {
-    let n = ast_new_let()
-    ast_set_name(n, name)
-    ast_set_value_expr(n, value)
-    ret n
-}
 
-fun assign_node(name: str, value: AstNode): AstNode {
-    let n = ast_new_assign()
-    ast_set_name(n, name)
-    ast_set_value_expr(n, value)
-    ret n
-}
 
 fun (p: Parser) parse_for_stmt(): AstNode {
     p.expect("FOR")
@@ -2557,33 +2396,6 @@ fun (p: Parser) parse_struct_init(name: Token): AstNode {
     ret node
 }
 
-fun (p: Parser) parse_named_init_fields(node: AstNode): AstNode {
-    p.expect("LBRACE")
-    p.skip_newlines()
-    for p.peek_kind("RBRACE") == 0 {
-        let field_name = p.expect("ID")
-        p.expect("COLON")
-        let field = ast_new_init_field()
-        ast_set_name(field, token_text(field_name))
-        ast_set_line(field, token_line(field_name))
-        ast_set_value_expr(field, p.parse_expr())
-        ast_fields(node).push(field)
-        if p.check("COMMA") == 1 {
-            p.skip_newlines()
-        } else {
-            if p.peek_kind("NEWLINE") == 1 {
-                p.skip_newlines()
-            } else {
-                if p.peek_kind("RBRACE") == 0 {
-                    let t = p.peek()
-                    parse_error(token_line(t), "Expected comma or newline in struct initializer")
-                }
-            }
-        }
-    }
-    p.expect("RBRACE")
-    ret node
-}
 
 fun (p: Parser) parse_array_literal(name: Token): AstNode {
     let node = ast_new_array_literal()
