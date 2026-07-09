@@ -153,7 +153,7 @@ _slice_T = {
 
 基本类型 dynamic array 存储基本类型的值。结构体和 `str` dynamic array 存储引用。
 
-`str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误。slice/map header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` / `entries` 可在首次写入时再分配。
+`str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend`、map 操作或字段访问是运行时错误。slice/map header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` / `entries` 可在首次写入时再分配。
 
 ### 结构体 (Struct)
 
@@ -208,6 +208,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
+- **For 降级**：`ForRange` 保持半开 numeric cursor lowering。`ForIn` 由 sema 按 source 类型分派：array source 降级为 index cursor loop，保存初始 `len` 作为上限并在每轮重新检查当前 `len`；map source 降级为隐藏 numeric cursor loop，通过 internal `__ep_map_str_len` / `__ep_map_str_key_at` 读取当前 key。`ForIn` 不对 map keys 做快照；对被迭代 map 的 insert/delete 是弱规定。
 - **Map 降级**：Python reference compiler 将 `map[str]T` 降级为 str-keyed map。entry 为 `{key, value, occupied}` 三个 word，key 比较调用 `__ep_str_eq`。value lowering 分为 word、bool、str 和 pointer 四类；struct、array、map 和 pointer value 走 pointer helper。`m[key] = value` 插入或覆盖，满时扩容。不存在的键查找触发 runtime panic；`m.has(key)` 区分是否缺失，`m.del(key)` 使用 swap-delete 并返回是否删除成功。`new map[str]T { ... }` 降级为一次 map new 加按源码顺序执行的 map set。
 
 ## 链接器 (Linker)
@@ -234,6 +235,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `str_replace_char` | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `xs.push(x)`      | 由 codegen 为动态数组发射                   | 公开容器点调用 |
+| `xs.pop()`        | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_pop`、`__ep_slice_i64_pop`、`__ep_slice_ptr_pop`；空数组 panic | 公开容器点调用 |
 | `dst.extend(src)`  | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_extend`、`__ep_slice_i64_extend`、`__ep_slice_ptr_extend` | 公开容器点调用 |
 | `len` / `cap`      | 直接内联发射                                | 公开 |
 | 切片语法           | 字符串用 `__ep_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |

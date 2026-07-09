@@ -233,7 +233,7 @@ Program
         Binary <
           Var typed
           Literal 10
-      For i
+      ForRange i
         Block
           ExprStmt
             Call println
@@ -242,6 +242,19 @@ Program
         Literal 0
         Call len
           Var xs
+      ForIn j
+        Block
+          ExprStmt
+            Call println
+              Call str
+                Var j
+        Var xs
+      ForIn key
+        Block
+          ExprStmt
+            Call println
+              Var key
+        Var mapping2
       Match
         Var typed
         MatchCase

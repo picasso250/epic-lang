@@ -75,8 +75,13 @@ fun use_arrays_and_strings(): i64 {
     let c = cap(xs)
     xs[0] = add(xs[1], xs[2])
     xs[1] += 1
+    let index_sum = 0
+    for i in xs {
+        index_sum += i
+    }
+    let popped = xs.pop()
     println(f"{again} {sub} {bsub} {b0}")
-    ret n + c + xs[0]
+    ret n + c + xs[0] + popped + index_sum
 }
 
 fun use_structs_and_maps(): i64 {
@@ -91,8 +96,14 @@ fun use_structs_and_maps(): i64 {
     m["two"] = add(m["one"], 1)
     let has_one = m.has("one")
     let removed = m.del("missing")
+    let key_count = 0
+    for key in m {
+        if m.has(key) {
+            key_count += 1
+        }
+    }
     if has_one && !removed {
-        ret m["two"] + h.count
+        ret m["two"] + h.count + key_count
     }
     ret 0
 }

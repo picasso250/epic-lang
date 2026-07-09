@@ -1,0 +1,7 @@
+# COMPILE_FAIL: for-in over str is not supported
+fun main(): i64 {
+    for i in "abc" {
+        println(str(i))
+    }
+    ret 0
+}

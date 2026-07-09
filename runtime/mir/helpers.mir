@@ -128,6 +128,27 @@ fail:
   ret i64 0
 }
 
+define i64 @__ep_slice_u8_pop(ptr %arr) {
+entry:
+  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sgt2: bool = icmp.sgt i64 %load1, i64 0
+  condbr bool %icmp_sgt2, label %ok, label %fail
+
+ok:
+  %sub3: i64 = sub i64 %load1, i64 1
+  %gep4: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
+  %load5: ptr = load ptr, ptr %gep4
+  %gep6: ptr = gep i8, ptr %load5, i64 %sub3
+  %load7: i64 = load i8, ptr %gep6
+  store i64 %sub3, ptr %gep0
+  ret i64 %load7
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
+  ret i64 0
+}
+
 define ptr @__ep_slice_i64_new(i64 %cap) {
 entry:
   %call0: ptr = call ptr __epx_alloc(i64 24)
@@ -270,6 +291,27 @@ swap:
   %load25: i64 = load i64, ptr %alloca5
   store i64 %load25, ptr %gep2
   br label %store
+}
+
+define i64 @__ep_slice_i64_pop(ptr %arr) {
+entry:
+  %gep0: ptr = gep ptr, ptr %arr, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sgt2: bool = icmp.sgt i64 %load1, i64 0
+  condbr bool %icmp_sgt2, label %ok, label %fail
+
+ok:
+  %sub3: i64 = sub i64 %load1, i64 1
+  %gep4: ptr = gep ptr, ptr %arr, i64 0
+  %load5: ptr = load ptr, ptr %gep4
+  %gep6: ptr = gep ptr, ptr %load5, i64 %sub3
+  %load7: i64 = load i64, ptr %gep6
+  store i64 %sub3, ptr %gep0
+  ret i64 %load7
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
+  ret i64 0
 }
 
 define void @__ep_slice_i64_extend(ptr %dst, ptr %src) {
@@ -438,6 +480,27 @@ swap:
   %load25: i64 = load i64, ptr %alloca5
   store i64 %load25, ptr %gep2
   br label %store
+}
+
+define ptr @__ep_slice_ptr_pop(ptr %arr) {
+entry:
+  %gep0: ptr = gep ptr, ptr %arr, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sgt2: bool = icmp.sgt i64 %load1, i64 0
+  condbr bool %icmp_sgt2, label %ok, label %fail
+
+ok:
+  %sub3: i64 = sub i64 %load1, i64 1
+  %gep4: ptr = gep ptr, ptr %arr, i64 0
+  %load5: ptr = load ptr, ptr %gep4
+  %gep6: ptr = gep ptr, ptr %load5, i64 %sub3
+  %load7: ptr = load ptr, ptr %gep6
+  store i64 %sub3, ptr %gep0
+  ret ptr %load7
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
+  ret ptr null
 }
 
 define void @__ep_slice_ptr_extend(ptr %dst, ptr %src) {
@@ -748,6 +811,39 @@ miss:
   %sub23: i64 = sub i64 0, i64 %load22
   %sub24: i64 = sub i64 %sub23, i64 1
   ret i64 %sub24
+}
+
+define i64 @__ep_map_str_len(ptr %map) {
+entry:
+  %gep0: ptr = gep ptr, ptr %map, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  ret i64 %load1
+}
+
+define ptr @__ep_map_str_key_at(ptr %map, i64 %idx) {
+entry:
+  %gep0: ptr = gep ptr, ptr %map, i64 1
+  %load1: i64 = load i64, ptr %gep0
+  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
+  condbr bool %icmp_sge2, label %check_high, label %fail
+
+check_high:
+  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
+  condbr bool %icmp_slt3, label %ok, label %fail
+
+ok:
+  %gep4: ptr = gep ptr, ptr %map, i64 0
+  %load5: ptr = load ptr, ptr %gep4
+  %add6: i64 = add i64 %idx, i64 %idx
+  %add7: i64 = add i64 %add6, i64 %idx
+  %gep8: ptr = gep ptr, ptr %load5, i64 %add7
+  %gep9: ptr = gep ptr, ptr %gep8, i64 0
+  %load10: ptr = load ptr, ptr %gep9
+  ret ptr %load10
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
+  ret ptr null
 }
 
 define ptr @__ep_map_str_i64_new() {

@@ -212,6 +212,17 @@ Program
           Var xs : i64[]
           Literal 1 : i64
         Literal 1 : i64
+      Let index_sum : i64
+        Literal 0 : i64
+      ForIn i : i64
+        Block
+          AssignOp +
+            Var index_sum : i64
+            Var i : i64
+        Var xs : i64[]
+      Let popped : i64
+        DotCall pop : i64
+          Var xs : i64[]
       ExprStmt
         Call println : void
           FString : str
@@ -225,11 +236,15 @@ Program
       Return
         Binary + : i64
           Binary + : i64
-            Var n : i64
-            Var c : i64
-          Subscript : i64
-            Var xs : i64[]
-            Literal 0 : i64
+            Binary + : i64
+              Binary + : i64
+                Var n : i64
+                Var c : i64
+              Subscript : i64
+                Var xs : i64[]
+                Literal 0 : i64
+            Var popped : i64
+          Var index_sum : i64
   FunDef use_structs_and_maps : i64
     Block
       Let p : Point
@@ -295,15 +310,30 @@ Program
         DotCall del : bool
           Var m : map[str]i64
           String missing : str
+      Let key_count : i64
+        Literal 0 : i64
+      ForIn key : str
+        Block
+          If
+            Block
+              AssignOp +
+                Var key_count : i64
+                Literal 1 : i64
+            DotCall has : bool
+              Var m : map[str]i64
+              Var key : str
+        Var m : map[str]i64
       If
         Block
           Return
             Binary + : i64
-              Subscript : i64
-                Var m : map[str]i64
-                String two : str
-              FieldAccess count : i64
-                Var h : Holder
+              Binary + : i64
+                Subscript : i64
+                  Var m : map[str]i64
+                  String two : str
+                FieldAccess count : i64
+                  Var h : Holder
+              Var key_count : i64
         Binary && : bool
           Var has_one : bool
           Unary ! : bool
@@ -315,7 +345,7 @@ Program
     Block
       Let total : i64
         Literal 0 : i64
-      For i : i64
+      ForRange i : i64
         Block
           If
             Block

@@ -157,7 +157,9 @@ let xs = new u8[]
 - `if` / `else if` / `else`，条件为显式布尔表达式。
 - `while`，条件为显式布尔表达式。
 - `break` 和 `continue` 绑定到最近的 `while` 循环。
-- `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`continue` 跳到增量步骤。
+- `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`i` 是函数级可变 local，也是实际 numeric cursor；修改 `i` 会影响循环进度。`continue` 跳到增量步骤。
+- `for i in xs` — array index iteration。`xs` 必须是 `T[]`；`i: i64`，是函数级可变 local，也是实际 index cursor。array 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`，如果当前 index 已无效则结束。循环中 `push` 不扩展本次循环，`pop` 可能导致提前结束。
+- `for k in m` — map key iteration。`m` 必须是 `map[str]T`；`k: str`，是函数级可变 local，每轮赋值为当前 key。map 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`。循环中 insert/delete 是允许但弱规定的：循环有界且内存安全，但 key 可能被跳过、重复或未全部访问。`for ... in str` 不支持；需要按字节遍历时显式写 `bytes(s)`。
 - `return expr` / `return`。
 - `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。
@@ -170,6 +172,7 @@ Epic 支持一小组内置容器点调用：
 
 ```epic
 xs.push(x)
+let last = xs.pop()
 dst.extend(src)
 let ok = m.has(key)
 let removed = m.del(key)
@@ -309,6 +312,7 @@ Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `st
 | `new T[]`             | 空数组，容量为 0                                  |
 | `new T[n]`            | 空数组，容量至少为 `n`                            |
 | `a.push(x)`          | 追加并扩容                                        |
+| `a.pop()`            | 删除并返回最后一个元素；空数组 runtime panic      |
 | `dst.extend(src)`    | `dst` 和 `src` 必须是相同元素类型的 `T[]`；将 `src` 的当前元素追加到 `dst` |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
@@ -414,6 +418,7 @@ let source = str(read_file(path))
 | `str_replace_char`     | 自己写 `u8[]` 扫描                          |
 | `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
 | `a.push(x)`             | 追加到动态数组                              |
+| `a.pop()`              | 删除并返回最后一个元素；空数组 panic            |
 | `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |
 
 `cstr` 要求字符串内部数据指针非空、`len(s) >= 0`、`s[0:len(s)]` 不含 `0`，并且内部数据在 `len(s)` 位置以 `0` 结尾。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。

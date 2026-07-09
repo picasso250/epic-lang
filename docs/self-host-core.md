@@ -50,7 +50,9 @@ required_helpers: defer; unconditional injection stays for now
 |-------------|-------|
 | `if`/`else if`/`else` | Boolean condition required |
 | `while`     | Boolean condition required |
-| `for i in start:end` | Half-open increasing range |
+| `for i in start:end` | Half-open increasing numeric range |
+| `for i in xs` | Array index iteration; `i: i64` |
+| `for k in m` | Map key iteration; `k: str` |
 | `break`/`continue` | Bound to innermost `while`/`for` |
 | `return`    | With or without expression |
 
@@ -88,6 +90,7 @@ required_helpers: defer; unconditional injection stays for now
 | `exit`        | Terminate process |
 | `len`/`cap`   | Length and capacity |
 | `xs.push(x)` | Array append dot call |
+| `xs.pop()` | Delete and return the last element; empty array panics |
 | `dst.extend(src)` | dot call for arrays with the same element type |
 | `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
 | `str(bytes)`  | `u8[]` to temporary `str` view; zero-copy identity cast |
@@ -118,6 +121,7 @@ These are unconditionally injected and considered part of the core runtime. MIR 
 - `__ep_slice_u8_get` — bounds-checked byte read
 - `__ep_slice_u8_set` — bounds-checked byte write
 - `__ep_slice_u8_push` — byte append
+- `__ep_slice_u8_pop` / `__ep_slice_i64_pop` / `__ep_slice_ptr_pop` — array pop helpers
 - `__ep_slice_u8_slice` — byte array slice copy
 - `__ep_slice_i64_get` — bounds-checked i64 array read
 - `__ep_slice_i64_set` — bounds-checked i64 array write
@@ -214,7 +218,7 @@ after ADT removal and naming unification.
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Function-style builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `str` / `bytes` / `cstr` / `system`
-- Builtin container dot calls: `xs.push(x)` / `dst.extend(src)` / `m.has(key)` / `m.del(key)`
+- Builtin container dot calls: `xs.push(x)` / `xs.pop()` / `dst.extend(src)` / `m.has(key)` / `m.del(key)`
 - User methods v1: `fun (receiver: StructName) method(args...): Ret { ... }`; receiver type must be a user-defined struct.
 - User method lowering: `fun (p: Parser) peek(): Token` occupies the global symbol `Parser__peek`; `p.peek()` lowers to `Parser__peek(p)`.
 - Method calls do not support overloads, traits, inheritance, virtual dispatch, method values, generics, or fallback to `peek(p)`.
@@ -287,7 +291,7 @@ Completed:
 - The zero-copy shared-buffer behavior is covered by `tests/e2e/pass/v5_zero_copy_str_bytes.ep`.
 - Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
   `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.
-- `dst.extend(src)` appends arrays with the same element type. Function-style `push`, `extend`, `map_has`, and `map_del` are removed from the public source surface.
+- `xs.pop()` removes and returns the last element, and panics on an empty array. `dst.extend(src)` appends arrays with the same element type. Function-style `push`, `pop`, `extend`, `map_has`, and `map_del` are removed from the public source surface.
 
 Remaining:
 - No retained `src/*.ep` source currently calls removed public string helpers. `src/link.ep` uses local `u8[]` byte scanning plus `str(n)`, and `src/parser.ep` no longer reserves `str_new`.

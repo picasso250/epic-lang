@@ -49,7 +49,8 @@ fun ast_kind(node: AstNode): str {
         AstSubscriptAssign n: { ret "SubscriptAssign" }
         AstIf n: { ret "If" }
         AstWhile n: { ret "While" }
-        AstFor n: { ret "For" }
+        AstForRange n: { ret "ForRange" }
+        AstForIn n: { ret "ForIn" }
         AstBreak n: { ret "Break" }
         AstContinue n: { ret "Continue" }
         AstPanic n: { ret "Panic" }
@@ -1133,6 +1134,10 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
             sema_check_assign(st, sema_array_elem(receiver), node.args[0], "push value")
             ret "void"
         }
+        if node.name == "pop" {
+            sema_check_arity("pop", 0, node.args)
+            ret sema_array_elem(receiver)
+        }
         if node.name == "extend" {
             sema_check_arity("extend", 1, node.args)
             let src = sema_expr_type(st, node.args[0])
@@ -1265,6 +1270,9 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     }
     if node.name == "push" {
         sema_die("push is removed from function-call surface; use xs.push(x)")
+    }
+    if node.name == "pop" {
+        sema_die("pop is removed from function-call surface; use xs.pop()")
     }
     if node.name == "extend" {
         sema_die("extend is removed from function-call surface; use dst.extend(src)")
@@ -1421,11 +1429,32 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             st.loop_depth -= 1
             ret
         }
-        AstFor n: {
+        AstForRange n: {
             sema_expect_int(st, n.start, "for range start")
             sema_expect_int(st, n.end, "for range end")
             ast_set_resolved_type(node, "i64")
             st.locals[n.name] = "i64"
+            st.loop_depth += 1
+            sema_block(st, n.body)
+            st.loop_depth -= 1
+            ret
+        }
+        AstForIn n: {
+            let source_type = sema_expr_type(st, n.source)
+            if epic_type_is_array(source_type) {
+                ast_set_resolved_type(node, "i64")
+                st.locals[n.name] = "i64"
+            } else {
+                if epic_type_is_map(source_type) {
+                    ast_set_resolved_type(node, "str")
+                    st.locals[n.name] = "str"
+                } else {
+                    if source_type == "str" {
+                        sema_die("for-in over str is not supported; use bytes(s) to iterate bytes")
+                    }
+                    sema_die(f"for-in expected array or map, got {source_type}")
+                }
+            }
             st.loop_depth += 1
             sema_block(st, n.body)
             st.loop_depth -= 1

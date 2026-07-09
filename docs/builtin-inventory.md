@@ -59,6 +59,7 @@ Current snapshot of functions handled specially by the active Python reference c
 | `len`    | ✓ (ln 482) | ✓ (auto handled) | ✓ (ln 299) | ✓ (ln 1011) | `str` and `array` |
 | `cap`    | ✓ (ln 488) | ✓ (auto handled) | ✓ (ln 302) | ✓ (ln 1023) | `array` only |
 | `xs.push(x)` | ✓ | ✓ | ✓ | ✓ | Array append dot call; old `push(xs,x)` removed |
+| `xs.pop()` | ✓ | ✓ | ✓ | ✓ | Delete and return last array element; empty array panics; old `pop(xs)` removed |
 | `dst.extend(src)` | ✓ | ✓ | ✓ | ✓ | Same-element array dot call; old `extend(dst,src)` removed |
 
 ---
@@ -175,8 +176,10 @@ symbols used by the Python backend.
 | `__ep_slice_u8_get` | bounds-checked byte array read |
 | `__ep_slice_u8_set` | bounds-checked byte array write |
 | `__ep_slice_u8_push` | append one byte to a byte array |
+| `__ep_slice_u8_pop` / `__ep_slice_i64_pop` / `__ep_slice_ptr_pop` | remove and return last array element |
 | `__ep_slice_u8_slice` | copy a half-open byte-array slice |
 | `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` | append one array into another |
+| `__ep_map_str_len` / `__ep_map_str_key_at` | internal map key iteration helpers |
 
 These are currently injected unconditionally by `bootstrap/mir_runtime_helpers.py`. Python and self-hosted compilers both load the committed bundle at `runtime/mir/helpers.mir`; run `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text to normalize bundle order.
 

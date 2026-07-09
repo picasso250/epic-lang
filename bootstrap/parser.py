@@ -376,11 +376,13 @@ class Parser:
         if self.peek_kind("ID") and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "IN":
             name = self.expect("ID")
             self.expect("IN")
-            start = self.parse_expr()
-            self.expect("COLON")
-            end = self.parse_expr()
+            source = self.parse_expr()
+            if self.check("COLON"):
+                end = self.parse_expr()
+                body = self.parse_block()
+                return ForRangeNode(name=name[1], start=source, end=end, body=body)
             body = self.parse_block()
-            return ForRangeNode(name=name[1], start=start, end=end, body=body)
+            return ForInNode(name=name[1], source=source, body=body)
         cond = self.parse_expr()
         body = self.parse_block()
         return WhileNode(cond=cond, body=body)
@@ -810,10 +812,14 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, ContinueNode):
         emit("Continue")
     elif isinstance(node, ForRangeNode):
-        emit(f"For {node.name}{_type_suffix(node)}")
+        emit(f"ForRange {node.name}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.body, depth + 1))
         out.extend(dump_ast_lines(node.start, depth + 1))
         out.extend(dump_ast_lines(node.end, depth + 1))
+    elif isinstance(node, ForInNode):
+        emit(f"ForIn {node.name}{_type_suffix(node)}")
+        out.extend(dump_ast_lines(node.body, depth + 1))
+        out.extend(dump_ast_lines(node.source, depth + 1))
     elif isinstance(node, PanicNode):
         emit("Panic")
         out.extend(dump_ast_lines(node.message, depth + 1))

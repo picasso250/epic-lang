@@ -1,0 +1,29 @@
+# EXIT: 0
+# STDOUT: 3
+# STDOUT: 2
+# STDOUT: 3
+fun main(): void {
+    let xs = new i64[0]
+    xs.push(1)
+    xs.push(2)
+    xs.push(3)
+    let sum = 0
+    for i in xs {
+        sum = sum + xs[i]
+        if i == 0 {
+            xs.pop()
+        }
+    }
+    println(str(sum))
+    println(str(xs.pop()))
+
+    let m = new map[str]i64 { "a": 1, "b": 2 }
+    let count = 0
+    for k in m {
+        if m.has(k) {
+            count = count + m[k]
+        }
+    }
+    println(str(count))
+    exit(0)
+}

@@ -117,18 +117,23 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_slice_u8_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_set", MirSignature([ptr(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_push", MirSignature([ptr(), I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_u8_pop", MirSignature([ptr()], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_slice", MirSignature([ptr(), I64, I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_i64_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_i64_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_i64_set", MirSignature([ptr(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_i64_push", MirSignature([ptr(), I64], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_i64_pop", MirSignature([ptr()], I64)))
         self.program.externs.append(MirExtern("__ep_slice_i64_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_set", MirSignature([ptr(), I64, ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_push", MirSignature([ptr(), ptr()], VOID)))
+        self.program.externs.append(MirExtern("__ep_slice_ptr_pop", MirSignature([ptr()], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr(), ptr()], VOID)))
+        self.program.externs.append(MirExtern("__ep_map_str_len", MirSignature([ptr()], I64)))
+        self.program.externs.append(MirExtern("__ep_map_str_key_at", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_map_str_i64_new", MirSignature([], ptr())))
         self.program.externs.append(MirExtern("__ep_map_str_i64_get", MirSignature([ptr(), ptr()], I64)))
         self.program.externs.append(MirExtern("__ep_map_str_i64_set", MirSignature([ptr(), ptr(), I64], VOID)))
@@ -607,6 +612,15 @@ class MirCodegen(MirFunctionBuilder):
             return "__ep_slice_ptr_extend"
         return None
 
+    def _array_pop_helper(self, typ):
+        if self._is_u8_array_type(typ):
+            return "__ep_slice_u8_pop", I64
+        if self._is_i64_array_type(typ):
+            return "__ep_slice_i64_pop", I64
+        if isinstance(typ, et.EpicType) and typ.kind == "array":
+            return "__ep_slice_ptr_pop", ptr()
+        return None, None
+
     def _emit_block(self, block):
         flow = self._emit_block_from(self.ensure_insertable(), block)
         self.current_block = flow.block if flow.reachable else None
@@ -659,6 +673,8 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_while_from(in_block, stmt)
         elif isinstance(stmt, ForRangeNode):
             return self._emit_for_range_from(in_block, stmt)
+        elif isinstance(stmt, ForInNode):
+            return self._emit_for_in_from(in_block, stmt)
         elif isinstance(stmt, AssertNode):
             return self._emit_assert_from(in_block, stmt)
         elif isinstance(stmt, PanicNode):
@@ -841,6 +857,109 @@ class MirCodegen(MirFunctionBuilder):
         cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
         nxt = self.inst("add", [ValueOperand(cur), ConstIntOperand(I64, 1)], result_type=I64)
         self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
+        self.br(inc_block, cond_block.name)
+        return self._reachable(end_block)
+
+    def _emit_for_in_from(self, in_block, stmt):
+        source_type = self._infer_type(stmt.source)
+        if source_type.kind == "array":
+            return self._emit_for_in_array_from(in_block, stmt, source_type)
+        if source_type.kind == "map":
+            return self._emit_for_in_map_from(in_block, stmt, source_type)
+        raise MirCodegenError(f"for-in expected array or map, got {source_type}")
+
+    def _emit_for_in_array_from(self, in_block, stmt, source_type):
+        source = self._expr_from(in_block, stmt.source)
+        self.set_block(source.block)
+        struct_name = self._layout_struct_name(source_type)
+        if struct_name is None:
+            raise MirCodegenError(f"unsupported for-in array source: {source_type}")
+
+        var_addr = self._alloc_local(stmt.name, I64)
+        limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
+        initial_len = self._load_field(source.value, struct_name, "len", result_type=I64)
+        self.inst("store", [initial_len, ValueOperand(limit_addr)])
+        self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(var_addr)])
+
+        cond_block = self.new_block("for.in.cond")
+        len_block = self.new_block("for.in.len")
+        body_block = self.new_block("for.in.body")
+        inc_block = self.new_block("for.in.inc")
+        end_block = self.new_block("for.in.end")
+        self.br(self.current_block, cond_block.name)
+
+        self.set_block(cond_block)
+        cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+        limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
+        within_limit = self.inst("icmp.slt", [ValueOperand(cur), ValueOperand(limit)], result_type=BOOL)
+        self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
+
+        self.set_block(len_block)
+        cur2 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+        current_len = self._load_field(source.value, struct_name, "len", result_type=I64)
+        within_current = self.inst("icmp.slt", [ValueOperand(cur2), current_len], result_type=BOOL)
+        self.condbr(len_block, ValueOperand(within_current), body_block.name, end_block.name)
+
+        self.loop_stack.append((inc_block.name, end_block.name))
+        body_flow = self._emit_block_from(body_block, stmt.body)
+        if body_flow.reachable:
+            self.br(body_flow.block, inc_block.name)
+        self.loop_stack.pop()
+
+        self.set_block(inc_block)
+        cur3 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+        nxt = self.inst("add", [ValueOperand(cur3), ConstIntOperand(I64, 1)], result_type=I64)
+        self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
+        self.br(inc_block, cond_block.name)
+        return self._reachable(end_block)
+
+    def _emit_for_in_map_from(self, in_block, stmt, source_type):
+        source = self._expr_from(in_block, stmt.source)
+        self.set_block(source.block)
+        key_addr = self._alloc_local(stmt.name, ptr())
+        index_addr = self._alloc_local(f"__{stmt.name}.index{self.value_counter}", I64)
+        limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
+        self.inst("store", [SymbolOperand(ptr(), self._string_label("")), ValueOperand(key_addr)])
+        self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(index_addr)])
+        initial_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
+        self.inst("store", [ValueOperand(initial_len), ValueOperand(limit_addr)])
+
+        cond_block = self.new_block("for.in.cond")
+        len_block = self.new_block("for.in.len")
+        key_block = self.new_block("for.in.key")
+        body_block = self.new_block("for.in.body")
+        inc_block = self.new_block("for.in.inc")
+        end_block = self.new_block("for.in.end")
+        self.br(self.current_block, cond_block.name)
+
+        self.set_block(cond_block)
+        idx = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+        limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
+        within_limit = self.inst("icmp.slt", [ValueOperand(idx), ValueOperand(limit)], result_type=BOOL)
+        self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
+
+        self.set_block(len_block)
+        idx2 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+        current_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
+        within_current = self.inst("icmp.slt", [ValueOperand(idx2), ValueOperand(current_len)], result_type=BOOL)
+        self.condbr(len_block, ValueOperand(within_current), key_block.name, end_block.name)
+
+        self.set_block(key_block)
+        idx3 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+        key = self.inst("call", [source.value, ValueOperand(idx3)], result_type=ptr(), type=ptr(), callee="__ep_map_str_key_at")
+        self.inst("store", [ValueOperand(key), ValueOperand(key_addr)])
+        self.br(key_block, body_block.name)
+
+        self.loop_stack.append((inc_block.name, end_block.name))
+        body_flow = self._emit_block_from(body_block, stmt.body)
+        if body_flow.reachable:
+            self.br(body_flow.block, inc_block.name)
+        self.loop_stack.pop()
+
+        self.set_block(inc_block)
+        idx4 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+        nxt = self.inst("add", [ValueOperand(idx4), ConstIntOperand(I64, 1)], result_type=I64)
+        self.inst("store", [ValueOperand(nxt), ValueOperand(index_addr)])
         self.br(inc_block, cond_block.name)
         return self._reachable(end_block)
 
@@ -1409,6 +1528,14 @@ class MirCodegen(MirFunctionBuilder):
                 else:
                     self.inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
                 return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
+            if expr.name == "pop":
+                helper, ret_type = self._array_pop_helper(receiver_type)
+                if helper is None:
+                    raise MirCodegenError("pop expects supported array type")
+                dst = self._emit_expr_from(self.current_block, expr.object)
+                self.set_block(dst.block)
+                result = self.inst("call", [dst.value], result_type=ret_type, type=ret_type, callee=helper)
+                return ValueFlow(ValueOperand(result), self.current_block)
             if expr.name == "extend":
                 helper = self._array_extend_helper(receiver_type)
                 if helper is None:

@@ -217,11 +217,18 @@ struct AstWhile {
     body: AstNode
 }
 
-struct AstFor {
+struct AstForRange {
     AstMeta
     name: str
     start: AstNode
     end: AstNode
+    body: AstNode
+}
+
+struct AstForIn {
+    AstMeta
+    name: str
+    source: AstNode
     body: AstNode
 }
 
@@ -389,7 +396,7 @@ struct AstMapInit {
     map_values: AstNode[]
 }
 
-type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstFor | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstFieldHas | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit | AstMapInit
+type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstFieldHas | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit | AstMapInit
 
 fun ast_new_empty(): AstNode {
     ret new AstNode(new AstEmpty { AstMeta: ast_meta() })
@@ -455,8 +462,12 @@ fun ast_new_while(): AstNode {
     ret new AstNode(new AstWhile { AstMeta: ast_meta(), expr: ast_empty(), body: ast_empty() })
 }
 
-fun ast_new_for(): AstNode {
-    ret new AstNode(new AstFor { AstMeta: ast_meta(), name: "", start: ast_empty(), end: ast_empty(), body: ast_empty() })
+fun ast_new_for_range(): AstNode {
+    ret new AstNode(new AstForRange { AstMeta: ast_meta(), name: "", start: ast_empty(), end: ast_empty(), body: ast_empty() })
+}
+
+fun ast_new_for_in(): AstNode {
+    ret new AstNode(new AstForIn { AstMeta: ast_meta(), name: "", source: ast_empty(), body: ast_empty() })
 }
 
 fun ast_new_break(): AstNode {
@@ -592,7 +603,8 @@ fun ast_node(kind: str): AstNode {
         "SubscriptAssign": { ret ast_new_subscript_assign() }
         "If": { ret ast_new_if() }
         "While": { ret ast_new_while() }
-        "For": { ret ast_new_for() }
+        "ForRange": { ret ast_new_for_range() }
+        "ForIn": { ret ast_new_for_in() }
         "Break": { ret ast_new_break() }
         "Continue": { ret ast_new_continue() }
         "Panic": { ret ast_new_panic() }
@@ -1042,6 +1054,21 @@ fun ast_set_end(node: AstNode, value: AstNode): void {
         ret
     }
     ast_bad_field("end")
+}
+
+fun ast_source(node: AstNode): AstNode {
+    if node.source? {
+        ret node.source
+    }
+    ret ast_empty()
+}
+
+fun ast_set_source(node: AstNode, value: AstNode): void {
+    if node.source? {
+        node.source = value
+        ret
+    }
+    ast_bad_field("source")
 }
 
 fun ast_variant_name(node: AstNode): str {
@@ -1812,17 +1839,27 @@ fun parse_for_stmt(p: Parser): AstNode {
     if p.peek_kind("ID") == 1 && p.pos + 1 < len(p.tokens) && token_kind(p.tokens[p.pos + 1]) == "IN" {
         let name = p.expect("ID")
         p.expect("IN")
-        let start = parse_expr(p)
-        p.expect("COLON")
-        let end = parse_expr(p)
+        let source = parse_expr(p)
+        if p.check("COLON") == 1 {
+            let end = parse_expr(p)
+            p.loop_depth += 1
+            let body = parse_block(p)
+            p.loop_depth -= 1
+
+            let out = ast_node("ForRange")
+            ast_set_name(out, token_text(name))
+            ast_set_start(out, source)
+            ast_set_end(out, end)
+            ast_set_body(out, body)
+            ret out
+        }
         p.loop_depth += 1
         let body = parse_block(p)
         p.loop_depth -= 1
 
-        let out = ast_node("For")
+        let out = ast_node("ForIn")
         ast_set_name(out, token_text(name))
-        ast_set_start(out, start)
-        ast_set_end(out, end)
+        ast_set_source(out, source)
         ast_set_body(out, body)
         ret out
     }
@@ -2590,6 +2627,7 @@ fun dump_node_tail(node: AstNode, depth: i64, is_string: bool): i64 {
     dump_node(ast_index(node), depth + 1)
     dump_node(ast_start(node), depth + 1)
     dump_node(ast_end(node), depth + 1)
+    dump_node(ast_source(node), depth + 1)
     dump_node(ast_count(node), depth + 1)
     dump_list(ast_args(node), depth + 1)
     ret 0
@@ -2698,7 +2736,8 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstSubscriptAssign n: { ret dump_node_generic(node, depth, "SubscriptAssign", false) }
         AstIf n: { ret dump_node_generic(node, depth, "If", false) }
         AstWhile n: { ret dump_node_generic(node, depth, "While", false) }
-        AstFor n: { ret dump_node_generic(node, depth, "For", false) }
+        AstForRange n: { ret dump_node_generic(node, depth, "ForRange", false) }
+        AstForIn n: { ret dump_node_generic(node, depth, "ForIn", false) }
         AstBreak n: { ret dump_node_generic(node, depth, "Break", false) }
         AstContinue n: { ret dump_node_generic(node, depth, "Continue", false) }
         AstPanic n: { ret dump_node_generic(node, depth, "Panic", false) }

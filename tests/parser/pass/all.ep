@@ -105,6 +105,12 @@ fun statements_and_control(flag: bool): void {
     for i in 0:len(xs) {
         println(str(i))
     }
+    for j in xs {
+        println(str(j))
+    }
+    for key in mapping2 {
+        println(key)
+    }
 
     match typed {
         0: {

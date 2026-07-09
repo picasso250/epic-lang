@@ -242,6 +242,21 @@ class SemanticAnalyzer:
             self._analyze_block(stmt.body)
             self.loop_depth -= 1
             return
+        if isinstance(stmt, ForInNode):
+            source = self._expr(stmt.source)
+            if source.type.kind == "array":
+                stmt.resolved_type = I64
+            elif source.type.kind == "map":
+                stmt.resolved_type = STR
+            elif source.type == STR:
+                self._fail("for-in over str is not supported; use bytes(s) to iterate bytes")
+            else:
+                self._fail(f"for-in expected array or map, got {source.type}")
+            self.locals[stmt.name] = stmt.resolved_type
+            self.loop_depth += 1
+            self._analyze_block(stmt.body)
+            self.loop_depth -= 1
+            return
         if isinstance(stmt, BreakNode):
             if self.loop_depth == 0:
                 self._fail("break outside loop")
@@ -538,6 +553,8 @@ class SemanticAnalyzer:
             return ExprInfo(I64)
         if name == "push":
             self._fail("push is removed from function-call surface; use xs.push(x)")
+        if name == "pop":
+            self._fail("pop is removed from function-call surface; use xs.pop()")
         if name == "extend":
             self._fail("extend is removed from function-call surface; use dst.extend(src)")
         if name == "len":
@@ -577,6 +594,9 @@ class SemanticAnalyzer:
                 self._check_arity("push", 1, expr.args)
                 self._check_assign(receiver.type.elem, self._expr(expr.args[0]), "push value")
                 return ExprInfo(VOID)
+            if expr.name == "pop":
+                self._check_arity("pop", 0, expr.args)
+                return ExprInfo(receiver.type.elem)
             if expr.name == "extend":
                 self._check_arity("extend", 1, expr.args)
                 src = self._expr(expr.args[0])
@@ -1070,6 +1090,11 @@ def assert_typed_program(program):
             require(node, path)
             expr(node.start, f"{path}.start")
             expr(node.end, f"{path}.end")
+            block(node.body, f"{path}.body")
+            return
+        if isinstance(node, ForInNode):
+            require(node, path)
+            expr(node.source, f"{path}.source")
             block(node.body, f"{path}.body")
             return
         if isinstance(node, (BreakNode, ContinueNode)):

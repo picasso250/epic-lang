@@ -146,6 +146,14 @@ class ForRangeNode(ASTNode):
 
 
 @dataclass
+class ForInNode(ASTNode):
+    name: str
+    source: ASTNode
+    body: 'BlockNode'
+    resolved_type: Optional[EpicType] = None
+
+
+@dataclass
 class PanicNode(ASTNode):
     message: ASTNode
 
