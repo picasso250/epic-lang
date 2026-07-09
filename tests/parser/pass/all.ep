@@ -83,6 +83,9 @@ fun statements_and_control(flag: bool): void {
     let first = xs[0]
     let middle = xs[1:2]
     let field_read = p3.name
+    let has_point = p?
+    let has_name = p3.name?
+    let grouped_check = (p3.name)?
 
     if flag {
         println("yes")

@@ -69,7 +69,6 @@ class SemanticAnalyzer:
         self.func_sigs = {}
         self.globals = {}
         self.locals = {}
-        self.partial_field_guards = {}
         self.fn_name = None
         self.loop_depth = 0
 
@@ -208,22 +207,7 @@ class SemanticAnalyzer:
             return
         if isinstance(stmt, IfNode):
             self._expect_bool(self._expr(stmt.cond), "if condition")
-            guard_key = None
-            old_guard = None
-            had_old_guard = False
-            if isinstance(stmt.cond, FieldHasNode):
-                guard_key = self._field_guard_key(stmt.cond.object, stmt.cond.field)
-                if guard_key is None:
-                    self._fail("field existence guard requires a variable receiver")
-                old_guard = self.partial_field_guards.get(guard_key)
-                had_old_guard = guard_key in self.partial_field_guards
-                self.partial_field_guards[guard_key] = self._union_partial_field_type(self._expr(stmt.cond.object).type.name, stmt.cond.field)
             self._analyze_block(stmt.then_block)
-            if guard_key is not None:
-                if had_old_guard:
-                    self.partial_field_guards[guard_key] = old_guard
-                else:
-                    del self.partial_field_guards[guard_key]
             if stmt.else_block is not None:
                 self._analyze_block(stmt.else_block)
             return
@@ -414,8 +398,8 @@ class SemanticAnalyzer:
             return self._dot_call_expr(expr)
         if isinstance(expr, FieldAccessNode):
             return ExprInfo(self._field_access_type(expr.object, expr.field))
-        if isinstance(expr, FieldHasNode):
-            return ExprInfo(self._field_has_type(expr))
+        if isinstance(expr, NullCheckNode):
+            return ExprInfo(self._null_check_type(expr))
         if isinstance(expr, SubscriptNode):
             return ExprInfo(self._subscript_type(expr.base, expr.index))
         if isinstance(expr, SliceNode):
@@ -770,22 +754,17 @@ class SemanticAnalyzer:
             self._fail(f"union {union_name} has no variant field {field}")
         return found
 
-    def _field_has_type(self, expr):
-        base = self._expr(expr.object).type
-        if base.kind != "named" or base.name not in self.union_names:
-            self._fail(f"field existence guard expected union, got {base}")
-        if self._field_guard_key(expr.object, expr.field) is None:
-            self._fail("field existence guard requires a variable receiver")
-        self._union_partial_field_type(base.name, expr.field)
+    def _is_reference_type(self, typ):
+        return typ == STR or typ.kind in ("array", "map", "named")
+
+    def _null_check_type(self, expr):
+        inner = self._expr(expr.expr).type
+        if not self._is_reference_type(inner):
+            self._fail(f"null check expected reference, got {inner}")
         return BOOL
 
     def _field_access_type(self, object_expr, field):
-        base_type = self._expr(object_expr).type
-        if base_type.kind == "named" and base_type.name in self.union_names:
-            guard_key = self._field_guard_key(object_expr, field)
-            if guard_key is not None and guard_key in self.partial_field_guards:
-                return self.partial_field_guards[guard_key]
-        return self._field_type(base_type, field)
+        return self._field_type(self._expr(object_expr).type, field)
 
     def _field_type(self, base_type, field):
         if base_type == STR:
@@ -1011,8 +990,8 @@ def assert_typed_program(program):
         if isinstance(node, FieldAccessNode):
             expr(node.object, f"{path}.object")
             return
-        if isinstance(node, FieldHasNode):
-            expr(node.object, f"{path}.object")
+        if isinstance(node, NullCheckNode):
+            expr(node.expr, f"{path}.expr")
             return
         if isinstance(node, SubscriptNode):
             expr(node.base, f"{path}.base")

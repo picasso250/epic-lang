@@ -88,6 +88,8 @@ fun use_structs_and_maps(): i64 {
     let p = make_point(1, 2, "p")
     let q = new Point
     let h = new Holder { point: p, bytes: bytes("abc"), count: 3 }
+    let has_point = h.point?
+    let has_bytes = h.bytes?
     q.x = p.x
     q.y = h.point.y
     q.label = str(h.bytes)
@@ -102,7 +104,7 @@ fun use_structs_and_maps(): i64 {
             key_count += 1
         }
     }
-    if has_one && !removed {
+    if has_one && !removed && has_point && has_bytes {
         ret m["two"] + h.count + key_count
     }
     ret 0

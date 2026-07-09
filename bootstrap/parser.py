@@ -535,7 +535,36 @@ class Parser:
             return UnaryNode(op="~", expr=self.parse_unary(), line=op[2])
         return self.parse_primary()
 
-    def parse_primary(self):
+    def parse_postfix(self, node):
+        while True:
+            if self.check("DOT"):
+                field = self.expect("ID")
+                if self.check("LPAREN"):
+                    args = self.parse_args()
+                    self.expect("RPAREN")
+                    node = DotCallNode(object=node, name=field[1], args=args, line=field[2])
+                else:
+                    node = FieldAccessNode(object=node, field=field[1], line=field[2])
+            elif self.check("LBRACKET"):
+                if self.check("COLON"):
+                    raise ParseError("slice requires explicit start and end")
+                index = self.parse_expr()
+                if self.check("COLON"):
+                    if self.peek_kind("RBRACKET"):
+                        raise ParseError("slice requires explicit start and end")
+                    end = self.parse_expr()
+                    self.expect("RBRACKET")
+                    node = SliceNode(base=node, start=index, end=end, line=getattr(index, "line", getattr(node, "line", 0)))
+                    continue
+                self.expect("RBRACKET")
+                node = SubscriptNode(base=node, index=index, line=getattr(index, "line", getattr(node, "line", 0)))
+            elif q := self.check("QUESTION"):
+                node = NullCheckNode(expr=node, line=q[2])
+            else:
+                break
+        return node
+
+    def parse_primary_atom(self):
         if self.peek_kind("NEW"):
             self.expect("NEW")
             t = self.advance()
@@ -598,44 +627,17 @@ class Parser:
             if self.check("LPAREN"):
                 args = self.parse_args()
                 self.expect("RPAREN")
-                node = CallNode(name=name, args=args, line=t[2])
-            else:
-                node = VarNode(name=name, line=t[2])
-            # Postfix: .field and [index]
-            while True:
-                if self.check("DOT"):
-                    field = self.expect("ID")
-                    if self.check("LPAREN"):
-                        args = self.parse_args()
-                        self.expect("RPAREN")
-                        node = DotCallNode(object=node, name=field[1], args=args, line=field[2])
-                    else:
-                        if self.check("QUESTION"):
-                            node = FieldHasNode(object=node, field=field[1], line=field[2])
-                        else:
-                            node = FieldAccessNode(object=node, field=field[1], line=field[2])
-                elif self.check("LBRACKET"):
-                    if self.check("COLON"):
-                        raise ParseError("slice requires explicit start and end")
-                    index = self.parse_expr()
-                    if self.check("COLON"):
-                        if self.peek_kind("RBRACKET"):
-                            raise ParseError("slice requires explicit start and end")
-                        end = self.parse_expr()
-                        self.expect("RBRACKET")
-                        node = SliceNode(base=node, start=index, end=end, line=getattr(index, "line", t[2]))
-                        continue
-                    self.expect("RBRACKET")
-                    node = SubscriptNode(base=node, index=index, line=getattr(index, "line", t[2]))
-                else:
-                    break
-            return node
+                return CallNode(name=name, args=args, line=t[2])
+            return VarNode(name=name, line=t[2])
         if self.check("LPAREN"):
             expr = self.parse_expr()
             self.expect("RPAREN")
             return expr
         t = self.peek()
         raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
+
+    def parse_primary(self):
+        return self.parse_postfix(self.parse_primary_atom())
 
     def parse_fstring_parts(self, parts, line):
         parsed = []
@@ -885,9 +887,9 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, FieldAccessNode):
         emit(f"FieldAccess {node.field}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.object, depth + 1))
-    elif isinstance(node, FieldHasNode):
-        emit(f"FieldHas {node.field}{_type_suffix(node)}")
-        out.extend(dump_ast_lines(node.object, depth + 1))
+    elif isinstance(node, NullCheckNode):
+        emit(f"NullCheck{_type_suffix(node)}")
+        out.extend(dump_ast_lines(node.expr, depth + 1))
     elif isinstance(node, SubscriptNode):
         emit(f"Subscript{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.base, depth + 1))

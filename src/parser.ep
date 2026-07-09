@@ -340,10 +340,9 @@ struct AstFieldAccess {
     name: str
 }
 
-struct AstFieldHas {
+struct AstNullCheck {
     AstMeta
-    object: AstNode
-    name: str
+    expr: AstNode
 }
 
 struct AstSubscript {
@@ -396,7 +395,7 @@ struct AstMapInit {
     map_values: AstNode[]
 }
 
-type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstFieldHas | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit | AstMapInit
+type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit | AstMapInit
 
 fun ast_new_empty(): AstNode {
     ret new AstNode(new AstEmpty { AstMeta: ast_meta() })
@@ -546,8 +545,8 @@ fun ast_new_field_access(): AstNode {
     ret new AstNode(new AstFieldAccess { AstMeta: ast_meta(), object: ast_empty(), name: "" })
 }
 
-fun ast_new_field_has(): AstNode {
-    ret new AstNode(new AstFieldHas { AstMeta: ast_meta(), object: ast_empty(), name: "" })
+fun ast_new_null_check(): AstNode {
+    ret new AstNode(new AstNullCheck { AstMeta: ast_meta(), expr: ast_empty() })
 }
 
 fun ast_new_subscript(): AstNode {
@@ -624,7 +623,7 @@ fun ast_node(kind: str): AstNode {
         "Call": { ret ast_new_call() }
         "DotCall": { ret ast_new_dot_call() }
         "FieldAccess": { ret ast_new_field_access() }
-        "FieldHas": { ret ast_new_field_has() }
+        "NullCheck": { ret ast_new_null_check() }
         "Subscript": { ret ast_new_subscript() }
         "Slice": { ret ast_new_slice() }
         "NewArray": { ret ast_new_new_array() }
@@ -720,492 +719,922 @@ fun ast_set_unions(node: AstNode, value: AstNode[]): void {
 }
 
 fun ast_name(node: AstNode): str {
-    if node.name? {
-        ret node.name
+    match node {
+        AstStructDef n: { ret n.name }
+        AstUnionDef n: { ret n.name }
+        AstFunDef n: { ret n.name }
+        AstParam n: { ret n.name }
+        AstStructField n: { ret n.name }
+        AstLet n: { ret n.name }
+        AstAssign n: { ret n.name }
+        AstFieldSet n: { ret n.name }
+        AstForRange n: { ret n.name }
+        AstForIn n: { ret n.name }
+        AstVar n: { ret n.name }
+        AstCall n: { ret n.name }
+        AstDotCall n: { ret n.name }
+        AstFieldAccess n: { ret n.name }
+        AstStructInit n: { ret n.name }
+        AstInitField n: { ret n.name }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_name(node: AstNode, value: str): void {
-    if node.name? {
-        node.name = value
-        ret
+    match node {
+        AstStructDef n: {
+            n.name = value
+            ret
+        }
+        AstUnionDef n: {
+            n.name = value
+            ret
+        }
+        AstFunDef n: {
+            n.name = value
+            ret
+        }
+        AstParam n: {
+            n.name = value
+            ret
+        }
+        AstStructField n: {
+            n.name = value
+            ret
+        }
+        AstLet n: {
+            n.name = value
+            ret
+        }
+        AstAssign n: {
+            n.name = value
+            ret
+        }
+        AstFieldSet n: {
+            n.name = value
+            ret
+        }
+        AstForRange n: {
+            n.name = value
+            ret
+        }
+        AstForIn n: {
+            n.name = value
+            ret
+        }
+        AstVar n: {
+            n.name = value
+            ret
+        }
+        AstCall n: {
+            n.name = value
+            ret
+        }
+        AstDotCall n: {
+            n.name = value
+            ret
+        }
+        AstFieldAccess n: {
+            n.name = value
+            ret
+        }
+        AstStructInit n: {
+            n.name = value
+            ret
+        }
+        AstInitField n: {
+            n.name = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("name")
 }
 
 fun ast_fields(node: AstNode): AstNode[] {
-    if node.fields? {
-        ret node.fields
+    match node {
+        AstStructDef n: { ret n.fields }
+        AstMatch n: { ret n.fields }
+        AstFString n: { ret n.fields }
+        AstStructInit n: { ret n.fields }
+        else: {}
     }
     ret new AstNode[0]
 }
 
 fun ast_set_fields(node: AstNode, value: AstNode[]): void {
-    if node.fields? {
-        node.fields = value
-        ret
+    match node {
+        AstStructDef n: {
+            n.fields = value
+            ret
+        }
+        AstMatch n: {
+            n.fields = value
+            ret
+        }
+        AstFString n: {
+            n.fields = value
+            ret
+        }
+        AstStructInit n: {
+            n.fields = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("fields")
 }
 
 fun ast_members(node: AstNode): str[] {
-    if node.members? {
-        ret node.members
+    match node {
+        AstUnionDef n: { ret n.members }
+        else: {}
     }
     ret new str[0]
 }
 
 fun ast_set_members(node: AstNode, value: str[]): void {
-    if node.members? {
-        node.members = value
-        ret
+    match node {
+        AstUnionDef n: {
+            n.members = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("members")
 }
 
 fun ast_params(node: AstNode): AstNode[] {
-    if node.params? {
-        ret node.params
+    match node {
+        AstFunDef n: { ret n.params }
+        else: {}
     }
     ret new AstNode[0]
 }
 
 fun ast_set_params(node: AstNode, value: AstNode[]): void {
-    if node.params? {
-        node.params = value
-        ret
+    match node {
+        AstFunDef n: {
+            n.params = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("params")
 }
 
 fun ast_type_name(node: AstNode): str {
-    if node.type_name? {
-        ret node.type_name
+    match node {
+        AstCall n: { ret n.type_name }
+        AstUnionInit n: { ret n.type_name }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_type_name(node: AstNode, value: str): void {
-    if node.type_name? {
-        node.type_name = value
-        ret
+    match node {
+        AstCall n: {
+            n.type_name = value
+            ret
+        }
+        AstUnionInit n: {
+            n.type_name = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("type_name")
 }
 
 fun ast_source_type(node: AstNode): TypeExpr {
-    if node.source_type? {
-        ret node.source_type
-    }
-    if node.elem_type? {
-        ret node.elem_type
+    match node {
+        AstFunDef n: { ret n.source_type }
+        AstParam n: { ret n.source_type }
+        AstStructField n: { ret n.source_type }
+        AstLet n: { ret n.source_type }
+        AstMapInit n: { ret n.source_type }
+        AstNewArray n: { ret n.elem_type }
+        AstArrayLiteral n: { ret n.elem_type }
+        else: {}
     }
     ret type_missing()
 }
 
 fun ast_set_source_type(node: AstNode, value: TypeExpr): void {
-    if node.source_type? {
-        node.source_type = value
-        ret
-    }
-    if node.elem_type? {
-        node.elem_type = value
-        ret
+    match node {
+        AstFunDef n: {
+            n.source_type = value
+            ret
+        }
+        AstParam n: {
+            n.source_type = value
+            ret
+        }
+        AstStructField n: {
+            n.source_type = value
+            ret
+        }
+        AstLet n: {
+            n.source_type = value
+            ret
+        }
+        AstMapInit n: {
+            n.source_type = value
+            ret
+        }
+        AstNewArray n: {
+            n.elem_type = value
+            ret
+        }
+        AstArrayLiteral n: {
+            n.elem_type = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("source_type")
 }
 
 fun ast_body(node: AstNode): AstNode {
-    if node.body? {
-        ret node.body
+    match node {
+        AstFunDef n: { ret n.body }
+        AstWhile n: { ret n.body }
+        AstForRange n: { ret n.body }
+        AstForIn n: { ret n.body }
+        AstMatchCase n: { ret n.body }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_body(node: AstNode, value: AstNode): void {
-    if node.body? {
-        node.body = value
-        ret
+    match node {
+        AstFunDef n: {
+            n.body = value
+            ret
+        }
+        AstWhile n: {
+            n.body = value
+            ret
+        }
+        AstForRange n: {
+            n.body = value
+            ret
+        }
+        AstForIn n: {
+            n.body = value
+            ret
+        }
+        AstMatchCase n: {
+            n.body = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("body")
 }
 
 fun ast_receiver_name(node: AstNode): str {
-    if node.receiver_name? {
-        ret node.receiver_name
+    match node {
+        AstFunDef n: { ret n.receiver_name }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_receiver_name(node: AstNode, value: str): void {
-    if node.receiver_name? {
-        node.receiver_name = value
-        ret
+    match node {
+        AstFunDef n: {
+            n.receiver_name = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("receiver_name")
 }
 
 fun ast_receiver_type(node: AstNode): str {
-    if node.receiver_type? {
-        ret node.receiver_type
+    match node {
+        AstFunDef n: { ret n.receiver_type }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_receiver_type(node: AstNode, value: str): void {
-    if node.receiver_type? {
-        node.receiver_type = value
-        ret
+    match node {
+        AstFunDef n: {
+            n.receiver_type = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("receiver_type")
 }
 
 fun ast_method_name(node: AstNode): str {
-    if node.method_name? {
-        ret node.method_name
+    match node {
+        AstFunDef n: { ret n.method_name }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_method_name(node: AstNode, value: str): void {
-    if node.method_name? {
-        node.method_name = value
-        ret
+    match node {
+        AstFunDef n: {
+            n.method_name = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("method_name")
 }
 
 fun ast_embedded(node: AstNode): bool {
-    if node.embedded? {
-        ret node.embedded
+    match node {
+        AstStructField n: { ret n.embedded }
+        else: {}
     }
     ret false
 }
 
 fun ast_set_embedded(node: AstNode, value: bool): void {
-    if node.embedded? {
-        node.embedded = value
-        ret
+    match node {
+        AstStructField n: {
+            n.embedded = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("embedded")
 }
 
 fun ast_stmts(node: AstNode): AstNode[] {
-    if node.stmts? {
-        ret node.stmts
+    match node {
+        AstBlock n: { ret n.stmts }
+        else: {}
     }
     ret new AstNode[0]
 }
 
 fun ast_set_stmts(node: AstNode, value: AstNode[]): void {
-    if node.stmts? {
-        node.stmts = value
-        ret
+    match node {
+        AstBlock n: {
+            n.stmts = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("stmts")
 }
 
 fun ast_value_expr(node: AstNode): AstNode {
-    if node.value_expr? {
-        ret node.value_expr
+    match node {
+        AstLet n: { ret n.value_expr }
+        AstAssign n: { ret n.value_expr }
+        AstAssignOp n: { ret n.value_expr }
+        AstFieldSet n: { ret n.value_expr }
+        AstSubscriptAssign n: { ret n.value_expr }
+        AstAssert n: { ret n.value_expr }
+        AstInitField n: { ret n.value_expr }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_value_expr(node: AstNode, value: AstNode): void {
-    if node.value_expr? {
-        node.value_expr = value
-        ret
+    match node {
+        AstLet n: {
+            n.value_expr = value
+            ret
+        }
+        AstAssign n: {
+            n.value_expr = value
+            ret
+        }
+        AstAssignOp n: {
+            n.value_expr = value
+            ret
+        }
+        AstFieldSet n: {
+            n.value_expr = value
+            ret
+        }
+        AstSubscriptAssign n: {
+            n.value_expr = value
+            ret
+        }
+        AstAssert n: {
+            n.value_expr = value
+            ret
+        }
+        AstInitField n: {
+            n.value_expr = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("value_expr")
 }
 
 fun ast_expr(node: AstNode): AstNode {
-    if node.expr? {
-        ret node.expr
+    match node {
+        AstReturn n: { ret n.expr }
+        AstAssignOp n: { ret n.expr }
+        AstIf n: { ret n.expr }
+        AstWhile n: { ret n.expr }
+        AstPanic n: { ret n.expr }
+        AstAssert n: { ret n.expr }
+        AstMatch n: { ret n.expr }
+        AstMatchCase n: { ret n.expr }
+        AstExprStmt n: { ret n.expr }
+        AstUnary n: { ret n.expr }
+        AstNullCheck n: { ret n.expr }
+        AstUnionInit n: { ret n.expr }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_expr(node: AstNode, value: AstNode): void {
-    if node.expr? {
-        node.expr = value
-        ret
+    match node {
+        AstReturn n: {
+            n.expr = value
+            ret
+        }
+        AstAssignOp n: {
+            n.expr = value
+            ret
+        }
+        AstIf n: {
+            n.expr = value
+            ret
+        }
+        AstWhile n: {
+            n.expr = value
+            ret
+        }
+        AstPanic n: {
+            n.expr = value
+            ret
+        }
+        AstAssert n: {
+            n.expr = value
+            ret
+        }
+        AstMatch n: {
+            n.expr = value
+            ret
+        }
+        AstMatchCase n: {
+            n.expr = value
+            ret
+        }
+        AstExprStmt n: {
+            n.expr = value
+            ret
+        }
+        AstUnary n: {
+            n.expr = value
+            ret
+        }
+        AstNullCheck n: {
+            n.expr = value
+            ret
+        }
+        AstUnionInit n: {
+            n.expr = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("expr")
 }
 
 fun ast_op(node: AstNode): str {
-    if node.op? {
-        ret node.op
+    match node {
+        AstAssignOp n: { ret n.op }
+        AstBinary n: { ret n.op }
+        AstUnary n: { ret n.op }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_op(node: AstNode, value: str): void {
-    if node.op? {
-        node.op = value
-        ret
+    match node {
+        AstAssignOp n: {
+            n.op = value
+            ret
+        }
+        AstBinary n: {
+            n.op = value
+            ret
+        }
+        AstUnary n: {
+            n.op = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("op")
 }
 
 fun ast_object(node: AstNode): AstNode {
-    if node.object? {
-        ret node.object
+    match node {
+        AstFieldSet n: { ret n.object }
+        AstDotCall n: { ret n.object }
+        AstFieldAccess n: { ret n.object }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_object(node: AstNode, value: AstNode): void {
-    if node.object? {
-        node.object = value
-        ret
+    match node {
+        AstFieldSet n: {
+            n.object = value
+            ret
+        }
+        AstDotCall n: {
+            n.object = value
+            ret
+        }
+        AstFieldAccess n: {
+            n.object = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("object")
 }
 
 fun ast_base(node: AstNode): AstNode {
-    if node.base? {
-        ret node.base
+    match node {
+        AstSubscriptAssign n: { ret n.base }
+        AstSubscript n: { ret n.base }
+        AstSlice n: { ret n.base }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_base(node: AstNode, value: AstNode): void {
-    if node.base? {
-        node.base = value
-        ret
+    match node {
+        AstSubscriptAssign n: {
+            n.base = value
+            ret
+        }
+        AstSubscript n: {
+            n.base = value
+            ret
+        }
+        AstSlice n: {
+            n.base = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("base")
 }
 
 fun ast_index(node: AstNode): AstNode {
-    if node.index? {
-        ret node.index
+    match node {
+        AstSubscriptAssign n: { ret n.index }
+        AstSubscript n: { ret n.index }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_index(node: AstNode, value: AstNode): void {
-    if node.index? {
-        node.index = value
-        ret
+    match node {
+        AstSubscriptAssign n: {
+            n.index = value
+            ret
+        }
+        AstSubscript n: {
+            n.index = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("index")
 }
 
 fun ast_then_block(node: AstNode): AstNode {
-    if node.then_block? {
-        ret node.then_block
+    match node {
+        AstIf n: { ret n.then_block }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_then_block(node: AstNode, value: AstNode): void {
-    if node.then_block? {
-        node.then_block = value
-        ret
+    match node {
+        AstIf n: {
+            n.then_block = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("then_block")
 }
 
 fun ast_else_block(node: AstNode): AstNode {
-    if node.else_block? {
-        ret node.else_block
+    match node {
+        AstIf n: { ret n.else_block }
+        AstMatch n: { ret n.else_block }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_else_block(node: AstNode, value: AstNode): void {
-    if node.else_block? {
-        node.else_block = value
-        ret
+    match node {
+        AstIf n: {
+            n.else_block = value
+            ret
+        }
+        AstMatch n: {
+            n.else_block = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("else_block")
 }
 
 fun ast_start(node: AstNode): AstNode {
-    if node.start? {
-        ret node.start
+    match node {
+        AstForRange n: { ret n.start }
+        AstSlice n: { ret n.start }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_start(node: AstNode, value: AstNode): void {
-    if node.start? {
-        node.start = value
-        ret
+    match node {
+        AstForRange n: {
+            n.start = value
+            ret
+        }
+        AstSlice n: {
+            n.start = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("start")
 }
 
 fun ast_end(node: AstNode): AstNode {
-    if node.end? {
-        ret node.end
+    match node {
+        AstForRange n: { ret n.end }
+        AstSlice n: { ret n.end }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_end(node: AstNode, value: AstNode): void {
-    if node.end? {
-        node.end = value
-        ret
+    match node {
+        AstForRange n: {
+            n.end = value
+            ret
+        }
+        AstSlice n: {
+            n.end = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("end")
 }
 
 fun ast_source(node: AstNode): AstNode {
-    if node.source? {
-        ret node.source
+    match node {
+        AstForIn n: { ret n.source }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_source(node: AstNode, value: AstNode): void {
-    if node.source? {
-        node.source = value
-        ret
+    match node {
+        AstForIn n: {
+            n.source = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("source")
 }
 
 fun ast_variant_name(node: AstNode): str {
-    if node.variant_name? {
-        ret node.variant_name
+    match node {
+        AstMatchCase n: { ret n.variant_name }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_variant_name(node: AstNode, value: str): void {
-    if node.variant_name? {
-        node.variant_name = value
-        ret
+    match node {
+        AstMatchCase n: {
+            n.variant_name = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("variant_name")
 }
 
 fun ast_binding_name(node: AstNode): str {
-    if node.binding_name? {
-        ret node.binding_name
+    match node {
+        AstMatchCase n: { ret n.binding_name }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_binding_name(node: AstNode, value: str): void {
-    if node.binding_name? {
-        node.binding_name = value
-        ret
+    match node {
+        AstMatchCase n: {
+            n.binding_name = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("binding_name")
 }
 
 fun ast_value(node: AstNode): str {
-    if node.value? {
-        ret node.value
+    match node {
+        AstLiteral n: { ret n.value }
+        AstChar n: { ret n.value }
+        AstBool n: { ret n.value }
+        AstString n: { ret n.value }
+        AstFStringText n: { ret n.value }
+        else: {}
     }
     ret ""
 }
 
 fun ast_set_value(node: AstNode, value: str): void {
-    if node.value? {
-        node.value = value
-        ret
+    match node {
+        AstLiteral n: {
+            n.value = value
+            ret
+        }
+        AstChar n: {
+            n.value = value
+            ret
+        }
+        AstBool n: {
+            n.value = value
+            ret
+        }
+        AstString n: {
+            n.value = value
+            ret
+        }
+        AstFStringText n: {
+            n.value = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("value")
 }
 
 fun ast_left(node: AstNode): AstNode {
-    if node.left? {
-        ret node.left
+    match node {
+        AstBinary n: { ret n.left }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_left(node: AstNode, value: AstNode): void {
-    if node.left? {
-        node.left = value
-        ret
+    match node {
+        AstBinary n: {
+            n.left = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("left")
 }
 
 fun ast_right(node: AstNode): AstNode {
-    if node.right? {
-        ret node.right
+    match node {
+        AstBinary n: { ret n.right }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_right(node: AstNode, value: AstNode): void {
-    if node.right? {
-        node.right = value
-        ret
+    match node {
+        AstBinary n: {
+            n.right = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("right")
 }
 
 fun ast_args(node: AstNode): AstNode[] {
-    if node.args? {
-        ret node.args
+    match node {
+        AstCall n: { ret n.args }
+        AstDotCall n: { ret n.args }
+        AstArrayLiteral n: { ret n.args }
+        else: {}
     }
     ret new AstNode[0]
 }
 
 fun ast_set_args(node: AstNode, value: AstNode[]): void {
-    if node.args? {
-        node.args = value
-        ret
+    match node {
+        AstCall n: {
+            n.args = value
+            ret
+        }
+        AstDotCall n: {
+            n.args = value
+            ret
+        }
+        AstArrayLiteral n: {
+            n.args = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("args")
 }
 
 fun ast_count(node: AstNode): AstNode {
-    if node.count? {
-        ret node.count
+    match node {
+        AstNewArray n: { ret n.count }
+        else: {}
     }
     ret ast_empty()
 }
 
 fun ast_set_count(node: AstNode, value: AstNode): void {
-    if node.count? {
-        node.count = value
-        ret
+    match node {
+        AstNewArray n: {
+            n.count = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("count")
 }
 
 fun ast_map_keys(node: AstNode): AstNode[] {
-    if node.map_keys? {
-        ret node.map_keys
+    match node {
+        AstMapInit n: { ret n.map_keys }
+        else: {}
     }
     ret new AstNode[0]
 }
 
 fun ast_set_map_keys(node: AstNode, value: AstNode[]): void {
-    if node.map_keys? {
-        node.map_keys = value
-        ret
+    match node {
+        AstMapInit n: {
+            n.map_keys = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("map_keys")
 }
 
 fun ast_map_values(node: AstNode): AstNode[] {
-    if node.map_values? {
-        ret node.map_values
+    match node {
+        AstMapInit n: { ret n.map_values }
+        else: {}
     }
     ret new AstNode[0]
 }
 
 fun ast_set_map_values(node: AstNode, value: AstNode[]): void {
-    if node.map_values? {
-        node.map_values = value
-        ret
+    match node {
+        AstMapInit n: {
+            n.map_values = value
+            ret
+        }
+        else: {}
     }
     ast_bad_field("map_values")
 }
-
 
 struct Parser {
     tokens: Token[]
@@ -2282,25 +2711,24 @@ fun (p: Parser) parse_postfix(node: AstNode): AstNode {
                 p.expect("RPAREN")
                 current = n
             } else {
-                if p.check("QUESTION") == 1 {
-                    let n = ast_node("FieldHas")
-                    ast_set_object(n, current)
-                    ast_set_name(n, token_text(field))
-                    ast_set_line(n, token_line(field))
-                    current = n
-                } else {
-                    let n = ast_node("FieldAccess")
-                    ast_set_object(n, current)
-                    ast_set_name(n, token_text(field))
-                    ast_set_line(n, token_line(field))
-                    current = n
-                }
+                let n = ast_node("FieldAccess")
+                ast_set_object(n, current)
+                ast_set_name(n, token_text(field))
+                ast_set_line(n, token_line(field))
+                current = n
             }
         } else {
             if p.check("LBRACKET") == 1 {
                 current = p.parse_bracket_postfix(current)
             } else {
-                done = 1
+                if p.check("QUESTION") == 1 {
+                    let n = ast_node("NullCheck")
+                    ast_set_expr(n, current)
+                    ast_set_line(n, ast_line(current))
+                    current = n
+                } else {
+                    done = 1
+                }
             }
         }
     }
@@ -2322,9 +2750,9 @@ fun (p: Parser) parse_primary(): AstNode {
             ast_set_source_type(n, type_map_of(p.parse_type()))
             ast_set_line(n, token_line(t))
             if p.peek_kind("LBRACE") == 1 {
-                ret p.parse_map_init_entries(n)
+                ret p.parse_postfix(p.parse_map_init_entries(n))
             }
-            ret n
+            ret p.parse_postfix(n)
         }
         if p.check("LBRACKET") == 1 {
             let count = ast_empty()
@@ -2335,7 +2763,7 @@ fun (p: Parser) parse_primary(): AstNode {
             match count {
                 AstEmpty n: {
                     if p.peek_kind("LBRACE") == 1 {
-                        ret p.parse_array_literal(t)
+                        ret p.parse_postfix(p.parse_array_literal(t))
                     }
                 }
                 else: {}
@@ -2344,7 +2772,7 @@ fun (p: Parser) parse_primary(): AstNode {
             ast_set_source_type(n, type_name_expr(token_text(t)))
             ast_set_count(n, count)
             ast_set_line(n, token_line(t))
-            ret n
+            ret p.parse_postfix(n)
         }
         if p.check("LPAREN") == 1 {
             let n = ast_node("UnionInit")
@@ -2352,36 +2780,36 @@ fun (p: Parser) parse_primary(): AstNode {
             ast_set_line(n, token_line(t))
             ast_set_expr(n, p.parse_expr())
             p.expect("RPAREN")
-            ret n
+            ret p.parse_postfix(n)
         }
         if p.peek_kind("LBRACE") == 1 {
-            ret p.parse_struct_init(t)
+            ret p.parse_postfix(p.parse_struct_init(t))
         }
         let n = ast_node("StructInit")
         ast_set_name(n, token_text(t))
         ast_set_line(n, token_line(t))
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("NUMBER") == 1 {
         let t = p.advance()
         let n = ast_node("Literal")
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("CHAR") == 1 {
         let t = p.advance()
         let n = ast_node("Char")
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("STRING") == 1 {
         let t = p.advance()
         let n = ast_node("String")
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("FSTRING") == 1 {
         let t = p.advance()
@@ -2390,27 +2818,27 @@ fun (p: Parser) parse_primary(): AstNode {
             FStringToken ft: {
                 ast_set_line(n, ft.line)
                 ast_set_fields(n, parse_fstring_parts(ft.parts, ft.line))
-                ret n
+                ret p.parse_postfix(n)
             }
             PlainToken pt: {
                 parse_error(pt.line, "Expected f-string parts")
             }
         }
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("TRUE") == 1 {
         let t = p.advance()
         let n = ast_node("Bool")
         ast_set_value(n, "1")
         ast_set_line(n, token_line(t))
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("FALSE") == 1 {
         let t = p.advance()
         let n = ast_node("Bool")
         ast_set_value(n, "0")
         ast_set_line(n, token_line(t))
-        ret n
+        ret p.parse_postfix(n)
     }
     if p.peek_kind("ID") == 1 {
         let t = p.advance()
@@ -2430,7 +2858,7 @@ fun (p: Parser) parse_primary(): AstNode {
     if p.check("LPAREN") == 1 {
         let expr = p.parse_expr()
         p.expect("RPAREN")
-        ret expr
+        ret p.parse_postfix(expr)
     }
     let t = p.peek()
     parse_error(token_line(t), "Unexpected token in expression")
@@ -2755,7 +3183,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstCall n: { ret dump_node_generic(node, depth, "Call", false) }
         AstDotCall n: { ret dump_node_generic(node, depth, "DotCall", false) }
         AstFieldAccess n: { ret dump_node_generic(node, depth, "FieldAccess", false) }
-        AstFieldHas n: { ret dump_node_generic(node, depth, "FieldHas", false) }
+        AstNullCheck n: { ret dump_node_generic(node, depth, "NullCheck", false) }
         AstSubscript n: { ret dump_node_generic(node, depth, "Subscript", false) }
         AstSlice n: { ret dump_node_generic(node, depth, "Slice", false) }
         AstNewArray n: { ret dump_node_generic(node, depth, "NewArray", false) }

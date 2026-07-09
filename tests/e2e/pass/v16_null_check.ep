@@ -1,0 +1,24 @@
+# EXIT: 0
+# STDOUT: false
+# STDOUT: true
+# STDOUT: true
+
+struct Inner {
+    ok: bool
+}
+
+struct Outer {
+    inner: Inner
+}
+
+fun main(): i64 {
+    let o = new Outer
+    println(str(o.inner?))
+    o.inner = new Inner { ok: true }
+    let x = o.inner
+    println(str(x?))
+    if x? {
+        println(str(x.ok))
+    }
+    ret 0
+}

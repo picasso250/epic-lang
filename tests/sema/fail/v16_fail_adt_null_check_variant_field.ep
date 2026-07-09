@@ -5,7 +5,6 @@ type Node = Leaf | Pair
 fun main(): void {
     let n: Node = new Node(new Pair { value: 1 })
     if n.name? {
-    } else {
-        println(n.name)
+        println("unreachable")
     }
 }

@@ -14,6 +14,7 @@ def emit_runtime_data(x64, program):
     x64.data_bytes("_newline", [10])
     x64.data_bytes("_cstr_panic_prefix", list(b"panic line "))
     x64.data_bytes("_cstr_panic_suffix", list(b": invalid cstr"))
+    x64.data_bytes("_trap_null_deref", list(b"runtime trap: null deref"))
     for glob in program.globals:
         if glob.name == "argv":
             continue
@@ -518,8 +519,17 @@ def emit_epx_slice_oob(x):
 
 def emit_epx_null_deref(x):
     x.label("__epx_null_deref")
+    x.inst("sub", R("rsp"), I(40))
+    x.inst("mov", R("rcx"), I(-11))
+    x.inst("call", Symbol("GetStdHandle"))
+    x.inst("mov", R("rcx"), R("rax"))
+    x.inst("lea", R("rdx"), MS("_trap_null_deref"))
+    x.inst("mov", R("r8"), I(24))
+    x.inst("lea", R("r9"), MS("_written"))
+    x.inst("mov", M("rsp", 32), I(0))
+    x.inst("call", Symbol("WriteFile"))
+    x.inst("call", Symbol("__epx_print_newline"))
     x.inst("mov", R("rcx"), I(1))
-    x.inst("sub", R("rsp"), I(32))
     x.inst("call", Symbol("ExitProcess"))
 
 

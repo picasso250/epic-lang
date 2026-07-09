@@ -263,6 +263,14 @@ Program
               String abc : str
           InitField count
             Literal 3 : i64
+      Let has_point : bool
+        NullCheck : bool
+          FieldAccess point : Point
+            Var h : Holder
+      Let has_bytes : bool
+        NullCheck : bool
+          FieldAccess bytes : u8[]
+            Var h : Holder
       FieldSet x
         FieldAccess x : i64
           Var p : Point
@@ -335,9 +343,13 @@ Program
                   Var h : Holder
               Var key_count : i64
         Binary && : bool
-          Var has_one : bool
-          Unary ! : bool
-            Var removed : bool
+          Binary && : bool
+            Binary && : bool
+              Var has_one : bool
+              Unary ! : bool
+                Var removed : bool
+            Var has_point : bool
+          Var has_bytes : bool
       Return
         Literal 0 : i64
   FunDef use_control : i64

@@ -1,0 +1,19 @@
+# EXIT: 1
+# STDOUT: runtime trap: null deref
+
+struct Inner {
+    ok: bool
+}
+
+struct Outer {
+    inner: Inner
+}
+
+fun main(): i64 {
+    let o = new Outer
+    let x = o.inner
+    if x.ok {
+        ret 1
+    }
+    ret 0
+}

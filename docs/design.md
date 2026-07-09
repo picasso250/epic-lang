@@ -124,7 +124,9 @@ let xs = new u8[]
 
 不带初始化器的 `let x: T` 非法。Epic 不为 local variable 创建隐式零值；标量、容器、map、字符串和结构体引用都必须由字面量、`new`、函数调用或其他表达式显式初始化。
 
-`str`、`T[]`、`map[str]T` 和用户结构体都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
+`str`、`T[]`、`map[str]T`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
+
+Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / `while` 条件仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
 
 ### 运算符 (Operators)
 
@@ -154,8 +156,8 @@ let xs = new u8[]
 
 ### 控制流 (Control Flow)
 
-- `if` / `else if` / `else`，条件为显式布尔表达式。
-- `while`，条件为显式布尔表达式。
+- `if` / `else if` / `else`，条件为显式布尔表达式；reference null-check 请写 `expr?`。
+- `while`，条件为显式布尔表达式；reference null-check 请写 `expr?`。
 - `break` 和 `continue` 绑定到最近的 `while` 循环。
 - `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`i` 是函数级可变 local，也是实际 numeric cursor；修改 `i` 会影响循环进度。`continue` 跳到增量步骤。
 - `for i in xs` — array index iteration。`xs` 必须是 `T[]`；`i: i64`，是函数级可变 local，也是实际 index cursor。array 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`，如果当前 index 已无效则结束。循环中 `push` 不扩展本次循环，`pop` 可能导致提前结束。
@@ -196,7 +198,7 @@ let q = new Pos { line: 3 }     # 省略的标量字段默认为 0 / false
 let z = new Pos {}              # 所有标量字段为默认值
 ```
 
-`new Ctor` 是 `new Ctor {}` 的简写。对于结构体，`Ctor` 是结构体名称。初始化器允许只写部分字段。省略的标量字段默认为 `0` / `false`；省略的 reference 字段默认为 null，必须在使用前显式赋值。
+`new Ctor` 是 `new Ctor {}` 的简写。对于结构体，`Ctor` 是结构体名称。初始化器允许只写部分字段。省略的标量字段默认为 `0` / `false`；省略的 reference 字段默认为 null，必须在使用前显式赋值或用 `field?` 检查。
 
 字段按名称指定。顺序无关。未知字段或重复字段是编译错误。
 
@@ -241,6 +243,14 @@ type Expr = LiteralExpr | BinaryExpr
 - `match` 必须覆盖全部 variant，或者提供 `_` 分支。
 - payload 仍然是普通 struct，可以作为函数参数类型。
 - 不支持 union extension。
+
+
+ADT field access 只支持两类：
+
+- 在 `match` case 中绑定具体 variant，然后访问该 variant 的普通字段。
+- 访问所有 variants 都通过 embedded struct 共享的 common embedded field。
+
+不存在 ADT partial field-exists sugar；`node.name?` 现在表示“访问 `node.name` 后检查该 reference 是否非 null”，因此 `name` 必须是合法字段访问。variant-specific 字段请用 `match`。
 
 `match` 使用 struct variant 名称进行匹配：
 

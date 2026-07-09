@@ -687,8 +687,7 @@ class MirCodegen(MirFunctionBuilder):
             value = self._expr_from(base.block, stmt.value)
             self.set_block(value.block)
             if base_type.kind == "named" and base_type.name in self.union_defs:
-                self._store_union_partial_field(base.value, base_type.name, stmt.field, value.value)
-                return self._reachable(self.current_block)
+                raise MirCodegenError("field assignment base must be struct")
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError("field assignment base must be a struct pointer")
@@ -1228,13 +1227,11 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_union_init_from(self.current_block, expr)
         if isinstance(expr, FieldAccessNode):
             return self._emit_field_access_from(self.current_block, expr)
-        if isinstance(expr, FieldHasNode):
-            base_type = self._infer_type(expr.object)
-            base = self._emit_expr_from(self.current_block, expr.object)
-            self.set_block(base.block)
-            if base_type.kind != "named" or base_type.name not in self.union_defs:
-                raise MirCodegenError("field existence guard base must be a union")
-            return ValueFlow(self._emit_union_field_has(base.value, base_type.name, expr.field), self.current_block)
+        if isinstance(expr, NullCheckNode):
+            value = self._emit_expr_from(self.current_block, expr.expr)
+            self.set_block(value.block)
+            result = self.inst("icmp.ne", [value.value, ConstNullOperand()], result_type=BOOL)
+            return ValueFlow(ValueOperand(result), self.current_block)
         raise MirCodegenError(f"machine MIR does not support expr yet: {type(expr).__name__}")
 
     def _emit_arg_flows_from(self, in_block, exprs):
@@ -1734,10 +1731,12 @@ class MirCodegen(MirFunctionBuilder):
         base = self._emit_expr_from(in_block, expr.object)
         self.set_block(base.block)
         if base_type.kind == "named" and base_type.name in self.union_defs:
+            if base_type.name == "AstNode":
+                return ValueFlow(self._load_union_partial_field(base.value, base_type.name, expr.field), self.current_block)
             try:
                 self._union_common_embedded_field_layout(base_type.name, expr.field)
             except MirCodegenError:
-                return ValueFlow(self._load_union_partial_field(base.value, base_type.name, expr.field), self.current_block)
+                raise MirCodegenError("field access base must be struct")
             return ValueFlow(self._load_union_common_embedded_field(base.value, base_type.name, expr.field), self.current_block)
         struct_name = self._layout_struct_name(base_type)
         field_layout = self._promoted_field_layout(struct_name, expr.field)

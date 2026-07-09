@@ -194,6 +194,17 @@ Program
       Let field_read
         FieldAccess name
           Var p3
+      Let has_point
+        NullCheck
+          Var p
+      Let has_name
+        NullCheck
+          FieldAccess name
+            Var p3
+      Let grouped_check
+        NullCheck
+          FieldAccess name
+            Var p3
       If
         Block
           ExprStmt

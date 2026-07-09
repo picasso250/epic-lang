@@ -271,9 +271,8 @@ class FieldAccessNode(ASTNode):
 
 
 @dataclass
-class FieldHasNode(ASTNode):
-    object: ASTNode
-    field: str
+class NullCheckNode(ASTNode):
+    expr: ASTNode
     resolved_type: Optional[EpicType] = None
 
 

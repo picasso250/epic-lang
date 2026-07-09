@@ -213,7 +213,8 @@ after ADT removal and naming unification.
 - `let` binding with optional type annotation
 - Local variable declarations must have an initializer; optional type annotations only constrain/check the initializer
 - No zero-value initialization for locals; use literals, `new`, calls, or other expressions explicitly
-- Heap-backed references (`str`, `T[]`, `map[str]T`, structs) may use `0` as null storage, but compiler-inserted container materialization is not part of the language model
+- Heap-backed references (`str`, `T[]`, `map[str]T`, structs, ADT wrappers) may use `0` as null storage, but compiler-inserted container materialization is not part of the language model
+- Postfix `expr?` is the only public null-check surface: it accepts reference types and returns `bool`; it is not ADT field-exists syntax and it does not dereference the checked value
 - `new S { ... }` allows partial field initialization: omitted scalar fields default to `0` / `false`, omitted reference fields default to null
 - Slice syntax `s[start:end]`
 - `match` literal switch only
