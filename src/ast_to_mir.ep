@@ -623,158 +623,6 @@ fun mir_union_has_common_embedded_field(st: MirCodegenState, union_name: str, fi
     ret true
 }
 
-fun mir_union_partial_field_type(st: MirCodegenState, union_name: str, field_name: str): str {
-    let members = mir_union_member_names(st, union_name)
-    let found = ""
-    for i in members {
-        let candidate = mir_direct_field_type(st, members[i], field_name)
-        if candidate != "" {
-            if found != "" && found != candidate {
-                ast_to_mir_die(f"union {union_name} field {field_name} has inconsistent types")
-            }
-            found = candidate
-        }
-    }
-    if found == "" {
-        ast_to_mir_die(f"union {union_name} has no variant field {field_name}")
-    }
-    ret found
-}
-
-fun mir_union_partial_field_members(st: MirCodegenState, union_name: str, field_name: str): str[] {
-    let out = new str[0]
-    let members = mir_union_member_names(st, union_name)
-    for i in members {
-        if mir_direct_field_type(st, members[i], field_name) != "" {
-            out.push(members[i])
-        }
-    }
-    if len(out) == 0 {
-        ast_to_mir_die(f"union {union_name} has no variant field {field_name}")
-    }
-    ret out
-}
-
-fun mir_emit_union_field_has(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirOperand {
-    let members = mir_union_partial_field_members(st, union_name, field_name)
-    let result = mir_const_bool(false)
-    for i in members {
-        let tag = mir_load_field(st, union_value, union_name, "tag")
-        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(tag)
-        cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, members[i])))
-        mir_emit_inst(st, cond)
-        let cond_value = mir_value_operand("bool", cond.result_name)
-        if i == 0 {
-            result = cond_value
-        } else {
-            let or_inst = mir_make_result_inst(st, "or", "bool")
-            or_inst.operands.push(result)
-            or_inst.operands.push(cond_value)
-            mir_emit_inst(st, or_inst)
-            result = mir_value_operand("bool", or_inst.result_name)
-        }
-    }
-    ret result
-}
-
-fun mir_load_union_partial_field(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirValueFlow {
-    let field_typ = mir_union_partial_field_type(st, union_name, field_name)
-    let wrapper_addr = mir_alloc_local(st, "__union_field", "ptr")
-    mir_emit_inst(st, mir_store(union_value, wrapper_addr))
-    let result_addr = mir_alloc_local(st, "__union_field_result", field_typ)
-    let members = mir_union_partial_field_members(st, union_name, field_name)
-    let end_block = mir_new_block(st, "union.field.end")
-    let case_blocks = new MirBlock[0]
-    for i in members {
-        case_blocks.push(mir_new_block(st, "union.field.case"))
-    }
-    let next_blocks = new MirBlock[0]
-    for i in 0:len(members) - 1 {
-        next_blocks.push(mir_new_block(st, "union.field.next"))
-    }
-    let check_block = st.current_block
-    for ci in members {
-        st.current_block = check_block
-        let next_block = end_block
-        if ci < len(members) - 1 {
-            next_block = next_blocks[ci]
-        }
-        let wrapper_name = mir_new_value(st, "load")
-        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
-        let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
-        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(tag)
-        cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, members[ci])))
-        mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)
-        st.current_block.has_terminator = true
-        if ci < len(members) - 1 {
-            check_block = next_blocks[ci]
-        }
-    }
-    for bi in members {
-        st.current_block = case_blocks[bi]
-        let wrapper_name = mir_new_value(st, "load")
-        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
-        let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
-        let value = mir_load_promoted_field(st, payload, members[bi], field_name)
-        mir_emit_inst(st, mir_store(value, result_addr))
-        st.current_block.terminator = mir_br(end_block.name)
-        st.current_block.has_terminator = true
-    }
-    st.current_block = end_block
-    let result_name = mir_new_value(st, "load")
-    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, result_addr))
-    ret mir_value_flow(mir_value_operand(field_typ, result_name), st.current_block)
-}
-
-fun mir_store_union_partial_field(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str, value: MirOperand): void {
-    let wrapper_addr = mir_alloc_local(st, "__union_field", "ptr")
-    mir_emit_inst(st, mir_store(union_value, wrapper_addr))
-    let members = mir_union_partial_field_members(st, union_name, field_name)
-    let end_block = mir_new_block(st, "union.field.end")
-    let case_blocks = new MirBlock[0]
-    for i in members {
-        case_blocks.push(mir_new_block(st, "union.field.case"))
-    }
-    let next_blocks = new MirBlock[0]
-    for i in 0:len(members) - 1 {
-        next_blocks.push(mir_new_block(st, "union.field.next"))
-    }
-    let check_block = st.current_block
-    for ci in members {
-        st.current_block = check_block
-        let next_block = end_block
-        if ci < len(members) - 1 {
-            next_block = next_blocks[ci]
-        }
-        let wrapper_name = mir_new_value(st, "load")
-        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
-        let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
-        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(tag)
-        cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, members[ci])))
-        mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)
-        st.current_block.has_terminator = true
-        if ci < len(members) - 1 {
-            check_block = next_blocks[ci]
-        }
-    }
-    for bi in members {
-        st.current_block = case_blocks[bi]
-        let wrapper_name = mir_new_value(st, "load")
-        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
-        let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
-        let addr = mir_field_addr(st, payload, members[bi], field_name)
-        mir_emit_inst(st, mir_store(value, addr))
-        st.current_block.terminator = mir_br(end_block.name)
-        st.current_block.has_terminator = true
-    }
-    st.current_block = end_block
-}
-
 fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirValueFlow {
     let field_typ = mir_union_common_embedded_field_type(st, union_name, field_name)
     let uniform_member = mir_uniform_direct_embedded_field_member(st, union_name, field_name)
@@ -959,14 +807,17 @@ fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstFString): Mi
     for i < len(expr.fields) {
         let part = expr.fields[i]
         let piece = mir_operand_null()
-        if ast_kind(part) == "FStringText" {
-            if len(part.value) > 0 {
-                piece = mir_symbol_operand("ptr", mir_string_label(st, part.value))
+        match part {
+            AstFStringText text: {
+                if len(text.value) > 0 {
+                    piece = mir_symbol_operand("ptr", mir_string_label(st, text.value))
+                }
             }
-        } else {
-            let piece_flow = mir_emit_str_conversion(st, st.current_block, part)
-            st.current_block = piece_flow.block
-            piece = piece_flow.value
+            _: {
+                let piece_flow = mir_emit_str_conversion(st, st.current_block, part)
+                st.current_block = piece_flow.block
+                piece = piece_flow.value
+            }
         }
         if mir_operand_is_null(piece) == false {
             if has_out == false {
@@ -1616,9 +1467,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             let base_flow = mir_emit_expr(st, st.current_block, n.object)
             st.current_block = base_flow.block
             if mir_is_union_name(st, base_type) {
-                if base_type == "AstNode" {
-                    ret mir_load_union_partial_field(st, base_flow.value, base_type, n.name)
-                }
                 if mir_union_has_common_embedded_field(st, base_type, n.name) {
                     ret mir_load_union_common_embedded_field(st, base_flow.value, base_type, n.name)
                 }

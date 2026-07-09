@@ -355,3 +355,15 @@ struct_field_keys.push(key)
 ```
 
 If the key is only encoding multiple known fields, introduce a small record instead. Prefer `MirStructFieldLayout { struct_name, field_name, field_type, field_index, embedded }` over parallel arrays keyed by `"Struct.field"` strings. String labels are fine for diagnostics, but they should not be the internal representation of typed layout data.
+
+### Pattern 5: type-name special cases before structural rules
+
+Bad shape:
+
+```epic
+if base_type == "AstNode" {
+    ret special_union_field_path(...)
+}
+```
+
+Prefer structural rules over type-name exceptions. For union field access, try common embedded fields first, then reject unsupported variant-only fields through the normal union rules. If source code needs a variant-only field from a union value, make the variant explicit with `match` instead of adding a type-name special case to sema or MIR lowering.

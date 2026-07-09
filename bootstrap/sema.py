@@ -723,37 +723,6 @@ class SemanticAnalyzer:
             return f"{object_expr.name}.{field}"
         return None
 
-    def _union_partial_field_type(self, union_name, field):
-        found = None
-        for member in self.union_defs[union_name]:
-            fields = self.struct_fields.get(member, {})
-            if field not in fields:
-                continue
-            candidate = fields[field]
-            if found is not None and candidate != found:
-                self._fail(f"union {union_name} field {field} has inconsistent types")
-            found = candidate
-        if found is None:
-            self._fail(f"union {union_name} has no variant field {field}")
-        return found
-
-    def _union_partial_or_promoted_field_type(self, union_name, field):
-        found = None
-        for member in self.union_defs[union_name]:
-            fields = self.struct_fields.get(member, {})
-            if field in fields:
-                candidate = fields[field]
-            else:
-                candidate = self._promoted_field_type(member, field)
-                if candidate is None:
-                    continue
-            if found is not None and candidate != found:
-                self._fail(f"union {union_name} field {field} has inconsistent types")
-            found = candidate
-        if found is None:
-            self._fail(f"union {union_name} has no variant field {field}")
-        return found
-
     def _is_reference_type(self, typ):
         return typ == STR or typ.kind in ("array", "map", "named")
 
@@ -775,8 +744,6 @@ class SemanticAnalyzer:
             fields = self.struct_fields.get(base_type.name)
             if fields is None:
                 if base_type.name in self.union_names:
-                    if base_type.name == "AstNode":
-                        return self._union_partial_or_promoted_field_type(base_type.name, field)
                     return self._union_common_embedded_field_type(base_type.name, field)
                 self._fail(f"field access expected struct, got {base_type}")
             if field in fields:

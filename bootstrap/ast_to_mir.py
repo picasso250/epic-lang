@@ -400,91 +400,6 @@ class MirCodegen(MirFunctionBuilder):
                 return None
         return first_member
 
-    def _union_partial_field_members(self, union_name, field):
-        members = []
-        found = None
-        for member in self.union_defs.get(union_name, []):
-            try:
-                layout = self.structs[member].field(field)
-            except KeyError:
-                continue
-            if found is not None and layout.type != found.type:
-                raise MirCodegenError(f"union {union_name} field {field} has inconsistent types")
-            found = layout
-            members.append(member)
-        if found is None:
-            raise MirCodegenError(f"union {union_name} has no variant field {field}")
-        return members, found
-
-    def _emit_union_field_has(self, union_value, union_name, field):
-        members, _ = self._union_partial_field_members(union_name, field)
-        result = None
-        for member in members:
-            tag = self._load_field(union_value, union_name, "tag")
-            cond = self.inst("icmp.eq", [tag, ConstIntOperand(I64, self.union_tags[union_name][member])], result_type=BOOL)
-            cond_op = ValueOperand(cond)
-            if result is None:
-                result = cond_op
-            else:
-                result_name = self.inst("or", [result, cond_op], result_type=BOOL)
-                result = ValueOperand(result_name)
-        return result or ConstBoolOperand(False)
-
-    def _load_union_partial_field(self, union_value, union_name, field):
-        members, field_layout = self._union_partial_field_members(union_name, field)
-        wrapper_addr = self._alloc_local("__union_field", ptr())
-        self.inst("store", [union_value, ValueOperand(wrapper_addr)])
-        result_addr = self._alloc_local("__union_field_result", field_layout.type)
-        end = self.new_block("union.field.end")
-        case_blocks = [self.new_block("union.field.case") for _ in members]
-        next_blocks = [self.new_block("union.field.next") for _ in range(max(len(members) - 1, 0))]
-        check_block = self.current_block
-        for idx, member in enumerate(members):
-            self.set_block(check_block)
-            wrapper = self.inst("load", [ValueOperand(wrapper_addr)], result_type=ptr(), type=ptr())
-            tag = self._load_field(ValueOperand(wrapper), union_name, "tag")
-            cond = self.inst("icmp.eq", [tag, ConstIntOperand(I64, self.union_tags[union_name][member])], result_type=BOOL)
-            next_block = next_blocks[idx] if idx < len(next_blocks) else end
-            self.condbr(ValueOperand(cond), case_blocks[idx], next_block)
-            if idx < len(next_blocks):
-                check_block = next_blocks[idx]
-        for idx, member in enumerate(members):
-            self.set_block(case_blocks[idx])
-            wrapper = self.inst("load", [ValueOperand(wrapper_addr)], result_type=ptr(), type=ptr())
-            payload = self._load_field(ValueOperand(wrapper), union_name, "payload")
-            value = self._load_promoted_field(payload, member, field)
-            self.inst("store", [value, ValueOperand(result_addr)])
-            self.br(end)
-        self.set_block(end)
-        result = self.inst("load", [ValueOperand(result_addr)], result_type=field_layout.type, type=field_layout.type)
-        return ValueOperand(result)
-
-    def _store_union_partial_field(self, union_value, union_name, field, value):
-        members, _ = self._union_partial_field_members(union_name, field)
-        wrapper_addr = self._alloc_local("__union_field", ptr())
-        self.inst("store", [union_value, ValueOperand(wrapper_addr)])
-        end = self.new_block("union.field.end")
-        case_blocks = [self.new_block("union.field.case") for _ in members]
-        next_blocks = [self.new_block("union.field.next") for _ in range(max(len(members) - 1, 0))]
-        check_block = self.current_block
-        for idx, member in enumerate(members):
-            self.set_block(check_block)
-            wrapper = self.inst("load", [ValueOperand(wrapper_addr)], result_type=ptr(), type=ptr())
-            tag = self._load_field(ValueOperand(wrapper), union_name, "tag")
-            cond = self.inst("icmp.eq", [tag, ConstIntOperand(I64, self.union_tags[union_name][member])], result_type=BOOL)
-            next_block = next_blocks[idx] if idx < len(next_blocks) else end
-            self.condbr(ValueOperand(cond), case_blocks[idx], next_block)
-            if idx < len(next_blocks):
-                check_block = next_blocks[idx]
-        for idx, member in enumerate(members):
-            self.set_block(case_blocks[idx])
-            wrapper = self.inst("load", [ValueOperand(wrapper_addr)], result_type=ptr(), type=ptr())
-            payload = self._load_field(ValueOperand(wrapper), union_name, "payload")
-            addr = self._field_addr(payload, member, field)
-            self.inst("store", [value, addr])
-            self.br(end)
-        self.set_block(end)
-
     def _load_union_common_embedded_field(self, union_value, union_name, field):
         field_layout = self._union_common_embedded_field_layout(union_name, field)
         uniform_member = self._uniform_direct_embedded_field_member(union_name, field)
@@ -1731,8 +1646,6 @@ class MirCodegen(MirFunctionBuilder):
         base = self._emit_expr_from(in_block, expr.object)
         self.set_block(base.block)
         if base_type.kind == "named" and base_type.name in self.union_defs:
-            if base_type.name == "AstNode":
-                return ValueFlow(self._load_union_partial_field(base.value, base_type.name, expr.field), self.current_block)
             try:
                 self._union_common_embedded_field_layout(base_type.name, expr.field)
             except MirCodegenError:

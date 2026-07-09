@@ -269,51 +269,6 @@ fun sema_field_guard_key(object: AstNode, field: str): str {
     ret ""
 }
 
-fun sema_union_partial_field_type(st: SemaState, union_name: str, field: str): str {
-    let found = ""
-    let count = st.union_member_count[union_name]
-    for i in 0:count {
-        let member = st.union_member_names[sema_key_index(union_name, i)]
-        let key = sema_key2(member, field)
-        if st.struct_fields.has(key) {
-            let candidate = st.struct_fields[key]
-            if found != "" && found != candidate {
-                sema_die(f"union {union_name} field {field} has inconsistent types")
-            }
-            found = candidate
-        }
-    }
-    if found == "" {
-        sema_die(f"union {union_name} has no variant field {field}")
-    }
-    ret found
-}
-
-fun sema_union_partial_or_promoted_field_type(st: SemaState, union_name: str, field: str): str {
-    let found = ""
-    let count = st.union_member_count[union_name]
-    for i in 0:count {
-        let member = st.union_member_names[sema_key_index(union_name, i)]
-        let key = sema_key2(member, field)
-        let candidate = ""
-        if st.struct_fields.has(key) {
-            candidate = st.struct_fields[key]
-        } else {
-            candidate = sema_promoted_field_type_inner(st, member, field, 64)
-        }
-        if candidate != "" {
-            if found != "" && found != candidate {
-                sema_die(f"union {union_name} field {field} has inconsistent types")
-            }
-            found = candidate
-        }
-    }
-    if found == "" {
-        sema_die(f"union {union_name} has no variant field {field}")
-    }
-    ret found
-}
-
 fun sema_is_reference_type(st: SemaState, typ: str): bool {
     ret typ == "str" || sema_is_array(typ) || sema_is_map(typ) || st.struct_names.has(typ) || st.union_names.has(typ)
 }
@@ -338,9 +293,6 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
         sema_die(f"unknown field {sema_key2(base_type, field)}")
     }
     if st.union_names.has(base_type) {
-        if base_type == "AstNode" {
-            ret sema_union_partial_or_promoted_field_type(st, base_type, field)
-        }
         ret sema_union_common_embedded_field_type(st, base_type, field)
     }
     if st.struct_names.has(base_type) == false {
