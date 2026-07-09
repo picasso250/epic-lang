@@ -693,6 +693,18 @@ def _dump_line(depth, text):
     return f"{'  ' * depth}{text}"
 
 
+def _type_suffix(node):
+    typ = getattr(node, "resolved_type", None)
+    return f" : {typ}" if typ is not None else ""
+
+
+def _decl_type_suffix(node, source_type):
+    resolved = _type_suffix(node)
+    if resolved:
+        return resolved
+    return f" : {source_type}" if source_type else ""
+
+
 def dump_ast_lines(node, depth=0):
     out = []
 
@@ -714,21 +726,21 @@ def dump_ast_lines(node, depth=0):
         for field in node.fields:
             out.extend(dump_ast_lines(field, depth + 1))
     elif isinstance(node, StructField):
-        emit(f"StructField {node.name} : {node.type}")
+        emit(f"StructField {node.name}{_decl_type_suffix(node, node.type)}")
     elif isinstance(node, UnionDefNode):
         emit(f"UnionDef {node.name}")
         for member in node.members:
             out.append(_dump_line(depth + 1, f"UnionMember {member}"))
     elif isinstance(node, FunDefNode):
         if node.method_name:
-            emit(f"Method {node.receiver_type}.{node.method_name} : {node.ret_type}")
+            emit(f"Method {node.receiver_type}.{node.method_name}{_decl_type_suffix(node, node.ret_type)}")
         else:
-            emit(f"FunDef {node.name} : {node.ret_type}")
+            emit(f"FunDef {node.name}{_decl_type_suffix(node, node.ret_type)}")
         for param in node.params:
             out.extend(dump_ast_lines(param, depth + 1))
         out.extend(dump_ast_lines(node.body, depth + 1))
     elif isinstance(node, Param):
-        emit(f"Param {node.name} : {node.type}")
+        emit(f"Param {node.name}{_decl_type_suffix(node, node.type)}")
     elif isinstance(node, BlockNode):
         emit("Block")
         for stmt in node.stmts:
@@ -738,8 +750,7 @@ def dump_ast_lines(node, depth=0):
         if node.expr is not None:
             out.extend(dump_ast_lines(node.expr, depth + 1))
     elif isinstance(node, LetNode):
-        suffix = f" : {node.var_type}" if node.var_type else ""
-        emit(f"Let {node.name}{suffix}")
+        emit(f"Let {node.name}{_decl_type_suffix(node, node.var_type)}")
         if node.value is not None:
             out.extend(dump_ast_lines(node.value, depth + 1))
     elif isinstance(node, AssignNode):
@@ -773,7 +784,7 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, ContinueNode):
         emit("Continue")
     elif isinstance(node, ForRangeNode):
-        emit(f"For {node.name}")
+        emit(f"For {node.name}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.body, depth + 1))
         out.extend(dump_ast_lines(node.start, depth + 1))
         out.extend(dump_ast_lines(node.end, depth + 1))
@@ -806,74 +817,74 @@ def dump_ast_lines(node, depth=0):
         emit("ExprStmt")
         out.extend(dump_ast_lines(node.expr, depth + 1))
     elif isinstance(node, LiteralNode):
-        emit(f"Literal {node.value}")
+        emit(f"Literal {node.value}{_type_suffix(node)}")
     elif isinstance(node, CharNode):
-        emit(f"Char {node.value}")
+        emit(f"Char {node.value}{_type_suffix(node)}")
     elif isinstance(node, BoolNode):
-        emit(f"Bool {node.value}")
+        emit(f"Bool {node.value}{_type_suffix(node)}")
     elif isinstance(node, StringNode):
-        emit(f"String {node.value}")
+        emit(f"String {node.value}{_type_suffix(node)}")
     elif isinstance(node, FStringNode):
-        emit("FString")
+        emit(f"FString{_type_suffix(node)}")
         for part in node.parts:
             if isinstance(part, FStringTextPart):
                 emit(f"  FStringText {part.value}")
             elif isinstance(part, FStringExprPart):
                 out.extend(dump_ast_lines(part.expr, depth + 1))
     elif isinstance(node, VarNode):
-        emit(f"Var {node.name}")
+        emit(f"Var {node.name}{_type_suffix(node)}")
     elif isinstance(node, CallNode):
         suffix = f" : {node.namespace}" if node.namespace else ""
-        emit(f"Call {node.name}{suffix}")
+        emit(f"Call {node.name}{suffix}{_type_suffix(node)}")
         for arg in node.args:
             out.extend(dump_ast_lines(arg, depth + 1))
     elif isinstance(node, DotCallNode):
-        emit(f"DotCall {node.name}")
+        emit(f"DotCall {node.name}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.object, depth + 1))
         for arg in node.args:
             out.extend(dump_ast_lines(arg, depth + 1))
     elif isinstance(node, BinaryNode):
-        emit(f"Binary {node.op}")
+        emit(f"Binary {node.op}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.left, depth + 1))
         out.extend(dump_ast_lines(node.right, depth + 1))
     elif isinstance(node, UnaryNode):
-        emit(f"Unary {node.op}")
+        emit(f"Unary {node.op}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.expr, depth + 1))
     elif isinstance(node, FieldAccessNode):
-        emit(f"FieldAccess {node.field}")
+        emit(f"FieldAccess {node.field}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.object, depth + 1))
     elif isinstance(node, FieldHasNode):
-        emit(f"FieldHas {node.field}")
+        emit(f"FieldHas {node.field}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.object, depth + 1))
     elif isinstance(node, SubscriptNode):
-        emit("Subscript")
+        emit(f"Subscript{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.base, depth + 1))
         out.extend(dump_ast_lines(node.index, depth + 1))
     elif isinstance(node, SliceNode):
-        emit("Slice")
+        emit(f"Slice{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.base, depth + 1))
         if node.start is not None:
             out.extend(dump_ast_lines(node.start, depth + 1))
         if node.end is not None:
             out.extend(dump_ast_lines(node.end, depth + 1))
     elif isinstance(node, NewArrayNode):
-        emit(f"NewArray : {node.elem_type}")
+        emit(f"NewArray : {node.elem_type}{_type_suffix(node)}")
         if node.count is not None:
             out.extend(dump_ast_lines(node.count, depth + 1))
     elif isinstance(node, StructInitNode):
-        emit(f"StructInit {node.type_name}")
+        emit(f"StructInit {node.type_name}{_type_suffix(node)}")
         for field, value in node.fields:
             out.append(_dump_line(depth + 1, f"InitField {field}"))
             out.extend(dump_ast_lines(value, depth + 2))
     elif isinstance(node, UnionInitNode):
-        emit(f"UnionInit {node.type_name}")
+        emit(f"UnionInit {node.type_name}{_type_suffix(node)}")
         out.extend(dump_ast_lines(node.payload, depth + 1))
     elif isinstance(node, ArrayLiteralNode):
-        emit(f"ArrayLiteral : {node.elem_type}")
+        emit(f"ArrayLiteral : {node.elem_type}{_type_suffix(node)}")
         for value in node.values:
             out.extend(dump_ast_lines(value, depth + 1))
     elif isinstance(node, MapInitNode):
-        emit(f"MapInit : {node.type_name}")
+        emit(f"MapInit : {node.type_name}{_type_suffix(node)}")
         for key, value in node.entries:
             out.append(_dump_line(depth + 1, "Key"))
             out.extend(dump_ast_lines(key, depth + 2))

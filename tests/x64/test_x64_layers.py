@@ -151,39 +151,39 @@ def test_target_mir_memory_ops_to_x64_golden():
 pair_field:
     push rbp
     mov rbp, rsp
-    sub rsp, 144
+    sub rsp, 112
 pair_field.entry:
     mov rax, 0
     mov rcx, 16
     add rax, rcx
     mov qword [rbp-8], rax
     mov rax, qword [rbp-8]
-    mov qword [rbp-16], rax
-    mov rcx, qword [rbp-16]
+    mov qword [rbp-8], rax
+    mov rcx, qword [rbp-8]
     sub rsp, 32
     call __epx_alloc
     add rsp, 32
-    mov qword [rbp-24], rax
-    mov rax, qword [rbp-24]
+    mov qword [rbp-8], rax
+    mov rax, qword [rbp-8]
     test rax, rax
     jz __epx_null_deref
     mov rcx, 8
     add rax, rcx
-    mov qword [rbp-32], rax
+    mov qword [rbp-8], rax
     mov rax, 42
-    mov rcx, qword [rbp-32]
+    mov rcx, qword [rbp-8]
     test rcx, rcx
     jz __epx_null_deref
     mov qword [rcx], rax
-    mov rax, qword [rbp-32]
+    mov rax, qword [rbp-8]
     test rax, rax
     jz __epx_null_deref
     mov rax, qword [rax]
-    mov qword [rbp-40], rax
-    mov rax, qword [rbp-40]
+    mov qword [rbp-8], rax
+    mov rax, qword [rbp-8]
     jmp pair_field.__return
 pair_field.__return:
-    add rsp, 144
+    add rsp, 112
     pop rbp
     ret
 """

@@ -1,0 +1,56 @@
+define void @__ep_debug_i64(i64 %value) {
+entry:
+  %buf: ptr = call ptr __epx_alloc(i64 19)
+  %written: ptr = alloca i64
+  %i: ptr = alloca i64
+  %ch_slot: ptr = alloca i64
+  %p0: ptr = gep i8, ptr %buf, i64 0
+  store i8 48, ptr %p0
+  %p1: ptr = gep i8, ptr %buf, i64 1
+  store i8 120, ptr %p1
+  %p18: ptr = gep i8, ptr %buf, i64 18
+  store i8 10, ptr %p18
+  store i64 0, ptr %i
+  br label %loop_check
+
+loop_check:
+  %idx0: i64 = load i64, ptr %i
+  %keep: bool = icmp.slt i64 %idx0, i64 16
+  condbr bool %keep, label %loop_body, label %write
+
+loop_body:
+  %idx1: i64 = load i64, ptr %i
+  %mul: i64 = mul i64 %idx1, i64 4
+  %shift: i64 = sub i64 60, i64 %mul
+  %shifted: i64 = shr i64 %value, i64 %shift
+  %nib: i64 = and i64 %shifted, i64 15
+  %is_digit: bool = icmp.slt i64 %nib, i64 10
+  condbr bool %is_digit, label %digit, label %letter
+
+digit:
+  %digit_ch: i64 = add i64 %nib, i64 48
+  store i64 %digit_ch, ptr %ch_slot
+  br label %store_char
+
+letter:
+  %letter_ch: i64 = add i64 %nib, i64 87
+  store i64 %letter_ch, ptr %ch_slot
+  br label %store_char
+
+store_char:
+  %idx2: i64 = load i64, ptr %i
+  %pos: i64 = add i64 %idx2, i64 2
+  %addr: ptr = gep i8, ptr %buf, i64 %pos
+  %ch8: i8 = load i8, ptr %ch_slot
+  store i8 %ch8, ptr %addr
+  %next: i64 = add i64 %idx2, i64 1
+  store i64 %next, ptr %i
+  br label %loop_check
+
+write:
+  %handle: i64 = call i64 GetStdHandle(i64 -11)
+  %buf_i64: i64 = ptrtoint ptr %buf to i64
+  %written_i64: i64 = ptrtoint ptr %written to i64
+  %ok: i64 = call i64 WriteFile(i64 %handle, i64 %buf_i64, i64 19, i64 %written_i64, i64 0)
+  ret void
+}

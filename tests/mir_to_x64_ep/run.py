@@ -48,7 +48,7 @@ section .text
 arith_mix:
     push rbp
     mov rbp, rsp
-    sub rsp, 128
+    sub rsp, 112
     mov qword [rbp-8], rcx
 arith_mix.entry:
     mov rax, qword [rbp-8]
@@ -58,15 +58,15 @@ arith_mix.entry:
     mov rax, qword [rbp-16]
     mov rcx, 3
     imul rax, rcx
-    mov qword [rbp-24], rax
-    mov rax, qword [rbp-24]
+    mov qword [rbp-16], rax
+    mov rax, qword [rbp-16]
     mov rcx, 7
     and rax, rcx
-    mov qword [rbp-32], rax
-    mov rax, qword [rbp-32]
+    mov qword [rbp-16], rax
+    mov rax, qword [rbp-16]
     jmp arith_mix.__return
 arith_mix.__return:
-    add rsp, 128
+    add rsp, 112
     pop rbp
     ret
 section .text

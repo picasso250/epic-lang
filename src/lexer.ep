@@ -695,6 +695,11 @@ fun lex(src: str): Token[] {
             pos += 1
             consumed = 1
         }
+        if consumed == 0 && ch == '?'  {
+            push_token(tokens, "QUESTION", "?", line)
+            pos += 1
+            consumed = 1
+        }
 
         # ── unknown ──
         if consumed == 0 {

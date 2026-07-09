@@ -1318,6 +1318,7 @@ _HELPER_ORDER = [
     "__ep_map_str_str_set",
     "__ep_map_str_str_has",
     "__ep_map_str_str_del",
+    "__ep_debug_i64",
 ]
 
 

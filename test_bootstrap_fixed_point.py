@@ -46,7 +46,7 @@ COMPILER_SOURCES = [
     os.path.join("src", "link.ep"),
     os.path.join("src", "epic.ep"),
 ]
-TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "240"))
+TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "30"))
 
 
 def format_size(num_bytes):
