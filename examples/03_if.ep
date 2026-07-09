@@ -1,0 +1,10 @@
+# EXIT: 0
+# STDOUT: big
+fun main(): void {
+    let x = 10
+    if x > 5 {
+        println("big")
+    } else {
+        println("small")
+    }
+}

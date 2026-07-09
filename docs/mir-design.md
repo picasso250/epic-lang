@@ -788,7 +788,7 @@ LowMIR / X64MIR backend 负责：
 2. text MIR pretty printer。
 3. validator。
 4. 手写 MIR smoke test。
-5. AST -> MIR for `m1_exit.ep`。
+5. AST -> MIR for `01_exit.ep`。
 6. MIR -> LowMIR pretty print。
 7. LowMIR -> machine emitter。
 

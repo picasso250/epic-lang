@@ -43,6 +43,7 @@ def parse_annotations(source):
     """Extract test annotations from # comments."""
     exit_code = None
     stdout_lines = []
+    stdout_contains = []
     argv = []
     clean_paths = []
     compile_fail = None
@@ -53,6 +54,8 @@ def parse_annotations(source):
             exit_code = int(m.group(1))
         elif m := re.match(r'#\s*STDOUT:\s*(.*)', line):
             stdout_lines.append(m.group(1))
+        elif m := re.match(r'#\s*STDOUT_CONTAINS:\s*(.*)', line):
+            stdout_contains.append(m.group(1))
         elif m := re.match(r'#\s*ARGV:\s*(.*)$', line):
             argv = shlex.split(m.group(1) or "")
         elif m := re.match(r'#\s*CLEAN:\s*(.+)$', line):
@@ -62,7 +65,7 @@ def parse_annotations(source):
         elif re.match(r'#\s*COMPILE_ONLY\b', line):
             compile_only = True
     stdout = "\n".join(stdout_lines) if stdout_lines else None
-    return exit_code, stdout, argv, clean_paths, compile_fail, compile_only
+    return exit_code, stdout, stdout_contains, argv, clean_paths, compile_fail, compile_only
 
 
 def clean_test_paths(paths):
@@ -118,9 +121,9 @@ def run_test_self_hosted(ep_file, compiler_exe):
     """Compile and run one .ep file using an already-built EP compiler."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
-    exit_expected, stdout_expected, argv, clean_paths, compile_fail, compile_only = parse_annotations(source)
+    exit_expected, stdout_expected, stdout_contains, argv, clean_paths, compile_fail, compile_only = parse_annotations(source)
 
-    if exit_expected is None and stdout_expected is None and compile_fail is None and not compile_only:
+    if exit_expected is None and stdout_expected is None and not stdout_contains and compile_fail is None and not compile_only:
         return True, "no annotations — skipped"
     if compile_fail is not None:
         return True, "compile-fail case skipped for self-hosted examples"
@@ -171,11 +174,15 @@ def run_test_self_hosted(ep_file, compiler_exe):
     failures = []
     if exit_expected is not None and proc.returncode != exit_expected:
         failures.append(f"EXIT: expected {exit_expected}, got {proc.returncode}")
+    raw = proc.stdout or b''
+    actual_stdout = raw.decode('ascii', errors='replace')
     if stdout_expected is not None:
-        raw = proc.stdout or b''
-        actual = raw.decode('ascii', errors='replace').strip()[:len(stdout_expected) + 100]
+        actual = actual_stdout.strip()[:len(stdout_expected) + 100]
         if actual != stdout_expected.strip():
             failures.append(f"STDOUT: expected {stdout_expected!r}, got {actual!r}")
+    for needle in stdout_contains:
+        if needle not in actual_stdout:
+            failures.append(f"STDOUT_CONTAINS: expected {needle!r} in {actual_stdout[:500]!r}")
     try:
         clean_test_paths(clean_paths)
     except RuntimeError as e:
@@ -189,9 +196,9 @@ def run_test(ep_file, linker="lld-link"):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
-    exit_expected, stdout_expected, argv, clean_paths, compile_fail, compile_only = parse_annotations(source)
+    exit_expected, stdout_expected, stdout_contains, argv, clean_paths, compile_fail, compile_only = parse_annotations(source)
     
-    if exit_expected is None and stdout_expected is None and compile_fail is None and not compile_only:
+    if exit_expected is None and stdout_expected is None and not stdout_contains and compile_fail is None and not compile_only:
         return True, "no annotations — skipped"
 
     try:
@@ -232,12 +239,16 @@ def run_test(ep_file, linker="lld-link"):
             failures.append(f"EXIT: expected {exit_expected}, got {proc.returncode}")
     
     # Check stdout
+    raw = proc.stdout or b''
+    actual_stdout = raw.decode('ascii', errors='replace')
     if stdout_expected is not None:
-        raw = proc.stdout or b''
         # Take only the first N bytes matching expected length
-        actual = raw.decode('ascii', errors='replace').strip()[:len(stdout_expected) + 100]
+        actual = actual_stdout.strip()[:len(stdout_expected) + 100]
         if actual != stdout_expected.strip():
             failures.append(f"STDOUT: expected {stdout_expected!r}, got {actual!r}")
+    for needle in stdout_contains:
+        if needle not in actual_stdout:
+            failures.append(f"STDOUT_CONTAINS: expected {needle!r} in {actual_stdout[:500]!r}")
     
     if failures:
         try:

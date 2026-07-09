@@ -7,7 +7,7 @@
 ```
 bootstrap/          Python reference compiler（Python 参考编译器）
 src/                Epic-written compiler modules and tools
-examples/           示例程序和回归测试
+examples/           正向学习示例程序
 tools/              本地工具二进制；LLD-Link 可选
 docs/               文档
 editors/            编辑器支持

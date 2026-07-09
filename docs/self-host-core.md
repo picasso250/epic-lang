@@ -249,7 +249,7 @@ after ADT removal and naming unification.
 - [x] 4. Document literal sharing / shared buffer semantics
 - [x] 5. Remove public str helper from sema
 - [x] 6. Remove `str + str` from sema
-- [x] 7. Add zero-copy behavior test (`examples/v5_zero_copy_str_bytes.ep`)
+- [x] 7. Add zero-copy behavior test (`tests/e2e/pass/v5_zero_copy_str_bytes.ep`)
 
 ### Phase 1: ADT Removal (completed)
 - [x] 1. Document decisions (this file)
@@ -284,7 +284,7 @@ Completed:
 - The byte-buffer-first text model is documented.
 - `read_file` / `write_file` use `u8[]` as the data carrier.
 - `str(u8[])` and `bytes(str)` are zero-copy identity casts. `str(struct)`, `str(map)`, and `str(T[])` for non-`u8` arrays are not supported; f-string interpolation uses the same convertibility rule as `str(expr)`.
-- The zero-copy shared-buffer behavior is covered by `examples/v5_zero_copy_str_bytes.ep`.
+- The zero-copy shared-buffer behavior is covered by `tests/e2e/pass/v5_zero_copy_str_bytes.ep`.
 - Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
   `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.
 - `dst.extend(src)` is byte-oriented and only supports `u8[]`. Function-style `push`, `extend`, `map_has`, and `map_del` are removed from the public source surface.

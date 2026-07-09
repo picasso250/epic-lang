@@ -1,0 +1,10 @@
+# EXIT: 0
+# STDOUT: 0
+# STDOUT: 1
+# STDOUT: 2
+# STDOUT: 3
+fun main(): void {
+    for i in 0:4 {
+        println(str(i))
+    }
+}

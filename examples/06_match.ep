@@ -1,0 +1,27 @@
+# EXIT: 0
+# STDOUT: one
+# STDOUT: yes
+fun main(): void {
+    let n = 1
+    match n {
+        0: {
+            println("zero")
+        }
+        1: {
+            println("one")
+        }
+        else: {
+            println("many")
+        }
+    }
+
+    let ok = true
+    match ok {
+        true: {
+            println("yes")
+        }
+        false: {
+            println("no")
+        }
+    }
+}
