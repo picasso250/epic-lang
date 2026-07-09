@@ -1529,42 +1529,60 @@ fun sema_block(st: SemaState, block: AstNode): void {
     }
 }
 
-fun sema_expr_is_exit(node: AstNode): bool {
-    if ast_kind(node) != "Call" {
-        ret false
-    }
-    if node.type_name == "" && node.name == "exit" {
-        ret true
-    }
-    ret node.type_name == "os" && node.dll == "kernel32" && node.name == "ExitProcess"
-}
 
-fun sema_stmt_returns(node: AstNode): bool {
-    if ast_kind(node) == "Return" || ast_kind(node) == "Panic" {
-        ret true
-    }
-    if ast_kind(node) == "ExprStmt" && sema_expr_is_exit(node.expr) {
-        ret true
-    }
-    if ast_kind(node) == "If" {
-        if ast_kind(node.else_block) == "" {
-            ret false
-        }
-        ret sema_block_returns(node.then_block) && sema_block_returns(node.else_block)
-    }
-    if ast_kind(node) == "Match" {
-        if ast_kind(node.else_block) == "" {
-            ret false
-        }
-        for i in 0:len(node.fields) {
-            if sema_block_returns(node.fields[i].body) == false {
-                ret false
+fun sema_expr_is_exit(node: AstNode): bool {
+    match node {
+        AstCall call: {
+            if call.type_name == "" && call.name == "exit" {
+                ret true
             }
+            ret call.type_name == "os" && call.dll == "kernel32" && call.name == "ExitProcess"
         }
-        ret sema_block_returns(node.else_block)
+        _: {}
     }
     ret false
 }
+
+
+
+fun sema_stmt_returns(node: AstNode): bool {
+    match node {
+        AstReturn ret_stmt: { ret true }
+        AstPanic panic_stmt: { ret true }
+        AstExprStmt stmt: {
+            ret sema_expr_is_exit(stmt.expr)
+        }
+        AstIf stmt: {
+            match stmt.else_block {
+                AstEmpty e: { ret false }
+                _: {}
+            }
+            ret sema_block_returns(stmt.then_block) && sema_block_returns(stmt.else_block)
+        }
+        AstMatch stmt: {
+            match stmt.else_block {
+                AstEmpty e: { ret false }
+                _: {}
+            }
+            for i in 0:len(stmt.fields) {
+                match stmt.fields[i] {
+                    AstMatchCase c: {
+                        if sema_block_returns(c.body) == false {
+                            ret false
+                        }
+                    }
+                    _: {
+                        sema_die("internal: expected match case")
+                    }
+                }
+            }
+            ret sema_block_returns(stmt.else_block)
+        }
+        _: {}
+    }
+    ret false
+}
+
 
 fun sema_block_returns(block: AstNode): bool {
     for i in 0:len(block.stmts) {
