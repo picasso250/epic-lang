@@ -585,58 +585,6 @@ fun ast_empty(): AstNode {
     ret ast_new_empty()
 }
 
-fun ast_node(kind: str): AstNode {
-    match kind {
-        "Program": { ret ast_new_program() }
-        "StructDef": { ret ast_new_struct_def() }
-        "UnionDef": { ret ast_new_union_def() }
-        "FunDef": { ret ast_new_fun_def() }
-        "Param": { ret ast_new_param() }
-        "StructField": { ret ast_new_struct_field() }
-        "Block": { ret ast_new_block() }
-        "Let": { ret ast_new_let() }
-        "Return": { ret ast_new_return() }
-        "Assign": { ret ast_new_assign() }
-        "AssignOp": { ret ast_new_assign_op() }
-        "FieldSet": { ret ast_new_field_set() }
-        "SubscriptAssign": { ret ast_new_subscript_assign() }
-        "If": { ret ast_new_if() }
-        "While": { ret ast_new_while() }
-        "ForRange": { ret ast_new_for_range() }
-        "ForIn": { ret ast_new_for_in() }
-        "Break": { ret ast_new_break() }
-        "Continue": { ret ast_new_continue() }
-        "Panic": { ret ast_new_panic() }
-        "Assert": { ret ast_new_assert() }
-        "Match": { ret ast_new_match() }
-        "MatchCase": { ret ast_new_match_case() }
-        "ExprStmt": { ret ast_new_expr_stmt() }
-        "Literal": { ret ast_new_literal() }
-        "Char": { ret ast_new_char() }
-        "Bool": { ret ast_new_bool() }
-        "String": { ret ast_new_string() }
-        "FString": { ret ast_new_f_string() }
-        "FStringText": { ret ast_new_f_string_text() }
-        "Var": { ret ast_new_var() }
-        "Binary": { ret ast_new_binary() }
-        "Unary": { ret ast_new_unary() }
-        "Call": { ret ast_new_call() }
-        "DotCall": { ret ast_new_dot_call() }
-        "FieldAccess": { ret ast_new_field_access() }
-        "NullCheck": { ret ast_new_null_check() }
-        "Subscript": { ret ast_new_subscript() }
-        "Slice": { ret ast_new_slice() }
-        "NewArray": { ret ast_new_new_array() }
-        "ArrayLiteral": { ret ast_new_array_literal() }
-        "StructInit": { ret ast_new_struct_init() }
-        "InitField": { ret ast_new_init_field() }
-        "UnionInit": { ret ast_new_union_init() }
-        "MapInit": { ret ast_new_map_init() }
-        else: {}
-    }
-    ret ast_empty()
-}
-
 fun ast_bad_field(field: str): void {
     panic str_cat2("invalid AST field ", field)
 }
@@ -1775,7 +1723,7 @@ fun (p: Parser) parse_params(): AstNode[] {
         let pname = p.expect("ID")
         p.expect("COLON")
         let ptype = p.parse_type()
-        let param = ast_node("Param")
+        let param = ast_new_param()
         ast_set_name(param, token_text(pname))
         ast_set_source_type(param, ptype)
         params.push(param)
@@ -1789,13 +1737,13 @@ fun (p: Parser) parse_params(): AstNode[] {
 fun (p: Parser) parse_struct_def(): AstNode {
     p.expect("STRUCT")
     let name = p.expect("ID")
-    let node = ast_node("StructDef")
+    let node = ast_new_struct_def()
     ast_set_name(node, token_text(name))
     p.expect("LBRACE")
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
         let fname = p.expect("ID")
-        let field = ast_node("StructField")
+        let field = ast_new_struct_field()
         ast_set_name(field, token_text(fname))
         ast_set_line(field, token_line(fname))
         if p.check("COLON") == 1 {
@@ -1831,7 +1779,7 @@ fun (p: Parser) parse_fn_def(): AstNode {
         method_name = token_text(name)
         symbol_name = str_cat2(str_cat2(receiver_type, "__"), method_name)
         line = token_line(name)
-        let receiver_param = ast_node("Param")
+        let receiver_param = ast_new_param()
         ast_set_name(receiver_param, receiver_name)
         ast_set_source_type(receiver_param, receiver_type_expr)
         params.push(receiver_param)
@@ -1849,7 +1797,7 @@ fun (p: Parser) parse_fn_def(): AstNode {
     p.expect("COLON")
     let ret_type = p.parse_type()
     let body = p.parse_block()
-    let node = ast_node("FunDef")
+    let node = ast_new_fun_def()
     ast_set_name(node, symbol_name)
     ast_set_params(node, params)
     ast_set_source_type(node, ret_type)
@@ -1865,7 +1813,7 @@ fun (p: Parser) parse_union_def(): AstNode {
     p.expect("TYPE")
     let name = p.expect("ID")
     p.expect("ASSIGN")
-    let node = ast_node("UnionDef")
+    let node = ast_new_union_def()
     ast_set_name(node, token_text(name))
     let done = 0
     for done == 0 {
@@ -1880,7 +1828,7 @@ fun (p: Parser) parse_union_def(): AstNode {
 }
 
 fun (p: Parser) parse_program(): AstNode {
-    let node = ast_node("Program")
+    let node = ast_new_program()
     p.skip_newlines()
     for p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("LET") == 1 || p.peek_kind("TYPE") == 1 {
         if p.peek_kind("FUN") == 1 {
@@ -1918,7 +1866,7 @@ fun (p: Parser) parse_program(): AstNode {
 }
 
 fun (p: Parser) parse_block(): AstNode {
-    let node = ast_node("Block")
+    let node = ast_new_block()
     p.expect("LBRACE")
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
@@ -1978,7 +1926,7 @@ fun (p: Parser) parse_return_stmt(): AstNode {
     let tok = p.peek()
     let line = token_line(tok)
     p.expect("RETURN")
-    let node = ast_node("Return")
+    let node = ast_new_return()
     if p.peek_kind("NEWLINE") == 0 {
         if p.peek_kind("RBRACE") == 0 {
             ast_set_expr(node, p.parse_expr())
@@ -1992,7 +1940,7 @@ fun (p: Parser) parse_return_stmt(): AstNode {
 fun (p: Parser) parse_let_stmt(): AstNode {
     p.expect("LET")
     let name = p.expect("ID")
-    let node = ast_node("Let")
+    let node = ast_new_let()
     ast_set_name(node, token_text(name))
     if p.check("COLON") == 1 {
         ast_set_source_type(node, p.parse_type())
@@ -2006,14 +1954,14 @@ fun (p: Parser) parse_let_stmt(): AstNode {
 
 fun (p: Parser) parse_assign_stmt(): AstNode {
     let name = p.expect("ID")
-    let lhs = ast_node("Var")
+    let lhs = ast_new_var()
     ast_set_name(lhs, token_text(name))
     ast_set_line(lhs, token_line(name))
     let done = 0
     for done == 0 {
         if p.check("DOT") == 1 {
             let field = p.expect("ID")
-            let n = ast_node("FieldAccess")
+            let n = ast_new_field_access()
             ast_set_object(n, lhs)
             ast_set_name(n, token_text(field))
             ast_set_line(n, token_line(field))
@@ -2034,7 +1982,7 @@ fun (p: Parser) parse_assign_stmt(): AstNode {
     let value = p.parse_expr()
     p.expect_stmt_end()
     if op != "=" {
-        let node = ast_node("AssignOp")
+        let node = ast_new_assign_op()
         ast_set_expr(node, lhs)
         ast_set_op(node, op)
         ast_set_value_expr(node, value)
@@ -2043,20 +1991,20 @@ fun (p: Parser) parse_assign_stmt(): AstNode {
     }
     match lhs {
         AstVar n: {
-            let node = ast_node("Assign")
+            let node = ast_new_assign()
             ast_set_name(node, n.name)
             ast_set_value_expr(node, value)
             ret node
         }
         AstFieldAccess n: {
-            let node = ast_node("FieldSet")
+            let node = ast_new_field_set()
             ast_set_object(node, n.object)
             ast_set_name(node, n.name)
             ast_set_value_expr(node, value)
             ret node
         }
         AstSubscript n: {
-            let node = ast_node("SubscriptAssign")
+            let node = ast_new_subscript_assign()
             ast_set_base(node, n.base)
             ast_set_index(node, n.index)
             ast_set_value_expr(node, value)
@@ -2080,7 +2028,7 @@ fun (p: Parser) parse_bracket_postfix(base: AstNode): AstNode {
             let t = p.peek()
             parse_error(token_line(t), "slice requires explicit start and end")
         }
-        n = ast_node("Slice")
+        n = ast_new_slice()
         ast_set_base(n, base)
         ast_set_start(n, first)
         ast_set_end(n, p.parse_expr())
@@ -2088,7 +2036,7 @@ fun (p: Parser) parse_bracket_postfix(base: AstNode): AstNode {
         p.expect("RBRACKET")
         ret n
     }
-    n = ast_node("Subscript")
+    n = ast_new_subscript()
     ast_set_base(n, base)
     ast_set_index(n, first)
     ast_set_line(n, ast_line(base))
@@ -2098,14 +2046,14 @@ fun (p: Parser) parse_bracket_postfix(base: AstNode): AstNode {
 
 fun (p: Parser) parse_if_stmt(): AstNode {
     p.expect("IF")
-    let node = ast_node("If")
+    let node = ast_new_if()
     ast_set_expr(node, p.parse_expr())
     ast_set_then_block(node, p.parse_block())
     p.skip_newlines()
     if p.check("ELSE") == 1 {
         p.skip_newlines()
         if p.peek_kind("IF") == 1 {
-            let b = ast_node("Block")
+            let b = ast_new_block()
             ast_stmts(b).push(p.parse_if_stmt())
             ast_set_else_block(node, b)
         } else {
@@ -2120,7 +2068,7 @@ fun (p: Parser) parse_break_stmt(): AstNode {
     if p.loop_depth == 0 {
         parse_error(token_line(t), "break outside loop")
     }
-    let node = ast_node("Break")
+    let node = ast_new_break()
     ast_set_line(node, token_line(t))
     p.expect_stmt_end()
     ret node
@@ -2131,7 +2079,7 @@ fun (p: Parser) parse_continue_stmt(): AstNode {
     if p.loop_depth == 0 {
         parse_error(token_line(t), "continue outside loop")
     }
-    let node = ast_node("Continue")
+    let node = ast_new_continue()
     ast_set_line(node, token_line(t))
     p.expect_stmt_end()
     ret node
@@ -2139,7 +2087,7 @@ fun (p: Parser) parse_continue_stmt(): AstNode {
 
 fun (p: Parser) parse_panic_stmt(): AstNode {
     let t = p.expect("PANIC")
-    let node = ast_node("Panic")
+    let node = ast_new_panic()
     ast_set_line(node, token_line(t))
     if p.peek_kind("NEWLINE") == 1 {
         parse_error(token_line(t), "panic expects message")
@@ -2151,7 +2099,7 @@ fun (p: Parser) parse_panic_stmt(): AstNode {
 
 fun (p: Parser) parse_assert_stmt(): AstNode {
     let t = p.expect("ASSERT")
-    let node = ast_node("Assert")
+    let node = ast_new_assert()
     ast_set_line(node, token_line(t))
     ast_set_expr(node, p.parse_expr())
     if p.check("COMMA") == 1 {
@@ -2164,7 +2112,7 @@ fun (p: Parser) parse_assert_stmt(): AstNode {
 fun (p: Parser) parse_match_literal(): AstNode {
     if p.peek_kind("NUMBER") == 1 {
         let t = p.advance()
-        let n = ast_node("Literal")
+        let n = ast_new_literal()
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
         ast_set_line(n, token_line(t))
@@ -2172,7 +2120,7 @@ fun (p: Parser) parse_match_literal(): AstNode {
     }
     if p.peek_kind("CHAR") == 1 {
         let t = p.advance()
-        let n = ast_node("Char")
+        let n = ast_new_char()
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
         ast_set_line(n, token_line(t))
@@ -2180,7 +2128,7 @@ fun (p: Parser) parse_match_literal(): AstNode {
     }
     if p.peek_kind("STRING") == 1 {
         let t = p.advance()
-        let n = ast_node("String")
+        let n = ast_new_string()
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
         ast_set_line(n, token_line(t))
@@ -2188,14 +2136,14 @@ fun (p: Parser) parse_match_literal(): AstNode {
     }
     if p.peek_kind("TRUE") == 1 {
         let t = p.advance()
-        let n = ast_node("Bool")
+        let n = ast_new_bool()
         ast_set_value(n, "1")
         ast_set_line(n, token_line(t))
         ret n
     }
     if p.peek_kind("FALSE") == 1 {
         let t = p.advance()
-        let n = ast_node("Bool")
+        let n = ast_new_bool()
         ast_set_value(n, "0")
         ast_set_line(n, token_line(t))
         ret n
@@ -2208,7 +2156,7 @@ fun (p: Parser) parse_match_literal(): AstNode {
 
 fun (p: Parser) parse_match_stmt(): AstNode {
     let t = p.expect("MATCH")
-    let node = ast_node("Match")
+    let node = ast_new_match()
     ast_set_line(node, token_line(t))
     ast_set_expr(node, p.parse_expr())
     p.expect("LBRACE")
@@ -2229,7 +2177,7 @@ fun (p: Parser) parse_match_stmt(): AstNode {
             ast_set_else_block(node, p.parse_block())
             saw_else = 1
         } else if p.peek_kind("ID") == 1 && p.pos + 2 < len(p.tokens) && token_kind(p.tokens[p.pos + 1]) == "ID" && token_kind(p.tokens[p.pos + 2]) == "COLON" {
-            let c = ast_node("MatchCase")
+            let c = ast_new_match_case()
             let variant = p.expect("ID")
             let binding = p.expect("ID")
             ast_set_line(c, token_line(variant))
@@ -2239,7 +2187,7 @@ fun (p: Parser) parse_match_stmt(): AstNode {
             ast_set_body(c, p.parse_block())
             ast_fields(node).push(c)
         } else {
-            let c = ast_node("MatchCase")
+            let c = ast_new_match_case()
             let first = p.peek()
             ast_set_line(c, token_line(first))
             ast_set_expr(c, p.parse_match_literal())
@@ -2254,26 +2202,26 @@ fun (p: Parser) parse_match_stmt(): AstNode {
 }
 
 fun var_node(name: str): AstNode {
-    let n = ast_node("Var")
+    let n = ast_new_var()
     ast_set_name(n, name)
     ret n
 }
 
 fun lit_node(value: str): AstNode {
-    let n = ast_node("Literal")
+    let n = ast_new_literal()
     ast_set_value(n, value)
     ret n
 }
 
 fun let_node(name: str, value: AstNode): AstNode {
-    let n = ast_node("Let")
+    let n = ast_new_let()
     ast_set_name(n, name)
     ast_set_value_expr(n, value)
     ret n
 }
 
 fun assign_node(name: str, value: AstNode): AstNode {
-    let n = ast_node("Assign")
+    let n = ast_new_assign()
     ast_set_name(n, name)
     ast_set_value_expr(n, value)
     ret n
@@ -2291,7 +2239,7 @@ fun (p: Parser) parse_for_stmt(): AstNode {
             let body = p.parse_block()
             p.loop_depth -= 1
 
-            let out = ast_node("ForRange")
+            let out = ast_new_for_range()
             ast_set_name(out, token_text(name))
             ast_set_start(out, source)
             ast_set_end(out, end)
@@ -2302,13 +2250,13 @@ fun (p: Parser) parse_for_stmt(): AstNode {
         let body = p.parse_block()
         p.loop_depth -= 1
 
-        let out = ast_node("ForIn")
+        let out = ast_new_for_in()
         ast_set_name(out, token_text(name))
         ast_set_source(out, source)
         ast_set_body(out, body)
         ret out
     }
-    let node = ast_node("While")
+    let node = ast_new_while()
     ast_set_expr(node, p.parse_expr())
     p.loop_depth += 1
     ast_set_body(node, p.parse_block())
@@ -2317,7 +2265,7 @@ fun (p: Parser) parse_for_stmt(): AstNode {
 }
 
 fun (p: Parser) parse_expr_stmt(): AstNode {
-    let node = ast_node("ExprStmt")
+    let node = ast_new_expr_stmt()
     ast_set_expr(node, p.parse_expr())
     p.expect_stmt_end()
     ret node
@@ -2579,7 +2527,7 @@ fun (p: Parser) parse_args(): AstNode[] {
 }
 
 fun (p: Parser) parse_struct_init(name: Token): AstNode {
-    let node = ast_node("StructInit")
+    let node = ast_new_struct_init()
     ast_set_name(node, token_text(name))
     ast_set_line(node, token_line(name))
     p.expect("LBRACE")
@@ -2587,7 +2535,7 @@ fun (p: Parser) parse_struct_init(name: Token): AstNode {
     for p.peek_kind("RBRACE") == 0 {
         let field_name = p.expect("ID")
         p.expect("COLON")
-        let field = ast_node("InitField")
+        let field = ast_new_init_field()
         ast_set_name(field, token_text(field_name))
         ast_set_line(field, token_line(field_name))
         ast_set_value_expr(field, p.parse_expr())
@@ -2615,7 +2563,7 @@ fun (p: Parser) parse_named_init_fields(node: AstNode): AstNode {
     for p.peek_kind("RBRACE") == 0 {
         let field_name = p.expect("ID")
         p.expect("COLON")
-        let field = ast_node("InitField")
+        let field = ast_new_init_field()
         ast_set_name(field, token_text(field_name))
         ast_set_line(field, token_line(field_name))
         ast_set_value_expr(field, p.parse_expr())
@@ -2638,7 +2586,7 @@ fun (p: Parser) parse_named_init_fields(node: AstNode): AstNode {
 }
 
 fun (p: Parser) parse_array_literal(name: Token): AstNode {
-    let node = ast_node("ArrayLiteral")
+    let node = ast_new_array_literal()
     ast_set_source_type(node, type_name_expr(token_text(name)))
     ast_set_line(node, token_line(name))
     p.expect("LBRACE")
@@ -2692,7 +2640,7 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
         match parts[i] {
             FStringTextPart part: {
                 if len(part.text) > 0 {
-                    let n = ast_node("FStringText")
+                    let n = ast_new_f_string_text()
                     ast_set_value(n, part.text)
                     out.push(n)
                 }
@@ -2719,7 +2667,7 @@ fun (p: Parser) parse_postfix(node: AstNode): AstNode {
         if p.check("DOT") == 1 {
             let field = p.expect("ID")
             if p.check("LPAREN") == 1 {
-                let n = ast_node("DotCall")
+                let n = ast_new_dot_call()
                 ast_set_object(n, current)
                 ast_set_name(n, token_text(field))
                 ast_set_line(n, token_line(field))
@@ -2727,7 +2675,7 @@ fun (p: Parser) parse_postfix(node: AstNode): AstNode {
                 p.expect("RPAREN")
                 current = n
             } else {
-                let n = ast_node("FieldAccess")
+                let n = ast_new_field_access()
                 ast_set_object(n, current)
                 ast_set_name(n, token_text(field))
                 ast_set_line(n, token_line(field))
@@ -2738,7 +2686,7 @@ fun (p: Parser) parse_postfix(node: AstNode): AstNode {
                 current = p.parse_bracket_postfix(current)
             } else {
                 if p.check("QUESTION") == 1 {
-                    let n = ast_node("NullCheck")
+                    let n = ast_new_null_check()
                     ast_set_expr(n, current)
                     ast_set_line(n, ast_line(current))
                     current = n
@@ -2762,7 +2710,7 @@ fun (p: Parser) parse_primary(): AstNode {
                 parse_error(token_line(key), "map key type must be str")
             }
             p.expect("RBRACKET")
-            let n = ast_node("MapInit")
+            let n = ast_new_map_init()
             ast_set_source_type(n, type_map_of(p.parse_type()))
             ast_set_line(n, token_line(t))
             if p.peek_kind("LBRACE") == 1 {
@@ -2784,14 +2732,14 @@ fun (p: Parser) parse_primary(): AstNode {
                 }
                 else: {}
             }
-            let n = ast_node("NewArray")
+            let n = ast_new_new_array()
             ast_set_source_type(n, type_name_expr(token_text(t)))
             ast_set_count(n, count)
             ast_set_line(n, token_line(t))
             ret p.parse_postfix(n)
         }
         if p.check("LPAREN") == 1 {
-            let n = ast_node("UnionInit")
+            let n = ast_new_union_init()
             ast_set_type_name(n, token_text(t))
             ast_set_line(n, token_line(t))
             ast_set_expr(n, p.parse_expr())
@@ -2801,35 +2749,35 @@ fun (p: Parser) parse_primary(): AstNode {
         if p.peek_kind("LBRACE") == 1 {
             ret p.parse_postfix(p.parse_struct_init(t))
         }
-        let n = ast_node("StructInit")
+        let n = ast_new_struct_init()
         ast_set_name(n, token_text(t))
         ast_set_line(n, token_line(t))
         ret p.parse_postfix(n)
     }
     if p.peek_kind("NUMBER") == 1 {
         let t = p.advance()
-        let n = ast_node("Literal")
+        let n = ast_new_literal()
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
         ret p.parse_postfix(n)
     }
     if p.peek_kind("CHAR") == 1 {
         let t = p.advance()
-        let n = ast_node("Char")
+        let n = ast_new_char()
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
         ret p.parse_postfix(n)
     }
     if p.peek_kind("STRING") == 1 {
         let t = p.advance()
-        let n = ast_node("String")
+        let n = ast_new_string()
         ast_set_value(n, token_text(t))
         ast_set_line(n, token_line(t))
         ret p.parse_postfix(n)
     }
     if p.peek_kind("FSTRING") == 1 {
         let t = p.advance()
-        let n = ast_node("FString")
+        let n = ast_new_f_string()
         match t {
             FStringToken ft: {
                 ast_set_line(n, ft.line)
@@ -2844,14 +2792,14 @@ fun (p: Parser) parse_primary(): AstNode {
     }
     if p.peek_kind("TRUE") == 1 {
         let t = p.advance()
-        let n = ast_node("Bool")
+        let n = ast_new_bool()
         ast_set_value(n, "1")
         ast_set_line(n, token_line(t))
         ret p.parse_postfix(n)
     }
     if p.peek_kind("FALSE") == 1 {
         let t = p.advance()
-        let n = ast_node("Bool")
+        let n = ast_new_bool()
         ast_set_value(n, "0")
         ast_set_line(n, token_line(t))
         ret p.parse_postfix(n)
@@ -2859,14 +2807,14 @@ fun (p: Parser) parse_primary(): AstNode {
     if p.peek_kind("ID") == 1 {
         let t = p.advance()
         if p.check("LPAREN") == 1 {
-            let call = ast_node("Call")
+            let call = ast_new_call()
             ast_set_name(call, token_text(t))
             ast_set_args(call, p.parse_args())
             ast_set_line(call, token_line(t))
             p.expect("RPAREN")
             ret p.parse_postfix(call)
         }
-        let node = ast_node("Var")
+        let node = ast_new_var()
         ast_set_name(node, token_text(t))
         ast_set_line(node, token_line(t))
         ret p.parse_postfix(node)
@@ -2882,7 +2830,7 @@ fun (p: Parser) parse_primary(): AstNode {
 }
 
 fun bin_node(op: str, left: AstNode, right: AstNode, line: i64): AstNode {
-    let n = ast_node("Binary")
+    let n = ast_new_binary()
     ast_set_op(n, op)
     ast_set_left(n, left)
     ast_set_right(n, right)
@@ -2893,7 +2841,7 @@ fun bin_node(op: str, left: AstNode, right: AstNode, line: i64): AstNode {
 fun (p: Parser) parse_unary(): AstNode {
     if p.peek_kind("BANG") == 1 || p.peek_kind("MINUS") == 1 || p.peek_kind("TILDE") == 1 {
         let op = p.advance()
-        let n = ast_node("Unary")
+        let n = ast_new_unary()
         ast_set_op(n, op_text(token_kind(op)))
         ast_set_expr(n, p.parse_unary())
         ast_set_line(n, token_line(op))
