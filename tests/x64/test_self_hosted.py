@@ -10,9 +10,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EPICC = ROOT / "bootstrap" / "epic.py"
-BUILD_DIR = ROOT / "build" / "x64-ep"
-FIXTURE = ROOT / "tests" / "x64_ep" / "fixture.ep"
-FIXTURE_EXE = BUILD_DIR / "tests" / "x64_ep" / "fixture.exe"
+BUILD_DIR = ROOT / "build" / "x64"
+FIXTURE = ROOT / "tests" / "x64" / "fixture.ep"
+FIXTURE_EXE = BUILD_DIR / "tests" / "x64" / "fixture.exe"
 
 EXPECTED = """global _start
 extern ExitProcess
@@ -71,17 +71,17 @@ def main() -> int:
             "--out-dir",
             str(BUILD_DIR),
         ],
-        "compile tests/x64_ep/fixture.ep",
+        "compile tests/x64/fixture.ep",
     )
     if not FIXTURE_EXE.exists():
         raise RuntimeError(f"expected fixture exe at {FIXTURE_EXE}")
 
-    result = run_checked([str(FIXTURE_EXE)], "run tests/x64_ep/fixture.exe")
+    result = run_checked([str(FIXTURE_EXE)], "run tests/x64/fixture.exe")
     if result.stdout != EXPECTED:
-        print("  FAIL  x64_ep pretty print")
+        print("  FAIL  x64 self-hosted pretty print")
         print_diff(EXPECTED, result.stdout)
         return 1
-    print("  PASS  x64_ep pretty print")
+    print("  PASS  x64 self-hosted pretty print")
     return 0
 
 

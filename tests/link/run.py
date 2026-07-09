@@ -18,7 +18,7 @@ from epic import compile_files  # noqa: E402
 EPICC = ROOT / "bootstrap" / "epic.py"
 LINK_SRC = ROOT / "src" / "link.ep"
 LINK_EXE = ROOT / "build" / "src" / "link.exe"
-OUT_DIR = ROOT / "build" / "link_ep"
+OUT_DIR = ROOT / "build" / "link"
 PY_OUT_DIR = OUT_DIR / "py"
 EP_OUT_DIR = OUT_DIR / "ep"
 EXAMPLES_DIR = ROOT / "examples"
@@ -127,7 +127,7 @@ def main() -> None:
         elif should_pass:
             failed += 1
     total = len(USER_CASES)
-    print(f"\nlink_ep examples: {passed}/{total} expected-pass, {failed} failed")
+    print(f"\nlink examples: {passed}/{total} expected-pass, {failed} failed")
     if failed:
         sys.exit(1)
 

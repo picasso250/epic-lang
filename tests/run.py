@@ -20,12 +20,10 @@ MODULES = [
     "mir",
     "ast_to_mir",
     "mir_to_x64",
-    "mir_to_x64_ep",
     "x64",
-    "x64_ep",
     "machine",
     "coff",
-    "link_ep",
+    "link",
     "e2e",
 ]
 
