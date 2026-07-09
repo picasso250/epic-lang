@@ -1877,7 +1877,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
     for i in stmt.fields {
         case_blocks.push(mir_new_block(st, "match.case"))
     }
-    let has_else = ast_kind(stmt.else_block) != ""
+    let has_else = stmt.has_else
     let else_block = end_block
     if has_else {
         else_block = mir_new_block(st, "match.else")
@@ -1957,7 +1957,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
         case_blocks.push(mir_new_block(st, "match.case"))
         i = i + 1
     }
-    let has_else = ast_kind(stmt.else_block) != ""
+    let has_else = stmt.has_else
     let else_block = end_block
     if has_else {
         else_block = mir_new_block(st, "match.else")
@@ -2023,7 +2023,7 @@ fun mir_emit_if(st: MirCodegenState, block: MirBlock, stmt: AstIf): MirBlockFlow
     let cond_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = cond_flow.block
     let then_block = mir_new_block(st, "if.then")
-    let has_else = ast_kind(stmt.else_block) != ""
+    let has_else = stmt.has_else
     let else_block = mir_block_empty("")
     if has_else {
         else_block = mir_new_block(st, "if.else")
@@ -2551,7 +2551,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
 }
 
 
-fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstNode): MirBlockFlow {
+fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
     let current = block
     let i = 0
     for i < len(ast_block.stmts) {

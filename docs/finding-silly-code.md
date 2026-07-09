@@ -192,8 +192,10 @@ The core AST buckets and homogeneous child lists are narrow:
 - `fun.params` is `AstParam[]`.
 - `match.fields` is `AstMatchCase[]`.
 - `struct_init.fields` is `AstInitField[]`.
+- function, loop, and match-case bodies are `AstBlock`.
+- `if.then_block` is `AstBlock`.
 
-Keep `AstNode[]` for truly heterogeneous lists, such as block statements, call arguments, array literal expressions, f-string parts, and map keys/values.
+Keep `AstNode[]` for truly heterogeneous lists, such as block statements, call arguments, array literal expressions, f-string parts, and map keys/values. Keep `AstNode` for optional block slots such as `else_block` until there is a dedicated optional-block representation.
 
 Bad shape:
 

@@ -1345,9 +1345,8 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
         AstIf n: {
             sema_expect_bool(st, n.expr, "if condition")
             sema_block(st, n.then_block)
-            match n.else_block {
-                AstEmpty e: {}
-                _: { sema_block(st, n.else_block) }
+            if n.has_else {
+                sema_block(st, n.else_block)
             }
             ret
         }
@@ -1443,14 +1442,13 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                         st.locals.del(c.binding_name)
                     }
                 }
-                match n.else_block {
-                    AstEmpty e: {
-                        let missing = sema_union_missing_text(st, scrutinee, seen)
-                        if missing != "" {
-                            sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
-                        }
+                if n.has_else {
+                    sema_block(st, n.else_block)
+                } else {
+                    let missing = sema_union_missing_text(st, scrutinee, seen)
+                    if missing != "" {
+                        sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
                     }
-                    _: { sema_block(st, n.else_block) }
                 }
                 ret
             }
@@ -1462,9 +1460,8 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 sema_check_assign(st, scrutinee, c.expr, "match pattern")
                 sema_block(st, c.body)
             }
-            match n.else_block {
-                AstEmpty e: {}
-                _: { sema_block(st, n.else_block) }
+            if n.has_else {
+                sema_block(st, n.else_block)
             }
             ret
         }
@@ -1475,7 +1472,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
 }
 
 
-fun sema_block(st: SemaState, block: AstNode): void {
+fun sema_block(st: SemaState, block: AstBlock): void {
     for i in block.stmts {
         sema_stmt(st, block.stmts[i])
     }
@@ -1505,16 +1502,14 @@ fun sema_stmt_returns(node: AstNode): bool {
             ret sema_expr_is_exit(stmt.expr)
         }
         AstIf stmt: {
-            match stmt.else_block {
-                AstEmpty e: { ret false }
-                _: {}
+            if stmt.has_else == false {
+                ret false
             }
             ret sema_block_returns(stmt.then_block) && sema_block_returns(stmt.else_block)
         }
         AstMatch stmt: {
-            match stmt.else_block {
-                AstEmpty e: { ret false }
-                _: {}
+            if stmt.has_else == false {
+                ret false
             }
             for i in stmt.fields {
                 let c = stmt.fields[i]
@@ -1530,7 +1525,7 @@ fun sema_stmt_returns(node: AstNode): bool {
 }
 
 
-fun sema_block_returns(block: AstNode): bool {
+fun sema_block_returns(block: AstBlock): bool {
     for i in block.stmts {
         if sema_stmt_returns(block.stmts[i]) {
             ret true
