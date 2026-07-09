@@ -47,8 +47,8 @@ Epic currently supports:
   and `continue`
 - integer and boolean operations, including signed / unsigned arithmetic cases
 - strings as byte-slice-backed text views during the current migration stage
-- byte arrays, checked indexing, slicing, `len`, and `cap`
-- dynamic arrays / slice headers with `push` and `extend`
+- dynamic arrays (`T[]`) backed by slice headers, with `len`, `cap`, checked indexing, and `push`
+- byte-oriented `u8[]` helpers such as slicing and `extend`
 - `map[str]T` with lookup, assignment, `has`, `del`, literals, and growth
 - heap-backed structs with field access, initialization, embedded fields, and
   user-defined methods on struct receivers

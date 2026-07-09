@@ -1,0 +1,32 @@
+# EXIT: 0
+# STDOUT: if
+# STDOUT: range 0
+# STDOUT: range 1
+# STDOUT: cond
+# STDOUT: slice 65
+# STDOUT: slice 66
+fun main(): void {
+    let n = 2
+    if n > 1 {
+        println("if")
+    } else {
+        println("else")
+    }
+
+    for i in 0:2 {
+        print("range ")
+        println(str(i))
+    }
+
+    let once = true
+    for once == true {
+        println("cond")
+        once = false
+    }
+
+    let xs = new u8[] { u8(65), u8(66) }
+    for i in 0:len(xs) {
+        print("slice ")
+        println(str(xs[i]))
+    }
+}

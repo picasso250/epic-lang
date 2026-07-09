@@ -1,4 +1,0 @@
-# EXIT: 42
-fun main(): void {
-    exit(42)
-}

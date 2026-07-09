@@ -1,27 +1,28 @@
 # EXIT: 0
-# STDOUT: one
-# STDOUT: yes
-fun main(): void {
+# STDOUT: int
+# STDOUT: str
+fun main(): i64 {
     let n = 1
     match n {
         0: {
             println("zero")
         }
         1: {
-            println("one")
+            println("int")
         }
         else: {
             println("many")
         }
     }
 
-    let ok = true
-    match ok {
-        true: {
-            println("yes")
+    let name = "epic"
+    match name {
+        "epic": {
+            println("str")
         }
-        false: {
-            println("no")
+        else: {
+            println("other")
         }
     }
+    ret 0
 }

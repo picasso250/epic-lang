@@ -1,0 +1,19 @@
+# EXIT: 0
+# STDOUT: 4
+# STDOUT: 6
+# STDOUT: 1
+# STDOUT: 10
+fun main(): void {
+    let xs = new i64[] { 1, 2, 3 }
+    xs.push(4)
+
+    println(str(len(xs)))
+    println(str(cap(xs)))
+    println(str(xs[0]))
+
+    let total = 0
+    for i in 0:len(xs) {
+        total = total + xs[i]
+    }
+    println(str(total))
+}

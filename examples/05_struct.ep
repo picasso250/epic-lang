@@ -1,0 +1,16 @@
+# EXIT: 0
+# STDOUT: 42
+struct Point {
+    x: i64
+    y: i64
+}
+
+fun (p: Point) sum(): i64 {
+    ret p.x + p.y
+}
+
+fun main(): i64 {
+    let p = new Point { x: 40, y: 2 }
+    println(str(p.sum()))
+    ret 0
+}

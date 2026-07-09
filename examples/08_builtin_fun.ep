@@ -1,0 +1,8 @@
+# EXIT: 7
+# STDOUT: 3
+# STDOUT: true
+fun main(): void {
+    println(str(len("abc")))
+    println(str(true))
+    exit(7)
+}

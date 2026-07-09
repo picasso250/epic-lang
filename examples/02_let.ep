@@ -1,9 +1,0 @@
-# EXIT: 0
-# STDOUT: 42
-# STDOUT: 43
-fun main(): void {
-    let x = 42
-    println(str(x))
-    x = x + 1
-    println(str(x))
-}

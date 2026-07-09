@@ -129,7 +129,9 @@ _slice_u8 = {
 > `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节），
 > 所以 `str(bytes)` 和 `bytes(str)` 都是 identity cast。
 
-### 动态数组 (Dynamic Array)
+### 动态数组 / Slice Header (Dynamic Array)
+
+Epic 用户层的 dynamic array（`T[]`）和实现层的 slice header（`_slice_T`）是同一个容器概念：header 持有 `data`、`len`、`cap`，并拥有可增长的 backing storage。这里的 “slice header” 是运行时布局命名，不表示只有 view 语义。
 
 ```
 _slice_T = {
@@ -139,7 +141,7 @@ _slice_T = {
 }
 ```
 
-基本类型数组存储基本类型的值。结构体和 `str` 数组存储引用。
+基本类型 dynamic array 存储基本类型的值。结构体和 `str` dynamic array 存储引用。
 
 `str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误。slice/map header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` / `entries` 可在首次写入时再分配。
 

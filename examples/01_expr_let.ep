@@ -1,0 +1,14 @@
+# EXIT: 0
+# STDOUT: 42
+# STDOUT: 47
+# STDOUT: 4
+fun main(): void {
+    let x = 40 + 2
+    println(str(x))
+
+    x = x + 5
+    println(str(x))
+
+    let y = (10 / 3) + (10 % 3)
+    println(str(y))
+}
