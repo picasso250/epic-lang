@@ -200,7 +200,7 @@ class MirLower:
         return -self.next_slot
 
     def _aligned_frame(self):
-        return ((self.next_slot + 32 + 15) // 16) * 16
+        return ((self.next_slot + 15) // 16) * 16
 
     def _block_label(self, fn, block_name):
         return f"{fn.name}.{block_name}"

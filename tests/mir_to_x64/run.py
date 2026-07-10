@@ -31,7 +31,7 @@ EXPECTED = """section .text
 add1:
     push rbp
     mov rbp, rsp
-    sub rsp, 112
+    sub rsp, 80
     mov qword [rbp-8], rcx
 add1.entry:
     mov rax, qword [rbp-8]
@@ -41,14 +41,14 @@ add1.entry:
     mov rax, qword [rbp-16]
     jmp add1.__return
 add1.__return:
-    add rsp, 112
+    add rsp, 80
     pop rbp
     ret
 section .text
 arith_mix:
     push rbp
     mov rbp, rsp
-    sub rsp, 112
+    sub rsp, 80
     mov qword [rbp-8], rcx
 arith_mix.entry:
     mov rax, qword [rbp-8]
@@ -66,14 +66,14 @@ arith_mix.entry:
     mov rax, qword [rbp-16]
     jmp arith_mix.__return
 arith_mix.__return:
-    add rsp, 112
+    add rsp, 80
     pop rbp
     ret
 section .text
 max2:
     push rbp
     mov rbp, rsp
-    sub rsp, 128
+    sub rsp, 96
     mov qword [rbp-8], rcx
     mov qword [rbp-16], rdx
 max2.entry:
@@ -94,7 +94,7 @@ max2.else:
     mov rax, qword [rbp-16]
     jmp max2.__return
 max2.__return:
-    add rsp, 128
+    add rsp, 96
     pop rbp
     ret
 """

@@ -123,7 +123,7 @@ ret
 
 - 每个 MIR 参数、临时 value、`alloca` address 都占 8 字节栈槽。
 - lowering 额外保留 8 个 scratch slots。
-- frame 大小按 `((next_slot + 32 + 15) // 16) * 16` 对齐。
+- frame 大小按 `((next_slot + 15) // 16) * 16` 对齐。
 - 第一版不做寄存器分配。
 
 ## 4. 当前 MIR lowering 覆盖

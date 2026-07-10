@@ -97,7 +97,7 @@ def test_mir_function_to_x64_golden():
 add1:
     push rbp
     mov rbp, rsp
-    sub rsp, 112
+    sub rsp, 80
     mov qword [rbp-8], rcx
 add1.entry:
     mov rax, qword [rbp-8]
@@ -107,7 +107,7 @@ add1.entry:
     mov rax, qword [rbp-16]
     jmp add1.__return
 add1.__return:
-    add rsp, 112
+    add rsp, 80
     pop rbp
     ret
 """
@@ -151,7 +151,7 @@ def test_target_mir_memory_ops_to_x64_golden():
 pair_field:
     push rbp
     mov rbp, rsp
-    sub rsp, 112
+    sub rsp, 80
 pair_field.entry:
     mov rax, 0
     mov rcx, 16
@@ -183,7 +183,7 @@ pair_field.entry:
     mov rax, qword [rbp-8]
     jmp pair_field.__return
 pair_field.__return:
-    add rsp, 112
+    add rsp, 80
     pop rbp
     ret
 """

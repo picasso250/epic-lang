@@ -103,12 +103,10 @@ slot 是负值：-8, -16, -24, ...
 ### 3.2 Frame alignment
 
 ```
-aligned_frame = ((next_slot + 32 + 15) // 16) * 16
+aligned_frame = ((next_slot + 15) // 16) * 16
 ```
 
-**当前实现超额保留了 32 字节**。`_lower_call()` 已为每次 call 独立分配 shadow space（`sub rsp, 32 + extra`），函数 frame 里的 `+32` 不是 ABI shadow space 的等价物。
-
-> ⚠️ 这是一个 design debt。`+32` 的来源和历史作用尚不明确；不要将其解释为 Windows x64 ABI 的 shadow space 机制，也不要依赖它在函数 frame 中预留 caller shadow space 的行为。
+`_lower_call()` 为每次 call 独立分配 shadow space（`sub rsp, 32 + extra`）。函数 frame 只覆盖本函数 slots，不额外预留 caller shadow space。
 
 ### 3.3 Value slot vs address slot
 

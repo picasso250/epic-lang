@@ -183,7 +183,7 @@ fun mir_to_x64_addr_slot(lower: MirToX64Lower, name: str): i64 {
     ret 0
 }
 fun mir_to_x64_aligned_frame(lower: MirToX64Lower): i64 {
-    ret ((lower.next_slot + 32 + 15) / 16) * 16
+    ret ((lower.next_slot + 15) / 16) * 16
 }
 
 fun mir_to_x64_emit_stack_alloc(lower: MirToX64Lower, size: i64): void {
