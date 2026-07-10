@@ -8,7 +8,6 @@ struct MirStructFieldLayout {
     field_name: str
     field_type: str
     field_index: i64
-    embedded: bool
 }
 
 struct MirUnionMemberLayout {
@@ -145,7 +144,7 @@ fun mir_add_global_lets(st: MirCodegenState, ast: AstProgram): void {
     let i = 0
     for i < len(ast.globals) {
         let g = ast.globals[i]
-        let typ = mir_epic_type(g.AstMeta.resolved_type)
+        let typ = mir_epic_type(g.meta.resolved_type)
         let label = mir_global_label(g.name)
         st.global_names.push(g.name)
         st.global_types.push(typ)
@@ -184,24 +183,24 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
     st.program.functions.push(st.current_fn)
 }
 
-fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, field_index: i64, embedded: bool): MirStructFieldLayout {
-    ret new MirStructFieldLayout { struct_name: struct_name, field_name: field_name, field_type: field_type, field_index: field_index, embedded: embedded }
+fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, field_index: i64): MirStructFieldLayout {
+    ret new MirStructFieldLayout { struct_name: struct_name, field_name: field_name, field_type: field_type, field_index: field_index }
 }
 
 fun mir_union_member_layout(union_name: str, member_name: str, tag: i64): MirUnionMemberLayout {
     ret new MirUnionMemberLayout { union_name: union_name, member_name: member_name, tag: tag }
 }
 
-fun mir_register_struct_field(st: MirCodegenState, struct_name: str, field_name: str, field_type: str, field_index: i64, embedded: bool): void {
-    st.struct_fields.push(mir_struct_field_layout(struct_name, field_name, field_type, field_index, embedded))
+fun mir_register_struct_field(st: MirCodegenState, struct_name: str, field_name: str, field_type: str, field_index: i64): void {
+    st.struct_fields.push(mir_struct_field_layout(struct_name, field_name, field_type, field_index))
     mir_program_add_struct_field(st.program, struct_name, field_type, field_index)
 }
 
 fun mir_register_runtime_struct3(st: MirCodegenState, struct_name: str, first_field: str): void {
     st.struct_names.push(struct_name)
-    mir_register_struct_field(st, struct_name, first_field, "ptr", 0, false)
-    mir_register_struct_field(st, struct_name, "len", "i64", 1, false)
-    mir_register_struct_field(st, struct_name, "cap", "i64", 2, false)
+    mir_register_struct_field(st, struct_name, first_field, "ptr", 0)
+    mir_register_struct_field(st, struct_name, "len", "i64", 1)
+    mir_register_struct_field(st, struct_name, "cap", "i64", 2)
 }
 
 fun mir_is_union_name(st: MirCodegenState, name: str): bool {
@@ -279,52 +278,6 @@ fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str 
     }
     ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
     ret "i64"
-}
-
-fun mir_is_embedded_field(st: MirCodegenState, struct_name: str, field_name: str): bool {
-    for i in st.struct_fields {
-        let field = st.struct_fields[i]
-        if field.struct_name == struct_name && field.field_name == field_name {
-            ret field.embedded
-        }
-    }
-    ret false
-}
-
-fun mir_promoted_field_type_inner(st: MirCodegenState, struct_name: str, field_name: str, depth: i64): str {
-    if depth <= 0 {
-        ast_to_mir_die(f"embedded field cycle while resolving {struct_name}.{field_name}")
-    }
-    let direct = mir_direct_field_type(st, struct_name, field_name)
-    if direct != "" {
-        ret direct
-    }
-    let found = ""
-    for i in st.struct_fields {
-        let field = st.struct_fields[i]
-        if field.struct_name == struct_name && field.embedded {
-            let embedded_type = field.field_type
-            if embedded_type == "ptr" {
-                embedded_type = field.field_name
-            }
-            let candidate = mir_promoted_field_type_inner(st, embedded_type, field_name, depth - 1)
-            if candidate != "" {
-                if found != "" {
-                    ast_to_mir_die(f"ambiguous field {struct_name}.{field_name}")
-                }
-                found = candidate
-            }
-        }
-    }
-    ret found
-}
-
-fun mir_promoted_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
-    let typ = mir_promoted_field_type_inner(st, struct_name, field_name, 64)
-    if typ == "" {
-        ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
-    }
-    ret typ
 }
 
 fun mir_func_return_type(st: MirCodegenState, name: str): str {
@@ -502,51 +455,6 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     ret mir_value_operand(field_typ, result_name)
 }
 
-fun mir_promoted_field_addr_inner(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str, depth: i64): MirOperand {
-    if depth <= 0 {
-        ast_to_mir_die(f"embedded field cycle while resolving {struct_name}.{field_name}")
-    }
-    if mir_direct_field_type(st, struct_name, field_name) != "" {
-        ret mir_field_addr(st, base, struct_name, field_name)
-    }
-    let found_count = 0
-    let found = mir_operand_null()
-    for i in st.struct_fields {
-        let field = st.struct_fields[i]
-        if field.struct_name == struct_name && field.embedded {
-            let embedded_name = field.field_name
-            let embedded_type = field.field_type
-            if embedded_type == "ptr" {
-                embedded_type = embedded_name
-            }
-            if mir_promoted_field_type_inner(st, embedded_type, field_name, depth - 1) != "" {
-                if found_count > 0 {
-                    ast_to_mir_die(f"ambiguous field {struct_name}.{field_name}")
-                }
-                let embedded_obj = mir_load_field(st, base, struct_name, embedded_name)
-                found = mir_promoted_field_addr_inner(st, embedded_obj, embedded_type, field_name, depth - 1)
-                found_count = found_count + 1
-            }
-        }
-    }
-    if found_count == 0 {
-        ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
-    }
-    ret found
-}
-
-fun mir_promoted_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
-    ret mir_promoted_field_addr_inner(st, base, struct_name, field_name, 64)
-}
-
-fun mir_load_promoted_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
-    let field_typ = mir_promoted_field_type(st, struct_name, field_name)
-    let addr = mir_promoted_field_addr(st, base, struct_name, field_name)
-    let result_name = mir_new_value(st, "load")
-    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
-    ret mir_value_operand(field_typ, result_name)
-}
-
 fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
     let out = new str[0]
     for i in st.union_members {
@@ -558,48 +466,37 @@ fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
     ret out
 }
 
-fun mir_union_common_embedded_field_type(st: MirCodegenState, union_name: str, field_name: str): str {
+fun mir_union_common_field_type(st: MirCodegenState, union_name: str, field_name: str): str {
     let members = mir_union_member_names(st, union_name)
     let found = ""
     for i in members {
-        let candidate = ""
-        if mir_is_embedded_field(st, members[i], field_name) {
-            candidate = mir_field_type(st, members[i], field_name)
-        } else {
-            candidate = mir_promoted_field_type_inner(st, members[i], field_name, 64)
-            if candidate == "" {
-                ast_to_mir_die(f"union {union_name} has no common embedded field {field_name}")
-            }
+        let candidate = mir_direct_field_type(st, members[i], field_name)
+        if candidate == "" {
+            ast_to_mir_die(f"union {union_name} has no common field {field_name}")
         }
         if found != "" && found != candidate {
-            ast_to_mir_die(f"union {union_name} embedded field {field_name} has inconsistent types")
+            ast_to_mir_die(f"union {union_name} field {field_name} has inconsistent types")
         }
         found = candidate
     }
     if found == "" {
-        ast_to_mir_die(f"union {union_name} has no common embedded field {field_name}")
+        ast_to_mir_die(f"union {union_name} has no common field {field_name}")
     }
     ret found
 }
 
-fun mir_uniform_direct_embedded_field_member(st: MirCodegenState, union_name: str, field_name: str): str {
+fun mir_uniform_direct_field_member(st: MirCodegenState, union_name: str, field_name: str): str {
     let members = mir_union_member_names(st, union_name)
     if len(members) == 0 {
         ret ""
     }
     let first_member = members[0]
-    if mir_is_embedded_field(st, first_member, field_name) == false {
-        ret ""
-    }
     let first_type = mir_direct_field_type(st, first_member, field_name)
     let first_index = mir_direct_field_index(st, first_member, field_name)
     if first_type == "" || first_index < 0 {
         ret ""
     }
     for i in 1:len(members) {
-        if mir_is_embedded_field(st, members[i], field_name) == false {
-            ret ""
-        }
         if mir_direct_field_type(st, members[i], field_name) != first_type {
             ret ""
         }
@@ -610,22 +507,22 @@ fun mir_uniform_direct_embedded_field_member(st: MirCodegenState, union_name: st
     ret first_member
 }
 
-fun mir_union_has_common_embedded_field(st: MirCodegenState, union_name: str, field_name: str): bool {
+fun mir_union_has_common_field(st: MirCodegenState, union_name: str, field_name: str): bool {
     let members = mir_union_member_names(st, union_name)
     if len(members) == 0 {
         ret false
     }
     for i in members {
-        if mir_is_embedded_field(st, members[i], field_name) == false && mir_promoted_field_type_inner(st, members[i], field_name, 64) == "" {
+        if mir_direct_field_type(st, members[i], field_name) == "" {
             ret false
         }
     }
     ret true
 }
 
-fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirValueFlow {
-    let field_typ = mir_union_common_embedded_field_type(st, union_name, field_name)
-    let uniform_member = mir_uniform_direct_embedded_field_member(st, union_name, field_name)
+fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, union_name: str, field_name: str): MirValueFlow {
+    let field_typ = mir_union_common_field_type(st, union_name, field_name)
+    let uniform_member = mir_uniform_direct_field_member(st, union_name, field_name)
     if uniform_member != "" {
         let payload = mir_load_field(st, union_value, union_name, "payload")
         let value = mir_load_field(st, payload, uniform_member, field_name)
@@ -674,7 +571,7 @@ fun mir_load_union_common_embedded_field(st: MirCodegenState, union_value: MirOp
         let wrapper_name = mir_new_value(st, "load")
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
         let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
-        let value = mir_load_promoted_field(st, payload, members[bi], field_name)
+        let value = mir_load_field(st, payload, members[bi], field_name)
         mir_emit_inst(st, mir_store(value, result_addr))
         st.current_block.terminator = mir_br(end_block.name)
         st.current_block.has_terminator = true
@@ -1042,8 +939,8 @@ fun mir_emit_slice(st: MirCodegenState, block: MirBlock, expr: AstSlice): MirVal
 
 fun mir_emit_map_init(st: MirCodegenState, block: MirBlock, expr: AstMapInit): MirValueFlow {
     st.current_block = block
-    let new_helper = mir_map_helper(st, expr.AstMeta.resolved_type, "new")
-    let set_helper = mir_map_helper(st, expr.AstMeta.resolved_type, "set")
+    let new_helper = mir_map_helper(st, expr.meta.resolved_type, "new")
+    let set_helper = mir_map_helper(st, expr.meta.resolved_type, "set")
     if new_helper == "" || set_helper == "" {
         ast_to_mir_die(f"unsupported map init target: {type_expr_text(expr.source_type)}")
     }
@@ -1112,14 +1009,14 @@ fun mir_emit_new_array(st: MirCodegenState, block: MirBlock, expr: AstNewArray):
             count = count_flow.value
         }
     }
-    let arr = mir_emit_empty_array(st, epic_type_array_elem(expr.AstMeta.resolved_type), count)
+    let arr = mir_emit_empty_array(st, epic_type_array_elem(expr.meta.resolved_type), count)
     ret mir_value_flow(arr, st.current_block)
 }
 
 fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstArrayLiteral): MirValueFlow {
     st.current_block = block
     let count = mir_const_int("i64", len(expr.args))
-    let elem_type = epic_type_array_elem(expr.AstMeta.resolved_type)
+    let elem_type = epic_type_array_elem(expr.meta.resolved_type)
     let arr = mir_emit_array_literal_storage(st, elem_type, count)
     let i = 0
     for i < len(expr.args) {
@@ -1256,7 +1153,7 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
             match field.object {
                 AstVar receiver: {
                     if receiver.name == "os" {
-                        let call = new AstCall { AstMeta: expr.AstMeta, name: expr.name, args: expr.args, type_name: "os", dll: field.name }
+                        let call = new AstCall { meta: expr.meta, name: expr.name, args: expr.args, type_name: "os", dll: field.name }
                         ret mir_emit_os_call(st, call)
                     }
                 }
@@ -1427,13 +1324,13 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             let op = mir_binary_op(n.op, left_type)
             let result_type = mir_op_result_type(op)
             if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
-                mir_emit_shift_count_check(st, right_flow.value, left_type, n.AstMeta.line)
+                mir_emit_shift_count_check(st, right_flow.value, left_type, n.meta.line)
             }
             let inst = mir_make_result_inst(st, op, result_type)
             inst.operands.push(left_flow.value)
             inst.operands.push(right_flow.value)
             mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), n.AstMeta.resolved_type), st.current_block)
+            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), n.meta.resolved_type), st.current_block)
         }
         AstNewArray n: {
             ret mir_emit_new_array(st, st.current_block, n)
@@ -1470,8 +1367,8 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             let base_flow = mir_emit_expr(st, st.current_block, n.object)
             st.current_block = base_flow.block
             if mir_is_union_name(st, base_type) {
-                if mir_union_has_common_embedded_field(st, base_type, n.name) {
-                    ret mir_load_union_common_embedded_field(st, base_flow.value, base_type, n.name)
+                if mir_union_has_common_field(st, base_type, n.name) {
+                    ret mir_load_union_common_field(st, base_flow.value, base_type, n.name)
                 }
                 ast_to_mir_die("field access base must be struct")
             }
@@ -1479,7 +1376,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             if struct_name == "" {
                 ast_to_mir_die("field access base must be struct")
             }
-            ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, n.name), st.current_block)
+            ret mir_value_flow(mir_load_field(st, base_flow.value, struct_name, n.name), st.current_block)
         }
         AstDotCall n: {
             ret mir_emit_dot_call(st, block, n)
@@ -1519,14 +1416,14 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 if struct_name == "" {
                     ast_to_mir_die("len/cap expects aggregate pointer")
                 }
-                ret mir_value_flow(mir_load_promoted_field(st, base_flow.value, struct_name, n.name), st.current_block)
+                ret mir_value_flow(mir_load_field(st, base_flow.value, struct_name, n.name), st.current_block)
             }
             if n.name == "cstr" {
                 let args = new MirOperand[0]
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
-                args.push(mir_const_int("i64", n.AstMeta.line))
+                args.push(mir_const_int("i64", n.meta.line))
                 ret mir_value_flow(mir_emit_call_inst(st, "__ep_cstr", "i64", args), st.current_block)
             }
             if n.name == "i64" || n.name == "u64" || n.name == "bool" {
@@ -1560,7 +1457,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
-                args.push(mir_const_int("i64", n.AstMeta.line))
+                args.push(mir_const_int("i64", n.meta.line))
                 ret mir_value_flow(mir_emit_call_inst(st, "__ep_read_file", "ptr", args), st.current_block)
             }
             if n.name == "write_file" {
@@ -1572,7 +1469,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                     args.push(arg_flow.value)
                     i = i + 1
                 }
-                args.push(mir_const_int("i64", n.AstMeta.line))
+                args.push(mir_const_int("i64", n.meta.line))
                 ret mir_value_flow(mir_emit_call_inst(st, "__ep_write_file", "i64", args), st.current_block)
             }
             if n.name == "exit" {
@@ -1677,7 +1574,7 @@ fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirB
     st.current_block.has_terminator = true
 
     st.current_block = fail_block
-    mir_emit_print_text(st, str_cat2(str_cat2("assert line ", str(stmt.AstMeta.line)), ": "))
+    mir_emit_print_text(st, str_cat2(str_cat2("assert line ", str(stmt.meta.line)), ": "))
     match stmt.value_expr {
         AstEmpty e: {
             mir_emit_print_text(st, "assertion failed")
@@ -1696,7 +1593,7 @@ fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirB
 
 fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstPanic): MirBlockFlow {
     st.current_block = block
-    mir_emit_print_text(st, str_cat2(str_cat2("panic line ", str(stmt.AstMeta.line)), ": "))
+    mir_emit_print_text(st, str_cat2(str_cat2("panic line ", str(stmt.meta.line)), ": "))
     mir_emit_print_expr(st, stmt.expr)
     mir_emit_print_newline(st)
     mir_emit_exit_current_block(st, 1)
@@ -2184,7 +2081,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             ret mir_reachable_flow(value_flow.block)
         }
         AstLet n: {
-            let typ = mir_epic_type(n.AstMeta.resolved_type)
+            let typ = mir_epic_type(n.meta.resolved_type)
             let addr = mir_alloc_local(st, n.name, typ)
             let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
             st.current_block = value_flow.block
@@ -2232,7 +2129,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             if struct_name == "" {
                 ast_to_mir_die("field assignment base must be struct")
             }
-            let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, n.name)
+            let addr = mir_field_addr(st, base_flow.value, struct_name, n.name)
             mir_emit_inst(st, mir_store(value_flow.value, addr))
             ret mir_reachable_flow(st.current_block)
         }
@@ -2259,11 +2156,11 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
-                    let target_type = target.AstMeta.resolved_type
+                    let target_type = target.meta.resolved_type
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
                     if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
-                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.AstMeta.line)
+                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
                     inst.operands.push(mir_value_operand(st.local_types[idx], result_name))
@@ -2280,17 +2177,17 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     }
                     let base_flow = mir_emit_expr(st, st.current_block, target.object)
                     st.current_block = base_flow.block
-                    let addr = mir_promoted_field_addr(st, base_flow.value, struct_name, target.name)
-                    let field_typ = mir_promoted_field_type(st, struct_name, target.name)
+                    let addr = mir_field_addr(st, base_flow.value, struct_name, target.name)
+                    let field_typ = mir_field_type(st, struct_name, target.name)
                     let result_name = mir_new_value(st, "load")
                     mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
-                    let target_type = target.AstMeta.resolved_type
+                    let target_type = target.meta.resolved_type
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
                     if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
-                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.AstMeta.line)
+                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
                     inst.operands.push(mir_value_operand(field_typ, result_name))
@@ -2321,11 +2218,11 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     }
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
-                    let target_type = target.AstMeta.resolved_type
+                    let target_type = target.meta.resolved_type
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
                     if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
-                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.AstMeta.line)
+                        mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
                     inst.operands.push(current)
@@ -2459,12 +2356,12 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     st.local_types = new str[0]
     st.continue_targets = new str[0]
     st.break_targets = new str[0]
-    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(fn_ast.AstMeta.resolved_type))
+    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(fn_ast.meta.resolved_type))
 
     let pi = 0
     for pi < len(fn_ast.params) {
         let param = fn_ast.params[pi]
-        st.current_fn.params.push(mir_param(param.name, mir_epic_type(param.AstMeta.resolved_type)))
+        st.current_fn.params.push(mir_param(param.name, mir_epic_type(param.meta.resolved_type)))
         pi = pi + 1
     }
 
@@ -2544,8 +2441,8 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 let fi2 = 0
                 for fi2 < len(sdef.fields) {
                     let field = sdef.fields[fi2]
-                    let field_mir_type = mir_epic_type(field.AstMeta.resolved_type)
-                    mir_register_struct_field(st, sdef.name, field.name, field_mir_type, fi2, field.embedded)
+                    let field_mir_type = mir_epic_type(field.meta.resolved_type)
+                    mir_register_struct_field(st, sdef.name, field.name, field_mir_type, fi2)
                     fi2 = fi2 + 1
                 }
                 si = si + 1
@@ -2557,8 +2454,8 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 for mi2 in union.members {
                     st.union_members.push(mir_union_member_layout(union.name, union.members[mi2], mi2 + 1))
                 }
-                mir_register_struct_field(st, union.name, "tag", "i64", 0, false)
-                mir_register_struct_field(st, union.name, "payload", "ptr", 1, false)
+                mir_register_struct_field(st, union.name, "tag", "i64", 0)
+                mir_register_struct_field(st, union.name, "payload", "ptr", 1)
             }
 
             mir_register_runtime_struct3(st, "str", "data")
@@ -2596,7 +2493,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             for fi < len(program.funcs) {
                 let fn = program.funcs[fi]
                 st.func_names.push(fn.name)
-                st.func_return_types.push(mir_epic_type(fn.AstMeta.resolved_type))
+                st.func_return_types.push(mir_epic_type(fn.meta.resolved_type))
                 fi = fi + 1
             }
 

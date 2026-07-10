@@ -94,14 +94,10 @@ class Parser:
         fields = []
         while not self.peek_kind("RBRACE"):
             fname = self.expect("ID")
-            if self.check("COLON"):
-                ftype = self.parse_type()
-                embedded = False
-            else:
-                ftype = self._type_atom(fname[1])
-                embedded = True
+            self.expect("COLON")
+            ftype = self.parse_type()
             self.expect_stmt_end()
-            fields.append(StructField(name=fname[1], type=ftype, line=fname[2], embedded=embedded))
+            fields.append(StructField(name=fname[1], type=ftype, line=fname[2]))
         self.expect("RBRACE")
         return StructDefNode(name=name[1], fields=fields)
 

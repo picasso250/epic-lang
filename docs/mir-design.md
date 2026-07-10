@@ -703,7 +703,7 @@ type Point = struct { i64, i64 }
 type Slice_u8 = struct { ptr, i64, i64 }
 ```
 
-声明只保存字段类型序列，不保存源语言字段名、embedded 信息或 ADT 信息。
+声明只保存字段类型序列，不保存源语言字段名或 ADT 信息。
 `gep struct Point, ... i32 1` 中的常量字段索引引用该序列。
 
 bootstrap v0 使用固定的简单布局：
@@ -862,4 +862,3 @@ LowMIR / X64MIR backend 负责：
 - 跨平台 ABI。
 - 通用汇编器。
 - 通用寄存器分配器。
-

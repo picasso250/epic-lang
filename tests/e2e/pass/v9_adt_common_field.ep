@@ -6,12 +6,12 @@ struct Meta {
 }
 
 struct Leaf {
-    Meta
+    meta: Meta
     value: i64
 }
 
 struct Pair {
-    Meta
+    meta: Meta
     left: i64
     right: i64
 }
@@ -20,8 +20,8 @@ type Node = Leaf | Pair
 
 fun main(): i64 {
     let m = new Meta { line: 41 }
-    let n: Node = new Node(new Leaf { Meta: m, value: 1 })
-    n.Meta.line += 1
-    println(str(n.Meta.line))
+    let n: Node = new Node(new Leaf { meta: m, value: 1 })
+    n.meta.line += 1
+    println(str(n.meta.line))
     ret 0
 }

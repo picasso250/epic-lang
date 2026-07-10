@@ -1,0 +1,12 @@
+# COMPILE_FAIL: Expected COLON
+struct Meta {
+    line: i64
+}
+
+struct Node {
+    Meta
+}
+
+fun main(): i64 {
+    ret 0
+}

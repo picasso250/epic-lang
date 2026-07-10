@@ -1,4 +1,4 @@
-# COMPILE_FAIL: union Node has no common embedded field name
+# COMPILE_FAIL: union Node has no common field name
 struct Leaf { name: str }
 struct Pair { value: i64 }
 type Node = Leaf | Pair

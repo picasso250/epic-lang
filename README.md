@@ -50,8 +50,8 @@ Epic currently supports:
 - dynamic arrays (`T[]`) backed by slice headers, with `len`, `cap`, checked indexing, and `push`
 - byte-oriented `u8[]` helpers such as slicing and `extend`
 - `map[str]T` with lookup, assignment, `has`, `del`, literals, and growth
-- heap-backed structs with field access, initialization, embedded fields, and
-  user-defined methods on struct receivers
+- heap-backed structs with explicit named fields, initialization, and user-defined
+  methods on struct receivers
 - ADTs backed by struct-union lowering, plus `match`
 - file I/O helpers, `argv`, process exit, and direct WinAPI import
   calls on Windows

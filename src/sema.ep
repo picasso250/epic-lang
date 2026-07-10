@@ -11,7 +11,6 @@ struct SemaState {
     struct_fields: map[str]str
     struct_field_count: map[str]i64
     struct_field_names: map[str]str
-    struct_field_embedded: map[str]bool
     union_names: map[str]bool
     union_member_count: map[str]i64
     union_member_names: map[str]str
@@ -174,59 +173,23 @@ fun sema_direct_field_type(st: SemaState, base_type: str, field: str): str {
     ret st.struct_fields[key]
 }
 
-fun sema_promoted_field_type_inner(st: SemaState, base_type: str, field: str, depth: i64): str {
-    if depth <= 0 {
-        sema_die(f"embedded field cycle while resolving {sema_key2(base_type, field)}")
-    }
-    if st.struct_field_count.has(base_type) == false {
-        ret ""
-    }
-    let found = ""
-    for i in 0:st.struct_field_count[base_type] {
-        let embedded_name = st.struct_field_names[sema_key_index(base_type, i)]
-        let embedded_key = sema_key2(base_type, embedded_name)
-        if st.struct_field_embedded[embedded_key] {
-            let embedded_type = st.struct_fields[embedded_key]
-            let direct_key = sema_key2(embedded_type, field)
-            let candidate = ""
-            if st.struct_fields.has(direct_key) {
-                candidate = st.struct_fields[direct_key]
-            } else {
-                candidate = sema_promoted_field_type_inner(st, embedded_type, field, depth - 1)
-            }
-            if candidate != "" {
-                if found != "" {
-                    sema_die(f"ambiguous field {sema_key2(base_type, field)}")
-                }
-                found = candidate
-            }
-        }
-    }
-    ret found
-}
-
-fun sema_union_common_embedded_field_type(st: SemaState, union_name: str, field: str): str {
+fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): str {
     let found = ""
     let count = st.union_member_count[union_name]
     for i in 0:count {
         let member = st.union_member_names[sema_key_index(union_name, i)]
         let key = sema_key2(member, field)
-        let candidate = ""
-        if st.struct_fields.has(key) && st.struct_field_embedded[key] {
-            candidate = st.struct_fields[key]
-        } else {
-            candidate = sema_promoted_field_type_inner(st, member, field, 64)
-            if candidate == "" {
-                sema_die(f"union {union_name} has no common embedded field {field}")
-            }
+        if st.struct_fields.has(key) == false {
+            sema_die(f"union {union_name} has no common field {field}")
         }
+        let candidate = st.struct_fields[key]
         if found != "" && found != candidate {
-            sema_die(f"union {union_name} embedded field {field} has inconsistent types")
+            sema_die(f"union {union_name} field {field} has inconsistent types")
         }
         found = candidate
     }
     if found == "" {
-        sema_die(f"union {union_name} has no common embedded field {field}")
+        sema_die(f"union {union_name} has no common field {field}")
     }
     ret found
 }
@@ -255,7 +218,7 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
         sema_die(f"unknown field {sema_key2(base_type, field)}")
     }
     if st.union_names.has(base_type) {
-        ret sema_union_common_embedded_field_type(st, base_type, field)
+        ret sema_union_common_field_type(st, base_type, field)
     }
     if st.struct_names.has(base_type) == false {
         sema_die(f"field access expected aggregate, got {base_type}")
@@ -263,10 +226,6 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
     let key = sema_key2(base_type, field)
     if st.struct_fields.has(key) {
         ret st.struct_fields[key]
-    }
-    let promoted = sema_promoted_field_type_inner(st, base_type, field, 64)
-    if promoted != "" {
-        ret promoted
     }
     sema_die(f"unknown field {key}")
     ret ""
@@ -534,14 +493,10 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                         sema_die(f"duplicate field {sema_key2(s.name, f.name)}")
                     }
                     seen[f.name] = true
-                    f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
-                    if f.embedded && st.struct_names.has(f.AstMeta.resolved_type) == false {
-                        sema_die(f"embedded field {sema_key2(s.name, f.name)} must be a struct")
-                    }
+                    f.meta.resolved_type = sema_type_name(st, f.source_type)
                     let key = sema_key2(s.name, f.name)
-                    st.struct_fields[key] = f.AstMeta.resolved_type
+                    st.struct_fields[key] = f.meta.resolved_type
                     st.struct_field_names[sema_key_index(s.name, j)] = f.name
-                    st.struct_field_embedded[key] = f.embedded
                 }
             }
             for i in program.unions {
@@ -584,23 +539,23 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                 if sema_is_reserved_func(f.name) {
                     sema_die(f"reserved builtin function name: {f.name}")
                 }
-                f.AstMeta.resolved_type = sema_type_name(st, f.source_type)
-                st.funcs_ret[f.name] = f.AstMeta.resolved_type
+                f.meta.resolved_type = sema_type_name(st, f.source_type)
+                st.funcs_ret[f.name] = f.meta.resolved_type
                 st.funcs_param_count[f.name] = len(f.params)
                 for j in f.params {
                     let p = f.params[j]
-                    p.AstMeta.resolved_type = sema_type_name(st, p.source_type)
-                    if p.AstMeta.resolved_type == "void" {
+                    p.meta.resolved_type = sema_type_name(st, p.source_type)
+                    if p.meta.resolved_type == "void" {
                         sema_die(f"function {f.name} parameter {p.name} cannot have type void")
                     }
-                    st.funcs_param_types[sema_key_index(f.name, j)] = p.AstMeta.resolved_type
+                    st.funcs_param_types[sema_key_index(f.name, j)] = p.meta.resolved_type
                 }
                 if f.method_name != "" {
                     if len(f.params) == 0 {
                         sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
                     }
                     let receiver = f.params[0]
-                    if receiver.AstMeta.resolved_type != f.receiver_type {
+                    if receiver.meta.resolved_type != f.receiver_type {
                         sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
                     }
                 }
@@ -687,7 +642,7 @@ fun sema_build_globals(st: SemaState, ast: AstNode): void {
                 if sema_is_global_literal_init(g.value_expr) == false {
                     sema_die(f"global let {g.name} requires a literal initializer")
                 }
-                g.AstMeta.resolved_type = target
+                g.meta.resolved_type = target
                 st.globals[g.name] = target
             }
             ret
@@ -967,7 +922,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
             match field.object {
                 AstVar receiver: {
                     if receiver.name == "os" {
-                        let call = new AstCall { AstMeta: node.AstMeta, name: node.name, args: node.args, type_name: "os", dll: field.name }
+                        let call = new AstCall { meta: node.meta, name: node.name, args: node.args, type_name: "os", dll: field.name }
                         ret sema_os_call_type(st, call)
                     }
                 }
@@ -1325,7 +1280,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                         sema_die(f"duplicate match case {c.variant_name}")
                     }
                     seen[c.variant_name] = true
-                    c.AstMeta.resolved_type = c.variant_name
+                    c.meta.resolved_type = c.variant_name
                     sema_push_scope(st)
                     sema_define_local(st, c.binding_name, c.variant_name)
                     sema_block(st, c.body)
@@ -1449,11 +1404,11 @@ fun sema_program(st: SemaState, ast: AstNode): void {
                 let f = program.funcs[i]
                 sema_reset_locals(st)
                 st.current_fn = f.name
-                st.current_ret = f.AstMeta.resolved_type
+                st.current_ret = f.meta.resolved_type
                 st.loop_depth = 0
                 for j in f.params {
                     let p = f.params[j]
-                    sema_define_local(st, p.name, p.AstMeta.resolved_type)
+                    sema_define_local(st, p.name, p.meta.resolved_type)
                 }
                 let tail_type = sema_function_body(st, f.body)
                 if sema_block_returns(f.body) == false {
@@ -1484,7 +1439,6 @@ fun make_sema_state(): SemaState {
     st.struct_fields = new map[str]str
     st.struct_field_count = new map[str]i64
     st.struct_field_names = new map[str]str
-    st.struct_field_embedded = new map[str]bool
     st.union_names = new map[str]bool
     st.union_member_count = new map[str]i64
     st.union_member_names = new map[str]str

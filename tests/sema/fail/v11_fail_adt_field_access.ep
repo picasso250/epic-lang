@@ -1,7 +1,0 @@
-# COMPILE_FAIL: union Expr has no common embedded field value
-struct Leaf { value: i64 }
-type Expr = Leaf
-fun main(): void {
-    let e: Expr = new Expr(new Leaf { value: 1 })
-    println(str(e.value))
-}
