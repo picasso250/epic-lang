@@ -31,8 +31,6 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 |--------|-------|
 | `bool` | Logical true/false |
 | `u8`   | Byte |
-| `i32`  | Signed 32-bit, stored in 8-byte slot |
-| `u32`  | Unsigned 32-bit, stored in 8-byte slot |
 | `i64`  | Signed 64-bit |
 | `u64`  | Unsigned 64-bit |
 
@@ -78,7 +76,7 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | Bitwise | `~` `&` `|` `^` |
 | Shift | `<<` `>>` `>>>` |
 | Compound assignment | `+=` `-=` `*=` `/=` `%=` `<<=` `>>=` `>>>=` `&=` `|=` `^=` |
-| Explicit integer conversion | `i32(x)` `u32(x)` `i64(x)` `u64(x)` `u8(x)` `bool(x)` |
+| Explicit integer conversion | `i64(x)` `u64(x)` `u8(x)` `bool(x)` |
 
 ### Builtins
 
@@ -197,7 +195,7 @@ after ADT removal and naming unification.
 
 ### Features retained in core
 
-- `i64` / `u64` / `i32` / `u32` / `u8` / `bool`
+- `i64` / `u64` / `u8` / `bool`
 - `str` (temporary `u8[]`-layout alias, see Deferred)
 - `struct`
 - `T[]` (dynamic array)

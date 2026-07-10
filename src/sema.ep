@@ -91,7 +91,7 @@ fun sema_type_atom(st: SemaState, name: str): str {
     if name == "" {
         ret "void"
     }
-    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" {
+    if name == "i64" || name == "u64" || name == "u8" {
         ret name
     }
     if name == "bool" || name == "void" || name == "str" {
@@ -349,16 +349,6 @@ fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
             sema_die(f"{context} literal {value} out of range for {target}")
         }
     }
-    if target == "i32" {
-        if value < (0 - 2147483647 - 1) || value > 2147483647 {
-            sema_die(f"{context} literal {value} out of range for {target}")
-        }
-    }
-    if target == "u32" {
-        if value < 0 || value > 4294967295 {
-            sema_die(f"{context} literal {value} out of range for {target}")
-        }
-    }
     if target == "i64" {
         if false {
             sema_die(f"{context} literal {value} out of range for {target}")
@@ -577,7 +567,7 @@ fun sema_is_global_literal_init(node: AstNode): bool {
             if len(n.args) != 1 {
                 ret false
             }
-            if n.name != "u8" && n.name != "i64" && n.name != "u64" && n.name != "i32" && n.name != "u32" && n.name != "bool" {
+            if n.name != "u8" && n.name != "i64" && n.name != "u64" && n.name != "bool" {
                 ret false
             }
             ret sema_is_global_literal_init(n.args[0])
@@ -1021,7 +1011,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
         sema_check_assign(st, "str", node.args[0], "cstr argument 1")
         ret "i64"
     }
-    if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "u8" {
+    if node.name == "i64" || node.name == "u64" || node.name == "u8" {
         sema_check_arity(node.name, 1, node.args)
         sema_expect_int(st, node.args[0], f"{node.name} argument")
         ret sema_type_atom(st, node.name)

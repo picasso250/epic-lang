@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from ast_nodes import *
 from epic_builtins import BUILTIN_FUNCTIONS, PSEUDO_BUILTINS
-from epic_types import ARRAY, BOOL, I32, I64, I8, MAP, NAMED, PTR, STR, U32, U64, U8, VOID, EpicType
+from epic_types import ARRAY, BOOL, I64, I8, MAP, NAMED, PTR, STR, U64, U8, VOID, EpicType
 from parser import dump_ast_text
 
 
@@ -23,8 +23,6 @@ class ExprInfo:
 class SemanticAnalyzer:
     INT_RANGES = {
         "u8": (0, 255),
-        "i32": (-2147483648, 2147483647),
-        "u32": (0, 4294967295),
         "i64": (-9223372036854775808, 9223372036854775807),
         "u64": (0, 18446744073709551615),
     }
@@ -50,8 +48,6 @@ class SemanticAnalyzer:
     INTEGER_CONVERSIONS = {
         "i64": I64,
         "u64": U64,
-        "i32": I32,
-        "u32": U32,
         "u8": U8,
     }
 
@@ -131,7 +127,7 @@ class SemanticAnalyzer:
         if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode)):
             return True
         if isinstance(node, CallNode):
-            return node.name in {"u8", "i64", "u64", "i32", "u32", "bool"} and len(node.args) == 1 and self._is_global_literal_init(node.args[0])
+            return node.name in {"u8", "i64", "u64", "bool"} and len(node.args) == 1 and self._is_global_literal_init(node.args[0])
         if isinstance(node, ArrayLiteralNode):
             return all(self._is_global_literal_init(value) for value in node.values)
         if isinstance(node, MapInitNode):
@@ -762,7 +758,7 @@ class SemanticAnalyzer:
             if name.name in self.struct_names or name.name in self.union_names:
                 return name
             self._fail_global(f"unknown type {name}")
-        if name in (I64, U64, I32, U32, I8, U8, BOOL, VOID, STR):
+        if name in (I64, U64, I8, U8, BOOL, VOID, STR):
             return name
         self._fail_global(f"unknown type {name}")
 

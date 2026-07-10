@@ -25,8 +25,6 @@ class EpicType:
 
 I64 = EpicType("i64")
 U64 = EpicType("u64")
-I32 = EpicType("i32")
-U32 = EpicType("u32")
 I8 = EpicType("i8")
 U8 = EpicType("u8")
 BOOL = EpicType("bool")

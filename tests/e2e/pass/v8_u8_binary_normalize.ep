@@ -1,0 +1,10 @@
+# EXIT: 0
+fun main(): i64 {
+    let wrapped: u8 = u8(255) + u8(1)
+    if i64(wrapped) != 0 { ret 10 }
+
+    let shifted: u8 = u8(1) << 7
+    if i64(shifted) != 128 { ret 11 }
+
+    ret 0
+}

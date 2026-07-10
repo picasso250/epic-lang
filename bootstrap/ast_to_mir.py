@@ -203,7 +203,7 @@ class MirCodegen(MirFunctionBuilder):
             return VOID
         if typ == et.BOOL:
             return BOOL
-        if typ in (et.I64, et.U64, et.I32, et.U32, et.I8, et.U8):
+        if typ in (et.I64, et.U64, et.I8, et.U8):
             return I64
         if typ == et.STR:
             return ptr()
@@ -211,7 +211,7 @@ class MirCodegen(MirFunctionBuilder):
             elem = typ.elem
             if elem in (et.I8, et.U8):
                 return ptr()
-            if elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
+            if elem in (et.I64, et.U64, et.BOOL):
                 return ptr()
             if elem == et.STR:
                 return ptr()
@@ -230,7 +230,7 @@ class MirCodegen(MirFunctionBuilder):
             return I8
         if typ == et.BOOL:
             return BOOL
-        if typ in (et.I64, et.U64, et.I32, et.U32):
+        if typ in (et.I64, et.U64):
             return I64
         if typ == et.STR:
             return ptr()
@@ -423,7 +423,7 @@ class MirCodegen(MirFunctionBuilder):
         if typ.kind == "array":
             if typ.elem in (et.I8, et.U8):
                 return "_slice_u8"
-            if typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
+            if typ.elem in (et.I64, et.U64, et.BOOL):
                 return "_slice_i64"
             if typ.elem == et.STR:
                 return "_slice_str"
@@ -454,7 +454,7 @@ class MirCodegen(MirFunctionBuilder):
             return "bool"
         if typ.elem == et.STR:
             return "str"
-        if typ.elem in (et.U64, et.I32, et.U32, et.U8):
+        if typ.elem in (et.U64, et.U8):
             return "i64"
         if typ.elem is not None and typ.elem.kind in ("named", "array", "map", "ptr"):
             return "ptr"
@@ -483,7 +483,7 @@ class MirCodegen(MirFunctionBuilder):
         return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I8, et.U8)
 
     def _is_i64_array_type(self, typ):
-        return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL)
+        return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I64, et.U64, et.BOOL)
 
     def _is_ptr_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "ptr"
@@ -924,8 +924,6 @@ class MirCodegen(MirFunctionBuilder):
     def _shift_width(self, typ):
         if typ in (et.U8, "u8"):
             return 8
-        if typ in (et.I32, et.U32, "i32", "u32"):
-            return 32
         return 64
 
     def _emit_shift_count_check(self, count, lhs_type, line):
@@ -1140,10 +1138,6 @@ class MirCodegen(MirFunctionBuilder):
     def _normalize_integer_value(self, value, typ):
         if typ in (et.U8, "u8"):
             return self._emit_truncating_uint_conversion_value(value, 255)
-        if typ in (et.U32, "u32"):
-            return self._emit_truncating_uint_conversion_value(value, 4294967295)
-        if typ in (et.I32, "i32"):
-            return self._emit_truncating_i32_conversion_value(value)
         return value
 
     def _binary(self, op, left, right, lhs_type=None, line=0):
@@ -1203,7 +1197,7 @@ class MirCodegen(MirFunctionBuilder):
         raise MirCodegenError(f"unsupported binary op: {expr.op}")
 
     def _is_unsigned_integer(self, typ):
-        return typ in (et.U64, et.U32, et.U8)
+        return typ in (et.U64, et.U8)
 
     def _emit_short_circuit(self, expr):
         return self._emit_short_circuit_from(self.ensure_insertable(), expr).value
@@ -1264,8 +1258,6 @@ class MirCodegen(MirFunctionBuilder):
             "u64",
             "u8",
             "bool",
-            "i32",
-            "u32",
             "bytes",
             "read_file",
             "write_file",
@@ -1324,14 +1316,6 @@ class MirCodegen(MirFunctionBuilder):
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
             return ValueFlow(self._emit_truncating_uint_conversion_value(arg.value, 255), self.current_block)
-        if name == "u32":
-            arg = self._emit_expr_from(self.current_block, expr.args[0])
-            self.set_block(arg.block)
-            return ValueFlow(self._emit_truncating_uint_conversion_value(arg.value, 4294967295), self.current_block)
-        if name == "i32":
-            arg = self._emit_expr_from(self.current_block, expr.args[0])
-            self.set_block(arg.block)
-            return ValueFlow(self._emit_truncating_i32_conversion_value(arg.value), self.current_block)
         if name == "bytes":
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
@@ -1652,20 +1636,10 @@ class MirCodegen(MirFunctionBuilder):
     def _emit_truncating_uint_conversion_value(self, value, mask):
         return ValueOperand(self.inst("and", [value, ConstIntOperand(I64, mask)], result_type=I64))
 
-    def _emit_truncating_i32_conversion_value(self, value):
-        shifted = self.inst("shl", [value, ConstIntOperand(I64, 32)], result_type=I64)
-        sign_extended = self.inst("sar", [ValueOperand(shifted), ConstIntOperand(I64, 32)], result_type=I64)
-        return ValueOperand(sign_extended)
-
     def _emit_truncating_uint_conversion(self, expr, mask):
         flow = self._emit_expr_from(self.ensure_insertable(), expr)
         self.set_block(flow.block)
         return self._emit_truncating_uint_conversion_value(flow.value, mask)
-
-    def _emit_truncating_i32_conversion(self, expr):
-        flow = self._emit_expr_from(self.ensure_insertable(), expr)
-        self.set_block(flow.block)
-        return self._emit_truncating_i32_conversion_value(flow.value)
 
     def _emit_str_conversion(self, expr):
         return self._emit_str_conversion_from(self.ensure_insertable(), expr).value

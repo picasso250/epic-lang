@@ -4,7 +4,7 @@ Consumes tokens from lexer, produces AST dataclass nodes.
 """
 
 from ast_nodes import *
-from epic_types import ARRAY, BOOL, I32, I64, MAP, NAMED, STR, U32, U64, U8, VOID
+from epic_types import ARRAY, BOOL, I64, MAP, NAMED, STR, U64, U8, VOID
 
 
 class ParseError(Exception):
@@ -192,10 +192,6 @@ class Parser:
             return I64
         if name == "u64":
             return U64
-        if name == "i32":
-            return I32
-        if name == "u32":
-            return U32
         if name == "u8":
             return U8
         if name == "bool":

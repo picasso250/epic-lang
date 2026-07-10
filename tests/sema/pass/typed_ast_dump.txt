@@ -45,24 +45,12 @@ Program
       Let c : u64
         Call u64 : u64
           Literal 3 : i64
-      Let d : i32
-        Call i32 : i32
-          Literal 4 : i64
-      Let e : u32
-        Call u32 : u32
-          Literal 5 : i64
       Let byte : u8
         Char 65 : u8
       Let ok : bool
         Bool 1 : bool
       Let no : bool
         Bool 0 : bool
-      Let converted_i32 : i32
-        Call i32 : i32
-          Var a : i64
-      Let converted_u32 : u32
-        Call u32 : u32
-          Var b : i64
       Let converted_u8 : u8
         Call u8 : u8
           Literal 65 : i64

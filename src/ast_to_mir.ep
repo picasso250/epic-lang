@@ -82,7 +82,7 @@ fun mir_epic_type(type_name: str): str {
     if type_name == "bool" {
         ret "bool"
     }
-    if type_name == "i64" || type_name == "i32" || type_name == "u64" || type_name == "u32" || type_name == "u8" {
+    if type_name == "i64" || type_name == "u64" || type_name == "u8" {
         ret "i64"
     }
     ret "ptr"
@@ -293,7 +293,7 @@ fun mir_func_return_type(st: MirCodegenState, name: str): str {
 }
 
 fun mir_is_unsigned_int_type(type_name: str): bool {
-    ret type_name == "u64" || type_name == "u32" || type_name == "u8"
+    ret type_name == "u64" || type_name == "u8"
 }
 
 fun mir_binary_op(expr_op: str, source_type: str): str {
@@ -346,7 +346,6 @@ fun mir_op_result_type(op: str): str {
 
 fun mir_shift_width(source_type: str): i64 {
     if source_type == "u8" { ret 8 }
-    if source_type == "i32" || source_type == "u32" { ret 32 }
     ret 64
 }
 
@@ -618,27 +617,9 @@ fun mir_trunc_uint_value(st: MirCodegenState, value: MirOperand, mask: i64): Mir
     ret mir_value_operand("i64", inst.result_id)
 }
 
-fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
-    let shl_inst = mir_make_result_inst(st, "shl", "i64")
-    shl_inst.operands.push(value)
-    shl_inst.operands.push(mir_const_int("i64", 32))
-    mir_emit_inst(st, shl_inst)
-    let sar_inst = mir_make_result_inst(st, "sar", "i64")
-    sar_inst.operands.push(mir_value_operand("i64", shl_inst.result_id))
-    sar_inst.operands.push(mir_const_int("i64", 32))
-    mir_emit_inst(st, sar_inst)
-    ret mir_value_operand("i64", sar_inst.result_id)
-}
-
 fun mir_normalize_int_value(st: MirCodegenState, value: MirOperand, source_type: str): MirOperand {
     if source_type == "u8" {
         ret mir_trunc_uint_value(st, value, 255)
-    }
-    if source_type == "u32" {
-        ret mir_trunc_uint_value(st, value, 4294967295)
-    }
-    if source_type == "i32" {
-        ret mir_trunc_i32_value(st, value)
     }
     ret value
 }
@@ -728,7 +709,7 @@ fun mir_array_elem_type(type_name: str): str {
 }
 
 fun mir_is_i64_array_elem_type(elem_type: str): bool {
-    ret elem_type == "i64" || elem_type == "i32" || elem_type == "u64" || elem_type == "u32" || elem_type == "bool"
+    ret elem_type == "i64" || elem_type == "u64" || elem_type == "bool"
 }
 
 fun mir_is_i64_array_type(type_name: str): bool {
@@ -833,7 +814,7 @@ fun mir_map_suffix(st: MirCodegenState, type_name: str): str {
     if value == "str" {
         ret "str"
     }
-    if value == "u64" || value == "i32" || value == "u32" || value == "u8" {
+    if value == "u64" || value == "u8" {
         ret "i64"
     }
     if epic_type_is_array(value) || epic_type_is_map(value) || mir_is_struct_name(st, value) {
@@ -1418,16 +1399,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
                 ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 255), st.current_block)
-            }
-            if n.name == "u32" {
-                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = arg_flow.block
-                ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 4294967295), st.current_block)
-            }
-            if n.name == "i32" {
-                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = arg_flow.block
-                ret mir_value_flow(mir_trunc_i32_value(st, arg_flow.value), st.current_block)
             }
             if n.name == "str" {
                 ret mir_emit_str_conversion(st, st.current_block, n.args[0])

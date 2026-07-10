@@ -102,8 +102,6 @@ MIR runtime helper body 统一提交在 `runtime/mir/helpers.mir`，Python refer
 |------------|-------------------|
 | `bool`     | `bool`            |
 | `u8`       | `u8`              |
-| `i32`      | 8 字节整数槽，值保持 32-bit signed 规范扩展 |
-| `u32`      | 8 字节整数槽，值保持 32-bit unsigned 规范扩展 |
 | `i64`      | `i64`             |
 | `u64`      | `u64`             |
 | `str`      | `&str` today; migration target is the same representation as `&_slice_u8` |

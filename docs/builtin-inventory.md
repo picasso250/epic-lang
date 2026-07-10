@@ -73,16 +73,11 @@ These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 |----------|---------|----------------|---------------------|------------|-------|
 | `i64`  | ✓ (ln 613) | ✗ delegated | ✗ | ✓ (ln 869) | |
 | `u64`  | ✓ (ln 615) | ✗ delegated | ✗ | ✓ (ln 869) | |
-| `i32`  | ✓ (ln 617) | ✗ delegated | ✗ | ✗ | In bootstrap sema only |
-| `u32`  | ✓ (ln 619) | ✗ delegated | ✗ | ✗ | In bootstrap sema only |
-
 | `u8`   | ✓ (ln 623) | ✗ delegated | ✗ | ✓ (ln 886) | |
 | `bool` | ✓ (ln 430, 625) | ✗ delegated | ✗ | ✓ (ln 876) | |
 | `void` | ✓ (ln 627) | ✗ delegated | ✗ | ✗ | Unit type; not bindable as local/parameter/container element |
 
-Note: `i32`, `u32` are handled in bootstrap `sema.py` but have no explicit
-handler in `src/codegen.ep`. `i8` has been removed from public surface;
-u8 is Epic's only byte type.
+`i8` has been removed from public surface; `u8` is Epic's only byte type.
 
 ---
 
@@ -205,20 +200,10 @@ str_starts_with str_find push extend map_has map_del
 
 ```
 print println exit read_file write_file
-itoa cstr i64 u64 i32 u32 u8 bool
+itoa cstr i64 u64 u8 bool
 ```
 
 This means a user function named `print()` or `exit()` would parse successfully
 but then fail in codegen — or worse, silently shadow the builtin. The reserved
 list should be kept in sync with the actual builtin set.
-
-### `i32`, `u32` in bootstrap sema but not in self-hosted codegen
-
-These are handled in `bootstrap/sema.py` but have no dedicated
-handler in `src/codegen.ep`. They may work through a general integer cast path,
-or may be broken in the self-hosted path. Needs verification.
-
-Note: `i8` was previously listed here but has been removed from the public
-surface. `u8` is Epic's only byte type.
-
 

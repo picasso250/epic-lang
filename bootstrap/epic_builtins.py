@@ -21,8 +21,6 @@ BUILTIN_FUNCTIONS = frozenset({
 
     "i64",
     "u64",
-    "i32",
-    "u32",
     "u8",
     "bool",
 
