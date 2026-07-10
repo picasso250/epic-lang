@@ -146,7 +146,7 @@ fun mir_register_runtime_struct3(st: MirCodegenState, struct_name: str, first_fi
 }
 
 fun mir_is_union_name(st: MirCodegenState, name: str): bool {
-    for i in st.union_names {
+    for i: 0:len(st.union_names) {
         if st.union_names[i] == name {
             ret true
         }
@@ -155,7 +155,7 @@ fun mir_is_union_name(st: MirCodegenState, name: str): bool {
 }
 
 fun mir_union_tag(st: MirCodegenState, union_name: str, member_name: str): i64 {
-    for i in st.union_members {
+    for i: 0:len(st.union_members) {
         let member = st.union_members[i]
         if member.union_name == union_name && member.member_name == member_name {
             ret member.tag
@@ -181,7 +181,7 @@ fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
 }
 
 fun mir_direct_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64 {
-    for i in st.struct_fields {
+    for i: 0:len(st.struct_fields) {
         let field = st.struct_fields[i]
         if field.struct_name == struct_name && field.field_name == field_name {
             ret field.field_index
@@ -200,7 +200,7 @@ fun mir_field_index(st: MirCodegenState, struct_name: str, field_name: str): i64
 }
 
 fun mir_direct_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
-    for i in st.struct_fields {
+    for i: 0:len(st.struct_fields) {
         let field = st.struct_fields[i]
         if field.struct_name == struct_name && field.field_name == field_name {
             ret field.field_type
@@ -401,7 +401,7 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
 
 fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
     let out = new str[]
-    for i in st.union_members {
+    for i: 0:len(st.union_members) {
         let member = st.union_members[i]
         if member.union_name == union_name {
             out.push(member.member_name)
@@ -413,7 +413,7 @@ fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
 fun mir_union_common_field_type(st: MirCodegenState, union_name: str, field_name: str): str {
     let members = mir_union_member_names(st, union_name)
     let found = ""
-    for i in members {
+    for i: 0:len(members) {
         let candidate = mir_direct_field_type(st, members[i], field_name)
         if candidate == "" {
             ast_to_mir_die(f"union {union_name} has no common field {field_name}")
@@ -440,7 +440,7 @@ fun mir_uniform_direct_field_member(st: MirCodegenState, union_name: str, field_
     if first_type == "" || first_index < 0 {
         ret ""
     }
-    for i in 1:len(members) {
+    for i: 1:len(members) {
         if mir_direct_field_type(st, members[i], field_name) != first_type {
             ret ""
         }
@@ -456,7 +456,7 @@ fun mir_union_has_common_field(st: MirCodegenState, union_name: str, field_name:
     if len(members) == 0 {
         ret false
     }
-    for i in members {
+    for i: 0:len(members) {
         if mir_direct_field_type(st, members[i], field_name) == "" {
             ret false
         }
@@ -478,15 +478,15 @@ fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, un
     let members = mir_union_member_names(st, union_name)
     let end_block = mir_new_block(st, "union.field.end")
     let case_blocks = new MirBlock[]
-    for i in members {
+    for i: 0:len(members) {
         case_blocks.push(mir_new_block(st, "union.field.case"))
     }
     let next_blocks = new MirBlock[]
-    for i in 0:len(members) - 1 {
+    for i: 0:len(members) - 1 {
         next_blocks.push(mir_new_block(st, "union.field.next"))
     }
     let check_block = st.current_block
-    for ci in members {
+    for ci: 0:len(members) {
         st.current_block = check_block
         let next_block = end_block
         if ci < len(members) - 1 {
@@ -510,7 +510,7 @@ fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, un
         st.current_block.terminator = mir_br(end_block.name)
         st.current_block.has_terminator = true
     }
-    for bi in members {
+    for bi: 0:len(members) {
         st.current_block = case_blocks[bi]
         let wrapper_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
@@ -1031,13 +1031,13 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
         }
     }
     let method_symbol = ((receiver_type + "__") + expr.name)
-    for mi in st.func_names {
+    for mi: 0:len(st.func_names) {
         if st.func_names[mi] == method_symbol {
             let args = new MirOperand[]
             let receiver_flow = mir_emit_expr(st, st.current_block, expr.object)
             st.current_block = receiver_flow.block
             args.push(receiver_flow.value)
-            for i in expr.args {
+            for i: 0:len(expr.args) {
                 let arg_flow = mir_emit_expr(st, st.current_block, expr.args[i])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
@@ -1386,7 +1386,7 @@ fun mir_truncate_locals(st: MirCodegenState, count: i64): void {
     let names = new str[]
     let addrs = new i64[]
     let types = new str[]
-    for i in 0:count {
+    for i: 0:count {
         names.push(st.local_names[i])
         addrs.push(st.local_addr_ids[i])
         types.push(st.local_types[i])
@@ -1407,7 +1407,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
 
     let end_block = mir_new_block(st, "match.end")
     let case_blocks = new MirBlock[]
-    for i in stmt.fields {
+    for i: 0:len(stmt.fields) {
         case_blocks.push(mir_new_block(st, "match.case"))
     }
     let has_else = stmt.has_else
@@ -1416,12 +1416,12 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
         else_block = mir_new_block(st, "match.else")
     }
     let next_blocks = new MirBlock[]
-    for i in 0:len(stmt.fields) - 1 {
+    for i: 0:len(stmt.fields) - 1 {
         next_blocks.push(mir_new_block(st, "match.next"))
     }
 
     let check_block = st.current_block
-    for ci in stmt.fields {
+    for ci: 0:len(stmt.fields) {
         st.current_block = check_block
         let next_block = else_block
         if ci < len(stmt.fields) - 1 {
@@ -1446,7 +1446,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
         st.current_block.has_terminator = true
     }
 
-    for bi in stmt.fields {
+    for bi: 0:len(stmt.fields) {
         st.current_block = case_blocks[bi]
         let local_count = len(st.local_names)
         let wrapper_name = mir_new_value(st)
@@ -1665,90 +1665,11 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     ret mir_reachable_flow(end_block)
 }
 
-fun mir_emit_for_in(st: MirCodegenState, block: MirBlock, stmt: AstForIn): MirBlockFlow {
-    let source_type = ast_resolved_type(stmt.source)
-    if mir_is_array_type(source_type) {
-        ret mir_emit_for_in_array(st, block, stmt, source_type)
-    }
-    ast_to_mir_die(f"for-in expected array, got {source_type}")
-    ret mir_reachable_flow(block)
-}
-
-fun mir_emit_for_in_array(st: MirCodegenState, block: MirBlock, stmt: AstForIn, source_type: str): MirBlockFlow {
+fun mir_emit_loop(st: MirCodegenState, block: MirBlock, stmt: AstLoop): MirBlockFlow {
     st.current_block = block
-    let source_flow = mir_emit_expr(st, st.current_block, stmt.source)
-    st.current_block = source_flow.block
-    let struct_name = mir_slice_struct_name(st, source_type)
-    if struct_name == "" {
-        ast_to_mir_die(f"unsupported for-in array source: {source_type}")
-    }
-
-    let local_count = len(st.local_names)
-    let var_addr = mir_alloc_local(st, stmt.name, "i64")
-    let limit_name = (("__" + stmt.name) + (".limit" + str(st.value_counter)))
-    let limit_addr = mir_alloc_local(st, limit_name, "i64")
-    let initial_len = mir_load_field(st, source_flow.value, struct_name, "len")
-    mir_emit_inst(st, mir_store(initial_len, limit_addr))
-    mir_emit_inst(st, mir_store(mir_const_int("i64", 0), var_addr))
-
-    let cond_block = mir_new_block(st, "for.in.cond")
-    let len_block = mir_new_block(st, "for.in.len")
-    let body_block = mir_new_block(st, "for.in.body")
-    let inc_block = mir_new_block(st, "for.in.inc")
-    let end_block = mir_new_block(st, "for.in.end")
-    st.current_block.terminator = mir_br(cond_block.name)
-    st.current_block.has_terminator = true
-
-    st.current_block = cond_block
-    let cur_name = mir_new_value(st)
-    mir_emit_inst(st, mir_load(cur_name, "i64", "i64", var_addr))
-    let limit_load_name = mir_new_value(st)
-    mir_emit_inst(st, mir_load(limit_load_name, "i64", "i64", limit_addr))
-    let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
-    cond_inst.operands.push(mir_value_operand("i64", cur_name))
-    cond_inst.operands.push(mir_value_operand("i64", limit_load_name))
-    mir_emit_inst(st, cond_inst)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_id), len_block.name, end_block.name)
-    st.current_block.has_terminator = true
-
-    st.current_block = len_block
-    let cur2_name = mir_new_value(st)
-    mir_emit_inst(st, mir_load(cur2_name, "i64", "i64", var_addr))
-    let current_len = mir_load_field(st, source_flow.value, struct_name, "len")
-    let len_cond = mir_make_result_inst(st, "icmp.slt", "bool")
-    len_cond.operands.push(mir_value_operand("i64", cur2_name))
-    len_cond.operands.push(current_len)
-    mir_emit_inst(st, len_cond)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", len_cond.result_id), body_block.name, end_block.name)
-    st.current_block.has_terminator = true
-
-    mir_push_loop(st, inc_block.name, end_block.name)
-    let body_flow = mir_emit_block(st, body_block, stmt.body)
-    if body_flow.reachable {
-        body_flow.block.terminator = mir_br(inc_block.name)
-        body_flow.block.has_terminator = true
-    }
-    mir_pop_loop(st)
-
-    st.current_block = inc_block
-    let inc_cur_name = mir_new_value(st)
-    mir_emit_inst(st, mir_load(inc_cur_name, "i64", "i64", var_addr))
-    let add_inst = mir_make_result_inst(st, "add", "i64")
-    add_inst.operands.push(mir_value_operand("i64", inc_cur_name))
-    add_inst.operands.push(mir_const_int("i64", 1))
-    mir_emit_inst(st, add_inst)
-    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_id), var_addr))
-    st.current_block.terminator = mir_br(cond_block.name)
-    st.current_block.has_terminator = true
-    mir_truncate_locals(st, local_count)
-    ret mir_reachable_flow(end_block)
-}
-
-fun mir_emit_while(st: MirCodegenState, block: MirBlock, stmt: AstWhile): MirBlockFlow {
-    st.current_block = block
-    let cond_block = mir_new_block(st, "while.cond")
-    let body_block = mir_new_block(st, "while.body")
-    let end_block = mir_new_block(st, "while.end")
+    let cond_block = mir_new_block(st, "loop.cond")
+    let body_block = mir_new_block(st, "loop.body")
+    let end_block = mir_new_block(st, "loop.end")
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
 
@@ -1934,14 +1855,11 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         AstMatch n: {
             ret mir_emit_match(st, st.current_block, n)
         }
-        AstWhile n: {
-            ret mir_emit_while(st, st.current_block, n)
+        AstLoop n: {
+            ret mir_emit_loop(st, st.current_block, n)
         }
         AstForRange n: {
             ret mir_emit_for_range(st, st.current_block, n)
-        }
-        AstForIn n: {
-            ret mir_emit_for_in(st, st.current_block, n)
         }
         AstBreak n: {
             if len(st.break_targets) == 0 {
@@ -2119,11 +2037,11 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 }
                 si = si + 1
             }
-            for ui in program.unions {
+            for ui: 0:len(program.unions) {
                 let union = program.unions[ui]
                 st.union_names.push(union.name)
                 st.struct_names.push(union.name)
-                for mi2 in union.members {
+                for mi2: 0:len(union.members) {
                     st.union_members.push(mir_union_member_layout(union.name, union.members[mi2], mi2 + 1))
                 }
                 mir_register_struct_field(st, union.name, "tag", "i64", 0)
@@ -2142,12 +2060,12 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 mir_register_slice_layout(st, ("_slice_" + sdef.name))
                 asi = asi + 1
             }
-            for aui in program.unions {
+            for aui: 0:len(program.unions) {
                 let union = program.unions[aui]
                 mir_register_slice_layout(st, ("_slice_" + union.name))
             }
 
-            for ei in program.externs {
+            for ei: 0:len(program.externs) {
                 let ext = program.externs[ei]
                 let callee = f"__ep_import${ext.library}${ext.name}"
                 st.func_names.push(ext.name)
@@ -2155,7 +2073,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 st.func_callees.push(callee)
                 st.func_source_returns.push(ext.meta.resolved_type)
                 let params = new str[]
-                for pi in ext.params { params.push(mir_epic_type(ext.params[pi].meta.resolved_type)) }
+                for pi: 0:len(ext.params) { params.push(mir_epic_type(ext.params[pi].meta.resolved_type)) }
                 st.program.externs.push(mir_extern(callee, mir_epic_type(ext.meta.resolved_type), params))
             }
             let fi = 0

@@ -1,7 +1,7 @@
 fun main(): i64 {
     let xs = new i64[] { 1, 2, 3 }
     let total = 0
-    for i in xs {
+    for i: 0:len(xs) {
         total += xs[i]
     }
     total += xs.pop()

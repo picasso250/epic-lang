@@ -1,0 +1,24 @@
+# EXIT: 0
+fun bump(counter: i64[]): i64 {
+    counter[0] += 1
+    ret counter[0]
+}
+
+fun main(): void {
+    let counter = new i64[] { 0 }
+    let sum = 0
+    for i: bump(counter):bump(counter) + 3 {
+        if i < 3 {
+            continue
+        }
+        sum += i
+    }
+    assert counter[0] == 2
+    assert sum == 7
+
+    let in = 42
+    let while = 43
+    assert in == 42
+    assert while == 43
+    exit(0)
+}

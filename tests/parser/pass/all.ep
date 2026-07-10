@@ -29,6 +29,7 @@ struct BinaryExpr {
 type Expr = LiteralExpr | BinaryExpr
 
 fun adt_parser_surface(): void {
+    let in = 42
     let e: Expr = new Expr(new LiteralExpr { value: "1" })
     match e {
         LiteralExpr lit: {
@@ -101,10 +102,10 @@ fun statements_and_control(flag: bool): void {
         }
     }
 
-    for i in 0:len(xs) {
+    for i: 0:len(xs) {
         println(str(i))
     }
-    for j in xs {
+    for j: 0:len(xs) {
         println(str(j))
     }
 

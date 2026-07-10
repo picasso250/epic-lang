@@ -36,6 +36,7 @@ fun make_point(x: i64, y: i64, label: str): Point {
 }
 
 fun use_scalars(): i64 {
+    let in = 42
     let a = 1
     let b: i64 = 2
     let c: u64 = u64(3)
@@ -81,7 +82,7 @@ fun use_arrays_and_strings(): i64 {
     xs[0] = add(xs[1], xs[2])
     xs[1] += 1
     let index_sum = 0
-    for i in xs {
+    for i: 0:len(xs) {
         index_sum += i
     }
     let popped = xs.pop()
@@ -109,7 +110,7 @@ fun use_structs(): i64 {
 
 fun use_control(limit: i64): i64 {
     let total = 0
-    for i in 0:limit {
+    for i: 0:limit {
         if i == 2 {
             continue
         }

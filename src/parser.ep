@@ -189,7 +189,7 @@ struct AstIf {
     has_else: bool
 }
 
-struct AstWhile {
+struct AstLoop {
     meta: AstMeta
     expr: AstNode
     body: AstBlock
@@ -200,13 +200,6 @@ struct AstForRange {
     name: str
     start: AstNode
     end: AstNode
-    body: AstBlock
-}
-
-struct AstForIn {
-    meta: AstMeta
-    name: str
-    source: AstNode
     body: AstBlock
 }
 
@@ -366,7 +359,7 @@ struct AstUnionInit {
 }
 
 
-type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_new_program(): AstProgram {
     ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
@@ -432,7 +425,6 @@ fun ast_name(node: AstNode): str {
         AstAssign n: { ret n.name }
         AstFieldSet n: { ret n.name }
         AstForRange n: { ret n.name }
-        AstForIn n: { ret n.name }
         AstVar n: { ret n.name }
         AstCall n: { ret n.name }
         AstDotCall n: { ret n.name }
@@ -448,14 +440,14 @@ fun ast_fields(node: AstNode): AstNode[] {
     match node {
         AstStructDef n: {
             let out = new AstNode[]
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 out.push(new AstNode(n.fields[i]))
             }
             ret out
         }
         AstMatch n: {
             let out = new AstNode[]
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 out.push(new AstNode(n.fields[i]))
             }
             ret out
@@ -463,7 +455,7 @@ fun ast_fields(node: AstNode): AstNode[] {
         AstFString n: { ret n.fields }
         AstStructInit n: {
             let out = new AstNode[]
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 out.push(new AstNode(n.fields[i]))
             }
             ret out
@@ -477,12 +469,12 @@ fun ast_params(node: AstNode): AstNode[] {
     match node {
         AstExternDef n: {
             let out = new AstNode[]
-            for i in n.params { out.push(new AstNode(n.params[i])) }
+            for i: 0:len(n.params) { out.push(new AstNode(n.params[i])) }
             ret out
         }
         AstFunDef n: {
             let out = new AstNode[]
-            for i in n.params {
+            for i: 0:len(n.params) {
                 out.push(new AstNode(n.params[i]))
             }
             ret out
@@ -509,9 +501,8 @@ fun ast_source_type(node: AstNode): TypeExpr {
 fun ast_body(node: AstNode): AstNode {
     match node {
         AstFunDef n: { ret new AstNode(n.body) }
-        AstWhile n: { ret new AstNode(n.body) }
+        AstLoop n: { ret new AstNode(n.body) }
         AstForRange n: { ret new AstNode(n.body) }
-        AstForIn n: { ret new AstNode(n.body) }
         AstMatchCase n: { ret new AstNode(n.body) }
         else: {}
     }
@@ -548,7 +539,7 @@ fun ast_expr(node: AstNode): AstNode {
         AstReturn n: { ret n.expr }
         AstAssignOp n: { ret n.expr }
         AstIf n: { ret n.expr }
-        AstWhile n: { ret n.expr }
+        AstLoop n: { ret n.expr }
         AstPanic n: { ret n.expr }
         AstAssert n: { ret n.expr }
         AstMatch n: { ret n.expr }
@@ -635,14 +626,6 @@ fun ast_end(node: AstNode): AstNode {
     match node {
         AstForRange n: { ret n.end }
         AstSlice n: { ret n.end }
-        else: {}
-    }
-    ret ast_empty()
-}
-
-fun ast_source(node: AstNode): AstNode {
-    match node {
-        AstForIn n: { ret n.source }
         else: {}
     }
     ret ast_empty()
@@ -874,7 +857,7 @@ fun (p: Parser) parse_fn_def(): AstFunDef {
     }
     p.expect("LPAREN")
     let more_params = p.parse_params()
-    for i in more_params {
+    for i: 0:len(more_params) {
         params.push(more_params[i])
     }
     p.expect("RPAREN")
@@ -1255,28 +1238,22 @@ fun (p: Parser) parse_match_stmt(): AstNode {
 }
 
 fun (p: Parser) parse_for_stmt(): AstNode {
-    p.expect("FOR")
-    if p.peek_kind("ID") == 1 && p.pos + 1 < len(p.tokens) && token_kind(p.tokens[p.pos + 1]) == "IN" {
+    let token = p.expect("FOR")
+    if p.peek_kind("ID") == 1 && p.pos + 1 < len(p.tokens) && token_kind(p.tokens[p.pos + 1]) == "COLON" {
         let name = p.expect("ID")
-        p.expect("IN")
-        let source = p.parse_expr()
-        if p.check("COLON") == 1 {
-            let end = p.parse_expr()
-            p.loop_depth += 1
-            let body = p.parse_block()
-            p.loop_depth -= 1
-
-            let out = new AstForRange { meta: ast_meta(), name: token_text(name), start: source, end: end, body: body }
-            ret new AstNode(out)
-        }
+        p.expect("COLON")
+        let start = p.parse_expr()
+        p.expect("COLON")
+        let end = p.parse_expr()
         p.loop_depth += 1
         let body = p.parse_block()
         p.loop_depth -= 1
-
-        let out = new AstForIn { meta: ast_meta(), name: token_text(name), source: source, body: body }
+        let out = new AstForRange { meta: ast_meta(), name: token_text(name), start: start, end: end, body: body }
+        out.meta.line = token_line(token)
         ret new AstNode(out)
     }
-    let node = new AstWhile { meta: ast_meta(), expr: p.parse_expr(), body: ast_new_block() }
+    let node = new AstLoop { meta: ast_meta(), expr: p.parse_expr(), body: ast_new_block() }
+    node.meta.line = token_line(token)
     p.loop_depth += 1
     node.body = p.parse_block()
     p.loop_depth -= 1
@@ -1599,7 +1576,7 @@ fun (p: Parser) parse_array_literal(name: Token): AstNode {
 
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[]
-    for i in parts {
+    for i: 0:len(parts) {
         match parts[i] {
             FStringTextPart part: {
                 if len(part.text) > 0 {
@@ -1873,14 +1850,14 @@ fun (p: Parser) parse_expr(): AstNode {
 }
 
 fun indent(n: i64): i64 {
-    for i in 0:n {
+    for i: 0:n {
         print("  ")
     }
     ret 0
 }
 
 fun dump_list(nodes: AstNode[], depth: i64): i64 {
-    for i in nodes {
+    for i: 0:len(nodes) {
         dump_node(nodes[i], depth)
     }
     ret 0
@@ -1948,7 +1925,6 @@ fun dump_node_tail(node: AstNode, depth: i64, is_string: bool): i64 {
     dump_node(ast_index(node), depth + 1)
     dump_node(ast_start(node), depth + 1)
     dump_node(ast_end(node), depth + 1)
-    dump_node(ast_source(node), depth + 1)
     dump_node(ast_count(node), depth + 1)
     dump_list(ast_args(node), depth + 1)
     ret 0
@@ -1970,16 +1946,16 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstProgram n: {
             indent(depth)
             println("Program")
-            for i in n.structs {
+            for i: 0:len(n.structs) {
                 dump_node(new AstNode(n.structs[i]), depth + 1)
             }
-            for i in n.unions {
+            for i: 0:len(n.unions) {
                 dump_node(new AstNode(n.unions[i]), depth + 1)
             }
-            for i in n.externs {
+            for i: 0:len(n.externs) {
                 dump_node(new AstNode(n.externs[i]), depth + 1)
             }
-            for i in n.funcs {
+            for i: 0:len(n.funcs) {
                 dump_node(new AstNode(n.funcs[i]), depth + 1)
             }
             ret 0
@@ -1988,7 +1964,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             indent(depth)
             println("Match")
             dump_node(n.expr, depth + 1)
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 dump_node(new AstNode(n.fields[i]), depth + 1)
             }
             if n.has_else {
@@ -2016,7 +1992,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             indent(depth)
             print("UnionDef ")
             println(n.name)
-            for i in n.members {
+            for i: 0:len(n.members) {
                 indent(depth + 1)
                 print("UnionMember ")
                 println(n.members[i])
@@ -2066,9 +2042,8 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstFieldSet n: { ret dump_node_generic(node, depth, "FieldSet", false) }
         AstSubscriptAssign n: { ret dump_node_generic(node, depth, "SubscriptAssign", false) }
         AstIf n: { ret dump_node_generic(node, depth, "If", false) }
-        AstWhile n: { ret dump_node_generic(node, depth, "While", false) }
+        AstLoop n: { ret dump_node_generic(node, depth, "Loop", false) }
         AstForRange n: { ret dump_node_generic(node, depth, "ForRange", false) }
-        AstForIn n: { ret dump_node_generic(node, depth, "ForIn", false) }
         AstBreak n: { ret dump_node_generic(node, depth, "Break", false) }
         AstContinue n: { ret dump_node_generic(node, depth, "Continue", false) }
         AstPanic n: { ret dump_node_generic(node, depth, "Panic", false) }

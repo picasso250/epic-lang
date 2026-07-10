@@ -54,7 +54,7 @@ fun align_to(n: i64, a: i64): i64 {
 }
 
 fun append_zero(buf: u8[], n: i64): void {
-    for i in 0:n {
+    for i: 0:n {
         buf.push(u8(0))
     }
 }
@@ -142,7 +142,7 @@ fun cstr_ready_path(s: str): str {
 
 fun append_name8(buf: u8[], name: str): void {
     let bs = bytes(name)
-    for i in 0:8 {
+    for i: 0:8 {
         if i < len(bs) {
             buf.push(bs[i])
         } else {
@@ -193,7 +193,7 @@ fun append_dos_stub(buf: u8[]): void {
 
 fun copy_bytes(src: u8[], off: i64, n: i64): u8[] {
     let out = new u8[n]
-    for i in 0:n {
+    for i: 0:n {
         out[i] = src[off + i]
     }
     ret out
@@ -201,7 +201,7 @@ fun copy_bytes(src: u8[], off: i64, n: i64): u8[] {
 
 fun str_from_bytes_until_zero(src: u8[], off: i64, max_n: i64): str {
     let out = new u8[]
-    for i in 0:max_n {
+    for i: 0:max_n {
         let b = src[off + i]
         if b == u8(0) {
             ret str(out)
@@ -221,9 +221,9 @@ fun find_text(s: str, needle: str): i64 {
     if len(hay) < n {
         ret -1
     }
-    for i in 0:(len(hay) - n + 1) {
+    for i: 0:(len(hay) - n + 1) {
         let ok = true
-        for j in 0:n {
+        for j: 0:n {
             if hay[i + j] != pat[j] {
                 ok = false
             }
@@ -243,7 +243,7 @@ fun has_text(s: str, needle: str): i64 {
 }
 
 fun get_name_value(items: NameValue[], name: str): i64 {
-    for i in items {
+    for i: 0:len(items) {
         let item = items[i]
         if item.name == name {
             ret item.value
@@ -260,7 +260,7 @@ fun put_name_value(items: NameValue[], name: str, value: i64): void {
 }
 
 fun set_name_value(items: NameValue[], name: str, value: i64): void {
-    for i in items {
+    for i: 0:len(items) {
         if items[i].name == name {
             items[i].value = value
             ret
@@ -270,7 +270,7 @@ fun set_name_value(items: NameValue[], name: str, value: i64): void {
 }
 
 fun contains_str(items: str[], name: str): i64 {
-    for i in items {
+    for i: 0:len(items) {
         if items[i] == name {
             ret 1
         }
@@ -286,7 +286,7 @@ fun sym_name(st: LinkState, sym: Symbol): str {
 }
 
 fun parse_sections(st: LinkState, nsects: i64): void {
-    for i in 0:nsects {
+    for i: 0:nsects {
         let off = 20 + i * 40
         let sec = new Section
         sec.name = str_from_bytes_until_zero(st.data, off, 8)
@@ -315,7 +315,7 @@ fun parse_symbols(st: LinkState, symtab_off: i64, nsyms: i64): void {
         sym.aux = i64(st.data[pos + 17])
         st.syms.push(sym)
 
-        for j in 0:sym.aux {
+        for j: 0:sym.aux {
             let aux_sym = new Symbol
             aux_sym.name_off = 0 - 1
             aux_sym.raw_off = 0
@@ -365,11 +365,11 @@ fun import_less_casefold(a: str, b: str): bool {
 
 fun sorted_imports(items: str[]): str[] {
     let out = new str[]
-    for i in items {
+    for i: 0:len(items) {
         let key = items[i]
         let next = new str[]
         let inserted = false
-        for j in out {
+        for j: 0:len(out) {
             if !inserted && import_less_casefold(key, out[j]) {
                 next.push(key)
                 inserted = true
@@ -385,7 +385,7 @@ fun sorted_imports(items: str[]): str[] {
 }
 
 fun collect_imports(st: LinkState): void {
-    for i in st.syms {
+    for i: 0:len(st.syms) {
         let sym = st.syms[i]
         if sym.section == 0 && sym.aux == 0 {
             let name = sym_name(st, sym)
@@ -397,9 +397,9 @@ fun collect_imports(st: LinkState): void {
 }
 
 fun collect_relocs(st: LinkState): void {
-    for si in st.sections {
+    for si: 0:len(st.sections) {
         let sec = st.sections[si]
-        for ri in 0:sec.nrel {
+        for ri: 0:sec.nrel {
             let rp = sec.rel_off + ri * 10
             let rtype = le16_as_i64(st.data, rp + 8)
             let sym_i = le32_as_i64(st.data, rp + 4)
@@ -435,7 +435,7 @@ fun import_has_prefix(name: str, prefix: str): bool {
 fun import_lower_text(text: str): str {
     let src = bytes(text)
     let out = new u8[]
-    for i in src { out.push(ascii_lower_byte(src[i])) }
+    for i: 0:len(src) { out.push(ascii_lower_byte(src[i])) }
     ret str(out)
 }
 
@@ -474,7 +474,7 @@ fun import_symbol_name(name: str): str {
 
 fun import_dlls(st: LinkState): str[] {
     let dlls = new str[]
-    for i in st.imports {
+    for i: 0:len(st.imports) {
         let dll = import_dll_name(st.imports[i])
         if contains_str(dlls, dll) == 0 { dlls.push(dll) }
     }
@@ -483,7 +483,7 @@ fun import_dlls(st: LinkState): str[] {
 
 fun import_count_for_dll(st: LinkState, dll: str): i64 {
     let count = 0
-    for i in st.imports {
+    for i: 0:len(st.imports) {
         if import_dll_name(st.imports[i]) == dll { count += 1 }
     }
     ret count
@@ -497,7 +497,7 @@ fun import_iat_dir_offset(st: LinkState): i64 {
     let dlls = import_dlls(st)
     if len(dlls) == 0 { ret 0 }
     let off = align_to((len(dlls) + 1) * 20, 8)
-    for i in dlls {
+    for i: 0:len(dlls) {
         off += (import_count_for_dll(st, dlls[i]) + 1) * 8
         off = align_to(off, 8)
     }
@@ -507,7 +507,7 @@ fun import_iat_dir_offset(st: LinkState): i64 {
 fun import_iat_dir_size(st: LinkState): i64 {
     let size = 0
     let dlls = import_dlls(st)
-    for i in dlls {
+    for i: 0:len(dlls) {
         size += (import_count_for_dll(st, dlls[i]) + 1) * 8
     }
     ret size
@@ -519,7 +519,7 @@ fun import_hint(name: str): i64 {
 }
 
 fun find_section(st: LinkState, needle: str): Section {
-    for i in st.sections {
+    for i: 0:len(st.sections) {
         let sec = st.sections[i]
         if has_text(sec.name, needle) == 1 {
             ret sec
@@ -534,7 +534,7 @@ fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void 
         text_sec.data.push(u8(204))
     }
     let thunk_base = text_rva + len(text_sec.data)
-    for i in st.imports {
+    for i: 0:len(st.imports) {
         let name = st.imports[i]
         let rva = thunk_base + i * 16
         put_name_value(st.thunk_rvas, name, rva)
@@ -542,7 +542,7 @@ fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void 
         text_sec.data.push(u8(37))
         append_zero(text_sec.data, 4)
         append_zero(text_sec.data, 10)
-        for j in 0:10 {
+        for j: 0:10 {
             text_sec.data[len(text_sec.data) - 1 - j] = u8(204)
         }
     }
@@ -560,14 +560,14 @@ fun build_idata(st: LinkState): void {
     let iat_group_offsets = new NameValue[]
     let next_indexes = new NameValue[]
 
-    for di in dlls {
+    for di: 0:len(dlls) {
         let dll = dlls[di]
         for len(st.idata) % 8 != 0 { st.idata.push(u8(0)) }
         put_name_value(ilt_offsets, dll, len(st.idata))
         append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
-    for di in dlls {
+    for di: 0:len(dlls) {
         let dll = dlls[di]
         for len(st.idata) % 8 != 0 { st.idata.push(u8(0)) }
         put_name_value(iat_group_offsets, dll, len(st.idata))
@@ -575,7 +575,7 @@ fun build_idata(st: LinkState): void {
         append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
-    for i in st.imports {
+    for i: 0:len(st.imports) {
         let encoded = st.imports[i]
         let dll = import_dll_name(encoded)
         let symbol = import_symbol_name(encoded)
@@ -593,7 +593,7 @@ fun build_idata(st: LinkState): void {
         set_name_value(next_indexes, dll, index + 1)
     }
 
-    for di in dlls {
+    for di: 0:len(dlls) {
         let dll = dlls[di]
         let dll_off = len(st.idata)
         append_str(st.idata, dll)
@@ -617,7 +617,7 @@ fun section_rva(st: LinkState, sec_index: i64): i64 {
 
 fun find_entry(st: LinkState): void {
     st.entry_rva = 4096
-    for i in st.syms {
+    for i: 0:len(st.syms) {
         let sym = st.syms[i]
         if sym.section > 0 {
             let name = sym_name(st, sym)
@@ -630,7 +630,7 @@ fun find_entry(st: LinkState): void {
 }
 
 fun patch_thunks(st: LinkState, text_sec: Section): void {
-    for i in st.imports {
+    for i: 0:len(st.imports) {
         let name = st.imports[i]
         let thunk = get_name_value(st.thunk_rvas, name)
         let iat = get_name_value(st.iat_offsets, name)
@@ -641,7 +641,7 @@ fun patch_thunks(st: LinkState, text_sec: Section): void {
 }
 
 fun patch_relocs(st: LinkState, text_sec: Section): void {
-    for i in st.relocs {
+    for i: 0:len(st.relocs) {
         let rel = st.relocs[i]
         let sym = st.syms[rel.sym_i]
         let target = 0

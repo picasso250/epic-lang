@@ -635,7 +635,7 @@ fun mir_program_add_struct_field(program: MirProgram, struct_name: str, field_ty
 }
 
 fun mir_name_in(names: str[], name: str): bool {
-    for i in names {
+    for i: 0:len(names) {
         if names[i] == name {
             ret true
         }

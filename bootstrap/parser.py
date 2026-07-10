@@ -377,20 +377,18 @@ class Parser:
         return IfNode(cond=cond, then_block=then_block, else_block=else_block)
 
     def parse_for_stmt(self):
-        self.expect("FOR")
-        if self.peek_kind("ID") and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "IN":
+        token = self.expect("FOR")
+        if self.peek_kind("ID") and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "COLON":
             name = self.expect("ID")
-            self.expect("IN")
-            source = self.parse_expr()
-            if self.check("COLON"):
-                end = self.parse_expr()
-                body = self.parse_block()
-                return ForRangeNode(name=name[1], start=source, end=end, body=body)
+            self.expect("COLON")
+            start = self.parse_expr()
+            self.expect("COLON")
+            end = self.parse_expr()
             body = self.parse_block()
-            return ForInNode(name=name[1], source=source, body=body)
+            return ForRangeNode(name=name[1], start=start, end=end, body=body, line=token[2])
         cond = self.parse_expr()
         body = self.parse_block()
-        return WhileNode(cond=cond, body=body)
+        return LoopNode(cond=cond, body=body, line=token[2])
 
     def parse_panic_stmt(self):
         t = self.expect("PANIC")
@@ -789,8 +787,8 @@ def dump_ast_lines(node, depth=0):
         if node.else_block is not None:
             out.extend(dump_ast_lines(node.else_block, depth + 1))
         out.extend(dump_ast_lines(node.cond, depth + 1))
-    elif isinstance(node, WhileNode):
-        emit("While")
+    elif isinstance(node, LoopNode):
+        emit("Loop")
         out.extend(dump_ast_lines(node.body, depth + 1))
         out.extend(dump_ast_lines(node.cond, depth + 1))
     elif isinstance(node, BreakNode):
@@ -802,10 +800,6 @@ def dump_ast_lines(node, depth=0):
         out.extend(dump_ast_lines(node.body, depth + 1))
         out.extend(dump_ast_lines(node.start, depth + 1))
         out.extend(dump_ast_lines(node.end, depth + 1))
-    elif isinstance(node, ForInNode):
-        emit(f"ForIn {node.name}{_type_suffix(node)}")
-        out.extend(dump_ast_lines(node.body, depth + 1))
-        out.extend(dump_ast_lines(node.source, depth + 1))
     elif isinstance(node, PanicNode):
         emit("Panic")
         out.extend(dump_ast_lines(node.message, depth + 1))

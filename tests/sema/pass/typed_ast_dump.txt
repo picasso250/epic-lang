@@ -39,6 +39,8 @@ Program
             Var label : str
   FunDef use_scalars : i64
     Block
+      Let in : i64
+        Literal 42 : i64
       Let a : i64
         Literal 1 : i64
       Let b : i64
@@ -227,12 +229,14 @@ Program
         Literal 1 : i64
       Let index_sum : i64
         Literal 0 : i64
-      ForIn i : i64
+      ForRange i : i64
         Block
           AssignOp +
             Var index_sum : i64
             Var i : i64
-        Var xs : i64[]
+        Literal 0 : i64
+        Call len : i64
+          Var xs : i64[]
       Let popped : i64
         DotCall pop : i64
           Var xs : i64[]
@@ -345,7 +349,7 @@ Program
             Var i : i64
         Literal 0 : i64
         Var limit : i64
-      While
+      Loop
         Block
           AssignOp +
             Var total : i64

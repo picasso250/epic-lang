@@ -5,11 +5,11 @@
 # STDOUT: 3
 fun main(): void {
     let end = 4
-    for i in 0:end {
+    for i: 0:end {
         println(str(i))
         end = end + 1
     }
-    for j in end:end {
+    for j: end:end {
         println(str(j))
     }
     exit(0)

@@ -130,7 +130,7 @@ class IfNode(ASTNode):
 
 
 @dataclass
-class WhileNode(ASTNode):
+class LoopNode(ASTNode):
     cond: ASTNode
     body: BlockNode
 
@@ -150,14 +150,6 @@ class ForRangeNode(ASTNode):
     name: str
     start: ASTNode
     end: ASTNode
-    body: 'BlockNode'
-    resolved_type: Optional[EpicType] = None
-
-
-@dataclass
-class ForInNode(ASTNode):
-    name: str
-    source: ASTNode
     body: 'BlockNode'
     resolved_type: Optional[EpicType] = None
 

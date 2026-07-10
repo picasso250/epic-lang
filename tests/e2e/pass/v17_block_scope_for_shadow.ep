@@ -1,7 +1,7 @@
 # EXIT: 0
 fun main(): i64 {
     let i = 5
-    for i in 0:3 {
+    for i: 0:3 {
         let inner = i
         if inner < 0 {
             ret 1

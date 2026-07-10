@@ -24,7 +24,7 @@ fun sema_die(msg: str): void {
 }
 
 fun sema_string_contains(values: str[], value: str): bool {
-    for i in values {
+    for i: 0:len(values) {
         if values[i] == value {
             ret true
         }
@@ -33,7 +33,7 @@ fun sema_string_contains(values: str[], value: str): bool {
 }
 
 fun sema_struct_index(st: SemaState, name: str): i64 {
-    for i in st.structs {
+    for i: 0:len(st.structs) {
         if st.structs[i].name == name {
             ret i
         }
@@ -42,7 +42,7 @@ fun sema_struct_index(st: SemaState, name: str): i64 {
 }
 
 fun sema_union_index(st: SemaState, name: str): i64 {
-    for i in st.unions {
+    for i: 0:len(st.unions) {
         if st.unions[i].name == name {
             ret i
         }
@@ -51,14 +51,14 @@ fun sema_union_index(st: SemaState, name: str): i64 {
 }
 
 fun sema_extern_index(st: SemaState, name: str): i64 {
-    for i in st.externs {
+    for i: 0:len(st.externs) {
         if st.externs[i].name == name { ret i }
     }
     ret -1
 }
 
 fun sema_func_index(st: SemaState, name: str): i64 {
-    for i in st.funcs {
+    for i: 0:len(st.funcs) {
         if st.funcs[i].name == name {
             ret i
         }
@@ -72,7 +72,7 @@ fun sema_union_member_index(st: SemaState, union_name: str, member_name: str): i
         ret -1
     }
     let members = st.unions[union_index].members
-    for i in members {
+    for i: 0:len(members) {
         if members[i] == member_name {
             ret i
         }
@@ -96,7 +96,7 @@ fun sema_is_extern_abi_type(t: str): bool {
 fun sema_validate_extern_library(name: str, library: str): void {
     if len(library) == 0 { sema_die(f"extern {name} requires a non-empty library") }
     let data = bytes(library)
-    for i in data {
+    for i: 0:len(data) {
         if data[i] == u8(0) || data[i] == u8(36) {
             sema_die(f"extern {name} library contains an unsupported character")
         }
@@ -184,7 +184,7 @@ fun sema_pop_scope(st: SemaState): void {
     let mark = st.local_scope_marks.pop()
     let names = new str[]
     let types = new str[]
-    for i in 0:mark {
+    for i: 0:mark {
         names.push(st.local_names[i])
         types.push(st.local_types[i])
     }
@@ -226,7 +226,7 @@ fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): st
     }
     let found = ""
     let members = st.unions[union_index].members
-    for i in members {
+    for i: 0:len(members) {
         let member = members[i]
         let candidate = sema_direct_field_type_or_empty(st, member, field)
         if candidate == "" {
@@ -285,7 +285,7 @@ fun sema_digit_value(c: u8): i64 {
 fun sema_parse_i64(s: str): i64 {
     let bs = bytes(s)
     let n = 0
-    for i in bs {
+    for i: 0:len(bs) {
         n = n * 10 + sema_digit_value(bs[i])
     }
     ret n
@@ -300,7 +300,7 @@ fun sema_decimal_gt(a: str, b: str): bool {
     }
     let ab = bytes(a)
     let bb = bytes(b)
-    for i in ab {
+    for i: 0:len(ab) {
         if ab[i] > bb[i] {
             ret true
         }
@@ -479,7 +479,7 @@ fun sema_check_func_call_args(st: SemaState, name: str, args: AstNode[]): void {
     }
     let fn = st.funcs[func_index]
     sema_check_arity(name, len(fn.params), args)
-    for i in fn.params {
+    for i: 0:len(fn.params) {
         sema_check_assign(st, fn.params[i].meta.resolved_type, args[i], f"{name} argument {i + 1}")
     }
 }
@@ -491,7 +491,7 @@ fun sema_union_members_text(st: SemaState, union_name: str): str {
     }
     let out = ""
     let members = st.unions[union_index].members
-    for i in members {
+    for i: 0:len(members) {
         if i > 0 {
             out = (out + ", ")
         }
@@ -507,7 +507,7 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: str[]): str {
     }
     let out = ""
     let members = st.unions[union_index].members
-    for i in members {
+    for i: 0:len(members) {
         let member = members[i]
         if sema_string_contains(seen, member) == false {
             if out != "" {
@@ -523,7 +523,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
             st.structs = program.structs
-            for i in program.unions {
+            for i: 0:len(program.unions) {
                 let u = program.unions[i]
                 if sema_struct_index(st, u.name) >= 0 {
                     sema_die(f"type {u.name} conflicts with struct {u.name}")
@@ -536,10 +536,10 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                 }
                 st.unions.push(u)
             }
-            for i in st.structs {
+            for i: 0:len(st.structs) {
                 let s = st.structs[i]
                 let seen = new str[]
-                for j in s.fields {
+                for j: 0:len(s.fields) {
                     let f = s.fields[j]
                     if sema_string_contains(seen, f.name) {
                         sema_die(f"duplicate field {((s.name + ".") + f.name)}")
@@ -548,10 +548,10 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                     f.meta.resolved_type = sema_type_name(st, f.source_type)
                 }
             }
-            for i in st.unions {
+            for i: 0:len(st.unions) {
                 let u = st.unions[i]
                 let seen = new str[]
-                for j in u.members {
+                for j: 0:len(u.members) {
                     let member = u.members[j]
                     if sema_string_contains(seen, member) {
                         sema_die(f"duplicate union member {((u.name + ".") + member)}")
@@ -573,7 +573,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
     match ast {
         AstProgram program: {
             st.externs = program.externs
-            for ei in program.externs {
+            for ei: 0:len(program.externs) {
                 let ext = program.externs[ei]
                 sema_validate_extern_library(ext.name, ext.library)
                 if sema_is_reserved_func(ext.name) { sema_die(f"reserved builtin function name: {ext.name}") }
@@ -584,7 +584,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                 if ext.meta.resolved_type != "void" && sema_is_extern_abi_type(ext.meta.resolved_type) == false {
                     sema_die(f"extern {ext.name} has unsupported ABI return type {ext.meta.resolved_type}")
                 }
-                for pi in ext.params {
+                for pi: 0:len(ext.params) {
                     let p = ext.params[pi]
                     p.meta.resolved_type = sema_type_name(st, p.source_type)
                     if sema_is_extern_abi_type(p.meta.resolved_type) == false {
@@ -592,7 +592,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                     }
                 }
             }
-            for i in program.funcs {
+            for i: 0:len(program.funcs) {
                 let f = program.funcs[i]
                 if sema_func_index(st, f.name) >= 0 || sema_extern_index(st, f.name) >= 0 {
                     sema_die(f"duplicate function {f.name}")
@@ -606,7 +606,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                     sema_die(f"reserved builtin function name: {f.name}")
                 }
                 f.meta.resolved_type = sema_type_name(st, f.source_type)
-                for j in f.params {
+                for j: 0:len(f.params) {
                     let p = f.params[j]
                     p.meta.resolved_type = sema_type_name(st, p.source_type)
                     if p.meta.resolved_type == "void" {
@@ -668,7 +668,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, "str")
         }
         AstFString n: {
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 let part = n.fields[i]
                 match part {
                     AstFStringText text: {}
@@ -779,7 +779,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         AstArrayLiteral n: {
             let elem = sema_type_name(st, n.elem_type)
-            for i in n.args {
+            for i: 0:len(n.args) {
                 sema_check_assign(st, elem, n.args[i], "array literal element")
             }
             ret sema_set_type(node, (elem + "[]"))
@@ -789,7 +789,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                 sema_die(f"unknown struct {n.name}")
             }
             let seen = new str[]
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 let f = n.fields[i]
                 if sema_string_contains(seen, f.name) {
                     sema_die(f"duplicate field initializer {((n.name + ".") + f.name)}")
@@ -850,7 +850,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         }
         let args = new AstNode[]
         args.push(node.object)
-        for i in node.args {
+        for i: 0:len(node.args) {
             args.push(node.args[i])
         }
         sema_check_func_call_args(st, method_symbol, args)
@@ -956,7 +956,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     if extern_index >= 0 {
         let ext = st.externs[extern_index]
         sema_check_arity(node.name, len(ext.params), node.args)
-        for i in ext.params { sema_check_assign(st, ext.params[i].meta.resolved_type, node.args[i], f"{node.name} argument {i + 1}") }
+        for i: 0:len(ext.params) { sema_check_assign(st, ext.params[i].meta.resolved_type, node.args[i], f"{node.name} argument {i + 1}") }
         ret ext.meta.resolved_type
     }
     let func_index = sema_func_index(st, node.name)
@@ -965,7 +965,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     }
     let fn = st.funcs[func_index]
     sema_check_arity(node.name, len(fn.params), node.args)
-    for i in fn.params {
+    for i: 0:len(fn.params) {
         sema_check_assign(st, fn.params[i].meta.resolved_type, node.args[i], f"{node.name} argument {i + 1}")
     }
     ret fn.meta.resolved_type
@@ -1072,37 +1072,19 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             }
             ret
         }
-        AstWhile n: {
-            sema_expect_bool(st, n.expr, "for condition")
+        AstLoop n: {
+            sema_expect_bool(st, n.expr, "loop condition")
             st.loop_depth += 1
             sema_block(st, n.body)
             st.loop_depth -= 1
             ret
         }
         AstForRange n: {
-            sema_expect_int(st, n.start, "for range start")
-            sema_expect_int(st, n.end, "for range end")
+            sema_check_assign(st, "i64", n.start, "for range start")
+            sema_check_assign(st, "i64", n.end, "for range end")
             ast_set_resolved_type(node, "i64")
             sema_push_scope(st)
             sema_define_local(st, n.name, "i64")
-            st.loop_depth += 1
-            sema_block(st, n.body)
-            st.loop_depth -= 1
-            sema_pop_scope(st)
-            ret
-        }
-        AstForIn n: {
-            let source_type = sema_expr_type(st, n.source)
-            if epic_type_is_array(source_type) {
-                ast_set_resolved_type(node, "i64")
-                sema_push_scope(st)
-                sema_define_local(st, n.name, "i64")
-            } else {
-                if source_type == "str" {
-                    sema_die("for-in over str is not supported; use bytes(s) to iterate bytes")
-                }
-                sema_die(f"for-in expected array, got {source_type}")
-            }
             st.loop_depth += 1
             sema_block(st, n.body)
             st.loop_depth -= 1
@@ -1137,7 +1119,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             let scrutinee = sema_expr_type(st, n.expr)
             if sema_union_index(st, scrutinee) >= 0 {
                 let seen = new str[]
-                for i in n.fields {
+                for i: 0:len(n.fields) {
                     let c = n.fields[i]
                     match c.expr {
                         AstEmpty e: {}
@@ -1169,7 +1151,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 }
                 ret
             }
-            for i in n.fields {
+            for i: 0:len(n.fields) {
                 let c = n.fields[i]
                 if c.variant_name != "" || c.binding_name != "" {
                     sema_die("ADT match case requires union scrutinee")
@@ -1190,7 +1172,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
 
 fun sema_block(st: SemaState, block: AstBlock): void {
     sema_push_scope(st)
-    for i in block.stmts {
+    for i: 0:len(block.stmts) {
         sema_stmt(st, block.stmts[i])
     }
     if block.has_value {
@@ -1202,7 +1184,7 @@ fun sema_block(st: SemaState, block: AstBlock): void {
 fun sema_function_body(st: SemaState, block: AstBlock): str {
     let tail_type = ""
     sema_push_scope(st)
-    for i in block.stmts {
+    for i: 0:len(block.stmts) {
         sema_stmt(st, block.stmts[i])
     }
     if block.has_value {
@@ -1237,7 +1219,7 @@ fun sema_stmt_returns(node: AstNode): bool {
             if stmt.has_else == false {
                 ret false
             }
-            for i in stmt.fields {
+            for i: 0:len(stmt.fields) {
                 let c = stmt.fields[i]
                 if sema_block_returns(c.body) == false {
                     ret false
@@ -1251,7 +1233,7 @@ fun sema_stmt_returns(node: AstNode): bool {
 }
 
 fun sema_block_returns(block: AstBlock): bool {
-    for i in block.stmts {
+    for i: 0:len(block.stmts) {
         if sema_stmt_returns(block.stmts[i]) {
             ret true
         }
@@ -1267,13 +1249,13 @@ fun sema_program(st: SemaState, ast: AstNode): void {
     sema_build_funcs(st, ast)
     match ast {
         AstProgram program: {
-            for i in program.funcs {
+            for i: 0:len(program.funcs) {
                 let f = program.funcs[i]
                 sema_reset_locals(st)
                 st.current_fn = f.name
                 st.current_ret = f.meta.resolved_type
                 st.loop_depth = 0
-                for j in f.params {
+                for j: 0:len(f.params) {
                     let p = f.params[j]
                     sema_define_local(st, p.name, p.meta.resolved_type)
                 }

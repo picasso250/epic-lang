@@ -196,35 +196,18 @@ class SemanticAnalyzer:
             if stmt.else_block is not None:
                 self._analyze_block(stmt.else_block)
             return
-        if isinstance(stmt, WhileNode):
-            self._expect_bool(self._expr(stmt.cond), "for condition")
+        if isinstance(stmt, LoopNode):
+            self._expect_bool(self._expr(stmt.cond), "loop condition")
             self.loop_depth += 1
             self._analyze_block(stmt.body)
             self.loop_depth -= 1
             return
         if isinstance(stmt, ForRangeNode):
-            self._expect_integer(self._expr(stmt.start), "for range start")
-            self._expect_integer(self._expr(stmt.end), "for range end")
+            self._check_assign(I64, self._expr(stmt.start), "for range start")
+            self._check_assign(I64, self._expr(stmt.end), "for range end")
             stmt.resolved_type = I64
             self._push_scope()
             self._define_local(stmt.name, I64)
-            self.loop_depth += 1
-            try:
-                self._analyze_block(stmt.body)
-            finally:
-                self.loop_depth -= 1
-                self._pop_scope()
-            return
-        if isinstance(stmt, ForInNode):
-            source = self._expr(stmt.source)
-            if source.type.kind == "array":
-                stmt.resolved_type = I64
-            elif source.type == STR:
-                self._fail("for-in over str is not supported; use bytes(s) to iterate bytes")
-            else:
-                self._fail(f"for-in expected array, got {source.type}")
-            self._push_scope()
-            self._define_local(stmt.name, stmt.resolved_type)
             self.loop_depth += 1
             try:
                 self._analyze_block(stmt.body)
@@ -932,7 +915,7 @@ def assert_typed_program(program):
             if node.else_block is not None:
                 block(node.else_block, f"{path}.else")
             return
-        if isinstance(node, WhileNode):
+        if isinstance(node, LoopNode):
             expr(node.cond, f"{path}.cond")
             block(node.body, f"{path}.body")
             return
@@ -940,11 +923,6 @@ def assert_typed_program(program):
             require(node, path)
             expr(node.start, f"{path}.start")
             expr(node.end, f"{path}.end")
-            block(node.body, f"{path}.body")
-            return
-        if isinstance(node, ForInNode):
-            require(node, path)
-            expr(node.source, f"{path}.source")
             block(node.body, f"{path}.body")
             return
         if isinstance(node, (BreakNode, ContinueNode)):

@@ -127,7 +127,7 @@ let xs = new u8[]
 
 `str`、`T[]`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
 
-Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / `while` 条件仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
+Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / 条件 `for` 仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
 
 ### 运算符 (Operators)
 
@@ -160,11 +160,11 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 ### 控制流 (Control Flow)
 
 - `if` / `else if` / `else`，条件为显式布尔表达式；reference null-check 请写 `expr?`。
-- `while`，条件为显式布尔表达式；reference null-check 请写 `expr?`。
-- `break` 和 `continue` 绑定到最近的 `while` 循环。
-- `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`i` 是 loop block scoped cursor，也是实际 numeric cursor；修改 `i` 会影响循环进度。`continue` 跳到增量步骤。
-- `for i in xs` — array index iteration。`xs` 必须是 `T[]`；`i: i64`，是 loop block scoped cursor，也是实际 index cursor。array 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`，如果当前 index 已无效则结束。循环中 `push` 不扩展本次循环，`pop` 可能导致提前结束。
-- `for ... in str` 不支持；需要按字节遍历时显式写 `bytes(s)`。
+- `for cond` — 条件循环；`cond` 必须是显式布尔表达式，reference null-check 请写 `expr?`。
+- `for i: start:end` — 范围循环，半开递增区间 `[start, end)`。`start` 和 `end` 必须是 `i64`，进入循环前按从左到右顺序各求值一次；之后修改边界来源不会改变本次循环次数。
+- 范围 cursor `i: i64` 只在循环 body 内可见。每轮正常结束后自动加一；`continue` 先跳到增量步骤，`break` 立即退出。`start >= end` 时执行零次。不支持隐式倒序、step 或省略起点。
+- Epic 当前没有 iterable/元素遍历协议。数组索引循环显式写 `for i: 0:len(xs)`；`in` 和 `while` 都不是关键字，可作为普通标识符。
+- `break` 和 `continue` 绑定到最近的 `for` 循环。
 - `ret expr` / `ret`。
 - `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。

@@ -49,10 +49,10 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | Construct   | Notes |
 |-------------|-------|
 | `if`/`else if`/`else` | Boolean condition required |
-| `while`     | Boolean condition required |
-| `for i in start:end` | Half-open increasing numeric range; cursor is loop block scoped |
-| `for i in xs` | Array index iteration; `i: i64`, loop block scoped |
-| `break`/`continue` | Bound to innermost `while`/`for` |
+| `for cond` | Conditional loop; boolean condition required |
+| `for i: start:end` | Range loop; `i64` half-open bounds evaluated once, cursor is loop-block scoped |
+| Array indexing | Explicitly write `for i: 0:len(xs)`; no iterable or element-loop syntax |
+| `break`/`continue` | Bound to innermost `for`; range `continue` executes the increment step |
 | `ret`       | With or without expression |
 
 ### Functions
@@ -197,7 +197,7 @@ after ADT removal and naming unification.
 - `str` (retained byte-string/text source type)
 - `struct`
 - `T[]` (dynamic array)
-- `fun` / `if` / `while` / `for` / `ret` / `break` / `continue`
+- `fun` / `if` / `for` / `ret` / `break` / `continue`
 - `new S { ... }` struct initialization
 - `new T[] { ... }` array literal
 - `new T[n]` array allocation

@@ -9,7 +9,7 @@ fun main(): void {
     xs.push(1)
     xs.push(2)
     let old_len = len(xs)
-    for i in 0:old_len {
+    for i: 0:old_len {
         xs.push(xs[i])
     }
     print(str(xs[0] + xs[1] + xs[2] + xs[3]))
@@ -23,7 +23,7 @@ fun main(): void {
     left.push(b1)
     right.push(b2)
     let right_len = len(right)
-    for i in 0:right_len {
+    for i: 0:right_len {
         left.push(right[i])
     }
     print(str(left[0].value + left[1].value))

@@ -12,7 +12,6 @@ TOKEN_SPEC = [
     ("IF",        r'\bif\b'),
     ("ELSE",      r'\belse\b'),
     ("FOR",       r'\bfor\b'),
-    ("IN",        r'\bin\b'),
     ("TYPE",      r'\btype\b'),
     ("MATCH",     r'\bmatch\b'),
     ("PANIC",     r'\bpanic\b'),

@@ -18,6 +18,8 @@ Program
   ExternDef GetTickCount64 : u64
   FunDef adt_parser_surface : void
     Block
+      Let in
+        Literal 42
       Let e : Expr
         UnionInit Expr
           StructInit LiteralExpr
@@ -210,7 +212,7 @@ Program
               Var typed
               Literal 1
         Var flag
-      While
+      Loop
         Block
           AssignOp +
             Var typed
@@ -239,13 +241,15 @@ Program
         Literal 0
         Call len
           Var xs
-      ForIn j
+      ForRange j
         Block
           BlockValue
             Call println
               Call str
                 Var j
-        Var xs
+        Literal 0
+        Call len
+          Var xs
       Match
         Var typed
         MatchCase

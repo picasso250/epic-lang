@@ -36,7 +36,7 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
         let is_main = input_paths[i] == main_path
         match parsed {
             AstProgram ast: {
-                for ei in ast.externs { merged.externs.push(ast.externs[ei]) }
+                for ei: 0:len(ast.externs) { merged.externs.push(ast.externs[ei]) }
                 let si = 0
                 for si < len(ast.structs) {
                     merged.structs.push(ast.structs[si])
@@ -80,7 +80,7 @@ fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
 
 fun epic_push_u64_le(out: i64[], value: i64): void {
     let v = value
-    for i in 0:8 {
+    for i: 0:8 {
         out.push(v & 255)
         v = v / 256
     }
@@ -138,7 +138,7 @@ fun epic_lower_program(program: MirProgram): X64Program {
     let lower = mir_to_x64_lower_empty()
     let start = epic_now_ms()
     x64_add_global(lower.x64, "_start")
-    for ei in program.externs {
+    for ei: 0:len(program.externs) {
         let ext = program.externs[ei]
         if backend_abi_is_winapi(ext.name) || (len(ext.name) >= 12 && ext.name[0:12] == "__ep_import$") {
             x64_add_extern(lower.x64, ext.name)

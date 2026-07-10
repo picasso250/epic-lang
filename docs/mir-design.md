@@ -45,7 +45,7 @@ Epic MIR 是一个 LLVM-like 的中层 IR，核心形态包括：
 - 显式 `gep` 地址计算。
 - 显式 `br` / `condbr`。
 
-MIR 不应该只是“结构化 x64 汇编”。如果 MIR 太贴近 x64，那么 `if`、`while`、`+`、`-`、比较、短路逻辑都会过早降成寄存器和跳转，后续调试、优化、自举实现都会不舒服。
+MIR 不应该只是“结构化 x64 汇编”。如果 MIR 太贴近 x64，那么 `if`、条件循环、`+`、`-`、比较、短路逻辑都会过早降成寄存器和跳转，后续调试、优化、自举实现都会不舒服。
 
 MIR 的 aggregate 和 runtime 相关语义在 AST -> MIR 期间展开为 `call`、`gep`、`load`、`store`、branch 等低层操作。
 
@@ -541,13 +541,13 @@ else:
 }
 ```
 
-### 12.2 while
+### 12.2 条件 `for`
 
 Epic 源码：
 
 ```text
 let x = 0;
-while x < 10 {
+for x < 10 {
   x = x + 1;
 }
 return x;
@@ -782,7 +782,7 @@ global @str.0: ptr = bytes "hello\n"
 
 - 实现简单。
 - 贴近当前 codegen 的 stack slot 模型。
-- `if`、`while`、变量赋值不需要立即处理 phi。
+- `if`、条件循环、变量赋值不需要立即处理 phi。
 - 后续如果要优化，可以再做 mem2reg / SSA 化。
 
 代价：
@@ -835,7 +835,7 @@ LowMIR / X64MIR backend 负责：
 - `add/sub`。
 - local `let`。
 - `if`。
-- `while`。
+- 条件循环。
 - 普通函数调用。
 - 最小 WinAPI import call。
 

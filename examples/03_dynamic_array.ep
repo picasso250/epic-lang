@@ -12,7 +12,7 @@ fun main(): void {
     println(str(xs[0]))
 
     let total = 0
-    for i in 0:len(xs) {
+    for i: 0:len(xs) {
         total = total + xs[i]
     }
     println(str(total))

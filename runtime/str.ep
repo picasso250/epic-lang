@@ -8,7 +8,7 @@ fun __ep_str_eq(left: str, right: str): bool {
     }
     let left_bytes = bytes(left)
     let right_bytes = bytes(right)
-    for i in 0:left_len {
+    for i: 0:left_len {
         if left_bytes[i] != right_bytes[i] {
             ret false
         }
@@ -32,7 +32,7 @@ fun __ep_str_from_i64(value: i64): str {
         let digits = bytes(__ep_str_from_u64(u64(0 - value)))
         let out = new u8[] {}
         out.push('-')
-        for i in 0:len(digits) {
+        for i: 0:len(digits) {
             out.push(digits[i])
         }
         ret str(out)
@@ -74,7 +74,7 @@ fun __ep_str_slice(s: str, start: i64, end: i64): str {
 
     let bytes_view = bytes(s)
     let out = new u8[] {}
-    for i in start:end {
+    for i: start:end {
         out.push(bytes_view[i])
     }
     ret str(out)

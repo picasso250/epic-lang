@@ -1,6 +1,6 @@
 fun main(): i64 {
     let sum = 0
-    for i in 0:4 {
+    for i: 0:4 {
         sum += i
     }
     ret sum

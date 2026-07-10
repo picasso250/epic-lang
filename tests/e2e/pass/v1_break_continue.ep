@@ -12,7 +12,7 @@ fun main(): void {
         }
         sum = sum + i
     }
-    for j in 0:6 {
+    for j: 0:6 {
         if j == 1 {
             continue
         }
