@@ -389,7 +389,10 @@ MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
 `bootstrap/mir_runtime_helpers.py` in the Python compiler and `src/mir_runtime.ep`
-in the self-hosted compiler. They no longer have same-named x64 fallback bodies.
+in the self-hosted compiler. After injection, both compilers prune unreachable
+MIR functions from the final program; roots include `main`, optional
+`__ep_global_init`, and MIR/Epic functions directly called by hand-written x64
+runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). They no longer have same-named x64 fallback bodies.
 Remaining x64 labels and function bodies are hand-written in `mir_to_x64.py`
 `_emit_*()` methods.
 

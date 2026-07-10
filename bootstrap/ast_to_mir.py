@@ -33,6 +33,7 @@ from mir import (
     validate,
 )
 from mir_runtime_helpers import inject_all_mir_helpers
+from mir_prune import prune_unreachable_functions
 
 
 class MirCodegenError(RuntimeError):
@@ -164,6 +165,7 @@ class MirCodegen(MirFunctionBuilder):
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
         inject_all_mir_helpers(self.program)
+        prune_unreachable_functions(self.program)
         validate(self.program)
         return self.program
 

@@ -191,6 +191,7 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     let mir_start = epic_now_ms()
     let mir = mir_ast_to_mir(ast)
     mir_inject_all_runtime_helpers(mir)
+    mir_prune_unreachable_functions(mir)
     let mir_stop = epic_now_ms()
     epic_timing("ast->mir+runtime", mir_start, mir_stop)
 

@@ -18,7 +18,7 @@ ADT:            planned as struct union (v1 design)
 match:          keep literal switch and add ADT match later
 str:            temporary u8[]-layout alias; public surface contracted
 naming:         unify, but only after ADT removal
-required_helpers: defer; unconditional injection stays for now
+required_helpers: explicit dependency tables deferred; MIR function pruning removes unreachable helpers/functions for now
 ```
 
 ---
@@ -108,7 +108,7 @@ required_helpers: defer; unconditional injection stays for now
 
 ### Runtime Helpers (MIR-implemented)
 
-These are unconditionally injected and considered part of the core runtime. MIR helper bodies used by both compilers live in the committed bundle `runtime/mir/helpers.mir`; update it with `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text:
+These are core runtime helpers. MIR helper bodies used by both compilers live in the committed bundle `runtime/mir/helpers.mir`; both compilers load the bundle and then prune unreachable MIR functions. Update the bundle with `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text:
 
 - `__ep_slice_u8_from_str` — str to `_slice_u8`
 - `__ep_str_from_slice_u8` — `_slice_u8` to str
@@ -187,7 +187,7 @@ after ADT removal and naming unification.
 | `str` vs `u8[]` | `u8[]` is the current text truth; `str` is a temporary compatibility alias over the same layout | Continue collapsing `str` toward `u8[]`; future UTF-8 `str` is a separate later design. See `str-u8-alias-plan.md`. |
 | `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
 | Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
-| `required_helpers` / lazy injection | Unconditional injection | Defer until helper naming is stable |
+| `required_helpers` / lazy injection | MIR function reachability pruning | Explicit dependency tables deferred; current pass keeps `main`, optional `__ep_global_init`, and x64-runtime MIR roots. |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
 | `system` | Kept for now | May be removed from core |
 | `map` | Kept for now | May be removed from core |

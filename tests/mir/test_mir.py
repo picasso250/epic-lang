@@ -294,7 +294,7 @@ def test_mir_helper_injection():
     assert "call void __ep_slice_i64_set" in text_i64_set, \
         f"expected call void __ep_slice_i64_set, got:\n{text_i64_set}"
 
-    def check(source):
+    def check(source, expected_helpers=()):
         ast = sema.analyze_program(Parser(lex(source)).parse_program())
         prog = ast_to_mir(ast)
         injected = {fn.name for fn in prog.functions}
@@ -302,8 +302,9 @@ def test_mir_helper_injection():
         global_names = [glob.name for glob in prog.globals]
         assert global_names.count("str.runtime.bool.true") == 1
         assert global_names.count("str.runtime.bool.false") == 1
+        for name in expected_helpers:
+            assert name in injected, f"{name} should be retained as reachable MirFunction, got injected={injected}"
         for name in IMPLEMENTED_MIR_HELPERS:
-            assert name in injected, f"{name} should be injected as MirFunction, got injected={injected}"
             assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
         return prog
 
@@ -311,7 +312,8 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let b = bytes("AB")
     ret 0
-}"""
+}""",
+        ["__ep_slice_u8_from_str"],
     )
 
     parsed_helper_path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "helpers.mir"))
@@ -321,7 +323,8 @@ def test_mir_helper_injection():
         """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
     ret xs[1]
-}"""
+}""",
+        ["__ep_slice_i64_get"],
     )
     parsed_fn = next(fn for fn in parsed_prog.functions if fn.name == "__ep_slice_i64_get")
     assert parsed_fn.text() == parsed_helper_text
@@ -331,7 +334,8 @@ def test_mir_helper_injection():
     let a = new u8[] { u8(65) }
     println(str(a))
     ret 0
-}"""
+}""",
+        ["__ep_str_from_slice_u8"],
     )
 
     check(
@@ -361,7 +365,8 @@ def test_mir_helper_injection():
     let b = new u8[] { u8(1), u8(2), u8(3) }
     let c = b[1:3]
     ret len(c)
-}"""
+}""",
+        ["__ep_slice_u8_slice"],
     )
 
     check(
@@ -370,16 +375,19 @@ def test_mir_helper_injection():
     let b = new u8[] { u8(3), u8(4) }
     a.extend(b)
     ret len(a)
-}"""
+}""",
+        ["__ep_slice_u8_extend"],
     )
 
     check(
         """fun main(): i64 {
-    if "epic" == "epic" {
+    let left = "epic"
+    let right = "epic"
+    if left == right {
         ret 1
     }
     ret 0
-}"""
+}""",
     )
 
     check(
@@ -387,7 +395,7 @@ def test_mir_helper_injection():
     println(str(true))
     println(str(false))
     ret 0
-}"""
+}""",
     )
 
     check(
@@ -395,7 +403,7 @@ def test_mir_helper_injection():
     let s = "epic-lang"
     let t = s[5:9]
     ret len(t)
-}"""
+}""",
     )
 
     # Deterministic order: running twice gives same injection list
@@ -411,7 +419,8 @@ def test_mir_helper_injection():
     order1 = [fn.name for fn in prog1.functions if fn.name in helper_names]
     order2 = [fn.name for fn in prog2.functions if fn.name in helper_names]
     assert order1 == order2, f"helper order differs between runs: {order1} != {order2}"
-    assert order1 == list(IMPLEMENTED_MIR_HELPERS), f"unexpected helper order: {order1}"
+    expected_order = [name for name in IMPLEMENTED_MIR_HELPERS if name in set(order1)]
+    assert order1 == expected_order, f"unexpected helper order: {order1}"
 
 
 def test_runtime_source_str_eq_lowers_as_epic_function():
