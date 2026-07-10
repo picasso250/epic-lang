@@ -20,7 +20,9 @@ struct SemaState {
     funcs_param_count: map[str]i64
     funcs_param_types: map[str]str
     globals: map[str]str
-    locals: map[str]str
+    local_names: str[]
+    local_types: str[]
+    local_scope_marks: i64[]
     current_fn: str
     current_ret: str
     loop_depth: i64
@@ -129,14 +131,39 @@ fun sema_type_name(st: SemaState, typ: TypeExpr): str {
 }
 
 fun sema_lookup(st: SemaState, name: str): str {
-    if st.locals.has(name) {
-        ret st.locals[name]
+    let i = len(st.local_names) - 1
+    for i >= 0 {
+        if st.local_names[i] == name {
+            ret st.local_types[i]
+        }
+        i = i - 1
     }
     if st.globals.has(name) {
         ret st.globals[name]
     }
     sema_die(f"undefined variable {name}")
     ret ""
+}
+
+fun sema_define_local(st: SemaState, name: str, typ: str): void {
+    st.local_names.push(name)
+    st.local_types.push(typ)
+}
+
+fun sema_push_scope(st: SemaState): void {
+    st.local_scope_marks.push(len(st.local_names))
+}
+
+fun sema_pop_scope(st: SemaState): void {
+    let mark = st.local_scope_marks.pop()
+    let names = new str[0]
+    let types = new str[0]
+    for i in 0:mark {
+        names.push(st.local_names[i])
+        types.push(st.local_types[i])
+    }
+    st.local_names = names
+    st.local_types = types
 }
 
 fun sema_direct_field_type(st: SemaState, base_type: str, field: str): str {
@@ -387,7 +414,10 @@ fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
 
 fun sema_check_assign_info(target: str, value_type: str, value_node: AstNode, context: str): void {
     if target == "void" {
-        sema_die(f"{context} expected non-void target, got void")
+        if value_type == "void" {
+            ret
+        }
+        sema_die(f"{context} expected void, got {value_type}")
     }
     if value_type == "void" {
         sema_die(f"{context} expected {target}, got void")
@@ -668,7 +698,10 @@ fun sema_build_globals(st: SemaState, ast: AstNode): void {
 }
 
 fun sema_reset_locals(st: SemaState): void {
-    st.locals = new map[str]str { "argv": epic_type_array_of("str") }
+    st.local_names = new str[0]
+    st.local_types = new str[0]
+    st.local_scope_marks = new i64[0]
+    sema_define_local(st, "argv", epic_type_array_of("str"))
 }
 
 fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode): str {
@@ -1155,7 +1188,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 sema_die(f"let {n.name} cannot have type void")
             }
             ast_set_resolved_type(node, target)
-            st.locals[n.name] = target
+            sema_define_local(st, n.name, target)
             ret
         }
         AstAssign n: {
@@ -1197,7 +1230,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 match n.expr {
                     AstEmpty e: {}
                     _: {
-                        sema_die(f"return expected void, got {sema_expr_type(st, n.expr)}")
+                        sema_check_assign(st, "void", n.expr, "return")
                     }
                 }
                 ret
@@ -1230,21 +1263,25 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             sema_expect_int(st, n.start, "for range start")
             sema_expect_int(st, n.end, "for range end")
             ast_set_resolved_type(node, "i64")
-            st.locals[n.name] = "i64"
+            sema_push_scope(st)
+            sema_define_local(st, n.name, "i64")
             st.loop_depth += 1
             sema_block(st, n.body)
             st.loop_depth -= 1
+            sema_pop_scope(st)
             ret
         }
         AstForIn n: {
             let source_type = sema_expr_type(st, n.source)
             if epic_type_is_array(source_type) {
                 ast_set_resolved_type(node, "i64")
-                st.locals[n.name] = "i64"
+                sema_push_scope(st)
+                sema_define_local(st, n.name, "i64")
             } else {
                 if epic_type_is_map(source_type) {
                     ast_set_resolved_type(node, "str")
-                    st.locals[n.name] = "str"
+                    sema_push_scope(st)
+                    sema_define_local(st, n.name, "str")
                 } else {
                     if source_type == "str" {
                         sema_die("for-in over str is not supported; use bytes(s) to iterate bytes")
@@ -1255,6 +1292,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             st.loop_depth += 1
             sema_block(st, n.body)
             st.loop_depth -= 1
+            sema_pop_scope(st)
             ret
         }
         AstBreak n: {
@@ -1302,18 +1340,10 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                     }
                     seen[c.variant_name] = true
                     c.AstMeta.resolved_type = c.variant_name
-                    let had_old = st.locals.has(c.binding_name)
-                    let old = ""
-                    if had_old {
-                        old = st.locals[c.binding_name]
-                    }
-                    st.locals[c.binding_name] = c.variant_name
+                    sema_push_scope(st)
+                    sema_define_local(st, c.binding_name, c.variant_name)
                     sema_block(st, c.body)
-                    if had_old {
-                        st.locals[c.binding_name] = old
-                    } else {
-                        st.locals.del(c.binding_name)
-                    }
+                    sema_pop_scope(st)
                 }
                 if n.has_else {
                     sema_block(st, n.else_block)
@@ -1345,9 +1375,27 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
 }
 
 fun sema_block(st: SemaState, block: AstBlock): void {
+    sema_push_scope(st)
     for i in block.stmts {
         sema_stmt(st, block.stmts[i])
     }
+    if block.has_value {
+        sema_expr_type(st, block.value_expr)
+    }
+    sema_pop_scope(st)
+}
+
+fun sema_function_body(st: SemaState, block: AstBlock): str {
+    let tail_type = ""
+    sema_push_scope(st)
+    for i in block.stmts {
+        sema_stmt(st, block.stmts[i])
+    }
+    if block.has_value {
+        tail_type = sema_expr_type(st, block.value_expr)
+    }
+    sema_pop_scope(st)
+    ret tail_type
 }
 
 fun sema_expr_is_exit(node: AstNode): bool {
@@ -1399,6 +1447,9 @@ fun sema_block_returns(block: AstBlock): bool {
             ret true
         }
     }
+    if block.has_value && sema_expr_is_exit(block.value_expr) {
+        ret true
+    }
     ret false
 }
 
@@ -1416,11 +1467,17 @@ fun sema_program(st: SemaState, ast: AstNode): void {
                 st.loop_depth = 0
                 for j in f.params {
                     let p = f.params[j]
-                    st.locals[p.name] = p.AstMeta.resolved_type
+                    sema_define_local(st, p.name, p.AstMeta.resolved_type)
                 }
-                sema_block(st, f.body)
-                if st.current_ret != "void" && sema_block_returns(f.body) == false {
-                    sema_die(f"function must return {st.current_ret} on all paths")
+                let tail_type = sema_function_body(st, f.body)
+                if sema_block_returns(f.body) == false {
+                    if f.body.has_value {
+                        sema_check_assign_info(st.current_ret, tail_type, f.body.value_expr, "function tail")
+                    } else {
+                        if st.current_ret != "void" {
+                            sema_die(f"function must return {st.current_ret} on all paths")
+                        }
+                    }
                 }
             }
             ret
@@ -1432,6 +1489,7 @@ fun sema_program(st: SemaState, ast: AstNode): void {
 
 fun sema_dump_typed_ast(ast: AstNode): void {
     dump_node(ast, 0)
+    ret
 }
 
 fun make_sema_state(): SemaState {
@@ -1449,7 +1507,10 @@ fun make_sema_state(): SemaState {
     st.funcs_param_count = new map[str]i64
     st.funcs_param_types = new map[str]str
     st.globals = new map[str]str
-    st.locals = new map[str]str { "argv": epic_type_array_of("str") }
+    st.local_names = new str[0]
+    st.local_types = new str[0]
+    st.local_scope_marks = new i64[0]
+    sema_define_local(st, "argv", epic_type_array_of("str"))
     st.current_fn = ""
     st.current_ret = "void"
     st.loop_depth = 0

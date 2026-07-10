@@ -36,9 +36,9 @@ python epic.py --main main.ep main.ep lib.ep
 | `Name`  | 堆分配的结构体引用               |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
 | `map[str]T` | 堆分配的映射表（str 键）           |
-| `void`  | 仅用于函数返回类型                      |
+| `void`  | unit 类型，表示唯一的“无信息”值；常用于函数返回和副作用表达式 |
 
-`str`、用户结构体、动态数组和映射表具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。
+`str`、用户结构体、动态数组和映射表具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。`void` 是 unit 类型，但不能作为参数、local 绑定、数组元素或 map value 的类型使用。
 
 ### 内置全局变量 (Built-in Globals)
 
@@ -52,11 +52,11 @@ python epic.py --main main.ep main.ep lib.ep
 
 ```epic
 fun add(a: i64, b: i64): i64 {
-    return a + b
+    a + b
 }
 ```
 
-Epic 函数最多有 4 个参数。普通 Epic 调用最多有 4 个参数；编译器内置的 WinAPI 调用可按其白名单签名使用更多参数。`void` 函数可以使用 `return` 或自然结束。`void` 函数中不允许 `return expr`。
+Epic 函数最多有 4 个参数。普通 Epic 调用最多有 4 个参数；编译器内置的 WinAPI 调用可按其白名单签名使用更多参数。函数体是一个 block：非 `void` 函数可以用最后一个裸表达式作为返回值，也可以显式 `ret expr`；`void` 函数可以使用 `ret` 或自然结束，尾表达式如果存在必须是 `void`。
 
 程序入口函数必须为：
 
@@ -124,6 +124,8 @@ let xs = new u8[]
 
 不带初始化器的 `let x: T` 非法。Epic 不为 local variable 创建隐式零值；标量、容器、map、字符串和结构体引用都必须由字面量、`new`、函数调用或其他表达式显式初始化。
 
+`let` 绑定是 lexical block scoped：只在当前 `{ ... }` block 及其内部嵌套 block 中可见。内层 block 可以 shadow 外层同名绑定；离开 block 后恢复外层绑定。
+
 `str`、`T[]`、`map[str]T`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
 
 Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / `while` 条件仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
@@ -159,13 +161,15 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 - `if` / `else if` / `else`，条件为显式布尔表达式；reference null-check 请写 `expr?`。
 - `while`，条件为显式布尔表达式；reference null-check 请写 `expr?`。
 - `break` 和 `continue` 绑定到最近的 `while` 循环。
-- `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`i` 是函数级可变 local，也是实际 numeric cursor；修改 `i` 会影响循环进度。`continue` 跳到增量步骤。
-- `for i in xs` — array index iteration。`xs` 必须是 `T[]`；`i: i64`，是函数级可变 local，也是实际 index cursor。array 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`，如果当前 index 已无效则结束。循环中 `push` 不扩展本次循环，`pop` 可能导致提前结束。
-- `for k in m` — map key iteration。`m` 必须是 `map[str]T`；`k: str`，是函数级可变 local，每轮赋值为当前 key。map 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`。循环中 insert/delete 是允许但弱规定的：循环有界且内存安全，但 key 可能被跳过、重复或未全部访问。`for ... in str` 不支持；需要按字节遍历时显式写 `bytes(s)`。
-- `return expr` / `return`。
+- `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`i` 是 loop block scoped cursor，也是实际 numeric cursor；修改 `i` 会影响循环进度。`continue` 跳到增量步骤。
+- `for i in xs` — array index iteration。`xs` 必须是 `T[]`；`i: i64`，是 loop block scoped cursor，也是实际 index cursor。array 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`，如果当前 index 已无效则结束。循环中 `push` 不扩展本次循环，`pop` 可能导致提前结束。
+- `for k in m` — map key iteration。`m` 必须是 `map[str]T`；`k: str`，是 loop block scoped cursor，每轮赋值为当前 key。map 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`。循环中 insert/delete 是允许但弱规定的：循环有界且内存安全，但 key 可能被跳过、重复或未全部访问。`for ... in str` 不支持；需要按字节遍历时显式写 `bytes(s)`。
+- `ret expr` / `ret`。
 - `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。
 - `assert cond` / `assert cond, "消息"` — 始终启用，失败时退出。
+
+Block 的最后一个裸表达式是该 block 的 value；没有尾表达式的 block 类型是 `void`。当前语法没有分号；如果 `void` 函数或 block 末尾需要丢弃一个非 `void` 表达式，写一个后续 statement（例如裸 `ret`）来避免它成为 block value。
 
 
 ### 内置容器点调用 (Builtin Container Dot Calls)

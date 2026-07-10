@@ -80,8 +80,8 @@ class MirCodegen(MirFunctionBuilder):
         self.program = MirProgram()
         self.func_sigs = {}
         self.globals = {}
-        self.locals = {}
-        self.local_types = {}
+        self.local_scopes = []
+        self.local_type_scopes = []
         self.strings = {}
         self.string_counter = 0
         self.structs = {}
@@ -173,20 +173,30 @@ class MirCodegen(MirFunctionBuilder):
             [MirParam(p.name, self._type(p.resolved_type)) for p in ast_fn.params],
             self._type(ast_fn.resolved_type),
         )
-        self.locals = {}
-        self.local_types = {}
+        self.local_scopes = [{}]
+        self.local_type_scopes = [{}]
         entry = self.new_block("entry")
         for param in self.fn.params:
             self.set_block(entry)
             addr = self._alloc_local(param.name, param.type)
             self.inst("store", [ValueOperand(param.value), ValueOperand(addr)])
             entry = self.current_block
-        body = self._emit_block_from(entry, ast_fn.body)
-        if body.reachable:
-            if self.fn.return_type == VOID:
-                self.ret(body.block)
-            else:
-                self.ret(body.block, ConstIntOperand(self.fn.return_type, 0))
+        self._push_local_scope()
+        try:
+            body = self._emit_block_stmts_from(entry, ast_fn.body)
+            if body.reachable:
+                if ast_fn.body.value_expr is not None:
+                    value = self._expr_from(body.block, ast_fn.body.value_expr)
+                    if self.fn.return_type == VOID:
+                        self.ret(value.block)
+                    else:
+                        self.ret(value.block, value.value)
+                elif self.fn.return_type == VOID:
+                    self.ret(body.block)
+                else:
+                    self.ret(body.block, ConstIntOperand(self.fn.return_type, 0))
+        finally:
+            self._pop_local_scope()
         return self.fn
 
     def _type(self, typ):
@@ -266,9 +276,34 @@ class MirCodegen(MirFunctionBuilder):
         block = self.ensure_insertable()
         addr = self.new_value(ptr(), f"{name}.addr")
         block.instructions.append(MirInst("alloca", result=addr, type=typ))
-        self.locals[name] = addr
-        self.local_types[name] = typ
+        self._define_local(name, addr, typ)
         return addr
+
+    def _push_local_scope(self):
+        self.local_scopes.append({})
+        self.local_type_scopes.append({})
+
+    def _pop_local_scope(self):
+        self.local_scopes.pop()
+        self.local_type_scopes.pop()
+
+    def _define_local(self, name, addr, typ):
+        if not self.local_scopes:
+            raise MirCodegenError("internal: no active local scope")
+        self.local_scopes[-1][name] = addr
+        self.local_type_scopes[-1][name] = typ
+
+    def _local_addr(self, name):
+        for scope in reversed(self.local_scopes):
+            if name in scope:
+                return scope[name]
+        raise MirCodegenError(f"undefined variable: {name}")
+
+    def _local_type(self, name):
+        for scope in reversed(self.local_type_scopes):
+            if name in scope:
+                return scope[name]
+        raise MirCodegenError(f"undefined variable: {name}")
 
     def _alloc_struct(self, struct_name):
         size_ptr = self.inst(
@@ -541,13 +576,24 @@ class MirCodegen(MirFunctionBuilder):
         self.current_block = flow.block if flow.reachable else None
         return flow
 
-    def _emit_block_from(self, in_block, block):
+    def _emit_block_stmts_from(self, in_block, block):
         flow = self._reachable(in_block)
         for stmt in block.stmts:
             if not flow.reachable:
                 return flow
             flow = self._emit_stmt_from(flow.block, stmt)
         return flow
+
+    def _emit_block_from(self, in_block, block):
+        self._push_local_scope()
+        try:
+            flow = self._emit_block_stmts_from(in_block, block)
+            if flow.reachable and block.value_expr is not None:
+                value = self._expr_from(flow.block, block.value_expr)
+                return self._reachable(value.block)
+            return flow
+        finally:
+            self._pop_local_scope()
 
     def _emit_stmt(self, stmt):
         flow = self._emit_stmt_from(self.ensure_insertable(), stmt)
@@ -573,9 +619,7 @@ class MirCodegen(MirFunctionBuilder):
             if stmt.name in self.globals:
                 self.inst("store", [value.value, SymbolOperand(ptr(), self._global_label(stmt.name))])
                 return self._reachable(self.current_block)
-            if stmt.name not in self.locals:
-                raise MirCodegenError(f"undefined variable: {stmt.name}")
-            self.inst("store", [value.value, ValueOperand(self.locals[stmt.name])])
+            self.inst("store", [value.value, ValueOperand(self._local_addr(stmt.name))])
             return self._reachable(self.current_block)
         elif isinstance(stmt, ReturnNode):
             if stmt.expr is None:
@@ -628,10 +672,8 @@ class MirCodegen(MirFunctionBuilder):
             return self._reachable(self.current_block)
         elif isinstance(stmt, AssignOpNode):
             if isinstance(stmt.target, VarNode):
-                if stmt.target.name not in self.locals:
-                    raise MirCodegenError(f"undefined variable: {stmt.target.name}")
-                typ = self.local_types[stmt.target.name]
-                addr = ValueOperand(self.locals[stmt.target.name])
+                typ = self._local_type(stmt.target.name)
+                addr = ValueOperand(self._local_addr(stmt.target.name))
                 current = self.inst("load", [addr], result_type=typ, type=typ)
                 rhs = self._expr_from(in_block, stmt.value)
                 self.set_block(rhs.block)
@@ -740,39 +782,42 @@ class MirCodegen(MirFunctionBuilder):
 
     def _emit_for_range_from(self, in_block, stmt):
         self.set_block(in_block)
-        var_addr = self._alloc_local(stmt.name, I64)
-        end_addr = self._alloc_local(f"__{stmt.name}.end{self.value_counter}", I64)
         start = self._expr_from(self.current_block, stmt.start)
-        self.set_block(start.block)
-        self.inst("store", [start.value, ValueOperand(var_addr)])
-        end_value = self._expr_from(self.current_block, stmt.end)
+        end_value = self._expr_from(start.block, stmt.end)
         self.set_block(end_value.block)
-        self.inst("store", [end_value.value, ValueOperand(end_addr)])
+        self._push_local_scope()
+        try:
+            var_addr = self._alloc_local(stmt.name, I64)
+            end_addr = self._alloc_local(f"__{stmt.name}.end{self.value_counter}", I64)
+            self.inst("store", [start.value, ValueOperand(var_addr)])
+            self.inst("store", [end_value.value, ValueOperand(end_addr)])
 
-        cond_block = self.new_block("for.cond")
-        body_block = self.new_block("for.body")
-        inc_block = self.new_block("for.inc")
-        end_block = self.new_block("for.end")
-        self.br(self.current_block, cond_block.name)
+            cond_block = self.new_block("for.cond")
+            body_block = self.new_block("for.body")
+            inc_block = self.new_block("for.inc")
+            end_block = self.new_block("for.end")
+            self.br(self.current_block, cond_block.name)
 
-        self.set_block(cond_block)
-        cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
-        end = self.inst("load", [ValueOperand(end_addr)], result_type=I64, type=I64)
-        cond = self.inst("icmp.slt", [ValueOperand(cur), ValueOperand(end)], result_type=BOOL)
-        self.condbr(cond_block, ValueOperand(cond), body_block.name, end_block.name)
+            self.set_block(cond_block)
+            cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+            end = self.inst("load", [ValueOperand(end_addr)], result_type=I64, type=I64)
+            cond = self.inst("icmp.slt", [ValueOperand(cur), ValueOperand(end)], result_type=BOOL)
+            self.condbr(cond_block, ValueOperand(cond), body_block.name, end_block.name)
 
-        self.loop_stack.append((inc_block.name, end_block.name))
-        body_flow = self._emit_block_from(body_block, stmt.body)
-        if body_flow.reachable:
-            self.br(body_flow.block, inc_block.name)
-        self.loop_stack.pop()
+            self.loop_stack.append((inc_block.name, end_block.name))
+            body_flow = self._emit_block_from(body_block, stmt.body)
+            if body_flow.reachable:
+                self.br(body_flow.block, inc_block.name)
+            self.loop_stack.pop()
 
-        self.set_block(inc_block)
-        cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
-        nxt = self.inst("add", [ValueOperand(cur), ConstIntOperand(I64, 1)], result_type=I64)
-        self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
-        self.br(inc_block, cond_block.name)
-        return self._reachable(end_block)
+            self.set_block(inc_block)
+            cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+            nxt = self.inst("add", [ValueOperand(cur), ConstIntOperand(I64, 1)], result_type=I64)
+            self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
+            self.br(inc_block, cond_block.name)
+            return self._reachable(end_block)
+        finally:
+            self._pop_local_scope()
 
     def _emit_for_in_from(self, in_block, stmt):
         source_type = self._infer_type(stmt.source)
@@ -789,93 +834,101 @@ class MirCodegen(MirFunctionBuilder):
         if struct_name is None:
             raise MirCodegenError(f"unsupported for-in array source: {source_type}")
 
-        var_addr = self._alloc_local(stmt.name, I64)
-        limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
-        initial_len = self._load_field(source.value, struct_name, "len", result_type=I64)
-        self.inst("store", [initial_len, ValueOperand(limit_addr)])
-        self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(var_addr)])
+        self._push_local_scope()
+        try:
+            var_addr = self._alloc_local(stmt.name, I64)
+            limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
+            initial_len = self._load_field(source.value, struct_name, "len", result_type=I64)
+            self.inst("store", [initial_len, ValueOperand(limit_addr)])
+            self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(var_addr)])
 
-        cond_block = self.new_block("for.in.cond")
-        len_block = self.new_block("for.in.len")
-        body_block = self.new_block("for.in.body")
-        inc_block = self.new_block("for.in.inc")
-        end_block = self.new_block("for.in.end")
-        self.br(self.current_block, cond_block.name)
+            cond_block = self.new_block("for.in.cond")
+            len_block = self.new_block("for.in.len")
+            body_block = self.new_block("for.in.body")
+            inc_block = self.new_block("for.in.inc")
+            end_block = self.new_block("for.in.end")
+            self.br(self.current_block, cond_block.name)
 
-        self.set_block(cond_block)
-        cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
-        limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
-        within_limit = self.inst("icmp.slt", [ValueOperand(cur), ValueOperand(limit)], result_type=BOOL)
-        self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
+            self.set_block(cond_block)
+            cur = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+            limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
+            within_limit = self.inst("icmp.slt", [ValueOperand(cur), ValueOperand(limit)], result_type=BOOL)
+            self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
 
-        self.set_block(len_block)
-        cur2 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
-        current_len = self._load_field(source.value, struct_name, "len", result_type=I64)
-        within_current = self.inst("icmp.slt", [ValueOperand(cur2), current_len], result_type=BOOL)
-        self.condbr(len_block, ValueOperand(within_current), body_block.name, end_block.name)
+            self.set_block(len_block)
+            cur2 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+            current_len = self._load_field(source.value, struct_name, "len", result_type=I64)
+            within_current = self.inst("icmp.slt", [ValueOperand(cur2), current_len], result_type=BOOL)
+            self.condbr(len_block, ValueOperand(within_current), body_block.name, end_block.name)
 
-        self.loop_stack.append((inc_block.name, end_block.name))
-        body_flow = self._emit_block_from(body_block, stmt.body)
-        if body_flow.reachable:
-            self.br(body_flow.block, inc_block.name)
-        self.loop_stack.pop()
+            self.loop_stack.append((inc_block.name, end_block.name))
+            body_flow = self._emit_block_from(body_block, stmt.body)
+            if body_flow.reachable:
+                self.br(body_flow.block, inc_block.name)
+            self.loop_stack.pop()
 
-        self.set_block(inc_block)
-        cur3 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
-        nxt = self.inst("add", [ValueOperand(cur3), ConstIntOperand(I64, 1)], result_type=I64)
-        self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
-        self.br(inc_block, cond_block.name)
-        return self._reachable(end_block)
+            self.set_block(inc_block)
+            cur3 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
+            nxt = self.inst("add", [ValueOperand(cur3), ConstIntOperand(I64, 1)], result_type=I64)
+            self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
+            self.br(inc_block, cond_block.name)
+            return self._reachable(end_block)
+        finally:
+            self._pop_local_scope()
 
     def _emit_for_in_map_from(self, in_block, stmt, source_type):
         source = self._expr_from(in_block, stmt.source)
         self.set_block(source.block)
-        key_addr = self._alloc_local(stmt.name, ptr())
-        index_addr = self._alloc_local(f"__{stmt.name}.index{self.value_counter}", I64)
-        limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
-        self.inst("store", [SymbolOperand(ptr(), self._string_label("")), ValueOperand(key_addr)])
-        self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(index_addr)])
-        initial_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
-        self.inst("store", [ValueOperand(initial_len), ValueOperand(limit_addr)])
+        self._push_local_scope()
+        try:
+            key_addr = self._alloc_local(stmt.name, ptr())
+            index_addr = self._alloc_local(f"__{stmt.name}.index{self.value_counter}", I64)
+            limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
+            self.inst("store", [SymbolOperand(ptr(), self._string_label("")), ValueOperand(key_addr)])
+            self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(index_addr)])
+            initial_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
+            self.inst("store", [ValueOperand(initial_len), ValueOperand(limit_addr)])
 
-        cond_block = self.new_block("for.in.cond")
-        len_block = self.new_block("for.in.len")
-        key_block = self.new_block("for.in.key")
-        body_block = self.new_block("for.in.body")
-        inc_block = self.new_block("for.in.inc")
-        end_block = self.new_block("for.in.end")
-        self.br(self.current_block, cond_block.name)
+            cond_block = self.new_block("for.in.cond")
+            len_block = self.new_block("for.in.len")
+            key_block = self.new_block("for.in.key")
+            body_block = self.new_block("for.in.body")
+            inc_block = self.new_block("for.in.inc")
+            end_block = self.new_block("for.in.end")
+            self.br(self.current_block, cond_block.name)
 
-        self.set_block(cond_block)
-        idx = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-        limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
-        within_limit = self.inst("icmp.slt", [ValueOperand(idx), ValueOperand(limit)], result_type=BOOL)
-        self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
+            self.set_block(cond_block)
+            idx = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+            limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
+            within_limit = self.inst("icmp.slt", [ValueOperand(idx), ValueOperand(limit)], result_type=BOOL)
+            self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
 
-        self.set_block(len_block)
-        idx2 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-        current_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
-        within_current = self.inst("icmp.slt", [ValueOperand(idx2), ValueOperand(current_len)], result_type=BOOL)
-        self.condbr(len_block, ValueOperand(within_current), key_block.name, end_block.name)
+            self.set_block(len_block)
+            idx2 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+            current_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
+            within_current = self.inst("icmp.slt", [ValueOperand(idx2), ValueOperand(current_len)], result_type=BOOL)
+            self.condbr(len_block, ValueOperand(within_current), key_block.name, end_block.name)
 
-        self.set_block(key_block)
-        idx3 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-        key = self.inst("call", [source.value, ValueOperand(idx3)], result_type=ptr(), type=ptr(), callee="__ep_map_str_key_at")
-        self.inst("store", [ValueOperand(key), ValueOperand(key_addr)])
-        self.br(key_block, body_block.name)
+            self.set_block(key_block)
+            idx3 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+            key = self.inst("call", [source.value, ValueOperand(idx3)], result_type=ptr(), type=ptr(), callee="__ep_map_str_key_at")
+            self.inst("store", [ValueOperand(key), ValueOperand(key_addr)])
+            self.br(key_block, body_block.name)
 
-        self.loop_stack.append((inc_block.name, end_block.name))
-        body_flow = self._emit_block_from(body_block, stmt.body)
-        if body_flow.reachable:
-            self.br(body_flow.block, inc_block.name)
-        self.loop_stack.pop()
+            self.loop_stack.append((inc_block.name, end_block.name))
+            body_flow = self._emit_block_from(body_block, stmt.body)
+            if body_flow.reachable:
+                self.br(body_flow.block, inc_block.name)
+            self.loop_stack.pop()
 
-        self.set_block(inc_block)
-        idx4 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-        nxt = self.inst("add", [ValueOperand(idx4), ConstIntOperand(I64, 1)], result_type=I64)
-        self.inst("store", [ValueOperand(nxt), ValueOperand(index_addr)])
-        self.br(inc_block, cond_block.name)
-        return self._reachable(end_block)
+            self.set_block(inc_block)
+            idx4 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
+            nxt = self.inst("add", [ValueOperand(idx4), ConstIntOperand(I64, 1)], result_type=I64)
+            self.inst("store", [ValueOperand(nxt), ValueOperand(index_addr)])
+            self.br(inc_block, cond_block.name)
+            return self._reachable(end_block)
+        finally:
+            self._pop_local_scope()
 
     def _emit_assert(self, stmt):
         flow = self._emit_assert_from(self.ensure_insertable(), stmt)
@@ -1060,22 +1113,13 @@ class MirCodegen(MirFunctionBuilder):
 
         for case, case_block in checks:
             self.set_block(case_block)
-            old_local = self.locals.get(case.binding_name)
-            old_type = self.local_types.get(case.binding_name)
-            had_old = case.binding_name in self.locals
             wrapper = self.inst("load", [ValueOperand(match_addr)], result_type=ptr(), type=ptr())
             payload = self._load_field(ValueOperand(wrapper), union_name, "payload", result_type=ptr())
+            self._push_local_scope()
             bind_addr = self._alloc_local(case.binding_name, ptr())
             self.inst("store", [payload, ValueOperand(bind_addr)])
-            self.locals[case.binding_name] = bind_addr
-            self.local_types[case.binding_name] = ptr()
             case_flow = self._emit_block_from(self.current_block, case.body)
-            if had_old:
-                self.locals[case.binding_name] = old_local
-                self.local_types[case.binding_name] = old_type
-            else:
-                self.locals.pop(case.binding_name, None)
-                self.local_types.pop(case.binding_name, None)
+            self._pop_local_scope()
             if case_flow.reachable:
                 self.br(case_flow.block, end_block.name)
 
@@ -1106,10 +1150,8 @@ class MirCodegen(MirFunctionBuilder):
                 typ = self.globals[expr.name]
                 value = self.inst("load", [SymbolOperand(ptr(), self._global_label(expr.name))], result_type=typ, type=typ)
                 return ValueFlow(ValueOperand(value), self.current_block)
-            if expr.name not in self.locals:
-                raise MirCodegenError(f"undefined variable: {expr.name}")
-            typ = self.local_types[expr.name]
-            value = self.inst("load", [ValueOperand(self.locals[expr.name])], result_type=typ, type=typ)
+            typ = self._local_type(expr.name)
+            value = self.inst("load", [ValueOperand(self._local_addr(expr.name))], result_type=typ, type=typ)
             return ValueFlow(ValueOperand(value), self.current_block)
         if isinstance(expr, UnaryNode):
             inner = self._emit_expr_from(self.current_block, expr.expr)
@@ -1772,8 +1814,8 @@ class MirCodegen(MirFunctionBuilder):
         if not ast.globals:
             return
         self.begin_function("__ep_global_init", [], VOID)
-        self.locals = {}
-        self.local_types = {}
+        self.local_scopes = [{}]
+        self.local_type_scopes = [{}]
         entry = self.new_block("entry")
         block = entry
         for glob in ast.globals:

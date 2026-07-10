@@ -67,6 +67,7 @@ class FunDefNode(ASTNode):
 @dataclass
 class BlockNode(ASTNode):
     stmts: list      # list of statement ASTNode
+    value_expr: Optional[ASTNode] = None
 
 
 # ── statements ──────────────────────────────────────────────────────────

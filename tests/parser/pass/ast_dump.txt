@@ -27,19 +27,19 @@ Program
         Var e
         MatchCase LiteralExpr lit
           Block
-            ExprStmt
+            BlockValue
               Call println
                 FieldAccess value
                   Var lit
         MatchCase BinaryExpr b
           Block
-            ExprStmt
+            BlockValue
               Call println
                 FieldAccess op
                   Var b
         MatchCase _
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String fallback
   FunDef helper : i64
@@ -207,17 +207,17 @@ Program
             Var p3
       If
         Block
-          ExprStmt
+          BlockValue
             Call println
               String yes
         Block
           If
             Block
-              ExprStmt
+              BlockValue
                 Call println
                   String maybe
             Block
-              ExprStmt
+              BlockValue
                 Call println
                   String no
             Binary >
@@ -246,7 +246,7 @@ Program
           Literal 10
       ForRange i
         Block
-          ExprStmt
+          BlockValue
             Call println
               Call str
                 Var i
@@ -255,14 +255,14 @@ Program
           Var xs
       ForIn j
         Block
-          ExprStmt
+          BlockValue
             Call println
               Call str
                 Var j
         Var xs
       ForIn key
         Block
-          ExprStmt
+          BlockValue
             Call println
               Var key
         Var mapping2
@@ -271,18 +271,18 @@ Program
         MatchCase
           Literal 0
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String zero
         MatchCase
           Literal 1
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String one
         MatchCase _
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String many
       Match
@@ -290,12 +290,12 @@ Program
         MatchCase
           Char 97
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String a
         MatchCase _
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String other
       Match
@@ -303,12 +303,12 @@ Program
         MatchCase
           String hello
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String hello
         MatchCase _
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String text
       Match
@@ -316,13 +316,13 @@ Program
         MatchCase
           Bool 1
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String true
         MatchCase
           Bool 0
           Block
-            ExprStmt
+            BlockValue
               Call println
                 String false
       Assert

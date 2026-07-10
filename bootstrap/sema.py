@@ -68,7 +68,7 @@ class SemanticAnalyzer:
         self.struct_embedded_fields = {}
         self.func_sigs = {}
         self.globals = {}
-        self.locals = {}
+        self.scopes = []
         self.fn_name = None
         self.loop_depth = 0
 
@@ -169,19 +169,42 @@ class SemanticAnalyzer:
 
     def _analyze_function(self, fn):
         self.fn_name = fn.name
-        self.locals = {"argv": ARRAY(STR)}
+        self.scopes = [{"argv": ARRAY(STR)}]
         self.loop_depth = 0
         for param in fn.params:
-            self.locals[param.name] = param.resolved_type
+            self._define_local(param.name, param.resolved_type)
 
-        self._analyze_block(fn.body)
+        tail_info = self._analyze_function_body(fn.body)
         ret_type = fn.resolved_type
-        if ret_type != VOID and not self._block_returns(fn.body):
+        if self._block_returns(fn.body):
+            return
+        if tail_info is not None:
+            self._check_assign(ret_type, tail_info, "function tail")
+            return
+        if ret_type != VOID:
             self._fail(f"function must return {ret_type} on all paths")
 
+    def _analyze_function_body(self, block):
+        tail_info = None
+        self._push_scope()
+        try:
+            for stmt in block.stmts:
+                self._analyze_stmt(stmt)
+            if block.value_expr is not None:
+                tail_info = self._expr(block.value_expr)
+        finally:
+            self._pop_scope()
+        return tail_info
+
     def _analyze_block(self, block):
-        for stmt in block.stmts:
-            self._analyze_stmt(stmt)
+        self._push_scope()
+        try:
+            for stmt in block.stmts:
+                self._analyze_stmt(stmt)
+            if block.value_expr is not None:
+                self._expr(block.value_expr)
+        finally:
+            self._pop_scope()
 
     def _analyze_stmt(self, stmt):
         if isinstance(stmt, ExprStmtNode):
@@ -221,10 +244,14 @@ class SemanticAnalyzer:
             self._expect_integer(self._expr(stmt.start), "for range start")
             self._expect_integer(self._expr(stmt.end), "for range end")
             stmt.resolved_type = I64
-            self.locals[stmt.name] = I64
+            self._push_scope()
+            self._define_local(stmt.name, I64)
             self.loop_depth += 1
-            self._analyze_block(stmt.body)
-            self.loop_depth -= 1
+            try:
+                self._analyze_block(stmt.body)
+            finally:
+                self.loop_depth -= 1
+                self._pop_scope()
             return
         if isinstance(stmt, ForInNode):
             source = self._expr(stmt.source)
@@ -236,10 +263,14 @@ class SemanticAnalyzer:
                 self._fail("for-in over str is not supported; use bytes(s) to iterate bytes")
             else:
                 self._fail(f"for-in expected array or map, got {source.type}")
-            self.locals[stmt.name] = stmt.resolved_type
+            self._push_scope()
+            self._define_local(stmt.name, stmt.resolved_type)
             self.loop_depth += 1
-            self._analyze_block(stmt.body)
-            self.loop_depth -= 1
+            try:
+                self._analyze_block(stmt.body)
+            finally:
+                self.loop_depth -= 1
+                self._pop_scope()
             return
         if isinstance(stmt, BreakNode):
             if self.loop_depth == 0:
@@ -278,7 +309,7 @@ class SemanticAnalyzer:
             self._fail(f"let {stmt.name} cannot have type void")
         self._check_assign(target, value, f"let {stmt.name}")
         stmt.resolved_type = target
-        self.locals[stmt.name] = target
+        self._define_local(stmt.name, target)
 
     def _analyze_assign_op(self, stmt):
         target_type = self._lvalue_type(stmt.target)
@@ -296,8 +327,7 @@ class SemanticAnalyzer:
         ret_type = self.func_sigs[self.fn_name][1]
         if ret_type == VOID:
             if stmt.expr is not None:
-                actual = self._expr(stmt.expr).type
-                self._fail(f"return expected void, got {actual}")
+                self._check_assign(VOID, self._expr(stmt.expr), "return")
             return
         if stmt.expr is None:
             self._fail(f"return expected {ret_type}, got void")
@@ -341,15 +371,13 @@ class SemanticAnalyzer:
             if case.variant_name in seen:
                 self._fail(f"duplicate match case {case.variant_name}")
             seen.add(case.variant_name)
-            old = self.locals.get(case.binding_name)
-            had_old = case.binding_name in self.locals
             case.binding_type = NAMED(case.variant_name)
-            self.locals[case.binding_name] = case.binding_type
-            self._analyze_block(case.body)
-            if had_old:
-                self.locals[case.binding_name] = old
-            else:
-                del self.locals[case.binding_name]
+            self._push_scope()
+            self._define_local(case.binding_name, case.binding_type)
+            try:
+                self._analyze_block(case.body)
+            finally:
+                self._pop_scope()
         if not seen_else:
             missing = [member for member in self.union_defs[union_name] if member not in seen]
             if missing:
@@ -802,7 +830,9 @@ class SemanticAnalyzer:
 
     def _check_assign(self, target, value, context):
         if target == VOID:
-            self._fail(f"{context} expected non-void target, got void")
+            if value.type == VOID:
+                return
+            self._fail(f"{context} expected void, got {value.type}")
         if value.type == VOID:
             self._fail(f"{context} expected {target}, got void")
         if target == value.type:
@@ -829,16 +859,30 @@ class SemanticAnalyzer:
             self._fail(f"{context} expected integer, got {info.type}")
 
     def _lookup(self, name):
-        if name in self.locals:
-            return self.locals[name]
+        for scope in reversed(self.scopes):
+            if name in scope:
+                return scope[name]
         if name in self.globals:
             return self.globals[name]
         self._fail(f"undefined variable {name}")
+
+    def _push_scope(self):
+        self.scopes.append({})
+
+    def _pop_scope(self):
+        self.scopes.pop()
+
+    def _define_local(self, name, typ):
+        if not self.scopes:
+            self._fail("internal: no active local scope")
+        self.scopes[-1][name] = typ
 
     def _block_returns(self, block):
         for stmt in block.stmts:
             if self._stmt_returns(stmt):
                 return True
+        if block.value_expr is not None and self._is_terminating_call(block.value_expr):
+            return True
         return False
 
     def _stmt_returns(self, stmt):
@@ -996,6 +1040,8 @@ def assert_typed_program(program):
     def block(node, path):
         for idx, stmt in enumerate(node.stmts):
             statement(stmt, f"{path}.stmts[{idx}]")
+        if node.value_expr is not None:
+            expr(node.value_expr, f"{path}.value")
 
     def statement(node, path):
         if isinstance(node, ExprStmtNode):

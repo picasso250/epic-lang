@@ -1,0 +1,7 @@
+# COMPILE_FAIL: undefined variable x
+fun main(): i64 {
+    if true {
+        let x = 1
+    }
+    ret x
+}

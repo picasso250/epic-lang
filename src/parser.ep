@@ -162,6 +162,8 @@ struct AstStructField {
 struct AstBlock {
     AstMeta
     stmts: AstNode[]
+    value_expr: AstNode
+    has_value: bool
 }
 
 struct AstLet {
@@ -407,7 +409,7 @@ fun ast_new_param(): AstParam {
 }
 
 fun ast_new_block(): AstBlock {
-    ret new AstBlock { AstMeta: ast_meta(), stmts: new AstNode[0] }
+    ret new AstBlock { AstMeta: ast_meta(), stmts: new AstNode[0], value_expr: ast_empty(), has_value: false }
 }
 
 fun ast_new_match_case(): AstMatchCase {
@@ -563,6 +565,9 @@ fun ast_value_expr(node: AstNode): AstNode {
         AstSubscriptAssign n: { ret n.value_expr }
         AstAssert n: { ret n.value_expr }
         AstInitField n: { ret n.value_expr }
+        AstBlock n: {
+            if n.has_value { ret n.value_expr }
+        }
         else: {}
     }
     ret ast_empty()
@@ -973,8 +978,21 @@ fun (p: Parser) parse_block(): AstBlock {
             let t = p.peek()
             parse_error(token_line(t), "Unexpected end of file in block")
         }
-        node.stmts.push(p.parse_stmt())
+        let stmt = p.parse_stmt()
         p.skip_newlines()
+        if p.peek_kind("RBRACE") == 1 {
+            match stmt {
+                AstExprStmt expr_stmt: {
+                    node.value_expr = expr_stmt.expr
+                    node.has_value = true
+                }
+                else: {
+                    node.stmts.push(stmt)
+                }
+            }
+        } else {
+            node.stmts.push(stmt)
+        }
     }
     p.expect("RBRACE")
     ret node
@@ -2126,7 +2144,17 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstStructDef n: { ret dump_node_generic(node, depth, "StructDef", false) }
         AstParam n: { ret dump_node_generic(node, depth, "Param", false) }
         AstStructField n: { ret dump_node_generic(node, depth, "StructField", false) }
-        AstBlock n: { ret dump_node_generic(node, depth, "Block", false) }
+        AstBlock n: {
+            indent(depth)
+            println("Block")
+            dump_list(n.stmts, depth + 1)
+            if n.has_value {
+                indent(depth + 1)
+                println("BlockValue")
+                dump_node(n.value_expr, depth + 2)
+            }
+            ret 0
+        }
         AstLet n: { ret dump_node_generic(node, depth, "Let", false) }
         AstReturn n: { ret dump_node_generic(node, depth, "Return", false) }
         AstAssign n: { ret dump_node_generic(node, depth, "Assign", false) }

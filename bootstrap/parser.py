@@ -216,13 +216,18 @@ class Parser:
         self.expect("LBRACE")
         self.skip_newlines()
         stmts = []
+        value_expr = None
         while not self.peek_kind("RBRACE"):
             if self.peek()[0] == "EOF":
                 raise ParseError("Unexpected end of file in block")
-            stmts.append(self.parse_stmt())
+            stmt = self.parse_stmt()
             self.skip_newlines()
+            if isinstance(stmt, ExprStmtNode) and self.peek_kind("RBRACE"):
+                value_expr = stmt.expr
+            else:
+                stmts.append(stmt)
         self.expect("RBRACE")
-        return BlockNode(stmts=stmts)
+        return BlockNode(stmts=stmts, value_expr=value_expr)
 
     # ── statements ────────────────────────────────────────────────────
 
@@ -775,6 +780,9 @@ def dump_ast_lines(node, depth=0):
         emit("Block")
         for stmt in node.stmts:
             out.extend(dump_ast_lines(stmt, depth + 1))
+        if node.value_expr is not None:
+            out.append(_dump_line(depth + 1, "BlockValue"))
+            out.extend(dump_ast_lines(node.value_expr, depth + 2))
     elif isinstance(node, ReturnNode):
         emit("Return")
         if node.expr is not None:

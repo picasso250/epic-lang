@@ -79,7 +79,7 @@ These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 
 | `u8`   | ✓ (ln 623) | ✗ delegated | ✗ | ✓ (ln 886) | |
 | `bool` | ✓ (ln 430, 625) | ✗ delegated | ✗ | ✓ (ln 876) | |
-| `void` | ✓ (ln 627) | ✗ delegated | ✗ | ✗ | Type-level only |
+| `void` | ✓ (ln 627) | ✗ delegated | ✗ | ✗ | Unit type; not bindable as local/parameter/container element |
 
 Note: `i32`, `u32` are handled in bootstrap `sema.py` but have no explicit
 handler in `src/codegen.ep`. `i8` has been removed from public surface;

@@ -50,17 +50,17 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 |-------------|-------|
 | `if`/`else if`/`else` | Boolean condition required |
 | `while`     | Boolean condition required |
-| `for i in start:end` | Half-open increasing numeric range |
-| `for i in xs` | Array index iteration; `i: i64` |
-| `for k in m` | Map key iteration; `k: str` |
+| `for i in start:end` | Half-open increasing numeric range; cursor is loop block scoped |
+| `for i in xs` | Array index iteration; `i: i64`, loop block scoped |
+| `for k in m` | Map key iteration; `k: str`, loop block scoped |
 | `break`/`continue` | Bound to innermost `while`/`for` |
-| `return`    | With or without expression |
+| `ret`       | With or without expression |
 
 ### Functions
 
 | Feature | Notes |
 |---------|-------|
-| `fun name(params): ret { body }` | Max 4 parameters |
+| `fun name(params): ret { body }` | Max 4 parameters; body may use a tail expression as the return value |
 | `main` entry | `fun main(): void` |
 | Recursion | Allowed |
 
@@ -204,13 +204,14 @@ after ADT removal and naming unification.
 - `struct`
 - `T[]` (dynamic array)
 - `map[str]T` (kept for now)
-- `fun` / `if` / `while` / `for` / `return` / `break` / `continue`
+- `fun` / `if` / `while` / `for` / `ret` / `break` / `continue`
 - `new S { ... }` struct initialization
 - `new T[] { ... }` array literal
 - `new T[n]` array allocation
 - `let` binding with optional type annotation
 - Local variable declarations must have an initializer; optional type annotations only constrain/check the initializer
 - No zero-value initialization for locals; use literals, `new`, calls, or other expressions explicitly
+- Lexical block scope for `let`, ADT match bindings, and loop cursors
 - Heap-backed references (`str`, `T[]`, `map[str]T`, structs, ADT wrappers) may use `0` as null storage, but compiler-inserted container materialization is not part of the language model
 - Postfix `expr?` is the only public null-check surface: it accepts reference types and returns `bool`; it is not ADT field-exists syntax and it does not dereference the checked value
 - `new S { ... }` allows partial field initialization: omitted scalar fields default to `0` / `false`, omitted reference fields default to null

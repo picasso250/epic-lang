@@ -993,6 +993,7 @@ fun mir_emit_print_text(st: MirCodegenState, text: str): void {
     let args = new MirOperand[0]
     args.push(mir_symbol_operand("ptr", mir_string_label(st, text)))
     mir_emit_call_inst(st, "__ep_print_str", "void", args)
+    ret
 }
 
 fun mir_emit_print_expr(st: MirCodegenState, expr: AstNode): void {
@@ -1001,11 +1002,13 @@ fun mir_emit_print_expr(st: MirCodegenState, expr: AstNode): void {
     let args = new MirOperand[0]
     args.push(value_flow.value)
     mir_emit_call_inst(st, "__ep_print_str", "void", args)
+    ret
 }
 
 fun mir_emit_print_newline(st: MirCodegenState): void {
     let args = new MirOperand[0]
     mir_emit_call_inst(st, "__ep_print_newline", "void", args)
+    ret
 }
 
 fun mir_emit_exit_current_block(st: MirCodegenState, code: i64): void {
@@ -1943,15 +1946,16 @@ fun mir_pop_loop(st: MirCodegenState): void {
 
 fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange): MirBlockFlow {
     st.current_block = block
+    let start_flow = mir_emit_expr(st, st.current_block, stmt.start)
+    st.current_block = start_flow.block
+    let end_flow = mir_emit_expr(st, st.current_block, stmt.end)
+    st.current_block = end_flow.block
+    let local_count = len(st.local_names)
     let var_addr = mir_alloc_local(st, stmt.name, "i64")
     let end_name = str_cat2(str_cat2("__", stmt.name), str_cat2(".end", str(st.value_counter)))
     let end_addr = mir_alloc_local(st, end_name, "i64")
 
-    let start_flow = mir_emit_expr(st, st.current_block, stmt.start)
-    st.current_block = start_flow.block
     mir_emit_inst(st, mir_store(start_flow.value, var_addr))
-    let end_flow = mir_emit_expr(st, st.current_block, stmt.end)
-    st.current_block = end_flow.block
     mir_emit_inst(st, mir_store(end_flow.value, end_addr))
 
     let cond_block = mir_new_block(st, "for.cond")
@@ -1991,6 +1995,7 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), var_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
+    mir_truncate_locals(st, local_count)
     ret mir_reachable_flow(end_block)
 }
 
@@ -2015,6 +2020,7 @@ fun mir_emit_for_in_array(st: MirCodegenState, block: MirBlock, stmt: AstForIn, 
         ast_to_mir_die(f"unsupported for-in array source: {source_type}")
     }
 
+    let local_count = len(st.local_names)
     let var_addr = mir_alloc_local(st, stmt.name, "i64")
     let limit_name = str_cat2(str_cat2("__", stmt.name), str_cat2(".limit", str(st.value_counter)))
     let limit_addr = mir_alloc_local(st, limit_name, "i64")
@@ -2071,6 +2077,7 @@ fun mir_emit_for_in_array(st: MirCodegenState, block: MirBlock, stmt: AstForIn, 
     mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), var_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
+    mir_truncate_locals(st, local_count)
     ret mir_reachable_flow(end_block)
 }
 
@@ -2078,6 +2085,7 @@ fun mir_emit_for_in_map(st: MirCodegenState, block: MirBlock, stmt: AstForIn, so
     st.current_block = block
     let source_flow = mir_emit_expr(st, st.current_block, stmt.source)
     st.current_block = source_flow.block
+    let local_count = len(st.local_names)
     let key_addr = mir_alloc_local(st, stmt.name, "ptr")
     let index_name = str_cat2(str_cat2("__", stmt.name), str_cat2(".index", str(st.value_counter)))
     let index_addr = mir_alloc_local(st, index_name, "i64")
@@ -2153,6 +2161,7 @@ fun mir_emit_for_in_map(st: MirCodegenState, block: MirBlock, stmt: AstForIn, so
     mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), index_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
+    mir_truncate_locals(st, local_count)
     ret mir_reachable_flow(end_block)
 }
 
@@ -2413,7 +2422,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
     ret mir_unreachable_flow()
 }
 
-fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
+fun mir_emit_block_stmts(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
     let current = block
     let i = 0
     for i < len(ast_block.stmts) {
@@ -2428,6 +2437,22 @@ fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): M
         i = i + 1
     }
     ret mir_reachable_flow(current)
+}
+
+fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
+    let local_count = len(st.local_names)
+    let flow = mir_emit_block_stmts(st, block, ast_block)
+    if flow.reachable == false {
+        mir_truncate_locals(st, local_count)
+        ret flow
+    }
+    if ast_block.has_value {
+        let value_flow = mir_emit_expr(st, flow.block, ast_block.value_expr)
+        mir_truncate_locals(st, local_count)
+        ret mir_reachable_flow(value_flow.block)
+    }
+    mir_truncate_locals(st, local_count)
+    ret flow
 }
 
 fun mir_param(name: str, typ: str): MirParam {
@@ -2463,19 +2488,33 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
         i = i + 1
     }
 
-    let body_flow = mir_emit_block(st, st.current_block, fn_ast.body)
+    let body_local_count = len(st.local_names)
+    let body_flow = mir_emit_block_stmts(st, st.current_block, fn_ast.body)
     if body_flow.reachable {
         st.current_block = body_flow.block
     }
     if st.current_block.has_terminator == false {
-        if st.current_fn.return_type == "void" {
-            st.current_block.terminator = mir_ret_void()
-            st.current_block.has_terminator = true
+        if fn_ast.body.has_value {
+            let value_flow = mir_emit_expr(st, st.current_block, fn_ast.body.value_expr)
+            st.current_block = value_flow.block
+            if st.current_fn.return_type == "void" {
+                st.current_block.terminator = mir_ret_void()
+                st.current_block.has_terminator = true
+            } else {
+                st.current_block.terminator = mir_ret_value(value_flow.value)
+                st.current_block.has_terminator = true
+            }
         } else {
-            st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
-            st.current_block.has_terminator = true
+            if st.current_fn.return_type == "void" {
+                st.current_block.terminator = mir_ret_void()
+                st.current_block.has_terminator = true
+            } else {
+                st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
+                st.current_block.has_terminator = true
+            }
         }
     }
+    mir_truncate_locals(st, body_local_count)
     ret st.current_fn
 }
 
