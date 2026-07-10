@@ -221,8 +221,8 @@ __epx_runtime_start:
 """
     text = program.text()
     assert text.startswith(expected)
-    assert "__ep_cstr:\n    jmp __epx_cstr" in text
-    assert "__epx_cstr:\n" in text
+    assert "__ep_cstr:\n" in text
+    assert "__epx_cstr" not in text
 
 
 def test_x64_to_machine_bytes_and_fixups_golden():

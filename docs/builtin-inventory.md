@@ -183,7 +183,7 @@ Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity 
 
 ### x64-backed private helpers
 
-Remaining hand-written x64 private helpers are emitted from `bootstrap/x64_runtime.py` as `__epx_*` primitives. Public `__ep_*` helper symbols are semantic-layer wrappers and may later be replaced by MIR/Epic implementations. This currently covers OS/ABI-facing helpers such as `__epx_cstr`, `__epx_read_file`, `__epx_write_file`, `__epx_argv_init`, `__epx_print_str`, and `__epx_print_newline`. Slice and map helpers are MIR helpers, not x64-backed helpers.
+Hand-written x64 helpers are emitted from `bootstrap/x64_runtime.py`. MIR-visible semantic helpers such as `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, and `__ep_print_newline` own their implementation labels directly. Only backend-private primitives such as `__epx_alloc` and `__epx_argv_init` retain the `__epx_*` prefix. Slice and map helpers are MIR helpers, not x64-backed helpers.
 
 These should be treated as backend implementation details, not language builtins.
 
