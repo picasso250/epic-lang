@@ -1,6 +1,12 @@
 # Semantic analysis surface contract sample.
 # This file must pass Python sema and produce a stable typed AST dump.
 
+fun check(ok: bool): void {
+    if !ok {
+        panic "check failed"
+    }
+}
+
 extern "kernel32.dll" fun GetTickCount64(): u64
 
 struct Point {
@@ -156,9 +162,10 @@ fun main(): void {
     let c = use_structs()
     let d = use_control(8)
     let e = use_adt()
-    assert a >= 0, "a"
-    assert b >= 0
-    assert e == 42
+    let assert = a >= 0
+    check(assert)
+    check(b >= 0)
+    check(e == 42)
     println(str(a + b + c + d + e))
     ret
 }

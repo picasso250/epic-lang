@@ -1,4 +1,10 @@
 # EXIT: 0
+fun check(ok: bool): void {
+    if !ok {
+        panic "check failed"
+    }
+}
+
 fun bump(counter: i64[]): i64 {
     counter[0] += 1
     ret counter[0]
@@ -13,12 +19,12 @@ fun main(): void {
         }
         sum += i
     }
-    assert counter[0] == 2
-    assert sum == 7
-
+    let assert = counter[0] == 2
+    check(assert)
+    check(sum == 7)
     let in = 42
     let while = 43
-    assert in == 42
-    assert while == 43
+    check(in == 42)
+    check(while == 43)
     exit(0)
 }

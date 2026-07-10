@@ -216,12 +216,6 @@ struct AstPanic {
     expr: AstNode
 }
 
-struct AstAssert {
-    meta: AstMeta
-    expr: AstNode
-    value_expr: AstNode
-}
-
 struct AstMatch {
     meta: AstMeta
     expr: AstNode
@@ -358,7 +352,7 @@ struct AstUnionInit {
     expr: AstNode
 }
 
-type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_new_program(): AstProgram {
     ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
@@ -419,7 +413,6 @@ fun ast_expr(node: AstNode): AstNode {
         AstIf n: { ret n.expr }
         AstLoop n: { ret n.expr }
         AstPanic n: { ret n.expr }
-        AstAssert n: { ret n.expr }
         AstMatch n: { ret n.expr }
         AstMatchCase n: { ret n.expr }
         AstExprStmt n: { ret n.expr }
@@ -890,18 +883,6 @@ fun (p: Parser) parse_panic_stmt(): AstNode {
     ret new AstNode(node)
 }
 
-fun (p: Parser) parse_assert_stmt(): AstNode {
-    let t = p.expect("ASSERT")
-    let node = new AstAssert { meta: ast_meta(), expr: ast_empty(), value_expr: ast_empty() }
-    node.meta.line = token_line(t)
-    node.expr = p.parse_expr()
-    if p.check("COMMA") == 1 {
-        node.value_expr = p.parse_expr()
-    }
-    p.expect_stmt_end()
-    ret new AstNode(node)
-}
-
 fun (p: Parser) parse_match_literal(): AstNode {
     if p.peek_kind("NUMBER") == 1 {
         let t = p.advance()
@@ -1174,9 +1155,6 @@ fun (p: Parser) parse_stmt(): AstNode {
     }
     if token_kind(t) == "PANIC" {
         ret p.parse_panic_stmt()
-    }
-    if token_kind(t) == "ASSERT" {
-        ret p.parse_assert_stmt()
     }
     if token_kind(t) == "MATCH" {
         ret p.parse_match_stmt()
@@ -1823,12 +1801,6 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstPanic n: {
             dump_node_line(node, depth, "Panic", "", "", false, "", "", false)
             dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstAssert n: {
-            dump_node_line(node, depth, "Assert", "", "", false, "", "", false)
-            dump_node(n.expr, depth + 1)
-            dump_node(n.value_expr, depth + 1)
             ret 0
         }
         AstExprStmt n: {

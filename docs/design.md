@@ -168,7 +168,9 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 - `ret expr` / `ret`。
 - `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。
-- `assert cond` / `assert cond, "消息"` — 始终启用，失败时退出。
+
+`assert` 不是关键字或内建语句；需要运行时检查时显式写
+`if !cond { panic "消息" }`。`assert` 可作为普通标识符。
 
 Block 的最后一个裸表达式是该 block 的 value；没有尾表达式的 block 类型是 `void`。当前语法没有分号；如果 `void` 函数或 block 末尾需要丢弃一个非 `void` 表达式，写一个后续 statement（例如裸 `ret`）来避免它成为 block value。
 

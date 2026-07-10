@@ -33,7 +33,7 @@ fun main(): i64 {
     # -- Identifiers ------------------------------------------------
     let while = 0
     let in = 0
-    let camelCase = 0
+    let assert = 0
     let UPPER_CASE = 0
     let mixed123 = 0
     let a_b_c = 0

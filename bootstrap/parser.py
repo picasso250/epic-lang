@@ -284,8 +284,6 @@ class Parser:
             return self.parse_continue_stmt()
         if t[0] == "PANIC":
             return self.parse_panic_stmt()
-        if t[0] == "ASSERT":
-            return self.parse_assert_stmt()
         if t[0] == "MATCH":
             return self.parse_match_stmt()
         if t[0] == "ID":
@@ -395,15 +393,6 @@ class Parser:
         message = self.parse_expr()
         self.expect_stmt_end()
         return PanicNode(message=message, line=t[2])
-
-    def parse_assert_stmt(self):
-        t = self.expect("ASSERT")
-        cond = self.parse_expr()
-        message = None
-        if self.check("COMMA"):
-            message = self.parse_expr()
-        self.expect_stmt_end()
-        return AssertNode(cond=cond, message=message, line=t[2])
 
     def parse_match_stmt(self):
         self.expect("MATCH")
@@ -803,11 +792,6 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, PanicNode):
         emit("Panic")
         out.extend(dump_ast_lines(node.message, depth + 1))
-    elif isinstance(node, AssertNode):
-        emit("Assert")
-        out.extend(dump_ast_lines(node.cond, depth + 1))
-        if node.message is not None:
-            out.extend(dump_ast_lines(node.message, depth + 1))
     elif isinstance(node, MatchNode):
         emit("Match")
         out.extend(dump_ast_lines(node.expr, depth + 1))

@@ -148,8 +148,13 @@ fun statements_and_control(flag: bool): void {
         }
     }
 
-    assert typed >= 0, "typed should be non-negative"
-    assert flag || typed != 0
+    let assert = typed >= 0
+    if !assert {
+        panic "typed should be non-negative"
+    }
+    if !(flag || typed != 0) {
+        panic "flag or typed must be nonzero"
+    }
     panic "parser-only panic statement"
     ret
 }

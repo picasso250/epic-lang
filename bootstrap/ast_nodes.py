@@ -159,11 +159,6 @@ class PanicNode(ASTNode):
     message: ASTNode
 
 
-@dataclass
-class AssertNode(ASTNode):
-    cond: ASTNode
-    message: Optional[ASTNode]
-
 
 @dataclass
 class MatchCase(ASTNode):

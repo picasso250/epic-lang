@@ -229,11 +229,6 @@ class SemanticAnalyzer:
         if isinstance(stmt, PanicNode):
             self._expr(stmt.message)
             return
-        if isinstance(stmt, AssertNode):
-            self._expect_bool(self._expr(stmt.cond), "assert condition")
-            if stmt.message is not None:
-                self._expr(stmt.message)
-            return
         if isinstance(stmt, MatchNode):
             self._analyze_match(stmt)
             return
@@ -933,11 +928,6 @@ def assert_typed_program(program):
             return
         if isinstance(node, PanicNode):
             expr(node.message, f"{path}.message")
-            return
-        if isinstance(node, AssertNode):
-            expr(node.cond, f"{path}.cond")
-            if node.message is not None:
-                expr(node.message, f"{path}.message")
             return
         if isinstance(node, MatchNode):
             expr(node.expr, f"{path}.expr")

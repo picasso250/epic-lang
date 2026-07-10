@@ -16,6 +16,15 @@ Program
     UnionMember SemLit
     UnionMember SemAdd
   ExternDef GetTickCount64 : u64
+  FunDef check : void
+    Param ok : bool
+    Block
+      If
+        Block
+          Panic
+            String check failed : str
+        Unary ! : bool
+          Var ok : bool
   FunDef add : i64
     Param a : i64
     Param b : i64
@@ -416,19 +425,23 @@ Program
           Literal 8 : i64
       Let e : i64
         Call use_adt : i64
-      Assert
+      Let assert : bool
         Binary >= : bool
           Var a : i64
           Literal 0 : i64
-        String a : str
-      Assert
-        Binary >= : bool
-          Var b : i64
-          Literal 0 : i64
-      Assert
-        Binary == : bool
-          Var e : i64
-          Literal 42 : i64
+      ExprStmt
+        Call check : void
+          Var assert : bool
+      ExprStmt
+        Call check : void
+          Binary >= : bool
+            Var b : i64
+            Literal 0 : i64
+      ExprStmt
+        Call check : void
+          Binary == : bool
+            Var e : i64
+            Literal 42 : i64
       ExprStmt
         Call println : void
           Call str : str

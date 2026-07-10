@@ -1,5 +1,11 @@
 # EXIT: 0
 # STDOUT: 47,1,65,2,-12
+fun check(ok: bool): void {
+    if !ok {
+        panic "check failed"
+    }
+}
+
 struct Pair {
     value: i64
 }
@@ -12,10 +18,10 @@ fun main(): void {
     let neg = str(0 - 12)
 
     let buf1 = new u8[]
-    assert(len(buf1) == 0)
-    assert(cap(buf1) == 0)
+    check(len(buf1) == 0)
+    check(cap(buf1) == 0)
     buf1.extend(bytes(a))
-    assert(cap(buf1) == 4)
+    check(cap(buf1) == 4)
     buf1.push(',')
     buf1.extend(bytes(b))
     print(str(buf1))
@@ -33,20 +39,19 @@ fun main(): void {
     print(str(buf3))
 
     let nums = new i64[]
-    assert(len(nums) == 0)
-    assert(cap(nums) == 0)
+    check(len(nums) == 0)
+    check(cap(nums) == 0)
     nums.push(40)
-    assert(cap(nums) == 4)
+    check(cap(nums) == 4)
     nums.push(2)
-    assert(nums[0] + nums[1] == 42)
-
+    check(nums[0] + nums[1] == 42)
     let pairs = new Pair[]
-    assert(len(pairs) == 0)
-    assert(cap(pairs) == 0)
+    check(len(pairs) == 0)
+    check(cap(pairs) == 0)
     let p = new Pair {}
     p.value = 7
     pairs.push(p)
-    assert(cap(pairs) == 4)
-    assert(pairs[0].value == 7)
+    check(cap(pairs) == 4)
+    check(pairs[0].value == 7)
     exit(0)
 }

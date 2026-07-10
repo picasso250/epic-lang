@@ -122,7 +122,6 @@ fun keyword_kind(text: str): str {
     if text == "match" { ret "MATCH" }
     if text == "false" { ret "FALSE" }
     if text == "ret" { ret "RETURN" }
-    if text == "assert" { ret "ASSERT" }
     if text == "struct" { ret "STRUCT" }
     if text == "continue" { ret "CONTINUE" }
     ret "ID"

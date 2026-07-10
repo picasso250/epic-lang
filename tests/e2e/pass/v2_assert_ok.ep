@@ -1,5 +1,0 @@
-# EXIT: 5
-fun main(): i64 {
-    assert true, "bad"
-    ret 5
-}

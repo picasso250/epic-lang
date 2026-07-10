@@ -225,10 +225,11 @@ after ADT removal and naming unification.
   - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
 - Top-level `extern` declarations with `i32/u32/i64/u64/void` ABI types
 - `argv` global
-- `assert` / `panic`
+- `panic`
 
 ### Features removed from core
 
+- `assert` statement; use `if !cond { panic "message" }`. The name `assert` is an ordinary identifier.
 - `type Name { ... }` ADT definition
 - `new A.V { ... }` variant initialization
 - ADT match with payload binding

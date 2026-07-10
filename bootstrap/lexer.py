@@ -15,7 +15,6 @@ TOKEN_SPEC = [
     ("TYPE",      r'\btype\b'),
     ("MATCH",     r'\bmatch\b'),
     ("PANIC",     r'\bpanic\b'),
-    ("ASSERT",    r'\bassert\b'),
     ("TRUE",      r'\btrue\b'),
     ("FALSE",     r'\bfalse\b'),
     ("BREAK",     r'\bbreak\b'),

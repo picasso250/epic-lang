@@ -1344,33 +1344,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
 
-fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirBlockFlow {
-    st.current_block = block
-    let cond_flow = mir_emit_expr(st, st.current_block, stmt.expr)
-    st.current_block = cond_flow.block
-    let ok_block = mir_new_block(st, "assert.ok")
-    let fail_block = mir_new_block(st, "assert.fail")
-    st.current_block.terminator = mir_condbr(cond_flow.value, ok_block.name, fail_block.name)
-    st.current_block.has_terminator = true
-
-    st.current_block = fail_block
-    mir_emit_print_text(st, (("assert line " + str(stmt.meta.line)) + ": "))
-    match stmt.value_expr {
-        AstEmpty e: {
-            mir_emit_print_text(st, "assertion failed")
-        }
-        _: {
-            mir_emit_print_expr(st, stmt.value_expr)
-        }
-    }
-    mir_emit_print_newline(st)
-    mir_emit_exit_current_block(st, 1)
-    st.current_block.terminator = mir_dummy_return(st)
-    st.current_block.has_terminator = true
-    st.current_block = ok_block
-    ret mir_reachable_flow(ok_block)
-}
-
 fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstPanic): MirBlockFlow {
     st.current_block = block
     mir_emit_print_text(st, (("panic line " + str(stmt.meta.line)) + ": "))
@@ -1845,9 +1818,6 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         }
         AstIf n: {
             ret mir_emit_if(st, st.current_block, n)
-        }
-        AstAssert n: {
-            ret mir_emit_assert(st, st.current_block, n)
         }
         AstPanic n: {
             ret mir_emit_panic(st, st.current_block, n)

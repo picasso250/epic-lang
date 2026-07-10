@@ -1,5 +1,0 @@
-# EXIT: 1
-# STDOUT: assert line 4: bad
-fun main(): void {
-    assert false, "bad"
-}

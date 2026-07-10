@@ -309,17 +309,26 @@ Program
             BlockValue
               Call println
                 String false
-      Assert
+      Let assert
         Binary >=
           Var typed
           Literal 0
-        String typed should be non-negative
-      Assert
-        Binary ||
-          Var flag
-          Binary !=
-            Var typed
-            Literal 0
+      If
+        Block
+          Panic
+            String typed should be non-negative
+        Unary !
+          Var assert
+      If
+        Block
+          Panic
+            String flag or typed must be nonzero
+        Unary !
+          Binary ||
+            Var flag
+            Binary !=
+              Var typed
+              Literal 0
       Panic
         String parser-only panic statement
       Return

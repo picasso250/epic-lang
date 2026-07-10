@@ -492,8 +492,6 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_loop_from(in_block, stmt)
         elif isinstance(stmt, ForRangeNode):
             return self._emit_for_range_from(in_block, stmt)
-        elif isinstance(stmt, AssertNode):
-            return self._emit_assert_from(in_block, stmt)
         elif isinstance(stmt, PanicNode):
             return self._emit_panic_from(in_block, stmt)
         elif isinstance(stmt, MatchNode):
@@ -669,28 +667,6 @@ class MirCodegen(MirFunctionBuilder):
             return self._reachable(end_block)
         finally:
             self._pop_local_scope()
-
-    def _emit_assert(self, stmt):
-        flow = self._emit_assert_from(self.ensure_insertable(), stmt)
-        self.current_block = flow.block if flow.reachable else None
-        return flow
-
-    def _emit_assert_from(self, in_block, stmt):
-        cond = self._expr_from(in_block, stmt.cond)
-        ok_block = self.new_block("assert.ok")
-        fail_block = self.new_block("assert.fail")
-        self.condbr(cond.block, cond.value, ok_block.name, fail_block.name)
-
-        self.set_block(fail_block)
-        self._emit_print_text(f"assert line {stmt.line}: ")
-        if stmt.message is None:
-            self._emit_print_text("assertion failed")
-        else:
-            self._emit_print_expr(stmt.message)
-        self._emit_print_newline()
-        self._emit_exit_current_block()
-        self.terminate(fail_block, self._dummy_return())
-        return self._reachable(ok_block)
 
     def _emit_panic(self, stmt):
         flow = self._emit_panic_from(self.ensure_insertable(), stmt)

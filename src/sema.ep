@@ -1103,14 +1103,6 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             }
             ret
         }
-        AstAssert n: {
-            sema_expect_bool(st, n.expr, "assert condition")
-            match n.value_expr {
-                AstEmpty e: {}
-                _: { sema_expr_type(st, n.value_expr) }
-            }
-            ret
-        }
         AstPanic n: {
             sema_expr_type(st, n.expr)
             ret

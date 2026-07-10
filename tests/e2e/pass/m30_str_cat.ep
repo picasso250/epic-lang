@@ -1,14 +1,20 @@
 # EXIT: 0
 # STDOUT: hello world
+fun check(ok: bool): void {
+    if !ok {
+        panic "check failed"
+    }
+}
+
 fun main(): void {
     let a = "hello"
     let b = " "
     let c = "world"
     let joined = a + b + c
-    assert(joined == "hello world")
-    assert(a == "hello")
-    assert(("" + "x") == "x")
-    assert(("x" + "") == "x")
+    check(joined == "hello world")
+    check(a == "hello")
+    check(("" + "x") == "x")
+    check(("x" + "") == "x")
     println(joined)
     exit(0)
 }
