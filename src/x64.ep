@@ -277,9 +277,9 @@ fun x64_mem_addr_text(op: X64Operand): str {
                 ret m.base
             }
             if m.disp > 0 {
-                ret str_cat2(str_cat2(m.base, "+"), str(m.disp))
+                ret ((m.base + "+") + str(m.disp))
             }
-            ret str_cat2(m.base, str(m.disp))
+            ret (m.base + str(m.disp))
         }
         X64MemSymbolOperand m: { ret m.symbol }
     }
@@ -292,8 +292,8 @@ fun x64_operand_text(op: X64Operand): str {
         X64ImmOperand i: { ret str(i.value) }
         X64SymbolOperand s: { ret s.name }
         X64LabelRefOperand l: { ret l.name }
-        X64MemBaseOperand m: { ret str_cat2(str_cat2(x64_size_prefix(m.size), "["), str_cat2(x64_mem_addr_text(op), "]")) }
-        X64MemSymbolOperand m: { ret str_cat2(str_cat2(x64_size_prefix(m.size), "["), str_cat2(x64_mem_addr_text(op), "]")) }
+        X64MemBaseOperand m: { ret ((x64_size_prefix(m.size) + "[") + (x64_mem_addr_text(op) + "]")) }
+        X64MemSymbolOperand m: { ret ((x64_size_prefix(m.size) + "[") + (x64_mem_addr_text(op) + "]")) }
     }
     ret "<bad operand>"
 }
@@ -340,28 +340,28 @@ fun x64_item_kind_text(item: X64Item): str {
 fun x64_item_text(item: X64Item): str {
     match item {
         X64GlobalItem it: {
-            ret str_cat2(str_cat2("global ", it.name), "\n")
+            ret (("global " + it.name) + "\n")
         }
         X64ExternItem it: {
-            ret str_cat2(str_cat2("extern ", it.name), "\n")
+            ret (("extern " + it.name) + "\n")
         }
         X64SectionItem it: {
-            ret str_cat2(str_cat2("section ", it.name), "\n")
+            ret (("section " + it.name) + "\n")
         }
         X64LabelItem it: {
-            ret str_cat2(str_cat2(it.name, ":"), "\n")
+            ret ((it.name + ":") + "\n")
         }
         X64InstItem it: {
             if len(it.operands) == 0 {
-                ret str_cat2(str_cat2("    ", it.op), "\n")
+                ret (("    " + it.op) + "\n")
             }
-            ret str_cat2(str_cat2(str_cat2(str_cat2("    ", it.op), " "), x64_operands_text(it.operands)), "\n")
+            ret (((("    " + it.op) + " ") + x64_operands_text(it.operands)) + "\n")
         }
         X64DataBytesItem it: {
-            ret str_cat2(str_cat2(str_cat2(it.name, ": db "), x64_values_text(it.values)), "\n")
+            ret (((it.name + ": db ") + x64_values_text(it.values)) + "\n")
         }
         X64DataZeroItem it: {
-            ret str_cat2(str_cat2(str_cat2(str_cat2(it.name, ": times "), str(it.count)), " db 0"), "\n")
+            ret ((((it.name + ": times ") + str(it.count)) + " db 0") + "\n")
         }
     }
     ret "<bad x64 item>\n"

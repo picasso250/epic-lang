@@ -4,7 +4,7 @@
 #
 
 fun mir_text_die(msg: str): void {
-    panic str_cat2("MIR text parse error: ", msg)
+    panic ("MIR text parse error: " + msg)
 }
 
 fun mrt_starts_with(s: str, prefix: str): bool {
@@ -169,15 +169,15 @@ fun mrt_is_int_text(s: str): bool {
 
 fun mrt_parse_local_id(text: str): i64 {
     if len(text) < 2 || text[0:1] != "%" {
-        mir_text_die(str_cat2("local value must use numeric %id: ", text))
+        mir_text_die(("local value must use numeric %id: " + text))
     }
     let raw = text[1:len(text)]
     if mrt_is_int_text(raw) == false {
-        mir_text_die(str_cat2("local value must use numeric %id: ", text))
+        mir_text_die(("local value must use numeric %id: " + text))
     }
     let value_id = mrt_parse_i64(raw)
     if value_id <= 0 {
-        mir_text_die(str_cat2("local value id must be positive: ", text))
+        mir_text_die(("local value id must be positive: " + text))
     }
     ret value_id
 }
@@ -186,7 +186,7 @@ fun mrt_parse_typed_operand(text: str): MirOperand {
     let typ_raw = mrt_first_word(text)
     let typ = mrt_strip_trailing_comma(typ_raw)
     let value = mrt_after_first_word(text)
-    if len(value) == 0 { mir_text_die(str_cat2("missing operand: ", text)) }
+    if len(value) == 0 { mir_text_die(("missing operand: " + text)) }
     if value[0:1] == "%" { ret mir_value_operand(typ, mrt_parse_local_id(value)) }
     if value == "null" { ret mir_operand_null() }
     if value == "true" { ret mir_const_bool(true) }
@@ -243,7 +243,7 @@ fun mrt_parse_inst(line: str): MirInst {
         let lhs = line[0:eq]
         body = line[eq + 3:len(line)]
         let colon = mrt_find(lhs, ":")
-        if colon < 0 { mir_text_die(str_cat2("bad result lhs: ", line)) }
+        if colon < 0 { mir_text_die(("bad result lhs: " + line)) }
         result_id = mrt_parse_local_id(mrt_trim(lhs[0:colon]))
         result_type = mrt_trim(lhs[colon + 1:len(lhs)])
     }
@@ -254,18 +254,18 @@ fun mrt_parse_inst(line: str): MirInst {
     if mrt_starts_with(body, "load ") {
         let rest = body[5:len(body)]
         let comma = mrt_find(rest, ",")
-        if comma < 0 { mir_text_die(str_cat2("bad load: ", line)) }
+        if comma < 0 { mir_text_die(("bad load: " + line)) }
         ret mir_load(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "store ") {
         let ops = mrt_parse_operands(body[6:len(body)])
-        if len(ops) != 2 { mir_text_die(str_cat2("bad store: ", line)) }
+        if len(ops) != 2 { mir_text_die(("bad store: " + line)) }
         ret mir_store(ops[0], ops[1])
     }
     if mrt_starts_with(body, "gep ") {
         let rest = body[4:len(body)]
         let comma = mrt_find(rest, ",")
-        if comma < 0 { mir_text_die(str_cat2("bad gep: ", line)) }
+        if comma < 0 { mir_text_die(("bad gep: " + line)) }
         let inst = mir_inst_empty()
         inst.op = "gep"
         inst.typ = mrt_trim(rest[0:comma])
@@ -278,7 +278,7 @@ fun mrt_parse_inst(line: str): MirInst {
         let after_ret = mrt_after_first_word(rest)
         let lp = mrt_find(after_ret, "(")
         let rp = mrt_find(after_ret, ")")
-        if lp < 0 || rp < lp { mir_text_die(str_cat2("bad call: ", line)) }
+        if lp < 0 || rp < lp { mir_text_die(("bad call: " + line)) }
         let callee = after_ret[0:lp]
         let args = mrt_parse_operands(after_ret[lp + 1:rp])
         ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_id, result_type)
@@ -286,7 +286,7 @@ fun mrt_parse_inst(line: str): MirInst {
     if mrt_starts_with(body, "ptrtoint ") {
         let rest = body[9:len(body)]
         let to_pos = mrt_find(rest, " to ")
-        if to_pos < 0 { mir_text_die(str_cat2("bad ptrtoint: ", line)) }
+        if to_pos < 0 { mir_text_die(("bad ptrtoint: " + line)) }
         let inst = mir_inst_empty()
         inst.op = "ptrtoint"
         inst.typ = mrt_trim(rest[to_pos + 4:len(rest)])
@@ -317,11 +317,11 @@ fun mrt_parse_terminator(line: str): MirTerminator {
     }
     if mrt_starts_with(line, "condbr ") {
         let parts = mrt_split_commas(line[7:len(line)])
-        if len(parts) != 3 { mir_text_die(str_cat2("bad condbr: ", line)) }
+        if len(parts) != 3 { mir_text_die(("bad condbr: " + line)) }
         let then_part = mrt_trim(parts[1])
         let else_part = mrt_trim(parts[2])
         if !mrt_starts_with(then_part, "label %") || !mrt_starts_with(else_part, "label %") {
-            mir_text_die(str_cat2("bad condbr labels: ", line))
+            mir_text_die(("bad condbr labels: " + line))
         }
         ret mir_condbr(mrt_parse_typed_operand(parts[0]), then_part[7:len(then_part)], else_part[7:len(else_part)])
     }
@@ -330,7 +330,7 @@ fun mrt_parse_terminator(line: str): MirTerminator {
         if rest == "void" { ret mir_ret_void() }
         ret mir_ret_value(mrt_parse_typed_operand(rest))
     }
-    mir_text_die(str_cat2("bad terminator: ", line))
+    mir_text_die(("bad terminator: " + line))
     ret mir_ret_void()
 }
 
@@ -344,7 +344,7 @@ fun mrt_hex_value(c: u8): i64 {
 fun mrt_parse_bytes_literal(text: str): str {
     let t = mrt_trim(text)
     if len(t) < 2 || t[0:1] != "\"" || t[len(t) - 1:len(t)] != "\"" {
-        mir_text_die(str_cat2("bad bytes literal: ", text))
+        mir_text_die(("bad bytes literal: " + text))
     }
     let raw = bytes(t[1:len(t) - 1])
     let out = new u8[]
@@ -398,17 +398,17 @@ fun mrt_parse_bytes_literal(text: str): str {
 fun mrt_parse_extern(line: str): MirExtern {
     let prefix = "extern "
     if !mrt_starts_with(line, prefix) {
-        mir_text_die(str_cat2("bad extern declaration: ", line))
+        mir_text_die(("bad extern declaration: " + line))
     }
     let rest = line[len(prefix):len(line)]
     let at_pos = mrt_find(rest, " @")
-    if at_pos < 0 { mir_text_die(str_cat2("bad extern declaration: ", line)) }
+    if at_pos < 0 { mir_text_die(("bad extern declaration: " + line)) }
     let return_type = mrt_trim(rest[0:at_pos])
     let after_at = rest[at_pos + 2:len(rest)]
     let lp = mrt_find(after_at, "(")
     let rp = mrt_find(after_at, ")")
     if lp <= 0 || rp < lp || rp != len(after_at) - 1 {
-        mir_text_die(str_cat2("bad extern declaration: ", line))
+        mir_text_die(("bad extern declaration: " + line))
     }
     let name = after_at[0:lp]
     let params_text = mrt_trim(after_at[lp + 1:rp])
@@ -427,11 +427,11 @@ fun mrt_parse_extern(line: str): MirExtern {
 fun mrt_parse_global(line: str): MirGlobal {
     let prefix = "global @"
     if !mrt_starts_with(line, prefix) {
-        mir_text_die(str_cat2("bad global: ", line))
+        mir_text_die(("bad global: " + line))
     }
     let rest = line[len(prefix):len(line)]
     let colon = mrt_find(rest, ":")
-    if colon <= 0 { mir_text_die(str_cat2("bad global name: ", line)) }
+    if colon <= 0 { mir_text_die(("bad global name: " + line)) }
     let name = rest[0:colon]
     let body = mrt_trim(rest[colon + 1:len(rest)])
     let eq = mrt_find(body, " = ")
@@ -451,19 +451,19 @@ fun mrt_parse_struct_type(program: MirProgram, line: str): void {
     let prefix = "type "
     let marker = " = struct {"
     if !mrt_starts_with(line, prefix) || !mrt_ends_with(line, "}") {
-        mir_text_die(str_cat2("bad struct type declaration: ", line))
+        mir_text_die(("bad struct type declaration: " + line))
     }
     let marker_pos = mrt_find(line, marker)
     if marker_pos < len(prefix) {
-        mir_text_die(str_cat2("bad struct type declaration: ", line))
+        mir_text_die(("bad struct type declaration: " + line))
     }
     let name = mrt_trim(line[len(prefix):marker_pos])
     if len(name) == 0 {
-        mir_text_die(str_cat2("missing struct type name: ", line))
+        mir_text_die(("missing struct type name: " + line))
     }
     let fields_text = mrt_trim(line[marker_pos + len(marker):len(line) - 1])
     if len(fields_text) == 0 {
-        mir_text_die(str_cat2("empty struct type is not supported in v0: ", name))
+        mir_text_die(("empty struct type is not supported in v0: " + name))
     }
     let field_types = mrt_split_commas(fields_text)
     let i = 0
@@ -477,15 +477,15 @@ fun mrt_parse_function(text: str): MirFunction {
     let lines = mrt_split_lines(text)
     if len(lines) == 0 { mir_text_die("empty helper text") }
     let header = lines[0]
-    if !mrt_starts_with(header, "define ") { mir_text_die(str_cat2("bad header: ", header)) }
+    if !mrt_starts_with(header, "define ") { mir_text_die(("bad header: " + header)) }
     let after_define = header[7:len(header)]
     let at_pos = mrt_find(after_define, " @")
-    if at_pos < 0 { mir_text_die(str_cat2("bad header: ", header)) }
+    if at_pos < 0 { mir_text_die(("bad header: " + header)) }
     let ret_type = after_define[0:at_pos]
     let after_at = after_define[at_pos + 2:len(after_define)]
     let lp = mrt_find(after_at, "(")
     let rp = mrt_find(after_at, ")")
-    if lp < 0 || rp < lp { mir_text_die(str_cat2("bad header params: ", header)) }
+    if lp < 0 || rp < lp { mir_text_die(("bad header params: " + header)) }
     let name = after_at[0:lp]
     let params_text = after_at[lp + 1:rp]
     let fn = mir_function_empty(name, ret_type)
@@ -505,7 +505,7 @@ fun mrt_parse_function(text: str): MirFunction {
             current = mir_block_empty(line[0:len(line) - 1])
             has_current = true
         } else {
-            if !has_current { mir_text_die(str_cat2("statement before block: ", line)) }
+            if !has_current { mir_text_die(("statement before block: " + line)) }
             if mrt_is_terminator(line) {
                 current.terminator = mrt_parse_terminator(line)
                 current.has_terminator = true
@@ -515,7 +515,7 @@ fun mrt_parse_function(text: str): MirFunction {
         }
         i = i + 1
     }
-    mir_text_die(str_cat2("missing closing brace: ", name))
+    mir_text_die(("missing closing brace: " + name))
     ret fn
 }
 
@@ -539,14 +539,14 @@ fun mrt_parse_program(text: str): MirProgram {
             let closed = false
             i = i + 1
             for i < len(lines) && !closed {
-                fn_text = str_cat2(str_cat2(fn_text, "\n"), lines[i])
+                fn_text = ((fn_text + "\n") + lines[i])
                 if lines[i] == "}" { closed = true }
                 i = i + 1
             }
             if !closed { mir_text_die("unterminated function in MIR program") }
             program.functions.push(mrt_parse_function(fn_text))
         } else {
-            mir_text_die(str_cat2("expected extern, type, global, or define; got: ", line))
+            mir_text_die(("expected extern, type, global, or define; got: " + line))
         }
     }
     ret program

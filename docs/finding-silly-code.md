@@ -350,7 +350,7 @@ At that point, switch from “silly code” cleanup to normal profiling, data-st
 Bad shape:
 
 ```epic
-let key = str_cat2(str_cat2(struct_name, "."), field_name)
+let key = struct_name + "." + field_name
 struct_field_keys.push(key)
 ```
 

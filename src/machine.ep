@@ -55,7 +55,7 @@ fun machine_builder_empty(): MachineBuilder {
 }
 
 fun machine_die(msg: str): void {
-    panic str_cat2("machine error: ", msg)
+    panic ("machine error: " + msg)
 }
 
 fun machine_append_byte(out: i64[], value: i64): void {
@@ -102,7 +102,7 @@ fun machine_reg64(name: str): i64 {
     if name == "r9" { ret 9 }
     if name == "r10" { ret 10 }
     if name == "r11" { ret 11 }
-    machine_die(str_cat2("unsupported reg64: ", name))
+    machine_die(("unsupported reg64: " + name))
     ret 0
 }
 
@@ -165,18 +165,6 @@ fun machine_text_label_offset_or_neg1(b: MachineBuilder, name: str): i64 {
     ret -1
 }
 
-fun machine_text_label_offset(b: MachineBuilder, name: str): i64 {
-    let offset = machine_text_label_offset_or_neg1(b, name)
-    if offset >= 0 {
-        ret offset
-    }
-    machine_die(str_cat2("unknown text label: ", name))
-    ret 0
-}
-
-fun machine_has_text_label(b: MachineBuilder, name: str): bool {
-    ret machine_text_label_offset_or_neg1(b, name) >= 0
-}
 fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
     b.fixups.push(new MachineFixup(new MachineLabelFixup { offset: offset, label: label }))
 }
@@ -334,7 +322,7 @@ fun machine_emit_jump(b: MachineBuilder, op: str, label: str): void {
         machine_append_byte(b.text, 15)
         machine_append_byte(b.text, 142)
     } else {
-        machine_die(str_cat2("unsupported jump: ", op))
+        machine_die(("unsupported jump: " + op))
     }
     let off = len(b.text)
     machine_append_i32(b.text, 0)
@@ -364,7 +352,7 @@ fun machine_reg8(name: str): i64 {
     if name == "r9b" { ret 9 }
     if name == "r10b" { ret 10 }
     if name == "r11b" { ret 11 }
-    machine_die(str_cat2("unsupported reg8: ", name))
+    machine_die(("unsupported reg8: " + name))
     ret 0
 }
 
@@ -434,7 +422,7 @@ fun machine_emit_mov_symbol_reg(b: MachineBuilder, symbol: str, src: str): void 
 
 fun machine_emit_mov_symbol_reg8(b: MachineBuilder, symbol: str, src: str): void {
     if src != "al" {
-        machine_die(str_cat2("unsupported symbol byte store register: ", src))
+        machine_die(("unsupported symbol byte store register: " + src))
     }
     machine_append_byte(b.text, 136)
     machine_append_byte(b.text, 5)
@@ -464,7 +452,7 @@ fun machine_alu_opcode(op: str): i64 {
     if op == "and" { ret 33 }
     if op == "or" { ret 9 }
     if op == "xor" { ret 49 }
-    machine_die(str_cat2("unsupported alu op: ", op))
+    machine_die(("unsupported alu op: " + op))
     ret 0
 }
 
@@ -495,7 +483,7 @@ fun machine_emit_setcc(b: MachineBuilder, op: str): void {
     else if op == "setae" { code = 147 }
     else if op == "setb" { code = 146 }
     else if op == "setbe" { code = 150 }
-    else { machine_die(str_cat2("unsupported setcc: ", op)) }
+    else { machine_die(("unsupported setcc: " + op)) }
     machine_append_byte(b.text, 15)
     machine_append_byte(b.text, code)
     machine_append_byte(b.text, 192)
@@ -529,7 +517,7 @@ fun machine_emit_shift_rax_cl(b: MachineBuilder, op: str): void {
     if op == "shl" { ext = 4 }
     else if op == "shr" { ext = 5 }
     else if op == "sar" { ext = 7 }
-    else { machine_die(str_cat2("unsupported shift: ", op)) }
+    else { machine_die(("unsupported shift: " + op)) }
     machine_rex(b, true, 0, 0)
     machine_append_byte(b.text, 211)
     machine_modrm(b, 3, ext, machine_reg64("rax"))
@@ -707,7 +695,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
         machine_emit_lea_base_disp(b, x64_operand_name(ops[0]), x64_operand_base(ops[1]), x64_operand_disp(ops[1]))
         ret
     }
-    machine_die(str_cat2("unsupported instruction: ", op))
+    machine_die(("unsupported instruction: " + op))
 }
 
 fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
@@ -732,15 +720,15 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
                 b.data_label_offsets.push(len(b.data))
                 ret
             }
-            machine_die(str_cat2("label outside section: ", it.name))
+            machine_die(("label outside section: " + it.name))
         }
         X64InstItem it: {
-            if b.section != ".text" { machine_die(str_cat2("instruction outside .text: ", it.op)) }
+            if b.section != ".text" { machine_die(("instruction outside .text: " + it.op)) }
             machine_emit_inst(b, it.op, it.operands)
             ret
         }
         X64DataBytesItem it: {
-            if b.section != ".data" { machine_die(str_cat2("data outside .data: ", it.name)) }
+            if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
             let i = 0
@@ -751,7 +739,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             ret
         }
         X64DataZeroItem it: {
-            if b.section != ".data" { machine_die(str_cat2("data outside .data: ", it.name)) }
+            if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
             let i = 0
@@ -762,7 +750,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             ret
         }
     }
-    machine_die(str_cat2("unsupported item: ", x64_item_kind_text(item)))
+    machine_die(("unsupported item: " + x64_item_kind_text(item)))
 }
 
 fun machine_now_ms(): i64 {
@@ -838,7 +826,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     for i < len(referenced_names) {
         let symbol_index = machine_symbol_name_index(obj.symbol_names, referenced_names[i])
         if symbol_index < 0 {
-            machine_die(str_cat2("unknown relocation symbol: ", referenced_names[i]))
+            machine_die(("unknown relocation symbol: " + referenced_names[i]))
         }
         referenced_symbol_indexes.push(symbol_index)
         i = i + 1

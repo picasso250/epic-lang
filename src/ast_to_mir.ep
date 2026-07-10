@@ -72,7 +72,7 @@ fun mir_unreachable_flow(): MirBlockFlow {
 }
 
 fun ast_to_mir_die(msg: str): void {
-    panic str_cat2("AST-to-MIR error: ", msg)
+    panic ("AST-to-MIR error: " + msg)
 }
 
 fun mir_epic_type(type_name: str): str {
@@ -95,7 +95,7 @@ fun mir_new_value(st: MirCodegenState): i64 {
 
 fun mir_new_block(st: MirCodegenState, prefix: str): MirBlock {
     st.block_counter = st.block_counter + 1
-    let block = mir_block_empty(str_cat2(prefix, str(st.block_counter)))
+    let block = mir_block_empty((prefix + str(st.block_counter)))
     st.current_fn.blocks.push(block)
     ret block
 }
@@ -126,7 +126,7 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
 }
 
 fun mir_global_label(name: str): str {
-    ret str_cat2("__epg_", name)
+    ret ("__epg_" + name)
 }
 
 fun mir_global_index(st: MirCodegenState, name: str): i64 {
@@ -365,13 +365,13 @@ fun mir_emit_shift_count_check(st: MirCodegenState, count: MirOperand, source_ty
     st.current_block.has_terminator = true
     st.current_block = fail_block
     let print_args = new MirOperand[]
-    print_args.push(mir_symbol_operand("ptr", mir_string_label(st, str_cat2(str_cat2("pa", "nic line "), str_cat2(str(line), ": invalid shift count")))))
+    print_args.push(mir_symbol_operand("ptr", mir_string_label(st, ("panic line " + str(line) + ": invalid shift count"))))
     mir_emit_call_inst(st, "__ep_print_str", "void", print_args)
     let nl_args = new MirOperand[]
     mir_emit_call_inst(st, "__ep_print_newline", "void", nl_args)
     let exit_args = new MirOperand[]
     exit_args.push(mir_const_int("i64", 1))
-    mir_emit_inst(st, mir_call(str_cat2("Exit", "Process"), "void", exit_args))
+    mir_emit_inst(st, mir_call("ExitProcess", "void", exit_args))
     if st.current_fn.return_type == "void" { st.current_block.terminator = mir_ret_void() } else { st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0)) }
     st.current_block.has_terminator = true
     st.current_block = ok_block
@@ -424,7 +424,7 @@ fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     ops.push(base)
     ops.push(mir_const_int("i64", 0))
     ops.push(mir_const_int("i64", mir_field_index(st, struct_name, field_name)))
-    ret mir_make_gep(st, str_cat2("struct ", struct_name), ops)
+    ret mir_make_gep(st, ("struct " + struct_name), ops)
 }
 
 fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
@@ -566,7 +566,7 @@ fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
     let size_ops = new MirOperand[]
     size_ops.push(mir_operand_null())
     size_ops.push(mir_const_int("i64", 1))
-    let size_ptr = mir_make_gep(st, str_cat2("struct ", struct_name), size_ops)
+    let size_ptr = mir_make_gep(st, ("struct " + struct_name), size_ops)
     let size_i64 = mir_make_ptrtoint(st, size_ptr, "i64")
     let args = new MirOperand[]
     args.push(size_i64)
@@ -629,7 +629,7 @@ fun mir_string_label(st: MirCodegenState, value: str): str {
         i = i + 1
     }
     st.string_counter = st.string_counter + 1
-    let label = str_cat2("str.", str(st.string_counter))
+    let label = ("str." + str(st.string_counter))
     st.string_values.push(value)
     st.string_labels.push(label)
     st.program.globals.push(mir_global_string(label, value))
@@ -791,7 +791,7 @@ fun mir_slice_struct_name(st: MirCodegenState, type_name: str): str {
         ret "_slice_str"
     }
     if elem != "" && mir_is_struct_name(st, elem) {
-        ret str_cat2("_slice_", elem)
+        ret ("_slice_" + elem)
     }
     ret ""
 }
@@ -828,7 +828,7 @@ fun mir_emit_print_newline(st: MirCodegenState): void {
 fun mir_emit_exit_current_block(st: MirCodegenState, code: i64): void {
     let args = new MirOperand[]
     args.push(mir_const_int("i64", code))
-    mir_emit_inst(st, mir_call(str_cat2("Exit", "Process"), "void", args))
+    mir_emit_inst(st, mir_call("ExitProcess", "void", args))
 }
 
 fun mir_emit_slice(st: MirCodegenState, block: MirBlock, expr: AstSlice): MirValueFlow {
@@ -1098,7 +1098,7 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
             ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
         }
     }
-    let method_symbol = str_cat2(str_cat2(receiver_type, "__"), expr.name)
+    let method_symbol = ((receiver_type + "__") + expr.name)
     for mi in st.func_names {
         if st.func_names[mi] == method_symbol {
             let args = new MirOperand[]
@@ -1421,7 +1421,7 @@ fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirB
     st.current_block.has_terminator = true
 
     st.current_block = fail_block
-    mir_emit_print_text(st, str_cat2(str_cat2("assert line ", str(stmt.meta.line)), ": "))
+    mir_emit_print_text(st, (("assert line " + str(stmt.meta.line)) + ": "))
     match stmt.value_expr {
         AstEmpty e: {
             mir_emit_print_text(st, "assertion failed")
@@ -1440,7 +1440,7 @@ fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirB
 
 fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstPanic): MirBlockFlow {
     st.current_block = block
-    mir_emit_print_text(st, str_cat2(str_cat2("panic line ", str(stmt.meta.line)), ": "))
+    mir_emit_print_text(st, (("panic line " + str(stmt.meta.line)) + ": "))
     mir_emit_print_expr(st, stmt.expr)
     mir_emit_print_newline(st)
     mir_emit_exit_current_block(st, 1)
@@ -1468,7 +1468,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
     let union_name = ast_resolved_type(stmt.expr)
     let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = scrutinee_flow.block
-    let match_name = str_cat2("__match", str(st.value_counter))
+    let match_name = ("__match" + str(st.value_counter))
     let match_addr = mir_alloc_local(st, match_name, "ptr")
     mir_emit_inst(st, mir_store(scrutinee_flow.value, match_addr))
 
@@ -1546,7 +1546,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
     }
     let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = scrutinee_flow.block
-    let match_name = str_cat2("__match", str(st.value_counter))
+    let match_name = ("__match" + str(st.value_counter))
     let match_addr = mir_alloc_local(st, match_name, mir_operand_type(scrutinee_flow.value))
     mir_emit_inst(st, mir_store(scrutinee_flow.value, match_addr))
 
@@ -1685,7 +1685,7 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     st.current_block = end_flow.block
     let local_count = len(st.local_names)
     let var_addr = mir_alloc_local(st, stmt.name, "i64")
-    let end_name = str_cat2(str_cat2("__", stmt.name), str_cat2(".end", str(st.value_counter)))
+    let end_name = (("__" + stmt.name) + (".end" + str(st.value_counter)))
     let end_addr = mir_alloc_local(st, end_name, "i64")
 
     mir_emit_inst(st, mir_store(start_flow.value, var_addr))
@@ -1752,7 +1752,7 @@ fun mir_emit_for_in_array(st: MirCodegenState, block: MirBlock, stmt: AstForIn, 
 
     let local_count = len(st.local_names)
     let var_addr = mir_alloc_local(st, stmt.name, "i64")
-    let limit_name = str_cat2(str_cat2("__", stmt.name), str_cat2(".limit", str(st.value_counter)))
+    let limit_name = (("__" + stmt.name) + (".limit" + str(st.value_counter)))
     let limit_addr = mir_alloc_local(st, limit_name, "i64")
     let initial_len = mir_load_field(st, source_flow.value, struct_name, "len")
     mir_emit_inst(st, mir_store(initial_len, limit_addr))
@@ -2212,12 +2212,12 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             let asi = 0
             for asi < len(program.structs) {
                 let sdef = program.structs[asi]
-                mir_register_slice_layout(st, str_cat2("_slice_", sdef.name))
+                mir_register_slice_layout(st, ("_slice_" + sdef.name))
                 asi = asi + 1
             }
             for aui in program.unions {
                 let union = program.unions[aui]
-                mir_register_slice_layout(st, str_cat2("_slice_", union.name))
+                mir_register_slice_layout(st, ("_slice_" + union.name))
             }
 
             mir_add_global_lets(st, program)

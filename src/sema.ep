@@ -20,15 +20,7 @@ struct SemaState {
 }
 
 fun sema_die(msg: str): void {
-    panic str_cat2("Sema error: ", msg)
-}
-
-fun sema_key2(a: str, b: str): str {
-    let out = new u8[]
-    out.extend(bytes(a))
-    out.push('.')
-    out.extend(bytes(b))
-    ret str(out)
+    panic ("Sema error: " + msg)
 }
 
 fun sema_string_contains(values: str[], value: str): bool {
@@ -216,7 +208,7 @@ fun sema_direct_field_type_or_empty(st: SemaState, base_type: str, field: str): 
 fun sema_direct_field_type(st: SemaState, base_type: str, field: str): str {
     let typ = sema_direct_field_type_or_empty(st, base_type, field)
     if typ == "" {
-        sema_die(f"unknown field {sema_key2(base_type, field)}")
+        sema_die(f"unknown field {((base_type + ".") + field)}")
     }
     ret typ
 }
@@ -266,7 +258,7 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
         sema_die(f"unknown field str.{field}")
     }
     if sema_is_array(base_type) {
-        sema_die(f"unknown field {sema_key2(base_type, field)}")
+        sema_die(f"unknown field {((base_type + ".") + field)}")
     }
     if sema_union_index(st, base_type) >= 0 {
         ret sema_union_common_field_type(st, base_type, field)
@@ -485,9 +477,9 @@ fun sema_union_members_text(st: SemaState, union_name: str): str {
     let members = st.unions[union_index].members
     for i in members {
         if i > 0 {
-            out = str_cat2(out, ", ")
+            out = (out + ", ")
         }
-        out = str_cat2(out, members[i])
+        out = (out + members[i])
     }
     ret out
 }
@@ -503,9 +495,9 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: str[]): str {
         let member = members[i]
         if sema_string_contains(seen, member) == false {
             if out != "" {
-                out = str_cat2(out, ", ")
+                out = (out + ", ")
             }
-            out = str_cat2(out, member)
+            out = (out + member)
         }
     }
     ret out
@@ -534,7 +526,7 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                 for j in s.fields {
                     let f = s.fields[j]
                     if sema_string_contains(seen, f.name) {
-                        sema_die(f"duplicate field {sema_key2(s.name, f.name)}")
+                        sema_die(f"duplicate field {((s.name + ".") + f.name)}")
                     }
                     seen.push(f.name)
                     f.meta.resolved_type = sema_type_name(st, f.source_type)
@@ -546,11 +538,11 @@ fun sema_build_types(st: SemaState, ast: AstNode): void {
                 for j in u.members {
                     let member = u.members[j]
                     if sema_string_contains(seen, member) {
-                        sema_die(f"duplicate union member {sema_key2(u.name, member)}")
+                        sema_die(f"duplicate union member {((u.name + ".") + member)}")
                     }
                     seen.push(member)
                     if sema_struct_index(st, member) < 0 {
-                        sema_die(f"union member {sema_key2(u.name, member)} must be a struct")
+                        sema_die(f"union member {((u.name + ".") + member)} must be a struct")
                     }
                 }
             }
@@ -820,14 +812,14 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                     sema_expect_int(st, n.count, "array length")
                 }
             }
-            ret sema_set_type(node, str_cat2(elem, "[]"))
+            ret sema_set_type(node, (elem + "[]"))
         }
         AstArrayLiteral n: {
             let elem = sema_type_name(st, n.elem_type)
             for i in n.args {
                 sema_check_assign(st, elem, n.args[i], "array literal element")
             }
-            ret sema_set_type(node, str_cat2(elem, "[]"))
+            ret sema_set_type(node, (elem + "[]"))
         }
         AstStructInit n: {
             if sema_struct_index(st, n.name) < 0 {
@@ -837,11 +829,11 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             for i in n.fields {
                 let f = n.fields[i]
                 if sema_string_contains(seen, f.name) {
-                    sema_die(f"duplicate field initializer {sema_key2(n.name, f.name)}")
+                    sema_die(f"duplicate field initializer {((n.name + ".") + f.name)}")
                 }
                 seen.push(f.name)
                 let ft = sema_direct_field_type(st, n.name, f.name)
-                sema_check_assign(st, ft, f.value_expr, f"field {sema_key2(n.name, f.name)}")
+                sema_check_assign(st, ft, f.value_expr, f"field {((n.name + ".") + f.name)}")
             }
             ret sema_set_type(node, n.name)
         }
@@ -965,7 +957,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         sema_die(f"array type {receiver} has no method {node.name}")
     }
     if sema_struct_index(st, receiver) >= 0 {
-        let method_symbol = str_cat2(str_cat2(receiver, "__"), node.name)
+        let method_symbol = ((receiver + "__") + node.name)
         let method_index = sema_func_index(st, method_symbol)
         if method_index < 0 {
             sema_die(f"type {receiver} has no method {node.name}; expected function {method_symbol}")

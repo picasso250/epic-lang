@@ -364,7 +364,7 @@ fun mir_operand_kind_text(op: MirOperand): str {
 fun mir_operand_text(op: MirOperand): str {
     match op {
         MirValueOperand v: {
-            ret str_cat2("%", str(v.value_id))
+            ret ("%" + str(v.value_id))
         }
         MirIntOperand i: {
             ret str(i.value)
@@ -570,7 +570,7 @@ fun mir_terminator_kind_text(term: MirTerminator): str {
 fun mir_terminator_text(term: MirTerminator): str {
     match term {
         MirBrTerminator br: {
-            ret str_cat2("br label %", br.target)
+            ret ("br label %" + br.target)
         }
         MirCondBrTerminator cond: {
             let buf = make_str_buf()
@@ -586,7 +586,7 @@ fun mir_terminator_text(term: MirTerminator): str {
             ret "ret void"
         }
         MirRetValueTerminator rv: {
-            ret str_cat2("ret ", mir_operand_typed_text(rv.value))
+            ret ("ret " + mir_operand_typed_text(rv.value))
         }
     }
     ret "<bad terminator>"
@@ -695,12 +695,12 @@ fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_t
     if index >= 0 {
         let ext = program.externs[index]
         if ext.return_type != return_type || len(ext.param_types) != len(param_types) {
-            panic str_cat2("conflicting MIR extern declaration: ", name)
+            panic ("conflicting MIR extern declaration: " + name)
         }
         let i = 0
         for i < len(param_types) {
             if ext.param_types[i] != param_types[i] {
-                panic str_cat2("conflicting MIR extern declaration: ", name)
+                panic ("conflicting MIR extern declaration: " + name)
             }
             i = i + 1
         }
@@ -958,7 +958,7 @@ fun mir_retain_referenced_externs(program: MirProgram): void {
     let i = 0
     for i < len(names) {
         let index = mir_find_extern(program, names[i])
-        if index < 0 { panic str_cat2("missing MIR extern declaration: ", names[i]) }
+        if index < 0 { panic ("missing MIR extern declaration: " + names[i]) }
         kept.push(program.externs[index])
         i = i + 1
     }
@@ -1028,7 +1028,7 @@ fun mir_struct_field_type_at(program: MirProgram, struct_name: str, field_index:
         }
         i = i + 1
     }
-    panic str_cat2("missing MIR struct field: ", struct_name)
+    panic ("missing MIR struct field: " + struct_name)
 }
 
 fun mir_print_struct_type(program: MirProgram, struct_name: str): void {
@@ -1037,7 +1037,7 @@ fun mir_print_struct_type(program: MirProgram, struct_name: str): void {
     str_buf_extend(buf, struct_name)
     str_buf_extend(buf, " = struct { ")
     let count = mir_struct_field_count(program, struct_name)
-    if count == 0 { panic str_cat2("missing MIR struct layout: ", struct_name) }
+    if count == 0 { panic ("missing MIR struct layout: " + struct_name) }
     let i = 0
     for i < count {
         if i > 0 { str_buf_extend(buf, ", ") }
@@ -1100,7 +1100,7 @@ fun mir_print_function(fn: MirFunction): void {
         if b > 0 {
             println("")
         }
-        println(str_cat2(fn.blocks[b].name, ":"))
+        println((fn.blocks[b].name + ":"))
         let j = 0
         for j < len(fn.blocks[b].instructions) {
             print("  ")
@@ -1122,7 +1122,7 @@ fun mir_print_program(program: MirProgram): void {
     let ei = 0
     for ei < len(extern_names) {
         let extern_index = mir_find_extern(program, extern_names[ei])
-        if extern_index < 0 { panic str_cat2("missing MIR extern declaration: ", extern_names[ei]) }
+        if extern_index < 0 { panic ("missing MIR extern declaration: " + extern_names[ei]) }
         if printed > 0 { println("") }
         println(mir_extern_text(program.externs[extern_index]))
         printed = printed + 1

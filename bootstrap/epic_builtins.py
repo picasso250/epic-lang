@@ -7,7 +7,6 @@ own behavior until they are migrated in small commits.
 BUILTIN_FUNCTIONS = frozenset({
     "print",
     "println",
-    "print_debug",
     "exit",
 
     "str",

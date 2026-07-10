@@ -6,13 +6,6 @@ fun epic_type_is_int(t: str): bool {
     ret t == "i64" || t == "u64" || t == "u8"
 }
 
-fun epic_type_starts_with(s: str, prefix: str): bool {
-    if len(s) < len(prefix) {
-        ret false
-    }
-    ret s[0:len(prefix)] == prefix
-}
-
 fun epic_type_ends_with(s: str, suffix: str): bool {
     if len(s) < len(suffix) {
         ret false
@@ -21,7 +14,7 @@ fun epic_type_ends_with(s: str, suffix: str): bool {
 }
 
 fun epic_type_array_of(elem: str): str {
-    ret str_cat2(elem, "[]")
+    ret (elem + "[]")
 }
 
 fun epic_type_is_array(t: str): bool {
@@ -30,7 +23,7 @@ fun epic_type_is_array(t: str): bool {
 
 fun epic_type_array_elem(t: str): str {
     if epic_type_is_array(t) == false {
-        panic str_cat2("internal type error: expected array type, got ", t)
+        panic ("internal type error: expected array type, got " + t)
     }
     ret t[0:len(t) - 2]
 }
@@ -417,10 +410,6 @@ fun ast_empty(): AstNode {
     ret new AstNode(new AstEmpty { meta: ast_meta() })
 }
 
-fun ast_bad_field(field: str): void {
-    panic str_cat2("invalid AST field ", field)
-}
-
 fun ast_line(node: AstNode): i64 { ret node.meta.line }
 fun ast_resolved_type(node: AstNode): str { ret node.meta.resolved_type }
 fun ast_set_resolved_type(node: AstNode, value: str): void { node.meta.resolved_type = value }
@@ -710,18 +699,6 @@ fun make_parser(tokens: Token[]): Parser {
     ret p
 }
 
-fun is_upper_name(name: str): i64 {
-    if len(name) == 0 {
-        ret 0
-    }
-    let bs = bytes(name)
-    let c = bs[0]
-    if c >= u8(65) && c <= u8(90) {
-        ret 1
-    }
-    ret 0
-}
-
 fun (p: Parser) peek(): Token {
     if p.pos < len(p.tokens) {
         ret p.tokens[p.pos]
@@ -744,7 +721,7 @@ fun (p: Parser) advance(): Token {
 }
 
 fun parse_error(line: i64, msg: str): i64 {
-    panic str_cat2(str_cat2("Parse error line ", str(line)), str_cat2(": ", msg))
+    panic (("Parse error line " + str(line)) + (": " + msg))
     ret 1
 }
 
@@ -855,7 +832,7 @@ fun (p: Parser) parse_fn_def(): AstFunDef {
         let name = p.expect("ID")
         receiver_name = token_text(receiver)
         method_name = token_text(name)
-        symbol_name = str_cat2(str_cat2(receiver_type, "__"), method_name)
+        symbol_name = ((receiver_type + "__") + method_name)
         line = token_line(name)
         let receiver_param = ast_new_param()
         receiver_param.name = receiver_name

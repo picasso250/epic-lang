@@ -509,11 +509,6 @@ class SemanticAnalyzer:
                 if arg.type != STR:
                     self._fail(f"println expected str, got {arg.type}")
             return ExprInfo(VOID)
-        if name == "print_debug":
-            self._check_arity(name, 1, expr.args)
-            arg = self._expr(expr.args[0])
-            self._expect_integer(arg, "print_debug argument 1")
-            return ExprInfo(VOID)
         if name == "exit":
             self._check_call_args(name, [I64], expr.args)
             return ExprInfo(VOID)

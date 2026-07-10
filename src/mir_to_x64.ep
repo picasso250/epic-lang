@@ -64,15 +64,15 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
 }
 
 fun mir_to_x64_die(msg: str): void {
-    panic str_cat2("MIR-to-X64 error: ", msg)
+    panic ("MIR-to-X64 error: " + msg)
 }
 
 fun mir_to_x64_data_label(name: str): str {
-    ret str_cat2(name, "_data")
+    ret (name + "_data")
 }
 
 fun mir_to_x64_header_label(name: str): str {
-    ret str_cat2(name, "_header")
+    ret (name + "_header")
 }
 
 fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): void {
@@ -158,18 +158,10 @@ fun mir_to_x64_value_slot(lower: MirToX64Lower, value_id: i64): i64 {
     if offset != 0 {
         ret offset
     }
-    mir_to_x64_die(str_cat2("unknown MIR value: ", str(value_id)))
+    mir_to_x64_die(("unknown MIR value: " + str(value_id)))
     ret 0
 }
 
-fun mir_to_x64_addr_slot(lower: MirToX64Lower, value_id: i64): i64 {
-    let offset = lower.addr_slots[value_id]
-    if offset != 0 {
-        ret offset
-    }
-    mir_to_x64_die(str_cat2("unknown MIR address: ", str(value_id)))
-    ret 0
-}
 fun mir_to_x64_aligned_frame(lower: MirToX64Lower): i64 {
     ret ((lower.next_slot + 15) / 16) * 16
 }
@@ -193,7 +185,7 @@ fun mir_to_x64_emit_stack_alloc(lower: MirToX64Lower, size: i64): void {
 }
 
 fun mir_to_x64_block_label(fn: MirFunction, block_name: str): str {
-    ret str_cat2(str_cat2(fn.name, "."), block_name)
+    ret ((fn.name + ".") + block_name)
 }
 
 fun mir_to_x64_count_use(counts: i64[], value_id: i64): void {
@@ -432,7 +424,7 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
             x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_base("rbp", addr_offset, 8))
             ret
         }
-        mir_to_x64_die(str_cat2("unknown MIR value: ", str(value_id)))
+        mir_to_x64_die(("unknown MIR value: " + str(value_id)))
         ret
     }
     if mir_operand_is_symbol(operand) {
@@ -457,10 +449,10 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
             x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(name, 8))
             ret
         }
-        mir_to_x64_die(str_cat2("unsupported symbol operand: ", name))
+        mir_to_x64_die(("unsupported symbol operand: " + name))
         ret
     }
-    mir_to_x64_die(str_cat2("unsupported operand: ", mir_operand_kind_text(operand)))
+    mir_to_x64_die(("unsupported operand: " + mir_operand_kind_text(operand)))
 }
 
 fun mir_to_x64_store_result(lower: MirToX64Lower, result_id: i64, reg: str): void {
@@ -479,7 +471,7 @@ fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field
         }
         i = i + 1
     }
-    mir_to_x64_die(str_cat2("unknown struct field index: ", struct_name))
+    mir_to_x64_die(("unknown struct field index: " + struct_name))
     ret 0
 }
 
@@ -493,7 +485,7 @@ fun mir_to_x64_struct_size(lower: MirToX64Lower, struct_name: str): i64 {
         i = i + 1
     }
     if size == 0 {
-        mir_to_x64_die(str_cat2("unknown struct layout: ", struct_name))
+        mir_to_x64_die(("unknown struct layout: " + struct_name))
     }
     ret size
 }
@@ -535,7 +527,7 @@ fun mir_to_x64_add_scaled_index(lower: MirToX64Lower, operand: MirOperand, scale
     if scale == 8 {
         mir_to_x64_scale_rcx_by_8(lower)
     } else if scale != 1 {
-        mir_to_x64_die(str_cat2("dynamic gep scale is not supported yet: ", str(scale)))
+        mir_to_x64_die(("dynamic gep scale is not supported yet: " + str(scale)))
     }
     x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
 }
@@ -627,7 +619,7 @@ fun mir_to_x64_icmp_cc(op: str): str {
     if op == "icmp.ugt" { ret "seta" }
     if op == "icmp.ule" { ret "setbe" }
     if op == "icmp.uge" { ret "setae" }
-    mir_to_x64_die(str_cat2("unsupported icmp op: ", op))
+    mir_to_x64_die(("unsupported icmp op: " + op))
     ret "sete"
 }
 
@@ -726,7 +718,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         mir_to_x64_emit_icmp(lower, inst)
         ret
     }
-    mir_to_x64_die(str_cat2("unsupported MIR instruction: ", inst.op))
+    mir_to_x64_die(("unsupported MIR instruction: " + inst.op))
 }
 
 fun mir_to_x64_emit_startup_hook_call(lower: MirToX64Lower): void {
@@ -773,7 +765,7 @@ fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTermin
             ret
         }
     }
-    mir_to_x64_die(str_cat2("unsupported MIR terminator: ", mir_terminator_kind_text(term)))
+    mir_to_x64_die(("unsupported MIR terminator: " + mir_terminator_kind_text(term)))
 }
 
 fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction): X64Program {
@@ -821,7 +813,7 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
     lower.next_slot = 0
-    lower.return_label = str_cat2(fn.name, ".__return")
+    lower.return_label = (fn.name + ".__return")
 
     let plan_start = mir_to_x64_now_ms()
     mir_to_x64_plan_slots(lower, fn)

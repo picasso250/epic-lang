@@ -67,10 +67,6 @@ fun u32_le(buf: u8[], off: i64): u64 {
     ret u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
 }
 
-fun u64_le(buf: u8[], off: i64): u64 {
-    ret u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24) | (u64(buf[off + 4]) << 32) | (u64(buf[off + 5]) << 40) | (u64(buf[off + 6]) << 48) | (u64(buf[off + 7]) << 56)
-}
-
 fun le16_as_i64(buf: u8[], off: i64): i64 {
     ret i64(u16_le(buf, off))
 }
@@ -79,13 +75,9 @@ fun le32_as_i64(buf: u8[], off: i64): i64 {
     ret i64(u32_le(buf, off))
 }
 
-fun le64_as_i64(buf: u8[], off: i64): i64 {
-    ret i64(u64_le(buf, off))
-}
-
 fun put_u16_le(buf: u8[], off: i64, x: u64): void {
     if x > u64(65535) {
-        panic str_cat_local("put_u16_le overflow: ", str(x))
+        panic ("put_u16_le overflow: " + str(x))
     }
     buf[off] = u8(x & u64(255))
     buf[off + 1] = u8((x >>> 8) & u64(255))
@@ -93,7 +85,7 @@ fun put_u16_le(buf: u8[], off: i64, x: u64): void {
 
 fun put_u32_le(buf: u8[], off: i64, x: u64): void {
     if x > u64(4294967295) {
-        panic str_cat_local("put_u32_le overflow: ", str(x))
+        panic ("put_u32_le overflow: " + str(x))
     }
     buf[off] = u8(x & u64(255))
     buf[off + 1] = u8((x >>> 8) & u64(255))
@@ -139,13 +131,6 @@ fun append_u64(buf: u8[], x: i64): void {
 
 fun append_str(buf: u8[], s: str): void {
     buf.extend(bytes(s))
-}
-
-fun str_cat_local(left: str, right: str): str {
-    let out = new u8[]
-    out.extend(bytes(left))
-    out.extend(bytes(right))
-    ret str(out)
 }
 
 fun cstr_ready_path(s: str): str {
@@ -537,14 +522,6 @@ fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void 
     text_sec.virtual_sz = len(text_sec.data)
 }
 
-fun hint_size(name: str): i64 {
-    let n = 2 + len(bytes(name)) + 1
-    if n % 2 != 0 {
-        n += 1
-    }
-    ret n
-}
-
 fun build_idata(st: LinkState): void {
     st.idata = new u8[]
     if len(st.imports) == 0 {
@@ -892,9 +869,9 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
 fun default_out_path(obj_path: str): str {
     let dot = find_text(obj_path, ".obj")
     if dot >= 0 {
-        ret str_cat_local(obj_path[0:dot], ".exe")
+        ret (obj_path[0:dot] + ".exe")
     }
-    ret str_cat_local(obj_path, ".exe")
+    ret (obj_path + ".exe")
 }
 
 fun main(): i64 {

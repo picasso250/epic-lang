@@ -125,7 +125,6 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
-        self.program.externs.append(MirExtern("__ep_debug_i64", MirSignature([I64], VOID)))
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
         self.program.globals.append(MirGlobal("argv", ptr(), None))
         self._emit_global_lets(ast)
@@ -1128,7 +1127,6 @@ class MirCodegen(MirFunctionBuilder):
         return name in {
             "println",
             "print",
-            "print_debug",
             "exit",
             "str",
             "cstr",
@@ -1168,13 +1166,6 @@ class MirCodegen(MirFunctionBuilder):
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
             self.inst("call", [arg.value], type=VOID, callee="__ep_print_str")
-            return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
-        if name == "print_debug":
-            if len(expr.args) != 1:
-                raise MirCodegenError("print_debug expects 1 argument")
-            arg = self._emit_expr_from(self.current_block, expr.args[0])
-            self.set_block(arg.block)
-            self.inst("call", [arg.value], type=VOID, callee="__ep_debug_i64")
             return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
         if name == "exit":
             arg = self._emit_expr_from(self.current_block, expr.args[0])

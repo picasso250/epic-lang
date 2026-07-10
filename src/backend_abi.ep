@@ -75,7 +75,7 @@ fun backend_validate_extern(ext: MirExtern): void {
     let expected_ret = backend_abi_return_type(ext.name)
     let expected_count = backend_abi_param_count(ext.name)
     if len(expected_ret) == 0 || expected_count < 0 {
-        panic str_cat2("backend ABI error: unsupported backend extern: ", ext.name)
+        panic ("backend ABI error: unsupported backend extern: " + ext.name)
     }
     if ext.return_type != expected_ret {
         panic f"backend ABI error: extern return type mismatch for {ext.name}: expected {expected_ret}, got {ext.return_type}"
