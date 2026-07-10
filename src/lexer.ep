@@ -107,30 +107,24 @@ fun is_digit(c: u8): bool {
     ret c >= '0' && c <= '9'
 }
 
-let keyword_kinds = new map[str]str {
-    "if": "IF"
-    "in": "IN"
-    "fun": "FUN"
-    "for": "FOR"
-    "new": "NEW"
-    "let": "LET"
-    "else": "ELSE"
-    "type": "TYPE"
-    "true": "TRUE"
-    "break": "BREAK"
-    "panic": "PANIC"
-    "match": "MATCH"
-    "false": "FALSE"
-    "ret": "RETURN"
-    "assert": "ASSERT"
-    "struct": "STRUCT"
-    "continue": "CONTINUE"
-}
-
 fun keyword_kind(text: str): str {
-    if keyword_kinds.has(text) {
-        ret keyword_kinds[text]
-    }
+    if text == "if" { ret "IF" }
+    if text == "in" { ret "IN" }
+    if text == "fun" { ret "FUN" }
+    if text == "for" { ret "FOR" }
+    if text == "new" { ret "NEW" }
+    if text == "let" { ret "LET" }
+    if text == "else" { ret "ELSE" }
+    if text == "type" { ret "TYPE" }
+    if text == "true" { ret "TRUE" }
+    if text == "break" { ret "BREAK" }
+    if text == "panic" { ret "PANIC" }
+    if text == "match" { ret "MATCH" }
+    if text == "false" { ret "FALSE" }
+    if text == "ret" { ret "RETURN" }
+    if text == "assert" { ret "ASSERT" }
+    if text == "struct" { ret "STRUCT" }
+    if text == "continue" { ret "CONTINUE" }
     ret "ID"
 }
 fun decode_escape(e: u8): u8 {

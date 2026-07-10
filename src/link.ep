@@ -419,28 +419,22 @@ fun collect_relocs(st: LinkState): void {
     }
 }
 
-let kernel32_import_hints = new map[str]i64 {
-    "CloseHandle": 157
-    "CreateFileA": 222
-    "ExitProcess": 390
-    "GetCommandLineA": 511
-    "GetFileSize": 631
-    "GetProcessHeap": 740
-    "GetStdHandle": 805
-    "GetTickCount64": 846
-    "HeapAlloc": 892
-    "lstrcmpA": 985
-    "lstrlenA": 991
-    "ReadFile": 1193
-    "SetFilePointer": 1384
-    "Sleep": 1410
-    "WriteFile": 1632
-}
-
 fun kernel32_hint(name: str): i64 {
-    if kernel32_import_hints.has(name) {
-        ret kernel32_import_hints[name]
-    }
+    if name == "CloseHandle" { ret 157 }
+    if name == "CreateFileA" { ret 222 }
+    if name == "ExitProcess" { ret 390 }
+    if name == "GetCommandLineA" { ret 511 }
+    if name == "GetFileSize" { ret 631 }
+    if name == "GetProcessHeap" { ret 740 }
+    if name == "GetStdHandle" { ret 805 }
+    if name == "GetTickCount64" { ret 846 }
+    if name == "HeapAlloc" { ret 892 }
+    if name == "lstrcmpA" { ret 985 }
+    if name == "lstrlenA" { ret 991 }
+    if name == "ReadFile" { ret 1193 }
+    if name == "SetFilePointer" { ret 1384 }
+    if name == "Sleep" { ret 1410 }
+    if name == "WriteFile" { ret 1632 }
     ret 0
 }
 
