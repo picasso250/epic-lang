@@ -325,10 +325,13 @@ COFF contract:
 - Relocation type is currently always `IMAGE_REL_AMD64_REL32`。
 - Symbols use section number 1 for `.text`, 2 for `.data`, 0 for external。
 - 只有 named text label 进入 symbol table；匿名 block/return label 不进入 COFF。
-- Symbol 顺序固定为 named text、data、按 ASCII 排序的 extern。Machine layer
-  使用固定容量、u64 FNV hash 的开放寻址 `MachineNameIndex` 做私有查询，
-  relocation 在扫描时直接取得最终 COFF symbol index；索引从不参与迭代，
-  因此 hash 桶布局不会影响输出顺序或自举固定点。
+- Symbol 顺序固定为 named text、data、按 ASCII 排序的 extern。
+- Python reference backend 使用 CPython 原生 `dict` / `set` 保存 symbol name，
+  `bootstrap/coff.py` 在序列化时建立 COFF symbol index。
+- Self-hosted backend 使用固定容量、u64 FNV hash 的开放寻址
+  `MachineNameIndex` 做私有查询，relocation 在 `src/machine.ep` 中直接取得
+  最终 COFF symbol index；索引从不参与迭代，因此 hash 桶布局不会影响
+  输出顺序或自举固定点。
 - `data_relocs` exists in the writer API but current machine backend does not emit it。
 
 `bootstrap/link.py` contract:

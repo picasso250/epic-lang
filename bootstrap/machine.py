@@ -55,52 +55,6 @@ class MachineBackendError(RuntimeError):
     pass
 
 
-class _MachineNameIndex:
-    """Fixed-capacity lookup index; insertion order is owned by the symbol arrays."""
-
-    def __init__(self, expected_count):
-        capacity = 8
-        while capacity < max(1, expected_count) * 2:
-            capacity *= 2
-        self.names = [None] * capacity
-        self.values = [0] * capacity
-        self.mask = capacity - 1
-
-    @staticmethod
-    def _hash(name):
-        value = 0xCBF29CE484222325
-        for byte in name.encode("utf-8"):
-            value ^= byte
-            value = (value * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
-        return value
-
-    def lookup(self, name):
-        slot = self._hash(name) & self.mask
-        while self.names[slot] is not None:
-            if self.names[slot] == name:
-                return self.values[slot]
-            slot = (slot + 1) & self.mask
-        return None
-
-    def insert(self, name, value):
-        slot = self._hash(name) & self.mask
-        while self.names[slot] is not None:
-            if self.names[slot] == name:
-                raise MachineBackendError(f"duplicate symbol name: {name}")
-            slot = (slot + 1) & self.mask
-        self.names[slot] = name
-        self.values[slot] = value
-
-    def update(self, name, value):
-        slot = self._hash(name) & self.mask
-        while self.names[slot] is not None:
-            if self.names[slot] == name:
-                self.values[slot] = value
-                return
-            slot = (slot + 1) & self.mask
-        raise MachineBackendError(f"unknown symbol name: {name}")
-
-
 class MachineObjectBuilder:
     def __init__(self, program):
         validate_x64_program(program)
@@ -120,32 +74,18 @@ class MachineObjectBuilder:
         self._emit_program()
         self._emit_needed_runtime_helpers()
         self._patch_internal_fixups()
-        symbols, text_relocs, data_relocs = self._build_symbols()
-        symbol_map = {name: (section, value) for name, section, value in symbols}
-        text_reloc_names = [(off, symbols[symbol_index][0]) for off, symbol_index in text_relocs]
-        data_reloc_names = [(off, symbols[symbol_index][0]) for off, symbol_index in data_relocs]
-        write_coff_obj(path, self.text, self.data, text_reloc_names, data_reloc_names, symbol_map)
-
-    def _build_symbols(self):
-        symbols = []
-        expected = len(self.text_labels) + len(self.data_labels) + len(self.text_relocs)
-        index = _MachineNameIndex(expected)
+        # The Python reference backend intentionally uses CPython's native hash
+        # tables; the self-hosted backend owns its separate MachineNameIndex.
+        symbols = {}
         for name, off in self.text_labels.items():
-            index.insert(name, len(symbols))
-            symbols.append((name, 1, off))
+            symbols[name] = (1, off)
         for name, off in self.data_labels.items():
-            index.insert(name, len(symbols))
-            symbols.append((name, 2, off))
-        externs = []
-        for _, name in self.text_relocs:
-            if index.lookup(name) is None:
-                index.insert(name, -1)
-                externs.append(name)
-        for name in sorted(externs):
-            index.update(name, len(symbols))
-            symbols.append((name, 0, 0))
-        text_relocs = [(off, index.lookup(name)) for off, name in self.text_relocs]
-        return symbols, text_relocs, []
+            symbols[name] = (2, off)
+        referenced = {sym for _, sym in self.text_relocs}
+        for name in sorted(referenced):
+            if name not in symbols:
+                symbols[name] = (0, 0)
+        write_coff_obj(path, self.text, self.data, self.text_relocs, [], symbols)
 
     def _emit_program(self):
         for item in self.program.items:
