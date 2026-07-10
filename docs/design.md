@@ -33,10 +33,9 @@ python epic.py --main main.ep main.ep lib.ep
 | `str`   | 当前阶段的临时文本 view；运行时布局与 `u8[]` 相同，未来 UTF-8 字符串另行设计 |
 | `Name`  | 堆分配的结构体引用               |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
-| `map[str]T` | 堆分配的映射表（str 键）           |
 | `void`  | unit 类型，表示唯一的“无信息”值；常用于函数返回和副作用表达式 |
 
-`str`、用户结构体、动态数组和映射表具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。`void` 是 unit 类型，但不能作为参数、local 绑定、数组元素或 map value 的类型使用。
+`str`、用户结构体和动态数组具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制结构体或数组的语义。`void` 是 unit 类型，但不能作为参数、local 绑定或数组元素类型使用。
 
 ### 内置全局变量 (Built-in Globals)
 
@@ -88,7 +87,7 @@ p.peek()                       =>  Parser__peek(p)
 
 规则：
 
-- receiver 类型必须是用户定义的 `struct` 名称；第一版不支持 primitive、`str`、`T[]`、`map[str]T` receiver。
+- receiver 类型必须是用户定义的 `struct` 名称；第一版不支持 primitive、`str` 或 `T[]` receiver。
 - receiver 作为降低后函数的第一个参数；Epic 的结构体本来就是 heap-backed reference，没有 Go 风格的值 receiver / 指针 receiver 区分。
 - 不支持重载、继承、trait、virtual dispatch、method value、泛型方法或 fallback 到 `peek(p)`。
 - struct receiver 的 `p.peek(args...)` 只查找 `Parser__peek(p, args...)`。
@@ -120,11 +119,11 @@ let xs = new u8[]
 
 当右侧明显确定类型时，应省略注解；需要约束类型或消歧时保留注解。
 
-不带初始化器的 `let x: T` 非法。Epic 不为 local variable 创建隐式零值；标量、容器、map、字符串和结构体引用都必须由字面量、`new`、函数调用或其他表达式显式初始化。
+不带初始化器的 `let x: T` 非法。Epic 不为 local variable 创建隐式零值；标量、容器、字符串和结构体引用都必须由字面量、`new`、函数调用或其他表达式显式初始化。
 
 `let` 绑定是 lexical block scoped：只在当前 `{ ... }` block 及其内部嵌套 block 中可见。内层 block 可以 shadow 外层同名绑定；离开 block 后恢复外层绑定。
 
-`str`、`T[]`、`map[str]T`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、map 操作或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
+`str`、`T[]`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
 
 Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / `while` 条件仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
 
@@ -158,7 +157,7 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 - `break` 和 `continue` 绑定到最近的 `while` 循环。
 - `for i in start:end` — 半开递增区间，`start` 和 `end` 各求值一次，当 `i < end` 时执行。`i` 是 loop block scoped cursor，也是实际 numeric cursor；修改 `i` 会影响循环进度。`continue` 跳到增量步骤。
 - `for i in xs` — array index iteration。`xs` 必须是 `T[]`；`i: i64`，是 loop block scoped cursor，也是实际 index cursor。array 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`，如果当前 index 已无效则结束。循环中 `push` 不扩展本次循环，`pop` 可能导致提前结束。
-- `for k in m` — map key iteration。`m` 必须是 `map[str]T`；`k: str`，是 loop block scoped cursor，每轮赋值为当前 key。map 表达式求值一次，进入循环时的 `len` 作为上限；每轮开始前重新读取当前 `len`。循环中 insert/delete 是允许但弱规定的：循环有界且内存安全，但 key 可能被跳过、重复或未全部访问。`for ... in str` 不支持；需要按字节遍历时显式写 `bytes(s)`。
+- `for ... in str` 不支持；需要按字节遍历时显式写 `bytes(s)`。
 - `ret expr` / `ret`。
 - `exit(code)` — 立即以指定状态码结束进程；控制流分析视为终止路径。
 - `panic "消息"` — 打印源码位置和消息，以非零状态退出。
@@ -175,11 +174,9 @@ Epic 支持一小组内置容器点调用：
 xs.push(x)
 let last = xs.pop()
 dst.extend(src)
-let ok = m.has(key)
-let removed = m.del(key)
 ```
 
-这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别 `os.*`、slice 和 map。
+这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别 `os.*` 和数组操作。
 
 ### 结构体初始化 (Struct Initialization)
 
@@ -289,20 +286,6 @@ match n {
 - 没有 fallthrough（向下穿透）。
 - 不进行穷尽性检查 — 缺失的分支会产生运行时 panic。
 
-### Map (映射表)
-
-```epic
-let ids = new map[str]i64
-let names = new map[str]str { "main": "entry", "lib": "helper" }
-ids["main"] = 1
-let id = ids["main"]
-let ok = ids.has("main")
-```
-
-键类型固定为 `str`，value 类型支持任意非 `void` 的当前语言类型。`m[key]` 读取要求 key 已存在；缺失 key 会触发 runtime panic。`m.has(key)` 用于判断是否存在；`m.del(key)` 删除键并返回是否真的删除了已有项。`m[key] = value` 是 insert-or-update。
-
-Map 初始化器使用 `new map[str]T { key: value, ... }`。`key` 是任意 `str` 表达式，`value` 按 `T` 做普通赋值兼容检查。初始化按源码顺序插入；重复 key 时后面的 entry 覆盖前面的值。`new map[str]T {}` 等价于空 map。
-
 ## 字符串与数组 (Strings and Arrays)
 
 ### 临时 `str` view 与 `u8[]` alias 方向
@@ -393,7 +376,7 @@ bytes(s: str): u8[]
 
 `str(bytes)` + `bytes(str)` 是过渡期对偶 cast。迁移目标是让 MIR 和 public API 越来越少关心 `str` 这个独立名字。
 
-`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是 bytes view/cast；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])`、`str(bool[])`、`str(map)` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
+`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是 bytes view/cast；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])` 和 `str(bool[])` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
 
 
 > ⚠ 修改 `bytes(str)` 返回的 `u8[]` 会修改原 `str` 的底层 buffer。如果多个 `str` 共享同一 buffer（例如相同内容的字面量），修改对所有 view 可见。语言不承诺 string literal 物理不可变。

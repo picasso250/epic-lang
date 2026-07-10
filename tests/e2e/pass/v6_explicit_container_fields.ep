@@ -3,20 +3,14 @@
 
 struct S {
     xs: i64[]
-    flags: map[str]bool
-    names: map[str]str
 }
 
 fun add_one(xs: i64[]): void {
     xs.push(1)
 }
 
-fun set_flag(flags: map[str]bool): void {
-    flags["from_fn"] = true
-}
-
 fun main(): i64 {
-    let s = new S { xs: new i64[], flags: new map[str]bool, names: new map[str]str }
+    let s = new S { xs: new i64[] }
     assert(len(s.xs) == 0)
     assert(cap(s.xs) == 0)
     s.xs.push(7)
@@ -24,18 +18,6 @@ fun main(): i64 {
     assert(len(s.xs) == 2)
     assert(s.xs[0] == 7)
     assert(s.xs[1] == 1)
-
-    assert(s.flags.has("x") == false)
-    s.flags["x"] = true
-    set_flag(s.flags)
-    assert(s.flags["x"] == true)
-    assert(s.flags["from_fn"] == true)
-
-    assert(s.names.has("missing") == false)
-    s.names["a"] = "alpha"
-    assert(s.names["a"] == "alpha")
-    assert(s.names.del("a"))
-    assert(s.names.has("a") == false)
 
     println("ok")
     ret 0

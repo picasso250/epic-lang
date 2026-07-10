@@ -24,16 +24,8 @@ fun epic_type_array_of(elem: str): str {
     ret str_cat2(elem, "[]")
 }
 
-fun epic_type_map_of(value: str): str {
-    ret str_cat2("map[str]", value)
-}
-
 fun epic_type_is_array(t: str): bool {
     ret epic_type_ends_with(t, "[]")
-}
-
-fun epic_type_is_map(t: str): bool {
-    ret epic_type_starts_with(t, "map[str]")
 }
 
 fun epic_type_array_elem(t: str): str {
@@ -41,13 +33,6 @@ fun epic_type_array_elem(t: str): str {
         panic str_cat2("internal type error: expected array type, got ", t)
     }
     ret t[0:len(t) - 2]
-}
-
-fun epic_type_map_value(t: str): str {
-    if epic_type_is_map(t) == false {
-        panic str_cat2("internal type error: expected map type, got ", t)
-    }
-    ret t[8:len(t)]
 }
 
 struct TypeMissing {
@@ -62,11 +47,7 @@ struct TypeArray {
     elem: TypeExpr
 }
 
-struct TypeMap {
-    value: TypeExpr
-}
-
-type TypeExpr = TypeMissing | TypeName | TypeArray | TypeMap
+type TypeExpr = TypeMissing | TypeName | TypeArray
 
 fun type_missing(): TypeExpr {
     ret new TypeExpr(new TypeMissing { dummy: 0 })
@@ -78,10 +59,6 @@ fun type_name_expr(name: str): TypeExpr {
 
 fun type_array_of(elem: TypeExpr): TypeExpr {
     ret new TypeExpr(new TypeArray { elem: elem })
-}
-
-fun type_map_of(value: TypeExpr): TypeExpr {
-    ret new TypeExpr(new TypeMap { value: value })
 }
 
 fun type_expr_is_missing(t: TypeExpr): bool {
@@ -97,7 +74,6 @@ fun type_expr_text(t: TypeExpr): str {
         TypeMissing n: { ret "" }
         TypeName n: { ret n.name }
         TypeArray n: { ret epic_type_array_of(type_expr_text(n.elem)) }
-        TypeMap n: { ret epic_type_map_of(type_expr_text(n.value)) }
     }
     ret ""
 }
@@ -390,14 +366,8 @@ struct AstUnionInit {
     expr: AstNode
 }
 
-struct AstMapInit {
-    meta: AstMeta
-    source_type: TypeExpr
-    map_keys: AstNode[]
-    map_values: AstNode[]
-}
 
-type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit | AstMapInit
+type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_new_program(): AstProgram {
     ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], structs: new AstStructDef[], globals: new AstLet[], unions: new AstUnionDef[] }
@@ -527,7 +497,6 @@ fun ast_source_type(node: AstNode): TypeExpr {
         AstParam n: { ret n.source_type }
         AstStructField n: { ret n.source_type }
         AstLet n: { ret n.source_type }
-        AstMapInit n: { ret n.source_type }
         AstNewArray n: { ret n.elem_type }
         AstArrayLiteral n: { ret n.elem_type }
         else: {}
@@ -819,16 +788,6 @@ fun (p: Parser) parse_type(): TypeExpr {
     let t = p.advance()
     if token_kind(t) != "ID" {
         parse_error(token_line(t), "Expected type")
-    }
-    if token_text(t) == "map" {
-        p.expect("LBRACKET")
-        let key = p.expect("ID")
-        if token_text(key) != "str" {
-            parse_error(token_line(key), "map key type must be str")
-        }
-        p.expect("RBRACKET")
-        let value_type = p.parse_type()
-        ret type_map_of(value_type)
     }
     let typ = type_name_expr(token_text(t))
     for p.check("LBRACKET") == 1 {
@@ -1636,30 +1595,6 @@ fun (p: Parser) parse_array_literal(name: Token): AstNode {
     ret new AstNode(node)
 }
 
-fun (p: Parser) parse_map_init_entries(node: AstMapInit): AstNode {
-    p.expect("LBRACE")
-    p.skip_newlines()
-    for p.peek_kind("RBRACE") == 0 {
-        node.map_keys.push(p.parse_expr())
-        p.expect("COLON")
-        node.map_values.push(p.parse_expr())
-        if p.check("COMMA") == 1 {
-            p.skip_newlines()
-        } else {
-            if p.peek_kind("NEWLINE") == 1 {
-                p.skip_newlines()
-            } else {
-                if p.peek_kind("RBRACE") == 0 {
-                    let t = p.peek()
-                    parse_error(token_line(t), "Expected comma or newline in map initializer")
-                }
-            }
-        }
-    }
-    p.expect("RBRACE")
-    ret new AstNode(node)
-}
-
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
     let out = new AstNode[]
     for i in parts {
@@ -1724,20 +1659,6 @@ fun (p: Parser) parse_primary(): AstNode {
     if p.peek_kind("NEW") == 1 {
         p.expect("NEW")
         let t = p.expect("ID")
-        if token_text(t) == "map" {
-            p.expect("LBRACKET")
-            let key = p.expect("ID")
-            if token_text(key) != "str" {
-                parse_error(token_line(key), "map key type must be str")
-            }
-            p.expect("RBRACKET")
-            let n = new AstMapInit { meta: ast_meta(), source_type: type_map_of(p.parse_type()), map_keys: new AstNode[], map_values: new AstNode[] }
-            n.meta.line = token_line(t)
-            if p.peek_kind("LBRACE") == 1 {
-                ret p.parse_postfix(p.parse_map_init_entries(n))
-            }
-            ret p.parse_postfix(new AstNode(n))
-        }
         if p.check("LBRACKET") == 1 {
             let count = ast_empty()
             if p.peek_kind("RBRACKET") == 0 {
@@ -2106,22 +2027,6 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             dump_print_resolved_suffix(node)
             println("")
             dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstMapInit n: {
-            indent(depth)
-            print("MapInit : ")
-            print(type_expr_text(n.source_type))
-            dump_print_resolved_suffix(node)
-            println("")
-            for i in n.map_keys {
-                indent(depth + 1)
-                println("Key")
-                dump_node(n.map_keys[i], depth + 2)
-                indent(depth + 1)
-                println("Value")
-                dump_node(n.map_values[i], depth + 2)
-            }
             ret 0
         }
         AstFunDef n: {

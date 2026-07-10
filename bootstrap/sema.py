@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from ast_nodes import *
 from epic_builtins import BUILTIN_FUNCTIONS, PSEUDO_BUILTINS
-from epic_types import ARRAY, BOOL, I64, I8, MAP, NAMED, PTR, STR, U64, U8, VOID, EpicType
+from epic_types import ARRAY, BOOL, I64, I8, NAMED, PTR, STR, U64, U8, VOID, EpicType
 from parser import dump_ast_text
 
 
@@ -130,8 +130,6 @@ class SemanticAnalyzer:
             return node.name in {"u8", "i64", "u64", "bool"} and len(node.args) == 1 and self._is_global_literal_init(node.args[0])
         if isinstance(node, ArrayLiteralNode):
             return all(self._is_global_literal_init(value) for value in node.values)
-        if isinstance(node, MapInitNode):
-            return all(self._is_global_literal_init(key) and self._is_global_literal_init(value) for key, value in node.entries)
         if isinstance(node, StructInitNode):
             return all(self._is_global_literal_init(value) for _, value in node.fields)
         if isinstance(node, UnionInitNode):
@@ -243,12 +241,10 @@ class SemanticAnalyzer:
             source = self._expr(stmt.source)
             if source.type.kind == "array":
                 stmt.resolved_type = I64
-            elif source.type.kind == "map":
-                stmt.resolved_type = STR
             elif source.type == STR:
                 self._fail("for-in over str is not supported; use bytes(s) to iterate bytes")
             else:
-                self._fail(f"for-in expected array or map, got {source.type}")
+                self._fail(f"for-in expected array, got {source.type}")
             self._push_scope()
             self._define_local(stmt.name, stmt.resolved_type)
             self.loop_depth += 1
@@ -441,8 +437,6 @@ class SemanticAnalyzer:
             return self._struct_init_expr(expr)
         if isinstance(expr, UnionInitNode):
             return self._union_init_expr(expr)
-        if isinstance(expr, MapInitNode):
-            return self._map_init_expr(expr)
         self._fail(f"unsupported expression: {type(expr).__name__}")
 
     def _unary_expr(self, expr):
@@ -564,10 +558,6 @@ class SemanticAnalyzer:
             if arg.type.kind != "array":
                 self._fail(f"cap expected array, got {arg.type}")
             return ExprInfo(I64)
-        if name == "map_has":
-            self._fail("map_has is removed from public surface; use m.has(key)")
-        if name == "map_del":
-            self._fail("map_del is removed from public surface; use m.del(key)")
 
         if name not in self.func_sigs:
             self._fail(f"unknown function {name}")
@@ -599,12 +589,6 @@ class SemanticAnalyzer:
                     self._fail("extend expects an array with the same element type")
                 return ExprInfo(VOID)
             self._fail(f"array type {receiver.type} has no method {expr.name}")
-        if receiver.type.kind == "map":
-            if expr.name == "has" or expr.name == "del":
-                self._check_arity(expr.name, 1, expr.args)
-                self._check_assign(STR, self._expr(expr.args[0]), f"{expr.name} key")
-                return ExprInfo(BOOL)
-            self._fail(f"map type {receiver.type} has no method {expr.name}")
         if receiver.type.kind == "named":
             method_symbol = f"{receiver.type.name}__{expr.name}"
             if method_symbol not in self.func_sigs:
@@ -612,7 +596,7 @@ class SemanticAnalyzer:
             params, ret = self.func_sigs[method_symbol]
             self._check_call_args(method_symbol, params, [expr.object] + expr.args)
             return ExprInfo(ret)
-        self._fail("method calls are only supported for os.*, slices, maps, and user structs for now")
+        self._fail("method calls are only supported for os.*, arrays, and user structs for now")
         return ExprInfo(VOID)
 
     def _os_call(self, expr):
@@ -641,15 +625,6 @@ class SemanticAnalyzer:
             self._fail(f"new {expr.type_name}(...) expected one of {', '.join(self.union_defs[expr.type_name])}, got {payload.type.name}")
         return ExprInfo(NAMED(expr.type_name))
 
-    def _map_init_expr(self, expr):
-        typ = self._type_name(expr.type_name)
-        if typ.kind == "map":
-            for key, value in expr.entries:
-                self._check_assign(STR, self._expr(key), "map init key")
-                self._check_assign(typ.elem, self._expr(value), "map init value")
-            return ExprInfo(typ)
-        self._fail(f"new expected map, got {typ}")
-
     def _check_named_fields(self, fields, supplied_fields, owner):
         seen = set()
         for name, value in supplied_fields:
@@ -672,9 +647,6 @@ class SemanticAnalyzer:
 
     def _subscript_type(self, base_expr, index_expr):
         base = self._expr(base_expr)
-        if base.type.kind == "map":
-            self._check_assign(STR, self._expr(index_expr), "map key")
-            return base.type.elem
         self._expect_integer(self._expr(index_expr), "subscript index")
         if base.type == STR:
             self._fail("str subscript is removed; use bytes(s)[i]")
@@ -682,7 +654,7 @@ class SemanticAnalyzer:
             return base.type.elem
         if base.type.kind == "ptr":
             return base.type.elem
-        self._fail(f"subscript expected array, map, or pointer, got {base.type}")
+        self._fail(f"subscript expected array or pointer, got {base.type}")
 
     def _direct_field_type(self, struct_name, field):
         fields = self.struct_fields.get(struct_name)
@@ -710,7 +682,7 @@ class SemanticAnalyzer:
         return None
 
     def _is_reference_type(self, typ):
-        return typ == STR or typ.kind in ("array", "map", "named")
+        return typ == STR or typ.kind in ("array", "named")
 
     def _null_check_type(self, expr):
         inner = self._expr(expr.expr).type
@@ -747,11 +719,6 @@ class SemanticAnalyzer:
             if elem == VOID:
                 self._fail_global("array element type cannot be void")
             return ARRAY(elem)
-        if name.kind == "map":
-            value = self._type_name(name.elem)
-            if value == VOID:
-                self._fail_global("map value type cannot be void")
-            return MAP(value)
         if name.kind == "ptr":
             return PTR(self._type_name(name.elem))
         if name.kind == "named":
@@ -984,11 +951,6 @@ def assert_typed_program(program):
         if isinstance(node, ArrayLiteralNode):
             for idx, value in enumerate(node.values):
                 expr(value, f"{path}.values[{idx}]")
-            return
-        if isinstance(node, MapInitNode):
-            for idx, (key, value) in enumerate(node.entries):
-                expr(key, f"{path}.entries[{idx}].key")
-                expr(value, f"{path}.entries[{idx}].value")
             return
         fail(path)
 

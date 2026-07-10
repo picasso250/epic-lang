@@ -65,7 +65,7 @@ Current snapshot of functions handled specially by the active Python reference c
 
 ## Type Conversion (constructors)
 
-`str(x)` public surface is intentionally narrow: `str`, integer types, `bool`, and `u8[]` only. `str(u8[])` is a zero-copy byte-slice view, not UTF-8 validation or allocation. Struct, map, and non-`u8[]` array repr is not supported, and f-string interpolation follows the same rule.
+`str(x)` public surface is intentionally narrow: `str`, integer types, `bool`, and `u8[]` only. `str(u8[])` is a zero-copy byte-slice view, not UTF-8 validation or allocation. Struct and non-`u8[]` array repr is not supported, and f-string interpolation follows the same rule.
 
 These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 
@@ -87,14 +87,6 @@ These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 |----------|---------|----------------|---------------------|------------|-------|
 | `read_file`  | ✓ (ln 439) | ✓ (ln 654) | ✗ | ✓ (ln 1035) | Returns `u8[]` |
 | `write_file` | ✓ (ln 442) | ✓ (ln 664) | ✗ | ✓ (ln 1043) | Returns `i64` |
-
----
-
-## Map
-
-| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
-|----------|---------|----------------|---------------------|------------|-------|
-| `m.has(k)` / `m.del(k)` | ✓ | ✓ | ✓ | ✓ | map[str]T dot calls; missing-key read panics; old `map_has`/`map_del` removed from public surface |
 
 ---
 
@@ -168,7 +160,6 @@ symbols used by the Python backend.
 | `__ep_slice_u8_pop` / `__ep_slice_i64_pop` / `__ep_slice_ptr_pop` | remove and return last array element |
 | `__ep_slice_u8_slice` | copy a half-open byte-array slice |
 | `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` | append one array into another |
-| `__ep_map_str_len` / `__ep_map_str_key_at` | internal map key iteration helpers |
 
 Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main`, optional `__ep_global_init`, and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). The committed bundle order is authoritative.
 
@@ -178,7 +169,7 @@ Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity 
 
 ### x64-backed private helpers
 
-Hand-written x64 helpers are emitted from `bootstrap/x64_runtime.py`. MIR-visible semantic helpers such as `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, and `__ep_print_newline` own their implementation labels directly. Only backend-private primitives such as `__epx_alloc` and `__epx_argv_init` retain the `__epx_*` prefix. Slice and map helpers are MIR helpers, not x64-backed helpers.
+Hand-written x64 helpers are emitted from `bootstrap/x64_runtime.py`. MIR-visible semantic helpers such as `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, and `__ep_print_newline` own their implementation labels directly. Only backend-private primitives such as `__epx_alloc` and `__epx_argv_init` retain the `__epx_*` prefix. Slice helpers are MIR helpers, not x64-backed helpers.
 
 These should be treated as backend implementation details, not language builtins.
 
@@ -193,7 +184,7 @@ user code from redefining them:
 
 ```
 len cap bytes str str_new str_slice
-str_starts_with str_find push extend map_has map_del
+str_starts_with str_find push extend
 ```
 
 **But does NOT reserve:**

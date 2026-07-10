@@ -80,7 +80,7 @@ fun use_arrays_and_strings(): i64 {
     ret n + c + xs[0] + popped + index_sum
 }
 
-fun use_structs_and_maps(): i64 {
+fun use_structs(): i64 {
     let p = make_point(1, 2, "p")
     let q = new Point
     let h = new Holder { point: p, bytes: bytes("abc"), count: 3 }
@@ -89,19 +89,8 @@ fun use_structs_and_maps(): i64 {
     q.x = p.x
     q.y = h.point.y
     q.label = str(h.bytes)
-    let m = new map[str]i64 { "zero": 0, q.label: add(2, 5) }
-    m["one"] = 1
-    m["two"] = add(m["one"], 1)
-    let has_one = m.has("one")
-    let removed = m.del("missing")
-    let key_count = 0
-    for key in m {
-        if m.has(key) {
-            key_count += 1
-        }
-    }
-    if has_one && !removed && has_point && has_bytes {
-        ret m["two"] + h.count + key_count
+    if has_point && has_bytes {
+        ret q.x + q.y + h.count
     }
     ret 0
 }
@@ -151,7 +140,7 @@ fun use_adt(): i64 {
 fun main(): void {
     let a = use_scalars()
     let b = use_arrays_and_strings()
-    let c = use_structs_and_maps()
+    let c = use_structs()
     let d = use_control(8)
     let e = use_adt()
     assert a >= 0, "a"

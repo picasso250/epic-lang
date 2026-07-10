@@ -15,7 +15,6 @@ _RUNTIME_STRING_GLOBALS = (
     ("str.runtime.empty", ""),
     ("str.runtime.panic.prefix", "runtime panic: "),
     ("str.runtime.slice.oob", "slice index out of bounds"),
-    ("str.runtime.map.missing", "map missing key"),
 )
 
 

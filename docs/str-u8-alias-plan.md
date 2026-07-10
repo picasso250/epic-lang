@@ -47,7 +47,7 @@ The current alias phase does **not** introduce:
 - Grapheme cluster semantics.
 - Immutable string literals.
 - A high-level string library.
-- Automatic formatting for structs, maps, or arbitrary arrays.
+- Automatic formatting for structs or arbitrary arrays.
 
 Those belong to a future string design.
 
@@ -60,7 +60,6 @@ contract in these places:
 - `argv` is currently `str[]`.
 - `print`, `println`, `cstr`, `read_file(path)`, and
   `write_file(path, data)` use `str` for text/path arguments.
-- `map[str]T` is the only supported map family.
 - The Python reference compiler has explicit `STR`, `ptr_str()`,
   `ptr_slice_str()`, `argv`, and `__ep_str_*` paths.
 - The self-hosted compiler (`src/*.ep`) uses `str` for token kinds, names,
@@ -90,8 +89,7 @@ contract in these places:
 
 - Convert parser/lexer/sema/codegen internal byte scanning to operate primarily
   on `u8[]`.
-- Keep a minimal compatibility layer only for literals, diagnostics, and map keys
-  until `map[u8[]]T` or another key strategy is decided.
+- Keep a minimal compatibility layer only for literals and diagnostics.
 
 ## Open decisions
 
@@ -101,7 +99,5 @@ These require explicit design choices before code changes should become large:
    during the transition?
 2. Should string literals eventually type as `u8[]` directly, or remain `str`
    until the final spelling removal?
-3. Should `map[str]T` become `map[u8[]]T`, or should map keys get a distinct
-   comparable byte-key type?
-4. What replaces `str(i64)` / `str(bool)` formatting once `str` no longer names a
+3. What replaces `str(i64)` / `str(bool)` formatting once `str` no longer names a
    real string type?

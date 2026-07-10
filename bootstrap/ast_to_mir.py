@@ -123,28 +123,6 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_slice_ptr_pop", MirSignature([ptr()], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__ep_map_str_len", MirSignature([ptr()], I64)))
-        self.program.externs.append(MirExtern("__ep_map_str_key_at", MirSignature([ptr(), I64], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_i64_new", MirSignature([], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_i64_get", MirSignature([ptr(), ptr()], I64)))
-        self.program.externs.append(MirExtern("__ep_map_str_i64_set", MirSignature([ptr(), ptr(), I64], VOID)))
-        self.program.externs.append(MirExtern("__ep_map_str_i64_has", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_i64_del", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_bool_new", MirSignature([], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_bool_get", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_bool_set", MirSignature([ptr(), ptr(), BOOL], VOID)))
-        self.program.externs.append(MirExtern("__ep_map_str_bool_has", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_bool_del", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_str_new", MirSignature([], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_str_get", MirSignature([ptr(), ptr()], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_str_set", MirSignature([ptr(), ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__ep_map_str_str_has", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_str_del", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_ptr_new", MirSignature([], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_ptr_get", MirSignature([ptr(), ptr()], ptr())))
-        self.program.externs.append(MirExtern("__ep_map_str_ptr_set", MirSignature([ptr(), ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__ep_map_str_ptr_has", MirSignature([ptr(), ptr()], BOOL)))
-        self.program.externs.append(MirExtern("__ep_map_str_ptr_del", MirSignature([ptr(), ptr()], BOOL)))
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__ep_debug_i64", MirSignature([I64], VOID)))
@@ -216,8 +194,6 @@ class MirCodegen(MirFunctionBuilder):
                 return ptr()
             if elem is not None and elem.kind == "named":
                 return ptr()
-        if typ.kind == "map":
-            return ptr()
         if typ.kind == "named":
             return ptr()
         if typ.kind == "ptr":
@@ -428,9 +404,6 @@ class MirCodegen(MirFunctionBuilder):
                 return "_slice_str"
             if typ.elem is not None and typ.elem.kind == "named":
                 return f"_slice_{typ.elem.name}"
-        if typ.kind == "map":
-            suffix = self._map_suffix(typ)
-            return f"_map_str_{suffix}" if suffix is not None else None
         if typ.kind == "named":
             return typ.name
         return None
@@ -443,37 +416,6 @@ class MirCodegen(MirFunctionBuilder):
         if typ.kind == "array" and typ.elem is not None and typ.elem.kind == "named":
             return typ.elem.name if typ.elem.name in self.structs else None
         return None
-
-    def _map_suffix(self, typ):
-        if not isinstance(typ, et.EpicType) or typ.kind != "map":
-            return None
-        if typ.elem == et.I64:
-            return "i64"
-        if typ.elem == et.BOOL:
-            return "bool"
-        if typ.elem == et.STR:
-            return "str"
-        if typ.elem in (et.U64, et.U8):
-            return "i64"
-        if typ.elem is not None and typ.elem.kind in ("named", "array", "map", "ptr"):
-            return "ptr"
-        return None
-
-    def _map_value_type(self, typ):
-        suffix = self._map_suffix(typ)
-        if suffix == "i64":
-            return I64
-        if suffix == "bool":
-            return BOOL
-        if suffix in ("str", "ptr"):
-            return ptr()
-        return None
-
-    def _map_helper(self, typ, op):
-        suffix = self._map_suffix(typ)
-        if suffix is None:
-            return None
-        return f"__ep_map_str_{suffix}_{op}"
 
     def _is_slice_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "array"
@@ -599,10 +541,7 @@ class MirCodegen(MirFunctionBuilder):
             elif self._array_struct_elem(base_type) is not None:
                 self.inst("call", [base.value, index.value, value.value], type=VOID, callee="__ep_slice_ptr_set")
             else:
-                callee = self._map_helper(base_type, "set")
-                if callee is None:
-                    raise MirCodegenError("subscript assignment only supports primitive arrays and maps in machine MIR so far")
-                self.inst("call", [base.value, index.value, value.value], type=VOID, callee=callee)
+                raise MirCodegenError("subscript assignment only supports arrays in machine MIR")
             return self._reachable(self.current_block)
         elif isinstance(stmt, AssignOpNode):
             if isinstance(stmt.target, VarNode):
@@ -638,21 +577,16 @@ class MirCodegen(MirFunctionBuilder):
                 base = self._expr_from(in_block, stmt.target.base)
                 index = self._expr_from(base.block, stmt.target.index)
                 self.set_block(index.block)
-                map_value_type = self._map_value_type(base_type)
-                if map_value_type is not None:
-                    current = self.inst("call", [base.value, index.value], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base_type, "get"))
-                elif self._is_i64_array_type(base_type):
+                if self._is_i64_array_type(base_type):
                     current = self.inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_i64_get")
                 elif self._is_u8_array_type(base_type):
                     current = self.inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_u8_get")
                 else:
-                    raise MirCodegenError("compound subscript assignment only supports primitive arrays and maps in machine MIR so far")
+                    raise MirCodegenError("compound subscript assignment only supports primitive arrays in machine MIR")
                 rhs = self._expr_from(self.current_block, stmt.value)
                 self.set_block(rhs.block)
                 result = self._binary(stmt.op, ValueOperand(current), rhs.value, self._infer_type(stmt.target), self._node_line(stmt))
-                if map_value_type is not None:
-                    self.inst("call", [base.value, index.value, result], type=VOID, callee=self._map_helper(base_type, "set"))
-                elif self._is_i64_array_type(base_type):
+                if self._is_i64_array_type(base_type):
                     self.inst("call", [base.value, index.value, result], type=VOID, callee="__ep_slice_i64_set")
                 else:
                     self.inst("call", [base.value, index.value, result], type=VOID, callee="__ep_slice_u8_set")
@@ -758,9 +692,7 @@ class MirCodegen(MirFunctionBuilder):
         source_type = self._infer_type(stmt.source)
         if source_type.kind == "array":
             return self._emit_for_in_array_from(in_block, stmt, source_type)
-        if source_type.kind == "map":
-            return self._emit_for_in_map_from(in_block, stmt, source_type)
-        raise MirCodegenError(f"for-in expected array or map, got {source_type}")
+        raise MirCodegenError(f"for-in expected array, got {source_type}")
 
     def _emit_for_in_array_from(self, in_block, stmt, source_type):
         source = self._expr_from(in_block, stmt.source)
@@ -806,60 +738,6 @@ class MirCodegen(MirFunctionBuilder):
             cur3 = self.inst("load", [ValueOperand(var_addr)], result_type=I64, type=I64)
             nxt = self.inst("add", [ValueOperand(cur3), ConstIntOperand(I64, 1)], result_type=I64)
             self.inst("store", [ValueOperand(nxt), ValueOperand(var_addr)])
-            self.br(inc_block, cond_block.name)
-            return self._reachable(end_block)
-        finally:
-            self._pop_local_scope()
-
-    def _emit_for_in_map_from(self, in_block, stmt, source_type):
-        source = self._expr_from(in_block, stmt.source)
-        self.set_block(source.block)
-        self._push_local_scope()
-        try:
-            key_addr = self._alloc_local(stmt.name, ptr())
-            index_addr = self._alloc_local(f"__{stmt.name}.index{self.value_counter}", I64)
-            limit_addr = self._alloc_local(f"__{stmt.name}.limit{self.value_counter}", I64)
-            self.inst("store", [SymbolOperand(ptr(), self._string_label("")), ValueOperand(key_addr)])
-            self.inst("store", [ConstIntOperand(I64, 0), ValueOperand(index_addr)])
-            initial_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
-            self.inst("store", [ValueOperand(initial_len), ValueOperand(limit_addr)])
-
-            cond_block = self.new_block("for.in.cond")
-            len_block = self.new_block("for.in.len")
-            key_block = self.new_block("for.in.key")
-            body_block = self.new_block("for.in.body")
-            inc_block = self.new_block("for.in.inc")
-            end_block = self.new_block("for.in.end")
-            self.br(self.current_block, cond_block.name)
-
-            self.set_block(cond_block)
-            idx = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-            limit = self.inst("load", [ValueOperand(limit_addr)], result_type=I64, type=I64)
-            within_limit = self.inst("icmp.slt", [ValueOperand(idx), ValueOperand(limit)], result_type=BOOL)
-            self.condbr(cond_block, ValueOperand(within_limit), len_block.name, end_block.name)
-
-            self.set_block(len_block)
-            idx2 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-            current_len = self.inst("call", [source.value], result_type=I64, type=I64, callee="__ep_map_str_len")
-            within_current = self.inst("icmp.slt", [ValueOperand(idx2), ValueOperand(current_len)], result_type=BOOL)
-            self.condbr(len_block, ValueOperand(within_current), key_block.name, end_block.name)
-
-            self.set_block(key_block)
-            idx3 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-            key = self.inst("call", [source.value, ValueOperand(idx3)], result_type=ptr(), type=ptr(), callee="__ep_map_str_key_at")
-            self.inst("store", [ValueOperand(key), ValueOperand(key_addr)])
-            self.br(key_block, body_block.name)
-
-            self.loop_stack.append((inc_block.name, end_block.name))
-            body_flow = self._emit_block_from(body_block, stmt.body)
-            if body_flow.reachable:
-                self.br(body_flow.block, inc_block.name)
-            self.loop_stack.pop()
-
-            self.set_block(inc_block)
-            idx4 = self.inst("load", [ValueOperand(index_addr)], result_type=I64, type=I64)
-            nxt = self.inst("add", [ValueOperand(idx4), ConstIntOperand(I64, 1)], result_type=I64)
-            self.inst("store", [ValueOperand(nxt), ValueOperand(index_addr)])
             self.br(inc_block, cond_block.name)
             return self._reachable(end_block)
         finally:
@@ -1107,8 +985,6 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_array_literal_from(self.current_block, expr)
         if isinstance(expr, NewArrayNode):
             return self._emit_new_array_from(self.current_block, expr)
-        if isinstance(expr, MapInitNode):
-            return self._emit_map_init_from(self.current_block, expr)
         if isinstance(expr, SliceNode):
             return self._emit_slice_from(self.current_block, expr)
         if isinstance(expr, StructInitNode):
@@ -1359,16 +1235,6 @@ class MirCodegen(MirFunctionBuilder):
             self.set_block(src.block)
             self.inst("call", [dst.value, src.value], type=VOID, callee=helper)
             return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
-        if name in ("map_has", "map_del"):
-            map_type = self._infer_type(expr.args[0])
-            base = self._emit_expr_from(self.current_block, expr.args[0])
-            key = self._emit_expr_from(base.block, expr.args[1])
-            self.set_block(key.block)
-            op = "has" if name == "map_has" else "del"
-            if self._map_helper(map_type, op) is None:
-                raise MirCodegenError(f"{name} expects map")
-            result = self.inst("call", [base.value, key.value], result_type=BOOL, type=BOOL, callee=self._map_helper(map_type, op))
-            return ValueFlow(ValueOperand(result), self.current_block)
         raise MirCodegenError(f"unsupported builtin call: {name}")
 
     def _emit_dot_call_from(self, in_block, expr):
@@ -1411,16 +1277,6 @@ class MirCodegen(MirFunctionBuilder):
                 self.set_block(src.block)
                 self.inst("call", [dst.value, src.value], type=VOID, callee=helper)
                 return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
-        if receiver_type.kind == "map":
-            if expr.name in ("has", "del"):
-                base = self._emit_expr_from(self.current_block, expr.object)
-                key = self._emit_expr_from(base.block, expr.args[0])
-                self.set_block(key.block)
-                helper = self._map_helper(receiver_type, expr.name)
-                if helper is None:
-                    raise MirCodegenError(f"{expr.name} expects map")
-                result = self.inst("call", [base.value, key.value], result_type=BOOL, type=BOOL, callee=helper)
-                return ValueFlow(ValueOperand(result), self.current_block)
         if receiver_type.kind == "named":
             method_symbol = f"{receiver_type.name}__{expr.name}"
             call = CallNode(name=method_symbol, args=[expr.object] + expr.args, line=expr.line)
@@ -1452,10 +1308,6 @@ class MirCodegen(MirFunctionBuilder):
         base = self._emit_expr_from(in_block, expr.base)
         index = self._emit_expr_from(base.block, expr.index)
         self.set_block(index.block)
-        map_value_type = self._map_value_type(base_type)
-        if map_value_type is not None:
-            result = self.inst("call", [base.value, index.value], result_type=map_value_type, type=map_value_type, callee=self._map_helper(base_type, "get"))
-            return ValueFlow(ValueOperand(result), self.current_block)
         if self._is_i64_array_type(base_type):
             result = self.inst("call", [base.value, index.value], result_type=I64, type=I64, callee="__ep_slice_i64_get")
             return ValueFlow(ValueOperand(result), self.current_block)
@@ -1522,28 +1374,6 @@ class MirCodegen(MirFunctionBuilder):
             result = self.inst("call", [count], result_type=arr_type, type=ptr(), callee="__ep_slice_ptr_new")
             return ValueFlow(ValueOperand(result), self.current_block)
         raise MirCodegenError(f"unsupported array element type: {expr.elem_type}")
-
-    def _emit_map_init(self, expr):
-        return self._emit_map_init_from(self.ensure_insertable(), expr).value
-
-    def _emit_map_init_from(self, in_block, expr):
-        self.set_block(in_block)
-        epic_type = self._resolved_type(expr)
-        result_type = self._type(epic_type)
-        new_helper = self._map_helper(epic_type, "new")
-        set_helper = self._map_helper(epic_type, "set")
-        if new_helper is None or set_helper is None:
-            raise MirCodegenError(f"unsupported map init target: {expr.type_name}")
-        result = self.inst("call", [], result_type=result_type, type=result_type, callee=new_helper)
-        map_value = ValueOperand(result)
-        block = self.current_block
-        for key_expr, value_expr in expr.entries:
-            key = self._emit_expr_from(block, key_expr)
-            value = self._emit_expr_from(key.block, value_expr)
-            self.set_block(value.block)
-            self.inst("call", [map_value, key.value, value.value], type=VOID, callee=set_helper)
-            block = self.current_block
-        return ValueFlow(map_value, self.current_block)
 
     def _emit_slice(self, expr):
         return self._emit_slice_from(self.ensure_insertable(), expr).value
@@ -1755,12 +1585,6 @@ class MirCodegen(MirFunctionBuilder):
         self.union_tags = {union.name: {member: idx for idx, member in enumerate(union.members, start=1)} for union in ast.unions}
         for struct_name in ("str", "_slice_u8", "_slice_i64", "_slice_str"):
             self.structs[struct_name] = self._slice_layout(struct_name)
-        for map_struct in ("_map_str_i64", "_map_str_bool", "_map_str_str", "_map_str_ptr"):
-            self.structs[map_struct] = self._make_struct_layout(
-                map_struct,
-                [("entries", ptr(), 0), ("len", I64, 8), ("cap", I64, 16)],
-                size=24,
-            )
         for struct_node in ast.structs:
             self.structs[struct_node.name] = MirStruct(struct_node.name, [], 0)
         for union_node in ast.unions:

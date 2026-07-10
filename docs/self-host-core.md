@@ -50,7 +50,6 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | `while`     | Boolean condition required |
 | `for i in start:end` | Half-open increasing numeric range; cursor is loop block scoped |
 | `for i in xs` | Array index iteration; `i: i64`, loop block scoped |
-| `for k in m` | Map key iteration; `k: str`, loop block scoped |
 | `break`/`continue` | Bound to innermost `while`/`for` |
 | `ret`       | With or without expression |
 
@@ -90,7 +89,7 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | `xs.push(x)` | Array append dot call |
 | `xs.pop()` | Delete and return the last element; empty array panics |
 | `dst.extend(src)` | dot call for arrays with the same element type |
-| `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/map/non-u8 array repr |
+| `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/non-u8 array repr |
 | `str(bytes)`  | `u8[]` to temporary `str` view; zero-copy identity cast |
 | `bytes(s)`    | temporary `str` view to `u8[]`; zero-copy identity cast |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |
@@ -101,7 +100,6 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | `str_find`    | Removed from public surface |
 | `str_trim`    | Removed entirely; write byte scanning in Epic |
 | `str_replace_char` | Removed entirely; write byte scanning in Epic |
-| `m.has(key)` / `m.del(key)` | Map existence/delete dot calls |
 
 ### Runtime Helpers (MIR-implemented)
 
@@ -122,13 +120,6 @@ These are core runtime helpers. MIR helper bodies used by both compilers live in
 - `__ep_slice_i64_set` — bounds-checked i64 array write
 - `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` — array append
 
-### Map
-
-`map[str]T` is retained but not a priority feature. Value type `T` may be any
-non-`void` current language type. Lookup of non-existent keys triggers runtime
-panic; use `m.has(key)` before reading when absence is possible. `m[key] = value`
-inserts or updates, and `m.del(key)` returns whether a key was removed.
-
 ### OS Namespace
 
 `os.<dll>.<Function>(<args>)` is retained for WinAPI interop (kernel32, user32).  
@@ -141,6 +132,12 @@ FFI arguments are `i64`; C strings require explicit `cstr(...)`.
 ---
 
 ## Removed from Self-Hosting Core
+
+### Built-in Map
+
+`map[str]T`, map literals, map subscripting, `.has` / `.del`, map iteration,
+and all `__ep_map_*` runtime helpers are removed. Compiler internals use explicit
+arrays and linear lookup where associative lookup is needed.
 
 ### ADT (Algebraic Data Types)
 
@@ -184,7 +181,6 @@ after ADT removal and naming unification.
 | Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
 | `required_helpers` / lazy injection | MIR function reachability pruning | Explicit dependency tables deferred; current pass keeps `main`, optional `__ep_global_init`, and x64-runtime MIR roots. |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
-| `map` | Kept for now | May be removed from core |
 | `itoa` | Removed from public surface | Use `str(n)` |
 | `i8` public type | Removed | `u8` is Epic's only byte type; byte loads zero-extend to 0..255 |
 | `cstr` | Kept for now | May be removed when WinAPI interop is redesigned |
@@ -199,7 +195,6 @@ after ADT removal and naming unification.
 - `str` (temporary `u8[]`-layout alias, see Deferred)
 - `struct`
 - `T[]` (dynamic array)
-- `map[str]T` (kept for now)
 - `fun` / `if` / `while` / `for` / `ret` / `break` / `continue`
 - `new S { ... }` struct initialization
 - `new T[] { ... }` array literal
@@ -208,13 +203,13 @@ after ADT removal and naming unification.
 - Local variable declarations must have an initializer; optional type annotations only constrain/check the initializer
 - No zero-value initialization for locals; use literals, `new`, calls, or other expressions explicitly
 - Lexical block scope for `let`, ADT match bindings, and loop cursors
-- Heap-backed references (`str`, `T[]`, `map[str]T`, structs, ADT wrappers) may use `0` as null storage, but compiler-inserted container materialization is not part of the language model
+- Heap-backed references (`str`, `T[]`, structs, ADT wrappers) may use `0` as null storage, but compiler-inserted container materialization is not part of the language model
 - Postfix `expr?` is the only public null-check surface: it accepts reference types and returns `bool`; it is not ADT field-exists syntax and it does not dereference the checked value
 - `new S { ... }` allows partial field initialization: omitted scalar fields default to `0` / `false`, omitted reference fields default to null
 - Slice syntax `s[start:end]`
 - `match` literal switch only
 - Function-style builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `str` / `bytes` / `cstr`
-- Builtin container dot calls: `xs.push(x)` / `xs.pop()` / `dst.extend(src)` / `m.has(key)` / `m.del(key)`
+- Builtin container dot calls: `xs.push(x)` / `xs.pop()` / `dst.extend(src)`
 - User methods v1: `fun (receiver: StructName) method(args...): Ret { ... }`; receiver type must be a user-defined struct.
 - User method lowering: `fun (p: Parser) peek(): Token` occupies the global symbol `Parser__peek`; `p.peek()` lowers to `Parser__peek(p)`.
 - Method calls do not support overloads, traits, inheritance, virtual dispatch, method values, generics, or fallback to `peek(p)`.
@@ -281,16 +276,16 @@ plan to rename helpers to bare names is obsolete.
 Completed:
 - The byte-buffer-first text model is documented.
 - `read_file` / `write_file` use `u8[]` as the data carrier.
-- `str(u8[])` and `bytes(str)` are zero-copy identity casts. `str(struct)`, `str(map)`, and `str(T[])` for non-`u8` arrays are not supported; f-string interpolation uses the same convertibility rule as `str(expr)`.
+- `str(u8[])` and `bytes(str)` are zero-copy identity casts. `str(struct)` and `str(T[])` for non-`u8` arrays are not supported; f-string interpolation uses the same convertibility rule as `str(expr)`.
 - The zero-copy shared-buffer behavior is covered by `tests/e2e/pass/v5_zero_copy_str_bytes.ep`.
 - Public str helper surface is removed: `str_new`, `itoa`, `str_find`,
   `str_starts_with`, `str_replace_char`, and `str_trim` are not public builtins.
-- `xs.pop()` removes and returns the last element, and panics on an empty array. `dst.extend(src)` appends arrays with the same element type. Function-style `push`, `pop`, `extend`, `map_has`, and `map_del` are removed from the public source surface.
+- `xs.pop()` removes and returns the last element, and panics on an empty array. `dst.extend(src)` appends arrays with the same element type. Function-style `push`, `pop`, and `extend` are removed from the public source surface.
 
 Remaining:
 - No retained `src/*.ep` source currently calls removed public string helpers. `src/link.ep` uses local `u8[]` byte scanning plus `str(n)`, and `src/parser.ep` no longer reserves `str_new`.
 
-Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to make `str` a temporary `u8[]`-layout alias first, then remove the temporary spelling after public APIs, runtime ABI, maps, argv, and self-hosted sources no longer depend on it. See [`str-u8-alias-plan.md`](str-u8-alias-plan.md).
+Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to make `str` a temporary `u8[]`-layout alias first, then remove the temporary spelling after public APIs, runtime ABI, argv, and self-hosted sources no longer depend on it. See [`str-u8-alias-plan.md`](str-u8-alias-plan.md).
 
 ---
 

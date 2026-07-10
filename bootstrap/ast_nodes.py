@@ -325,13 +325,3 @@ class ArrayLiteralNode(ASTNode):
     elem_type: EpicType
     values: list
     resolved_type: Optional[EpicType] = None
-
-
-@dataclass
-class MapInitNode(ASTNode):
-    type_name: EpicType
-    entries: list
-    resolved_type: Optional[EpicType] = None
-
-
-

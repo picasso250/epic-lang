@@ -1,4 +1,0 @@
-# COMPILE_FAIL: map init value expected bool, got str
-fun main(): void {
-    let m = new map[str]bool { "ok": "yes" }
-}

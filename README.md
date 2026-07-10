@@ -49,7 +49,6 @@ Epic currently supports:
 - strings as byte-slice-backed text views during the current migration stage
 - dynamic arrays (`T[]`) backed by slice headers, with `len`, `cap`, checked indexing, and `push`
 - byte-oriented `u8[]` helpers such as slicing and `extend`
-- `map[str]T` with lookup, assignment, `has`, `del`, literals, and growth
 - heap-backed structs with explicit named fields, initialization, and user-defined
   methods on struct receivers
 - ADTs backed by struct-union lowering, plus `match`

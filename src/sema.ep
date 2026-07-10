@@ -105,10 +105,6 @@ fun sema_is_array(t: str): bool {
     ret epic_type_is_array(t)
 }
 
-fun sema_is_map(t: str): bool {
-    ret epic_type_is_map(t)
-}
-
 fun sema_array_elem(t: str): str {
     if sema_is_array(t) == false {
         sema_die("expected array type")
@@ -116,21 +112,11 @@ fun sema_array_elem(t: str): str {
     ret epic_type_array_elem(t)
 }
 
-fun sema_map_value(t: str): str {
-    if sema_is_map(t) == false {
-        sema_die("expected map type")
-    }
-    ret epic_type_map_value(t)
-}
-
 fun sema_is_reserved_func(name: str): bool {
     if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" {
         ret true
     }
     if name == "read_file" || name == "write_file" || name == "len" || name == "cap" || name == "push" || name == "extend" {
-        ret true
-    }
-    if name == "map_has" || name == "map_del" {
         ret true
     }
     ret false
@@ -166,13 +152,6 @@ fun sema_type_name(st: SemaState, typ: TypeExpr): str {
                 sema_die("array element type cannot be void")
             }
             ret epic_type_array_of(elem)
-        }
-        TypeMap n: {
-            let value = sema_type_name(st, n.value)
-            if value == "void" {
-                sema_die("map value type cannot be void")
-            }
-            ret epic_type_map_of(value)
         }
     }
     ret ""
@@ -267,7 +246,7 @@ fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): st
 }
 
 fun sema_is_reference_type(st: SemaState, typ: str): bool {
-    ret typ == "str" || sema_is_array(typ) || sema_is_map(typ) || sema_struct_index(st, typ) >= 0 || sema_union_index(st, typ) >= 0
+    ret typ == "str" || sema_is_array(typ) || sema_struct_index(st, typ) >= 0 || sema_union_index(st, typ) >= 0
 }
 
 fun sema_null_check_type(st: SemaState, node: AstNode): str {
@@ -647,17 +626,6 @@ fun sema_is_global_literal_init(node: AstNode): bool {
             }
             ret true
         }
-        AstMapInit n: {
-            for i in n.map_keys {
-                if sema_is_global_literal_init(n.map_keys[i]) == false {
-                    ret false
-                }
-                if sema_is_global_literal_init(n.map_values[i]) == false {
-                    ret false
-                }
-            }
-            ret true
-        }
         AstStructInit n: {
             for i in n.fields {
                 let f = n.fields[i]
@@ -718,10 +686,6 @@ fun sema_reset_locals(st: SemaState): void {
 
 fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode): str {
     let base = sema_expr_type(st, base_expr)
-    if sema_is_map(base) {
-        sema_check_assign(st, "str", index_expr, "map key")
-        ret sema_map_value(base)
-    }
     sema_expect_int(st, index_expr, "subscript index")
     if base == "str" {
         sema_die("str subscript is removed; use bytes(s)[i]")
@@ -729,7 +693,7 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     if sema_is_array(base) {
         ret sema_array_elem(base)
     }
-    sema_die(f"subscript expected array, map, or pointer, got {base}")
+    sema_die(f"subscript expected array, got {base}")
     ret ""
 }
 
@@ -888,21 +852,6 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             }
             ret sema_set_type(node, n.type_name)
         }
-        AstMapInit n: {
-            let typ = sema_type_name(st, n.source_type)
-            if sema_is_map(typ) {
-                let value_type = sema_map_value(typ)
-                if len(n.map_keys) != len(n.map_values) {
-                    sema_die("internal map initializer entry mismatch")
-                }
-                for i in n.map_keys {
-                    sema_check_assign(st, "str", n.map_keys[i], "map init key")
-                    sema_check_assign(st, value_type, n.map_values[i], "map init value")
-                }
-                ret sema_set_type(node, typ)
-            }
-            sema_die(f"new expected map, got {typ}")
-        }
         _: {
             sema_die("unsupported expression")
         }
@@ -1009,14 +958,6 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         }
         sema_die(f"array type {receiver} has no method {node.name}")
     }
-    if sema_is_map(receiver) {
-        if node.name == "has" || node.name == "del" {
-            sema_check_arity(node.name, 1, node.args)
-            sema_check_assign(st, "str", node.args[0], f"{node.name} key")
-            ret "bool"
-        }
-        sema_die(f"map type {receiver} has no method {node.name}")
-    }
     if sema_struct_index(st, receiver) >= 0 {
         let method_symbol = str_cat2(str_cat2(receiver, "__"), node.name)
         let method_index = sema_func_index(st, method_symbol)
@@ -1031,7 +972,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         sema_check_func_call_args(st, method_symbol, args)
         ret st.funcs[method_index].meta.resolved_type
     }
-    sema_die("method calls are only supported for os.*, slices, maps, and user structs for now")
+    sema_die("method calls are only supported for os.*, arrays, and user structs for now")
     ret ""
 }
 
@@ -1132,12 +1073,6 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     }
     if node.name == "extend" {
         sema_die("extend is removed from function-call surface; use dst.extend(src)")
-    }
-    if node.name == "map_has" {
-        sema_die("map_has is removed from public surface; use m.has(key)")
-    }
-    if node.name == "map_del" {
-        sema_die("map_del is removed from public surface; use m.del(key)")
     }
     let func_index = sema_func_index(st, node.name)
     if func_index < 0 {
@@ -1278,16 +1213,10 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 sema_push_scope(st)
                 sema_define_local(st, n.name, "i64")
             } else {
-                if epic_type_is_map(source_type) {
-                    ast_set_resolved_type(node, "str")
-                    sema_push_scope(st)
-                    sema_define_local(st, n.name, "str")
-                } else {
-                    if source_type == "str" {
-                        sema_die("for-in over str is not supported; use bytes(s) to iterate bytes")
-                    }
-                    sema_die(f"for-in expected array or map, got {source_type}")
+                if source_type == "str" {
+                    sema_die("for-in over str is not supported; use bytes(s) to iterate bytes")
                 }
+                sema_die(f"for-in expected array, got {source_type}")
             }
             st.loop_depth += 1
             sema_block(st, n.body)

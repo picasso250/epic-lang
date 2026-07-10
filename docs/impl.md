@@ -51,9 +51,8 @@ oracle 对拍稳定；但 `src/parser.ep` 的源码类型表达已经使用 `Typ
 `src/ast_to_mir.ep` 继续消费 sema 写入的规范类型文本。Self-hosted sema
 直接保留 `AstStructDef[]`、`AstUnionDef[]`、`AstFunDef[]` 和已分析的
 `AstLet[]`，通过线性查询读取声明及其 resolved metadata；它不再建立
-`map[str]` 符号表或复制字段、参数和返回类型。少数 MIR lowering 辅助仍通过
-`epic_type_*` 查询规范文本结构；声明位置不再保存手写拼接的 `[]` /
-`map[str]` 类型字符串。
+通用哈希符号表或复制字段、参数和返回类型。少数 MIR lowering 辅助仍通过
+`epic_type_*` 查询规范文本结构；声明位置不再保存手写拼接的 `[]` 类型字符串。
 
 ### 构造器简写 (Constructor Shorthand)
 
@@ -154,7 +153,7 @@ _slice_T = {
 
 基本类型 dynamic array 存储基本类型的值。结构体和 `str` dynamic array 存储引用。
 
-`str`、`T[]`、`map[str]T` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend`、map 操作或字段访问是运行时错误。slice/map header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` / `entries` 可在首次写入时再分配。
+`str` 和 `T[]` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误。slice header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` 可在首次写入时再分配。
 
 ### 结构体 (Struct)
 
@@ -205,13 +204,13 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 ### 降级说明 (Lowering Notes)
 
 - **用户方法 v1**：Parser 将 `fun (p: Parser) peek(): Token` 解析为带 receiver metadata 的函数定义，并占用内部符号 `Parser__peek`。Sema 对 `p.peek(args...)` 先求 receiver 类型；如果是用户 struct `Parser`，只查 `Parser__peek(p, args...)`，不 fallback 到 `peek(p, args...)`。普通函数名允许包含 `__`；mangled method symbol 与已有函数重复时，复用普通重复定义错误。
-- **Null check postfix**：Parser 将 `expr?` 解析为 `NullCheck`。Sema 只允许 reference 类型（`str`、array、map、struct、ADT wrapper），返回 `bool`。AST-to-MIR 对被检查表达式求值一次，然后发射 `icmp.ne <ptr>, null`；`?` 本身不 deref 被检查值，不触发 null trap。
-- **方法边界**：第一版只支持用户 struct receiver，不支持 primitive / `str` / array / map receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 struct 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
+- **Null check postfix**：Parser 将 `expr?` 解析为 `NullCheck`。Sema 只允许 reference 类型（`str`、array、struct、ADT wrapper），返回 `bool`。AST-to-MIR 对被检查表达式求值一次，然后发射 `icmp.ne <ptr>, null`；`?` 本身不 deref 被检查值，不触发 null trap。
+- **方法边界**：第一版只支持用户 struct receiver，不支持 primitive / `str` / array receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 struct 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
-- **For 降级**：`ForRange` 保持半开 numeric cursor lowering。`ForIn` 由 sema 按 source 类型分派：array source 降级为 index cursor loop，保存初始 `len` 作为上限并在每轮重新检查当前 `len`；map source 降级为隐藏 numeric cursor loop，通过 internal `__ep_map_str_len` / `__ep_map_str_key_at` 读取当前 key。`ForIn` 不对 map keys 做快照；对被迭代 map 的 insert/delete 是弱规定。
-- **Map 降级**：Python reference compiler 将 `map[str]T` 降级为 str-keyed map。entry 为 `{key, value, occupied}` 三个 word，key 比较调用 `__ep_str_eq`。value lowering 分为 word、bool、str 和 pointer 四类；struct、array、map 和 pointer value 走 pointer helper。`m[key] = value` 插入或覆盖，满时扩容。不存在的键查找触发 runtime panic；`m.has(key)` 区分是否缺失，`m.del(key)` 使用 swap-delete 并返回是否删除成功。`new map[str]T { ... }` 降级为一次 map new 加按源码顺序执行的 map set。
+- **For 降级**：`ForRange` 保持半开 numeric cursor lowering。`ForIn` 只接受 array source，降级为 index cursor loop，保存初始 `len` 作为上限并在每轮重新检查当前 `len`。
+- **Map 删除**：内建 map 类型、语法、sema/codegen 分支和 MIR runtime helper 均已删除。需要名称查找的编译器代码使用显式数组与线性查询。
 
 ## 链接器 (Linker)
 
@@ -225,7 +224,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(x)`           | 过渡期 formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、map、非 `u8[]` array 不支持 | 公开但准备收缩 |
+| `str(x)`           | 过渡期 formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、非 `u8[]` array 不支持 | 公开但准备收缩 |
 | `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |
 | `write_file`       | `__ep_write_file` helper                    | 公开 |
 | `str` (`u8[]`)     | zero-copy layout reinterpret；alias 迁移路径 | 公开但准备收缩 |

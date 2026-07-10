@@ -6,7 +6,6 @@ Program
   StructDef Box
     StructField point : Point
     StructField bytes : u8[]
-    StructField flags : map[str]bool
   StructDef LiteralExpr
     StructField value : str
   StructDef BinaryExpr
@@ -64,20 +63,6 @@ Program
       Let typed : i64
         Literal 2
       Let empty : u8[]
-      Let mapping : map[str]i64
-        MapInit : map[str]i64
-      Let mapping2
-        MapInit : map[str]i64
-          Key
-            String one
-          Value
-            Literal 1
-          Key
-            Var text
-          Value
-            Binary +
-              Var typed
-              Var inferred
       Let p
         StructInit Point
       Let p2
@@ -260,12 +245,6 @@ Program
               Call str
                 Var j
         Var xs
-      ForIn key
-        Block
-          BlockValue
-            Call println
-              Var key
-        Var mapping2
       Match
         Var typed
         MatchCase

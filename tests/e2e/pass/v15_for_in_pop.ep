@@ -1,7 +1,6 @@
 # EXIT: 0
 # STDOUT: 3
 # STDOUT: 2
-# STDOUT: 3
 fun main(): void {
     let xs = new i64[]
     xs.push(1)
@@ -17,13 +16,5 @@ fun main(): void {
     println(str(sum))
     println(str(xs.pop()))
 
-    let m = new map[str]i64 { "a": 1, "b": 2 }
-    let count = 0
-    for k in m {
-        if m.has(k) {
-            count = count + m[k]
-        }
-    }
-    println(str(count))
     exit(0)
 }

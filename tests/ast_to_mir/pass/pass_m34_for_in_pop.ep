@@ -5,11 +5,5 @@ fun main(): i64 {
         total += xs[i]
     }
     total += xs.pop()
-    let m = new map[str]i64 { "a": 1, "b": 2 }
-    for k in m {
-        if m.has(k) {
-            total += m[k]
-        }
-    }
     ret total
 }

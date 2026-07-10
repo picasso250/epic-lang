@@ -11,7 +11,6 @@ struct Point {
 struct Box {
     point: Point
     bytes: u8[]
-    flags: map[str]bool
 }
 
 
@@ -50,11 +49,6 @@ fun statements_and_control(flag: bool): void {
     let inferred = 1
     let typed: i64 = 2
     let empty: u8[]
-    let mapping: map[str]i64 = new map[str]i64
-    let mapping2 = new map[str]i64 {
-        "one": 1
-        text: typed + inferred
-    }
     let p = new Point
     let p2 = new Point {}
     let p3 = new Point { x: 1, y: 2, name: "origin" }
@@ -110,9 +104,6 @@ fun statements_and_control(flag: bool): void {
     }
     for j in xs {
         println(str(j))
-    }
-    for key in mapping2 {
-        println(key)
     }
 
     match typed {

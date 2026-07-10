@@ -161,7 +161,7 @@ struct Name
 - `bool` 是 Epic MIR 的逻辑布尔类型，文本不写作 `i1`。
 - `ptr` 是 opaque pointer，不携带 pointee type。
 - `array N x T` 主要用于 global string / static data 描述，也可作为 `gep` 的 source element type。
-- `struct Name` 用于结构体、字符串对象、map 等 layout 描述，也可作为 `gep` 的 source element type。
+- `struct Name` 用于结构体、字符串对象等 layout 描述，也可作为 `gep` 的 source element type。
 - validator 不能依赖 pointer pointee type；需要检查 `load/store` 的访问类型、`gep` 的 source element type 和 index 合法性。
 
 第一版可以先只实际实现：

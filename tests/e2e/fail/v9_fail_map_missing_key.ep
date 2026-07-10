@@ -1,7 +1,0 @@
-# EXIT: 1
-# STDOUT_CONTAINS: runtime panic: map missing key
-fun main(): void {
-    let ids = new map[str]i64
-    let x = ids["missing"]
-    println(str(x))
-}

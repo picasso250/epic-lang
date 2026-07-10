@@ -233,7 +233,7 @@ Program
                 Literal 0 : i64
             Var popped : i64
           Var index_sum : i64
-  FunDef use_structs_and_maps : i64
+  FunDef use_structs : i64
     Block
       Let p : Point
         Call make_point : Point
@@ -273,70 +273,19 @@ Program
           FieldAccess bytes : u8[]
             Var h : Holder
         Var q : Point
-      Let m : map[str]i64
-        MapInit : map[str]i64 : map[str]i64
-          Key
-            String zero : str
-          Value
-            Literal 0 : i64
-          Key
-            FieldAccess label : str
-              Var q : Point
-          Value
-            Call add : i64
-              Literal 2 : i64
-              Literal 5 : i64
-      SubscriptAssign
-        Literal 1 : i64
-        Var m : map[str]i64
-        String one : str
-      SubscriptAssign
-        Call add : i64
-          Subscript : i64
-            Var m : map[str]i64
-            String one : str
-          Literal 1 : i64
-        Var m : map[str]i64
-        String two : str
-      Let has_one : bool
-        DotCall has : bool
-          Var m : map[str]i64
-          String one : str
-      Let removed : bool
-        DotCall del : bool
-          Var m : map[str]i64
-          String missing : str
-      Let key_count : i64
-        Literal 0 : i64
-      ForIn key : str
-        Block
-          If
-            Block
-              AssignOp +
-                Var key_count : i64
-                Literal 1 : i64
-            DotCall has : bool
-              Var m : map[str]i64
-              Var key : str
-        Var m : map[str]i64
       If
         Block
           Return
             Binary + : i64
               Binary + : i64
-                Subscript : i64
-                  Var m : map[str]i64
-                  String two : str
-                FieldAccess count : i64
-                  Var h : Holder
-              Var key_count : i64
+                FieldAccess x : i64
+                  Var q : Point
+                FieldAccess y : i64
+                  Var q : Point
+              FieldAccess count : i64
+                Var h : Holder
         Binary && : bool
-          Binary && : bool
-            Binary && : bool
-              Var has_one : bool
-              Unary ! : bool
-                Var removed : bool
-            Var has_point : bool
+          Var has_point : bool
           Var has_bytes : bool
       Return
         Literal 0 : i64
@@ -425,7 +374,7 @@ Program
       Let b : i64
         Call use_arrays_and_strings : i64
       Let c : i64
-        Call use_structs_and_maps : i64
+        Call use_structs : i64
       Let d : i64
         Call use_control : i64
           Literal 8 : i64

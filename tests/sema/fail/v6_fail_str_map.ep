@@ -1,6 +1,0 @@
-# COMPILE_FAIL: str expected str, integer, bool, or u8[], got map[str]i64
-fun main(): void {
-    let m = new map[str]i64
-    println(str(m))
-}
-

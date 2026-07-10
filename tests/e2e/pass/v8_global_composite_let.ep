@@ -7,7 +7,6 @@ struct Config {
 let greeting = "hello"
 let bytes = new u8[] { u8(1), u8(2), u8(3) }
 let nums = new i64[] { 4, 5 }
-let names = new map[str]str { "if": "IF", "fun": "FUN" }
 let cfg = new Config { port: 7, name: "dev" }
 
 fun main(): i64 {
@@ -19,12 +18,6 @@ fun main(): i64 {
     }
     if nums[1] != 5 {
         ret 3
-    }
-    if names.has("if") == false {
-        ret 4
-    }
-    if names["fun"] != "FUN" {
-        ret 5
     }
     if cfg.port != 7 {
         ret 6

@@ -27,8 +27,6 @@ BUILTIN_FUNCTIONS = frozenset({
     "read_file",
     "write_file",
 
-    "map_has",
-    "map_del",
 })
 
 PSEUDO_BUILTINS = frozenset({

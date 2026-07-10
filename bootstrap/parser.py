@@ -4,7 +4,7 @@ Consumes tokens from lexer, produces AST dataclass nodes.
 """
 
 from ast_nodes import *
-from epic_types import ARRAY, BOOL, I64, MAP, NAMED, STR, U64, U8, VOID
+from epic_types import ARRAY, BOOL, I64, NAMED, STR, U64, U8, VOID
 
 
 class ParseError(Exception):
@@ -169,15 +169,6 @@ class Parser:
         return params
 
     def parse_type(self):
-        if self.peek_kind("ID") and self.peek()[1] == "map":
-            self.advance()
-            self.expect("LBRACKET")
-            key = self.expect("ID")
-            self.expect("RBRACKET")
-            if key[1] != "str":
-                raise ParseError(f"only map[str]T is supported, got map[{key[1]}]", key[2])
-            value = self.parse_type()
-            return MAP(value)
         t = self.advance()
         if t[0] in ("ID",):
             typ = self._type_atom(t[1])
@@ -567,16 +558,6 @@ class Parser:
             t = self.advance()
             if t[0] != "ID":
                 raise ParseError(f"Expected type after new, got {t[0]}", t[2])
-            if t[1] == "map":
-                self.expect("LBRACKET")
-                key = self.expect("ID")
-                self.expect("RBRACKET")
-                if key[1] != "str":
-                    raise ParseError(f"only map[str]T is supported, got map[{key[1]}]", key[2])
-                value = self.parse_type()
-                type_name = MAP(value)
-                entries = self.parse_map_entries_after_lbrace() if self.check("LBRACE") else []
-                return MapInitNode(type_name=type_name, entries=entries, line=t[2])
             name = t[1]
             if self.check("LBRACKET"):
                 count = None
@@ -688,24 +669,6 @@ class Parser:
                 raise ParseError("Expected comma or newline in array literal", t[2])
         self.expect("RBRACE")
         return values
-
-    def parse_map_entries_after_lbrace(self):
-        entries = []
-        self.skip_newlines()
-        while not self.peek_kind("RBRACE"):
-            key = self.parse_expr()
-            self.expect("COLON")
-            value = self.parse_expr()
-            entries.append((key, value))
-            if self.check("COMMA"):
-                self.skip_newlines()
-            elif self.peek_kind("NEWLINE"):
-                self.skip_newlines()
-            elif not self.peek_kind("RBRACE"):
-                t = self.peek()
-                raise ParseError("Expected comma or newline in map initializer", t[2])
-        self.expect("RBRACE")
-        return entries
 
     def parse_args(self):
         args = []
@@ -917,13 +880,6 @@ def dump_ast_lines(node, depth=0):
         emit(f"ArrayLiteral : {node.elem_type}{_type_suffix(node)}")
         for value in node.values:
             out.extend(dump_ast_lines(value, depth + 1))
-    elif isinstance(node, MapInitNode):
-        emit(f"MapInit : {node.type_name}{_type_suffix(node)}")
-        for key, value in node.entries:
-            out.append(_dump_line(depth + 1, "Key"))
-            out.extend(dump_ast_lines(key, depth + 2))
-            out.append(_dump_line(depth + 1, "Value"))
-            out.extend(dump_ast_lines(value, depth + 2))
     else:
         raise TypeError(f"unsupported AST node: {type(node).__name__}")
 

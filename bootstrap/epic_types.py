@@ -14,8 +14,6 @@ class EpicType:
     def __str__(self):
         if self.kind == "array":
             return f"{self.elem}[]"
-        if self.kind == "map":
-            return f"map[str]{self.elem}"
         if self.kind == "ptr":
             return f"&{self.elem}"
         if self.kind == "named":
@@ -34,10 +32,6 @@ STR = EpicType("str")
 
 def ARRAY(elem):
     return EpicType("array", elem=elem)
-
-
-def MAP(value):
-    return EpicType("map", elem=value)
 
 
 def PTR(elem):
