@@ -325,8 +325,6 @@ class MirProgram:
     def text(self):
         parts = []
         parts.extend(struct_item.text() for struct_item in self.structs.values())
-        parts.extend(imp.text() for imp in self.imports)
-        parts.extend(ext.text() for ext in self.externs)
         parts.extend(glob.text() for glob in self.globals)
         parts.extend(fn.text() for fn in self.functions)
         return "\n\n".join(parts)
@@ -502,7 +500,14 @@ class MirValidator:
     def _validate_call(self, fn, where, inst):
         self._require(inst.callee is not None, fn, where, "call needs callee")
         self._require(inst.type is not None, fn, where, "call needs return type")
+        if inst.type == VOID:
+            self._require(inst.result is None, fn, where, "void call must not have a result")
+        else:
+            self._require(inst.result is not None and self._same_type(inst.result.type, inst.type), fn, where, "call result type mismatch")
+
         callee = self.symbols.get(inst.callee)
+        if callee is None:
+            return
         signature = getattr(callee, "signature", None)
         if signature is None:
             self.errors.append(f"{fn.name}.{where}: callee is not callable: {inst.callee}")
@@ -511,10 +516,6 @@ class MirValidator:
         self._require(len(signature.params) == len(inst.operands), fn, where, "call arity mismatch")
         for idx, (expected, operand) in enumerate(zip(signature.params, inst.operands)):
             self._require(self._same_type(expected, operand.type), fn, where, f"call argument {idx} type mismatch")
-        if inst.type == VOID:
-            self._require(inst.result is None, fn, where, "void call must not have a result")
-        else:
-            self._require(inst.result is not None and self._same_type(inst.result.type, inst.type), fn, where, "call result type mismatch")
 
     def _validate_gep(self, fn, where, inst):
         self._require(inst.result is not None, fn, where, "gep needs a result")

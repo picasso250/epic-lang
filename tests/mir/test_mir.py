@@ -221,7 +221,10 @@ entry:
 
 
 def test_mir_parser_strips_text_sigils():
-    source = """declare ptr @helper(ptr)
+    source = """define ptr @helper(ptr %value) {
+entry:
+  ret ptr %value
+}
 
 define ptr @main(ptr %arg) {
 entry:
@@ -230,8 +233,7 @@ entry:
 }
 """
     program = parse_mir_text(source)
-    assert program.externs[0].name == "helper"
-    fn = program.functions[0]
+    fn = program.functions[1]
     assert fn.name == "main"
     assert fn.params[0].name == "arg"
     inst = fn.blocks[0].instructions[0]
@@ -240,19 +242,35 @@ entry:
     assert fn.text().startswith("define ptr @main(ptr %arg)")
 
 
-def test_runtime_mir_bundle_parses_without_local_validation():
+def test_text_mir_rejects_import_and_declare_directives():
+    for directive in ("import void @ExitProcess(i64)", "declare ptr @__epx_alloc(i64)"):
+        try:
+            parse_mir_text(directive)
+        except Exception as exc:
+            assert "expected type, global, or define" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"text MIR accepted backend-only directive: {directive}")
+
+
+def test_unresolved_calls_are_backend_abi_symbols():
+    source = """define void @main() {
+entry:
+  call void ExitProcess(i64 0)
+  ret void
+}
+"""
+    program = parse_mir_text(source)
+    assert program.functions[0].blocks[0].instructions[0].callee == "ExitProcess"
+
+
+def test_runtime_mir_bundle_is_declaration_free_fragment():
     runtime_mir_dir = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir"))
     path = runtime_mir_dir / "helpers.mir"
     assert sorted(p.name for p in runtime_mir_dir.glob("*.mir")) == ["helpers.mir"]
     text = path.read_text(encoding="utf-8")
-    try:
-        parse_mir_text(text, filename=str(path))
-    except MirValidationError as exc:
-        assert "callee is not callable" in str(exc), str(exc)
-    else:
-        raise AssertionError("runtime helper bundle should not need local extern declarations")
-
-    program = parse_mir_file(path, validate_program=False)
+    assert "import " not in text
+    assert "declare " not in text
+    program = parse_mir_text(text, filename=str(path), validate_program=False)
     assert [fn.name for fn in program.functions] == list(IMPLEMENTED_MIR_HELPERS)
     parsed_fn = next(fn for fn in program.functions if fn.name == "__ep_slice_i64_get")
     assert parsed_fn.text() in text
@@ -707,7 +725,9 @@ def main():
     test_struct_type_text_round_trip_and_v0_slot_layout()
     test_mir_parser_rejects_unsigned_integer_types()
     test_mir_parser_strips_text_sigils()
-    test_runtime_mir_bundle_parses_without_local_validation()
+    test_text_mir_rejects_import_and_declare_directives()
+    test_unresolved_calls_are_backend_abi_symbols()
+    test_runtime_mir_bundle_is_declaration_free_fragment()
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()
     test_runtime_source_str_from_bool_lowers_as_epic_function()

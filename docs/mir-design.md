@@ -718,6 +718,11 @@ bootstrap v0 使用固定的简单布局：
 这使文本 MIR 能完整承载当前 `MirProgram.structs` / `MirProgram.struct_fields`
 侧表，同时让后端不依赖 AST 或源语言字段语义。
 
+bootstrap v0 的规范文本 MIR 不包含 `import` 或 `declare`。外部 call 名称由后端 ABI
+表解析；通用 validator 严格验证模块内函数签名，但对未解析 callee 只验证 call 指令
+自身的返回值形状。Python 编译器内部仍可保留 imports / externs 作为后端元数据，
+但 `MirProgram.text()` 不序列化它们。
+
 ## 14. Validator 第一版
 
 第一版 validator 至少检查：

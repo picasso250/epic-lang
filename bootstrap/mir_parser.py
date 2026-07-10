@@ -24,11 +24,9 @@ from mir import (
     ConstIntOperand,
     ConstNullOperand,
     MirBlock,
-    MirExtern,
     MirField,
     MirFunction,
     MirGlobal,
-    MirImport,
     MirInst,
     MirParam,
     MirProgram,
@@ -100,19 +98,13 @@ class _MirTextParser:
                     self._error(line_no, f"duplicate struct type: {struct_item.name}")
                 program.structs[struct_item.name] = struct_item
                 self.i += 1
-            elif line.startswith("import "):
-                program.imports.append(self._parse_import(line_no, line))
-                self.i += 1
-            elif line.startswith("declare "):
-                program.externs.append(self._parse_declare(line_no, line))
-                self.i += 1
             elif line.startswith("define "):
                 program.functions.append(self._parse_function())
             elif " = global " in line:
                 program.globals.append(self._parse_global(line_no, line))
                 self.i += 1
             else:
-                self._error(line_no, f"expected type, import, declare, global, or define; got: {line}")
+                self._error(line_no, f"expected type, global, or define; got: {line}")
         return program
 
     def _parse_struct(self, line_no, line):
@@ -124,24 +116,6 @@ class _MirTextParser:
         field_types = [] if not fields_text else [self._parse_type(part) for part in self._split_commas(fields_text)]
         fields = [MirField(str(index), typ, index * 8) for index, typ in enumerate(field_types)]
         return MirStruct(name, fields, max(len(fields) * 8, 1))
-
-    def _parse_import(self, line_no, line):
-        m = re.fullmatch(r"import\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
-        if not m:
-            self._error(line_no, f"invalid import: {line}")
-        return MirImport(
-            _strip_module_sigil(m.group(2)),
-            self._parse_signature_parts(m.group(3), m.group(1), line_no),
-        )
-
-    def _parse_declare(self, line_no, line):
-        m = re.fullmatch(r"declare\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
-        if not m:
-            self._error(line_no, f"invalid declare: {line}")
-        return MirExtern(
-            _strip_module_sigil(m.group(2)),
-            self._parse_signature_parts(m.group(3), m.group(1), line_no),
-        )
 
     def _parse_global(self, line_no, line):
         m = re.fullmatch(r"(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(.+?)\s*=\s*global\s*(.*)", line)
