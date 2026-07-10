@@ -86,36 +86,6 @@ fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
     coff_append_byte(strings, 0)
 }
 
-fun coff_symbol_index(obj: MachineObject, name: str): i64 {
-    let i = 0
-    for i < len(obj.symbol_names) {
-        if obj.symbol_names[i] == name {
-            ret i
-        }
-        i = i + 1
-    }
-    coff_die(str_cat2("unknown symbol: ", name))
-    ret 0
-}
-
-fun coff_symbol_index_build(obj: MachineObject): map[str]i64 {
-    let idx = new map[str]i64
-    let i = 0
-    for i < len(obj.symbol_names) {
-        idx[obj.symbol_names[i]] = i
-        i = i + 1
-    }
-    ret idx
-}
-
-fun coff_symbol_index_lookup(idx: map[str]i64, name: str): i64 {
-    if idx.has(name) {
-        ret idx[name]
-    }
-    coff_die(str_cat2("unknown symbol: ", name))
-    ret 0
-}
-
 fun coff_now_ms(): i64 {
     ret os.kernel32.GetTickCount64()
 }
@@ -178,7 +148,6 @@ fun coff_build_obj(obj: MachineObject): u8[] {
     let strings = new u8[]
     let symtab = new u8[]
     coff_append_symbols(symtab, obj, strings)
-    let symbol_index = coff_symbol_index_build(obj)
 
     let buf = new u8[]
     coff_append_u16(buf, 34404)
@@ -203,12 +172,12 @@ fun coff_build_obj(obj: MachineObject): u8[] {
 
     let i = 0
     for i < len(obj.text_reloc_offsets) {
-        coff_append_reloc(buf, obj.text_reloc_offsets[i], coff_symbol_index_lookup(symbol_index, obj.text_reloc_names[i]))
+        coff_append_reloc(buf, obj.text_reloc_offsets[i], obj.text_reloc_symbol_indexes[i])
         i = i + 1
     }
     i = 0
     for i < len(obj.data_reloc_offsets) {
-        coff_append_reloc(buf, obj.data_reloc_offsets[i], coff_symbol_index_lookup(symbol_index, obj.data_reloc_names[i]))
+        coff_append_reloc(buf, obj.data_reloc_offsets[i], obj.data_reloc_symbol_indexes[i])
         i = i + 1
     }
 
@@ -233,7 +202,6 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     let strings = new u8[]
     let symtab = new u8[]
     coff_append_symbols(symtab, obj, strings)
-    let symbol_index = coff_symbol_index_build(obj)
     let sym_stop = coff_now_ms()
     coff_print_timing("symbols", sym_start, sym_stop)
 
@@ -267,12 +235,12 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     let reloc_start = coff_now_ms()
     let i = 0
     for i < len(obj.text_reloc_offsets) {
-        coff_append_reloc(buf, obj.text_reloc_offsets[i], coff_symbol_index_lookup(symbol_index, obj.text_reloc_names[i]))
+        coff_append_reloc(buf, obj.text_reloc_offsets[i], obj.text_reloc_symbol_indexes[i])
         i = i + 1
     }
     i = 0
     for i < len(obj.data_reloc_offsets) {
-        coff_append_reloc(buf, obj.data_reloc_offsets[i], coff_symbol_index_lookup(symbol_index, obj.data_reloc_names[i]))
+        coff_append_reloc(buf, obj.data_reloc_offsets[i], obj.data_reloc_symbol_indexes[i])
         i = i + 1
     }
     let reloc_stop = coff_now_ms()

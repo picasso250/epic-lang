@@ -65,6 +65,10 @@ Machine layer 把 X64IR 编成：
 - text relocations
 - COFF symbols
 
+Self-hosted `MachineObject` stores each relocation as an offset plus an already
+resolved COFF symbol index. Symbol names are consumed inside `src/machine.ep`;
+`src/coff.ep` only serializes integer indexes and does not rebuild a name map.
+
 它只支持当前 lowering 实际会生成的指令和操作数组合。
 
 ## 2. X64Program 数据模型

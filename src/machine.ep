@@ -7,9 +7,9 @@ struct MachineObject {
     text: i64[]
     data: i64[]
     text_reloc_offsets: i64[]
-    text_reloc_names: str[]
+    text_reloc_symbol_indexes: i64[]
     data_reloc_offsets: i64[]
-    data_reloc_names: str[]
+    data_reloc_symbol_indexes: i64[]
     symbol_names: str[]
     symbol_sections: i64[]
     symbol_values: i64[]
@@ -28,7 +28,6 @@ struct MachineBuilder {
     section: str
     text_label_names: str[]
     text_label_offsets: i64[]
-    text_label_index: map[str]i64
     data_label_names: str[]
     data_label_offsets: i64[]
     fixups: MachineFixup[]
@@ -45,7 +44,6 @@ fun machine_builder_empty(): MachineBuilder {
     b.section = ""
     b.text_label_names = new str[]
     b.text_label_offsets = new i64[]
-    b.text_label_index = new map[str]i64
     b.data_label_names = new str[]
     b.data_label_offsets = new i64[]
     b.fixups = new MachineFixup[]
@@ -154,12 +152,15 @@ fun machine_add_text_label(b: MachineBuilder, name: str): void {
     let offset = len(b.text)
     b.text_label_names.push(name)
     b.text_label_offsets.push(offset)
-    b.text_label_index[name] = offset
 }
 
 fun machine_text_label_offset_or_neg1(b: MachineBuilder, name: str): i64 {
-    if b.text_label_index.has(name) {
-        ret b.text_label_index[name]
+    let i = len(b.text_label_names)
+    for i > 0 {
+        i -= 1
+        if b.text_label_names[i] == name {
+            ret b.text_label_offsets[i]
+        }
     }
     ret -1
 }
@@ -185,15 +186,19 @@ fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
     b.text_reloc_names.push(name)
 }
 
-fun machine_has_symbol_name(names: str[], name: str): bool {
+fun machine_symbol_name_index(names: str[], name: str): i64 {
     let i = 0
     for i < len(names) {
         if names[i] == name {
-            ret true
+            ret i
         }
         i = i + 1
     }
-    ret false
+    ret -1
+}
+
+fun machine_has_symbol_name(names: str[], name: str): bool {
+    ret machine_symbol_name_index(names, name) >= 0
 }
 
 fun machine_ascii_less(a: str, b: str): bool {
@@ -773,52 +778,81 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.text = b.text
     obj.data = b.data
     obj.text_reloc_offsets = b.text_reloc_offsets
-    obj.text_reloc_names = b.text_reloc_names
+    obj.text_reloc_symbol_indexes = new i64[]
     obj.data_reloc_offsets = b.data_reloc_offsets
-    obj.data_reloc_names = b.data_reloc_names
+    obj.data_reloc_symbol_indexes = new i64[]
     obj.symbol_names = new str[]
     obj.symbol_sections = new i64[]
     obj.symbol_values = new i64[]
-    let symbol_seen = new map[str]i64
+
     let i = 0
     for i < len(b.text_label_names) {
-        if !symbol_seen.has(b.text_label_names[i]) {
-            symbol_seen[b.text_label_names[i]] = 1
-            obj.symbol_names.push(b.text_label_names[i])
-            obj.symbol_sections.push(1)
-            obj.symbol_values.push(b.text_label_offsets[i])
-        }
+        obj.symbol_names.push(b.text_label_names[i])
+        obj.symbol_sections.push(1)
+        obj.symbol_values.push(b.text_label_offsets[i])
         i = i + 1
     }
     i = 0
     for i < len(b.data_label_names) {
-        if !symbol_seen.has(b.data_label_names[i]) {
-            symbol_seen[b.data_label_names[i]] = 1
-            obj.symbol_names.push(b.data_label_names[i])
-            obj.symbol_sections.push(2)
-            obj.symbol_values.push(b.data_label_offsets[i])
+        obj.symbol_names.push(b.data_label_names[i])
+        obj.symbol_sections.push(2)
+        obj.symbol_values.push(b.data_label_offsets[i])
+        i = i + 1
+    }
+
+    let referenced_names = new str[]
+    i = 0
+    for i < len(b.text_reloc_names) {
+        if !machine_has_symbol_name(referenced_names, b.text_reloc_names[i]) {
+            referenced_names.push(b.text_reloc_names[i])
         }
         i = i + 1
     }
-    let externs = new str[]
-    let extern_seen = new map[str]i64
     i = 0
-    for i < len(b.text_reloc_names) {
-        if !symbol_seen.has(b.text_reloc_names[i]) && !extern_seen.has(b.text_reloc_names[i]) {
-            extern_seen[b.text_reloc_names[i]] = 1
-            externs.push(b.text_reloc_names[i])
+    for i < len(b.data_reloc_names) {
+        if !machine_has_symbol_name(referenced_names, b.data_reloc_names[i]) {
+            referenced_names.push(b.data_reloc_names[i])
+        }
+        i = i + 1
+    }
+
+    let externs = new str[]
+    i = 0
+    for i < len(referenced_names) {
+        if !machine_has_symbol_name(obj.symbol_names, referenced_names[i]) {
+            externs.push(referenced_names[i])
         }
         i = i + 1
     }
     let sorted_externs = machine_sorted_strings(externs)
     i = 0
     for i < len(sorted_externs) {
-        if !symbol_seen.has(sorted_externs[i]) {
-            symbol_seen[sorted_externs[i]] = 1
-            obj.symbol_names.push(sorted_externs[i])
-            obj.symbol_sections.push(0)
-            obj.symbol_values.push(0)
+        obj.symbol_names.push(sorted_externs[i])
+        obj.symbol_sections.push(0)
+        obj.symbol_values.push(0)
+        i = i + 1
+    }
+
+    let referenced_symbol_indexes = new i64[]
+    i = 0
+    for i < len(referenced_names) {
+        let symbol_index = machine_symbol_name_index(obj.symbol_names, referenced_names[i])
+        if symbol_index < 0 {
+            machine_die(str_cat2("unknown relocation symbol: ", referenced_names[i]))
         }
+        referenced_symbol_indexes.push(symbol_index)
+        i = i + 1
+    }
+    i = 0
+    for i < len(b.text_reloc_names) {
+        let referenced_index = machine_symbol_name_index(referenced_names, b.text_reloc_names[i])
+        obj.text_reloc_symbol_indexes.push(referenced_symbol_indexes[referenced_index])
+        i = i + 1
+    }
+    i = 0
+    for i < len(b.data_reloc_names) {
+        let referenced_index = machine_symbol_name_index(referenced_names, b.data_reloc_names[i])
+        obj.data_reloc_symbol_indexes.push(referenced_symbol_indexes[referenced_index])
         i = i + 1
     }
     ret obj
@@ -859,7 +893,7 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
     let symbols_stop = machine_now_ms()
     machine_print_timing("build symbols", symbols_start, symbols_stop)
 
-    println(f"  timing: machine output counts: symbols={len(obj.symbol_names)} text_relocs={len(obj.text_reloc_names)} data_relocs={len(obj.data_reloc_names)}")
+    println(f"  timing: machine output counts: symbols={len(obj.symbol_names)} text_relocs={len(obj.text_reloc_symbol_indexes)} data_relocs={len(obj.data_reloc_symbol_indexes)}")
     ret obj
 }
 fun machine_print_bytes(label: str, values: i64[]): void {
