@@ -35,7 +35,6 @@ class MirLower:
         self.return_label = None
         self.string_globals = {}
         self.global_slots = set()
-        self.has_global_init = False
         self.scratch_slots = []
         self.label_counter = 0
         self.temp_value_slots = []
@@ -51,7 +50,6 @@ class MirLower:
         self.x64.section(".data")
         self.string_globals = emit_runtime_data(self.x64, self.program)
         self.global_slots = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is None}
-        self.has_global_init = any(fn.name == "__ep_global_init" for fn in self.program.functions)
         self.x64.section(".text")
 
     def lower(self):
@@ -81,7 +79,7 @@ class MirLower:
         if frame:
             self._emit_stack_alloc(frame)
         if fn.name == "main":
-            emit_startup_hook_call(self.x64, self.has_global_init)
+            emit_startup_hook_call(self.x64)
         for idx, param in enumerate(fn.params):
             if idx < len(ARG_REGS):
                 self.x64.inst("mov", M("rbp", self.value_slots[param.id]), R(ARG_REGS[idx]))

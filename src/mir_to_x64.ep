@@ -15,7 +15,6 @@ struct MirToX64Lower {
     string_names: str[]
     string_lengths: i64[]
     global_names: str[]
-    has_global_init: bool
     struct_field_names: str[]
     struct_field_types: str[]
     struct_field_indexes: i64[]
@@ -45,7 +44,6 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.string_names = new str[]
     lower.string_lengths = new i64[]
     lower.global_names = new str[]
-    lower.has_global_init = false
     lower.struct_field_names = new str[]
     lower.struct_field_types = new str[]
     lower.struct_field_indexes = new i64[]
@@ -99,13 +97,6 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
                     lower.global_names.push(g.name)
                 }
             }
-        }
-        i = i + 1
-    }
-    i = 0
-    for i < len(program.functions) {
-        if program.functions[i].name == "__ep_global_init" {
-            lower.has_global_init = true
         }
         i = i + 1
     }
@@ -724,9 +715,6 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
 fun mir_to_x64_emit_startup_hook_call(lower: MirToX64Lower): void {
     x64_add_inst2(lower.x64, "sub", x64_reg("rsp"), x64_imm(32))
     x64_add_inst1(lower.x64, "call", x64_symbol("__epx_runtime_start"))
-    if lower.has_global_init {
-        x64_add_inst1(lower.x64, "call", x64_symbol("__ep_global_init"))
-    }
     x64_add_inst2(lower.x64, "add", x64_reg("rsp"), x64_imm(32))
 }
 

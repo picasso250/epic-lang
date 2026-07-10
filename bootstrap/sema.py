@@ -59,7 +59,6 @@ class SemanticAnalyzer:
         self.union_tags = {}
         self.struct_fields = {}
         self.func_sigs = {}
-        self.globals = {}
         self.scopes = []
         self.fn_name = None
         self.loop_depth = 0
@@ -68,7 +67,6 @@ class SemanticAnalyzer:
         self._build_types()
         self._build_unions()
         self._build_functions()
-        self._build_globals()
         for fn in self.program.funcs:
             self._analyze_function(fn)
         assert_typed_program(self.program)
@@ -122,34 +120,6 @@ class SemanticAnalyzer:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
             fn.resolved_type = self._type_name(fn.ret_type)
             self.func_sigs[fn.name] = (params, fn.resolved_type)
-
-    def _is_global_literal_init(self, node):
-        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode)):
-            return True
-        if isinstance(node, CallNode):
-            return node.name in {"u8", "i64", "u64", "bool"} and len(node.args) == 1 and self._is_global_literal_init(node.args[0])
-        if isinstance(node, ArrayLiteralNode):
-            return all(self._is_global_literal_init(value) for value in node.values)
-        if isinstance(node, StructInitNode):
-            return all(self._is_global_literal_init(value) for _, value in node.fields)
-        if isinstance(node, UnionInitNode):
-            return self._is_global_literal_init(node.payload)
-        return False
-
-    def _build_globals(self):
-        for glob in self.program.globals:
-            if glob.value is None:
-                self._fail_global(f"global let {glob.name} requires an initializer")
-            target = self._type_name(glob.var_type) if glob.var_type else None
-            value_info = self._expr(glob.value)
-            if target is None:
-                target = value_info.type
-            else:
-                self._check_assign(target, value_info, f"global let {glob.name}")
-            if not self._is_global_literal_init(glob.value):
-                self._fail_global(f"global let {glob.name} requires a literal initializer")
-            glob.resolved_type = target
-            self.globals[glob.name] = target
 
     def _analyze_function(self, fn):
         self.fn_name = fn.name
@@ -783,8 +753,6 @@ class SemanticAnalyzer:
         for scope in reversed(self.scopes):
             if name in scope:
                 return scope[name]
-        if name in self.globals:
-            return self.globals[name]
         self._fail(f"undefined variable {name}")
 
     def _push_scope(self):

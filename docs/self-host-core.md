@@ -179,7 +179,7 @@ after ADT removal and naming unification.
 | `str` vs `u8[]` | Distinct source types with the same current `{data,len,cap}` layout | Keep text semantics on `str`, mutable-buffer semantics on `u8[]`; the representation may diverge later. See `str-u8-layout-contract.md`. |
 | `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
 | Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
-| `required_helpers` / lazy injection | MIR function reachability pruning | Explicit dependency tables deferred; current pass keeps `main`, optional `__ep_global_init`, and x64-runtime MIR roots. |
+| `required_helpers` / lazy injection | MIR function reachability pruning | Explicit dependency tables deferred; current pass keeps `main` and x64-runtime MIR roots. |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
 | `itoa` | Removed from public surface | Use `str(n)` |
 | `i8` public type | Removed | `u8` is Epic's only byte type; byte loads zero-extend to 0..255 |
@@ -200,6 +200,7 @@ after ADT removal and naming unification.
 - `new T[] { ... }` array literal
 - `new T[n]` array allocation
 - `let` binding with optional type annotation
+- Top-level/global `let` is removed; mutable state must be local or passed explicitly
 - Local variable declarations must have an initializer; optional type annotations only constrain/check the initializer
 - No zero-value initialization for locals; use literals, `new`, calls, or other expressions explicitly
 - Lexical block scope for `let`, ADT match bindings, and loop cursors

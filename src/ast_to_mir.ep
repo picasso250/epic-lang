@@ -27,8 +27,6 @@ struct MirCodegenState {
     local_types: str[]
     func_names: str[]
     func_return_types: str[]
-    global_names: str[]
-    global_types: str[]
     continue_targets: str[]
     break_targets: str[]
     struct_names: str[]
@@ -123,64 +121,6 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
     }
     ast_to_mir_die(f"undefined variable: {name}")
     ret 0
-}
-
-fun mir_global_label(name: str): str {
-    ret ("__epg_" + name)
-}
-
-fun mir_global_index(st: MirCodegenState, name: str): i64 {
-    let i = 0
-    for i < len(st.global_names) {
-        if st.global_names[i] == name {
-            ret i
-        }
-        i = i + 1
-    }
-    ret 0 - 1
-}
-
-fun mir_add_global_lets(st: MirCodegenState, ast: AstProgram): void {
-    let i = 0
-    for i < len(ast.globals) {
-        let g = ast.globals[i]
-        let typ = mir_epic_type(g.meta.resolved_type)
-        let label = mir_global_label(g.name)
-        st.global_names.push(g.name)
-        st.global_types.push(typ)
-        st.program.globals.push(mir_global_decl(label, typ))
-        i = i + 1
-    }
-}
-
-fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
-    if len(ast.globals) == 0 {
-        ret
-    }
-    st.value_counter = 0
-    st.block_counter = 0
-    st.local_names = new str[]
-    st.local_addr_ids = new i64[]
-    st.local_types = new str[]
-    st.continue_targets = new str[]
-    st.break_targets = new str[]
-    st.current_fn = mir_function_empty("__ep_global_init", "void")
-    st.current_block = mir_new_block(st, "entry")
-
-    let i = 0
-    for i < len(ast.globals) {
-        let g = ast.globals[i]
-        let value_flow = mir_emit_expr(st, st.current_block, g.value_expr)
-        st.current_block = value_flow.block
-        let addr = mir_symbol_operand("ptr", mir_global_label(g.name))
-        mir_emit_inst(st, mir_store(value_flow.value, addr))
-        i = i + 1
-    }
-    if st.current_block.has_terminator == false {
-        st.current_block.terminator = mir_ret_void()
-        st.current_block.has_terminator = true
-    }
-    st.program.functions.push(st.current_fn)
 }
 
 fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, field_index: i64): MirStructFieldLayout {
@@ -1139,13 +1079,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             if n.name == "argv" {
                 ret mir_value_flow(mir_symbol_operand("ptr", "argv"), st.current_block)
             }
-            let gidx = mir_global_index(st, n.name)
-            if gidx >= 0 {
-                let result_id = mir_new_value(st)
-                let addr = mir_symbol_operand("ptr", mir_global_label(n.name))
-                mir_emit_inst(st, mir_load(result_id, st.global_types[gidx], st.global_types[gidx], addr))
-                ret mir_value_flow(mir_value_operand(st.global_types[gidx], result_id), st.current_block)
-            }
             let idx = mir_local_index(st, n.name)
             let result_id = mir_new_value(st)
             let addr = mir_value_operand("ptr", st.local_addr_ids[idx])
@@ -1891,12 +1824,6 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
         AstAssign n: {
             let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
             st.current_block = value_flow.block
-            let gidx = mir_global_index(st, n.name)
-            if gidx >= 0 {
-                let addr = mir_symbol_operand("ptr", mir_global_label(n.name))
-                mir_emit_inst(st, mir_store(value_flow.value, addr))
-                ret mir_reachable_flow(st.current_block)
-            }
             let idx = mir_local_index(st, n.name)
             let addr = mir_value_operand("ptr", st.local_addr_ids[idx])
             mir_emit_inst(st, mir_store(value_flow.value, addr))
@@ -2165,8 +2092,6 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.local_types = new str[]
     st.func_names = new str[]
     st.func_return_types = new str[]
-    st.global_names = new str[]
-    st.global_types = new str[]
     st.continue_targets = new str[]
     st.break_targets = new str[]
     st.struct_names = new str[]
@@ -2219,9 +2144,6 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 let union = program.unions[aui]
                 mir_register_slice_layout(st, ("_slice_" + union.name))
             }
-
-            mir_add_global_lets(st, program)
-            mir_emit_global_init_function(st, program)
 
             let fi = 0
             for fi < len(program.funcs) {

@@ -46,11 +46,6 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
                     merged.unions.push(ast.unions[ui])
                     ui = ui + 1
                 }
-                let gi = 0
-                for gi < len(ast.globals) {
-                    merged.globals.push(ast.globals[gi])
-                    gi = gi + 1
-                }
                 let fi = 0
                 for fi < len(ast.funcs) {
                     if ast.funcs[fi].name == "main" {

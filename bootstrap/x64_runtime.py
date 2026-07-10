@@ -33,11 +33,9 @@ def emit_runtime_data(x64, program):
     return string_globals
 
 
-def emit_startup_hook_call(x64, has_global_init=False):
+def emit_startup_hook_call(x64):
     x64.inst("sub", R("rsp"), I(32))
     x64.inst("call", Symbol("__epx_runtime_start"))
-    if has_global_init:
-        x64.inst("call", Symbol("__ep_global_init"))
     x64.inst("add", R("rsp"), I(32))
 
 

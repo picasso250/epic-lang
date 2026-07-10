@@ -186,7 +186,6 @@ The core AST buckets and homogeneous child lists are narrow:
 
 - `program.funcs` is `AstFunDef[]`.
 - `program.structs` is `AstStructDef[]`.
-- `program.globals` is `AstLet[]`.
 - `program.unions` is `AstUnionDef[]`.
 - `struct.fields` is `AstStructField[]`.
 - `fun.params` is `AstParam[]`.

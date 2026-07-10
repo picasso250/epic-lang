@@ -88,7 +88,6 @@ struct AstProgram {
     meta: AstMeta
     funcs: AstFunDef[]
     structs: AstStructDef[]
-    globals: AstLet[]
     unions: AstUnionDef[]
 }
 
@@ -363,7 +362,7 @@ struct AstUnionInit {
 type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_new_program(): AstProgram {
-    ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], structs: new AstStructDef[], globals: new AstLet[], unions: new AstUnionDef[] }
+    ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
 }
 
 fun ast_new_param(): AstParam {
@@ -877,19 +876,13 @@ fun (p: Parser) parse_union_def(): AstUnionDef {
 fun (p: Parser) parse_program(): AstNode {
     let program = ast_new_program()
     p.skip_newlines()
-    for p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("LET") == 1 || p.peek_kind("TYPE") == 1 {
+    for p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("TYPE") == 1 {
         if p.peek_kind("FUN") == 1 {
             program.funcs.push(p.parse_fn_def())
         } else if p.peek_kind("STRUCT") == 1 {
             program.structs.push(p.parse_struct_def())
-        } else if p.peek_kind("TYPE") == 1 {
-            program.unions.push(p.parse_union_def())
         } else {
-            let item = p.parse_let_stmt()
-            match item {
-                AstLet g: { program.globals.push(g) }
-                _: { parse_error(ast_line(item), "internal: expected global let") }
-            }
+            program.unions.push(p.parse_union_def())
         }
         p.skip_newlines()
     }
@@ -1949,9 +1942,6 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             }
             for i in n.unions {
                 dump_node(new AstNode(n.unions[i]), depth + 1)
-            }
-            for i in n.globals {
-                dump_node(new AstNode(n.globals[i]), depth + 1)
             }
             for i in n.funcs {
                 dump_node(new AstNode(n.funcs[i]), depth + 1)

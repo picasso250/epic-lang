@@ -109,7 +109,7 @@ p.peek()                       =>  Parser__peek(p)
 
 ### Let 声明 (Let Declarations)
 
-`let` 支持可选的类型注解，但 local variable 必须带初始化器：
+`let` 仅允许出现在函数体内，支持可选的类型注解，但 local variable 必须带初始化器。顶层只允许 `fun`、`struct` 和 `type` 定义；顶层/global `let` 已删除：
 
 ```epic
 let b: u8 = 1

@@ -821,7 +821,6 @@ fun mir_mark_reachable_function(program: MirProgram, reachable: str[], name: str
 fun mir_prune_unreachable_functions(program: MirProgram): void {
     let reachable = new str[]
     mir_mark_reachable_function(program, reachable, "main")
-    mir_mark_reachable_function(program, reachable, "__ep_global_init")
     mir_mark_reachable_function(program, reachable, "__ep_str_from_i64")
     mir_mark_reachable_function(program, reachable, "__ep_slice_u8_alloc")
 

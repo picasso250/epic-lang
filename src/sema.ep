@@ -10,7 +10,6 @@ struct SemaState {
     structs: AstStructDef[]
     unions: AstUnionDef[]
     funcs: AstFunDef[]
-    globals: AstLet[]
     local_names: str[]
     local_types: str[]
     local_scope_marks: i64[]
@@ -53,17 +52,6 @@ fun sema_union_index(st: SemaState, name: str): i64 {
 fun sema_func_index(st: SemaState, name: str): i64 {
     for i in st.funcs {
         if st.funcs[i].name == name {
-            ret i
-        }
-    }
-    ret -1
-}
-
-fun sema_global_index(st: SemaState, name: str): i64 {
-    let i = len(st.globals)
-    for i > 0 {
-        i -= 1
-        if st.globals[i].name == name {
             ret i
         }
     }
@@ -156,10 +144,6 @@ fun sema_lookup(st: SemaState, name: str): str {
             ret st.local_types[i]
         }
         i = i - 1
-    }
-    let global_index = sema_global_index(st, name)
-    if global_index >= 0 {
-        ret st.globals[global_index].meta.resolved_type
     }
     sema_die(f"undefined variable {name}")
     ret ""
@@ -587,80 +571,6 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                     }
                 }
                 st.funcs.push(f)
-            }
-            ret
-        }
-        _: {}
-    }
-    sema_die("internal: expected program")
-}
-
-fun sema_is_global_literal_init(node: AstNode): bool {
-    match node {
-        AstLiteral n: { ret true }
-        AstChar n: { ret true }
-        AstBool n: { ret true }
-        AstString n: { ret true }
-        AstCall n: {
-            if len(n.args) != 1 {
-                ret false
-            }
-            if n.name != "u8" && n.name != "i64" && n.name != "u64" && n.name != "bool" {
-                ret false
-            }
-            ret sema_is_global_literal_init(n.args[0])
-        }
-        AstArrayLiteral n: {
-            for i in n.args {
-                if sema_is_global_literal_init(n.args[i]) == false {
-                    ret false
-                }
-            }
-            ret true
-        }
-        AstStructInit n: {
-            for i in n.fields {
-                let f = n.fields[i]
-                if sema_is_global_literal_init(f.value_expr) == false {
-                    ret false
-                }
-            }
-            ret true
-        }
-        AstUnionInit n: {
-            ret sema_is_global_literal_init(n.expr)
-        }
-        _: {}
-    }
-    ret false
-}
-
-fun sema_build_globals(st: SemaState, ast: AstNode): void {
-    match ast {
-        AstProgram program: {
-            for i in program.globals {
-                let g = program.globals[i]
-                match g.value_expr {
-                    AstEmpty e: {
-                        sema_die(f"global let {g.name} requires an initializer")
-                    }
-                    _: {}
-                }
-                let target = ""
-                if type_expr_is_missing(g.source_type) == false {
-                    target = sema_type_name(st, g.source_type)
-                }
-                let val = sema_expr_type(st, g.value_expr)
-                if target == "" {
-                    target = val
-                } else {
-                    sema_check_assign_info(target, val, g.value_expr, f"global let {g.name}")
-                }
-                if sema_is_global_literal_init(g.value_expr) == false {
-                    sema_die(f"global let {g.name} requires a literal initializer")
-                }
-                g.meta.resolved_type = target
-                st.globals.push(g)
             }
             ret
         }
@@ -1383,7 +1293,6 @@ fun sema_block_returns(block: AstBlock): bool {
 fun sema_program(st: SemaState, ast: AstNode): void {
     sema_build_types(st, ast)
     sema_build_funcs(st, ast)
-    sema_build_globals(st, ast)
     match ast {
         AstProgram program: {
             for i in program.funcs {
@@ -1424,7 +1333,6 @@ fun make_sema_state(): SemaState {
     st.structs = new AstStructDef[]
     st.unions = new AstUnionDef[]
     st.funcs = new AstFunDef[]
-    st.globals = new AstLet[]
     st.local_names = new str[]
     st.local_types = new str[]
     st.local_scope_marks = new i64[]

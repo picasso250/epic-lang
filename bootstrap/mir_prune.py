@@ -21,7 +21,7 @@ def _function_calls(fn) -> set[str]:
 def prune_unreachable_functions(program) -> None:
     """Remove MIR functions that are not reachable from program/runtime roots."""
     functions = {fn.name: fn for fn in program.functions}
-    roots = {"main", "__ep_global_init"} | X64_RUNTIME_MIR_ROOTS
+    roots = {"main"} | X64_RUNTIME_MIR_ROOTS
     reachable = set()
     stack = [name for name in sorted(roots) if name in functions]
 

@@ -72,7 +72,6 @@ class MirCodegen(MirFunctionBuilder):
         super().__init__(numbered_blocks=True)
         self.program = MirProgram()
         self.func_sigs = {}
-        self.globals = {}
         self.local_scopes = []
         self.local_type_scopes = []
         self.strings = {}
@@ -127,8 +126,6 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
         self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
         self.program.globals.append(MirGlobal("argv", ptr(), None))
-        self._emit_global_lets(ast)
-        self._emit_global_init_function(ast)
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
         self.program.retain_referenced_externs()
@@ -491,9 +488,6 @@ class MirCodegen(MirFunctionBuilder):
         elif isinstance(stmt, AssignNode):
             value = self._expr_from(in_block, stmt.value)
             self.set_block(value.block)
-            if stmt.name in self.globals:
-                self.inst("store", [value.value, SymbolOperand(ptr(), self._global_label(stmt.name))])
-                return self._reachable(self.current_block)
             self.inst("store", [value.value, ValueOperand(self._local_addr(stmt.name))])
             return self._reachable(self.current_block)
         elif isinstance(stmt, ReturnNode):
@@ -956,10 +950,6 @@ class MirCodegen(MirFunctionBuilder):
         if isinstance(expr, VarNode):
             if expr.name == "argv":
                 return ValueFlow(SymbolOperand(ptr(), "argv"), self.current_block)
-            if expr.name in self.globals:
-                typ = self.globals[expr.name]
-                value = self.inst("load", [SymbolOperand(ptr(), self._global_label(expr.name))], result_type=typ, type=typ)
-                return ValueFlow(ValueOperand(value), self.current_block)
             typ = self._local_type(expr.name)
             value = self.inst("load", [ValueOperand(self._local_addr(expr.name))], result_type=typ, type=typ)
             return ValueFlow(ValueOperand(value), self.current_block)
@@ -1533,32 +1523,6 @@ class MirCodegen(MirFunctionBuilder):
             self.strings[text] = label
             self.program.globals.append(MirGlobal(label, ptr(), text))
         return self.strings[text]
-
-    def _global_label(self, name):
-        return f"__epg_{name}"
-
-    def _emit_global_lets(self, ast):
-        for glob in ast.globals:
-            typ = self._type(glob.resolved_type)
-            label = self._global_label(glob.name)
-            self.globals[glob.name] = typ
-            self.program.globals.append(MirGlobal(label, typ, None))
-
-    def _emit_global_init_function(self, ast):
-        if not ast.globals:
-            return
-        self.begin_function("__ep_global_init", [], VOID)
-        self.local_scopes = [{}]
-        self.local_type_scopes = [{}]
-        entry = self.new_block("entry")
-        block = entry
-        for glob in ast.globals:
-            value = self._expr_from(block, glob.value)
-            self.set_block(value.block)
-            self.inst("store", [value.value, SymbolOperand(ptr(), self._global_label(glob.name))])
-            block = self.current_block
-        self.ret(block)
-        self.program.functions.append(self.fn)
 
     def _make_struct_layout(self, name, fields, size=None):
         layout_fields = [MirField(field_name, field_type, offset) for field_name, field_type, offset in fields]
