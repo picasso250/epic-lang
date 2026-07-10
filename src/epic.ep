@@ -194,15 +194,13 @@ fun epic_frontend(input_paths: str[], main_path: str): MirProgram {
     ret mir
 }
 
-fun epic_prepare_mir(mir: MirProgram): void {
-    let start = epic_now_ms()
+fun epic_backend(mir: MirProgram, exe_path: str): void {
+    let prepare_start = epic_now_ms()
     mir_inject_all_runtime_helpers(mir)
     mir_prune_unreachable_functions(mir)
-    let stop = epic_now_ms()
-    epic_timing("prepare mir", start, stop)
-}
+    let prepare_stop = epic_now_ms()
+    epic_timing("prepare mir", prepare_start, prepare_stop)
 
-fun epic_backend(mir: MirProgram, exe_path: str): void {
     let lower_start = epic_now_ms()
     let x64 = epic_lower_program(mir)
     let lower_stop = epic_now_ms()
@@ -233,7 +231,6 @@ fun epic_backend(mir: MirProgram, exe_path: str): void {
 fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     let total_start = epic_now_ms()
     let mir = epic_frontend(input_paths, main_path)
-    epic_prepare_mir(mir)
     epic_backend(mir, exe_path)
     let total_stop = epic_now_ms()
     epic_timing("total", total_start, total_stop)
