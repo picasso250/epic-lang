@@ -58,7 +58,7 @@ contract in these places:
 
 - String literals currently type as `str`.
 - `argv` is currently `str[]`.
-- `print`, `println`, `cstr`, `system`, `read_file(path)`, and
+- `print`, `println`, `cstr`, `read_file(path)`, and
   `write_file(path, data)` use `str` for text/path arguments.
 - `map[str]T` is the only supported map family.
 - The Python reference compiler has explicit `STR`, `ptr_str()`,

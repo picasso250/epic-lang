@@ -79,7 +79,7 @@ fun sema_is_reserved_func(name: str): bool {
     if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" {
         ret true
     }
-    if name == "read_file" || name == "write_file" || name == "system" || name == "len" || name == "cap" || name == "push" || name == "extend" {
+    if name == "read_file" || name == "write_file" || name == "len" || name == "cap" || name == "push" || name == "extend" {
         ret true
     }
     if name == "map_has" || name == "map_del" {
@@ -950,15 +950,6 @@ fun sema_os_call_type(st: SemaState, node: AstCall): str {
         if node.name == "CloseHandle" {
             ret sema_check_os_call(st, node, 1, "i64")
         }
-        if node.name == "CreateProcessA" {
-            ret sema_check_os_call(st, node, 0, "i64")
-        }
-        if node.name == "WaitForSingleObject" {
-            ret sema_check_os_call(st, node, 2, "i64")
-        }
-        if node.name == "GetExitCodeProcess" {
-            ret sema_check_os_call(st, node, 2, "i64")
-        }
         if node.name == "GetCommandLineA" {
             ret sema_check_os_call(st, node, 0, "i64")
         }
@@ -1102,11 +1093,6 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
         sema_check_arity("write_file", 2, node.args)
         sema_check_assign(st, "str", node.args[0], "write_file argument 1")
         sema_check_assign(st, "u8[]", node.args[1], "write_file argument 2")
-        ret "i64"
-    }
-    if node.name == "system" {
-        sema_check_arity("system", 1, node.args)
-        sema_check_assign(st, "str", node.args[0], "system argument 1")
         ret "i64"
     }
     if node.name == "len" {

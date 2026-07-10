@@ -103,7 +103,6 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | `str_find`    | Removed from public surface |
 | `str_trim`    | Removed entirely; write byte scanning in Epic |
 | `str_replace_char` | Removed entirely; write byte scanning in Epic |
-| `system`      | Shell command (kept for now) |
 | `m.has(key)` / `m.del(key)` | Map existence/delete dot calls |
 
 ### Runtime Helpers (MIR-implemented)
@@ -187,7 +186,6 @@ after ADT removal and naming unification.
 | Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
 | `required_helpers` / lazy injection | MIR function reachability pruning | Explicit dependency tables deferred; current pass keeps `main`, optional `__ep_global_init`, and x64-runtime MIR roots. |
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
-| `system` | Kept for now | May be removed from core |
 | `map` | Kept for now | May be removed from core |
 | `itoa` | Removed from public surface | Use `str(n)` |
 | `i8` public type | Removed | `u8` is Epic's only byte type; byte loads zero-extend to 0..255 |
@@ -217,7 +215,7 @@ after ADT removal and naming unification.
 - `new S { ... }` allows partial field initialization: omitted scalar fields default to `0` / `false`, omitted reference fields default to null
 - Slice syntax `s[start:end]`
 - `match` literal switch only
-- Function-style builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `str` / `bytes` / `cstr` / `system`
+- Function-style builtins: `print` / `println` / `read_file` / `write_file` / `exit` / `len` / `cap` / `str` / `bytes` / `cstr`
 - Builtin container dot calls: `xs.push(x)` / `xs.pop()` / `dst.extend(src)` / `m.has(key)` / `m.del(key)`
 - User methods v1: `fun (receiver: StructName) method(args...): Ret { ... }`; receiver type must be a user-defined struct.
 - User method lowering: `fun (p: Parser) peek(): Token` occupies the global symbol `Parser__peek`; `p.peek()` lowers to `Parser__peek(p)`.
@@ -229,7 +227,6 @@ after ADT removal and naming unification.
   - `itoa` — removed entirely; use `str(n)`
   - `str_slice`, `str_cat` — removed from public surface; internal helpers retained where syntax lowering still needs them
   - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
-- `system` kept for now
 - `os.*` WinAPI calls
 - `argv` global
 - `assert` / `panic`

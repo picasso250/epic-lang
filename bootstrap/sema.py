@@ -43,9 +43,6 @@ class SemanticAnalyzer:
         ("kernel32", "ReadFile"): ([I64, I64, I64, I64, I64], I64),
         ("kernel32", "WriteFile"): ([I64, I64, I64, I64, I64], I64),
         ("kernel32", "CloseHandle"): ([I64], I64),
-        ("kernel32", "CreateProcessA"): ([], I64),
-        ("kernel32", "WaitForSingleObject"): ([I64, I64], I64),
-        ("kernel32", "GetExitCodeProcess"): ([I64, I64], I64),
         ("kernel32", "GetCommandLineA"): ([], I64),
         ("user32", "MessageBoxA"): ([I64, I64, I64, I64], I64),
     }
@@ -559,9 +556,6 @@ class SemanticAnalyzer:
             return ExprInfo(ARRAY(U8))
         if name == "write_file":
             self._check_call_args(name, [STR, ARRAY(U8)], expr.args)
-            return ExprInfo(I64)
-        if name == "system":
-            self._check_call_args(name, [STR], expr.args)
             return ExprInfo(I64)
         if name == "push":
             self._fail("push is removed from function-call surface; use xs.push(x)")

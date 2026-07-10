@@ -1,6 +1,6 @@
 #
 # x64-windows-v0 backend-owned MIR call ABI.
-# Canonical MIR contains call names but no import/declare directives.
+# Canonical MIR carries target-neutral extern declarations.
 #
 
 fun backend_abi_is_winapi(name: str): bool {
@@ -17,9 +17,6 @@ fun backend_abi_is_winapi(name: str): bool {
     if name == "ReadFile" { ret true }
     if name == "WriteFile" { ret true }
     if name == "CloseHandle" { ret true }
-    if name == "CreateProcessA" { ret true }
-    if name == "WaitForSingleObject" { ret true }
-    if name == "GetExitCodeProcess" { ret true }
     if name == "GetCommandLineA" { ret true }
     if name == "MessageBoxA" { ret true }
     ret false
@@ -31,7 +28,6 @@ fun backend_abi_return_type(name: str): str {
     if name == "__ep_cstr" { ret "i64" }
     if name == "__ep_write_file" { ret "i64" }
     if name == "__ep_read_file" { ret "ptr" }
-    if name == "__ep_system_cmd" { ret "i64" }
     if name == "__ep_print_str" { ret "void" }
     if name == "__ep_print_newline" { ret "void" }
     if name == "__epx_alloc" { ret "ptr" }
@@ -40,9 +36,9 @@ fun backend_abi_return_type(name: str): str {
 
 fun backend_abi_param_count(name: str): i64 {
     if name == "ExitProcess" || name == "Sleep" { ret 1 }
-    if name == "GetTickCount64" || name == "GetProcessHeap" || name == "CreateProcessA" || name == "GetCommandLineA" { ret 0 }
+    if name == "GetTickCount64" || name == "GetProcessHeap" || name == "GetCommandLineA" { ret 0 }
     if name == "lstrlenA" || name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
-    if name == "lstrcmpA" || name == "GetFileSize" || name == "WaitForSingleObject" || name == "GetExitCodeProcess" { ret 2 }
+    if name == "lstrcmpA" || name == "GetFileSize" { ret 2 }
     if name == "HeapAlloc" { ret 3 }
     if name == "CreateFileA" { ret 7 }
     if name == "ReadFile" || name == "WriteFile" { ret 5 }
@@ -50,7 +46,6 @@ fun backend_abi_param_count(name: str): i64 {
     if name == "__ep_cstr" { ret 2 }
     if name == "__ep_write_file" { ret 3 }
     if name == "__ep_read_file" { ret 2 }
-    if name == "__ep_system_cmd" { ret 2 }
     if name == "__ep_print_str" { ret 1 }
     if name == "__ep_print_newline" { ret 0 }
     if name == "__epx_alloc" { ret 1 }
@@ -67,7 +62,7 @@ fun backend_abi_param_type(name: str, index: i64): str {
         if index < 2 { ret "ptr" }
         ret "i64"
     }
-    if name == "__ep_read_file" || name == "__ep_system_cmd" {
+    if name == "__ep_read_file" {
         if index == 0 { ret "ptr" }
         ret "i64"
     }

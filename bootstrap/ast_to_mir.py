@@ -63,9 +63,6 @@ WINAPI_IMPORTS = [
     ("kernel32", "ReadFile", [I64, I64, I64, I64, I64], I64),
     ("kernel32", "WriteFile", [I64, I64, I64, I64, I64], I64),
     ("kernel32", "CloseHandle", [I64], I64),
-    ("kernel32", "CreateProcessA", [], I64),
-    ("kernel32", "WaitForSingleObject", [I64, I64], I64),
-    ("kernel32", "GetExitCodeProcess", [I64, I64], I64),
     ("kernel32", "GetCommandLineA", [], I64),
     ("user32", "MessageBoxA", [I64, I64, I64, I64], I64),
 ]
@@ -108,7 +105,6 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_cstr", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_read_file", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_write_file", MirSignature([ptr(), ptr(), I64], I64)))
-        self.program.externs.append(MirExtern("__ep_system_cmd", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_alloc", MirSignature([I64, I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_u8_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_set", MirSignature([ptr(), I64, I64], VOID)))
@@ -1329,7 +1325,6 @@ class MirCodegen(MirFunctionBuilder):
             "bytes",
             "read_file",
             "write_file",
-            "system",
             "len",
             "cap",
         }
@@ -1406,11 +1401,6 @@ class MirCodegen(MirFunctionBuilder):
             args = self._emit_arg_flows_from(self.current_block, expr.args)
             args.value.append(ConstIntOperand(I64, expr.line))
             result = self.inst("call", args.value, result_type=I64, type=I64, callee="__ep_write_file")
-            return ValueFlow(ValueOperand(result), self.current_block)
-        if name == "system":
-            arg = self._emit_expr_from(self.current_block, expr.args[0])
-            self.set_block(arg.block)
-            result = self.inst("call", [arg.value, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_system_cmd")
             return ValueFlow(ValueOperand(result), self.current_block)
         if name == "push":
             dst_type = self._infer_type(expr.args[0])

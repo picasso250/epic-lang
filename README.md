@@ -53,7 +53,7 @@ Epic currently supports:
 - heap-backed structs with field access, initialization, embedded fields, and
   user-defined methods on struct receivers
 - ADTs backed by struct-union lowering, plus `match`
-- file I/O helpers, `argv`, `system`, process exit, and direct WinAPI import
+- file I/O helpers, `argv`, process exit, and direct WinAPI import
   calls on Windows
 
 The language is intentionally moving fast. Public surface is documented by the

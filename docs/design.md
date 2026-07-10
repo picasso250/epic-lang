@@ -415,7 +415,6 @@ let source = str(read_file(path))
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
-| `system(cmd: str): i64`                | 执行命令，返回退出码                        |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 

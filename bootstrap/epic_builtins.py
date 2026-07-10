@@ -9,7 +9,6 @@ BUILTIN_FUNCTIONS = frozenset({
     "println",
     "print_debug",
     "exit",
-    "system",
 
     "str",
     "cstr",

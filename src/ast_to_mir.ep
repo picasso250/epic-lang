@@ -1162,9 +1162,6 @@ fun mir_os_call_return_type(dll: str, name: str): str {
         if name == "ReadFile" { ret "i64" }
         if name == "WriteFile" { ret "i64" }
         if name == "CloseHandle" { ret "i64" }
-        if name == "CreateProcessA" { ret "i64" }
-        if name == "WaitForSingleObject" { ret "i64" }
-        if name == "GetExitCodeProcess" { ret "i64" }
         if name == "GetCommandLineA" { ret "i64" }
     }
     if dll == "user32" {
@@ -1577,14 +1574,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 }
                 args.push(mir_const_int("i64", n.AstMeta.line))
                 ret mir_value_flow(mir_emit_call_inst(st, "__ep_write_file", "i64", args), st.current_block)
-            }
-            if n.name == "system" {
-                let args = new MirOperand[0]
-                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = arg_flow.block
-                args.push(arg_flow.value)
-                args.push(mir_const_int("i64", n.AstMeta.line))
-                ret mir_value_flow(mir_emit_call_inst(st, "__ep_system_cmd", "i64", args), st.current_block)
             }
             if n.name == "exit" {
                 let args = new MirOperand[0]

@@ -376,7 +376,7 @@ ret
 - `__epx_alloc` (x64 primitive)
 - x64 primitives and still-x64 helpers:
 - `cstr` (`__ep_cstr`)
-- `__ep_write_file` / `__ep_read_file` / `__ep_system_cmd`
+- `__ep_write_file` / `__ep_read_file`
 - `__epx_argv_init`
 - `__ep_print_str` / `__ep_print_newline`
 - `__epx_slice_oob`

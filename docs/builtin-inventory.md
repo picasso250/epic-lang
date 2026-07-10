@@ -23,7 +23,6 @@ Current snapshot of functions handled specially by the active Python reference c
 | `print`  | ✓ (ln 401) | ✓ (ln 588) | ✗ | ✓ (ln 831) | Print with trailing newline — `println` handled same line |
 | `println` | ✓ (ln 401) | ✓ (ln 580) | ✗ | ✓ (ln 831) | |
 | `exit`   | ✓ (ln 414) | ✓ (ln 603) | ✗ | ✗ | Terminate process; `n` args=`i64` |
-| `system` | ✓ (ln 465) | ✓ (ln 685) | ✗ | ✓ (ln 906) | Shell command, returns `i64` |
 
 ---
 
@@ -134,9 +133,6 @@ kernel32.GetFileSize(i64, i64) -> i64
 kernel32.ReadFile(i64, i64, i64, i64, i64) -> i64
 kernel32.WriteFile(i64, i64, i64, i64, i64) -> i64
 kernel32.CloseHandle(i64) -> i64
-kernel32.CreateProcessA() -> i64
-kernel32.WaitForSingleObject(i64, i64) -> i64
-kernel32.GetExitCodeProcess(i64, i64) -> i64
 kernel32.GetCommandLineA() -> i64
 user32.MessageBoxA(i64, i64, i64, i64) -> i64
 ```
@@ -187,7 +183,7 @@ Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity 
 
 ### x64-backed private helpers
 
-Remaining hand-written x64 private helpers are emitted from `bootstrap/x64_runtime.py` as `__epx_*` primitives. Public `__ep_*` helper symbols are semantic-layer wrappers and may later be replaced by MIR/Epic implementations. This currently covers OS/ABI-facing helpers such as `__epx_cstr`, `__epx_read_file`, `__epx_write_file`, `__epx_system_cmd`, `__epx_argv_init`, `__epx_print_str`, and `__epx_print_newline`. Slice and map helpers are MIR helpers, not x64-backed helpers.
+Remaining hand-written x64 private helpers are emitted from `bootstrap/x64_runtime.py` as `__epx_*` primitives. Public `__ep_*` helper symbols are semantic-layer wrappers and may later be replaced by MIR/Epic implementations. This currently covers OS/ABI-facing helpers such as `__epx_cstr`, `__epx_read_file`, `__epx_write_file`, `__epx_argv_init`, `__epx_print_str`, and `__epx_print_newline`. Slice and map helpers are MIR helpers, not x64-backed helpers.
 
 These should be treated as backend implementation details, not language builtins.
 
@@ -208,7 +204,7 @@ str_starts_with str_find push extend map_has map_del
 **But does NOT reserve:**
 
 ```
-print println exit system read_file write_file
+print println exit read_file write_file
 itoa cstr i64 u64 i32 u32 u8 bool
 ```
 

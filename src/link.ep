@@ -422,10 +422,8 @@ fun collect_relocs(st: LinkState): void {
 let kernel32_import_hints = new map[str]i64 {
     "CloseHandle": 157
     "CreateFileA": 222
-    "CreateProcessA": 253
     "ExitProcess": 390
     "GetCommandLineA": 511
-    "GetExitCodeProcess": 615
     "GetFileSize": 631
     "GetProcessHeap": 740
     "GetStdHandle": 805
@@ -436,7 +434,6 @@ let kernel32_import_hints = new map[str]i64 {
     "ReadFile": 1193
     "SetFilePointer": 1384
     "Sleep": 1410
-    "WaitForSingleObject": 1573
     "WriteFile": 1632
 }
 

@@ -25,9 +25,6 @@ WINAPI_ABI = {
     "ReadFile": MirSignature([I64, I64, I64, I64, I64], I64),
     "WriteFile": MirSignature([I64, I64, I64, I64, I64], I64),
     "CloseHandle": MirSignature([I64], I64),
-    "CreateProcessA": MirSignature([], I64),
-    "WaitForSingleObject": MirSignature([I64, I64], I64),
-    "GetExitCodeProcess": MirSignature([I64, I64], I64),
     "GetCommandLineA": MirSignature([], I64),
     "MessageBoxA": MirSignature([I64, I64, I64, I64], I64),
 }
@@ -36,7 +33,6 @@ RUNTIME_ABI = {
     "__ep_cstr": MirSignature([ptr(), I64], I64),
     "__ep_write_file": MirSignature([ptr(), ptr(), I64], I64),
     "__ep_read_file": MirSignature([ptr(), I64], ptr()),
-    "__ep_system_cmd": MirSignature([ptr(), I64], I64),
     "__ep_print_str": MirSignature([ptr()], VOID),
     "__ep_print_newline": MirSignature([], VOID),
     "__epx_alloc": MirSignature([I64], ptr()),
