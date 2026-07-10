@@ -37,6 +37,13 @@ struct MachineBuilder {
     data_reloc_names: str[]
 }
 
+struct MachineNameIndex {
+    capacity: i64
+    names: str[]
+    values: i64[]
+    occupied: i64[]
+}
+
 fun machine_builder_empty(label_count: i64): MachineBuilder {
     let b = new MachineBuilder
     b.text = new i64[]
@@ -174,19 +181,62 @@ fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
     b.text_reloc_names.push(name)
 }
 
-fun machine_symbol_name_index(names: str[], name: str): i64 {
+fun machine_name_index_new(expected_count: i64): MachineNameIndex {
+    let capacity = 8
+    for capacity < expected_count * 2 { capacity = capacity * 2 }
+    let index = new MachineNameIndex
+    index.capacity = capacity
+    index.names = new str[capacity]
+    index.values = new i64[capacity]
+    index.occupied = new i64[capacity]
+    ret index
+}
+
+fun machine_name_hash(name: str): i64 {
+    let value = -3750763034362895579
+    let bs = bytes(name)
     let i = 0
-    for i < len(names) {
-        if names[i] == name {
-            ret i
-        }
+    for i < len(bs) {
+        value = (value ^ i64(bs[i])) * 1099511628211
         i = i + 1
+    }
+    ret value
+}
+
+fun machine_name_index_slot(index: MachineNameIndex, name: str): i64 {
+    ret machine_name_hash(name) & (index.capacity - 1)
+}
+
+fun machine_name_index_lookup(index: MachineNameIndex, name: str): i64 {
+    let slot = machine_name_index_slot(index, name)
+    for index.occupied[slot] != 0 {
+        if index.names[slot] == name { ret index.values[slot] }
+        slot = (slot + 1) & (index.capacity - 1)
     }
     ret -1
 }
 
-fun machine_has_symbol_name(names: str[], name: str): bool {
-    ret machine_symbol_name_index(names, name) >= 0
+fun machine_name_index_insert(index: MachineNameIndex, name: str, value: i64): void {
+    let slot = machine_name_index_slot(index, name)
+    for index.occupied[slot] != 0 {
+        if index.names[slot] == name { machine_die(("duplicate symbol name: " + name)) }
+        slot = (slot + 1) & (index.capacity - 1)
+    }
+    index.occupied[slot] = 1
+    index.names[slot] = name
+    index.values[slot] = value
+}
+
+fun machine_name_index_set(index: MachineNameIndex, name: str, value: i64): void {
+    let slot = machine_name_index_slot(index, name)
+    for index.occupied[slot] != 0 {
+        if index.names[slot] == name {
+            index.values[slot] = value
+            ret
+        }
+        slot = (slot + 1) & (index.capacity - 1)
+    }
+    machine_die(("unknown symbol name: " + name))
 }
 
 fun machine_ascii_less(a: str, b: str): bool {
@@ -778,9 +828,11 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.symbol_names = new str[]
     obj.symbol_sections = new i64[]
     obj.symbol_values = new i64[]
+    let name_index = machine_name_index_new(len(b.text_label_names) + len(b.data_label_names) + len(b.text_reloc_names) + len(b.data_reloc_names))
 
     let i = 0
     for i < len(b.text_label_names) {
+        machine_name_index_insert(name_index, b.text_label_names[i], len(obj.symbol_names))
         obj.symbol_names.push(b.text_label_names[i])
         obj.symbol_sections.push(1)
         obj.symbol_values.push(b.text_label_offsets[i])
@@ -788,65 +840,52 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     }
     i = 0
     for i < len(b.data_label_names) {
+        machine_name_index_insert(name_index, b.data_label_names[i], len(obj.symbol_names))
         obj.symbol_names.push(b.data_label_names[i])
         obj.symbol_sections.push(2)
         obj.symbol_values.push(b.data_label_offsets[i])
         i = i + 1
     }
 
-    let referenced_names = new str[]
+    let externs = new str[]
     i = 0
     for i < len(b.text_reloc_names) {
-        if !machine_has_symbol_name(referenced_names, b.text_reloc_names[i]) {
-            referenced_names.push(b.text_reloc_names[i])
+        if machine_name_index_lookup(name_index, b.text_reloc_names[i]) == -1 {
+            machine_name_index_insert(name_index, b.text_reloc_names[i], -2)
+            externs.push(b.text_reloc_names[i])
         }
         i = i + 1
     }
     i = 0
     for i < len(b.data_reloc_names) {
-        if !machine_has_symbol_name(referenced_names, b.data_reloc_names[i]) {
-            referenced_names.push(b.data_reloc_names[i])
-        }
-        i = i + 1
-    }
-
-    let externs = new str[]
-    i = 0
-    for i < len(referenced_names) {
-        if !machine_has_symbol_name(obj.symbol_names, referenced_names[i]) {
-            externs.push(referenced_names[i])
+        if machine_name_index_lookup(name_index, b.data_reloc_names[i]) == -1 {
+            machine_name_index_insert(name_index, b.data_reloc_names[i], -2)
+            externs.push(b.data_reloc_names[i])
         }
         i = i + 1
     }
     let sorted_externs = machine_sorted_strings(externs)
     i = 0
     for i < len(sorted_externs) {
+        machine_name_index_set(name_index, sorted_externs[i], len(obj.symbol_names))
         obj.symbol_names.push(sorted_externs[i])
         obj.symbol_sections.push(0)
         obj.symbol_values.push(0)
         i = i + 1
     }
 
-    let referenced_symbol_indexes = new i64[]
-    i = 0
-    for i < len(referenced_names) {
-        let symbol_index = machine_symbol_name_index(obj.symbol_names, referenced_names[i])
-        if symbol_index < 0 {
-            machine_die(("unknown relocation symbol: " + referenced_names[i]))
-        }
-        referenced_symbol_indexes.push(symbol_index)
-        i = i + 1
-    }
     i = 0
     for i < len(b.text_reloc_names) {
-        let referenced_index = machine_symbol_name_index(referenced_names, b.text_reloc_names[i])
-        obj.text_reloc_symbol_indexes.push(referenced_symbol_indexes[referenced_index])
+        let symbol_index = machine_name_index_lookup(name_index, b.text_reloc_names[i])
+        if symbol_index < 0 { machine_die(("unknown relocation symbol: " + b.text_reloc_names[i])) }
+        obj.text_reloc_symbol_indexes.push(symbol_index)
         i = i + 1
     }
     i = 0
     for i < len(b.data_reloc_names) {
-        let referenced_index = machine_symbol_name_index(referenced_names, b.data_reloc_names[i])
-        obj.data_reloc_symbol_indexes.push(referenced_symbol_indexes[referenced_index])
+        let symbol_index = machine_name_index_lookup(name_index, b.data_reloc_names[i])
+        if symbol_index < 0 { machine_die(("unknown relocation symbol: " + b.data_reloc_names[i])) }
+        obj.data_reloc_symbol_indexes.push(symbol_index)
         i = i + 1
     }
     ret obj

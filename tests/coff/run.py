@@ -75,16 +75,11 @@ def coff_dump_from_x64(program: X64Program) -> str:
     builder._emit_program()
     builder._emit_needed_runtime_helpers()
     builder._patch_internal_fixups()
-    symbols: dict[str, tuple[int, int]] = {}
-    for name, off in builder.text_labels.items():
-        symbols[name] = (1, off)
-    for name, off in builder.data_labels.items():
-        symbols[name] = (2, off)
-    referenced = {sym for _, sym in builder.text_relocs}
-    for name in sorted(referenced):
-        if name not in symbols:
-            symbols[name] = (0, 0)
-    return byte_dump(build_coff_obj(builder.text, builder.data, builder.text_relocs, [], symbols))
+    symbols, text_relocs, data_relocs = builder._build_symbols()
+    symbol_map = {name: (section, value) for name, section, value in symbols}
+    text_reloc_names = [(off, symbols[index][0]) for off, index in text_relocs]
+    data_reloc_names = [(off, symbols[index][0]) for off, index in data_relocs]
+    return byte_dump(build_coff_obj(builder.text, builder.data, text_reloc_names, data_reloc_names, symbol_map))
 
 
 def python_user_coff(path: Path) -> str:

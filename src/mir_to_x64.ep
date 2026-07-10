@@ -813,6 +813,12 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
     lower.next_slot = 0
+    let entry_label = new X64Label
+    if fn.name == "main" {
+        entry_label = x64_new_symbol_label(lower.x64, "_start")
+    } else {
+        entry_label = x64_new_symbol_label(lower.x64, fn.name)
+    }
     lower.block_label_names = new str[]
     lower.block_labels = new X64Label[]
     let label_i = 0
@@ -831,12 +837,6 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
 
     let prologue_start = mir_to_x64_now_ms()
     x64_add_section(lower.x64, ".text")
-    let entry_label = new X64Label
-    if fn.name == "main" {
-        entry_label = x64_new_symbol_label(lower.x64, "_start")
-    } else {
-        entry_label = x64_new_symbol_label(lower.x64, fn.name)
-    }
     x64_bind_label(lower.x64, entry_label)
     x64_add_inst1(lower.x64, "push", x64_reg("rbp"))
     x64_add_inst2(lower.x64, "mov", x64_reg("rbp"), x64_reg("rsp"))

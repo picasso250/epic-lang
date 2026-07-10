@@ -29,5 +29,15 @@ fun build_machine_x64_fixture(): X64Program {
 }
 
 fun main(): void {
-    machine_print_object(machine_build_object(build_machine_x64_fixture()))
+    let index = machine_name_index_new(2)
+    machine_name_index_insert(index, "symbol_0", 7)
+    machine_name_index_insert(index, "symbol_8", 11)
+    if machine_name_index_lookup(index, "symbol_0") != 7 || machine_name_index_lookup(index, "symbol_8") != 11 {
+        panic "machine name index collision lookup failed"
+    }
+    let obj = machine_build_object(build_machine_x64_fixture())
+    if len(obj.symbol_names) != 4 || obj.symbol_names[0] != "_start" || obj.symbol_names[1] != "msg" || obj.symbol_names[2] != "scratch" || obj.symbol_names[3] != "ExitProcess" {
+        panic "machine symbol order mismatch"
+    }
+    machine_print_object(obj)
 }

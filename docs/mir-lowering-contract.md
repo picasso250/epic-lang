@@ -68,7 +68,9 @@ mov [rbp+slot], rcx/rdx/r8/r9
 
 ### 2.4 Block lowering
 
-每个 MIR block → 一个 x64 label（格式 `fn_name.block_name`），后面跟其指令序列和 terminator。
+函数 lowering 开始时预分配 entry、全部 MIR block 和 return label。block name
+只用于 lowering 内找到对应 handle；X64IR 中保存数字 label ID，不构造
+`fn_name.block_name` 字符串。block/return 的 debug 文本为 `.L<id>`。
 
 ### 2.5 Epilogue
 
@@ -314,7 +316,7 @@ Shadow space (32) 已包含在 frame 计算中。栈参数按 16 字节对齐计
 ### 7.1 `br`
 
 ```
-jmp LabelRef(fn_name.block_name)
+jmp LabelRef(block_label_id)
 ```
 
 ### 7.2 `condbr`

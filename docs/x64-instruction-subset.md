@@ -73,14 +73,17 @@ resolved COFF symbol index. Symbol names are consumed inside `src/machine.ep`;
 
 ## 2. X64Program 数据模型
 
-`X64Program.items` 是顺序 item 列表：
+`X64Program` 单调分配 `X64Label { id, symbol_name }`，`items` 是顺序 item
+列表。匿名 label 只表示函数内控制流；带 `symbol_name` 的 label 同时是
+linker 可见的 text symbol。创建、绑定和引用分别使用
+`new_label/new_symbol_label`、`bind_label`、`label_ref`，不存在字符串 label API。
 
 | Item | 含义 |
 | --- | --- |
 | `X64Global(name)` | 声明全局符号；当前 machine layer 不使用它决定导出，只依赖 label symbols。 |
 | `X64Extern(name)` | 声明外部符号；当前 machine layer 收集但不验证引用必须先声明。 |
 | `X64Section(name)` | 切换当前 section；当前支持 `.text`、`.data`。 |
-| `X64Label(name)` | 当前 section 内定义 label。 |
+| `X64Label(id, symbol_name)` | 在当前 section 绑定已分配的 label handle。 |
 | `X64Inst(op, operands)` | `.text` 指令。 |
 | `X64DataBytes(label, values)` | `.data` 内定义字节序列。 |
 | `X64DataZero(label, count)` | `.data` 内定义零初始化字节。 |
@@ -92,10 +95,12 @@ resolved COFF symbol index. Symbol names are consumed inside `src/machine.ep`;
 | `Reg(name)` | 寄存器。 |
 | `Imm(value)` | 整数立即数。 |
 | `Symbol(name)` | call target 或外部/section symbol reference。 |
-| `LabelRef(name)` | branch target。 |
+| `LabelRef(label)` | 持有数字 label handle 的 branch target。 |
 | `Mem(base, disp, symbol, size)` | base+disp memory 或 RIP-relative symbol memory。 |
 
 `Mem(size=1)` 打印 `byte [...]`，`Mem(size=8)` 打印 `qword [...]`。
+匿名 label 的 debug 文本是 `.L<id>`；函数入口和 runtime helper 等 named
+label 保留 `symbol_name`，因此其汇编审查文本和链接名稳定。
 
 ## 3. Windows x64 ABI 约定
 
@@ -299,9 +304,13 @@ Internal branch fixups:
 
 - `jmp` emits `E9 rel32 placeholder`。
 - `jcc` emits `0F 8? rel32 placeholder`。
-- If the target label exists in `.text`, machine layer patches the signed rel32
-  displacement directly.
+- `MachineBuilder` 按 `program.label_count` 分配 `label_offsets` 和
+  `label_defined`；fixup 保存 label handle，并用 ID 直接索引目标 offset。
+- If the target label is bound in `.text`, machine layer patches the signed rel32
+  displacement directly，不扫描字符串 label 表。
 - Displacement is computed from the address after the 4-byte immediate.
+- 重复绑定、越界 ID、未绑定匿名 label 是 backend error。未绑定 named label
+  会变成 relocation，供 standalone function lowering 使用。
 
 External or section symbol references:
 
@@ -315,6 +324,11 @@ COFF contract:
 - `bootstrap/coff.py` writes exactly two sections: `.text` and `.data`。
 - Relocation type is currently always `IMAGE_REL_AMD64_REL32`。
 - Symbols use section number 1 for `.text`, 2 for `.data`, 0 for external。
+- 只有 named text label 进入 symbol table；匿名 block/return label 不进入 COFF。
+- Symbol 顺序固定为 named text、data、按 ASCII 排序的 extern。Machine layer
+  使用固定容量、u64 FNV hash 的开放寻址 `MachineNameIndex` 做私有查询，
+  relocation 在扫描时直接取得最终 COFF symbol index；索引从不参与迭代，
+  因此 hash 桶布局不会影响输出顺序或自举固定点。
 - `data_relocs` exists in the writer API but current machine backend does not emit it。
 
 `bootstrap/link.py` contract:
@@ -411,7 +425,6 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `bootstrap/link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
 Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
-
 
 
 

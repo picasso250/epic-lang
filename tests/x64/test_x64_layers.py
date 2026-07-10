@@ -6,7 +6,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
-from machine import MachineObjectBuilder
+from machine import MachineObjectBuilder, _MachineNameIndex
 from mir import I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirField
 from mir import MirFunction, MirInst, MirParam, MirProgram, MirSignature, MirStruct
 from mir import MirValue, Ret, ValueOperand, ptr, struct as mir_struct
@@ -295,6 +295,48 @@ def test_shared_null_trap_label_is_patched_directly():
     assert builder.text_labels == {"__epx_null_deref": 128 * 6}
 
 
+def test_machine_name_index_collision_and_symbol_order():
+    index = _MachineNameIndex(2)
+    by_slot = {}
+    collision = None
+    for number in range(100):
+        name = f"symbol_{number}"
+        slot = index._hash(name) & index.mask
+        if slot in by_slot:
+            collision = (by_slot[slot], name)
+            break
+        by_slot[slot] = name
+    assert collision is not None
+    index.insert(collision[0], 7)
+    index.insert(collision[1], 11)
+    assert index.lookup(collision[0]) == 7
+    assert index.lookup(collision[1]) == 11
+
+    program = X64Program()
+    entry = program.new_symbol_label("entry")
+    local = program.new_label()
+    program.extern("z_ext")
+    program.extern("a_ext")
+    program.section(".data")
+    program.data_bytes("data", [1])
+    program.section(".text")
+    program.bind_label(entry)
+    program.bind_label(local)
+    program.inst("call", Symbol("z_ext"))
+    program.inst("call", Symbol("a_ext"))
+    program.inst("call", Symbol("z_ext"))
+    program.inst("lea", R("rax"), MS("data"))
+    builder = build_machine_state(program)
+    symbols, relocs, _ = builder._build_symbols()
+    assert symbols == [
+        ("entry", 1, 0),
+        ("data", 2, 0),
+        ("a_ext", 0, 0),
+        ("z_ext", 0, 0),
+    ]
+    assert [symbol_index for _, symbol_index in relocs] == [3, 2, 3, 1]
+
+
 def test_x64_validator_rejects_bad_forms():
     validate_x64_program(build_x64_fixture())
 
@@ -323,6 +365,7 @@ def main():
     test_x64_to_machine_bytes_and_fixups_golden()
     test_numeric_label_fixup_contract()
     test_shared_null_trap_label_is_patched_directly()
+    test_machine_name_index_collision_and_symbol_order()
     test_x64_validator_rejects_bad_forms()
     print("PASS test_x64_layers")
 

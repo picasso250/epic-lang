@@ -33,14 +33,14 @@ add1:
     mov rbp, rsp
     sub rsp, 80
     mov qword [rbp-8], rcx
-add1.entry:
+.L2:
     mov rax, qword [rbp-8]
     mov rcx, 1
     add rax, rcx
     mov qword [rbp-16], rax
     mov rax, qword [rbp-16]
-    jmp add1.__return
-add1.__return:
+    jmp .L3
+.L3:
     add rsp, 80
     pop rbp
     ret
@@ -50,7 +50,7 @@ arith_mix:
     mov rbp, rsp
     sub rsp, 80
     mov qword [rbp-8], rcx
-arith_mix.entry:
+.L2:
     mov rax, qword [rbp-8]
     mov rcx, 2
     sub rax, rcx
@@ -64,8 +64,8 @@ arith_mix.entry:
     and rax, rcx
     mov qword [rbp-16], rax
     mov rax, qword [rbp-16]
-    jmp arith_mix.__return
-arith_mix.__return:
+    jmp .L3
+.L3:
     add rsp, 80
     pop rbp
     ret
@@ -76,7 +76,7 @@ max2:
     sub rsp, 96
     mov qword [rbp-8], rcx
     mov qword [rbp-16], rdx
-max2.entry:
+.L2:
     mov rax, qword [rbp-8]
     mov rcx, qword [rbp-16]
     cmp rax, rcx
@@ -85,15 +85,15 @@ max2.entry:
     mov qword [rbp-24], rax
     mov rax, qword [rbp-24]
     test rax, rax
-    jnz max2.then
-    jmp max2.else
-max2.then:
+    jnz .L3
+    jmp .L4
+.L3:
     mov rax, qword [rbp-8]
-    jmp max2.__return
-max2.else:
+    jmp .L5
+.L4:
     mov rax, qword [rbp-16]
-    jmp max2.__return
-max2.__return:
+    jmp .L5
+.L5:
     add rsp, 96
     pop rbp
     ret
