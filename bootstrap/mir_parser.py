@@ -13,7 +13,6 @@ from pathlib import Path
 
 from mir import (
     BOOL,
-    I32,
     I64,
     I8,
     PTR,
@@ -49,7 +48,6 @@ class MirParseError(RuntimeError):
 
 _SIMPLE_TYPES = {
     "i64": I64,
-    "i32": I32,
     "i8": I8,
     "bool": BOOL,
     "void": VOID,

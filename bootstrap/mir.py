@@ -24,7 +24,6 @@ class MirType:
 
 
 I64 = MirType("i64")
-I32 = MirType("i32")
 I8 = MirType("i8")
 BOOL = MirType("bool")
 VOID = MirType("void")
@@ -586,7 +585,7 @@ class MirValidator:
             return
         self._require(self._is_ptr(inst.operands[0].type), fn, where, "gep base must be ptr")
         for operand in inst.operands[1:]:
-            self._require(operand.type in (I64, I32), fn, where, "gep indices must be integer")
+            self._require(operand.type == I64, fn, where, "gep indices must be i64")
         if inst.type is None:
             return
         if inst.type.kind == "struct":

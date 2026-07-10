@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
 from machine import MachineObjectBuilder
-from mir import I32, I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirField
+from mir import I64, ConstIntOperand, ConstNullOperand, MirBlock, MirExtern, MirField
 from mir import MirFunction, MirInst, MirParam, MirProgram, MirSignature, MirStruct
 from mir import MirValue, Ret, ValueOperand, ptr, struct as mir_struct
 from mir_to_x64 import MirLower
@@ -128,7 +128,7 @@ def test_target_mir_memory_ops_to_x64_golden():
             MirInst("call", [ValueOperand(size)], result=obj, type=ptr(), callee="__epx_alloc"),
             MirInst(
                 "gep",
-                [ValueOperand(obj), ConstIntOperand(I64, 0), ConstIntOperand(I32, 1)],
+                [ValueOperand(obj), ConstIntOperand(I64, 0), ConstIntOperand(I64, 1)],
                 result=field_ptr,
                 type=mir_struct("Pair"),
             ),

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from backend_abi import BackendAbiError, validate_backend_abi
 from lexer import lex
-from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
+from mir import BOOL, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
 from mir import MirGlobal, MirProgram, MirStruct, MirValue, Ret, SymbolOperand, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from ast_to_mir import ast_to_mir
@@ -108,7 +108,7 @@ def test_gep_null_and_ptrtoint_text_and_validation():
             MirInst("ptrtoint", [ValueOperand(size_ptr)], result=size, type=I64),
             MirInst(
                 "gep",
-                [ConstNullOperand(), ConstIntOperand(I64, 0), ConstIntOperand(I32, 1)],
+                [ConstNullOperand(), ConstIntOperand(I64, 0), ConstIntOperand(I64, 1)],
                 result=field_ptr,
                 type=mir_struct("Pair"),
             ),
@@ -126,10 +126,31 @@ define i64 @main() {
 entry:
   %1: ptr = gep struct Pair, ptr null, i64 1
   %2: i64 = ptrtoint ptr %1 to i64
-  %3: ptr = gep struct Pair, ptr null, i64 0, i32 1
+  %3: ptr = gep struct Pair, ptr null, i64 0, i64 1
   ret i64 %2
 }"""
     assert program.text() == expected
+
+
+def test_validator_requires_i64_gep_indices():
+    field_ptr = MirValue(1, ptr())
+    block = MirBlock(
+        "entry",
+        [
+            MirInst(
+                "gep",
+                [ConstNullOperand(), ConstIntOperand(I64, 0), ConstIntOperand(I8, 1)],
+                result=field_ptr,
+                type=mir_struct("Pair"),
+            )
+        ],
+        Ret(ConstIntOperand(I64, 0)),
+    )
+    program = MirProgram(
+        functions=[MirFunction("main", [], I64, [block])],
+        structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
+    )
+    assert_mir_invalid(program, "gep indices must be i64")
 
 
 def test_validator_rejects_non_positive_local_ids():
@@ -235,8 +256,8 @@ def test_global_text_round_trip_uses_canonical_bytes_literals():
     assert program.globals[2].init == 'A\n"\\\x00\xff//tail'
     assert program.text() == source.rstrip()
 
-def test_mir_parser_rejects_unsigned_integer_types():
-    for typ in ("u64", "u8"):
+def test_mir_parser_rejects_noncanonical_integer_types():
+    for typ in ("i32", "u64", "u8"):
         source = f"""define {typ} @main({typ} %1) {{
 entry:
   ret {typ} %1
@@ -247,7 +268,7 @@ entry:
         except Exception as exc:
             assert "unknown type" in str(exc)
         else:
-            raise AssertionError(f"MIR parser accepted unsigned integer type: {typ}")
+            raise AssertionError(f"MIR parser accepted noncanonical integer type: {typ}")
 
 
 def test_mir_parser_reads_numeric_local_ids():
@@ -433,13 +454,14 @@ fun main(): i64 {
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
+    test_validator_requires_i64_gep_indices()
     test_validator_rejects_non_positive_local_ids()
     test_validator_rejects_text_sigils_in_module_symbols()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
     test_struct_type_text_round_trip_and_v0_slot_layout()
     test_global_text_round_trip_uses_canonical_bytes_literals()
-    test_mir_parser_rejects_unsigned_integer_types()
+    test_mir_parser_rejects_noncanonical_integer_types()
     test_mir_parser_reads_numeric_local_ids()
     test_mir_parser_rejects_named_local_values()
     test_text_mir_uses_target_neutral_extern_contracts()

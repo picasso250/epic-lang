@@ -14,7 +14,6 @@ from mir import (
     ConstBoolOperand,
     ConstIntOperand,
     ConstNullOperand,
-    I32,
     MirBlock,
     MirExtern,
     MirField,
@@ -328,7 +327,7 @@ class MirCodegen(MirFunctionBuilder):
         field_type = result_type or field_layout.type
         addr = self.inst(
             "gep",
-            [base, ConstIntOperand(I64, 0), ConstIntOperand(I32, self._field_index(struct_name, field))],
+            [base, ConstIntOperand(I64, 0), ConstIntOperand(I64, self._field_index(struct_name, field))],
             result_type=ptr(),
             type=mir_struct(struct_name),
         )

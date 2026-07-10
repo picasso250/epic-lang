@@ -427,7 +427,7 @@ fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     let ops = new MirOperand[]
     ops.push(base)
     ops.push(mir_const_int("i64", 0))
-    ops.push(mir_const_int("i32", mir_field_index(st, struct_name, field_name)))
+    ops.push(mir_const_int("i64", mir_field_index(st, struct_name, field_name)))
     ret mir_make_gep(st, str_cat2("struct ", struct_name), ops)
 }
 
