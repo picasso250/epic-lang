@@ -76,7 +76,7 @@ fun mrt_strip_comment(line: str): str {
 }
 
 fun mrt_split_lines(text: str): str[] {
-    let out = new str[0]
+    let out = new str[]
     let bs = bytes(text)
     let start = 0
     let i = 0
@@ -96,7 +96,7 @@ fun mrt_split_lines(text: str): str[] {
 }
 
 fun mrt_split_commas(text: str): str[] {
-    let out = new str[0]
+    let out = new str[]
     let bs = bytes(text)
     let start = 0
     let i = 0
@@ -181,7 +181,7 @@ fun mrt_parse_typed_operand(text: str): MirOperand {
 }
 
 fun mrt_parse_params(text: str): MirParam[] {
-    let out = new MirParam[0]
+    let out = new MirParam[]
     let t = mrt_trim(text)
     if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
@@ -200,7 +200,7 @@ fun mrt_parse_params(text: str): MirParam[] {
 }
 
 fun mrt_parse_operands(text: str): MirOperand[] {
-    let out = new MirOperand[0]
+    let out = new MirOperand[]
     let t = mrt_trim(text)
     if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
@@ -335,7 +335,7 @@ fun mrt_parse_bytes_literal(text: str): str {
         mir_text_die(str_cat2("bad bytes literal: ", text))
     }
     let raw = bytes(t[1:len(t) - 1])
-    let out = new u8[0]
+    let out = new u8[]
     let i = 0
     for i < len(raw) {
         let c = raw[i]
@@ -400,7 +400,7 @@ fun mrt_parse_extern(line: str): MirExtern {
     }
     let name = after_at[0:lp]
     let params_text = mrt_trim(after_at[lp + 1:rp])
-    let param_types = new str[0]
+    let param_types = new str[]
     if len(params_text) > 0 {
         let parts = mrt_split_commas(params_text)
         let i = 0

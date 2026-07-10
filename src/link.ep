@@ -369,10 +369,10 @@ fun import_less_casefold(a: str, b: str): bool {
 }
 
 fun sorted_imports(items: str[]): str[] {
-    let out = new str[0]
+    let out = new str[]
     for i in items {
         let key = items[i]
-        let next = new str[0]
+        let next = new str[]
         let inserted = false
         for j in out {
             if !inserted && import_less_casefold(key, out[j]) {

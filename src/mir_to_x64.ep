@@ -45,15 +45,15 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.temp_value_slots = new map[str]bool
     lower.block_local_use_counts = new map[str]i64
     lower.reusable_value_names = new map[str]bool
-    lower.free_value_slots = new i64[0]
+    lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
-    lower.string_names = new str[0]
-    lower.string_lengths = new i64[0]
-    lower.global_names = new str[0]
+    lower.string_names = new str[]
+    lower.string_lengths = new i64[]
+    lower.global_names = new str[]
     lower.has_global_init = false
-    lower.struct_field_names = new str[0]
-    lower.struct_field_types = new str[0]
-    lower.struct_field_indexes = new i64[0]
+    lower.struct_field_names = new str[]
+    lower.struct_field_types = new str[]
+    lower.struct_field_indexes = new i64[]
     lower.next_slot = 0
     lower.return_label = ""
     lower.timing_plan_slots = 0
@@ -660,7 +660,7 @@ fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
 }
 
 fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
-    let arg_regs = new str[0]
+    let arg_regs = new str[]
     arg_regs.push("rcx")
     arg_regs.push("rdx")
     arg_regs.push("r8")
@@ -812,7 +812,7 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     lower.temp_value_slots = new map[str]bool
     lower.block_local_use_counts = new map[str]i64
     lower.reusable_value_names = new map[str]bool
-    lower.free_value_slots = new i64[0]
+    lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
     lower.next_slot = 0
     lower.return_label = str_cat2(fn.name, ".__return")
@@ -842,7 +842,7 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     lower.timing_prologue = lower.timing_prologue + (prologue_stop - prologue_start)
 
     let params_start = mir_to_x64_now_ms()
-    let arg_regs = new str[0]
+    let arg_regs = new str[]
     arg_regs.push("rcx")
     arg_regs.push("rdx")
     arg_regs.push("r8")

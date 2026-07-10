@@ -210,7 +210,7 @@ fun x64_operand_is_mem(op: X64Operand): bool { ret x64_operand_kind_text(op) == 
 
 fun x64_program_empty(): X64Program {
     let program = new X64Program
-    program.items = new X64Item[0]
+    program.items = new X64Item[]
     ret program
 }
 
@@ -235,17 +235,17 @@ fun x64_add_inst(program: X64Program, op: str, operands: X64Operand[]): void {
 }
 
 fun x64_add_inst0(program: X64Program, op: str): void {
-    x64_add_inst(program, op, new X64Operand[0])
+    x64_add_inst(program, op, new X64Operand[])
 }
 
 fun x64_add_inst1(program: X64Program, op: str, a: X64Operand): void {
-    let operands = new X64Operand[0]
+    let operands = new X64Operand[]
     operands.push(a)
     x64_add_inst(program, op, operands)
 }
 
 fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): void {
-    let operands = new X64Operand[0]
+    let operands = new X64Operand[]
     operands.push(a)
     operands.push(b)
     x64_add_inst(program, op, operands)

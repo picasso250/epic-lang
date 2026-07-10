@@ -400,7 +400,7 @@ struct AstMapInit {
 type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit | AstMapInit
 
 fun ast_new_program(): AstProgram {
-    ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[0], structs: new AstStructDef[0], globals: new AstLet[0], unions: new AstUnionDef[0] }
+    ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], structs: new AstStructDef[], globals: new AstLet[], unions: new AstUnionDef[] }
 }
 
 fun ast_new_param(): AstParam {
@@ -408,7 +408,7 @@ fun ast_new_param(): AstParam {
 }
 
 fun ast_new_block(): AstBlock {
-    ret new AstBlock { meta: ast_meta(), stmts: new AstNode[0], value_expr: ast_empty(), has_value: false }
+    ret new AstBlock { meta: ast_meta(), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }
 }
 
 fun ast_new_match_case(): AstMatchCase {
@@ -440,7 +440,7 @@ fun ast_new_field_access(): AstFieldAccess {
 }
 
 fun ast_new_struct_init(): AstStructInit {
-    ret new AstStructInit { meta: ast_meta(), name: "", fields: new AstInitField[0] }
+    ret new AstStructInit { meta: ast_meta(), name: "", fields: new AstInitField[] }
 }
 
 fun ast_empty(): AstNode {
@@ -481,14 +481,14 @@ fun ast_name(node: AstNode): str {
 fun ast_fields(node: AstNode): AstNode[] {
     match node {
         AstStructDef n: {
-            let out = new AstNode[0]
+            let out = new AstNode[]
             for i in n.fields {
                 out.push(new AstNode(n.fields[i]))
             }
             ret out
         }
         AstMatch n: {
-            let out = new AstNode[0]
+            let out = new AstNode[]
             for i in n.fields {
                 out.push(new AstNode(n.fields[i]))
             }
@@ -496,7 +496,7 @@ fun ast_fields(node: AstNode): AstNode[] {
         }
         AstFString n: { ret n.fields }
         AstStructInit n: {
-            let out = new AstNode[0]
+            let out = new AstNode[]
             for i in n.fields {
                 out.push(new AstNode(n.fields[i]))
             }
@@ -504,13 +504,13 @@ fun ast_fields(node: AstNode): AstNode[] {
         }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstNode[]
 }
 
 fun ast_params(node: AstNode): AstNode[] {
     match node {
         AstFunDef n: {
-            let out = new AstNode[0]
+            let out = new AstNode[]
             for i in n.params {
                 out.push(new AstNode(n.params[i]))
             }
@@ -518,7 +518,7 @@ fun ast_params(node: AstNode): AstNode[] {
         }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstNode[]
 }
 
 fun ast_source_type(node: AstNode): TypeExpr {
@@ -552,7 +552,7 @@ fun ast_stmts(node: AstNode): AstNode[] {
         AstBlock n: { ret n.stmts }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstNode[]
 }
 
 fun ast_value_expr(node: AstNode): AstNode {
@@ -712,7 +712,7 @@ fun ast_args(node: AstNode): AstNode[] {
         AstArrayLiteral n: { ret n.args }
         else: {}
     }
-    ret new AstNode[0]
+    ret new AstNode[]
 }
 
 fun ast_count(node: AstNode): AstNode {
@@ -839,7 +839,7 @@ fun (p: Parser) parse_type(): TypeExpr {
 }
 
 fun (p: Parser) parse_params(): AstParam[] {
-    let params = new AstParam[0]
+    let params = new AstParam[]
     if p.peek_kind("ID") == 0 {
         ret params
     }
@@ -862,7 +862,7 @@ fun (p: Parser) parse_params(): AstParam[] {
 fun (p: Parser) parse_struct_def(): AstStructDef {
     p.expect("STRUCT")
     let name = p.expect("ID")
-    let node = new AstStructDef { meta: ast_meta(), name: token_text(name), fields: new AstStructField[0] }
+    let node = new AstStructDef { meta: ast_meta(), name: token_text(name), fields: new AstStructField[] }
     p.expect("LBRACE")
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
@@ -885,7 +885,7 @@ fun (p: Parser) parse_fn_def(): AstFunDef {
     let method_name = ""
     let symbol_name = ""
     let line = 0
-    let params = new AstParam[0]
+    let params = new AstParam[]
     if p.peek_kind("LPAREN") == 1 {
         p.expect("LPAREN")
         let receiver = p.expect("ID")
@@ -925,7 +925,7 @@ fun (p: Parser) parse_union_def(): AstUnionDef {
     p.expect("TYPE")
     let name = p.expect("ID")
     p.expect("ASSIGN")
-    let node = new AstUnionDef { meta: ast_meta(), name: token_text(name), members: new str[0] }
+    let node = new AstUnionDef { meta: ast_meta(), name: token_text(name), members: new str[] }
     let done = 0
     for done == 0 {
         let member = p.expect("ID")
@@ -1247,7 +1247,7 @@ fun (p: Parser) parse_match_literal(): AstNode {
 
 fun (p: Parser) parse_match_stmt(): AstNode {
     let t = p.expect("MATCH")
-    let node = new AstMatch { meta: ast_meta(), expr: p.parse_expr(), fields: new AstMatchCase[0], else_block: ast_new_block(), has_else: false }
+    let node = new AstMatch { meta: ast_meta(), expr: p.parse_expr(), fields: new AstMatchCase[], else_block: ast_new_block(), has_else: false }
     node.meta.line = token_line(t)
     p.expect("LBRACE")
     p.skip_newlines()
@@ -1573,7 +1573,7 @@ fun op_text(kind: str): str {
 }
 
 fun (p: Parser) parse_args(): AstNode[] {
-    let args = new AstNode[0]
+    let args = new AstNode[]
     if p.peek_kind("RPAREN") == 0 {
         args.push(p.parse_expr())
         for p.check("COMMA") == 1 {
@@ -1613,7 +1613,7 @@ fun (p: Parser) parse_struct_init(name: Token): AstNode {
 }
 
 fun (p: Parser) parse_array_literal(name: Token): AstNode {
-    let node = new AstArrayLiteral { meta: ast_meta(), elem_type: type_name_expr(token_text(name)), args: new AstNode[0] }
+    let node = new AstArrayLiteral { meta: ast_meta(), elem_type: type_name_expr(token_text(name)), args: new AstNode[] }
     node.meta.line = token_line(name)
     p.expect("LBRACE")
     p.skip_newlines()
@@ -1661,7 +1661,7 @@ fun (p: Parser) parse_map_init_entries(node: AstMapInit): AstNode {
 }
 
 fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
-    let out = new AstNode[0]
+    let out = new AstNode[]
     for i in parts {
         match parts[i] {
             FStringTextPart part: {
@@ -1731,7 +1731,7 @@ fun (p: Parser) parse_primary(): AstNode {
                 parse_error(token_line(key), "map key type must be str")
             }
             p.expect("RBRACKET")
-            let n = new AstMapInit { meta: ast_meta(), source_type: type_map_of(p.parse_type()), map_keys: new AstNode[0], map_values: new AstNode[0] }
+            let n = new AstMapInit { meta: ast_meta(), source_type: type_map_of(p.parse_type()), map_keys: new AstNode[], map_values: new AstNode[] }
             n.meta.line = token_line(t)
             if p.peek_kind("LBRACE") == 1 {
                 ret p.parse_postfix(p.parse_map_init_entries(n))
@@ -1793,7 +1793,7 @@ fun (p: Parser) parse_primary(): AstNode {
     }
     if p.peek_kind("FSTRING") == 1 {
         let t = p.advance()
-        let n = new AstFString { meta: ast_meta(), fields: new AstNode[0] }
+        let n = new AstFString { meta: ast_meta(), fields: new AstNode[] }
         match t {
             FStringToken ft: {
                 n.meta.line = ft.line

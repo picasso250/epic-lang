@@ -40,19 +40,19 @@ struct MachineBuilder {
 
 fun machine_builder_empty(): MachineBuilder {
     let b = new MachineBuilder
-    b.text = new i64[0]
-    b.data = new i64[0]
+    b.text = new i64[]
+    b.data = new i64[]
     b.section = ""
-    b.text_label_names = new str[0]
-    b.text_label_offsets = new i64[0]
+    b.text_label_names = new str[]
+    b.text_label_offsets = new i64[]
     b.text_label_index = new map[str]i64
-    b.data_label_names = new str[0]
-    b.data_label_offsets = new i64[0]
-    b.fixups = new MachineFixup[0]
-    b.text_reloc_offsets = new i64[0]
-    b.text_reloc_names = new str[0]
-    b.data_reloc_offsets = new i64[0]
-    b.data_reloc_names = new str[0]
+    b.data_label_names = new str[]
+    b.data_label_offsets = new i64[]
+    b.fixups = new MachineFixup[]
+    b.text_reloc_offsets = new i64[]
+    b.text_reloc_names = new str[]
+    b.data_reloc_offsets = new i64[]
+    b.data_reloc_names = new str[]
     ret b
 }
 
@@ -217,11 +217,11 @@ fun machine_ascii_less(a: str, b: str): bool {
 }
 
 fun machine_sorted_strings(names: str[]): str[] {
-    let out = new str[0]
+    let out = new str[]
     let i = 0
     for i < len(names) {
         let key = names[i]
-        let next = new str[0]
+        let next = new str[]
         let inserted = false
         let j = 0
         for j < len(out) {
@@ -776,9 +776,9 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.text_reloc_names = b.text_reloc_names
     obj.data_reloc_offsets = b.data_reloc_offsets
     obj.data_reloc_names = b.data_reloc_names
-    obj.symbol_names = new str[0]
-    obj.symbol_sections = new i64[0]
-    obj.symbol_values = new i64[0]
+    obj.symbol_names = new str[]
+    obj.symbol_sections = new i64[]
+    obj.symbol_values = new i64[]
     let symbol_seen = new map[str]i64
     let i = 0
     for i < len(b.text_label_names) {
@@ -800,7 +800,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
         }
         i = i + 1
     }
-    let externs = new str[0]
+    let externs = new str[]
     let extern_seen = new map[str]i64
     i = 0
     for i < len(b.text_reloc_names) {
