@@ -1,7 +1,3 @@
-fun cstr_ready_path(s: str): str {
-    ret s
-}
-
 fun main(): void {
     let text = make_str_buf()
     str_buf_extend(text, "type Zed = struct { ptr }\n\ntype Unused = struct { i64 }\n\ntype Data = struct { i8, i64 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
@@ -14,9 +10,10 @@ fun main(): void {
     text.push(u8(92))
     str_buf_extend(text, "x00")
     text.push(u8(92))
-    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %zed: ptr = gep struct Zed, ptr null, i64 1\n  %data: ptr = gep struct Data, ptr null, i64 1\n  ret i64 0\n}\n")
+    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %zed: ptr = gep struct Zed, ptr null, i64 1\n  %data: ptr = gep struct Data, ptr null, i64 1\n  call void ExitProcess(i64 0)\n  ret i64 0\n}\n")
 
     let program = mrt_parse_program(str_buf_finish(text))
+    backend_validate_program_abi(program)
     assert len(program.struct_fields) == 4
     assert program.struct_fields[2].struct_name == "Data"
     assert program.struct_fields[2].field_type == "i8"

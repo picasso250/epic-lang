@@ -1,5 +1,6 @@
 """Lower Epic MIR to structured X64 MachineIR."""
 
+from backend_abi import validate_backend_abi
 from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
 from x64_runtime import append_runtime_helpers, emit_runtime_data, emit_startup_hook_call
@@ -31,6 +32,7 @@ class MirLower:
         self.free_value_slots = []
 
     def lower(self):
+        validate_backend_abi(self.program)
         self.x64.global_("_start")
         for imp in self.program.imports:
             self.x64.extern(imp.name)

@@ -1,0 +1,147 @@
+#
+# x64-windows-v0 backend-owned MIR call ABI.
+# Canonical MIR contains call names but no import/declare directives.
+#
+
+fun backend_abi_is_winapi(name: str): bool {
+    if name == "ExitProcess" { ret true }
+    if name == "Sleep" { ret true }
+    if name == "GetTickCount64" { ret true }
+    if name == "lstrlenA" { ret true }
+    if name == "lstrcmpA" { ret true }
+    if name == "GetStdHandle" { ret true }
+    if name == "GetProcessHeap" { ret true }
+    if name == "HeapAlloc" { ret true }
+    if name == "CreateFileA" { ret true }
+    if name == "GetFileSize" { ret true }
+    if name == "ReadFile" { ret true }
+    if name == "WriteFile" { ret true }
+    if name == "CloseHandle" { ret true }
+    if name == "CreateProcessA" { ret true }
+    if name == "WaitForSingleObject" { ret true }
+    if name == "GetExitCodeProcess" { ret true }
+    if name == "GetCommandLineA" { ret true }
+    if name == "MessageBoxA" { ret true }
+    ret false
+}
+
+fun backend_abi_return_type(name: str): str {
+    if name == "ExitProcess" || name == "Sleep" { ret "void" }
+    if backend_abi_is_winapi(name) { ret "i64" }
+    if name == "__ep_cstr" { ret "i64" }
+    if name == "__ep_write_file" { ret "i64" }
+    if name == "__ep_read_file" { ret "ptr" }
+    if name == "__ep_system_cmd" { ret "i64" }
+    if name == "__ep_print_str" { ret "void" }
+    if name == "__ep_print_newline" { ret "void" }
+    if name == "__epx_alloc" { ret "ptr" }
+    ret ""
+}
+
+fun backend_abi_param_count(name: str): i64 {
+    if name == "ExitProcess" || name == "Sleep" { ret 1 }
+    if name == "GetTickCount64" || name == "GetProcessHeap" || name == "CreateProcessA" || name == "GetCommandLineA" { ret 0 }
+    if name == "lstrlenA" || name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
+    if name == "lstrcmpA" || name == "GetFileSize" || name == "WaitForSingleObject" || name == "GetExitCodeProcess" { ret 2 }
+    if name == "HeapAlloc" { ret 3 }
+    if name == "CreateFileA" { ret 7 }
+    if name == "ReadFile" || name == "WriteFile" { ret 5 }
+    if name == "MessageBoxA" { ret 4 }
+    if name == "__ep_cstr" { ret 2 }
+    if name == "__ep_write_file" { ret 3 }
+    if name == "__ep_read_file" { ret 2 }
+    if name == "__ep_system_cmd" { ret 2 }
+    if name == "__ep_print_str" { ret 1 }
+    if name == "__ep_print_newline" { ret 0 }
+    if name == "__epx_alloc" { ret 1 }
+    ret 0 - 1
+}
+
+fun backend_abi_param_type(name: str, index: i64): str {
+    if backend_abi_is_winapi(name) { ret "i64" }
+    if name == "__ep_cstr" {
+        if index == 0 { ret "ptr" }
+        ret "i64"
+    }
+    if name == "__ep_write_file" {
+        if index < 2 { ret "ptr" }
+        ret "i64"
+    }
+    if name == "__ep_read_file" || name == "__ep_system_cmd" {
+        if index == 0 { ret "ptr" }
+        ret "i64"
+    }
+    if name == "__ep_print_str" { ret "ptr" }
+    if name == "__epx_alloc" { ret "i64" }
+    ret ""
+}
+
+fun backend_validate_call(program: MirProgram, caller: MirFunction, block: MirBlock, inst: MirInst): void {
+    let expected_ret = ""
+    let expected_count = 0
+    let internal_index = mir_find_function(program, inst.callee)
+    if internal_index >= 0 {
+        let target = program.functions[internal_index]
+        expected_ret = target.return_type
+        expected_count = len(target.params)
+    } else {
+        expected_ret = backend_abi_return_type(inst.callee)
+        expected_count = backend_abi_param_count(inst.callee)
+        if len(expected_ret) == 0 || expected_count < 0 {
+            panic f"backend ABI error: {caller.name}.{block.name}: unknown backend symbol: {inst.callee}"
+        }
+    }
+
+    if inst.typ != expected_ret {
+        panic f"backend ABI error: {caller.name}.{block.name}: return type mismatch for {inst.callee}: expected {expected_ret}, got {inst.typ}"
+    }
+    if len(inst.operands) != expected_count {
+        panic f"backend ABI error: {caller.name}.{block.name}: argument count mismatch for {inst.callee}: expected {expected_count}, got {len(inst.operands)}"
+    }
+
+    let i = 0
+    for i < expected_count {
+        let expected_type = ""
+        if internal_index >= 0 {
+            expected_type = program.functions[internal_index].params[i].typ
+        } else {
+            expected_type = backend_abi_param_type(inst.callee, i)
+        }
+        let actual_type = mir_operand_type(inst.operands[i])
+        if actual_type != expected_type {
+            panic f"backend ABI error: {caller.name}.{block.name}: argument type mismatch for {inst.callee} at {i}: expected {expected_type}, got {actual_type}"
+        }
+        i = i + 1
+    }
+
+    if expected_ret == "void" {
+        if inst.has_result {
+            panic f"backend ABI error: {caller.name}.{block.name}: void call has result: {inst.callee}"
+        }
+    } else {
+        if !inst.has_result || inst.result_type != expected_ret {
+            panic f"backend ABI error: {caller.name}.{block.name}: non-void call result mismatch: {inst.callee}"
+        }
+    }
+}
+
+fun backend_validate_program_abi(program: MirProgram): void {
+    let fi = 0
+    for fi < len(program.functions) {
+        let fn = program.functions[fi]
+        let bi = 0
+        for bi < len(fn.blocks) {
+            let block = fn.blocks[bi]
+            let ii = 0
+            for ii < len(block.instructions) {
+                let inst = block.instructions[ii]
+                if inst.op == "call" {
+                    backend_validate_call(program, fn, block, inst)
+                }
+                ii = ii + 1
+            }
+            bi = bi + 1
+        }
+        fi = fi + 1
+    }
+}

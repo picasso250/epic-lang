@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
+from backend_abi import BackendAbiError, validate_backend_abi
 from lexer import lex
 from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
 from mir import MirGlobal, MirProgram, MirStruct, MirValue, Ret, SymbolOperand, ValueOperand, ConstIntOperand, ConstNullOperand
@@ -293,6 +294,42 @@ entry:
 """
     program = parse_mir_text(source)
     assert program.functions[0].blocks[0].instructions[0].callee == "ExitProcess"
+
+
+def test_backend_abi_validates_external_calls_before_lowering():
+    valid = parse_mir_text("""define void @main() {
+entry:
+  call void ExitProcess(i64 0)
+  ret void
+}
+""")
+    validate_backend_abi(valid)
+
+    unknown = parse_mir_text("""define void @main() {
+entry:
+  call void ExitProces(i64 0)
+  ret void
+}
+""")
+    try:
+        validate_backend_abi(unknown)
+    except BackendAbiError as exc:
+        assert "unknown backend symbol: ExitProces" in str(exc), str(exc)
+    else:
+        raise AssertionError("backend ABI accepted an unknown external callee")
+
+    wrong_args = parse_mir_text("""define void @main() {
+entry:
+  call void ExitProcess(ptr null)
+  ret void
+}
+""")
+    try:
+        validate_backend_abi(wrong_args)
+    except BackendAbiError as exc:
+        assert "backend call argument mismatch for ExitProcess" in str(exc), str(exc)
+    else:
+        raise AssertionError("backend ABI accepted a wrong external signature")
 
 
 def test_runtime_mir_bundle_is_declaration_free_fragment():
@@ -760,6 +797,7 @@ def main():
     test_mir_parser_strips_text_sigils()
     test_text_mir_rejects_import_and_declare_directives()
     test_unresolved_calls_are_backend_abi_symbols()
+    test_backend_abi_validates_external_calls_before_lowering()
     test_runtime_mir_bundle_is_declaration_free_fragment()
     test_mir_helper_injection()
     test_runtime_source_str_eq_lowers_as_epic_function()

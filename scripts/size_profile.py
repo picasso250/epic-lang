@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "bootstrap"
 sys.path.insert(0, str(BOOTSTRAP))
 
+from backend_abi import validate_backend_abi  # noqa: E402
 import epic  # noqa: E402
 import machine  # noqa: E402
 from machine import MachineObjectBuilder  # noqa: E402
@@ -31,7 +32,9 @@ COMPILER_SOURCES = [
     Path("src") / "parser.ep",
     Path("src") / "sema.ep",
     Path("src") / "mir.ep",
+    Path("src") / "mir_text.ep",
     Path("src") / "mir_runtime.ep",
+    Path("src") / "backend_abi.ep",
     Path("src") / "ast_to_mir.ep",
     Path("src") / "x64.ep",
     Path("src") / "mir_to_x64.ep",
@@ -58,6 +61,7 @@ def build_profile_rows():
     ast = epic.analyze_program(ast)
     program = epic.ast_to_mir(ast)
     inject_all_mir_helpers(program)
+    validate_backend_abi(program)
 
     lower = MirLower(program)
     lower.x64.global_("_start")

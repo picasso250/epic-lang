@@ -723,6 +723,14 @@ bootstrap v0 的规范文本 MIR 不包含 `import` 或 `declare`。外部 call 
 自身的返回值形状。Python 编译器内部仍可保留 imports / externs 作为后端元数据，
 但 `MirProgram.text()` 不序列化它们。
 
+`src/mir_text.ep` 只负责纯文本扫描和 `MirProgram` 解析，不读取文件，也不知道 runtime
+helper bundle。`src/mir_runtime.ep` 负责读取 helper bundle、调用文本 parser，并把结果
+注入用户 MIR；因此 frontend/backend CLI 可以独立复用文本层。
+
+runtime 注入和 unreachable pruning 完成后，具体 backend 必须在 lowering 前执行 ABI
+验证。每个 call 必须解析为模块内函数或 `x64-windows-v0` ABI 表中的外部符号，并检查
+返回类型、参数数量和每个参数类型。未知名称不得自动降级为 COFF extern。
+
 规范输出只包含当前 MIR 指令通过 `gep struct Name` 实际引用的 struct layout。
 引用名称按 ASCII 字节序排序，字段仍按 field index 排列；未引用的隐藏/runtime layout
 不进入文件。引用了但缺少 layout 时，serializer 必须立即报错。

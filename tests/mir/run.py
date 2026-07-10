@@ -35,7 +35,8 @@ def main():
             "tests/mir/type_decl.ep",
             "src/util.ep",
             "src/mir.ep",
-            "src/mir_runtime.ep",
+            "src/mir_text.ep",
+            "src/backend_abi.ep",
             "tests/mir/type_decl.ep",
             "--out-dir",
             str(build_dir),
@@ -75,6 +76,7 @@ define i64 @main() {
 entry:
   %zed: ptr = gep struct Zed, ptr null, i64 1
   %data: ptr = gep struct Data, ptr null, i64 1
+  call void ExitProcess(i64 0)
   ret i64 0
 }
 """
@@ -88,6 +90,47 @@ entry:
         sys.exit(1)
 
     print("  PASS  MIR canonical text round-trip")
+
+    fail_compile = subprocess.run(
+        [
+            sys.executable,
+            str(root / "bootstrap" / "epic.py"),
+            "--main",
+            "tests/mir/backend_abi_fail.ep",
+            "src/util.ep",
+            "src/mir.ep",
+            "src/mir_text.ep",
+            "src/backend_abi.ep",
+            "tests/mir/backend_abi_fail.ep",
+            "--out-dir",
+            str(build_dir),
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if fail_compile.returncode != 0:
+        print("  FAIL  backend ABI negative fixture compile")
+        print(fail_compile.stdout)
+        print(fail_compile.stderr)
+        sys.exit(fail_compile.returncode)
+
+    fail_exe = build_dir / "tests" / "mir" / "backend_abi_fail.exe"
+    fail_run = subprocess.run(
+        [str(fail_exe)],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="ascii",
+        errors="replace",
+    )
+    fail_output = fail_run.stdout + fail_run.stderr
+    if fail_run.returncode == 0 or "unknown backend symbol: ExitProces" not in fail_output:
+        print("  FAIL  backend ABI accepted unknown Epic callee")
+        print(fail_output)
+        sys.exit(1)
+
+    print("  PASS  backend ABI rejects unknown Epic callee")
     print("  PASS  mir")
     sys.exit(0)
 
