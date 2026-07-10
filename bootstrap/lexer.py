@@ -6,6 +6,7 @@ Tokenizes .ep source into a list of (kind, value, line, dump_value) tuples.
 import re
 
 TOKEN_SPEC = [
+    ("EXTERN",    r'\bextern\b'),
     ("FUN",       r'\bfun\b'),
     ("RETURN",    r'\bret\b'),
     ("IF",        r'\bif\b'),

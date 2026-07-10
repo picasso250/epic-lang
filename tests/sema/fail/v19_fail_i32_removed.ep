@@ -1,5 +1,0 @@
-# COMPILE_FAIL: unknown type i32
-
-fun main(): void {
-    let x: i32 = 0
-}

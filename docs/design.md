@@ -10,7 +10,7 @@ Epic 是一门面向 Windows x64 的小型 C-like 系统语言（systems languag
 
 ## 程序模型 (Program Model)
 
-一个程序由一组顶层 struct、type 和 function 定义组成。没有导入（import）、包（package）、可见性规则或按文件的命名空间。
+一个程序由一组顶层 `struct`、`type`、`fun` 和 `extern` 声明组成。没有包（package）、可见性规则或按文件的命名空间。
 
 当前驱动程序支持全程序源码合并：
 
@@ -28,6 +28,8 @@ python epic.py --main main.ep main.ep lib.ep
 |---------|-----------------------------------------|
 | `bool`  | 逻辑值，`true` 或 `false`              |
 | `u8`    | 无符号 8 位字节                         |
+| `i32`   | 有符号 32 位整数，当前实现使用 8 字节槽存储 |
+| `u32`   | 无符号 32 位整数，当前实现使用 8 字节槽存储 |
 | `i64`   | 有符号 64 位整数                        |
 | `u64`   | 无符号 64 位整数                        |
 | `str`   | 字节字符串/文本值；支持字面量、内容相等、切片和分配式拼接 |
@@ -53,7 +55,7 @@ fun add(a: i64, b: i64): i64 {
 }
 ```
 
-Epic 函数最多有 4 个参数。普通 Epic 调用最多有 4 个参数；编译器内置的 WinAPI 调用可按其白名单签名使用更多参数。函数体是一个 block：非 `void` 函数可以用最后一个裸表达式作为返回值，也可以显式 `ret expr`；`void` 函数可以使用 `ret` 或自然结束，尾表达式如果存在必须是 `void`。
+Epic 调用遵循 Windows x64 ABI：前四个整数参数使用寄存器，更多参数使用 8 字节栈槽。函数体是一个 block：非 `void` 函数可以用最后一个裸表达式作为返回值，也可以显式 `ret expr`；`void` 函数可以使用 `ret` 或自然结束，尾表达式如果存在必须是 `void`。
 
 程序入口函数必须为：
 
@@ -92,7 +94,7 @@ p.peek()                       =>  Parser__peek(p)
 - 不支持重载、继承、trait、virtual dispatch、method value、泛型方法或 fallback 到 `peek(p)`。
 - struct receiver 的 `p.peek(args...)` 只查找 `Parser__peek(p, args...)`。
 - 普通函数名允许包含 `__`，以兼容 runtime/helper 命名；method declaration 生成的 `Type__method` 如果与已有函数符号重复，按普通重复定义报错。
-- `os.<dll>.<Function>(...)` 和内置容器点调用仍由语义层优先识别；用户方法不覆盖这些内置点调用。
+- 内置容器点调用仍由语义层优先识别；用户方法不覆盖这些内置点调用。
 
 从 `main` 末尾自然结束时以状态 `0` 退出。非零退出使用 `exit(code)`。
 
@@ -100,16 +102,16 @@ p.peek()                       =>  Parser__peek(p)
 
 ### 字面量 (Literals)
 
-- 数字字面量永远是 `i64`，不根据目标类型改成 `u64`/`u8`。
+- 数字字面量永远是 `i64`，不根据目标类型改成 `u64`/`u32`/`i32`/`u8`。
 - 数字字面量必须落在 `i64` 正数 token 可表示范围内：`0..9223372036854775807`。需要 `i64` 最小值请写 `0 - 9223372036854775807 - 1`。
-- `u64`/`u8` 的最大值或 wrap 值必须通过显式转换和运算构造，例如 `u64(0) - u64(1)`、`u8(0) - u8(1)`。
+- `u64`/`u32`/`u8` 的最大值或 wrap 值必须通过显式转换和运算构造，例如 `u64(0) - u64(1)`、`u32(0) - u32(1)`。
 - `true` 和 `false` 是 `bool` 字面量。
 - 字符串字面量产生 `str`。当前字符串语义按字节定义，不提供 Unicode 字符索引。支持的转义：`\n \r \t \\ \" \' \0`。仅支持 ASCII。
 - 字符字面量产生 `u8`。支持的转义同字符串。
 
 ### Let 声明 (Let Declarations)
 
-`let` 仅允许出现在函数体内，支持可选的类型注解，但 local variable 必须带初始化器。顶层只允许 `fun`、`struct` 和 `type` 定义；顶层/global `let` 已删除：
+`let` 仅允许出现在函数体内，支持可选的类型注解，但 local variable 必须带初始化器。顶层只允许 `fun`、`extern`、`struct` 和 `type` 声明；顶层/global `let` 已删除：
 
 ```epic
 let b: u8 = 1
@@ -141,12 +143,15 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 
 ### 整数转换 (Integer Conversions)
 
-`u8(x)` 是显式截断转换，不做运行时越界检查：它保留低 8 位并零扩展。
-`i64(x)`、`u64(x)` 用于显式整数类型转换。显式转换不放宽数字字面量范围；
-`u64(18446744073709551615)` 仍非法，最大值需写成 `u64(0) - u64(1)`。
+`i32(x)`、`u32(x)`、`u8(x)` 是显式截断转换，不做运行时越界检查。
+转换先保留低位，再按目标类型规范化：`i32(x)` 保留低 32 位并符号扩展回当前 8 字节槽；
+`u32(x)` 保留低 32 位并零扩展；`u8(x)` 保留低 8 位并零扩展。
+例如 `u32(0) - u32(1)` 得到 `4294967295`，`i32(2147483647) + i32(1)` 得到 `-2147483648`。
+显式整数转换不放宽数字字面量范围；`u64(18446744073709551615)`、`u32(4294967296)`、`i32(2147483648)` 都非法。
 
-非字面量跨整数类型赋给 `u8` 必须写显式转换；显式转换表达的是“我接受截断”。
-算术、位运算、除余和移位会将 `u8` 结果规范化到 `0..255`；比较按左操作数类型选择 signed/unsigned 语义。
+非字面量跨整数类型赋给 `i32/u32/u8` 必须写显式转换；显式转换表达的是“我接受截断”。
+当前 Python reference compiler 的 `i32/u32/u8` 布局仍使用 8 字节槽。
+算术、位运算、除余和移位会按结果类型规范化 `u8/u32/i32`；比较按左操作数类型选择 signed/unsigned 语义。
 
 ### 复合赋值 (Compound Assignment)
 
@@ -178,7 +183,7 @@ let last = xs.pop()
 dst.extend(src)
 ```
 
-这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别 `os.*` 和数组操作。
+这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别数组操作或用户结构体方法。
 
 ### 结构体初始化 (Struct Initialization)
 
@@ -397,7 +402,7 @@ let source = str(read_file(path))
 |----------------------------------------|---------------------------------------------|
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
-| `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
+| `cstr(s: str): u64`                    | 检查并返回可传给 C API 的 NUL 结尾地址值    |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 
@@ -419,15 +424,23 @@ let source = str(read_file(path))
 
 `cstr` 要求字符串内部数据指针非空、`len(s) >= 0`、`s[0:len(s)]` 不含 `0`，并且内部数据在 `len(s)` 位置以 `0` 结尾。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
 
-`os.*` 名称保留给编译器暴露的系统调用。WinAPI 调用使用 `os.<dll>.<Function>(...)`，DLL 段目前只支持 `kernel32` 和 `user32`，函数必须在编译器白名单内。FFI 参数统一按 `i64` 传递；C 字符串参数必须显式写 `cstr(...)`：
+### Extern FFI
+
+源码使用顶层声明描述 Windows x64 ABI 导入：
 
 ```epic
-os.kernel32.Sleep(1000)
-let n = os.kernel32.lstrlenA(cstr("abc"))
-let r = os.user32.MessageBoxA(0, cstr("hi"), cstr("Epic"), 0)
+extern "kernel32.dll" fun Sleep(milliseconds: u32): void
+extern "kernel32.dll" fun GetTickCount64(): u64
+extern "kernel32.dll" fun lstrcmpA(left: u64, right: u64): i32
 ```
 
-普通代码应使用 `exit(code)` 退出。`os.kernel32.ExitProcess(code)` 仍在 WinAPI 白名单内，但不作为日常写法。
+extern 参数只允许 `i32`、`u32`、`i64`、`u64`，返回类型还可为 `void`。`DWORD`/`UINT` 使用 `u32`，C `int`/`LONG` 使用 `i32`，64 位整数使用对应的 `i64/u64`。32 位返回值在调用边界立即符号扩展或零扩展。
+
+Epic 不公开 `ptr` 类型。外部指针、C 字符串地址、Windows handle 和其他 pointer-sized opaque value 使用 `u64` bit pattern；`0` 写作 `u64(0)`，`INVALID_HANDLE_VALUE` 可写作 `u64(0) - u64(1)`。这些值不能解引用，也不使用 postfix `?`；空地址检查显式写 `value != u64(0)`。
+
+`cstr(s)` 返回 `u64`，并要求字符串不含内嵌 NUL。extern 不提供隐式字符串转换。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
+
+源码 extern 通过自带 PE linker 的编码导入符号传递 DLL metadata，因此 Python 驱动下要求默认的 `--linker py`；`lld-link` 仍可用于没有源码 extern 的程序。普通退出继续使用 `exit(code)`。
 
 ## 自举模型 (Bootstrap Model)
 

@@ -31,21 +31,13 @@ KERNEL32_HINTS = {
     "GetFileSize": 631,
     "GetProcessHeap": 740,
     "GetStdHandle": 805,
-    "GetTickCount64": 846,
     "HeapAlloc": 892,
-    "lstrcmpA": 985,
-    "lstrlenA": 991,
     "ReadFile": 1193,
-    "SetFilePointer": 1384,
-    "Sleep": 1410,
     "WriteFile": 1632,
 }
 
 IMPORT_HINTS = {
-    "KERNEL32.dll": KERNEL32_HINTS,
-    "USER32.dll": {
-        "MessageBoxA": 0,
-    },
+    "kernel32.dll": KERNEL32_HINTS,
 }
 
 IMPORT_DLL_BY_FUNC = {
@@ -193,11 +185,15 @@ def build_idata(imports, idata_rva):
 
     groups = {}
     for func in imports:
+        if func.startswith("__ep_import$"):
+            _, dll, symbol = func.split("$", 2)
+            groups.setdefault(dll.lower(), []).append((func, symbol))
+            continue
         dll = IMPORT_DLL_BY_FUNC.get(func)
         if dll is None:
             raise RuntimeError(f"unsupported import: {func}")
-        groups.setdefault(dll, []).append(func)
-    ordered = [(dll, sorted(funcs, key=str.lower)) for dll, funcs in sorted(groups.items(), key=lambda item: item[0].lower())]
+        groups.setdefault(dll, []).append((func, func))
+    ordered = [(dll, sorted(funcs, key=lambda item: item[1].lower())) for dll, funcs in sorted(groups.items(), key=lambda item: item[0].lower())]
 
     descriptor_size = (len(ordered) + 1) * 20
     buf = bytearray(b'\x00' * descriptor_size)
@@ -223,15 +219,15 @@ def build_idata(imports, idata_rva):
         if iat_dir_rva == 0:
             iat_dir_rva = idata_rva + len(buf)
         iat_offsets[dll] = len(buf)
-        for idx, func in enumerate(funcs):
-            iat_map[func] = len(buf) + idx * 8
+        for idx, (encoded, func) in enumerate(funcs):
+            iat_map[encoded] = len(buf) + idx * 8
         buf.extend(b'\x00' * ((len(funcs) + 1) * 8))
     if iat_dir_rva:
         iat_dir_size = idata_rva + len(buf) - iat_dir_rva
 
     for dll, funcs in ordered:
-        hints = IMPORT_HINTS[dll]
-        for func in funcs:
+        hints = IMPORT_HINTS.get(dll, {})
+        for encoded, func in funcs:
             pad_to(2)
             hint_offsets[func] = len(buf)
             buf.extend(struct.pack('<H', hints.get(func, 0)))
@@ -245,7 +241,7 @@ def build_idata(imports, idata_rva):
     for desc_idx, (dll, funcs) in enumerate(ordered):
         ilt_off = ilt_offsets[dll]
         iat_off = iat_offsets[dll]
-        for idx, func in enumerate(funcs):
+        for idx, (encoded, func) in enumerate(funcs):
             thunk = struct.pack('<Q', idata_rva + hint_offsets[func])
             struct.pack_into('<Q', buf, ilt_off + idx * 8, struct.unpack('<Q', thunk)[0])
             struct.pack_into('<Q', buf, iat_off + idx * 8, struct.unpack('<Q', thunk)[0])

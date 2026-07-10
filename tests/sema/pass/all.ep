@@ -1,6 +1,8 @@
 # Semantic analysis surface contract sample.
 # This file must pass Python sema and produce a stable typed AST dump.
 
+extern "kernel32.dll" fun GetTickCount64(): u64
+
 struct Point {
     x: i64
     y: i64
@@ -37,9 +39,13 @@ fun use_scalars(): i64 {
     let a = 1
     let b: i64 = 2
     let c: u64 = u64(3)
+    let d: i32 = i32(4)
+    let e: u32 = u32(5)
     let byte: u8 = 'A'
     let ok: bool = true
     let no: bool = false
+    let converted_i32 = i32(a)
+    let converted_u32 = u32(b)
     let converted_u8 = u8(65)
     let converted_bool = bool(a)
     let sum = a + b * 3 - 4 / 2 + 5 % 2

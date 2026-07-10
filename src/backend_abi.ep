@@ -5,10 +5,6 @@
 
 fun backend_abi_is_winapi(name: str): bool {
     if name == "ExitProcess" { ret true }
-    if name == "Sleep" { ret true }
-    if name == "GetTickCount64" { ret true }
-    if name == "lstrlenA" { ret true }
-    if name == "lstrcmpA" { ret true }
     if name == "GetStdHandle" { ret true }
     if name == "GetProcessHeap" { ret true }
     if name == "HeapAlloc" { ret true }
@@ -18,12 +14,11 @@ fun backend_abi_is_winapi(name: str): bool {
     if name == "WriteFile" { ret true }
     if name == "CloseHandle" { ret true }
     if name == "GetCommandLineA" { ret true }
-    if name == "MessageBoxA" { ret true }
     ret false
 }
 
 fun backend_abi_return_type(name: str): str {
-    if name == "ExitProcess" || name == "Sleep" { ret "void" }
+    if name == "ExitProcess" { ret "void" }
     if backend_abi_is_winapi(name) { ret "i64" }
     if name == "__ep_cstr" { ret "i64" }
     if name == "__ep_write_file" { ret "i64" }
@@ -35,14 +30,13 @@ fun backend_abi_return_type(name: str): str {
 }
 
 fun backend_abi_param_count(name: str): i64 {
-    if name == "ExitProcess" || name == "Sleep" { ret 1 }
-    if name == "GetTickCount64" || name == "GetProcessHeap" || name == "GetCommandLineA" { ret 0 }
-    if name == "lstrlenA" || name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
-    if name == "lstrcmpA" || name == "GetFileSize" { ret 2 }
+    if name == "ExitProcess" { ret 1 }
+    if name == "GetProcessHeap" || name == "GetCommandLineA" { ret 0 }
+    if name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
+    if name == "GetFileSize" { ret 2 }
     if name == "HeapAlloc" { ret 3 }
     if name == "CreateFileA" { ret 7 }
     if name == "ReadFile" || name == "WriteFile" { ret 5 }
-    if name == "MessageBoxA" { ret 4 }
     if name == "__ep_cstr" { ret 2 }
     if name == "__ep_write_file" { ret 3 }
     if name == "__ep_read_file" { ret 2 }
@@ -74,6 +68,7 @@ fun backend_abi_param_type(name: str, index: i64): str {
 fun backend_validate_extern(ext: MirExtern): void {
     let expected_ret = backend_abi_return_type(ext.name)
     let expected_count = backend_abi_param_count(ext.name)
+    if len(ext.name) >= 12 && ext.name[0:12] == "__ep_import$" { ret }
     if len(expected_ret) == 0 || expected_count < 0 {
         panic ("backend ABI error: unsupported backend extern: " + ext.name)
     }

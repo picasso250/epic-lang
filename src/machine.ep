@@ -754,7 +754,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
 }
 
 fun machine_now_ms(): i64 {
-    ret os.kernel32.GetTickCount64()
+    ret i64(GetTickCount64())
 }
 
 fun machine_print_timing(label: str, start: i64, stop: i64): void {

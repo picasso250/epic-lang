@@ -14,6 +14,8 @@
 #
 # Note: new T[n] creates length n and capacity n, so elements can be assigned by index.
 
+extern "kernel32.dll" fun GetTickCount64(): u64
+
 struct Mat {
     data: i64[]
     rows: i64
@@ -135,14 +137,14 @@ fun main(): void {
     let a = init_rand(n, 42)
     let b = init_rand(n, 99)
 
-    let t0 = os.kernel32.GetTickCount64()
+    let t0 = GetTickCount64()
     let c1 = mul_ijk(a, b)
-    let t1 = os.kernel32.GetTickCount64()
+    let t1 = GetTickCount64()
     let dt_ijk = t1 - t0
 
-    let t2 = os.kernel32.GetTickCount64()
+    let t2 = GetTickCount64()
     let c2 = mul_ikj(a, b)
-    let t3 = os.kernel32.GetTickCount64()
+    let t3 = GetTickCount64()
     let dt_ikj = t3 - t2
 
     print("ijk=")

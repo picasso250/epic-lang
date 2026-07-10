@@ -1,6 +1,9 @@
 fun main(): i64 {
     let x = 257
+    let y = 4294967295
     let a = u8(x)
-    let b = u64(x)
-    ret i64(a) + i64(b)
+    let b = i32(y)
+    let c = u32(y)
+    let d = u64(c)
+    ret i64(a) + i64(b) + i64(d)
 }

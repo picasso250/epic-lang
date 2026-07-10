@@ -1,5 +1,0 @@
-# COMPILE_FAIL: expected i64, got str
-fun main(): void {
-    let n = os.kernel32.lstrlenA("abc")
-    exit(n)
-}

@@ -13,10 +13,6 @@ class BackendAbiError(RuntimeError):
 
 WINAPI_ABI = {
     "ExitProcess": MirSignature([I64], VOID),
-    "Sleep": MirSignature([I64], VOID),
-    "GetTickCount64": MirSignature([], I64),
-    "lstrlenA": MirSignature([I64], I64),
-    "lstrcmpA": MirSignature([I64, I64], I64),
     "GetStdHandle": MirSignature([I64], I64),
     "GetProcessHeap": MirSignature([], I64),
     "HeapAlloc": MirSignature([I64, I64, I64], I64),
@@ -26,7 +22,6 @@ WINAPI_ABI = {
     "WriteFile": MirSignature([I64, I64, I64, I64, I64], I64),
     "CloseHandle": MirSignature([I64], I64),
     "GetCommandLineA": MirSignature([], I64),
-    "MessageBoxA": MirSignature([I64, I64, I64, I64], I64),
 }
 
 RUNTIME_ABI = {
@@ -49,6 +44,8 @@ def validate_backend_abi(program, abi=None):
     for item in program.externs:
         declarations[item.name] = item.signature
     for name, signature in declarations.items():
+        if name.startswith("__ep_import$"):
+            continue
         provided = abi.get(name)
         if provided is None:
             raise BackendAbiError(f"unsupported backend extern: {name}")

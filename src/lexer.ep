@@ -111,6 +111,7 @@ fun keyword_kind(text: str): str {
     if text == "if" { ret "IF" }
     if text == "in" { ret "IN" }
     if text == "fun" { ret "FUN" }
+    if text == "extern" { ret "EXTERN" }
     if text == "for" { ret "FOR" }
     if text == "new" { ret "NEW" }
     if text == "let" { ret "LET" }

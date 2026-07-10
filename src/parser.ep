@@ -3,7 +3,7 @@
 #
 
 fun epic_type_is_int(t: str): bool {
-    ret t == "i64" || t == "u64" || t == "u8"
+    ret t == "i64" || t == "u64" || t == "i32" || t == "u32" || t == "u8"
 }
 
 fun epic_type_ends_with(s: str, suffix: str): bool {
@@ -87,6 +87,7 @@ struct AstEmpty {
 struct AstProgram {
     meta: AstMeta
     funcs: AstFunDef[]
+    externs: AstExternDef[]
     structs: AstStructDef[]
     unions: AstUnionDef[]
 }
@@ -101,6 +102,14 @@ struct AstUnionDef {
     meta: AstMeta
     name: str
     members: str[]
+}
+
+struct AstExternDef {
+    meta: AstMeta
+    library: str
+    name: str
+    params: AstParam[]
+    source_type: TypeExpr
 }
 
 struct AstFunDef {
@@ -293,8 +302,6 @@ struct AstCall {
     meta: AstMeta
     name: str
     args: AstNode[]
-    type_name: str
-    dll: str
 }
 
 struct AstDotCall {
@@ -359,10 +366,10 @@ struct AstUnionInit {
 }
 
 
-type AstNode = AstEmpty | AstProgram | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstWhile | AstForRange | AstForIn | AstBreak | AstContinue | AstPanic | AstAssert | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_new_program(): AstProgram {
-    ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
+    ret new AstProgram { meta: ast_meta(), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
 }
 
 fun ast_new_param(): AstParam {
@@ -417,6 +424,7 @@ fun ast_name(node: AstNode): str {
     match node {
         AstStructDef n: { ret n.name }
         AstUnionDef n: { ret n.name }
+        AstExternDef n: { ret n.name }
         AstFunDef n: { ret n.name }
         AstParam n: { ret n.name }
         AstStructField n: { ret n.name }
@@ -467,6 +475,11 @@ fun ast_fields(node: AstNode): AstNode[] {
 
 fun ast_params(node: AstNode): AstNode[] {
     match node {
+        AstExternDef n: {
+            let out = new AstNode[]
+            for i in n.params { out.push(new AstNode(n.params[i])) }
+            ret out
+        }
         AstFunDef n: {
             let out = new AstNode[]
             for i in n.params {
@@ -481,6 +494,7 @@ fun ast_params(node: AstNode): AstNode[] {
 
 fun ast_source_type(node: AstNode): TypeExpr {
     match node {
+        AstExternDef n: { ret n.source_type }
         AstFunDef n: { ret n.source_type }
         AstParam n: { ret n.source_type }
         AstStructField n: { ret n.source_type }
@@ -794,6 +808,22 @@ fun (p: Parser) parse_params(): AstParam[] {
     ret params
 }
 
+fun (p: Parser) parse_extern_def(): AstExternDef {
+    let start = p.expect("EXTERN")
+    let library = p.expect("STRING")
+    p.expect("FUN")
+    let name = p.expect("ID")
+    p.expect("LPAREN")
+    let params = p.parse_params()
+    p.expect("RPAREN")
+    p.expect("COLON")
+    let ret_type = p.parse_type()
+    p.expect_stmt_end()
+    let node = new AstExternDef { meta: ast_meta(), library: token_text(library), name: token_text(name), params: params, source_type: ret_type }
+    node.meta.line = token_line(start)
+    ret node
+}
+
 fun (p: Parser) parse_struct_def(): AstStructDef {
     p.expect("STRUCT")
     let name = p.expect("ID")
@@ -876,8 +906,10 @@ fun (p: Parser) parse_union_def(): AstUnionDef {
 fun (p: Parser) parse_program(): AstNode {
     let program = ast_new_program()
     p.skip_newlines()
-    for p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("TYPE") == 1 {
-        if p.peek_kind("FUN") == 1 {
+    for p.peek_kind("EXTERN") == 1 || p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("TYPE") == 1 {
+        if p.peek_kind("EXTERN") == 1 {
+            program.externs.push(p.parse_extern_def())
+        } else if p.peek_kind("FUN") == 1 {
             program.funcs.push(p.parse_fn_def())
         } else if p.peek_kind("STRUCT") == 1 {
             program.structs.push(p.parse_struct_def())
@@ -1714,7 +1746,7 @@ fun (p: Parser) parse_primary(): AstNode {
     if p.peek_kind("ID") == 1 {
         let t = p.advance()
         if p.check("LPAREN") == 1 {
-            let call = new AstCall { meta: ast_meta(), name: token_text(t), args: p.parse_args(), type_name: "", dll: "" }
+            let call = new AstCall { meta: ast_meta(), name: token_text(t), args: p.parse_args() }
             call.meta.line = token_line(t)
             p.expect("RPAREN")
             ret p.parse_postfix(new AstNode(call))
@@ -1857,6 +1889,7 @@ fun dump_list(nodes: AstNode[], depth: i64): i64 {
 fun dump_node_is_decl(node: AstNode): bool {
     match node {
         AstStructField n: { ret true }
+        AstExternDef n: { ret true }
         AstFunDef n: { ret true }
         AstParam n: { ret true }
         AstLet n: { ret true }
@@ -1943,6 +1976,9 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             for i in n.unions {
                 dump_node(new AstNode(n.unions[i]), depth + 1)
             }
+            for i in n.externs {
+                dump_node(new AstNode(n.externs[i]), depth + 1)
+            }
             for i in n.funcs {
                 dump_node(new AstNode(n.funcs[i]), depth + 1)
             }
@@ -1996,6 +2032,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             dump_node(n.expr, depth + 1)
             ret 0
         }
+        AstExternDef n: { ret dump_node_generic(node, depth, "ExternDef", false) }
         AstFunDef n: {
             if n.method_name != "" {
                 indent(depth)

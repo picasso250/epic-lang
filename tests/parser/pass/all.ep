@@ -2,6 +2,8 @@
 # This file is parser-only: it should parse and dump consistently in Python and Epic,
 # but it is not intended to pass sema/codegen.
 
+extern "kernel32.dll" fun GetTickCount64(): u64
+
 struct Point {
     x: i64
     y: i64

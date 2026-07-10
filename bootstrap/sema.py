@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from ast_nodes import *
 from epic_builtins import BUILTIN_FUNCTIONS, PSEUDO_BUILTINS
-from epic_types import ARRAY, BOOL, I64, I8, NAMED, PTR, STR, U64, U8, VOID, EpicType
+from epic_types import ARRAY, BOOL, I32, I64, I8, NAMED, PTR, STR, U32, U64, U8, VOID, EpicType
 from parser import dump_ast_text
 
 
@@ -23,31 +23,19 @@ class ExprInfo:
 class SemanticAnalyzer:
     INT_RANGES = {
         "u8": (0, 255),
+        "i32": (-2147483648, 2147483647),
+        "u32": (0, 4294967295),
         "i64": (-9223372036854775808, 9223372036854775807),
         "u64": (0, 18446744073709551615),
     }
 
-    OS_SIGNATURES = {
-        ("kernel32", "ExitProcess"): ([I64], VOID),
-        ("kernel32", "Sleep"): ([I64], VOID),
-        ("kernel32", "GetTickCount64"): ([], I64),
-        ("kernel32", "lstrlenA"): ([I64], I64),
-        ("kernel32", "lstrcmpA"): ([I64, I64], I64),
-        ("kernel32", "GetStdHandle"): ([I64], I64),
-        ("kernel32", "GetProcessHeap"): ([], I64),
-        ("kernel32", "HeapAlloc"): ([I64, I64, I64], I64),
-        ("kernel32", "CreateFileA"): ([I64, I64, I64, I64, I64, I64, I64], I64),
-        ("kernel32", "GetFileSize"): ([I64, I64], I64),
-        ("kernel32", "ReadFile"): ([I64, I64, I64, I64, I64], I64),
-        ("kernel32", "WriteFile"): ([I64, I64, I64, I64, I64], I64),
-        ("kernel32", "CloseHandle"): ([I64], I64),
-        ("kernel32", "GetCommandLineA"): ([], I64),
-        ("user32", "MessageBoxA"): ([I64, I64, I64, I64], I64),
-    }
+    EXTERN_ABI_TYPES = {I32, U32, I64, U64}
 
     INTEGER_CONVERSIONS = {
         "i64": I64,
         "u64": U64,
+        "i32": I32,
+        "u32": U32,
         "u8": U8,
     }
 
@@ -67,6 +55,25 @@ class SemanticAnalyzer:
         self._build_types()
         self._build_unions()
         self._build_functions()
+        for ext in self.program.externs:
+            if not ext.library:
+                self._fail_global(f"extern {ext.name} requires a non-empty library")
+            if "$" in ext.library or "\0" in ext.library:
+                self._fail_global(f"extern {ext.name} library contains an unsupported character")
+            if ext.name in BUILTIN_FUNCTIONS or ext.name in PSEUDO_BUILTINS:
+                self._fail_global(f"reserved builtin function name: {ext.name}")
+            params = []
+            for param in ext.params:
+                param.resolved_type = self._type_name(param.type)
+                if param.resolved_type not in self.EXTERN_ABI_TYPES:
+                    self._fail_global(f"extern {ext.name} parameter {param.name} has unsupported ABI type {param.resolved_type}")
+                params.append(param.resolved_type)
+            ext.resolved_type = self._type_name(ext.ret_type)
+            if ext.resolved_type != VOID and ext.resolved_type not in self.EXTERN_ABI_TYPES:
+                self._fail_global(f"extern {ext.name} has unsupported ABI return type {ext.resolved_type}")
+            if ext.name in self.func_sigs:
+                self._fail_global(f"duplicate function {ext.name}")
+            self.func_sigs[ext.name] = (params, ext.resolved_type)
         for fn in self.program.funcs:
             self._analyze_function(fn)
         assert_typed_program(self.program)
@@ -120,6 +127,7 @@ class SemanticAnalyzer:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
             fn.resolved_type = self._type_name(fn.ret_type)
             self.func_sigs[fn.name] = (params, fn.resolved_type)
+
 
     def _analyze_function(self, fn):
         self.fn_name = fn.name
@@ -458,11 +466,6 @@ class SemanticAnalyzer:
         self._fail(f"unsupported binary operator {expr.op}")
 
     def _call_expr(self, expr):
-        if expr.namespace == "os":
-            return self._os_call(expr)
-        if expr.namespace:
-            self._fail(f"unsupported namespaced call {expr.namespace}.{expr.name}")
-
         name = expr.name
         if name == "print":
             if len(expr.args) != 1:
@@ -488,7 +491,7 @@ class SemanticAnalyzer:
             return ExprInfo(STR)
         if name == "cstr":
             self._check_call_args(name, [STR], expr.args)
-            return ExprInfo(I64)
+            return ExprInfo(U64)
         if name in self.INTEGER_CONVERSIONS:
             self._check_arity(name, 1, expr.args)
             arg = self._expr(expr.args[0])
@@ -535,13 +538,6 @@ class SemanticAnalyzer:
         return ExprInfo(ret)
 
     def _dot_call_expr(self, expr):
-        if (
-            isinstance(expr.object, FieldAccessNode)
-            and isinstance(expr.object.object, VarNode)
-            and expr.object.object.name == "os"
-        ):
-            call = CallNode(name=expr.name, args=expr.args, namespace="os", dll=expr.object.field, line=expr.line)
-            return self._os_call(call)
         receiver = self._expr(expr.object)
         if receiver.type.kind == "array":
             if expr.name == "push":
@@ -565,18 +561,8 @@ class SemanticAnalyzer:
             params, ret = self.func_sigs[method_symbol]
             self._check_call_args(method_symbol, params, [expr.object] + expr.args)
             return ExprInfo(ret)
-        self._fail("method calls are only supported for os.*, arrays, and user structs for now")
+        self._fail("method calls are only supported for arrays and user structs")
         return ExprInfo(VOID)
-
-    def _os_call(self, expr):
-        key = (expr.dll, expr.name)
-        if expr.dll not in {"kernel32", "user32"}:
-            self._fail(f"unsupported os dll os.{expr.dll}")
-        if key not in self.OS_SIGNATURES:
-            self._fail(f"unsupported os call os.{expr.dll}.{expr.name}")
-        params, ret = self.OS_SIGNATURES[key]
-        self._check_call_args(f"os.{expr.dll}.{expr.name}", params, expr.args)
-        return ExprInfo(ret)
 
     def _struct_init_expr(self, expr):
         if expr.type_name not in self.struct_fields:
@@ -694,7 +680,7 @@ class SemanticAnalyzer:
             if name.name in self.struct_names or name.name in self.union_names:
                 return name
             self._fail_global(f"unknown type {name}")
-        if name in (I64, U64, I8, U8, BOOL, VOID, STR):
+        if name in (I64, U64, I32, U32, I8, U8, BOOL, VOID, STR):
             return name
         self._fail_global(f"unknown type {name}")
 
@@ -794,19 +780,7 @@ class SemanticAnalyzer:
         return False
 
     def _is_terminating_call(self, expr):
-        if isinstance(expr, CallNode):
-            if not expr.namespace and expr.name == "exit":
-                return True
-            return expr.namespace == "os" and expr.dll == "kernel32" and expr.name == "ExitProcess"
-        if isinstance(expr, DotCallNode):
-            return (
-                expr.name == "ExitProcess"
-                and isinstance(expr.object, FieldAccessNode)
-                and expr.object.field == "kernel32"
-                and isinstance(expr.object.object, VarNode)
-                and expr.object.object.name == "os"
-            )
-        return False
+        return isinstance(expr, CallNode) and expr.name == "exit"
 
     def _is_integer(self, typ):
         return typ.kind in self.INT_RANGES

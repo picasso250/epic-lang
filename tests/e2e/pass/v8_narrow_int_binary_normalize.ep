@@ -1,0 +1,19 @@
+# EXIT: 0
+fun main(): i64 {
+    let u: u32 = u32(4294967295) + u32(1)
+    if u64(u) != u64(0) { ret 10 }
+
+    let u_sub: u32 = u32(0) - u32(1)
+    if u64(u_sub) != u64(4294967295) { ret 11 }
+
+    let small: u8 = u8(255) + u8(1)
+    if i64(small) != 0 { ret 12 }
+
+    let i: i32 = i32(2147483647) + i32(1)
+    if i64(i) != (0 - 2147483647 - 1) { ret 13 }
+
+    let shifted: i32 = i32(1) << 31
+    if i64(shifted) != (0 - 2147483647 - 1) { ret 14 }
+
+    ret 0
+}

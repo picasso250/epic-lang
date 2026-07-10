@@ -19,7 +19,7 @@ MirLower.__init__(program)
 
 lower():
   ├─ x64.global("_start")
-  ├─ x64.extern(...) for each program.import
+  ├─ x64.extern(...) for each referenced program extern and backend-owned runtime import
   ├─ x64.section(".data")
   ├─ emit_runtime_data(x64, program)    # 数据全局、string header
   ├─ x64.section(".text")
@@ -300,7 +300,8 @@ if inst.result is not None:
 `Symbol(callee)` 的 `callee` 直接取 `inst.callee` 字符串。可以是：
 
 - 用户函数名（如 `main`、`foo`）
-- WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
+- backend-owned WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
+- source extern 编码名（`__ep_import$<dll>$<symbol>`）
 - Runtime helper 名（如 `__ep_print_str`、`__epx_alloc`）
 - `__epx_alloc`
 

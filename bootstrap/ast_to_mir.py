@@ -48,30 +48,13 @@ class BlockFlow:
     block: object = None
 
 
-WINAPI_IMPORTS = [
-    ("kernel32", "ExitProcess", [I64], VOID),
-    ("kernel32", "Sleep", [I64], VOID),
-    ("kernel32", "GetTickCount64", [], I64),
-    ("kernel32", "lstrlenA", [I64], I64),
-    ("kernel32", "lstrcmpA", [I64, I64], I64),
-    ("kernel32", "GetStdHandle", [I64], I64),
-    ("kernel32", "GetProcessHeap", [], I64),
-    ("kernel32", "HeapAlloc", [I64, I64, I64], I64),
-    ("kernel32", "CreateFileA", [I64, I64, I64, I64, I64, I64, I64], I64),
-    ("kernel32", "GetFileSize", [I64, I64], I64),
-    ("kernel32", "ReadFile", [I64, I64, I64, I64, I64], I64),
-    ("kernel32", "WriteFile", [I64, I64, I64, I64, I64], I64),
-    ("kernel32", "CloseHandle", [I64], I64),
-    ("kernel32", "GetCommandLineA", [], I64),
-    ("user32", "MessageBoxA", [I64, I64, I64, I64], I64),
-]
-
-
 class MirCodegen(MirFunctionBuilder):
     def __init__(self):
         super().__init__(numbered_blocks=True)
         self.program = MirProgram()
         self.func_sigs = {}
+        self.func_callees = {}
+        self.extern_source_returns = {}
         self.local_scopes = []
         self.local_type_scopes = []
         self.strings = {}
@@ -87,8 +70,15 @@ class MirCodegen(MirFunctionBuilder):
             fn.name: MirSignature([self._type(p.resolved_type) for p in fn.params], self._type(fn.resolved_type))
             for fn in ast.funcs
         }
-        for _dll, name, params, ret in WINAPI_IMPORTS:
-            self.program.externs.append(MirExtern(name, MirSignature(params, ret)))
+        self.func_callees = {fn.name: fn.name for fn in ast.funcs}
+        for ext in ast.externs:
+            callee = "__ep_import$" + ext.library + "$" + ext.name
+            sig = MirSignature([self._type(p.resolved_type) for p in ext.params], self._type(ext.resolved_type))
+            self.func_sigs[ext.name] = sig
+            self.func_callees[ext.name] = callee
+            self.extern_source_returns[ext.name] = ext.resolved_type
+            self.program.externs.append(MirExtern(callee, sig))
+        self.program.externs.append(MirExtern("ExitProcess", MirSignature([I64], VOID)))
         if "__ep_str_from_i64" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr())))
         if "__ep_str_from_u64" not in self.func_sigs:
@@ -176,7 +166,7 @@ class MirCodegen(MirFunctionBuilder):
             return VOID
         if typ == et.BOOL:
             return BOOL
-        if typ in (et.I64, et.U64, et.I8, et.U8):
+        if typ in (et.I64, et.U64, et.I32, et.U32, et.I8, et.U8):
             return I64
         if typ == et.STR:
             return ptr()
@@ -184,7 +174,7 @@ class MirCodegen(MirFunctionBuilder):
             elem = typ.elem
             if elem in (et.I8, et.U8):
                 return ptr()
-            if elem in (et.I64, et.U64, et.BOOL):
+            if elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
                 return ptr()
             if elem == et.STR:
                 return ptr()
@@ -201,7 +191,7 @@ class MirCodegen(MirFunctionBuilder):
             return I8
         if typ == et.BOOL:
             return BOOL
-        if typ in (et.I64, et.U64):
+        if typ in (et.I64, et.U64, et.I32, et.U32):
             return I64
         if typ == et.STR:
             return ptr()
@@ -394,7 +384,7 @@ class MirCodegen(MirFunctionBuilder):
         if typ.kind == "array":
             if typ.elem in (et.I8, et.U8):
                 return "_slice_u8"
-            if typ.elem in (et.I64, et.U64, et.BOOL):
+            if typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL):
                 return "_slice_i64"
             if typ.elem == et.STR:
                 return "_slice_str"
@@ -413,6 +403,7 @@ class MirCodegen(MirFunctionBuilder):
             return typ.elem.name if typ.elem.name in self.structs else None
         return None
 
+
     def _is_slice_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "array"
 
@@ -420,7 +411,7 @@ class MirCodegen(MirFunctionBuilder):
         return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I8, et.U8)
 
     def _is_i64_array_type(self, typ):
-        return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I64, et.U64, et.BOOL)
+        return isinstance(typ, et.EpicType) and typ.kind == "array" and typ.elem in (et.I64, et.U64, et.I32, et.U32, et.BOOL)
 
     def _is_ptr_type(self, typ):
         return isinstance(typ, et.EpicType) and typ.kind == "ptr"
@@ -794,6 +785,8 @@ class MirCodegen(MirFunctionBuilder):
     def _shift_width(self, typ):
         if typ in (et.U8, "u8"):
             return 8
+        if typ in (et.I32, et.U32, "i32", "u32"):
+            return 32
         return 64
 
     def _emit_shift_count_check(self, count, lhs_type, line):
@@ -1002,6 +995,10 @@ class MirCodegen(MirFunctionBuilder):
     def _normalize_integer_value(self, value, typ):
         if typ in (et.U8, "u8"):
             return self._emit_truncating_uint_conversion_value(value, 255)
+        if typ in (et.U32, "u32"):
+            return self._emit_truncating_uint_conversion_value(value, 4294967295)
+        if typ in (et.I32, "i32"):
+            return self._emit_truncating_i32_conversion_value(value)
         return value
 
     def _binary(self, op, left, right, lhs_type=None, line=0):
@@ -1064,7 +1061,7 @@ class MirCodegen(MirFunctionBuilder):
         raise MirCodegenError(f"unsupported binary op: {expr.op}")
 
     def _is_unsigned_integer(self, typ):
-        return typ in (et.U64, et.U8)
+        return typ in (et.U64, et.U32, et.U8)
 
     def _emit_short_circuit(self, expr):
         return self._emit_short_circuit_from(self.ensure_insertable(), expr).value
@@ -1105,10 +1102,6 @@ class MirCodegen(MirFunctionBuilder):
     def _emit_call_from(self, in_block, expr):
         self.set_block(in_block)
         name = expr.name
-        if expr.namespace == "os":
-            return self._emit_os_call_from(self.current_block, expr)
-        if expr.namespace:
-            raise MirCodegenError(f"unsupported namespaced call: {expr.namespace}.{name}")
         if self._is_builtin(name):
             return self._emit_builtin_from(self.current_block, expr)
         return self._emit_user_call_from(self.current_block, expr)
@@ -1124,6 +1117,8 @@ class MirCodegen(MirFunctionBuilder):
             "u64",
             "u8",
             "bool",
+            "i32",
+            "u32",
             "bytes",
             "read_file",
             "write_file",
@@ -1175,6 +1170,14 @@ class MirCodegen(MirFunctionBuilder):
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
             return ValueFlow(self._emit_truncating_uint_conversion_value(arg.value, 255), self.current_block)
+        if name == "u32":
+            arg = self._emit_expr_from(self.current_block, expr.args[0])
+            self.set_block(arg.block)
+            return ValueFlow(self._emit_truncating_uint_conversion_value(arg.value, 4294967295), self.current_block)
+        if name == "i32":
+            arg = self._emit_expr_from(self.current_block, expr.args[0])
+            self.set_block(arg.block)
+            return ValueFlow(self._emit_truncating_i32_conversion_value(arg.value), self.current_block)
         if name == "bytes":
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
@@ -1223,13 +1226,6 @@ class MirCodegen(MirFunctionBuilder):
 
     def _emit_dot_call_from(self, in_block, expr):
         self.set_block(in_block)
-        if (
-            isinstance(expr.object, FieldAccessNode)
-            and isinstance(expr.object.object, VarNode)
-            and expr.object.object.name == "os"
-        ):
-            call = CallNode(name=expr.name, args=expr.args, namespace="os", dll=expr.object.field, line=expr.line)
-            return self._emit_os_call_from(self.current_block, call)
         receiver_type = self._infer_type(expr.object)
         if receiver_type.kind == "array":
             if expr.name == "push":
@@ -1278,7 +1274,15 @@ class MirCodegen(MirFunctionBuilder):
         args = self._emit_arg_flows_from(self.current_block, expr.args)
         sig = self.func_sigs[name]
         result_type = None if sig.ret == VOID else sig.ret
-        result = self.inst("call", args.value, result_type=result_type, type=sig.ret, callee=name)
+        result = self.inst("call", args.value, result_type=result_type, type=sig.ret, callee=self.func_callees[name])
+        if result is not None and name in self.extern_source_returns:
+            source_ret = self.extern_source_returns[name]
+            value = ValueOperand(result)
+            if source_ret == et.U32:
+                value = self._emit_truncating_uint_conversion_value(value, 4294967295)
+            elif source_ret == et.I32:
+                value = self._emit_truncating_i32_conversion_value(value)
+            return ValueFlow(value, self.current_block)
         return ValueFlow(ValueOperand(result) if result is not None else ConstIntOperand(I64, 0), self.current_block)
 
     def _infer_type(self, expr):
@@ -1426,33 +1430,23 @@ class MirCodegen(MirFunctionBuilder):
             raise MirCodegenError(f"unknown field: {expr.field}")
         return ValueFlow(self._load_field(base.value, struct_name, expr.field), self.current_block)
 
-    def _emit_os_call(self, expr):
-        return self._emit_os_call_from(self.ensure_insertable(), expr).value
-
-    def _emit_os_call_from(self, in_block, expr):
-        self.set_block(in_block)
-        signature = next(
-            (
-                MirSignature(params, ret)
-                for dll, name, params, ret in WINAPI_IMPORTS
-                if dll == expr.dll and name == expr.name
-            ),
-            None,
-        )
-        if signature is None:
-            raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}")
-        args = self._emit_arg_flows_from(self.current_block, expr.args)
-        result_type = None if signature.ret == VOID else signature.ret
-        result = self.inst("call", args.value, result_type=result_type, type=signature.ret, callee=expr.name)
-        return ValueFlow(ValueOperand(result) if result is not None else ConstIntOperand(I64, 0), self.current_block)
-
     def _emit_truncating_uint_conversion_value(self, value, mask):
         return ValueOperand(self.inst("and", [value, ConstIntOperand(I64, mask)], result_type=I64))
+
+    def _emit_truncating_i32_conversion_value(self, value):
+        shifted = self.inst("shl", [value, ConstIntOperand(I64, 32)], result_type=I64)
+        sign_extended = self.inst("sar", [ValueOperand(shifted), ConstIntOperand(I64, 32)], result_type=I64)
+        return ValueOperand(sign_extended)
 
     def _emit_truncating_uint_conversion(self, expr, mask):
         flow = self._emit_expr_from(self.ensure_insertable(), expr)
         self.set_block(flow.block)
         return self._emit_truncating_uint_conversion_value(flow.value, mask)
+
+    def _emit_truncating_i32_conversion(self, expr):
+        flow = self._emit_expr_from(self.ensure_insertable(), expr)
+        self.set_block(flow.block)
+        return self._emit_truncating_i32_conversion_value(flow.value)
 
     def _emit_str_conversion(self, expr):
         return self._emit_str_conversion_from(self.ensure_insertable(), expr).value

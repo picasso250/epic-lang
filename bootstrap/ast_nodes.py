@@ -19,9 +19,19 @@ class ASTNode:
 
 @dataclass
 class ProgramNode(ASTNode):
-    funcs: list      # list[FunDefNode]
-    structs: list    # list[StructDefNode]
-    unions: list = field(default_factory=list)   # list[UnionDefNode]
+    funcs: list
+    structs: list
+    unions: list = field(default_factory=list)
+    externs: list = field(default_factory=list)
+
+
+@dataclass
+class ExternDefNode(ASTNode):
+    library: str
+    name: str
+    params: list
+    ret_type: EpicType
+    resolved_type: Optional[EpicType] = None
 
 
 @dataclass
@@ -242,8 +252,6 @@ class VarNode(ASTNode):
 class CallNode(ASTNode):
     name: str
     args: list      # list[ASTNode]
-    namespace: str = ""
-    dll: str = ""
     resolved_type: Optional[EpicType] = None
 
 

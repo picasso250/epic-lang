@@ -1,5 +1,7 @@
 # COMPILE_ONLY
+extern "user32.dll" fun MessageBoxA(hwnd: u64, text: u64, caption: u64, flags: u32): i32
+
 fun main(): void {
-    os.user32.MessageBoxA(0, cstr("hi"), cstr("Epic"), 0)
+    MessageBoxA(u64(0), cstr("hi"), cstr("Epic"), u32(0))
     exit(0)
 }

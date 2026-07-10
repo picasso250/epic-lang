@@ -135,6 +135,7 @@ def _parse_file(input_path, verbose=True):
 
 def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     funcs = []
+    externs = []
     structs = []
     unions = []
     seen_funcs = {}
@@ -165,6 +166,8 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
             seen_unions[union.name] = input_path
             unions.append(union)
 
+        externs.extend(ast.externs)
+
         for func in ast.funcs:
             if func.name == "main" and not is_main_file:
                 continue
@@ -180,7 +183,7 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     if not found_main:
         raise RuntimeError(f"Main file has no main function: {main_path}")
 
-    return ProgramNode(funcs=funcs, structs=structs, unions=unions)
+    return ProgramNode(funcs=funcs, structs=structs, unions=unions, externs=externs)
 
 
 def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
@@ -192,6 +195,8 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
     stage_start = _now()
     ast = _merge_programs(input_paths, main_path)
     _print_timing("read+lex+parse+merge", stage_start)
+    if linker != "py" and ast.externs:
+        raise RuntimeError("source extern declarations require --linker py")
 
     print("[2/5] Semantic analysis")
     stage_start = _now()

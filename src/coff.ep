@@ -83,7 +83,7 @@ fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
 }
 
 fun coff_now_ms(): i64 {
-    ret os.kernel32.GetTickCount64()
+    ret i64(GetTickCount64())
 }
 
 fun coff_print_timing(label: str, start: i64, stop: i64): void {

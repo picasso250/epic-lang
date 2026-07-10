@@ -259,6 +259,16 @@ fun put_name_value(items: NameValue[], name: str, value: i64): void {
     items.push(item)
 }
 
+fun set_name_value(items: NameValue[], name: str, value: i64): void {
+    for i in items {
+        if items[i].name == name {
+            items[i].value = value
+            ret
+        }
+    }
+    put_name_value(items, name, value)
+}
+
 fun contains_str(items: str[], name: str): i64 {
     for i in items {
         if items[i] == name {
@@ -412,82 +422,99 @@ fun kernel32_hint(name: str): i64 {
     if name == "GetFileSize" { ret 631 }
     if name == "GetProcessHeap" { ret 740 }
     if name == "GetStdHandle" { ret 805 }
-    if name == "GetTickCount64" { ret 846 }
     if name == "HeapAlloc" { ret 892 }
-    if name == "lstrcmpA" { ret 985 }
-    if name == "lstrlenA" { ret 991 }
     if name == "ReadFile" { ret 1193 }
-    if name == "SetFilePointer" { ret 1384 }
-    if name == "Sleep" { ret 1410 }
     if name == "WriteFile" { ret 1632 }
     ret 0
 }
 
-fun is_user32_import(name: str): bool {
-    ret name == "MessageBoxA"
+fun import_has_prefix(name: str, prefix: str): bool {
+    ret len(name) >= len(prefix) && name[0:len(prefix)] == prefix
 }
 
-fun import_user32_count(st: LinkState): i64 {
-    let n = 0
-    for i in st.imports {
-        if is_user32_import(st.imports[i]) {
-            n += 1
-        }
+fun import_lower_text(text: str): str {
+    let src = bytes(text)
+    let out = new u8[]
+    for i in src { out.push(ascii_lower_byte(src[i])) }
+    ret str(out)
+}
+
+fun import_payload(name: str): str {
+    let prefix = "__ep_import$"
+    if import_has_prefix(name, prefix) == false { ret "" }
+    ret name[len(prefix):len(name)]
+}
+
+fun import_payload_separator(name: str): i64 {
+    let payload = import_payload(name)
+    let separator = find_text(payload, "$")
+    if separator <= 0 || separator + 1 >= len(payload) {
+        die_link(f"invalid encoded import: {name}")
     }
-    ret n
+    ret separator
 }
 
-fun import_kernel32_count(st: LinkState): i64 {
-    ret len(st.imports) - import_user32_count(st)
+fun import_dll_name(name: str): str {
+    if import_has_prefix(name, "__ep_import$") {
+        let payload = import_payload(name)
+        let separator = import_payload_separator(name)
+        ret import_lower_text(payload[0:separator])
+    }
+    ret "kernel32.dll"
+}
+
+fun import_symbol_name(name: str): str {
+    if import_has_prefix(name, "__ep_import$") {
+        let payload = import_payload(name)
+        let separator = import_payload_separator(name)
+        ret payload[separator + 1:len(payload)]
+    }
+    ret name
+}
+
+fun import_dlls(st: LinkState): str[] {
+    let dlls = new str[]
+    for i in st.imports {
+        let dll = import_dll_name(st.imports[i])
+        if contains_str(dlls, dll) == 0 { dlls.push(dll) }
+    }
+    ret sorted_imports(dlls)
+}
+
+fun import_count_for_dll(st: LinkState, dll: str): i64 {
+    let count = 0
+    for i in st.imports {
+        if import_dll_name(st.imports[i]) == dll { count += 1 }
+    }
+    ret count
 }
 
 fun import_dll_count(st: LinkState): i64 {
-    if import_user32_count(st) > 0 {
-        ret 2
-    }
-    if len(st.imports) > 0 {
-        ret 1
-    }
-    ret 0
+    ret len(import_dlls(st))
 }
 
 fun import_iat_dir_offset(st: LinkState): i64 {
-    let dlls = import_dll_count(st)
-    if dlls == 0 {
-        ret 0
+    let dlls = import_dlls(st)
+    if len(dlls) == 0 { ret 0 }
+    let off = align_to((len(dlls) + 1) * 20, 8)
+    for i in dlls {
+        off += (import_count_for_dll(st, dlls[i]) + 1) * 8
+        off = align_to(off, 8)
     }
-    let off = (dlls + 1) * 20
-    off = align_to(off, 8)
-    let k = import_kernel32_count(st)
-    if k > 0 {
-        off += (k + 1) * 8
-    }
-    off = align_to(off, 8)
-    let u = import_user32_count(st)
-    if u > 0 {
-        off += (u + 1) * 8
-    }
-    off = align_to(off, 8)
     ret off
 }
 
 fun import_iat_dir_size(st: LinkState): i64 {
     let size = 0
-    let k = import_kernel32_count(st)
-    if k > 0 {
-        size += (k + 1) * 8
-    }
-    let u = import_user32_count(st)
-    if u > 0 {
-        size += (u + 1) * 8
+    let dlls = import_dlls(st)
+    for i in dlls {
+        size += (import_count_for_dll(st, dlls[i]) + 1) * 8
     }
     ret size
 }
 
 fun import_hint(name: str): i64 {
-    if is_user32_import(name) {
-        ret 0
-    }
+    if import_has_prefix(name, "__ep_import$") { ret 0 }
     ret kernel32_hint(name)
 }
 
@@ -524,102 +551,56 @@ fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void 
 
 fun build_idata(st: LinkState): void {
     st.idata = new u8[]
-    if len(st.imports) == 0 {
-        ret
+    if len(st.imports) == 0 { ret }
+
+    let dlls = import_dlls(st)
+    append_zero(st.idata, (len(dlls) + 1) * 20)
+
+    let ilt_offsets = new NameValue[]
+    let iat_group_offsets = new NameValue[]
+    let next_indexes = new NameValue[]
+
+    for di in dlls {
+        let dll = dlls[di]
+        for len(st.idata) % 8 != 0 { st.idata.push(u8(0)) }
+        put_name_value(ilt_offsets, dll, len(st.idata))
+        append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
-    let dll_count = import_dll_count(st)
-    let desc_size = (dll_count + 1) * 20
-    append_zero(st.idata, desc_size)
-
-    let k_count = import_kernel32_count(st)
-    let u_count = import_user32_count(st)
-    let k_ilt = 0
-    let u_ilt = 0
-    let k_iat = 0
-    let u_iat = 0
-    for len(st.idata) % 8 != 0 {
-        st.idata.push(u8(0))
-    }
-    if k_count > 0 {
-        k_ilt = len(st.idata)
-        append_zero(st.idata, (k_count + 1) * 8)
-    }
-    for len(st.idata) % 8 != 0 {
-        st.idata.push(u8(0))
-    }
-    if u_count > 0 {
-        u_ilt = len(st.idata)
-        append_zero(st.idata, (u_count + 1) * 8)
-    }
-    for len(st.idata) % 8 != 0 {
-        st.idata.push(u8(0))
-    }
-    if k_count > 0 {
-        k_iat = len(st.idata)
-        append_zero(st.idata, (k_count + 1) * 8)
-    }
-    for len(st.idata) % 8 != 0 {
-        st.idata.push(u8(0))
-    }
-    if u_count > 0 {
-        u_iat = len(st.idata)
-        append_zero(st.idata, (u_count + 1) * 8)
+    for di in dlls {
+        let dll = dlls[di]
+        for len(st.idata) % 8 != 0 { st.idata.push(u8(0)) }
+        put_name_value(iat_group_offsets, dll, len(st.idata))
+        put_name_value(next_indexes, dll, 0)
+        append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
-    let ki = 0
-    let ui = 0
     for i in st.imports {
-        let name = st.imports[i]
-        if !is_user32_import(name) {
-            let hint_rva = st.idata_rva + len(st.idata)
-            append_u16(st.idata, import_hint(name))
-            append_str(st.idata, name)
-            st.idata.push(u8(0))
-            if len(st.idata) % 2 != 0 {
-                st.idata.push(u8(0))
-            }
-            put_u64_le(st.idata, k_ilt + ki * 8, u64(hint_rva))
-            put_u64_le(st.idata, k_iat + ki * 8, u64(hint_rva))
-            put_name_value(st.iat_offsets, name, k_iat + ki * 8)
-            ki += 1
-        }
-    }
-    for i in st.imports {
-        let name = st.imports[i]
-        if is_user32_import(name) {
-            let hint_rva = st.idata_rva + len(st.idata)
-            append_u16(st.idata, import_hint(name))
-            append_str(st.idata, name)
-            st.idata.push(u8(0))
-            if len(st.idata) % 2 != 0 {
-                st.idata.push(u8(0))
-            }
-            put_u64_le(st.idata, u_ilt + ui * 8, u64(hint_rva))
-            put_u64_le(st.idata, u_iat + ui * 8, u64(hint_rva))
-            put_name_value(st.iat_offsets, name, u_iat + ui * 8)
-            ui += 1
-        }
+        let encoded = st.imports[i]
+        let dll = import_dll_name(encoded)
+        let symbol = import_symbol_name(encoded)
+        let index = get_name_value(next_indexes, dll)
+        let hint_rva = st.idata_rva + len(st.idata)
+        append_u16(st.idata, import_hint(encoded))
+        append_str(st.idata, symbol)
+        st.idata.push(u8(0))
+        if len(st.idata) % 2 != 0 { st.idata.push(u8(0)) }
+        let ilt = get_name_value(ilt_offsets, dll)
+        let iat = get_name_value(iat_group_offsets, dll)
+        put_u64_le(st.idata, ilt + index * 8, u64(hint_rva))
+        put_u64_le(st.idata, iat + index * 8, u64(hint_rva))
+        put_name_value(st.iat_offsets, encoded, iat + index * 8)
+        set_name_value(next_indexes, dll, index + 1)
     }
 
-    let desc = 0
-    if k_count > 0 {
+    for di in dlls {
+        let dll = dlls[di]
         let dll_off = len(st.idata)
-        append_str(st.idata, "KERNEL32.dll")
+        append_str(st.idata, dll)
         st.idata.push(u8(0))
-        put_u32_le(st.idata, desc * 20, u64(st.idata_rva + k_ilt))
-        put_u32_le(st.idata, desc * 20 + 12, u64(st.idata_rva + dll_off))
-        put_u32_le(st.idata, desc * 20 + 16, u64(st.idata_rva + k_iat))
-        desc += 1
-    }
-    if u_count > 0 {
-        let dll_off = len(st.idata)
-        append_str(st.idata, "USER32.dll")
-        st.idata.push(u8(0))
-        put_u32_le(st.idata, desc * 20, u64(st.idata_rva + u_ilt))
-        put_u32_le(st.idata, desc * 20 + 12, u64(st.idata_rva + dll_off))
-        put_u32_le(st.idata, desc * 20 + 16, u64(st.idata_rva + u_iat))
-        desc += 1
+        put_u32_le(st.idata, di * 20, u64(st.idata_rva + get_name_value(ilt_offsets, dll)))
+        put_u32_le(st.idata, di * 20 + 12, u64(st.idata_rva + dll_off))
+        put_u32_le(st.idata, di * 20 + 16, u64(st.idata_rva + get_name_value(iat_group_offsets, dll)))
     }
 }
 

@@ -31,6 +31,8 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 |--------|-------|
 | `bool` | Logical true/false |
 | `u8`   | Byte |
+| `i32`  | Signed 32-bit, stored in 8-byte slot |
+| `u32`  | Unsigned 32-bit, stored in 8-byte slot |
 | `i64`  | Signed 64-bit |
 | `u64`  | Unsigned 64-bit |
 
@@ -57,7 +59,7 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 
 | Feature | Notes |
 |---------|-------|
-| `fun name(params): ret { body }` | Max 4 parameters; body may use a tail expression as the return value |
+| `fun name(params): ret { body }` | Windows x64 register/stack arguments; body may use a tail expression as the return value |
 | `main` entry | `fun main(): void` |
 | Recursion | Allowed |
 
@@ -75,7 +77,7 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | Bitwise | `~` `&` `|` `^` |
 | Shift | `<<` `>>` `>>>` |
 | Compound assignment | `+=` `-=` `*=` `/=` `%=` `<<=` `>>=` `>>>=` `&=` `|=` `^=` |
-| Explicit integer conversion | `i64(x)` `u64(x)` `u8(x)` `bool(x)` |
+| Explicit integer conversion | `i32(x)` `u32(x)` `i64(x)` `u64(x)` `u8(x)` `bool(x)` |
 
 ### Builtins
 
@@ -120,10 +122,10 @@ These are core runtime helpers. MIR helper bodies used by both compilers live in
 - `__ep_slice_i64_set` — bounds-checked i64 array write
 - `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` — array append
 
-### OS Namespace
+### Extern FFI
 
-`os.<dll>.<Function>(<args>)` is retained for WinAPI interop (kernel32, user32).  
-FFI arguments are `i64`; C strings require explicit `cstr(...)`.
+`extern "library.dll" fun Name(params): Ret` declares an exact Windows x64 import.
+ABI types are `i32`, `u32`, `i64`, `u64`, and `void` for returns. Foreign pointers and handles are opaque `u64` bit patterns; source-level `ptr`, dereference, pointer arithmetic, and `null` literals are not part of the language. C strings require explicit `cstr(...)`, which returns `u64`. The old `os.*` namespace is removed.
 
 ### Globals
 
@@ -183,7 +185,7 @@ after ADT removal and naming unification.
 | `match` general future | Kept as literal switch | Decide later whether to keep or remove |
 | `itoa` | Removed from public surface | Use `str(n)` |
 | `i8` public type | Removed | `u8` is Epic's only byte type; byte loads zero-extend to 0..255 |
-| `cstr` | Kept for now | May be removed when WinAPI interop is redesigned |
+| `cstr` | Returns an opaque `u64` C-string address for extern calls | Keep explicit; no implicit FFI string conversion |
 
 ---
 
@@ -191,7 +193,7 @@ after ADT removal and naming unification.
 
 ### Features retained in core
 
-- `i64` / `u64` / `u8` / `bool`
+- `i64` / `u64` / `i32` / `u32` / `u8` / `bool`
 - `str` (retained byte-string/text source type)
 - `struct`
 - `T[]` (dynamic array)
@@ -221,7 +223,7 @@ after ADT removal and naming unification.
   - `itoa` — removed entirely; use `str(n)`
   - `str_slice`, `str_cat` — function-style builtins removed from public surface; internal helpers retained for slice and `+` syntax lowering
   - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
-- `os.*` WinAPI calls
+- Top-level `extern` declarations with `i32/u32/i64/u64/void` ABI types
 - `argv` global
 - `assert` / `panic`
 

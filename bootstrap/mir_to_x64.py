@@ -47,6 +47,9 @@ class MirLower:
         # The x64 runtime itself calls WinAPI; those imports are backend-owned.
         for name in sorted(WINAPI_ABI):
             self.x64.extern(name)
+        for ext in self.program.externs:
+            if ext.name.startswith("__ep_import$"):
+                self.x64.extern(ext.name)
         self.x64.section(".data")
         self.string_globals = emit_runtime_data(self.x64, self.program)
         self.global_slots = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is None}

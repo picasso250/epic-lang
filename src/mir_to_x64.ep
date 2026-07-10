@@ -763,7 +763,7 @@ fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction)
 }
 
 fun mir_to_x64_now_ms(): i64 {
-    ret os.kernel32.GetTickCount64()
+    ret i64(GetTickCount64())
 }
 
 fun mir_to_x64_value_capacity(fn: MirFunction): i64 {

@@ -4,7 +4,7 @@ Consumes tokens from lexer, produces AST dataclass nodes.
 """
 
 from ast_nodes import *
-from epic_types import ARRAY, BOOL, I64, NAMED, STR, U64, U8, VOID
+from epic_types import ARRAY, BOOL, I32, I64, NAMED, STR, U32, U64, U8, VOID
 
 
 class ParseError(Exception):
@@ -67,9 +67,12 @@ class Parser:
         funcs = []
         structs = []
         unions = []
+        externs = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "STRUCT", "TYPE"):
-            if self.peek_kind("FUN"):
+        while self.peek()[0] in ("EXTERN", "FUN", "STRUCT", "TYPE"):
+            if self.peek_kind("EXTERN"):
+                externs.append(self.parse_extern_def())
+            elif self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
             elif self.peek_kind("STRUCT"):
                 structs.append(self.parse_struct_def())
@@ -79,7 +82,20 @@ class Parser:
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return ProgramNode(funcs=funcs, structs=structs, unions=unions)
+        return ProgramNode(funcs=funcs, structs=structs, unions=unions, externs=externs)
+
+    def parse_extern_def(self):
+        token = self.expect("EXTERN")
+        library = self.expect("STRING")
+        self.expect("FUN")
+        name = self.expect("ID")
+        self.expect("LPAREN")
+        params = self.parse_params()
+        self.expect("RPAREN")
+        self.expect("COLON")
+        ret_type = self.parse_type()
+        self.expect_stmt_end()
+        return ExternDefNode(library=library[1], name=name[1], params=params, ret_type=ret_type, line=token[2])
 
     # ── fun definition ─────────────────────────────────────────────────
 
@@ -180,6 +196,10 @@ class Parser:
             return I64
         if name == "u64":
             return U64
+        if name == "i32":
+            return I32
+        if name == "u32":
+            return U32
         if name == "u8":
             return U8
         if name == "bool":
@@ -704,6 +724,8 @@ def dump_ast_lines(node, depth=0):
             out.extend(dump_ast_lines(struct, depth + 1))
         for union in node.unions:
             out.extend(dump_ast_lines(union, depth + 1))
+        for ext in node.externs:
+            out.extend(dump_ast_lines(ext, depth + 1))
         for func in node.funcs:
             out.extend(dump_ast_lines(func, depth + 1))
     elif isinstance(node, StructDefNode):
@@ -716,6 +738,10 @@ def dump_ast_lines(node, depth=0):
         emit(f"UnionDef {node.name}")
         for member in node.members:
             out.append(_dump_line(depth + 1, f"UnionMember {member}"))
+    elif isinstance(node, ExternDefNode):
+        emit(f"ExternDef {node.name}{_decl_type_suffix(node, node.ret_type)}")
+        for param in node.params:
+            out.extend(dump_ast_lines(param, depth + 1))
     elif isinstance(node, FunDefNode):
         if node.method_name:
             emit(f"Method {node.receiver_type}.{node.method_name}{_decl_type_suffix(node, node.ret_type)}")
@@ -826,8 +852,7 @@ def dump_ast_lines(node, depth=0):
     elif isinstance(node, VarNode):
         emit(f"Var {node.name}{_type_suffix(node)}")
     elif isinstance(node, CallNode):
-        suffix = f" : {node.namespace}" if node.namespace else ""
-        emit(f"Call {node.name}{suffix}{_type_suffix(node)}")
+        emit(f"Call {node.name}{_type_suffix(node)}")
         for arg in node.args:
             out.extend(dump_ast_lines(arg, depth + 1))
     elif isinstance(node, DotCallNode):

@@ -39,7 +39,7 @@ Current snapshot of functions handled specially by the active Python reference c
 | Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
 | `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Formatting/view operation for the retained byte-string type |
-| `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to C-style (null-terminated); WinAPI interop |
+| `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to NUL-terminated opaque `u64` address for extern calls |
 | `bytes`    | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | String → `u8[]` |
 | `str_new`  | 🚫 Public surface removed; `str(bytes)` is the recommended path |
 | `itoa`     | 🚫 Public surface removed; `str(n)` is the recommended path |
@@ -73,11 +73,14 @@ These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 |----------|---------|----------------|---------------------|------------|-------|
 | `i64`  | ✓ (ln 613) | ✗ delegated | ✗ | ✓ (ln 869) | |
 | `u64`  | ✓ (ln 615) | ✗ delegated | ✗ | ✓ (ln 869) | |
+| `i32`  | ✓ | ✓ | ✓ | historical | Signed 32-bit semantics; canonical sign-extended 8-byte slot |
+| `u32`  | ✓ | ✓ | ✓ | historical | Unsigned 32-bit semantics; canonical zero-extended 8-byte slot |
+
 | `u8`   | ✓ (ln 623) | ✗ delegated | ✗ | ✓ (ln 886) | |
 | `bool` | ✓ (ln 430, 625) | ✗ delegated | ✗ | ✓ (ln 876) | |
 | `void` | ✓ (ln 627) | ✗ delegated | ✗ | ✗ | Unit type; not bindable as local/parameter/container element |
 
-`i8` has been removed from public surface; `u8` is Epic's only byte type.
+`i32` and `u32` are implemented in both the Python and self-hosted MIR paths. Arithmetic and casts re-normalize to 32 bits. `i8` has been removed from public surface; `u8` is Epic's only byte type.
 
 ---
 
@@ -98,33 +101,15 @@ These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
 
 ---
 
-## OS-namespaced calls
+## Source extern declarations
 
-Syntax: `os.<dll>.<Function>(<args>)`
+Syntax:
 
-Only `kernel32` and `user32` are supported (`bootstrap/sema.py` ln 506).
-
-Registered signatures (`bootstrap/sema.py` ln 75–95):
-
-```
-kernel32.ExitProcess(i64) -> void
-kernel32.Sleep(i64) -> void
-kernel32.GetTickCount64() -> i64
-kernel32.lstrlenA(i64) -> i64
-kernel32.lstrcmpA(i64, i64) -> i64
-kernel32.GetStdHandle(i64) -> i64
-kernel32.GetProcessHeap() -> i64
-kernel32.HeapAlloc(i64, i64, i64) -> i64
-kernel32.CreateFileA(i64, i64, i64, i64, i64, i64, i64) -> i64
-kernel32.GetFileSize(i64, i64) -> i64
-kernel32.ReadFile(i64, i64, i64, i64, i64) -> i64
-kernel32.WriteFile(i64, i64, i64, i64, i64) -> i64
-kernel32.CloseHandle(i64) -> i64
-kernel32.GetCommandLineA() -> i64
-user32.MessageBoxA(i64, i64, i64, i64) -> i64
+```epic
+extern "kernel32.dll" fun Sleep(milliseconds: u32): void
 ```
 
-The self-hosted `src/codegen.ep` maps these to MASM `invoke` / `call` stubs.
+The public ABI types are `i32`, `u32`, `i64`, `u64`, plus `void` returns. Foreign pointers and handles are represented as opaque `u64` values; `cstr(str)` returns `u64`. The compiler lowers source imports to self-describing symbols of the form `__ep_import$<dll>$<symbol>`, and the built-in linker groups them by DLL without a function whitelist. `os.*` is removed.
 
 ---
 
@@ -191,10 +176,9 @@ str_starts_with str_find push extend
 
 ```
 print println exit read_file write_file
-itoa cstr i64 u64 u8 bool
+itoa cstr i64 u64 i32 u32 u8 bool
 ```
 
 This means a user function named `print()` or `exit()` would parse successfully
 but then fail in codegen — or worse, silently shadow the builtin. The reserved
 list should be kept in sync with the actual builtin set.
-

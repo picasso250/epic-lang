@@ -110,7 +110,7 @@ fun main(): i64 {
     let result = foo(1, 2)
 
     # Dotted call (module-style)
-    let code = os.kernel32.ExitProcess(0)
+    let code = foo.bar.baz(0)
     ret 0
 }
 
