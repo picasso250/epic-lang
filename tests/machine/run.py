@@ -41,12 +41,14 @@ def build_x64_fixture() -> X64Program:
     program.data_bytes("msg", [65, 0])
     program.data_zero("scratch", 8)
     program.section(".text")
-    program.label("_start")
+    start = program.new_symbol_label("_start")
+    done = program.new_label()
+    program.bind_label(start)
     program.inst("mov", R("rax"), I(1))
     program.inst("cmp", R("rax"), I(1))
-    program.inst("jz", LabelRef("done"))
+    program.inst("jz", program.label_ref(done))
     program.inst("mov", R("rax"), I(2))
-    program.label("done")
+    program.bind_label(done)
     program.inst("lea", R("rdx"), MS("msg"))
     program.inst("mov", R("rcx"), R("rax"))
     program.inst("call", Symbol("ExitProcess"))
@@ -63,7 +65,7 @@ def machine_dump(text: bytes | bytearray, data: bytes | bytearray) -> str:
 
 
 def machine_program_with_externs(program: X64Program) -> X64Program:
-    labels = {item.name for item in program.items if isinstance(item, X64Label)}
+    labels = {item.symbol_name for item in program.items if isinstance(item, X64Label) and item.symbol_name is not None}
     labels.update(item.label for item in program.items if isinstance(item, (X64DataBytes, X64DataZero)))
     declared = {item.name for item in program.items if isinstance(item, X64Extern)}
     refs: set[str] = set()
@@ -73,13 +75,15 @@ def machine_program_with_externs(program: X64Program) -> X64Program:
             if isinstance(operand, Symbol):
                 refs.add(operand.name)
             elif isinstance(operand, LabelRef):
-                refs.add(operand.name)
+                if operand.label.symbol_name is not None:
+                    refs.add(operand.label.symbol_name)
             elif isinstance(operand, Mem) and operand.symbol is not None:
                 refs.add(operand.symbol)
     wrapped = X64Program()
     for name in sorted(refs - labels - declared):
         wrapped.extern(name)
     wrapped.items.extend(program.items)
+    wrapped.labels.extend(program.labels)
     return wrapped
 
 

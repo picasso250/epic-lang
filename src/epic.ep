@@ -166,7 +166,7 @@ fun epic_lower_program(program: MirProgram): X64Program {
     epic_timing("lower functions", funcs_start, funcs_stop)
 
     let runtime_start = epic_now_ms()
-    x64_runtime_append_runtime_helpers(lower.x64)
+    x64_runtime_append_runtime_helpers(lower.x64, lower.null_deref_label)
     let runtime_stop = epic_now_ms()
     epic_timing("lower x64 runtime", runtime_start, runtime_stop)
 

@@ -140,12 +140,13 @@ def x64_label_graph(program) -> tuple[set[str], dict[str, set[str]], set[str]]:
         if section != ".text":
             continue
         if isinstance(item, X64Label):
-            if current is not None and last_text_inst not in ("jmp", "ret"):
-                graph[current].add(item.name)
-            current = item.name
-            last_text_inst = None
-            labels.add(current)
-            graph.setdefault(current, set())
+            if item.symbol_name is not None:
+                if current is not None and last_text_inst not in ("jmp", "ret"):
+                    graph[current].add(item.symbol_name)
+                current = item.symbol_name
+                last_text_inst = None
+                labels.add(current)
+                graph.setdefault(current, set())
             continue
         if current is None or not isinstance(item, X64Inst):
             continue
@@ -155,7 +156,8 @@ def x64_label_graph(program) -> tuple[set[str], dict[str, set[str]], set[str]]:
                 direct_calls.add(operand.name)
                 graph[current].add(operand.name)
             elif isinstance(operand, LabelRef):
-                graph[current].add(operand.name)
+                if operand.label.symbol_name is not None:
+                    graph[current].add(operand.label.symbol_name)
     return labels, graph, direct_calls
 
 

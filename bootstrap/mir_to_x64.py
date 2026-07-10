@@ -2,7 +2,7 @@
 
 from backend_abi import WINAPI_ABI, validate_backend_abi
 from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID, validate
-from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
+from x64 import I, M, MS, R, Symbol, X64Program
 from mir_prune import prune_unreachable_functions
 from mir_runtime_helpers import inject_all_mir_helpers
 from x64_runtime import append_runtime_helpers, emit_runtime_data, emit_startup_hook_call
@@ -33,6 +33,8 @@ class MirLower:
         self.addr_slots = []
         self.next_slot = 0
         self.return_label = None
+        self.block_labels = {}
+        self.null_deref_label = self.x64.new_symbol_label("__epx_null_deref")
         self.string_globals = {}
         self.global_slots = set()
         self.scratch_slots = []
@@ -60,7 +62,7 @@ class MirLower:
         self._prepare_program()
         for fn in self.program.functions:
             self._lower_function(fn)
-        append_runtime_helpers(self.x64)
+        append_runtime_helpers(self.x64, self.null_deref_label)
         return self.x64
 
     def _lower_function(self, fn):
@@ -72,11 +74,13 @@ class MirLower:
         self.block_local_use_counts = [0] * value_capacity
         self.reusable_values = [False] * value_capacity
         self.free_value_slots = []
-        self.return_label = f"{fn.name}.__return"
+        entry_name = "_start" if fn.name == "main" else fn.name
+        entry_label = self.x64.new_symbol_label(entry_name)
+        self.block_labels = {block.name: self.x64.new_label() for block in fn.blocks}
+        self.return_label = self.x64.new_label()
         self._plan_slots(fn)
-        label = "_start" if fn.name == "main" else fn.name
         frame = self._aligned_frame()
-        self.x64.label(label)
+        self.x64.bind_label(entry_label)
         self.x64.inst("push", R("rbp"))
         self.x64.inst("mov", R("rbp"), R("rsp"))
         if frame:
@@ -90,11 +94,11 @@ class MirLower:
                 self.x64.inst("mov", R("rax"), M("rbp", 16 + idx * 8))
                 self.x64.inst("mov", M("rbp", self.value_slots[param.id]), R("rax"))
         for block in fn.blocks:
-            self.x64.label(self._block_label(fn, block.name))
+            self.x64.bind_label(self._block_label(block.name))
             for inst in block.instructions:
                 self._lower_inst(inst)
             self._lower_term(fn, block.terminator)
-        self.x64.label(self.return_label)
+        self.x64.bind_label(self.return_label)
         if frame:
             self.x64.inst("add", R("rsp"), I(frame))
         self.x64.inst("pop", R("rbp"))
@@ -223,8 +227,11 @@ class MirLower:
     def _aligned_frame(self):
         return ((self.next_slot + 15) // 16) * 16
 
-    def _block_label(self, fn, block_name):
-        return f"{fn.name}.{block_name}"
+    def _block_label(self, block_name):
+        try:
+            return self.block_labels[block_name]
+        except KeyError as exc:
+            raise MirLowerError(f"unknown MIR block: {block_name}") from exc
 
     def _lower_inst(self, inst):
         if inst.op == "alloca":
@@ -323,12 +330,12 @@ class MirLower:
 
     def _lower_term(self, fn, term):
         if isinstance(term, Br):
-            self.x64.inst("jmp", LabelRef(self._block_label(fn, term.target)))
+            self.x64.inst("jmp", self.x64.label_ref(self._block_label(term.target)))
         elif isinstance(term, CondBr):
             self._load_operand("rax", term.cond)
             self.x64.inst("test", R("rax"), R("rax"))
-            self.x64.inst("jnz", LabelRef(self._block_label(fn, term.then_target)))
-            self.x64.inst("jmp", LabelRef(self._block_label(fn, term.else_target)))
+            self.x64.inst("jnz", self.x64.label_ref(self._block_label(term.then_target)))
+            self.x64.inst("jmp", self.x64.label_ref(self._block_label(term.else_target)))
         elif isinstance(term, Ret):
             if term.value is not None:
                 self._load_operand("rax", term.value)
@@ -337,7 +344,7 @@ class MirLower:
                 self.x64.inst("sub", R("rsp"), I(32))
                 self.x64.inst("call", Symbol("ExitProcess"))
             else:
-                self.x64.inst("jmp", LabelRef(self.return_label))
+                self.x64.inst("jmp", self.x64.label_ref(self.return_label))
         else:
             raise MirLowerError("missing terminator")
 
@@ -379,7 +386,7 @@ class MirLower:
 
     def _trap_if_zero(self, reg):
         self.x64.inst("test", R(reg), R(reg))
-        self.x64.inst("jz", LabelRef("__epx_null_deref"))
+        self.x64.inst("jz", self.x64.label_ref(self.null_deref_label))
 
     def _addr_slot(self, operand):
         if not isinstance(operand, ValueOperand) or self.addr_slots[operand.value.id] == 0:

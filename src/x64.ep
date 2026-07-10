@@ -16,8 +16,13 @@ struct X64SymbolOperand {
     name: str
 }
 
+struct X64Label {
+    id: i64
+    symbol_name: str
+}
+
 struct X64LabelRefOperand {
-    name: str
+    label: X64Label
 }
 
 struct X64MemBaseOperand {
@@ -46,7 +51,7 @@ struct X64SectionItem {
 }
 
 struct X64LabelItem {
-    name: str
+    label: X64Label
 }
 
 struct X64InstItem {
@@ -68,6 +73,7 @@ type X64Item = X64GlobalItem | X64ExternItem | X64SectionItem | X64LabelItem | X
 
 struct X64Program {
     items: X64Item[]
+    label_count: i64
 }
 
 fun x64_reg(name: str): X64Operand {
@@ -82,8 +88,8 @@ fun x64_symbol(name: str): X64Operand {
     ret new X64Operand(new X64SymbolOperand { name: name })
 }
 
-fun x64_label_ref(name: str): X64Operand {
-    ret new X64Operand(new X64LabelRefOperand { name: name })
+fun x64_label_ref(label: X64Label): X64Operand {
+    ret new X64Operand(new X64LabelRefOperand { label: label })
 }
 
 fun x64_mem_base(base: str, disp: i64, size: i64): X64Operand {
@@ -111,7 +117,7 @@ fun x64_operand_name(op: X64Operand): str {
         X64RegOperand r: { ret r.name }
         X64ImmOperand i: { ret "" }
         X64SymbolOperand s: { ret s.name }
-        X64LabelRefOperand l: { ret l.name }
+        X64LabelRefOperand l: { ret x64_label_text(l.label) }
         X64MemBaseOperand m: { ret "" }
         X64MemSymbolOperand m: { ret "" }
     }
@@ -166,6 +172,18 @@ fun x64_operand_symbol_name(op: X64Operand): str {
     ret ""
 }
 
+fun x64_operand_label(op: X64Operand): X64Label {
+    match op {
+        X64LabelRefOperand l: { ret l.label }
+        X64RegOperand r: { panic "operand is not a label ref" }
+        X64ImmOperand i: { panic "operand is not a label ref" }
+        X64SymbolOperand s: { panic "operand is not a label ref" }
+        X64MemBaseOperand m: { panic "operand is not a label ref" }
+        X64MemSymbolOperand m: { panic "operand is not a label ref" }
+    }
+    ret new X64Label
+}
+
 fun x64_operand_size(op: X64Operand): i64 {
     match op {
         X64RegOperand r: { ret 8 }
@@ -211,7 +229,25 @@ fun x64_operand_is_mem(op: X64Operand): bool { ret x64_operand_kind_text(op) == 
 fun x64_program_empty(): X64Program {
     let program = new X64Program
     program.items = new X64Item[]
+    program.label_count = 0
     ret program
+}
+
+fun x64_new_label(program: X64Program): X64Label {
+    let label = new X64Label { id: program.label_count, symbol_name: "" }
+    program.label_count = program.label_count + 1
+    ret label
+}
+
+fun x64_new_symbol_label(program: X64Program, symbol_name: str): X64Label {
+    let label = new X64Label { id: program.label_count, symbol_name: symbol_name }
+    program.label_count = program.label_count + 1
+    ret label
+}
+
+fun x64_label_text(label: X64Label): str {
+    if len(label.symbol_name) != 0 { ret label.symbol_name }
+    ret (".L" + str(label.id))
 }
 
 fun x64_add_global(program: X64Program, name: str): void {
@@ -226,8 +262,8 @@ fun x64_add_section(program: X64Program, name: str): void {
     program.items.push(new X64Item(new X64SectionItem { name: name }))
 }
 
-fun x64_add_label(program: X64Program, name: str): void {
-    program.items.push(new X64Item(new X64LabelItem { name: name }))
+fun x64_bind_label(program: X64Program, label: X64Label): void {
+    program.items.push(new X64Item(new X64LabelItem { label: label }))
 }
 
 fun x64_add_inst(program: X64Program, op: str, operands: X64Operand[]): void {
@@ -291,7 +327,7 @@ fun x64_operand_text(op: X64Operand): str {
         X64RegOperand r: { ret r.name }
         X64ImmOperand i: { ret str(i.value) }
         X64SymbolOperand s: { ret s.name }
-        X64LabelRefOperand l: { ret l.name }
+        X64LabelRefOperand l: { ret x64_label_text(l.label) }
         X64MemBaseOperand m: { ret ((x64_size_prefix(m.size) + "[") + (x64_mem_addr_text(op) + "]")) }
         X64MemSymbolOperand m: { ret ((x64_size_prefix(m.size) + "[") + (x64_mem_addr_text(op) + "]")) }
     }
@@ -349,7 +385,7 @@ fun x64_item_text(item: X64Item): str {
             ret (("section " + it.name) + "\n")
         }
         X64LabelItem it: {
-            ret ((it.name + ":") + "\n")
+            ret ((x64_label_text(it.label) + ":") + "\n")
         }
         X64InstItem it: {
             if len(it.operands) == 0 {

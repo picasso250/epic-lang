@@ -51,11 +51,23 @@ class Symbol:
 
 
 @dataclass(frozen=True)
-class LabelRef:
-    name: str
+class X64Label:
+    id: int
+    symbol_name: str | None = None
 
     def text(self):
-        return self.name
+        return self.symbol_name if self.symbol_name is not None else f".L{self.id}"
+
+    def lines(self):
+        return [f"{self.text()}:"]
+
+
+@dataclass(frozen=True)
+class LabelRef:
+    label: X64Label
+
+    def text(self):
+        return self.label.text()
 
 
 @dataclass(frozen=True)
@@ -100,14 +112,6 @@ class X64Section:
 
 
 @dataclass(frozen=True)
-class X64Label:
-    name: str
-
-    def lines(self):
-        return [f"{self.name}:"]
-
-
-@dataclass(frozen=True)
 class X64Inst:
     op: str
     operands: tuple = ()
@@ -139,6 +143,27 @@ class X64DataZero:
 @dataclass
 class X64Program:
     items: list = field(default_factory=list)
+    labels: list[X64Label] = field(default_factory=list)
+
+    @property
+    def label_count(self):
+        return len(self.labels)
+
+    def new_label(self):
+        label = X64Label(self.label_count)
+        self.labels.append(label)
+        return label
+
+    def new_symbol_label(self, symbol_name):
+        label = X64Label(self.label_count, symbol_name)
+        self.labels.append(label)
+        return label
+
+    def bind_label(self, label):
+        self.items.append(label)
+
+    def label_ref(self, label):
+        return LabelRef(label)
 
     def global_(self, name):
         self.items.append(X64Global(name))
@@ -148,9 +173,6 @@ class X64Program:
 
     def section(self, name):
         self.items.append(X64Section(name))
-
-    def label(self, name):
-        self.items.append(X64Label(name))
 
     def inst(self, op, *operands):
         self.items.append(X64Inst(op, tuple(operands)))
@@ -179,6 +201,7 @@ class X64Validator:
         self.externs = set()
         self.globals = set()
         self.text_labels = set()
+        self.bound_label_ids = set()
         self.data_labels = set()
         self.defined_symbols = set()
         self.declared_symbols = set()
@@ -200,10 +223,17 @@ class X64Validator:
             elif isinstance(item, X64Global):
                 self._add_decl(self.globals, item.name, "global", idx)
             elif isinstance(item, X64Label):
+                if not self._validate_label_handle(item, idx):
+                    continue
+                if item.id in self.bound_label_ids:
+                    self.errors.append(f"item {idx}: duplicate label binding: {item.text()}")
+                self.bound_label_ids.add(item.id)
                 if section == ".text":
-                    self._define_symbol(item.name, self.text_labels, "text label", idx)
+                    if item.symbol_name is not None:
+                        self._define_symbol(item.symbol_name, self.text_labels, "text label", idx)
                 elif section == ".data":
-                    self._define_symbol(item.name, self.data_labels, "data label", idx)
+                    if item.symbol_name is not None:
+                        self._define_symbol(item.symbol_name, self.data_labels, "data label", idx)
             elif isinstance(item, (X64DataBytes, X64DataZero)) and section == ".data":
                 self._define_symbol(item.label, self.data_labels, "data label", idx)
 
@@ -248,9 +278,21 @@ class X64Validator:
         self.section = item.name
 
     def _validate_label(self, item, idx):
-        self._require_name(item.name, idx, "label")
+        self._validate_label_handle(item, idx)
         if self.section not in SUPPORTED_SECTIONS:
-            self.errors.append(f"item {idx}: label outside section: {item.name}")
+            self.errors.append(f"item {idx}: label outside section: {item.text()}")
+
+    def _validate_label_handle(self, label, idx):
+        if not isinstance(label.id, int) or label.id < 0 or label.id >= self.program.label_count:
+            self.errors.append(f"item {idx}: label id out of range: {label.id}")
+            return False
+        declared = self.program.labels[label.id]
+        if declared != label:
+            self.errors.append(f"item {idx}: label handle does not match program label {label.id}")
+            return False
+        if label.symbol_name is not None:
+            self._require_name(label.symbol_name, idx, "label symbol")
+        return True
 
     def _validate_data_bytes(self, item, idx):
         self._require_section(idx, ".data", f"data bytes {item.label}")
@@ -327,6 +369,7 @@ class X64Validator:
             self._require_known_symbol(operand.name, idx, "symbol")
             return
         if isinstance(operand, LabelRef):
+            self._validate_label_handle(operand.label, idx)
             return
         if isinstance(operand, Mem):
             self._validate_mem(operand, idx)
@@ -356,9 +399,9 @@ class X64Validator:
         operands = inst.operands
         if not self._require(len(operands) == 1 and isinstance(operands[0], LabelRef), idx, f"{inst.op} needs one LabelRef operand"):
             return
-        target = operands[0].name
-        if target not in self.text_labels and target not in self.externs:
-            self.errors.append(f"item {idx}: undefined branch target: {target}")
+        label = operands[0].label
+        if label.id not in self.bound_label_ids and label.symbol_name is None:
+            self.errors.append(f"item {idx}: unbound anonymous label: {label.text()}")
 
     def _validate_cmp(self, inst, idx):
         operands = inst.operands

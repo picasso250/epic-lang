@@ -23,9 +23,9 @@ section .text
 _start:
     mov rax, 1
     cmp rax, 1
-    jz done
+    jz .L1
     mov rax, 2
-done:
+.L1:
     lea rdx, qword [msg]
     mov rcx, rax
     call ExitProcess

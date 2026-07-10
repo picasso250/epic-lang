@@ -61,6 +61,8 @@ class MachineObjectBuilder:
         self.program = program
         self.text = bytearray()
         self.data = bytearray()
+        self.label_offsets = [0] * program.label_count
+        self.label_defined = [False] * program.label_count
         self.text_labels = {}
         self.data_labels = {}
         self.externs = set()
@@ -95,12 +97,22 @@ class MachineObjectBuilder:
         elif isinstance(item, X64Section):
             self.section = item.name
         elif isinstance(item, X64Label):
+            if item.id < 0 or item.id >= self.program.label_count:
+                raise MachineBackendError(f"label id out of range: {item.id}")
+            if self.label_defined[item.id]:
+                raise MachineBackendError(f"duplicate label binding: {item.text()}")
             if self.section == ".text":
-                self.text_labels[item.name] = len(self.text)
+                self.label_offsets[item.id] = len(self.text)
+                self.label_defined[item.id] = True
+                if item.symbol_name is not None:
+                    self.text_labels[item.symbol_name] = len(self.text)
             elif self.section == ".data":
-                self.data_labels[item.name] = len(self.data)
+                self.label_offsets[item.id] = len(self.data)
+                self.label_defined[item.id] = True
+                if item.symbol_name is not None:
+                    self.data_labels[item.symbol_name] = len(self.data)
             else:
-                raise MachineBackendError(f"label outside section: {item.name}")
+                raise MachineBackendError(f"label outside section: {item.text()}")
         elif isinstance(item, X64Inst):
             if self.section != ".text":
                 raise MachineBackendError(f"instruction outside .text: {item.op}")
@@ -138,7 +150,7 @@ class MachineObjectBuilder:
         elif op == "call" and len(operands) == 1 and isinstance(operands[0], Symbol):
             self._emit_call(operands[0].name)
         elif op in ("jmp", "jo", "jz", "jnz", "jl", "jge", "jle", "jg", "jns") and len(operands) == 1 and isinstance(operands[0], LabelRef):
-            self._emit_jump(op, operands[0].name)
+            self._emit_jump(op, operands[0].label)
         elif op == "cqo" and not operands:
             self.text.extend(b"\x48\x99")
         elif op in ("idiv", "div") and self._regs(operands, "rcx"):
@@ -238,14 +250,14 @@ class MachineObjectBuilder:
         self.text.extend(b"\x00\x00\x00\x00")
         self.text_relocs.append((off, symbol))
 
-    def _emit_jump(self, kind, symbol):
+    def _emit_jump(self, kind, label):
         if kind == "jmp":
             self.text.append(0xE9)
         else:
             self.text.extend(bytes([0x0F, JCC[kind]]))
         off = len(self.text)
         self.text.extend(b"\x00\x00\x00\x00")
-        self.internal_fixups.append((off, symbol))
+        self.internal_fixups.append((off, label))
 
     def _emit_mov_reg_imm(self, reg, imm):
         if reg in REG32_MOV_IMM:
@@ -475,11 +487,15 @@ class MachineObjectBuilder:
         return
 
     def _patch_internal_fixups(self):
-        for off, symbol in self.internal_fixups:
-            if symbol not in self.text_labels:
-                self.text_relocs.append((off, symbol))
+        for off, label in self.internal_fixups:
+            if label.id < 0 or label.id >= self.program.label_count:
+                raise MachineBackendError(f"label id out of range: {label.id}")
+            if not self.label_defined[label.id]:
+                if label.symbol_name is None:
+                    raise MachineBackendError(f"unbound anonymous label: {label.text()}")
+                self.text_relocs.append((off, label.symbol_name))
                 continue
-            disp = self.text_labels[symbol] - (off + 4)
+            disp = self.label_offsets[label.id] - (off + 4)
             struct.pack_into("<i", self.text, off, disp)
 
 def write_machine_obj(program, obj_path):

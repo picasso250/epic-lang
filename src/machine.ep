@@ -17,36 +17,38 @@ struct MachineObject {
 
 struct MachineLabelFixup {
     offset: i64
-    label: str
+    label: X64Label
 }
-
-type MachineFixup = MachineLabelFixup
 
 struct MachineBuilder {
     text: i64[]
     data: i64[]
     section: str
+    label_offsets: i64[]
+    label_defined: i64[]
     text_label_names: str[]
     text_label_offsets: i64[]
     data_label_names: str[]
     data_label_offsets: i64[]
-    fixups: MachineFixup[]
+    fixups: MachineLabelFixup[]
     text_reloc_offsets: i64[]
     text_reloc_names: str[]
     data_reloc_offsets: i64[]
     data_reloc_names: str[]
 }
 
-fun machine_builder_empty(): MachineBuilder {
+fun machine_builder_empty(label_count: i64): MachineBuilder {
     let b = new MachineBuilder
     b.text = new i64[]
     b.data = new i64[]
     b.section = ""
+    b.label_offsets = new i64[label_count]
+    b.label_defined = new i64[label_count]
     b.text_label_names = new str[]
     b.text_label_offsets = new i64[]
     b.data_label_names = new str[]
     b.data_label_offsets = new i64[]
-    b.fixups = new MachineFixup[]
+    b.fixups = new MachineLabelFixup[]
     b.text_reloc_offsets = new i64[]
     b.text_reloc_names = new str[]
     b.data_reloc_offsets = new i64[]
@@ -148,25 +150,23 @@ fun machine_mem_modrm(b: MachineBuilder, reg_field: i64, base: str, disp: i64): 
     }
 }
 
-fun machine_add_text_label(b: MachineBuilder, name: str): void {
-    let offset = len(b.text)
-    b.text_label_names.push(name)
-    b.text_label_offsets.push(offset)
-}
-
-fun machine_text_label_offset_or_neg1(b: MachineBuilder, name: str): i64 {
-    let i = len(b.text_label_names)
-    for i > 0 {
-        i -= 1
-        if b.text_label_names[i] == name {
-            ret b.text_label_offsets[i]
-        }
+fun machine_require_label_id(b: MachineBuilder, label: X64Label): void {
+    if label.id < 0 || label.id >= len(b.label_offsets) {
+        machine_die(("label id out of range: " + str(label.id)))
     }
-    ret -1
 }
 
-fun machine_add_fixup(b: MachineBuilder, offset: i64, label: str, kind: str): void {
-    b.fixups.push(new MachineFixup(new MachineLabelFixup { offset: offset, label: label }))
+fun machine_bind_label(b: MachineBuilder, label: X64Label, offset: i64): void {
+    machine_require_label_id(b, label)
+    if b.label_defined[label.id] != 0 {
+        machine_die(("duplicate label binding: " + x64_label_text(label)))
+    }
+    b.label_offsets[label.id] = offset
+    b.label_defined[label.id] = 1
+}
+
+fun machine_add_fixup(b: MachineBuilder, offset: i64, label: X64Label): void {
+    b.fixups.push(new MachineLabelFixup { offset: offset, label: label })
 }
 
 fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
@@ -245,16 +245,15 @@ fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
 fun machine_patch_fixups(b: MachineBuilder): void {
     let i = 0
     for i < len(b.fixups) {
-        match b.fixups[i] {
-            MachineLabelFixup f: {
-                let target = machine_text_label_offset_or_neg1(b, f.label)
-                if target >= 0 {
-                    let disp = target - (f.offset + 4)
-                    machine_patch_i32(b.text, f.offset, disp)
-                } else {
-                    machine_add_text_reloc(b, f.offset, f.label)
-                }
-            }
+        let f = b.fixups[i]
+        machine_require_label_id(b, f.label)
+        if b.label_defined[f.label.id] != 0 {
+            let disp = b.label_offsets[f.label.id] - (f.offset + 4)
+            machine_patch_i32(b.text, f.offset, disp)
+        } else if len(f.label.symbol_name) != 0 {
+            machine_add_text_reloc(b, f.offset, f.label.symbol_name)
+        } else {
+            machine_die(("unbound anonymous label: " + x64_label_text(f.label)))
         }
         i = i + 1
     }
@@ -303,7 +302,7 @@ fun machine_emit_cmp_reg_imm(b: MachineBuilder, reg_name: str, imm: i64): void {
     }
 }
 
-fun machine_emit_jump(b: MachineBuilder, op: str, label: str): void {
+fun machine_emit_jump(b: MachineBuilder, op: str, label: X64Label): void {
     if op == "jmp" {
         machine_append_byte(b.text, 233)
     } else if op == "jz" {
@@ -326,7 +325,7 @@ fun machine_emit_jump(b: MachineBuilder, op: str, label: str): void {
     }
     let off = len(b.text)
     machine_append_i32(b.text, 0)
-    machine_add_fixup(b, off, label, "label")
+    machine_add_fixup(b, off, label)
 }
 
 fun machine_emit_lea_symbol(b: MachineBuilder, dst: str, symbol: str): void {
@@ -584,7 +583,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
         ret
     }
     if (op == "jmp" || op == "jz" || op == "jnz" || op == "jl" || op == "jge" || op == "jle") && len(ops) == 1 && x64_operand_is_label_ref(ops[0]) {
-        machine_emit_jump(b, op, x64_operand_name(ops[0]))
+        machine_emit_jump(b, op, x64_operand_label(ops[0]))
         ret
     }
     if op == "lea" && len(ops) == 2 && x64_operand_is_reg(ops[0]) && x64_operand_is_mem(ops[1]) && x64_operand_has_symbol(ops[1]) {
@@ -712,15 +711,22 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
         }
         X64LabelItem it: {
             if b.section == ".text" {
-                machine_add_text_label(b, it.name)
+                machine_bind_label(b, it.label, len(b.text))
+                if len(it.label.symbol_name) != 0 {
+                    b.text_label_names.push(it.label.symbol_name)
+                    b.text_label_offsets.push(len(b.text))
+                }
                 ret
             }
             if b.section == ".data" {
-                b.data_label_names.push(it.name)
-                b.data_label_offsets.push(len(b.data))
+                machine_bind_label(b, it.label, len(b.data))
+                if len(it.label.symbol_name) != 0 {
+                    b.data_label_names.push(it.label.symbol_name)
+                    b.data_label_offsets.push(len(b.data))
+                }
                 ret
             }
-            machine_die(("label outside section: " + it.name))
+            machine_die(("label outside section: " + x64_label_text(it.label)))
         }
         X64InstItem it: {
             if b.section != ".text" { machine_die(("instruction outside .text: " + it.op)) }
@@ -847,7 +853,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
 }
 
 fun machine_build_object(program: X64Program): MachineObject {
-    let b = machine_builder_empty()
+    let b = machine_builder_empty(program.label_count)
     let i = 0
     for i < len(program.items) {
         machine_emit_item(b, program.items[i])
@@ -858,7 +864,7 @@ fun machine_build_object(program: X64Program): MachineObject {
 }
 
 fun machine_build_object_timed(program: X64Program): MachineObject {
-    let b = machine_builder_empty()
+    let b = machine_builder_empty(program.label_count)
 
     let emit_start = machine_now_ms()
     let i = 0
@@ -897,4 +903,3 @@ fun machine_print_object(obj: MachineObject): void {
     machine_print_bytes("TEXT", obj.text)
     machine_print_bytes("DATA", obj.data)
 }
-
