@@ -1,0 +1,15 @@
+fun cstr_ready_path(s: str): str {
+    ret s
+}
+fun main(): void {
+    let program = mir_program_empty()
+    mrt_parse_struct_type(program, "type Data = struct { i8, i64 }")
+    assert len(program.struct_fields) == 2
+    assert program.struct_fields[0].struct_name == "Data"
+    assert program.struct_fields[0].field_type == "i8"
+    assert program.struct_fields[0].field_index == 0
+    assert program.struct_fields[1].struct_name == "Data"
+    assert program.struct_fields[1].field_type == "i64"
+    assert program.struct_fields[1].field_index == 1
+    println("PASS MIR struct type declaration")
+}

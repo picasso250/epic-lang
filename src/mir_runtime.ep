@@ -314,6 +314,32 @@ fun mrt_parse_terminator(line: str): MirTerminator {
     ret mir_ret_void()
 }
 
+fun mrt_parse_struct_type(program: MirProgram, line: str): void {
+    let prefix = "type "
+    let marker = " = struct {"
+    if !mrt_starts_with(line, prefix) || !mrt_ends_with(line, "}") {
+        mir_runtime_die(str_cat2("bad struct type declaration: ", line))
+    }
+    let marker_pos = mrt_find(line, marker)
+    if marker_pos < len(prefix) {
+        mir_runtime_die(str_cat2("bad struct type declaration: ", line))
+    }
+    let name = mrt_trim(line[len(prefix):marker_pos])
+    if len(name) == 0 {
+        mir_runtime_die(str_cat2("missing struct type name: ", line))
+    }
+    let fields_text = mrt_trim(line[marker_pos + len(marker):len(line) - 1])
+    if len(fields_text) == 0 {
+        mir_runtime_die(str_cat2("empty struct type is not supported in v0: ", name))
+    }
+    let field_types = mrt_split_commas(fields_text)
+    let i = 0
+    for i < len(field_types) {
+        mir_program_add_struct_field(program, name, field_types[i], i)
+        i = i + 1
+    }
+}
+
 fun mrt_parse_function(text: str): MirFunction {
     let lines = mrt_split_lines(text)
     if len(lines) == 0 { mir_runtime_die("empty helper text") }

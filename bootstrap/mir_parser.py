@@ -25,6 +25,7 @@ from mir import (
     ConstNullOperand,
     MirBlock,
     MirExtern,
+    MirField,
     MirFunction,
     MirGlobal,
     MirImport,
@@ -32,6 +33,7 @@ from mir import (
     MirParam,
     MirProgram,
     MirSignature,
+    MirStruct,
     MirValue,
     Ret,
     SymbolOperand,
@@ -92,7 +94,13 @@ class _MirTextParser:
         program = MirProgram()
         while not self._done():
             line_no, line = self._peek()
-            if line.startswith("import "):
+            if line.startswith("type "):
+                struct_item = self._parse_struct(line_no, line)
+                if struct_item.name in program.structs:
+                    self._error(line_no, f"duplicate struct type: {struct_item.name}")
+                program.structs[struct_item.name] = struct_item
+                self.i += 1
+            elif line.startswith("import "):
                 program.imports.append(self._parse_import(line_no, line))
                 self.i += 1
             elif line.startswith("declare "):
@@ -104,8 +112,18 @@ class _MirTextParser:
                 program.globals.append(self._parse_global(line_no, line))
                 self.i += 1
             else:
-                self._error(line_no, f"expected import, declare, global, or define; got: {line}")
+                self._error(line_no, f"expected type, import, declare, global, or define; got: {line}")
         return program
+
+    def _parse_struct(self, line_no, line):
+        m = re.fullmatch(r"type\s+([A-Za-z_.$][A-Za-z0-9_.$]*)\s*=\s*struct\s*\{(.*)\}", line)
+        if not m:
+            self._error(line_no, f"invalid struct type declaration: {line}")
+        name = m.group(1)
+        fields_text = m.group(2).strip()
+        field_types = [] if not fields_text else [self._parse_type(part) for part in self._split_commas(fields_text)]
+        fields = [MirField(str(index), typ, index * 8) for index, typ in enumerate(field_types)]
+        return MirStruct(name, fields, max(len(fields) * 8, 1))
 
     def _parse_import(self, line_no, line):
         m = re.fullmatch(r"import\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)

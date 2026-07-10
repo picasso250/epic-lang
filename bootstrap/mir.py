@@ -294,6 +294,10 @@ class MirStruct:
     fields: list[MirField] = field(default_factory=list)
     size: int = 0
 
+    def text(self):
+        field_types = ", ".join(str(field.type) for field in self.fields)
+        return f"type {self.name} = struct {{ {field_types} }}"
+
     def field(self, name):
         for field_item in self.fields:
             if field_item.name == name:
@@ -320,6 +324,7 @@ class MirProgram:
 
     def text(self):
         parts = []
+        parts.extend(struct_item.text() for struct_item in self.structs.values())
         parts.extend(imp.text() for imp in self.imports)
         parts.extend(ext.text() for ext in self.externs)
         parts.extend(glob.text() for glob in self.globals)

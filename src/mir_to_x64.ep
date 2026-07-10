@@ -486,13 +486,6 @@ fun mir_to_x64_store_result(lower: MirToX64Lower, result_name: str, reg: str): v
     x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, result_name), 8), x64_reg(reg))
 }
 
-fun mir_to_x64_type_size(typ: str): i64 {
-    if typ == "i8" {
-        ret 1
-    }
-    ret 8
-}
-
 fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field_index: i64): i64 {
     let offset = 0
     let i = 0
@@ -501,7 +494,7 @@ fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field
             if lower.struct_field_indexes[i] == field_index {
                 ret offset
             }
-            offset = offset + mir_to_x64_type_size(lower.struct_field_types[i])
+            offset = offset + 8
         }
         i = i + 1
     }
@@ -514,7 +507,7 @@ fun mir_to_x64_struct_size(lower: MirToX64Lower, struct_name: str): i64 {
     let i = 0
     for i < len(lower.struct_field_names) {
         if lower.struct_field_names[i] == struct_name {
-            size = size + mir_to_x64_type_size(lower.struct_field_types[i])
+            size = size + 8
         }
         i = i + 1
     }

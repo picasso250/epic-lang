@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
 from lexer import lex
-from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
+from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
 from mir import MirProgram, MirStruct, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from ast_to_mir import ast_to_mir
@@ -118,7 +118,9 @@ def test_gep_null_and_ptrtoint_text_and_validation():
         structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
     validate(program)
-    expected = """define i64 @main() {
+    expected = """type Pair = struct { i64, i64 }
+
+define i64 @main() {
 entry:
   %size.ptr: ptr = gep struct Pair, ptr null, i64 1
   %size: i64 = ptrtoint ptr %size.ptr to i64
@@ -185,6 +187,22 @@ fun main(): i64 {
         "ptr.i64.get",
     ):
         assert op not in text
+
+
+def test_struct_type_text_round_trip_and_v0_slot_layout():
+    source = """type Data = struct { i8, i64 }
+
+define i64 @main() {
+entry:
+  ret i64 0
+}
+"""
+    program = parse_mir_text(source)
+    layout = program.structs["Data"]
+    assert [field.type for field in layout.fields] == [I8, I64]
+    assert [field.offset for field in layout.fields] == [0, 8]
+    assert layout.size == 16
+    assert program.text() == source.rstrip()
 
 
 def test_mir_parser_rejects_unsigned_integer_types():
@@ -686,6 +704,7 @@ def main():
     test_gep_null_and_ptrtoint_text_and_validation()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
+    test_struct_type_text_round_trip_and_v0_slot_layout()
     test_mir_parser_rejects_unsigned_integer_types()
     test_mir_parser_strips_text_sigils()
     test_runtime_mir_bundle_parses_without_local_validation()

@@ -695,6 +695,29 @@ MirType
 - validator 根据 operand type 判断是否是 pointer，并根据指令携带的访问类型检查结果和值类型。
 - struct / array layout 是 MIR module 的显式合约，通过 `MirProgram.structs: dict[str, MirStruct]` 传给 lowering。
 
+### 13.1 Text MIR struct type declarations
+
+前后端通过模块级 type declaration 传递后端所需的 struct layout：
+
+```text
+type Point = struct { i64, i64 }
+type Slice_u8 = struct { ptr, i64, i64 }
+```
+
+声明只保存字段类型序列，不保存源语言字段名、embedded 信息或 ADT 信息。
+`gep struct Point, ... i32 1` 中的常量字段索引引用该序列。
+
+bootstrap v0 使用固定的简单布局：
+
+- 每个 struct 字段占一个 8-byte slot；
+- 字段 `i` 的 offset 是 `i * 8`；
+- struct size 是 `field_count * 8`；
+- 不支持 packed / compact struct，也不接受每字段显式 offset；
+- `i8` 在 byte array 中仍占 1 byte，但作为 struct 字段仍占一个 8-byte slot。
+
+这使文本 MIR 能完整承载当前 `MirProgram.structs` / `MirProgram.struct_fields`
+侧表，同时让后端不依赖 AST 或源语言字段语义。
+
 ## 14. Validator 第一版
 
 第一版 validator 至少检查：
