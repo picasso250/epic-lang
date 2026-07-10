@@ -407,6 +407,9 @@ class MirLower:
     def _add_rax_imm(self, value):
         if value == 0:
             return
+        if -128 <= value <= 127:
+            self.x64.inst("add", R("rax"), I(value))
+            return
         self.x64.inst("mov", R("rcx"), I(value))
         self.x64.inst("add", R("rax"), R("rcx"))
 

@@ -250,7 +250,7 @@ _load_operand("rax", operands[0])   # 基址
 # 处理每个 index
 for each index:
   if index is ConstIntOperand:
-    rax += index.value * scale         # 通过 mov rcx, imm; add rax, rcx
+    rax += index.value * scale         # imm8 用 add rax, imm；否则 mov rcx, imm; add rax, rcx
   else:
     _load_operand("rcx", index)
     if scale == 8:  rcx = rcx*8       # scale_rcx_by_8: add rcx x 3
@@ -416,9 +416,12 @@ No known unused runtime helper label is intentionally emitted. The old `__epx_pu
 
 `_add_scaled_index` 在动态 index 且 `scale != 1` / `scale != 8` 时抛出 `MirLowerError`。常量 index 不受此限制，因为 offset 会在 lowering 时折叠成立即数。当前这足够覆盖 `u8` buffer（scale=1）、word/pointer array（scale=8）和常量 struct field offset；未来若支持紧凑 `i32[]`、value struct array，或更通用 aggregate GEP，需要补通用 `index * element_size` 地址计算。scale=8 仅通过三次 `add rcx, rcx` 实现，不是真正的 shift。
 
-### 9.5 `_add_rax_imm` 不使用 `add rax, imm32/imm8`
+### 9.5 `_add_rax_imm` only uses current machine-supported immediates
 
-当前总是 `mov rcx, imm; add rax, rcx`，即使 imm 可以用单指令 `add rax, imm` 完成。
+`_add_rax_imm` emits single-instruction `add rax, imm` only for signed imm8
+values because the current machine encoder supports `add reg, imm8`. Larger
+offsets still lower as `mov rcx, imm; add rax, rcx` until the encoder grows
+imm32 support.
 
 ### 9.6 No `.data` relocations
 

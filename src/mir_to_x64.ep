@@ -538,6 +538,10 @@ fun mir_to_x64_add_rax_imm(lower: MirToX64Lower, value: i64): void {
     if value == 0 {
         ret
     }
+    if value >= -128 && value <= 127 {
+        x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_imm(value))
+        ret
+    }
     x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_imm(value))
     x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
 }

@@ -154,8 +154,7 @@ pair_field:
     sub rsp, 80
 pair_field.entry:
     mov rax, 0
-    mov rcx, 16
-    add rax, rcx
+    add rax, 16
     mov qword [rbp-8], rax
     mov rax, qword [rbp-8]
     mov qword [rbp-8], rax
@@ -167,8 +166,7 @@ pair_field.entry:
     mov rax, qword [rbp-8]
     test rax, rax
     jz __epx_null_deref
-    mov rcx, 8
-    add rax, rcx
+    add rax, 8
     mov qword [rbp-8], rax
     mov rax, 42
     mov rcx, qword [rbp-8]
