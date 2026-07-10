@@ -17,12 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "bootstrap"
 sys.path.insert(0, str(BOOTSTRAP))
 
-from backend_abi import validate_backend_abi  # noqa: E402
 import epic  # noqa: E402
 import machine  # noqa: E402
 from machine import MachineObjectBuilder  # noqa: E402
-from mir_runtime_helpers import inject_all_mir_helpers  # noqa: E402
-from mir_to_x64 import MirLower, emit_runtime_data  # noqa: E402
+from mir_to_x64 import MirLower, prepare_mir_for_x64  # noqa: E402
 
 
 RUNTIME_SOURCES = [Path("runtime") / "str.ep"]
@@ -60,16 +58,10 @@ def build_profile_rows():
     ast = epic._merge_programs(sources, main_path, verbose=False, include_runtime=False)
     ast = epic.analyze_program(ast)
     program = epic.ast_to_mir(ast)
-    inject_all_mir_helpers(program)
-    validate_backend_abi(program)
+    prepare_mir_for_x64(program)
 
     lower = MirLower(program)
-    lower.x64.global_("_start")
-    for imp in program.imports:
-        lower.x64.extern(imp.name)
-    lower.x64.section(".data")
-    lower.string_globals = emit_runtime_data(lower.x64, program)
-    lower.x64.section(".text")
+    lower._prepare_program()
     for fn in program.functions:
         lower._lower_function(fn)
 

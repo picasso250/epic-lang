@@ -248,7 +248,7 @@ ret i64 %x1
 
 ```text
 module
-  imports
+  externs
   globals
   functions
 ```
@@ -256,10 +256,10 @@ module
 示例：
 
 ```text
-declare void @ExitProcess(i64)
-import bool @WriteFile(ptr, ptr, i64, ptr, ptr)
+extern void @ExitProcess(i64)
+extern i64 @WriteFile(i64, i64, i64, i64, i64)
 
-str.0: array 6 x i8 = global c"hello\00"
+global @str.0: ptr = bytes "hello"
 
 define i64 @main() {
 entry:
@@ -269,8 +269,8 @@ entry:
 
 说明：
 
-- `ExitProcess` 和 `WriteFile` 是 import/declaration，由 module symbol table 声明。
-- call 处只写 `call ... WriteFile(...)`，不写 `call import`。
+- `ExitProcess` 和 `WriteFile` 是 target-neutral extern，由 module symbol table 声明。
+- call 处只写 `call ... WriteFile(...)`；DLL、导入库和具体实现属于 backend。
 - `str.0` 是 global symbol。
 - `main` 是函数 symbol。
 
@@ -617,15 +617,14 @@ Python 原型可以用 dataclass 表示。
 
 ```text
 MirProgram
-  imports: list[MirImport]
+  externs: list[MirExtern]
   globals: list[MirGlobal]
   structs: list[MirStruct]
   functions: list[MirFunction]
 
-MirImport
+MirExtern
   name: str                  # WriteFile
   signature: MirSignature
-  dll: str?                  # 可选，后端/PE writer 可能需要
 
 MirGlobal
   name: str                  # str.0
@@ -718,18 +717,25 @@ bootstrap v0 使用固定的简单布局：
 这使文本 MIR 能完整承载当前 `MirProgram.structs` / `MirProgram.struct_fields`
 侧表，同时让后端不依赖 AST 或源语言字段语义。
 
-bootstrap v0 的规范文本 MIR 不包含 `import` 或 `declare`。外部 call 名称由后端 ABI
-表解析；通用 validator 严格验证模块内函数签名，但对未解析 callee 只验证 call 指令
-自身的返回值形状。Python 编译器内部仍可保留 imports / externs 作为后端元数据，
-但 `MirProgram.text()` 不序列化它们。
+bootstrap v0 的规范文本 MIR 使用 target-neutral `extern` 声明，不包含 DLL、导入库或
+平台实现信息：
+
+```text
+extern void @ExitProcess(i64)
+extern ptr @__epx_alloc(i64)
+```
+
+每个 call 必须解析为模块内 `define` 或同模块 `extern`，通用 validator 负责检查完整签名。
+serializer 只输出实际被 call 引用的 extern，并按名称排序；缺失声明立即报错。
+`import` 和旧 `declare` 都不是 canonical MIR 语法。
 
 `src/mir_text.ep` 只负责纯文本扫描和 `MirProgram` 解析，不读取文件，也不知道 runtime
 helper bundle。`src/mir_runtime.ep` 负责读取 helper bundle、调用文本 parser，并把结果
 注入用户 MIR；因此 frontend/backend CLI 可以独立复用文本层。
 
-runtime 注入和 unreachable pruning 完成后，具体 backend 必须在 lowering 前执行 ABI
-验证。每个 call 必须解析为模块内函数或 `x64-windows-v0` ABI 表中的外部符号，并检查
-返回类型、参数数量和每个参数类型。未知名称不得自动降级为 COFF extern。
+runtime 注入和 unreachable pruning 完成后，backend 会再次裁剪未引用 extern，再在
+lowering 前验证剩余 extern 是否由当前 target 提供且签名一致。未知或不受支持的 extern
+不得自动降级为 COFF external symbol。
 
 规范输出只包含当前 MIR 指令通过 `gep struct Name` 实际引用的 struct layout。
 引用名称按 ASCII 字节序排序，字段仍按 field index 排列；未引用的隐藏/runtime layout

@@ -1,6 +1,6 @@
 fun main(): void {
     let text = make_str_buf()
-    str_buf_extend(text, "type Zed = struct { ptr }\n\ntype Unused = struct { i64 }\n\ntype Data = struct { i8, i64 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
+    str_buf_extend(text, "extern void @ExitProcess(i64)\n\ntype Zed = struct { ptr }\n\ntype Unused = struct { i64 }\n\ntype Data = struct { i8, i64 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
     text.push(u8(92))
     text.push(u8(110))
     text.push(u8(92))

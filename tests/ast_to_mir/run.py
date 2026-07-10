@@ -35,7 +35,6 @@ from parser import Parser
 from sema import analyze_program
 from ast_to_mir import ast_to_mir
 from mir import MirProgram
-from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
 
 
 def run_checked(cmd, label):
@@ -80,14 +79,14 @@ def python_user_mir(path):
         source = f.read()
     typed = analyze_program(Parser(lex(source)).parse_program())
     lowered = ast_to_mir(typed)
-    helper_names = set(IMPLEMENTED_MIR_HELPERS)
     frontend = MirProgram(
+        externs=lowered.externs,
         globals=[
             glob
             for glob in lowered.globals
             if glob.name != "argv" and not glob.name.startswith("str.runtime.")
         ],
-        functions=[fn for fn in lowered.functions if fn.name not in helper_names],
+        functions=lowered.functions,
         structs=lowered.structs,
     )
     return frontend.text() + "\n"

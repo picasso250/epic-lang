@@ -24,6 +24,7 @@ from mir import (
     ConstIntOperand,
     ConstNullOperand,
     MirBlock,
+    MirExtern,
     MirField,
     MirFunction,
     MirGlobal,
@@ -111,7 +112,10 @@ class _MirTextParser:
         program = MirProgram()
         while not self._done():
             line_no, line = self._peek()
-            if line.startswith("type "):
+            if line.startswith("extern "):
+                program.externs.append(self._parse_extern(line_no, line))
+                self.i += 1
+            elif line.startswith("type "):
                 struct_item = self._parse_struct(line_no, line)
                 if struct_item.name in program.structs:
                     self._error(line_no, f"duplicate struct type: {struct_item.name}")
@@ -123,8 +127,17 @@ class _MirTextParser:
                 program.globals.append(self._parse_global(line_no, line))
                 self.i += 1
             else:
-                self._error(line_no, f"expected type, global, or define; got: {line}")
+                self._error(line_no, f"expected extern, type, global, or define; got: {line}")
         return program
+
+    def _parse_extern(self, line_no, line):
+        m = re.fullmatch(r"extern\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
+        if not m:
+            self._error(line_no, f"invalid extern declaration: {line}")
+        return MirExtern(
+            _strip_module_sigil(m.group(2)),
+            self._parse_signature_parts(m.group(3), m.group(1), line_no),
+        )
 
     def _parse_struct(self, line_no, line):
         m = re.fullmatch(r"type\s+([A-Za-z_.$][A-Za-z0-9_.$]*)\s*=\s*struct\s*\{(.*)\}", line)

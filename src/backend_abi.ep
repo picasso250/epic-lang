@@ -76,72 +76,33 @@ fun backend_abi_param_type(name: str, index: i64): str {
     ret ""
 }
 
-fun backend_validate_call(program: MirProgram, caller: MirFunction, block: MirBlock, inst: MirInst): void {
-    let expected_ret = ""
-    let expected_count = 0
-    let internal_index = mir_find_function(program, inst.callee)
-    if internal_index >= 0 {
-        let target = program.functions[internal_index]
-        expected_ret = target.return_type
-        expected_count = len(target.params)
-    } else {
-        expected_ret = backend_abi_return_type(inst.callee)
-        expected_count = backend_abi_param_count(inst.callee)
-        if len(expected_ret) == 0 || expected_count < 0 {
-            panic f"backend ABI error: {caller.name}.{block.name}: unknown backend symbol: {inst.callee}"
-        }
+fun backend_validate_extern(ext: MirExtern): void {
+    let expected_ret = backend_abi_return_type(ext.name)
+    let expected_count = backend_abi_param_count(ext.name)
+    if len(expected_ret) == 0 || expected_count < 0 {
+        panic str_cat2("backend ABI error: unsupported backend extern: ", ext.name)
     }
-
-    if inst.typ != expected_ret {
-        panic f"backend ABI error: {caller.name}.{block.name}: return type mismatch for {inst.callee}: expected {expected_ret}, got {inst.typ}"
+    if ext.return_type != expected_ret {
+        panic f"backend ABI error: extern return type mismatch for {ext.name}: expected {expected_ret}, got {ext.return_type}"
     }
-    if len(inst.operands) != expected_count {
-        panic f"backend ABI error: {caller.name}.{block.name}: argument count mismatch for {inst.callee}: expected {expected_count}, got {len(inst.operands)}"
+    if len(ext.param_types) != expected_count {
+        panic f"backend ABI error: extern argument count mismatch for {ext.name}: expected {expected_count}, got {len(ext.param_types)}"
     }
-
     let i = 0
     for i < expected_count {
-        let expected_type = ""
-        if internal_index >= 0 {
-            expected_type = program.functions[internal_index].params[i].typ
-        } else {
-            expected_type = backend_abi_param_type(inst.callee, i)
-        }
-        let actual_type = mir_operand_type(inst.operands[i])
-        if actual_type != expected_type {
-            panic f"backend ABI error: {caller.name}.{block.name}: argument type mismatch for {inst.callee} at {i}: expected {expected_type}, got {actual_type}"
+        let expected_type = backend_abi_param_type(ext.name, i)
+        if ext.param_types[i] != expected_type {
+            panic f"backend ABI error: extern argument type mismatch for {ext.name} at {i}: expected {expected_type}, got {ext.param_types[i]}"
         }
         i = i + 1
-    }
-
-    if expected_ret == "void" {
-        if inst.has_result {
-            panic f"backend ABI error: {caller.name}.{block.name}: void call has result: {inst.callee}"
-        }
-    } else {
-        if !inst.has_result || inst.result_type != expected_ret {
-            panic f"backend ABI error: {caller.name}.{block.name}: non-void call result mismatch: {inst.callee}"
-        }
     }
 }
 
 fun backend_validate_program_abi(program: MirProgram): void {
-    let fi = 0
-    for fi < len(program.functions) {
-        let fn = program.functions[fi]
-        let bi = 0
-        for bi < len(fn.blocks) {
-            let block = fn.blocks[bi]
-            let ii = 0
-            for ii < len(block.instructions) {
-                let inst = block.instructions[ii]
-                if inst.op == "call" {
-                    backend_validate_call(program, fn, block, inst)
-                }
-                ii = ii + 1
-            }
-            bi = bi + 1
-        }
-        fi = fi + 1
+    mir_validate_call_contracts(program)
+    let i = 0
+    for i < len(program.externs) {
+        backend_validate_extern(program.externs[i])
+        i = i + 1
     }
 }

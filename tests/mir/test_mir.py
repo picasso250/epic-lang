@@ -13,7 +13,8 @@ from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction,
 from mir import MirGlobal, MirProgram, MirStruct, MirValue, Ret, SymbolOperand, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from ast_to_mir import ast_to_mir
-from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
+from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS, inject_all_mir_helpers
+from mir_prune import prune_unreachable_functions
 from mir_parser import parse_mir_file, parse_mir_text
 from parser import Parser
 import sema
@@ -275,64 +276,61 @@ entry:
     assert fn.text().startswith("define ptr @main(ptr %arg)")
 
 
-def test_text_mir_rejects_import_and_declare_directives():
-    for directive in ("import void @ExitProcess(i64)", "declare ptr @__epx_alloc(i64)"):
-        try:
-            parse_mir_text(directive)
-        except Exception as exc:
-            assert "expected type, global, or define" in str(exc), str(exc)
-        else:
-            raise AssertionError(f"text MIR accepted backend-only directive: {directive}")
+def test_text_mir_uses_target_neutral_extern_contracts():
+    source = """extern void @ExitProcess(i64)
 
-
-def test_unresolved_calls_are_backend_abi_symbols():
-    source = """define void @main() {
+define void @main() {
 entry:
   call void ExitProcess(i64 0)
   ret void
 }
 """
     program = parse_mir_text(source)
-    assert program.functions[0].blocks[0].instructions[0].callee == "ExitProcess"
+    assert program.externs[0].name == "ExitProcess"
+    assert program.text() == source.rstrip()
+
+    for directive in ("import void @ExitProcess(i64)", "declare ptr @__epx_alloc(i64)"):
+        try:
+            parse_mir_text(directive)
+        except Exception as exc:
+            assert "expected extern, type, global, or define" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"text MIR accepted non-canonical directive: {directive}")
 
 
-def test_backend_abi_validates_external_calls_before_lowering():
-    valid = parse_mir_text("""define void @main() {
+def test_undeclared_calls_are_rejected():
+    source = """define void @main() {
 entry:
   call void ExitProcess(i64 0)
   ret void
 }
-""")
-    validate_backend_abi(valid)
+"""
+    try:
+        parse_mir_text(source)
+    except MirValidationError as exc:
+        assert "undeclared callee: ExitProcess" in str(exc), str(exc)
+    else:
+        raise AssertionError("MIR accepted an undeclared callee")
 
-    unknown = parse_mir_text("""define void @main() {
+
+def test_backend_abi_rejects_unsupported_extern():
+    program = parse_mir_text("""extern void @ExitProces(i64)
+
+define void @main() {
 entry:
   call void ExitProces(i64 0)
   ret void
 }
 """)
     try:
-        validate_backend_abi(unknown)
+        validate_backend_abi(program)
     except BackendAbiError as exc:
-        assert "unknown backend symbol: ExitProces" in str(exc), str(exc)
+        assert "unsupported backend extern: ExitProces" in str(exc), str(exc)
     else:
-        raise AssertionError("backend ABI accepted an unknown external callee")
-
-    wrong_args = parse_mir_text("""define void @main() {
-entry:
-  call void ExitProcess(ptr null)
-  ret void
-}
-""")
-    try:
-        validate_backend_abi(wrong_args)
-    except BackendAbiError as exc:
-        assert "backend call argument mismatch for ExitProcess" in str(exc), str(exc)
-    else:
-        raise AssertionError("backend ABI accepted a wrong external signature")
+        raise AssertionError("backend ABI accepted an unsupported extern")
 
 
-def test_runtime_mir_bundle_is_declaration_free_fragment():
+def test_runtime_mir_bundle_declares_external_contracts():
     runtime_mir_dir = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir"))
     path = runtime_mir_dir / "helpers.mir"
     assert sorted(p.name for p in runtime_mir_dir.glob("*.mir")) == ["helpers.mir"]
@@ -340,192 +338,33 @@ def test_runtime_mir_bundle_is_declaration_free_fragment():
     assert "import " not in text
     assert "declare " not in text
     program = parse_mir_text(text, filename=str(path), validate_program=False)
+    assert {ext.name for ext in program.externs} == {
+        "ExitProcess", "GetStdHandle", "WriteFile",
+        "__ep_print_newline", "__ep_print_str", "__epx_alloc",
+    }
     assert [fn.name for fn in program.functions] == list(IMPLEMENTED_MIR_HELPERS)
     parsed_fn = next(fn for fn in program.functions if fn.name == "__ep_slice_i64_get")
     assert parsed_fn.text() in text
 
 
-def test_mir_helper_injection():
-    """Verify all implemented MIR runtime helpers are always injected."""
-
-    assert "__ep_slice_u8_slice" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_new" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_get" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_set" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_push" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_new" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_get" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_set" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_push" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_u8_extend" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_eq" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_from_bool" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_cat" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_slice" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_starts_with" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_get" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_find" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_replace_char" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_trim" not in IMPLEMENTED_MIR_HELPERS
-
-    # i64[] reads use __ep_slice_i64_get, not __epic_slice_i64_get
-    src_i64 = """fun main(): i64 {
+def test_backend_preparation_replaces_runtime_extern_with_definition():
+    source = """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
     ret xs[1]
 }"""
-    ast_i64 = sema.analyze_program(Parser(lex(src_i64)).parse_program())
-    prog_i64 = ast_to_mir(ast_i64)
-    text_i64 = prog_i64.text()
-    assert "call i64 __ep_slice_i64_get" in text_i64, \
-        f"expected call i64 __ep_slice_i64_get, got:\n{text_i64}"
-    assert "__epic_slice_i64_get" not in text_i64, \
-        f"unexpected __epic_slice_i64_get:\n{text_i64}"
-    old_qword_new = "__epx_slice_" + "qword_new"
-    old_i64_push = "__epx_slice_" + "i64_push"
-    assert old_qword_new not in text_i64, \
-        f"unexpected {old_qword_new}:\n{text_i64}"
-    assert old_i64_push not in text_i64, \
-        f"unexpected {old_i64_push}:\n{text_i64}"
+    typed = sema.analyze_program(Parser(lex(source)).parse_program())
+    program = ast_to_mir(typed)
 
-    # i64[] writes use __ep_slice_i64_set
-    src_i64_set = """fun main(): i64 {
-    let xs = new i64[] { 10, 20 }
-    xs[0] = 99
-    ret xs[0]
-}"""
-    ast_i64_set = sema.analyze_program(Parser(lex(src_i64_set)).parse_program())
-    prog_i64_set = ast_to_mir(ast_i64_set)
-    text_i64_set = prog_i64_set.text()
-    assert "call void __ep_slice_i64_set" in text_i64_set, \
-        f"expected call void __ep_slice_i64_set, got:\n{text_i64_set}"
+    assert "__ep_slice_i64_get" in {ext.name for ext in program.externs}
+    assert "__ep_slice_i64_get" not in {fn.name for fn in program.functions}
 
-    def check(source, expected_helpers=()):
-        ast = sema.analyze_program(Parser(lex(source)).parse_program())
-        prog = ast_to_mir(ast)
-        injected = {fn.name for fn in prog.functions}
-        externs = {ext.name for ext in prog.externs}
-        global_names = [glob.name for glob in prog.globals]
-        assert global_names.count("str.runtime.bool.true") == 1
-        assert global_names.count("str.runtime.bool.false") == 1
-        for name in expected_helpers:
-            assert name in injected, f"{name} should be retained as reachable MirFunction, got injected={injected}"
-        for name in IMPLEMENTED_MIR_HELPERS:
-            assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
-        return prog
+    inject_all_mir_helpers(program)
+    prune_unreachable_functions(program)
+    validate(program)
+    validate_backend_abi(program)
 
-    bytes_prog = check(
-        """fun main(): i64 {
-    let b = bytes("AB")
-    ret 0
-}"""
-    )
-    assert "__ep_slice_u8_from_str" not in bytes_prog.text()
-
-    parsed_helper_path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "helpers.mir"))
-    parsed_helper_program = parse_mir_file(parsed_helper_path, validate_program=False)
-    parsed_helper_text = next(fn for fn in parsed_helper_program.functions if fn.name == "__ep_slice_i64_get").text()
-    parsed_prog = check(
-        """fun main(): i64 {
-    let xs = new i64[] { 10, 20 }
-    ret xs[1]
-}""",
-        ["__ep_slice_i64_get"],
-    )
-    parsed_fn = next(fn for fn in parsed_prog.functions if fn.name == "__ep_slice_i64_get")
-    assert parsed_fn.text() == parsed_helper_text
-
-    str_prog = check(
-        """fun main(): i64 {
-    let a = new u8[] { u8(65) }
-    println(str(a))
-    ret 0
-}"""
-    )
-    assert "__ep_str_from_slice_u8" not in str_prog.text()
-
-    check(
-        """fun main(): i64 {
-    let a = new u8[] { u8(1), u8(2) }
-    ret 0
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let b = new u8[] { u8(1), u8(2) }
-    ret i64(b[0])
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let b = new u8[] { u8(1), u8(2) }
-    b.push(u8(3))
-    ret len(b)
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let b = new u8[] { u8(1), u8(2), u8(3) }
-    let c = b[1:3]
-    ret len(c)
-}""",
-        ["__ep_slice_u8_slice"],
-    )
-
-    check(
-        """fun main(): i64 {
-    let a = new u8[] { u8(1), u8(2) }
-    let b = new u8[] { u8(3), u8(4) }
-    a.extend(b)
-    ret len(a)
-}""",
-        ["__ep_slice_u8_extend"],
-    )
-
-    check(
-        """fun main(): i64 {
-    let left = "epic"
-    let right = "epic"
-    if left == right {
-        ret 1
-    }
-    ret 0
-}""",
-    )
-
-    check(
-        """fun main(): i64 {
-    println(str(true))
-    println(str(false))
-    ret 0
-}""",
-    )
-
-    check(
-        """fun main(): i64 {
-    let s = "epic-lang"
-    let t = s[5:9]
-    ret len(t)
-}""",
-    )
-
-    # Deterministic order: running twice gives same injection list
-    src = """fun main(): i64 {
-    let b = new u8[] { u8(65), u8(66) }
-    b[0] = u8(99)
-    ret i64(b[0])
-}"""
-    ast = sema.analyze_program(Parser(lex(src)).parse_program())
-    prog1 = ast_to_mir(ast)
-    prog2 = ast_to_mir(ast)
-    helper_names = set(IMPLEMENTED_MIR_HELPERS)
-    order1 = [fn.name for fn in prog1.functions if fn.name in helper_names]
-    order2 = [fn.name for fn in prog2.functions if fn.name in helper_names]
-    assert order1 == order2, f"helper order differs between runs: {order1} != {order2}"
-    expected_order = [name for name in IMPLEMENTED_MIR_HELPERS if name in set(order1)]
-    assert order1 == expected_order, f"unexpected helper order: {order1}"
+    assert "__ep_slice_i64_get" not in {ext.name for ext in program.externs}
+    assert "__ep_slice_i64_get" in {fn.name for fn in program.functions}
 
 
 def test_runtime_source_str_eq_lowers_as_epic_function():
@@ -795,11 +634,11 @@ def main():
     test_global_text_round_trip_uses_canonical_bytes_literals()
     test_mir_parser_rejects_unsigned_integer_types()
     test_mir_parser_strips_text_sigils()
-    test_text_mir_rejects_import_and_declare_directives()
-    test_unresolved_calls_are_backend_abi_symbols()
-    test_backend_abi_validates_external_calls_before_lowering()
-    test_runtime_mir_bundle_is_declaration_free_fragment()
-    test_mir_helper_injection()
+    test_text_mir_uses_target_neutral_extern_contracts()
+    test_undeclared_calls_are_rejected()
+    test_backend_abi_rejects_unsupported_extern()
+    test_runtime_mir_bundle_declares_external_contracts()
+    test_backend_preparation_replaces_runtime_extern_with_definition()
     test_runtime_source_str_eq_lowers_as_epic_function()
     test_runtime_source_str_from_bool_lowers_as_epic_function()
     test_runtime_source_str_from_i64_lowers_as_epic_function()

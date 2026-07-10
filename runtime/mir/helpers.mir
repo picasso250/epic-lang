@@ -1,3 +1,15 @@
+extern void @ExitProcess(i64)
+
+extern i64 @GetStdHandle(i64)
+
+extern i64 @WriteFile(i64, i64, i64, i64, i64)
+
+extern void @__ep_print_newline()
+
+extern void @__ep_print_str(ptr)
+
+extern ptr @__epx_alloc(i64)
+
 define void @__ep_runtime_panic(ptr %msg) {
 entry:
   call void __ep_print_str(ptr str.runtime.panic.prefix)

@@ -62,7 +62,9 @@ def main():
         print(run_result.stderr)
         sys.exit(run_result.returncode)
 
-    expected = """type Data = struct { i8, i64 }
+    expected = """extern void @ExitProcess(i64)
+
+type Data = struct { i8, i64 }
 
 type Zed = struct { ptr }
 
@@ -125,12 +127,12 @@ entry:
         errors="replace",
     )
     fail_output = fail_run.stdout + fail_run.stderr
-    if fail_run.returncode == 0 or "unknown backend symbol: ExitProces" not in fail_output:
+    if fail_run.returncode == 0 or "unsupported backend extern: ExitProces" not in fail_output:
         print("  FAIL  backend ABI accepted unknown Epic callee")
         print(fail_output)
         sys.exit(1)
 
-    print("  PASS  backend ABI rejects unknown Epic callee")
+    print("  PASS  backend ABI rejects unsupported Epic extern")
     print("  PASS  mir")
     sys.exit(0)
 

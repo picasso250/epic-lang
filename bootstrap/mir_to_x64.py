@@ -1,8 +1,10 @@
 """Lower Epic MIR to structured X64 MachineIR."""
 
-from backend_abi import validate_backend_abi
-from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID
+from backend_abi import WINAPI_ABI, validate_backend_abi
+from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID, validate
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
+from mir_prune import prune_unreachable_functions
+from mir_runtime_helpers import inject_all_mir_helpers
 from x64_runtime import append_runtime_helpers, emit_runtime_data, emit_startup_hook_call
 
 
@@ -11,6 +13,16 @@ ARG_REGS = ["rcx", "rdx", "r8", "r9"]
 
 class MirLowerError(RuntimeError):
     pass
+
+
+def prepare_mir_for_x64(program):
+    """Apply the x64 backend's MIR preparation contract in one place."""
+    inject_all_mir_helpers(program)
+    prune_unreachable_functions(program)
+    program.retain_referenced_externs()
+    validate(program)
+    validate_backend_abi(program)
+    return program
 
 
 class MirLower:
@@ -31,16 +43,20 @@ class MirLower:
         self.reusable_value_names = set()
         self.free_value_slots = []
 
-    def lower(self):
-        validate_backend_abi(self.program)
+    def _prepare_program(self):
         self.x64.global_("_start")
-        for imp in self.program.imports:
-            self.x64.extern(imp.name)
+        # The x64 runtime itself calls WinAPI; those imports are backend-owned.
+        for name in sorted(WINAPI_ABI):
+            self.x64.extern(name)
         self.x64.section(".data")
         self.string_globals = emit_runtime_data(self.x64, self.program)
         self.global_slots = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is None}
         self.has_global_init = any(fn.name == "__ep_global_init" for fn in self.program.functions)
         self.x64.section(".text")
+
+    def lower(self):
+        prepare_mir_for_x64(self.program)
+        self._prepare_program()
         for fn in self.program.functions:
             self._lower_function(fn)
         append_runtime_helpers(self.x64)

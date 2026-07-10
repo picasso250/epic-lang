@@ -103,10 +103,10 @@ def load_pipeline(root: Path):
     from epic import _merge_programs  # type: ignore
     from sema import analyze_program  # type: ignore
     from ast_to_mir import ast_to_mir  # type: ignore
-    from mir_to_x64 import lower_mir_to_x64  # type: ignore
+    from mir_to_x64 import lower_mir_to_x64, prepare_mir_for_x64  # type: ignore
     from x64 import X64DataBytes, X64DataZero, X64Inst, X64Label  # type: ignore
 
-    return _merge_programs, analyze_program, ast_to_mir, lower_mir_to_x64, X64Inst, X64Label, X64DataBytes, X64DataZero
+    return _merge_programs, analyze_program, ast_to_mir, prepare_mir_for_x64, lower_mir_to_x64, X64Inst, X64Label, X64DataBytes, X64DataZero
 
 
 def rel_or_abs(root: Path, value: str) -> str:
@@ -133,6 +133,7 @@ def build_report(args: argparse.Namespace) -> Report:
         merge_programs,
         analyze_program,
         ast_to_mir,
+        prepare_mir_for_x64,
         lower_mir_to_x64,
         X64Inst,
         X64Label,
@@ -150,6 +151,7 @@ def build_report(args: argparse.Namespace) -> Report:
     ast = analyze_program(ast)
     t2 = time.perf_counter()
     mir = ast_to_mir(ast)
+    prepare_mir_for_x64(mir)
     t3 = time.perf_counter()
 
     functions = [count_mir_function(fn) for fn in mir.functions]

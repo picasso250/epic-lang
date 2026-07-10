@@ -19,7 +19,6 @@ from mir import (
     MirExtern,
     MirField,
     MirGlobal,
-    MirImport,
     MirInst,
     MirParam,
     MirProgram,
@@ -32,8 +31,6 @@ from mir import (
     struct as mir_struct,
     validate,
 )
-from mir_runtime_helpers import inject_all_mir_helpers
-from mir_prune import prune_unreachable_functions
 
 
 class MirCodegenError(RuntimeError):
@@ -95,8 +92,8 @@ class MirCodegen(MirFunctionBuilder):
             fn.name: MirSignature([self._type(p.resolved_type) for p in fn.params], self._type(fn.resolved_type))
             for fn in ast.funcs
         }
-        for dll, name, params, ret in WINAPI_IMPORTS:
-            self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
+        for _dll, name, params, ret in WINAPI_IMPORTS:
+            self.program.externs.append(MirExtern(name, MirSignature(params, ret)))
         if "__ep_str_from_i64" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr())))
         if "__ep_str_from_u64" not in self.func_sigs:
@@ -162,8 +159,7 @@ class MirCodegen(MirFunctionBuilder):
         self._emit_global_init_function(ast)
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
-        inject_all_mir_helpers(self.program)
-        prune_unreachable_functions(self.program)
+        self.program.retain_referenced_externs()
         validate(self.program)
         return self.program
 
@@ -1703,10 +1699,16 @@ class MirCodegen(MirFunctionBuilder):
 
     def _emit_os_call_from(self, in_block, expr):
         self.set_block(in_block)
-        try:
-            signature = next(imp.signature for imp in self.program.imports if imp.name == expr.name and imp.dll == f"{expr.dll}.dll")
-        except StopIteration as exc:
-            raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}") from exc
+        signature = next(
+            (
+                MirSignature(params, ret)
+                for dll, name, params, ret in WINAPI_IMPORTS
+                if dll == expr.dll and name == expr.name
+            ),
+            None,
+        )
+        if signature is None:
+            raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}")
         args = self._emit_arg_flows_from(self.current_block, expr.args)
         result_type = None if signature.ret == VOID else signature.ret
         result = self.inst("call", args.value, result_type=result_type, type=signature.ret, callee=expr.name)

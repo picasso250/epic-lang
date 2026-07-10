@@ -1,7 +1,7 @@
 """Backend-owned MIR ABI validation.
 
-Canonical MIR does not carry import/declare directives. This module is the
-x64-windows-v0 authority for external call names and signatures.
+Canonical MIR carries target-neutral extern declarations. This module is the
+x64-windows-v0 authority for which externs the backend can provide.
 """
 
 from mir import I64, VOID, MirSignature, ptr
@@ -46,32 +46,18 @@ X64_WINDOWS_V0_ABI = {**WINAPI_ABI, **RUNTIME_ABI}
 
 
 def validate_backend_abi(program, abi=None):
-    """Validate every MIR call against module functions or the backend ABI."""
+    """Validate declared externs against the concrete backend ABI."""
 
     abi = X64_WINDOWS_V0_ABI if abi is None else abi
-    internal = {fn.name: fn.signature for fn in program.functions}
-    for fn in program.functions:
-        for block in fn.blocks:
-            for inst in block.instructions:
-                if inst.op != "call":
-                    continue
-                signature = internal.get(inst.callee)
-                if signature is None:
-                    signature = abi.get(inst.callee)
-                if signature is None:
-                    raise BackendAbiError(
-                        f"{fn.name}.{block.name}: unknown backend symbol: {inst.callee}"
-                    )
-                if inst.type != signature.ret:
-                    raise BackendAbiError(
-                        f"{fn.name}.{block.name}: backend call return type mismatch for "
-                        f"{inst.callee}: expected {signature.ret}, got {inst.type}"
-                    )
-                actual_params = [operand.type for operand in inst.operands]
-                if actual_params != signature.params:
-                    expected = ", ".join(str(item) for item in signature.params)
-                    actual = ", ".join(str(item) for item in actual_params)
-                    raise BackendAbiError(
-                        f"{fn.name}.{block.name}: backend call argument mismatch for "
-                        f"{inst.callee}: expected ({expected}), got ({actual})"
-                    )
+    declarations = {}
+    for item in program.externs:
+        declarations[item.name] = item.signature
+    for name, signature in declarations.items():
+        provided = abi.get(name)
+        if provided is None:
+            raise BackendAbiError(f"unsupported backend extern: {name}")
+        if provided != signature:
+            raise BackendAbiError(
+                f"backend extern signature mismatch for {name}: "
+                f"declared {signature}, backend provides {provided}"
+            )

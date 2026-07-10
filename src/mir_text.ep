@@ -383,6 +383,35 @@ fun mrt_parse_bytes_literal(text: str): str {
     }
     ret str(out)
 }
+fun mrt_parse_extern(line: str): MirExtern {
+    let prefix = "extern "
+    if !mrt_starts_with(line, prefix) {
+        mir_text_die(str_cat2("bad extern declaration: ", line))
+    }
+    let rest = line[len(prefix):len(line)]
+    let at_pos = mrt_find(rest, " @")
+    if at_pos < 0 { mir_text_die(str_cat2("bad extern declaration: ", line)) }
+    let return_type = mrt_trim(rest[0:at_pos])
+    let after_at = rest[at_pos + 2:len(rest)]
+    let lp = mrt_find(after_at, "(")
+    let rp = mrt_find(after_at, ")")
+    if lp <= 0 || rp < lp || rp != len(after_at) - 1 {
+        mir_text_die(str_cat2("bad extern declaration: ", line))
+    }
+    let name = after_at[0:lp]
+    let params_text = mrt_trim(after_at[lp + 1:rp])
+    let param_types = new str[0]
+    if len(params_text) > 0 {
+        let parts = mrt_split_commas(params_text)
+        let i = 0
+        for i < len(parts) {
+            param_types.push(parts[i])
+            i = i + 1
+        }
+    }
+    ret mir_extern(name, return_type, param_types)
+}
+
 fun mrt_parse_global(line: str): MirGlobal {
     let prefix = "global @"
     if !mrt_starts_with(line, prefix) {
@@ -484,7 +513,10 @@ fun mrt_parse_program(text: str): MirProgram {
     let i = 0
     for i < len(lines) {
         let line = lines[i]
-        if mrt_starts_with(line, "type ") {
+        if mrt_starts_with(line, "extern ") {
+            program.externs.push(mrt_parse_extern(line))
+            i = i + 1
+        } else if mrt_starts_with(line, "type ") {
             mrt_parse_struct_type(program, line)
             i = i + 1
         } else if mrt_starts_with(line, "global ") {
@@ -502,7 +534,7 @@ fun mrt_parse_program(text: str): MirProgram {
             if !closed { mir_text_die("unterminated function in MIR program") }
             program.functions.push(mrt_parse_function(fn_text))
         } else {
-            mir_text_die(str_cat2("expected type, global, or define; got: ", line))
+            mir_text_die(str_cat2("expected extern, type, global, or define; got: ", line))
         }
     }
     ret program

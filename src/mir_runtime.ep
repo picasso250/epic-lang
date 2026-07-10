@@ -35,10 +35,23 @@ fun mir_inject_all_runtime_helpers(program: MirProgram): void {
     mir_runtime_add_global(program, "str.runtime.panic.prefix", "runtime panic: ")
     mir_runtime_add_global(program, "str.runtime.slice.oob", "slice index out of bounds")
     mir_runtime_add_global(program, "str.runtime.map.missing", "map missing key")
+
     let helpers = mir_runtime_helper_program()
     let i = 0
     for i < len(helpers.functions) {
-        program.functions.push(helpers.functions[i])
+        if mir_find_function(program, helpers.functions[i].name) < 0 {
+            program.functions.push(helpers.functions[i])
+        }
+        i = i + 1
+    }
+    mir_remove_defined_externs(program)
+
+    i = 0
+    for i < len(helpers.externs) {
+        let ext = helpers.externs[i]
+        if mir_find_function(program, ext.name) < 0 && mir_find_extern(program, ext.name) < 0 {
+            program.externs.push(ext)
+        }
         i = i + 1
     }
 }

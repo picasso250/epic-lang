@@ -135,24 +135,13 @@ class SymbolOperand(MirOperand):
 
 
 @dataclass
-class MirImport:
-    name: str
-    signature: MirSignature
-    dll: str | None = None
-
-    def text(self):
-        ret, params = self.signature.text_parts()
-        return f"import {ret} @{self.name}({params})"
-
-
-@dataclass
 class MirExtern:
     name: str
     signature: MirSignature
 
     def text(self):
         ret, params = self.signature.text_parts()
-        return f"declare {ret} @{self.name}({params})"
+        return f"extern {ret} @{self.name}({params})"
 
 
 def mir_escape_bytes(text):
@@ -344,7 +333,6 @@ class MirStruct:
 
 @dataclass
 class MirProgram:
-    imports: list[MirImport] = field(default_factory=list)
     externs: list[MirExtern] = field(default_factory=list)
     globals: list[MirGlobal] = field(default_factory=list)
     functions: list[MirFunction] = field(default_factory=list)
@@ -359,8 +347,41 @@ class MirProgram:
                         names.add(inst.type.name)
         return names
 
+    def referenced_external_names(self):
+        defined = {fn.name for fn in self.functions}
+        names = set()
+        for fn in self.functions:
+            for block in fn.blocks:
+                for inst in block.instructions:
+                    if inst.op == "call" and inst.callee not in defined:
+                        names.add(inst.callee)
+        return names
+
+    def retain_referenced_externs(self):
+        referenced = self.referenced_external_names()
+        declarations = self.external_declarations()
+        missing = sorted(name for name in referenced if name not in declarations)
+        if missing:
+            raise ValueError(f"missing MIR extern declaration: {missing[0]}")
+        self.externs = [declarations[name] for name in sorted(referenced)]
+
+    def external_declarations(self):
+        declarations = {}
+        for item in self.externs:
+            existing = declarations.get(item.name)
+            if existing is not None and existing.signature != item.signature:
+                raise ValueError(f"conflicting MIR extern declaration: {item.name}")
+            declarations[item.name] = MirExtern(item.name, item.signature)
+        return declarations
+
     def text(self):
         parts = []
+        declarations = self.external_declarations()
+        for name in sorted(self.referenced_external_names()):
+            declaration = declarations.get(name)
+            if declaration is None:
+                raise ValueError(f"missing MIR extern declaration: {name}")
+            parts.append(declaration.text())
         for name in sorted(self.referenced_struct_names()):
             struct_item = self.structs.get(name)
             if struct_item is None:
@@ -414,7 +435,7 @@ class MirValidator:
             raise MirValidationError("\n".join(self.errors))
 
     def _collect_symbols(self):
-        for item in [*self.program.imports, *self.program.externs, *self.program.globals, *self.program.functions]:
+        for item in [*self.program.externs, *self.program.globals, *self.program.functions]:
             if not is_raw_module_symbol(item.name):
                 self.errors.append(f"module symbol must be raw and must not include text sigil '@': {item.name}")
             if item.name in self.symbols:
@@ -548,6 +569,7 @@ class MirValidator:
 
         callee = self.symbols.get(inst.callee)
         if callee is None:
+            self.errors.append(f"{fn.name}.{where}: undeclared callee: {inst.callee}")
             return
         signature = getattr(callee, "signature", None)
         if signature is None:

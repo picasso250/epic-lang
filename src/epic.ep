@@ -198,6 +198,7 @@ fun epic_backend(mir: MirProgram, exe_path: str): void {
     let prepare_start = epic_now_ms()
     mir_inject_all_runtime_helpers(mir)
     mir_prune_unreachable_functions(mir)
+    mir_retain_referenced_externs(mir)
     backend_validate_program_abi(mir)
     let prepare_stop = epic_now_ms()
     epic_timing("prepare mir", prepare_start, prepare_stop)

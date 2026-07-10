@@ -96,6 +96,12 @@ struct MirScalarGlobal {
 
 type MirGlobal = MirStringGlobal | MirDeclGlobal | MirScalarGlobal
 
+struct MirExtern {
+    name: str
+    return_type: str
+    param_types: str[]
+}
+
 struct MirStructField {
     struct_name: str
     field_type: str
@@ -103,9 +109,18 @@ struct MirStructField {
 }
 
 struct MirProgram {
+    externs: MirExtern[]
     globals: MirGlobal[]
     struct_fields: MirStructField[]
     functions: MirFunction[]
+}
+
+fun mir_extern(name: str, return_type: str, param_types: str[]): MirExtern {
+    let ext = new MirExtern
+    ext.name = name
+    ext.return_type = return_type
+    ext.param_types = param_types
+    ret ext
 }
 
 fun mir_const_int(typ: str, value: i64): MirOperand {
@@ -637,6 +652,139 @@ fun mir_find_function(program: MirProgram, name: str): i64 {
     ret 0 - 1
 }
 
+fun mir_find_extern(program: MirProgram, name: str): i64 {
+    let i = 0
+    for i < len(program.externs) {
+        if program.externs[i].name == name { ret i }
+        i = i + 1
+    }
+    ret 0 - 1
+}
+
+fun mir_call_param_types(inst: MirInst): str[] {
+    let types = new str[0]
+    let i = 0
+    for i < len(inst.operands) {
+        types.push(mir_operand_type(inst.operands[i]))
+        i = i + 1
+    }
+    ret types
+}
+
+fun mir_signature_matches_call(return_type: str, param_types: str[], inst: MirInst): bool {
+    if return_type != inst.typ || len(param_types) != len(inst.operands) { ret false }
+    let i = 0
+    for i < len(param_types) {
+        if param_types[i] != mir_operand_type(inst.operands[i]) { ret false }
+        i = i + 1
+    }
+    ret true
+}
+
+fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_types: str[]): void {
+    if mir_find_function(program, name) >= 0 { ret }
+    let index = mir_find_extern(program, name)
+    if index >= 0 {
+        let ext = program.externs[index]
+        if ext.return_type != return_type || len(ext.param_types) != len(param_types) {
+            panic str_cat2("conflicting MIR extern declaration: ", name)
+        }
+        let i = 0
+        for i < len(param_types) {
+            if ext.param_types[i] != param_types[i] {
+                panic str_cat2("conflicting MIR extern declaration: ", name)
+            }
+            i = i + 1
+        }
+        ret
+    }
+    program.externs.push(mir_extern(name, return_type, param_types))
+}
+
+fun mir_declare_unresolved_calls(program: MirProgram): void {
+    let fi = 0
+    for fi < len(program.functions) {
+        let fn = program.functions[fi]
+        let bi = 0
+        for bi < len(fn.blocks) {
+            let block = fn.blocks[bi]
+            let ii = 0
+            for ii < len(block.instructions) {
+                let inst = block.instructions[ii]
+                if inst.op == "call" && mir_find_function(program, inst.callee) < 0 {
+                    mir_declare_extern(program, inst.callee, inst.typ, mir_call_param_types(inst))
+                }
+                ii = ii + 1
+            }
+            bi = bi + 1
+        }
+        fi = fi + 1
+    }
+}
+
+fun mir_remove_defined_externs(program: MirProgram): void {
+    let kept = new MirExtern[0]
+    let i = 0
+    for i < len(program.externs) {
+        if mir_find_function(program, program.externs[i].name) < 0 {
+            kept.push(program.externs[i])
+        }
+        i = i + 1
+    }
+    program.externs = kept
+}
+
+fun mir_validate_call_contracts(program: MirProgram): void {
+    let fi = 0
+    for fi < len(program.functions) {
+        let fn = program.functions[fi]
+        let bi = 0
+        for bi < len(fn.blocks) {
+            let block = fn.blocks[bi]
+            let ii = 0
+            for ii < len(block.instructions) {
+                let inst = block.instructions[ii]
+                if inst.op == "call" {
+                    let internal_index = mir_find_function(program, inst.callee)
+                    if internal_index >= 0 {
+                        let target = program.functions[internal_index]
+                        let params = new str[0]
+                        let pi = 0
+                        for pi < len(target.params) {
+                            params.push(target.params[pi].typ)
+                            pi = pi + 1
+                        }
+                        if !mir_signature_matches_call(target.return_type, params, inst) {
+                            panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {inst.callee}"
+                        }
+                    } else {
+                        let extern_index = mir_find_extern(program, inst.callee)
+                        if extern_index < 0 {
+                            panic f"MIR validation error: {fn.name}.{block.name}: undeclared callee: {inst.callee}"
+                        }
+                        let ext = program.externs[extern_index]
+                        if !mir_signature_matches_call(ext.return_type, ext.param_types, inst) {
+                            panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {inst.callee}"
+                        }
+                    }
+                    if inst.typ == "void" {
+                        if inst.has_result {
+                            panic f"MIR validation error: {fn.name}.{block.name}: void call has result: {inst.callee}"
+                        }
+                    } else {
+                        if !inst.has_result || inst.result_type != inst.typ {
+                            panic f"MIR validation error: {fn.name}.{block.name}: non-void call result mismatch: {inst.callee}"
+                        }
+                    }
+                }
+                ii = ii + 1
+            }
+            bi = bi + 1
+        }
+        fi = fi + 1
+    }
+}
+
 fun mir_mark_reachable_function(program: MirProgram, reachable: str[], name: str): void {
     if mir_name_in(reachable, name) {
         ret
@@ -683,6 +831,7 @@ fun mir_prune_unreachable_functions(program: MirProgram): void {
 
 fun mir_program_empty(): MirProgram {
     let p = new MirProgram
+    p.externs = new MirExtern[0]
     p.globals = new MirGlobal[0]
     p.struct_fields = new MirStructField[0]
     p.functions = new MirFunction[0]
@@ -770,6 +919,59 @@ fun mir_struct_name_from_type(typ: str): str {
         ret typ[len(prefix):len(typ)]
     }
     ret ""
+}
+
+fun mir_referenced_external_names(program: MirProgram): str[] {
+    let names = new str[0]
+    let fi = 0
+    for fi < len(program.functions) {
+        let fn = program.functions[fi]
+        let bi = 0
+        for bi < len(fn.blocks) {
+            let block = fn.blocks[bi]
+            let ii = 0
+            for ii < len(block.instructions) {
+                let inst = block.instructions[ii]
+                if inst.op == "call" && mir_find_function(program, inst.callee) < 0 {
+                    mir_push_unique(names, inst.callee)
+                }
+                ii = ii + 1
+            }
+            bi = bi + 1
+        }
+        fi = fi + 1
+    }
+    ret mir_sorted_strings(names)
+}
+
+fun mir_retain_referenced_externs(program: MirProgram): void {
+    let names = mir_referenced_external_names(program)
+    let kept = new MirExtern[0]
+    let i = 0
+    for i < len(names) {
+        let index = mir_find_extern(program, names[i])
+        if index < 0 { panic str_cat2("missing MIR extern declaration: ", names[i]) }
+        kept.push(program.externs[index])
+        i = i + 1
+    }
+    program.externs = kept
+}
+
+fun mir_extern_text(ext: MirExtern): str {
+    let buf = make_str_buf()
+    str_buf_extend(buf, "extern ")
+    str_buf_extend(buf, ext.return_type)
+    str_buf_extend(buf, " @")
+    str_buf_extend(buf, ext.name)
+    str_buf_extend(buf, "(")
+    let i = 0
+    for i < len(ext.param_types) {
+        if i > 0 { str_buf_extend(buf, ", ") }
+        str_buf_extend(buf, ext.param_types[i])
+        i = i + 1
+    }
+    str_buf_extend(buf, ")")
+    ret str_buf_finish(buf)
 }
 
 fun mir_referenced_struct_names(program: MirProgram): str[] {
@@ -908,6 +1110,17 @@ fun mir_print_function(fn: MirFunction): void {
 
 fun mir_print_program(program: MirProgram): void {
     let printed = 0
+    let extern_names = mir_referenced_external_names(program)
+    let ei = 0
+    for ei < len(extern_names) {
+        let extern_index = mir_find_extern(program, extern_names[ei])
+        if extern_index < 0 { panic str_cat2("missing MIR extern declaration: ", extern_names[ei]) }
+        if printed > 0 { println("") }
+        println(mir_extern_text(program.externs[extern_index]))
+        printed = printed + 1
+        ei = ei + 1
+    }
+
     let struct_names = mir_referenced_struct_names(program)
     let si = 0
     for si < len(struct_names) {
