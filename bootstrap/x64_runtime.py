@@ -23,7 +23,7 @@ def emit_runtime_data(x64, program):
         elif glob.type.kind == "ptr":
             data_label = _data_label(glob.name)
             header_label = _header_label(glob.name)
-            values = list(glob.init.encode("ascii")) + [0]
+            values = list(glob.init.encode("latin1")) + [0]
             string_globals[glob.name] = (header_label, data_label, len(glob.init))
             x64.data_bytes(data_label, values)
             x64.data_zero(header_label, 24)

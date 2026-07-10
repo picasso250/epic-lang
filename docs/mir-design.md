@@ -723,6 +723,22 @@ bootstrap v0 的规范文本 MIR 不包含 `import` 或 `declare`。外部 call 
 自身的返回值形状。Python 编译器内部仍可保留 imports / externs 作为后端元数据，
 但 `MirProgram.text()` 不序列化它们。
 
+规范输出只包含当前 MIR 指令通过 `gep struct Name` 实际引用的 struct layout。
+引用名称按 ASCII 字节序排序，字段仍按 field index 排列；未引用的隐藏/runtime layout
+不进入文件。引用了但缺少 layout 时，serializer 必须立即报错。
+
+模块级 global 使用三种无歧义形式：
+
+```text
+global @argv: ptr
+global @counter: i64 = 42
+global @str.0: ptr = bytes "hello\n"
+```
+
+`bytes` initializer 是字节序列，不引入 Unicode 语义。允许的 canonical 转义为
+`\\`、`\"`、`\n`、`\r`、`\t` 和 `\xNN`；其余可打印 ASCII 字节直接输出。
+无 initializer 的 storage declaration 不使用 `None` 或 `null`。
+
 ## 14. Validator 第一版
 
 第一版 validator 至少检查：

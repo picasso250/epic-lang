@@ -689,6 +689,182 @@ fun mir_program_empty(): MirProgram {
     ret p
 }
 
+fun mir_hex_digit(value: i64): u8 {
+    if value < 10 { ret u8(48 + value) }
+    ret u8(65 + value - 10)
+}
+
+fun mir_escape_bytes(text: str): str {
+    let out = new u8[0]
+    let bs = bytes(text)
+    let i = 0
+    for i < len(bs) {
+        let c = bs[i]
+        if c == u8(92) {
+            out.push(u8(92))
+            out.push(u8(92))
+        } else if c == u8(34) {
+            out.push(u8(92))
+            out.push(u8(34))
+        } else if c == u8(10) {
+            out.push(u8(92))
+            out.push(u8(110))
+        } else if c == u8(13) {
+            out.push(u8(92))
+            out.push(u8(114))
+        } else if c == u8(9) {
+            out.push(u8(92))
+            out.push(u8(116))
+        } else if c >= u8(32) && c <= u8(126) {
+            out.push(c)
+        } else {
+            out.push(u8(92))
+            out.push(u8(120))
+            out.push(mir_hex_digit(i64(c) / 16))
+            out.push(mir_hex_digit(i64(c) % 16))
+        }
+        i = i + 1
+    }
+    ret str(out)
+}
+
+fun mir_ascii_less(a: str, b: str): bool {
+    let ab = bytes(a)
+    let bb = bytes(b)
+    let n = len(ab)
+    if len(bb) < n { n = len(bb) }
+    let i = 0
+    for i < n {
+        if ab[i] < bb[i] { ret true }
+        if ab[i] > bb[i] { ret false }
+        i = i + 1
+    }
+    ret len(ab) < len(bb)
+}
+
+fun mir_sorted_strings(names: str[]): str[] {
+    let out = new str[0]
+    let i = 0
+    for i < len(names) {
+        let key = names[i]
+        let next = new str[0]
+        let inserted = false
+        let j = 0
+        for j < len(out) {
+            if !inserted && mir_ascii_less(key, out[j]) {
+                next.push(key)
+                inserted = true
+            }
+            next.push(out[j])
+            j = j + 1
+        }
+        if !inserted { next.push(key) }
+        out = next
+        i = i + 1
+    }
+    ret out
+}
+fun mir_struct_name_from_type(typ: str): str {
+    let prefix = "struct "
+    if len(typ) > len(prefix) && typ[0:len(prefix)] == prefix {
+        ret typ[len(prefix):len(typ)]
+    }
+    ret ""
+}
+
+fun mir_referenced_struct_names(program: MirProgram): str[] {
+    let names = new str[0]
+    let fi = 0
+    for fi < len(program.functions) {
+        let fn = program.functions[fi]
+        let bi = 0
+        for bi < len(fn.blocks) {
+            let block = fn.blocks[bi]
+            let ii = 0
+            for ii < len(block.instructions) {
+                let inst = block.instructions[ii]
+                if inst.op == "gep" {
+                    let name = mir_struct_name_from_type(inst.typ)
+                    if len(name) > 0 { mir_push_unique(names, name) }
+                }
+                ii = ii + 1
+            }
+            bi = bi + 1
+        }
+        fi = fi + 1
+    }
+    ret mir_sorted_strings(names)
+}
+
+fun mir_struct_field_count(program: MirProgram, struct_name: str): i64 {
+    let count = 0
+    let i = 0
+    for i < len(program.struct_fields) {
+        let field = program.struct_fields[i]
+        if field.struct_name == struct_name && field.field_index + 1 > count {
+            count = field.field_index + 1
+        }
+        i = i + 1
+    }
+    ret count
+}
+
+fun mir_struct_field_type_at(program: MirProgram, struct_name: str, field_index: i64): str {
+    let i = 0
+    for i < len(program.struct_fields) {
+        let field = program.struct_fields[i]
+        if field.struct_name == struct_name && field.field_index == field_index {
+            ret field.field_type
+        }
+        i = i + 1
+    }
+    panic str_cat2("missing MIR struct field: ", struct_name)
+}
+
+fun mir_print_struct_type(program: MirProgram, struct_name: str): void {
+    let buf = make_str_buf()
+    str_buf_extend(buf, "type ")
+    str_buf_extend(buf, struct_name)
+    str_buf_extend(buf, " = struct { ")
+    let count = mir_struct_field_count(program, struct_name)
+    if count == 0 { panic str_cat2("missing MIR struct layout: ", struct_name) }
+    let i = 0
+    for i < count {
+        if i > 0 { str_buf_extend(buf, ", ") }
+        str_buf_extend(buf, mir_struct_field_type_at(program, struct_name, i))
+        i = i + 1
+    }
+    str_buf_extend(buf, " }")
+    println(str_buf_finish(buf))
+}
+
+fun mir_global_text(global: MirGlobal): str {
+    let buf = make_str_buf()
+    match global {
+        MirStringGlobal g: {
+            str_buf_extend(buf, "global @")
+            str_buf_extend(buf, g.name)
+            str_buf_extend(buf, ": ptr = bytes \"")
+            str_buf_extend(buf, mir_escape_bytes(g.init))
+            str_buf_extend(buf, "\"")
+        }
+        MirDeclGlobal g: {
+            str_buf_extend(buf, "global @")
+            str_buf_extend(buf, g.name)
+            str_buf_extend(buf, ": ")
+            str_buf_extend(buf, g.typ)
+        }
+        MirScalarGlobal g: {
+            str_buf_extend(buf, "global @")
+            str_buf_extend(buf, g.name)
+            str_buf_extend(buf, ": ")
+            str_buf_extend(buf, g.typ)
+            str_buf_extend(buf, " = ")
+            str_buf_extend(buf, g.init)
+        }
+    }
+    ret str_buf_finish(buf)
+}
 fun mir_print_function(fn: MirFunction): void {
     let header = make_str_buf()
     str_buf_extend(header, "define ")
@@ -731,12 +907,29 @@ fun mir_print_function(fn: MirFunction): void {
 }
 
 fun mir_print_program(program: MirProgram): void {
-    let i = 0
-    for i < len(program.functions) {
-        if i > 0 {
-            println("")
-        }
-        mir_print_function(program.functions[i])
-        i = i + 1
+    let printed = 0
+    let struct_names = mir_referenced_struct_names(program)
+    let si = 0
+    for si < len(struct_names) {
+        if printed > 0 { println("") }
+        mir_print_struct_type(program, struct_names[si])
+        printed = printed + 1
+        si = si + 1
+    }
+
+    let gi = 0
+    for gi < len(program.globals) {
+        if printed > 0 { println("") }
+        println(mir_global_text(program.globals[gi]))
+        printed = printed + 1
+        gi = gi + 1
+    }
+
+    let fi = 0
+    for fi < len(program.functions) {
+        if printed > 0 { println("") }
+        mir_print_function(program.functions[fi])
+        printed = printed + 1
+        fi = fi + 1
     }
 }

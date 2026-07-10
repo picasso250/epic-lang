@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from lexer import lex
 from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
-from mir import MirProgram, MirStruct, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
+from mir import MirGlobal, MirProgram, MirStruct, MirValue, Ret, SymbolOperand, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from ast_to_mir import ast_to_mir
 from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
@@ -190,10 +190,16 @@ fun main(): i64 {
 
 
 def test_struct_type_text_round_trip_and_v0_slot_layout():
-    source = """type Data = struct { i8, i64 }
+    source = """type Zed = struct { ptr }
+
+type Unused = struct { i64 }
+
+type Data = struct { i8, i64 }
 
 define i64 @main() {
 entry:
+  %zed: ptr = gep struct Zed, ptr null, i64 1
+  %data: ptr = gep struct Data, ptr null, i64 1
   ret i64 0
 }
 """
@@ -202,8 +208,34 @@ entry:
     assert [field.type for field in layout.fields] == [I8, I64]
     assert [field.offset for field in layout.fields] == [0, 8]
     assert layout.size == 16
-    assert program.text() == source.rstrip()
+    expected = """type Data = struct { i8, i64 }
 
+type Zed = struct { ptr }
+
+define i64 @main() {
+entry:
+  %zed: ptr = gep struct Zed, ptr null, i64 1
+  %data: ptr = gep struct Data, ptr null, i64 1
+  ret i64 0
+}"""
+    assert program.text() == expected
+
+
+def test_global_text_round_trip_uses_canonical_bytes_literals():
+    source = (
+        "global @argv: ptr\n\n"
+        "global @counter: i64 = 42\n\n"
+        'global @str.0: ptr = bytes "A\\n\\\"\\\\\\x00\\xFF//tail"\n\n'
+        "define i64 @main() {\n"
+        "entry:\n"
+        "  ret i64 0\n"
+        "}\n"
+    )
+    program = parse_mir_text(source)
+    assert program.globals[0].init is None
+    assert program.globals[1].init == "42"
+    assert program.globals[2].init == 'A\n"\\\x00\xff//tail'
+    assert program.text() == source.rstrip()
 
 def test_mir_parser_rejects_unsigned_integer_types():
     for typ in ("u64", "u8"):
@@ -723,6 +755,7 @@ def main():
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
     test_struct_type_text_round_trip_and_v0_slot_layout()
+    test_global_text_round_trip_uses_canonical_bytes_literals()
     test_mir_parser_rejects_unsigned_integer_types()
     test_mir_parser_strips_text_sigils()
     test_text_mir_rejects_import_and_declare_directives()

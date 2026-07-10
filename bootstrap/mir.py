@@ -155,14 +155,42 @@ class MirExtern:
         return f"declare {ret} @{self.name}({params})"
 
 
+def mir_escape_bytes(text):
+    out = []
+    for ch in text:
+        value = ord(ch)
+        if value > 0xFF:
+            raise ValueError(f"MIR byte string contains non-byte code point: U+{value:04X}")
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif 0x20 <= value <= 0x7E:
+            out.append(ch)
+        else:
+            out.append(f"\\x{value:02X}")
+    return "".join(out)
+
+
 @dataclass
 class MirGlobal:
     name: str
     type: MirType
-    init: str
+    init: str | None
 
     def text(self):
-        return f"{self.name}: {self.type} = global {self.init}"
+        prefix = f"global @{self.name}: {self.type}"
+        if self.init is None:
+            return prefix
+        if self.type.kind == "ptr":
+            return f'{prefix} = bytes "{mir_escape_bytes(self.init)}"'
+        return f"{prefix} = {self.init}"
 
 
 @dataclass
@@ -322,9 +350,22 @@ class MirProgram:
     functions: list[MirFunction] = field(default_factory=list)
     structs: dict[str, MirStruct] = field(default_factory=dict)
 
+    def referenced_struct_names(self):
+        names = set()
+        for fn in self.functions:
+            for block in fn.blocks:
+                for inst in block.instructions:
+                    if inst.op == "gep" and inst.type is not None and inst.type.kind == "struct":
+                        names.add(inst.type.name)
+        return names
+
     def text(self):
         parts = []
-        parts.extend(struct_item.text() for struct_item in self.structs.values())
+        for name in sorted(self.referenced_struct_names()):
+            struct_item = self.structs.get(name)
+            if struct_item is None:
+                raise ValueError(f"missing MIR struct layout: {name}")
+            parts.append(struct_item.text())
         parts.extend(glob.text() for glob in self.globals)
         parts.extend(fn.text() for fn in self.functions)
         return "\n\n".join(parts)

@@ -1,15 +1,50 @@
 fun cstr_ready_path(s: str): str {
     ret s
 }
+
 fun main(): void {
-    let program = mir_program_empty()
-    mrt_parse_struct_type(program, "type Data = struct { i8, i64 }")
-    assert len(program.struct_fields) == 2
-    assert program.struct_fields[0].struct_name == "Data"
-    assert program.struct_fields[0].field_type == "i8"
-    assert program.struct_fields[0].field_index == 0
-    assert program.struct_fields[1].struct_name == "Data"
-    assert program.struct_fields[1].field_type == "i64"
-    assert program.struct_fields[1].field_index == 1
-    println("PASS MIR struct type declaration")
+    let text = make_str_buf()
+    str_buf_extend(text, "type Zed = struct { ptr }\n\ntype Unused = struct { i64 }\n\ntype Data = struct { i8, i64 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
+    text.push(u8(92))
+    text.push(u8(110))
+    text.push(u8(92))
+    text.push(u8(34))
+    text.push(u8(92))
+    text.push(u8(92))
+    text.push(u8(92))
+    str_buf_extend(text, "x00")
+    text.push(u8(92))
+    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %zed: ptr = gep struct Zed, ptr null, i64 1\n  %data: ptr = gep struct Data, ptr null, i64 1\n  ret i64 0\n}\n")
+
+    let program = mrt_parse_program(str_buf_finish(text))
+    assert len(program.struct_fields) == 4
+    assert program.struct_fields[2].struct_name == "Data"
+    assert program.struct_fields[2].field_type == "i8"
+    assert program.struct_fields[2].field_index == 0
+    assert program.struct_fields[3].field_type == "i64"
+    assert program.struct_fields[3].field_index == 1
+    assert len(program.globals) == 3
+    match program.globals[0] {
+        MirDeclGlobal g: { assert g.name == "argv" && g.typ == "ptr" }
+        _: { assert false }
+    }
+    match program.globals[1] {
+        MirScalarGlobal g: { assert g.name == "counter" && g.typ == "i64" && g.init == "42" }
+        _: { assert false }
+    }
+    match program.globals[2] {
+        MirStringGlobal g: {
+            let value = bytes(g.init)
+            assert len(value) == 12
+            assert value[0] == u8(65)
+            assert value[1] == u8(10)
+            assert value[2] == u8(34)
+            assert value[3] == u8(92)
+            assert value[4] == u8(0)
+            assert value[5] == u8(255)
+            assert g.init[6:12] == "//tail"
+        }
+        _: { assert false }
+    }
+    mir_print_program(program)
 }

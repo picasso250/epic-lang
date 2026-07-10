@@ -83,10 +83,29 @@ class _MirTextParser:
         self.filename = filename
         self.lines = []
         for line_no, raw in enumerate(text.splitlines(), 1):
-            line = raw.split("//", 1)[0].strip()
+            line = self._strip_comment(raw).strip()
             if line:
                 self.lines.append((line_no, line))
         self.i = 0
+
+    @staticmethod
+    def _strip_comment(raw):
+        in_string = False
+        escaped = False
+        for i, ch in enumerate(raw):
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+            elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                return raw[:i]
+        return raw
 
     def parse_program(self):
         program = MirProgram()
@@ -100,7 +119,7 @@ class _MirTextParser:
                 self.i += 1
             elif line.startswith("define "):
                 program.functions.append(self._parse_function())
-            elif " = global " in line:
+            elif line.startswith("global "):
                 program.globals.append(self._parse_global(line_no, line))
                 self.i += 1
             else:
@@ -118,16 +137,55 @@ class _MirTextParser:
         return MirStruct(name, fields, max(len(fields) * 8, 1))
 
     def _parse_global(self, line_no, line):
-        m = re.fullmatch(r"(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(.+?)\s*=\s*global\s*(.*)", line)
+        m = re.fullmatch(r"global\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(.+?)(?:\s*=\s*(.+))?", line)
         if not m:
             self._error(line_no, f"invalid global: {line}")
-        return MirGlobal(_strip_module_sigil(m.group(1)), self._parse_type(m.group(2)), self._parse_global_init(m.group(3)))
+        name = _strip_module_sigil(m.group(1))
+        typ = self._parse_type(m.group(2))
+        init_text = m.group(3)
+        if init_text is None:
+            return MirGlobal(name, typ, None)
+        init_text = init_text.strip()
+        if init_text.startswith("bytes "):
+            if typ.kind != "ptr":
+                self._error(line_no, "bytes global initializer requires ptr type")
+            return MirGlobal(name, typ, self._parse_bytes_literal(line_no, init_text[6:].strip()))
+        if typ.kind == "ptr":
+            self._error(line_no, "ptr global initializer must use bytes literal")
+        return MirGlobal(name, typ, init_text)
 
-    def _parse_global_init(self, text):
-        text = text.strip()
-        if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
-            return bytes(text[1:-1], "utf-8").decode("unicode_escape")
-        return text
+    def _parse_bytes_literal(self, line_no, text):
+        if len(text) < 2 or text[0] != '"' or text[-1] != '"':
+            self._error(line_no, f"invalid bytes literal: {text}")
+        raw = text[1:-1]
+        out = bytearray()
+        i = 0
+        simple = {"\\": 0x5C, '"': 0x22, "n": 0x0A, "r": 0x0D, "t": 0x09}
+        while i < len(raw):
+            ch = raw[i]
+            if ch != "\\":
+                value = ord(ch)
+                if value > 0x7E or value < 0x20:
+                    self._error(line_no, "bytes literal contains unescaped non-printable byte")
+                out.append(value)
+                i += 1
+                continue
+            i += 1
+            if i >= len(raw):
+                self._error(line_no, "unterminated bytes escape")
+            esc = raw[i]
+            if esc in simple:
+                out.append(simple[esc])
+                i += 1
+                continue
+            if esc == "x" and i + 2 < len(raw):
+                digits = raw[i + 1:i + 3]
+                if re.fullmatch(r"[0-9A-Fa-f]{2}", digits):
+                    out.append(int(digits, 16))
+                    i += 3
+                    continue
+            self._error(line_no, f"invalid bytes escape near: {raw[i - 1:]}")
+        return bytes(out).decode("latin1")
 
     def _parse_function(self):
         line_no, header = self._next()

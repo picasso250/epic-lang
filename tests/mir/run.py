@@ -47,11 +47,47 @@ def main():
         sys.exit(compile_result.returncode)
 
     exe = build_dir / "tests" / "mir" / "type_decl.exe"
-    run_result = subprocess.run([str(exe)], cwd=root)
+    run_result = subprocess.run(
+        [str(exe)],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="ascii",
+        errors="strict",
+    )
     if run_result.returncode != 0:
-        print(f"  FAIL  MIR struct type declaration run (exit {run_result.returncode})")
+        print(f"  FAIL  MIR canonical text run (exit {run_result.returncode})")
+        print(run_result.stdout)
+        print(run_result.stderr)
         sys.exit(run_result.returncode)
 
+    expected = """type Data = struct { i8, i64 }
+
+type Zed = struct { ptr }
+
+global @argv: ptr
+
+global @counter: i64 = 42
+
+global @str.0: ptr = bytes "A\\n\\\"\\\\\\x00\\xFF//tail"
+
+define i64 @main() {
+entry:
+  %zed: ptr = gep struct Zed, ptr null, i64 1
+  %data: ptr = gep struct Data, ptr null, i64 1
+  ret i64 0
+}
+"""
+    actual = run_result.stdout.replace("\r\n", "\n")
+    if actual != expected:
+        print("  FAIL  MIR canonical text output mismatch")
+        print("--- expected ---")
+        print(expected)
+        print("--- actual ---")
+        print(actual)
+        sys.exit(1)
+
+    print("  PASS  MIR canonical text round-trip")
     print("  PASS  mir")
     sys.exit(0)
 
