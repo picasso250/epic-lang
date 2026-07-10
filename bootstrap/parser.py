@@ -129,9 +129,9 @@ class Parser:
 
     def parse_fn_def(self):
         self.expect("FUN")
-        receiver_name = ""
+        receiver_name = None
         receiver_type = None
-        method_name = ""
+        method_name = None
         if self.peek_kind("LPAREN"):
             self.expect("LPAREN")
             receiver = self.expect("ID")
@@ -176,7 +176,7 @@ class Parser:
             pname = self.expect("ID")
             self.expect("COLON")
             ptype = self.parse_type()
-            params.append(Param(name=pname[1], type=ptype))
+            params.append(Param(name=pname[1], type=ptype, line=pname[2]))
             if not self.check("COMMA"):
                 break
         return params
@@ -309,11 +309,11 @@ class Parser:
         if self.peek_kind("COLON"):
             self.advance()
             typ = self.parse_type()
-        value = None
-        if self.check("ASSIGN"):
-            value = self.parse_expr()
+        if not self.check("ASSIGN"):
+            raise ParseError(f"let {name[1]} requires an initializer", name[2])
+        value = self.parse_expr()
         self.expect_stmt_end()
-        return LetNode(name=name[1], var_type=typ, value=value)
+        return LetNode(name=name[1], value=value, var_type=typ, line=name[2])
 
     def parse_assign_stmt(self):
         name = self.expect("ID")
@@ -405,23 +405,23 @@ class Parser:
                 self.advance()
                 self.expect("COLON")
                 body = self.parse_block()
-                cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
+                cases.append(MatchCase(pattern=None, body=body, is_else=True))
             elif self.peek_kind("ID") and self.peek()[1] == "_":
                 self.advance()
                 self.expect("COLON")
                 body = self.parse_block()
-                cases.append(MatchCase(pattern=None, bindings=[], body=body, is_else=True))
+                cases.append(MatchCase(pattern=None, body=body, is_else=True))
             elif self.peek_kind("ID") and self.peek_ahead(1)[0] == "ID" and self.peek_ahead(2)[0] == "COLON":
                 variant = self.expect("ID")
                 binding = self.expect("ID")
                 self.expect("COLON")
                 body = self.parse_block()
-                cases.append(MatchCase(pattern=None, bindings=[], body=body, variant_name=variant[1], binding_name=binding[1]))
+                cases.append(MatchCase(pattern=None, body=body, variant_name=variant[1], binding_name=binding[1], line=variant[2]))
             else:
                 pattern = self.parse_expr()
                 self.expect("COLON")
                 body = self.parse_block()
-                cases.append(MatchCase(pattern=pattern, bindings=[], body=body))
+                cases.append(MatchCase(pattern=pattern, body=body, line=getattr(pattern, "line", 0)))
             self.skip_newlines()
         self.expect("RBRACE")
         return MatchNode(expr=expr, cases=cases)
@@ -806,8 +806,6 @@ def dump_ast_lines(node, depth=0):
             emit("MatchCase")
         if node.pattern is not None:
             out.extend(dump_ast_lines(node.pattern, depth + 1))
-        for field, bind in node.bindings:
-            emit(f"  MatchBinding {field} : {bind}")
         out.extend(dump_ast_lines(node.body, depth + 1))
     elif isinstance(node, ExprStmtNode):
         emit("ExprStmt")

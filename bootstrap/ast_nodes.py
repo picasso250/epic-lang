@@ -67,9 +67,9 @@ class FunDefNode(ASTNode):
     ret_type: EpicType
     body: 'BlockNode'
     resolved_type: Optional[EpicType] = None
-    receiver_name: str = ""
+    receiver_name: Optional[str] = None
     receiver_type: Optional[EpicType] = None
-    method_name: str = ""
+    method_name: Optional[str] = None
 
 
 @dataclass
@@ -88,8 +88,8 @@ class ReturnNode(ASTNode):
 @dataclass
 class LetNode(ASTNode):
     name: str
+    value: ASTNode
     var_type: Optional[EpicType] = None
-    value: Optional[ASTNode] = None
     resolved_type: Optional[EpicType] = None
 
 
@@ -162,12 +162,11 @@ class PanicNode(ASTNode):
 
 @dataclass
 class MatchCase(ASTNode):
-    pattern: ASTNode
-    bindings: list
+    pattern: Optional[ASTNode]
     body: 'BlockNode'
     is_else: bool = False
-    variant_name: str = ""
-    binding_name: str = ""
+    variant_name: Optional[str] = None
+    binding_name: Optional[str] = None
     binding_type: Optional[EpicType] = None
 
 
@@ -175,7 +174,7 @@ class MatchCase(ASTNode):
 class MatchNode(ASTNode):
     expr: ASTNode
     cases: list
-    union_name: str = ""
+    union_name: Optional[str] = None
 
 
 @dataclass

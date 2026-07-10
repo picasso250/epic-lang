@@ -51,7 +51,7 @@ fun helper(a: i64, b: i64, c: i64, d: i64): i64 {
 fun statements_and_control(flag: bool): void {
     let inferred = 1
     let typed: i64 = 2
-    let empty: u8[]
+    let empty: u8[] = new u8[]
     let p = new Point
     let p2 = new Point {}
     let p3 = new Point { x: 1, y: 2, name: "origin" }

@@ -597,7 +597,10 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                 if sema_func_index(st, f.name) >= 0 || sema_extern_index(st, f.name) >= 0 {
                     sema_die(f"duplicate function {f.name}")
                 }
-                if f.method_name != "" {
+                if f.method_name? {
+                    if f.receiver_type? == false || f.receiver_name? == false {
+                        sema_die("method metadata is incomplete")
+                    }
                     if sema_struct_index(st, f.receiver_type) < 0 {
                         sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
                     }
@@ -613,7 +616,7 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                         sema_die(f"function {f.name} parameter {p.name} cannot have type void")
                     }
                 }
-                if f.method_name != "" {
+                if f.method_name? {
                     if len(f.params) == 0 {
                         sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
                     }
@@ -985,12 +988,6 @@ fun sema_lvalue_type(st: SemaState, node: AstNode): str {
 fun sema_stmt(st: SemaState, node: AstNode): void {
     match node {
         AstLet n: {
-            match n.value_expr {
-                AstEmpty e: {
-                    sema_die(f"let {n.name} requires an initializer")
-                }
-                _: {}
-            }
             let target = ""
             if type_expr_is_missing(n.source_type) == false {
                 target = sema_type_name(st, n.source_type)
@@ -1117,7 +1114,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                         AstEmpty e: {}
                         _: { sema_die(f"ADT match on {scrutinee} requires variant binding cases") }
                     }
-                    if c.variant_name == "" || c.binding_name == "" {
+                    if c.variant_name? == false || c.binding_name? == false {
                         sema_die(f"ADT match on {scrutinee} requires variant binding cases")
                     }
                     if sema_union_member_index(st, scrutinee, c.variant_name) < 0 {
@@ -1145,7 +1142,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             }
             for i: 0:len(n.fields) {
                 let c = n.fields[i]
-                if c.variant_name != "" || c.binding_name != "" {
+                if c.variant_name? || c.binding_name? {
                     sema_die("ADT match case requires union scrutinee")
                 }
                 sema_check_assign(st, scrutinee, c.expr, "match pattern")

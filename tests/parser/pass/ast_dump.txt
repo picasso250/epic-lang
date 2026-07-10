@@ -66,6 +66,7 @@ Program
       Let typed : i64
         Literal 2
       Let empty : u8[]
+        NewArray : u8
       Let p
         StructInit Point
       Let p2

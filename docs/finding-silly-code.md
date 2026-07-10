@@ -207,16 +207,17 @@ ast_fields(node).push(field)
 Better shape:
 
 ```epic
-let field = ast_new_struct_field()
-field.name = token_text(fname)
+let field = new AstStructField {
+    meta: ast_meta(token_line(fname)),
+    name: token_text(fname),
+    source_type: p.parse_type()
+}
 node.fields.push(field)
 ```
 
 Once the parser knows a child has a concrete type, keep that type until the value actually crosses into a heterogeneous AST position. Downstream code should trust concrete container element types instead of re-matching every element.
 
-The same rule applies to AST constructors. `ast_new_*` should return the concrete payload type, not `AstNode`. Wrap with `new AstNode(payload)` only at heterogeneous boundaries such as block statements, expression operands, call arguments, and optional expression fields.
-
-Single-use AST constructors should usually be deleted and replaced with direct struct literals at the construction site. Keep only constructors that are reused or encode a real semantic sentinel, such as common default block/param/literal builders.
+The same rule applies to AST construction: use a direct struct literal and supply every semantically required field immediately. Wrap with `new AstNode(payload)` only at heterogeneous boundaries such as block statements, expression operands, and call arguments. Reuse alone is not enough to justify a placeholder builder; keep a helper only when it encodes a real semantic abstraction or sentinel. In the current parser, `ast_empty()` remains because it denotes an explicit optional AST slot, while the `ast_new_*` default block/param/literal builders were removed.
 
 ## Pattern 4: uniform union projection still using tag dispatch
 

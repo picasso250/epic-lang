@@ -235,8 +235,6 @@ class SemanticAnalyzer:
         self._fail(f"unsupported statement: {type(stmt).__name__}")
 
     def _analyze_let(self, stmt):
-        if stmt.value is None:
-            self._fail(f"let {stmt.name} requires an initializer")
         target = self._type_name(stmt.var_type) if stmt.var_type is not None else None
         value = self._expr(stmt.value)
         if target is None:
@@ -322,8 +320,6 @@ class SemanticAnalyzer:
                 self._fail(f"non-exhaustive match for {union_name}; missing {', '.join(missing)}")
 
     def _analyze_match_case(self, scrutinee_type, case):
-        if case.bindings:
-            self._fail("match bindings are not supported")
         self._check_assign(scrutinee_type, self._expr(case.pattern), "match pattern")
         self._analyze_block(case.body)
 
@@ -589,12 +585,6 @@ class SemanticAnalyzer:
             return base.type.elem
         self._fail(f"subscript expected array or pointer, got {base.type}")
 
-    def _direct_field_type(self, struct_name, field):
-        fields = self.struct_fields.get(struct_name)
-        if fields is None or field not in fields:
-            self._fail(f"unknown field {struct_name}.{field}")
-        return fields[field]
-
     def _union_common_field_type(self, union_name, field):
         found = None
         for member in self.union_defs[union_name]:
@@ -608,11 +598,6 @@ class SemanticAnalyzer:
         if found is None:
             self._fail(f"union {union_name} has no common field {field}")
         return found
-
-    def _field_guard_key(self, object_expr, field):
-        if isinstance(object_expr, VarNode):
-            return f"{object_expr.name}.{field}"
-        return None
 
     def _is_reference_type(self, typ):
         return typ == STR or typ.kind in ("array", "named")

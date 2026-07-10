@@ -884,14 +884,14 @@ fun mir_emit_new_array(st: MirCodegenState, block: MirBlock, expr: AstNewArray):
             count = count_flow.value
         }
     }
-    let arr = mir_emit_empty_array(st, epic_type_array_elem(expr.meta.resolved_type), count)
+    let arr = mir_emit_empty_array(st, epic_type_array_elem(ast_require_resolved_type(expr.meta)), count)
     ret mir_value_flow(arr, st.current_block)
 }
 
 fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstArrayLiteral): MirValueFlow {
     st.current_block = block
     let count = mir_const_int("i64", len(expr.args))
-    let elem_type = epic_type_array_elem(expr.meta.resolved_type)
+    let elem_type = epic_type_array_elem(ast_require_resolved_type(expr.meta))
     let arr = mir_emit_array_literal_storage(st, elem_type, count)
     let i = 0
     for i < len(expr.args) {
@@ -1133,7 +1133,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             inst.operands.push(left_flow.value)
             inst.operands.push(right_flow.value)
             mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), n.meta.resolved_type), st.current_block)
+            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), ast_require_resolved_type(n.meta)), st.current_block)
         }
         AstNewArray n: {
             ret mir_emit_new_array(st, st.current_block, n)
@@ -1668,7 +1668,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             ret mir_reachable_flow(value_flow.block)
         }
         AstLet n: {
-            let typ = mir_epic_type(n.meta.resolved_type)
+            let typ = mir_epic_type(ast_require_resolved_type(n.meta))
             let addr = mir_alloc_local(st, n.name, typ)
             let value_flow = mir_emit_expr(st, st.current_block, n.value_expr)
             st.current_block = value_flow.block
@@ -1732,7 +1732,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     mir_emit_inst(st, mir_load(result_id, st.local_types[idx], st.local_types[idx], addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
-                    let target_type = target.meta.resolved_type
+                    let target_type = ast_require_resolved_type(target.meta)
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
                     if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
@@ -1759,7 +1759,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     mir_emit_inst(st, mir_load(result_id, field_typ, field_typ, addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
-                    let target_type = target.meta.resolved_type
+                    let target_type = ast_require_resolved_type(target.meta)
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
                     if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
@@ -1789,7 +1789,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     }
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
-                    let target_type = target.meta.resolved_type
+                    let target_type = ast_require_resolved_type(target.meta)
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
                     if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
@@ -1916,12 +1916,12 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     st.local_types = new str[]
     st.continue_targets = new str[]
     st.break_targets = new str[]
-    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(fn_ast.meta.resolved_type))
+    st.current_fn = mir_function_empty(fn_ast.name, mir_epic_type(ast_require_resolved_type(fn_ast.meta)))
 
     let pi = 0
     for pi < len(fn_ast.params) {
         let param = fn_ast.params[pi]
-        st.current_fn.params.push(mir_param(mir_new_value(st), mir_epic_type(param.meta.resolved_type)))
+        st.current_fn.params.push(mir_param(mir_new_value(st), mir_epic_type(ast_require_resolved_type(param.meta))))
         pi = pi + 1
     }
 
@@ -2001,7 +2001,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 let fi2 = 0
                 for fi2 < len(sdef.fields) {
                     let field = sdef.fields[fi2]
-                    let field_mir_type = mir_epic_type(field.meta.resolved_type)
+                    let field_mir_type = mir_epic_type(ast_require_resolved_type(field.meta))
                     mir_register_struct_field(st, sdef.name, field.name, field_mir_type, fi2)
                     fi2 = fi2 + 1
                 }
@@ -2039,20 +2039,20 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 let ext = program.externs[ei]
                 let callee = f"__ep_import${ext.library}${ext.name}"
                 st.func_names.push(ext.name)
-                st.func_return_types.push(mir_epic_type(ext.meta.resolved_type))
+                st.func_return_types.push(mir_epic_type(ast_require_resolved_type(ext.meta)))
                 st.func_callees.push(callee)
-                st.func_source_returns.push(ext.meta.resolved_type)
+                st.func_source_returns.push(ast_require_resolved_type(ext.meta))
                 let params = new str[]
-                for pi: 0:len(ext.params) { params.push(mir_epic_type(ext.params[pi].meta.resolved_type)) }
-                st.program.externs.push(mir_extern(callee, mir_epic_type(ext.meta.resolved_type), params))
+                for pi: 0:len(ext.params) { params.push(mir_epic_type(ast_require_resolved_type(ext.params[pi].meta))) }
+                st.program.externs.push(mir_extern(callee, mir_epic_type(ast_require_resolved_type(ext.meta)), params))
             }
             let fi = 0
             for fi < len(program.funcs) {
                 let fn = program.funcs[fi]
                 st.func_names.push(fn.name)
-                st.func_return_types.push(mir_epic_type(fn.meta.resolved_type))
+                st.func_return_types.push(mir_epic_type(ast_require_resolved_type(fn.meta)))
                 st.func_callees.push(fn.name)
-                st.func_source_returns.push(fn.meta.resolved_type)
+                st.func_source_returns.push(ast_require_resolved_type(fn.meta))
                 fi = fi + 1
             }
 

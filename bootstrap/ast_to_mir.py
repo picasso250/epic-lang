@@ -472,7 +472,7 @@ class MirCodegen(MirFunctionBuilder):
             typ = self._type(stmt.resolved_type)
             addr = self._alloc_local(stmt.name, typ)
             init_block = self.current_block
-            value = self._expr_from(init_block, stmt.value) if stmt.value is not None else ValueFlow(self._zero_value(typ), init_block)
+            value = self._expr_from(init_block, stmt.value)
             self.set_block(value.block)
             self.inst("store", [value.value, ValueOperand(addr)])
             return self._reachable(self.current_block)
@@ -772,7 +772,6 @@ class MirCodegen(MirFunctionBuilder):
         any_reachable = False
         for case, case_block in checks:
             self.set_block(case_block)
-            self._emit_match_bindings(match_addr, case)
             case_flow = self._emit_block_from(case_block, case.body)
             if case_flow.reachable:
                 any_reachable = True
@@ -794,10 +793,6 @@ class MirCodegen(MirFunctionBuilder):
         pat = self._emit_expr(case.pattern)
         cond = self.inst("icmp.eq", [scrut_op, pat], result_type=BOOL)
         self.condbr(self.current_block, ValueOperand(cond), case_block.name, next_block.name)
-
-    def _emit_match_bindings(self, match_addr, case):
-        if not case.bindings:
-            return
 
     def _emit_union_match_from(self, in_block, stmt):
         scrutinee = self._expr_from(in_block, stmt.expr)
@@ -1423,11 +1418,6 @@ class MirCodegen(MirFunctionBuilder):
         if self._infer_type(expr) == et.STR:
             return self._emit_expr(expr)
         return self._emit_str_conversion(expr)
-
-    def _zero_value(self, typ):
-        if typ.kind == "ptr":
-            return ConstNullOperand()
-        return ConstIntOperand(typ, 0)
 
     def _string_label(self, text):
         if text not in self.strings:

@@ -41,14 +41,20 @@ parse/merge -> semantic analysis -> MIR -> X64IR -> machine obj -> link
 `python-asm-archive-2026-07-02`，需要排查历史行为时从该 tag 对比。
 
 Python parser 直接在 AST 声明位置保存 `EpicType`，语义分析只负责校验和补齐
-`resolved_type`，后端不再接受旧的字符串类型协议。
+`resolved_type`，后端不再接受旧的字符串类型协议。`let` 的 initializer 是 parser
+级必需项：AST 中不存在“缺 initializer、等待 sema 拒绝”的 `LetNode` 状态。
 
 `src/` 下只保留仍活跃的 Epic-written compiler modules/tools。旧 `src/epic.ep` driver 依赖已删除的 NASM codegen 线，已从 active source 中移除；Python reference compiler 的 MIR -> X64IR -> machine backend 是当前默认编译管线。
 
 Epic 自举源码当前仍在 typed AST dump 中保存规范化类型文本，以保持 Python/Epic
 oracle 对拍稳定；但 `src/parser.ep` 的源码类型表达已经使用 `TypeExpr`
-结构表示。`src/sema.ep` 从 `TypeExpr` 规范化到 `AstMeta.resolved_type` 文本，
-`src/ast_to_mir.ep` 继续消费 sema 写入的规范类型文本。Self-hosted sema
+结构表示。每个 AST payload 在 parser 已知源码位置时直接以 `ast_meta(line)`
+构造；literal value、name、child expression 等必需字段也在同一个 `new` 中给齐，
+不再经过会产生半初始化节点的 `ast_new_*` placeholder constructor。
+`AstMeta.resolved_type` 在 parse 阶段是真正的 null optional，`src/sema.ep` 从
+`TypeExpr` 规范化并写入类型文本；typed AST dump 用 postfix `?` 安全观察它，
+`src/ast_to_mir.ep` 则要求该字段已经存在，拒绝未经 sema 的 AST。
+Self-hosted sema
 直接保留 `AstStructDef[]`、`AstUnionDef[]`、`AstFunDef[]` 和已分析的
 `AstLet[]`，通过线性查询读取声明及其 resolved metadata；它不再建立
 通用哈希符号表或复制字段、参数和返回类型。少数 MIR lowering 辅助仍通过

@@ -596,13 +596,8 @@ fun lex(src: str): Token[] {
                 push_token(tokens, "MINUS_ASSIGN", "-=", line)
                 pos += 2
             } else {
-                if char_at(src, pos + 1) == 62 {
-                    push_token(tokens, "ARROW", "->", line)
-                    pos += 2
-                } else {
-                    push_token(tokens, "MINUS", "-", line)
-                    pos += 1
-                }
+                push_token(tokens, "MINUS", "-", line)
+                pos += 1
             }
             consumed = 1
         }
