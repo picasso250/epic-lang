@@ -25,13 +25,14 @@ from mir import (
     ConstNullOperand,
     MirBlock,
     MirExtern,
+    MirField,
     MirFunction,
     MirGlobal,
-    MirImport,
     MirInst,
     MirParam,
     MirProgram,
     MirSignature,
+    MirStruct,
     MirValue,
     Ret,
     SymbolOperand,
@@ -72,10 +73,13 @@ def _strip_module_sigil(name):
     return name[1:] if name.startswith("@") else name
 
 
-def _strip_local_sigil(name):
+def _parse_local_id(name):
     if not name.startswith("%"):
         raise MirParseError(f"local value must use % sigil in text MIR: {name}")
-    return name[1:]
+    raw = name[1:]
+    if not re.fullmatch(r"[1-9][0-9]*", raw):
+        raise MirParseError(f"local value id must be a positive integer in text MIR: {name}")
+    return int(raw)
 
 
 class _MirTextParser:
@@ -83,59 +87,121 @@ class _MirTextParser:
         self.filename = filename
         self.lines = []
         for line_no, raw in enumerate(text.splitlines(), 1):
-            line = raw.split("//", 1)[0].strip()
+            line = self._strip_comment(raw).strip()
             if line:
                 self.lines.append((line_no, line))
         self.i = 0
+
+    @staticmethod
+    def _strip_comment(raw):
+        in_string = False
+        escaped = False
+        for i, ch in enumerate(raw):
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+            elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                return raw[:i]
+        return raw
 
     def parse_program(self):
         program = MirProgram()
         while not self._done():
             line_no, line = self._peek()
-            if line.startswith("import "):
-                program.imports.append(self._parse_import(line_no, line))
+            if line.startswith("extern "):
+                program.externs.append(self._parse_extern(line_no, line))
                 self.i += 1
-            elif line.startswith("declare "):
-                program.externs.append(self._parse_declare(line_no, line))
+            elif line.startswith("type "):
+                struct_item = self._parse_struct(line_no, line)
+                if struct_item.name in program.structs:
+                    self._error(line_no, f"duplicate struct type: {struct_item.name}")
+                program.structs[struct_item.name] = struct_item
                 self.i += 1
             elif line.startswith("define "):
                 program.functions.append(self._parse_function())
-            elif " = global " in line:
+            elif line.startswith("global "):
                 program.globals.append(self._parse_global(line_no, line))
                 self.i += 1
             else:
-                self._error(line_no, f"expected import, declare, global, or define; got: {line}")
+                self._error(line_no, f"expected extern, type, global, or define; got: {line}")
         return program
 
-    def _parse_import(self, line_no, line):
-        m = re.fullmatch(r"import\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
+    def _parse_extern(self, line_no, line):
+        m = re.fullmatch(r"extern\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
         if not m:
-            self._error(line_no, f"invalid import: {line}")
-        return MirImport(
-            _strip_module_sigil(m.group(2)),
-            self._parse_signature_parts(m.group(3), m.group(1), line_no),
-        )
-
-    def _parse_declare(self, line_no, line):
-        m = re.fullmatch(r"declare\s+(.+?)\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*)\((.*)\)", line)
-        if not m:
-            self._error(line_no, f"invalid declare: {line}")
+            self._error(line_no, f"invalid extern declaration: {line}")
         return MirExtern(
             _strip_module_sigil(m.group(2)),
             self._parse_signature_parts(m.group(3), m.group(1), line_no),
         )
 
+    def _parse_struct(self, line_no, line):
+        m = re.fullmatch(r"type\s+([A-Za-z_.$][A-Za-z0-9_.$]*)\s*=\s*struct\s*\{(.*)\}", line)
+        if not m:
+            self._error(line_no, f"invalid struct type declaration: {line}")
+        name = m.group(1)
+        fields_text = m.group(2).strip()
+        field_types = [] if not fields_text else [self._parse_type(part) for part in self._split_commas(fields_text)]
+        fields = [MirField(str(index), typ, index * 8) for index, typ in enumerate(field_types)]
+        return MirStruct(name, fields, max(len(fields) * 8, 1))
+
     def _parse_global(self, line_no, line):
-        m = re.fullmatch(r"(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(.+?)\s*=\s*global\s*(.*)", line)
+        m = re.fullmatch(r"global\s+(@?[A-Za-z_.$][A-Za-z0-9_.$]*):\s*(.+?)(?:\s*=\s*(.+))?", line)
         if not m:
             self._error(line_no, f"invalid global: {line}")
-        return MirGlobal(_strip_module_sigil(m.group(1)), self._parse_type(m.group(2)), self._parse_global_init(m.group(3)))
+        name = _strip_module_sigil(m.group(1))
+        typ = self._parse_type(m.group(2))
+        init_text = m.group(3)
+        if init_text is None:
+            return MirGlobal(name, typ, None)
+        init_text = init_text.strip()
+        if init_text.startswith("bytes "):
+            if typ.kind != "ptr":
+                self._error(line_no, "bytes global initializer requires ptr type")
+            return MirGlobal(name, typ, self._parse_bytes_literal(line_no, init_text[6:].strip()))
+        if typ.kind == "ptr":
+            self._error(line_no, "ptr global initializer must use bytes literal")
+        return MirGlobal(name, typ, init_text)
 
-    def _parse_global_init(self, text):
-        text = text.strip()
-        if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
-            return bytes(text[1:-1], "utf-8").decode("unicode_escape")
-        return text
+    def _parse_bytes_literal(self, line_no, text):
+        if len(text) < 2 or text[0] != '"' or text[-1] != '"':
+            self._error(line_no, f"invalid bytes literal: {text}")
+        raw = text[1:-1]
+        out = bytearray()
+        i = 0
+        simple = {"\\": 0x5C, '"': 0x22, "n": 0x0A, "r": 0x0D, "t": 0x09}
+        while i < len(raw):
+            ch = raw[i]
+            if ch != "\\":
+                value = ord(ch)
+                if value > 0x7E or value < 0x20:
+                    self._error(line_no, "bytes literal contains unescaped non-printable byte")
+                out.append(value)
+                i += 1
+                continue
+            i += 1
+            if i >= len(raw):
+                self._error(line_no, "unterminated bytes escape")
+            esc = raw[i]
+            if esc in simple:
+                out.append(simple[esc])
+                i += 1
+                continue
+            if esc == "x" and i + 2 < len(raw):
+                digits = raw[i + 1:i + 3]
+                if re.fullmatch(r"[0-9A-Fa-f]{2}", digits):
+                    out.append(int(digits, 16))
+                    i += 3
+                    continue
+            self._error(line_no, f"invalid bytes escape near: {raw[i - 1:]}")
+        return bytes(out).decode("latin1")
 
     def _parse_function(self):
         line_no, header = self._next()
@@ -174,7 +240,7 @@ class _MirTextParser:
         params = []
         for part in self._split_commas(text):
             typ, name = self._parse_typed_name(part, line_no)
-            params.append(MirParam(_strip_local_sigil(name), typ))
+            params.append(MirParam(_parse_local_id(name), typ))
         return params
 
     def _parse_signature_parts(self, params_text, ret_text, line_no):
@@ -206,8 +272,8 @@ class _MirTextParser:
         result_type = None
         if " = " in line:
             lhs, line = line.split(" = ", 1)
-            result_name, result_type = self._parse_result_lhs(lhs, line_no)
-            result = MirValue(_strip_local_sigil(result_name), result_type)
+            result_id, result_type = self._parse_result_lhs(lhs, line_no)
+            result = MirValue(_parse_local_id(result_id), result_type)
 
         if line.startswith("alloca "):
             return MirInst("alloca", result=result, type=self._parse_type(line[len("alloca "):]))
@@ -267,7 +333,7 @@ class _MirTextParser:
         if not value:
             self._error(line_no, f"missing operand value: {text}")
         if value.startswith("%"):
-            return ValueOperand(MirValue(_strip_local_sigil(value), typ))
+            return ValueOperand(MirValue(_parse_local_id(value), typ))
         if value.startswith("@"):
             return SymbolOperand(typ, _strip_module_sigil(value))
         if value == "null":

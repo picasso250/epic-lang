@@ -1,0 +1,103 @@
+#
+# x64-windows-v0 backend-owned MIR call ABI.
+# Canonical MIR carries target-neutral extern declarations.
+#
+
+fun backend_abi_is_winapi(name: str): bool {
+    if name == "ExitProcess" { ret true }
+    if name == "Sleep" { ret true }
+    if name == "GetTickCount64" { ret true }
+    if name == "lstrlenA" { ret true }
+    if name == "lstrcmpA" { ret true }
+    if name == "GetStdHandle" { ret true }
+    if name == "GetProcessHeap" { ret true }
+    if name == "HeapAlloc" { ret true }
+    if name == "CreateFileA" { ret true }
+    if name == "GetFileSize" { ret true }
+    if name == "ReadFile" { ret true }
+    if name == "WriteFile" { ret true }
+    if name == "CloseHandle" { ret true }
+    if name == "GetCommandLineA" { ret true }
+    if name == "MessageBoxA" { ret true }
+    ret false
+}
+
+fun backend_abi_return_type(name: str): str {
+    if name == "ExitProcess" || name == "Sleep" { ret "void" }
+    if backend_abi_is_winapi(name) { ret "i64" }
+    if name == "__ep_cstr" { ret "i64" }
+    if name == "__ep_write_file" { ret "i64" }
+    if name == "__ep_read_file" { ret "ptr" }
+    if name == "__ep_print_str" { ret "void" }
+    if name == "__ep_print_newline" { ret "void" }
+    if name == "__epx_alloc" { ret "ptr" }
+    ret ""
+}
+
+fun backend_abi_param_count(name: str): i64 {
+    if name == "ExitProcess" || name == "Sleep" { ret 1 }
+    if name == "GetTickCount64" || name == "GetProcessHeap" || name == "GetCommandLineA" { ret 0 }
+    if name == "lstrlenA" || name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
+    if name == "lstrcmpA" || name == "GetFileSize" { ret 2 }
+    if name == "HeapAlloc" { ret 3 }
+    if name == "CreateFileA" { ret 7 }
+    if name == "ReadFile" || name == "WriteFile" { ret 5 }
+    if name == "MessageBoxA" { ret 4 }
+    if name == "__ep_cstr" { ret 2 }
+    if name == "__ep_write_file" { ret 3 }
+    if name == "__ep_read_file" { ret 2 }
+    if name == "__ep_print_str" { ret 1 }
+    if name == "__ep_print_newline" { ret 0 }
+    if name == "__epx_alloc" { ret 1 }
+    ret 0 - 1
+}
+
+fun backend_abi_param_type(name: str, index: i64): str {
+    if backend_abi_is_winapi(name) { ret "i64" }
+    if name == "__ep_cstr" {
+        if index == 0 { ret "ptr" }
+        ret "i64"
+    }
+    if name == "__ep_write_file" {
+        if index < 2 { ret "ptr" }
+        ret "i64"
+    }
+    if name == "__ep_read_file" {
+        if index == 0 { ret "ptr" }
+        ret "i64"
+    }
+    if name == "__ep_print_str" { ret "ptr" }
+    if name == "__epx_alloc" { ret "i64" }
+    ret ""
+}
+
+fun backend_validate_extern(ext: MirExtern): void {
+    let expected_ret = backend_abi_return_type(ext.name)
+    let expected_count = backend_abi_param_count(ext.name)
+    if len(expected_ret) == 0 || expected_count < 0 {
+        panic str_cat2("backend ABI error: unsupported backend extern: ", ext.name)
+    }
+    if ext.return_type != expected_ret {
+        panic f"backend ABI error: extern return type mismatch for {ext.name}: expected {expected_ret}, got {ext.return_type}"
+    }
+    if len(ext.param_types) != expected_count {
+        panic f"backend ABI error: extern argument count mismatch for {ext.name}: expected {expected_count}, got {len(ext.param_types)}"
+    }
+    let i = 0
+    for i < expected_count {
+        let expected_type = backend_abi_param_type(ext.name, i)
+        if ext.param_types[i] != expected_type {
+            panic f"backend ABI error: extern argument type mismatch for {ext.name} at {i}: expected {expected_type}, got {ext.param_types[i]}"
+        }
+        i = i + 1
+    }
+}
+
+fun backend_validate_program_abi(program: MirProgram): void {
+    mir_validate_call_contracts(program)
+    let i = 0
+    for i < len(program.externs) {
+        backend_validate_extern(program.externs[i])
+        i = i + 1
+    }
+}

@@ -1,0 +1,5 @@
+fun main(): void {
+    let text = "extern void @ExitProces(i64)\n\ndefine void @main() {\nentry:\n  call void ExitProces(i64 0)\n  ret void\n}\n"
+    let program = mrt_parse_program(text)
+    backend_validate_program_abi(program)
+}

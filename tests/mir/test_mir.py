@@ -7,23 +7,25 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bootstrap"))
 
+from backend_abi import BackendAbiError, validate_backend_abi
 from lexer import lex
-from mir import BOOL, I32, I64, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
-from mir import MirProgram, MirStruct, MirValue, Ret, ValueOperand, ConstIntOperand, ConstNullOperand
+from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction, MirInst, MirParam
+from mir import MirGlobal, MirProgram, MirStruct, MirValue, Ret, SymbolOperand, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from ast_to_mir import ast_to_mir
-from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS
+from mir_runtime_helpers import inject_all_mir_helpers
+from mir_prune import prune_unreachable_functions
 from mir_parser import parse_mir_file, parse_mir_text
 from parser import Parser
 import sema
 
 
 def build_smoke_program():
-    x_addr = MirValue("x.addr", ptr())
-    x0 = MirValue("x0", I64)
-    c0 = MirValue("c0", BOOL)
-    x1 = MirValue("x1", I64)
-    r = MirValue("r", I64)
+    x_addr = MirValue(1, ptr())
+    x0 = MirValue(2, I64)
+    c0 = MirValue(3, BOOL)
+    x1 = MirValue(4, I64)
+    r = MirValue(5, I64)
 
     entry = MirBlock(
         "entry",
@@ -65,23 +67,23 @@ def test_smoke_text_and_validation():
     validate(program)
     expected = """define i64 @main() {
 entry:
-  %x.addr: ptr = alloca i64
-  store i64 0, ptr %x.addr
+  %1: ptr = alloca i64
+  store i64 0, ptr %1
   br label %loop
 
 loop:
-  %x0: i64 = load i64, ptr %x.addr
-  %c0: bool = icmp.slt i64 %x0, i64 3
-  condbr bool %c0, label %body, label %done
+  %2: i64 = load i64, ptr %1
+  %3: bool = icmp.slt i64 %2, i64 3
+  condbr bool %3, label %body, label %done
 
 body:
-  %x1: i64 = add i64 %x0, i64 1
-  store i64 %x1, ptr %x.addr
+  %4: i64 = add i64 %2, i64 1
+  store i64 %4, ptr %1
   br label %loop
 
 done:
-  %r: i64 = load i64, ptr %x.addr
-  ret i64 %r
+  %5: i64 = load i64, ptr %1
+  ret i64 %5
 }"""
     assert program.text() == expected
 
@@ -96,9 +98,9 @@ def assert_mir_invalid(program, message):
 
 
 def test_gep_null_and_ptrtoint_text_and_validation():
-    size_ptr = MirValue("size.ptr", ptr())
-    size = MirValue("size", I64)
-    field_ptr = MirValue("field.ptr", ptr())
+    size_ptr = MirValue(1, ptr())
+    size = MirValue(2, I64)
+    field_ptr = MirValue(3, ptr())
     block = MirBlock(
         "entry",
         [
@@ -118,27 +120,25 @@ def test_gep_null_and_ptrtoint_text_and_validation():
         structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
     validate(program)
-    expected = """define i64 @main() {
+    expected = """type Pair = struct { i64, i64 }
+
+define i64 @main() {
 entry:
-  %size.ptr: ptr = gep struct Pair, ptr null, i64 1
-  %size: i64 = ptrtoint ptr %size.ptr to i64
-  %field.ptr: ptr = gep struct Pair, ptr null, i64 0, i32 1
-  ret i64 %size
+  %1: ptr = gep struct Pair, ptr null, i64 1
+  %2: i64 = ptrtoint ptr %1 to i64
+  %3: ptr = gep struct Pair, ptr null, i64 0, i32 1
+  ret i64 %2
 }"""
     assert program.text() == expected
 
 
-def test_validator_rejects_text_sigils_in_local_names():
-    bad_value = MirValue("%x", I64)
-    bad_value_program = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [], Ret(ValueOperand(bad_value)))])])
-    assert_mir_invalid(bad_value_program, "local value name must be raw")
-
-    bad_param_program = MirProgram(functions=[MirFunction("main", [MirParam("%p", I64)], I64, [MirBlock("entry", [], Ret(ValueOperand(MirValue("%p", I64))))])])
-    assert_mir_invalid(bad_param_program, "local value name must be raw")
+def test_validator_rejects_non_positive_local_ids():
+    bad_param_program = MirProgram(functions=[MirFunction("main", [MirParam(0, I64)], I64, [MirBlock("entry", [], Ret(ValueOperand(MirValue(0, I64))))])])
+    assert_mir_invalid(bad_param_program, "local value id must be a positive integer")
 
 
 def test_validator_rejects_text_sigils_in_module_symbols():
-    value = MirValue("x", I64)
+    value = MirValue(1, I64)
     bad_fn = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [], Ret(ConstIntOperand(I64, 0)))])])
     assert_mir_invalid(bad_fn, "module symbol must be raw")
 
@@ -148,7 +148,7 @@ def test_validator_rejects_text_sigils_in_module_symbols():
 
 
 def test_validator_rejects_unknown_and_high_level_ops():
-    result = MirValue("x", I64)
+    result = MirValue(1, I64)
     unknown = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [MirInst("mystery", result=result)], Ret(ValueOperand(result)))])])
     assert_mir_invalid(unknown, "unknown MIR op: mystery")
 
@@ -187,11 +187,59 @@ fun main(): i64 {
         assert op not in text
 
 
+def test_struct_type_text_round_trip_and_v0_slot_layout():
+    source = """type Zed = struct { ptr }
+
+type Unused = struct { i64 }
+
+type Data = struct { i8, i64 }
+
+define i64 @main() {
+entry:
+  %1: ptr = gep struct Zed, ptr null, i64 1
+  %2: ptr = gep struct Data, ptr null, i64 1
+  ret i64 0
+}
+"""
+    program = parse_mir_text(source)
+    layout = program.structs["Data"]
+    assert [field.type for field in layout.fields] == [I8, I64]
+    assert [field.offset for field in layout.fields] == [0, 8]
+    assert layout.size == 16
+    expected = """type Data = struct { i8, i64 }
+
+type Zed = struct { ptr }
+
+define i64 @main() {
+entry:
+  %1: ptr = gep struct Zed, ptr null, i64 1
+  %2: ptr = gep struct Data, ptr null, i64 1
+  ret i64 0
+}"""
+    assert program.text() == expected
+
+
+def test_global_text_round_trip_uses_canonical_bytes_literals():
+    source = (
+        "global @argv: ptr\n\n"
+        "global @counter: i64 = 42\n\n"
+        'global @str.0: ptr = bytes "A\\n\\\"\\\\\\x00\\xFF//tail"\n\n'
+        "define i64 @main() {\n"
+        "entry:\n"
+        "  ret i64 0\n"
+        "}\n"
+    )
+    program = parse_mir_text(source)
+    assert program.globals[0].init is None
+    assert program.globals[1].init == "42"
+    assert program.globals[2].init == 'A\n"\\\x00\xff//tail'
+    assert program.text() == source.rstrip()
+
 def test_mir_parser_rejects_unsigned_integer_types():
     for typ in ("u64", "u8"):
-        source = f"""define {typ} @main({typ} %x) {{
+        source = f"""define {typ} @main({typ} %1) {{
 entry:
-  ret {typ} %x
+  ret {typ} %1
 }}
 """
         try:
@@ -202,316 +250,130 @@ entry:
             raise AssertionError(f"MIR parser accepted unsigned integer type: {typ}")
 
 
-def test_mir_parser_strips_text_sigils():
-    source = """declare ptr @helper(ptr)
-
-define ptr @main(ptr %arg) {
+def test_mir_parser_reads_numeric_local_ids():
+    source = """define ptr @helper(ptr %1) {
 entry:
-  %tmp: ptr = call ptr @helper(ptr %arg)
-  ret ptr %tmp
+  ret ptr %1
+}
+
+define ptr @main(ptr %1) {
+entry:
+  %2: ptr = call ptr @helper(ptr %1)
+  ret ptr %2
 }
 """
     program = parse_mir_text(source)
-    assert program.externs[0].name == "helper"
-    fn = program.functions[0]
+    fn = program.functions[1]
     assert fn.name == "main"
-    assert fn.params[0].name == "arg"
+    assert fn.params[0].id == 1
     inst = fn.blocks[0].instructions[0]
-    assert inst.result.name == "tmp"
+    assert inst.result.id == 2
     assert inst.callee == "helper"
-    assert fn.text().startswith("define ptr @main(ptr %arg)")
+    assert fn.text().startswith("define ptr @main(ptr %1)")
 
 
-def test_runtime_mir_bundle_parses_without_local_validation():
+def test_mir_parser_rejects_named_local_values():
+    source = """define i64 @main(i64 %value) {
+entry:
+  ret i64 %value
+}
+"""
+    try:
+        parse_mir_text(source)
+    except Exception as exc:
+        assert "local value id must be a positive integer" in str(exc), str(exc)
+    else:
+        raise AssertionError("MIR parser accepted a named local value")
+
+
+def test_text_mir_uses_target_neutral_extern_contracts():
+    source = """extern void @ExitProcess(i64)
+
+define void @main() {
+entry:
+  call void ExitProcess(i64 0)
+  ret void
+}
+"""
+    program = parse_mir_text(source)
+    assert program.externs[0].name == "ExitProcess"
+    assert program.text() == source.rstrip()
+
+    for directive in ("import void @ExitProcess(i64)", "declare ptr @__epx_alloc(i64)"):
+        try:
+            parse_mir_text(directive)
+        except Exception as exc:
+            assert "expected extern, type, global, or define" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"text MIR accepted non-canonical directive: {directive}")
+
+
+def test_undeclared_calls_are_rejected():
+    source = """define void @main() {
+entry:
+  call void ExitProcess(i64 0)
+  ret void
+}
+"""
+    try:
+        parse_mir_text(source)
+    except MirValidationError as exc:
+        assert "undeclared callee: ExitProcess" in str(exc), str(exc)
+    else:
+        raise AssertionError("MIR accepted an undeclared callee")
+
+
+def test_backend_abi_rejects_unsupported_extern():
+    program = parse_mir_text("""extern void @ExitProces(i64)
+
+define void @main() {
+entry:
+  call void ExitProces(i64 0)
+  ret void
+}
+""")
+    try:
+        validate_backend_abi(program)
+    except BackendAbiError as exc:
+        assert "unsupported backend extern: ExitProces" in str(exc), str(exc)
+    else:
+        raise AssertionError("backend ABI accepted an unsupported extern")
+
+
+def test_runtime_mir_bundle_declares_external_contracts():
     runtime_mir_dir = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir"))
     path = runtime_mir_dir / "helpers.mir"
     assert sorted(p.name for p in runtime_mir_dir.glob("*.mir")) == ["helpers.mir"]
     text = path.read_text(encoding="utf-8")
-    try:
-        parse_mir_text(text, filename=str(path))
-    except MirValidationError as exc:
-        assert "callee is not callable" in str(exc), str(exc)
-    else:
-        raise AssertionError("runtime helper bundle should not need local extern declarations")
-
-    program = parse_mir_file(path, validate_program=False)
-    assert [fn.name for fn in program.functions] == list(IMPLEMENTED_MIR_HELPERS)
+    assert "import " not in text
+    assert "declare " not in text
+    program = parse_mir_text(text, filename=str(path), validate_program=False)
+    assert {ext.name for ext in program.externs} == {
+        "ExitProcess", "GetStdHandle", "WriteFile",
+        "__ep_print_newline", "__ep_print_str", "__epx_alloc",
+    }
     parsed_fn = next(fn for fn in program.functions if fn.name == "__ep_slice_i64_get")
     assert parsed_fn.text() in text
 
 
-def test_mir_helper_injection():
-    """Verify all implemented MIR runtime helpers are always injected."""
-
-    assert "__ep_slice_u8_slice" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_new" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_get" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_set" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_i64_push" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_new" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_get" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_set" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_ptr_push" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_slice_u8_extend" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_eq" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_from_bool" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_cat" in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_slice" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_starts_with" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_get" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_find" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_replace_char" not in IMPLEMENTED_MIR_HELPERS
-    assert "__ep_str_trim" not in IMPLEMENTED_MIR_HELPERS
-
-    # i64[] reads use __ep_slice_i64_get, not __epic_slice_i64_get
-    src_i64 = """fun main(): i64 {
+def test_backend_preparation_replaces_runtime_extern_with_definition():
+    source = """fun main(): i64 {
     let xs = new i64[] { 10, 20 }
     ret xs[1]
 }"""
-    ast_i64 = sema.analyze_program(Parser(lex(src_i64)).parse_program())
-    prog_i64 = ast_to_mir(ast_i64)
-    text_i64 = prog_i64.text()
-    assert "call i64 __ep_slice_i64_get" in text_i64, \
-        f"expected call i64 __ep_slice_i64_get, got:\n{text_i64}"
-    assert "__epic_slice_i64_get" not in text_i64, \
-        f"unexpected __epic_slice_i64_get:\n{text_i64}"
-    old_qword_new = "__epx_slice_" + "qword_new"
-    old_i64_push = "__epx_slice_" + "i64_push"
-    assert old_qword_new not in text_i64, \
-        f"unexpected {old_qword_new}:\n{text_i64}"
-    assert old_i64_push not in text_i64, \
-        f"unexpected {old_i64_push}:\n{text_i64}"
+    typed = sema.analyze_program(Parser(lex(source)).parse_program())
+    program = ast_to_mir(typed)
 
-    # i64[] writes use __ep_slice_i64_set
-    src_i64_set = """fun main(): i64 {
-    let xs = new i64[] { 10, 20 }
-    xs[0] = 99
-    ret xs[0]
-}"""
-    ast_i64_set = sema.analyze_program(Parser(lex(src_i64_set)).parse_program())
-    prog_i64_set = ast_to_mir(ast_i64_set)
-    text_i64_set = prog_i64_set.text()
-    assert "call void __ep_slice_i64_set" in text_i64_set, \
-        f"expected call void __ep_slice_i64_set, got:\n{text_i64_set}"
+    assert "__ep_slice_i64_get" in {ext.name for ext in program.externs}
+    assert "__ep_slice_i64_get" not in {fn.name for fn in program.functions}
 
-    def check(source, expected_helpers=()):
-        ast = sema.analyze_program(Parser(lex(source)).parse_program())
-        prog = ast_to_mir(ast)
-        injected = {fn.name for fn in prog.functions}
-        externs = {ext.name for ext in prog.externs}
-        global_names = [glob.name for glob in prog.globals]
-        assert global_names.count("str.runtime.bool.true") == 1
-        assert global_names.count("str.runtime.bool.false") == 1
-        for name in expected_helpers:
-            assert name in injected, f"{name} should be retained as reachable MirFunction, got injected={injected}"
-        for name in IMPLEMENTED_MIR_HELPERS:
-            assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
-        return prog
+    inject_all_mir_helpers(program)
+    prune_unreachable_functions(program)
+    validate(program)
+    validate_backend_abi(program)
 
-    bytes_prog = check(
-        """fun main(): i64 {
-    let b = bytes("AB")
-    ret 0
-}"""
-    )
-    assert "__ep_slice_u8_from_str" not in bytes_prog.text()
-
-    parsed_helper_path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "helpers.mir"))
-    parsed_helper_program = parse_mir_file(parsed_helper_path, validate_program=False)
-    parsed_helper_text = next(fn for fn in parsed_helper_program.functions if fn.name == "__ep_slice_i64_get").text()
-    parsed_prog = check(
-        """fun main(): i64 {
-    let xs = new i64[] { 10, 20 }
-    ret xs[1]
-}""",
-        ["__ep_slice_i64_get"],
-    )
-    parsed_fn = next(fn for fn in parsed_prog.functions if fn.name == "__ep_slice_i64_get")
-    assert parsed_fn.text() == parsed_helper_text
-
-    str_prog = check(
-        """fun main(): i64 {
-    let a = new u8[] { u8(65) }
-    println(str(a))
-    ret 0
-}"""
-    )
-    assert "__ep_str_from_slice_u8" not in str_prog.text()
-
-    check(
-        """fun main(): i64 {
-    let a = new u8[] { u8(1), u8(2) }
-    ret 0
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let b = new u8[] { u8(1), u8(2) }
-    ret i64(b[0])
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let b = new u8[] { u8(1), u8(2) }
-    b.push(u8(3))
-    ret len(b)
-}"""
-    )
-
-    check(
-        """fun main(): i64 {
-    let b = new u8[] { u8(1), u8(2), u8(3) }
-    let c = b[1:3]
-    ret len(c)
-}""",
-        ["__ep_slice_u8_slice"],
-    )
-
-    check(
-        """fun main(): i64 {
-    let a = new u8[] { u8(1), u8(2) }
-    let b = new u8[] { u8(3), u8(4) }
-    a.extend(b)
-    ret len(a)
-}""",
-        ["__ep_slice_u8_extend"],
-    )
-
-    check(
-        """fun main(): i64 {
-    let left = "epic"
-    let right = "epic"
-    if left == right {
-        ret 1
-    }
-    ret 0
-}""",
-    )
-
-    check(
-        """fun main(): i64 {
-    println(str(true))
-    println(str(false))
-    ret 0
-}""",
-    )
-
-    check(
-        """fun main(): i64 {
-    let s = "epic-lang"
-    let t = s[5:9]
-    ret len(t)
-}""",
-    )
-
-    # Deterministic order: running twice gives same injection list
-    src = """fun main(): i64 {
-    let b = new u8[] { u8(65), u8(66) }
-    b[0] = u8(99)
-    ret i64(b[0])
-}"""
-    ast = sema.analyze_program(Parser(lex(src)).parse_program())
-    prog1 = ast_to_mir(ast)
-    prog2 = ast_to_mir(ast)
-    helper_names = set(IMPLEMENTED_MIR_HELPERS)
-    order1 = [fn.name for fn in prog1.functions if fn.name in helper_names]
-    order2 = [fn.name for fn in prog2.functions if fn.name in helper_names]
-    assert order1 == order2, f"helper order differs between runs: {order1} != {order2}"
-    expected_order = [name for name in IMPLEMENTED_MIR_HELPERS if name in set(order1)]
-    assert order1 == expected_order, f"unexpected helper order: {order1}"
-
-
-def test_runtime_source_str_eq_lowers_as_epic_function():
-    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
-    user_src = """fun main(): i64 {
-    if "epic" == "epic" {
-        ret 1
-    }
-    if "epic" != "lang" {
-        ret 2
-    }
-    ret 0
-}"""
-    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
-    prog = ast_to_mir(sema.analyze_program(ast))
-    text = prog.text()
-    function_names = {fn.name for fn in prog.functions}
-    extern_names = {ext.name for ext in prog.externs}
-    assert "__ep_str_eq" in function_names
-    assert "__ep_str_eq" not in extern_names
-    assert "call bool __ep_str_eq" in text
-    assert "define bool @__ep_str_eq(ptr %left, ptr %right)" in text
-    assert "define bool @__ep_str_eq" in text
-
-
-def test_runtime_source_str_from_bool_lowers_as_epic_function():
-    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
-    user_src = """fun main(): void {
-    println(str(true))
-    println(str(false))
-}"""
-    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
-    prog = ast_to_mir(sema.analyze_program(ast))
-    text = prog.text()
-    function_names = {fn.name for fn in prog.functions}
-    extern_names = {ext.name for ext in prog.externs}
-    assert "__ep_str_from_bool" in function_names
-    assert "__ep_str_from_bool" not in extern_names
-    assert "call ptr __ep_str_from_bool" in text
-    assert "define ptr @__ep_str_from_bool(bool %value)" in text
-
-
-def test_runtime_source_str_from_i64_lowers_as_epic_function():
-    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
-    user_src = """fun main(): void {
-    println(str(0 - 9223372036854775807 - 1))
-}"""
-    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
-    prog = ast_to_mir(sema.analyze_program(ast))
-    text = prog.text()
-    function_names = {fn.name for fn in prog.functions}
-    extern_names = {ext.name for ext in prog.externs}
-    assert "__ep_str_from_i64" in function_names
-    assert "__ep_str_from_i64" not in extern_names
-    assert "call ptr __ep_str_from_i64" in text
-    assert "define ptr @__ep_str_from_i64(i64 %value)" in text
-    assert "-9223372036854775808" in text
-
-
-def test_runtime_source_str_from_u64_lowers_as_epic_function():
-    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
-    user_src = """fun main(): void {
-    println(str((u64(0) - u64(1))))
-}"""
-    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
-    prog = ast_to_mir(sema.analyze_program(ast))
-    text = prog.text()
-    function_names = {fn.name for fn in prog.functions}
-    extern_names = {ext.name for ext in prog.externs}
-    assert "__ep_str_from_u64" in function_names
-    assert "__ep_str_from_u64" not in extern_names
-    assert "call ptr __ep_str_from_u64" in text
-    assert "define ptr @__ep_str_from_u64(i64 %value)" in text
-
-
-def test_runtime_source_str_slice_lowers_as_epic_function():
-    runtime_src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "str.ep")).read_text(encoding="utf-8")
-    user_src = """fun main(): void {
-    let s = "Epic"
-    print(s[1:4])
-}"""
-    ast = Parser(lex(runtime_src + "\n" + user_src)).parse_program()
-    prog = ast_to_mir(sema.analyze_program(ast))
-    text = prog.text()
-    function_names = {fn.name for fn in prog.functions}
-    extern_names = {ext.name for ext in prog.externs}
-    assert "__ep_str_slice" in function_names
-    assert "__ep_str_slice" not in extern_names
-    assert "call ptr __ep_str_slice" in text
-    assert "define ptr @__ep_str_slice(ptr %s, i64 %start, i64 %end)" in text
-    assert "invalid string slice" in text
+    assert "__ep_slice_i64_get" not in {ext.name for ext in program.externs}
+    assert "__ep_slice_i64_get" in {fn.name for fn in program.functions}
 
 
 
@@ -539,7 +401,7 @@ fun main(): i64 {
     typed = sema.analyze_program(ast)
     prog = ast_to_mir(typed)
     text = prog.text()
-    assert "define i64 @Counter__add(ptr %c, i64 %delta)" in text
+    assert "define i64 @Counter__add(ptr %1, i64 %2)" in text
     assert "call i64 Counter__add" in text
 
 
@@ -568,139 +430,25 @@ fun main(): i64 {
         return
     raise AssertionError("expected duplicate method symbol error")
 
-
-def test_adt_struct_union_lowers_to_wrapper_and_payload_match():
-    source = """struct LiteralExpr {
-    value: str
-    line: i64
-}
-
-struct BinaryExpr {
-    op: str
-    left: Expr
-    right: Expr
-    line: i64
-}
-
-type Expr = LiteralExpr | BinaryExpr
-
-fun literal_value(x: LiteralExpr): str {
-    ret x.value
-}
-
-fun main(): void {
-    let e: Expr = new Expr(new LiteralExpr { value: "1", line: 1 })
-    match e {
-        LiteralExpr lit: {
-            print(literal_value(lit))
-        }
-        BinaryExpr b: {
-            print(b.op)
-        }
-    }
-}
-"""
-    ast = Parser(lex(source)).parse_program()
-    assert ast.unions[0].name == "Expr"
-    assert ast.unions[0].members == ["LiteralExpr", "BinaryExpr"]
-    typed = sema.analyze_program(ast)
-    prog = ast_to_mir(typed)
-    text = prog.text()
-    assert "gep struct Expr" in text
-    assert "call ptr __epx_alloc" in text
-    assert "i64 1" in text
-    assert "call ptr literal_value" in text
-
-
-def test_adt_match_must_be_exhaustive_without_default():
-    source = """struct LiteralExpr {
-    value: str
-}
-
-struct BinaryExpr {
-    op: str
-}
-
-type Expr = LiteralExpr | BinaryExpr
-
-fun main(): void {
-    let e: Expr = new Expr(new LiteralExpr { value: "1" })
-    match e {
-        LiteralExpr lit: {
-            print(lit.value)
-        }
-    }
-}
-"""
-    try:
-        sema.analyze_program(Parser(lex(source)).parse_program())
-    except sema.SemanticError as exc:
-        assert "non-exhaustive match for Expr; missing BinaryExpr" in str(exc)
-        return
-    raise AssertionError("expected non-exhaustive ADT match error")
-
-
-def test_adt_requires_explicit_wrapper_construction():
-    source = """struct LiteralExpr {
-    value: str
-}
-
-type Expr = LiteralExpr
-
-fun main(): void {
-    let e: Expr = new LiteralExpr { value: "1" }
-}
-"""
-    try:
-        sema.analyze_program(Parser(lex(source)).parse_program())
-    except sema.SemanticError as exc:
-        assert "let e expected Expr, got LiteralExpr" in str(exc)
-        return
-    raise AssertionError("expected explicit ADT wrapper construction error")
-
-
-def test_adt_single_wildcard_match_is_allowed():
-    source = """struct LiteralExpr {
-    value: str
-}
-
-type Expr = LiteralExpr
-
-fun main(): void {
-    let e: Expr = new Expr(new LiteralExpr { value: "1" })
-    match e {
-        _: {
-            print("ok")
-        }
-    }
-}
-"""
-    typed = sema.analyze_program(Parser(lex(source)).parse_program())
-    prog = ast_to_mir(typed)
-    text = prog.text()
-    assert "gep struct Expr" in text
-    assert "call void __ep_print_str" in text
-
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
+    test_validator_rejects_non_positive_local_ids()
+    test_validator_rejects_text_sigils_in_module_symbols()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
+    test_struct_type_text_round_trip_and_v0_slot_layout()
+    test_global_text_round_trip_uses_canonical_bytes_literals()
     test_mir_parser_rejects_unsigned_integer_types()
-    test_mir_parser_strips_text_sigils()
-    test_runtime_mir_bundle_parses_without_local_validation()
-    test_mir_helper_injection()
-    test_runtime_source_str_eq_lowers_as_epic_function()
-    test_runtime_source_str_from_bool_lowers_as_epic_function()
-    test_runtime_source_str_from_i64_lowers_as_epic_function()
-    test_runtime_source_str_from_u64_lowers_as_epic_function()
-    test_runtime_source_str_slice_lowers_as_epic_function()
+    test_mir_parser_reads_numeric_local_ids()
+    test_mir_parser_rejects_named_local_values()
+    test_text_mir_uses_target_neutral_extern_contracts()
+    test_undeclared_calls_are_rejected()
+    test_backend_abi_rejects_unsupported_extern()
+    test_runtime_mir_bundle_declares_external_contracts()
+    test_backend_preparation_replaces_runtime_extern_with_definition()
     test_user_method_lowers_to_mangled_function_call()
     test_user_method_conflicts_with_mangled_function_name()
-    test_adt_struct_union_lowers_to_wrapper_and_payload_match()
-    test_adt_match_must_be_exhaustive_without_default()
-    test_adt_requires_explicit_wrapper_construction()
-    test_adt_single_wildcard_match_is_allowed()
     print("PASS test_mir")
 
 

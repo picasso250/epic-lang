@@ -12,6 +12,8 @@ import os
 import subprocess
 import sys
 
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
     sys.stderr.reconfigure(errors="replace")
@@ -26,25 +28,6 @@ EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 SELF_HOST_BUILD_DIR = os.path.join(SCRIPT_DIR, "build", "self_hosted_examples")
 SELF_HOST_COMPILER_DIR = os.path.join(SCRIPT_DIR, "build", "self_hosted_compiler")
 SELF_HOST_COMPILER_EXE = os.path.join(SELF_HOST_COMPILER_DIR, "src", "epic.exe")
-SELF_HOST_COMPILER_SOURCES = [
-    "src/util.ep",
-    "src/lexer.ep",
-    "src/parser.ep",
-    "src/sema.ep",
-    "src/mir.ep",
-    "src/mir_runtime.ep",
-    "src/ast_to_mir.ep",
-    "src/x64.ep",
-    "src/mir_to_x64.ep",
-    "src/x64_runtime.ep",
-    "src/machine.ep",
-    "src/coff.ep",
-    "src/link.ep",
-    "src/epic.ep",
-]
-SELF_HOST_RUNTIME_SOURCES = [
-    "runtime/str.ep",
-]
 
 
 def compile_self_hosted_compiler():

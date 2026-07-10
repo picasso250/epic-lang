@@ -1,9 +1,0 @@
-# COMPILE_FAIL: embedded field Bad.i64 must be a struct
-struct Bad {
-    i64
-}
-
-fun main(): i64 {
-    ret 0
-}
-

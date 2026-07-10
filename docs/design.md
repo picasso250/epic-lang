@@ -252,7 +252,10 @@ type Expr = LiteralExpr | BinaryExpr
 ADT field access 只支持两类：
 
 - 在 `match` case 中绑定具体 variant，然后访问该 variant 的普通字段。
-- 访问所有 variants 都通过 embedded struct 共享的 common embedded field。
+- 访问所有 variants 都直接声明的同名、同类型 common field。字段在所有 variants
+  中索引一致时，lowering 直接按公共布局读取；索引不一致时按 tag 分派。
+
+Struct 只支持显式命名字段。匿名 embedded field、递归字段提升及其歧义规则均不属于语言 surface；组合关系写成 `meta: Meta`，访问时显式写 `node.meta.line`。
 
 不存在 ADT partial field-exists sugar；`node.name?` 现在表示“访问 `node.name` 后检查该 reference 是否非 null”，因此 `name` 必须是合法字段访问。variant-specific 字段请用 `match`。
 
@@ -415,7 +418,6 @@ let source = str(read_file(path))
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
 | `cstr(s: str): i64`                    | 检查并返回可传给 C API 的 NUL 结尾字节指针  |
-| `system(cmd: str): i64`                | 执行命令，返回退出码                        |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 

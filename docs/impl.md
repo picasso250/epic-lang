@@ -94,7 +94,7 @@ machine backend 验收入口。
 ## 运行时辅助代码 (Runtime Helpers)
 
 Python machine backend 的 x64 运行时片段在 `bootstrap/x64_runtime.py` 中发射。
-MIR runtime helper body 统一提交在 `runtime/mir/helpers.mir`，Python reference compiler 和 Epic 自举编译器都读取这个 bundle；修改 helper MIR 文本后运行 `python scripts/write_mir_runtime_bundle.py` 规范化顺序。旧 `runtime/*.asm` 路线已删除。
+MIR runtime helper body 统一提交在 `runtime/mir/helpers.mir`，Python reference compiler 和 Epic 自举编译器都读取这个 bundle；helper 的文本顺序就是规范 bundle 顺序。旧 `runtime/*.asm` 路线已删除。
 
 ## 类型降级 (Type Lowering)
 
@@ -225,7 +225,6 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
 | `str(x)`           | 过渡期 formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、map、非 `u8[]` array 不支持 | 公开但准备收缩 |
-| `system`           | `__ep_system_cmd` helper                    | 公开 |
 | `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |
 | `write_file`       | `__ep_write_file` helper                    | 公开 |
 | `str` (`u8[]`)     | zero-copy layout reinterpret；alias 迁移路径 | 公开但准备收缩 |

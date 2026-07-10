@@ -1,11 +1,6 @@
 #
-# MIR runtime helpers from canonical MIR text.
-# Helper bodies are loaded from runtime/mir/helpers.mir.
+# MIR runtime helper loading and injection.
 #
-
-fun mir_runtime_die(msg: str): void {
-    panic str_cat2("MIR runtime parse error: ", msg)
-}
 
 fun mir_runtime_has_global(program: MirProgram, name: str): bool {
     let i = 0
@@ -24,377 +19,13 @@ fun mir_runtime_add_global(program: MirProgram, name: str, init: str): void {
     if !mir_runtime_has_global(program, name) { program.globals.push(mir_global_string(name, init)) }
 }
 
-fun mrt_starts_with(s: str, prefix: str): bool {
-    if len(s) < len(prefix) { ret false }
-    ret s[0:len(prefix)] == prefix
-}
-
-fun mrt_ends_with(s: str, suffix: str): bool {
-    if len(s) < len(suffix) { ret false }
-    ret s[len(s) - len(suffix):len(s)] == suffix
-}
-
-fun mrt_trim(s: str): str {
-    let bs = bytes(s)
-    let start = 0
-    let end = len(bs)
-    for start < end && (bs[start] == u8(32) || bs[start] == u8(9) || bs[start] == u8(13)) {
-        start = start + 1
-    }
-    for end > start && (bs[end - 1] == u8(32) || bs[end - 1] == u8(9) || bs[end - 1] == u8(13)) {
-        end = end - 1
-    }
-    ret s[start:end]
-}
-
-fun mrt_find_from(s: str, needle: str, start: i64): i64 {
-    if len(needle) == 0 { ret start }
-    let i = start
-    for i + len(needle) <= len(s) {
-        if s[i:i + len(needle)] == needle { ret i }
-        i = i + 1
-    }
-    ret 0 - 1
-}
-
-fun mrt_find(s: str, needle: str): i64 {
-    ret mrt_find_from(s, needle, 0)
-}
-
-fun mrt_strip_comment(line: str): str {
-    let comment = mrt_find(line, "//")
-    if comment >= 0 { ret line[0:comment] }
-    ret line
-}
-
-fun mrt_split_lines(text: str): str[] {
-    let out = new str[0]
-    let bs = bytes(text)
-    let start = 0
-    let i = 0
-    for i < len(bs) {
-        if bs[i] == u8(10) {
-            let line = mrt_trim(mrt_strip_comment(text[start:i]))
-            if len(line) > 0 { out.push(line) }
-            start = i + 1
-        }
-        i = i + 1
-    }
-    if start < len(text) {
-        let line = mrt_trim(mrt_strip_comment(text[start:len(text)]))
-        if len(line) > 0 { out.push(line) }
-    }
-    ret out
-}
-
-fun mrt_split_commas(text: str): str[] {
-    let out = new str[0]
-    let bs = bytes(text)
-    let start = 0
-    let i = 0
-    for i < len(bs) {
-        if bs[i] == u8(44) {
-            out.push(mrt_trim(text[start:i]))
-            start = i + 1
-        }
-        i = i + 1
-    }
-    let last = mrt_trim(text[start:len(text)])
-    if len(last) > 0 { out.push(last) }
-    ret out
-}
-
-fun mrt_first_word(text: str): str {
-    let s = mrt_trim(text)
-    let sp = mrt_find(s, " ")
-    if sp < 0 { ret s }
-    ret s[0:sp]
-}
-
-fun mrt_after_first_word(text: str): str {
-    let s = mrt_trim(text)
-    let sp = mrt_find(s, " ")
-    if sp < 0 { ret "" }
-    ret mrt_trim(s[sp + 1:len(s)])
-}
-
-fun mrt_strip_trailing_comma(s: str): str {
-    let t = mrt_trim(s)
-    if len(t) > 0 && t[len(t) - 1:len(t)] == "," {
-        ret t[0:len(t) - 1]
-    }
-    ret t
-}
-
-fun mrt_parse_i64(s: str): i64 {
-    let t = mrt_trim(s)
-    let bs = bytes(t)
-    let sign = 1
-    let i = 0
-    if len(bs) > 0 && bs[0] == u8(45) {
-        sign = 0 - 1
-        i = 1
-    }
-    let n = 0
-    for i < len(bs) {
-        n = n * 10 + (i64(bs[i]) - 48)
-        i = i + 1
-    }
-    ret n * sign
-}
-
-fun mrt_is_int_text(s: str): bool {
-    let t = mrt_trim(s)
-    let bs = bytes(t)
-    if len(bs) == 0 { ret false }
-    let i = 0
-    if bs[0] == u8(45) {
-        if len(bs) == 1 { ret false }
-        i = 1
-    }
-    for i < len(bs) {
-        if bs[i] < u8(48) || bs[i] > u8(57) { ret false }
-        i = i + 1
-    }
-    ret true
-}
-
-fun mrt_parse_typed_operand(text: str): MirOperand {
-    let typ_raw = mrt_first_word(text)
-    let typ = mrt_strip_trailing_comma(typ_raw)
-    let value = mrt_after_first_word(text)
-    if len(value) == 0 { mir_runtime_die(str_cat2("missing operand: ", text)) }
-    if value[0:1] == "%" { ret mir_value_operand(typ, value[1:len(value)]) }
-    if value == "null" { ret mir_operand_null() }
-    if value == "true" { ret mir_const_bool(true) }
-    if value == "false" { ret mir_const_bool(false) }
-    if mrt_is_int_text(value) { ret mir_const_int(typ, mrt_parse_i64(value)) }
-    ret mir_symbol_operand(typ, value)
-}
-
-fun mrt_parse_params(text: str): MirParam[] {
-    let out = new MirParam[0]
-    let t = mrt_trim(text)
-    if len(t) == 0 { ret out }
-    let parts = mrt_split_commas(t)
-    let i = 0
-    for i < len(parts) {
-        let part = parts[i]
-        let p = new MirParam
-        p.typ = mrt_first_word(part)
-        let name = mrt_after_first_word(part)
-        if len(name) > 0 && name[0:1] == "%" { name = name[1:len(name)] }
-        p.name = name
-        out.push(p)
-        i = i + 1
-    }
-    ret out
-}
-
-fun mrt_parse_operands(text: str): MirOperand[] {
-    let out = new MirOperand[0]
-    let t = mrt_trim(text)
-    if len(t) == 0 { ret out }
-    let parts = mrt_split_commas(t)
-    let i = 0
-    for i < len(parts) {
-        out.push(mrt_parse_typed_operand(parts[i]))
-        i = i + 1
-    }
-    ret out
-}
-
-fun mrt_inst_with_result(inst: MirInst, result_name: str, result_type: str): MirInst {
-    if len(result_name) > 0 {
-        inst.has_result = true
-        inst.result_name = result_name
-        inst.result_type = result_type
-    }
-    ret inst
-}
-
-fun mrt_parse_inst(line: str): MirInst {
-    let body = line
-    let result_name = ""
-    let result_type = ""
-    let eq = mrt_find(line, " = ")
-    if eq >= 0 {
-        let lhs = line[0:eq]
-        body = line[eq + 3:len(line)]
-        let colon = mrt_find(lhs, ":")
-        if colon < 0 { mir_runtime_die(str_cat2("bad result lhs: ", line)) }
-        result_name = mrt_trim(lhs[0:colon])
-        if len(result_name) > 0 && result_name[0:1] == "%" { result_name = result_name[1:len(result_name)] }
-        result_type = mrt_trim(lhs[colon + 1:len(lhs)])
-    }
-
-    if mrt_starts_with(body, "alloca ") {
-        ret mir_alloca(result_name, mrt_trim(body[7:len(body)]))
-    }
-    if mrt_starts_with(body, "load ") {
-        let rest = body[5:len(body)]
-        let comma = mrt_find(rest, ",")
-        if comma < 0 { mir_runtime_die(str_cat2("bad load: ", line)) }
-        ret mir_load(result_name, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
-    }
-    if mrt_starts_with(body, "store ") {
-        let ops = mrt_parse_operands(body[6:len(body)])
-        if len(ops) != 2 { mir_runtime_die(str_cat2("bad store: ", line)) }
-        ret mir_store(ops[0], ops[1])
-    }
-    if mrt_starts_with(body, "gep ") {
-        let rest = body[4:len(body)]
-        let comma = mrt_find(rest, ",")
-        if comma < 0 { mir_runtime_die(str_cat2("bad gep: ", line)) }
-        let inst = mir_inst_empty()
-        inst.op = "gep"
-        inst.typ = mrt_trim(rest[0:comma])
-        inst.operands = mrt_parse_operands(rest[comma + 1:len(rest)])
-        ret mrt_inst_with_result(inst, result_name, result_type)
-    }
-    if mrt_starts_with(body, "call ") {
-        let rest = body[5:len(body)]
-        let ret_type = mrt_first_word(rest)
-        let after_ret = mrt_after_first_word(rest)
-        let lp = mrt_find(after_ret, "(")
-        let rp = mrt_find(after_ret, ")")
-        if lp < 0 || rp < lp { mir_runtime_die(str_cat2("bad call: ", line)) }
-        let callee = after_ret[0:lp]
-        let args = mrt_parse_operands(after_ret[lp + 1:rp])
-        ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_name, result_type)
-    }
-    if mrt_starts_with(body, "ptrtoint ") {
-        let rest = body[9:len(body)]
-        let to_pos = mrt_find(rest, " to ")
-        if to_pos < 0 { mir_runtime_die(str_cat2("bad ptrtoint: ", line)) }
-        let inst = mir_inst_empty()
-        inst.op = "ptrtoint"
-        inst.typ = mrt_trim(rest[to_pos + 4:len(rest)])
-        inst.operands.push(mrt_parse_typed_operand(rest[0:to_pos]))
-        ret mrt_inst_with_result(inst, result_name, result_type)
-    }
-    if mrt_starts_with(body, "not ") {
-        let inst = mir_inst_empty()
-        inst.op = "not"
-        inst.operands.push(mrt_parse_typed_operand(body[4:len(body)]))
-        ret mrt_inst_with_result(inst, result_name, result_type)
-    }
-
-    let op = mrt_first_word(body)
-    let inst = mir_inst_empty()
-    inst.op = op
-    inst.operands = mrt_parse_operands(mrt_after_first_word(body))
-    ret mrt_inst_with_result(inst, result_name, result_type)
-}
-
-fun mrt_is_terminator(line: str): bool {
-    ret mrt_starts_with(line, "br ") || mrt_starts_with(line, "condbr ") || mrt_starts_with(line, "ret ")
-}
-
-fun mrt_parse_terminator(line: str): MirTerminator {
-    if mrt_starts_with(line, "br label %") {
-        ret mir_br(line[10:len(line)])
-    }
-    if mrt_starts_with(line, "condbr ") {
-        let parts = mrt_split_commas(line[7:len(line)])
-        if len(parts) != 3 { mir_runtime_die(str_cat2("bad condbr: ", line)) }
-        let then_part = mrt_trim(parts[1])
-        let else_part = mrt_trim(parts[2])
-        if !mrt_starts_with(then_part, "label %") || !mrt_starts_with(else_part, "label %") {
-            mir_runtime_die(str_cat2("bad condbr labels: ", line))
-        }
-        ret mir_condbr(mrt_parse_typed_operand(parts[0]), then_part[7:len(then_part)], else_part[7:len(else_part)])
-    }
-    if mrt_starts_with(line, "ret ") {
-        let rest = line[4:len(line)]
-        if rest == "void" { ret mir_ret_void() }
-        ret mir_ret_value(mrt_parse_typed_operand(rest))
-    }
-    mir_runtime_die(str_cat2("bad terminator: ", line))
-    ret mir_ret_void()
-}
-
-fun mrt_parse_function(text: str): MirFunction {
-    let lines = mrt_split_lines(text)
-    if len(lines) == 0 { mir_runtime_die("empty helper text") }
-    let header = lines[0]
-    if !mrt_starts_with(header, "define ") { mir_runtime_die(str_cat2("bad header: ", header)) }
-    let after_define = header[7:len(header)]
-    let at_pos = mrt_find(after_define, " @")
-    if at_pos < 0 { mir_runtime_die(str_cat2("bad header: ", header)) }
-    let ret_type = after_define[0:at_pos]
-    let after_at = after_define[at_pos + 2:len(after_define)]
-    let lp = mrt_find(after_at, "(")
-    let rp = mrt_find(after_at, ")")
-    if lp < 0 || rp < lp { mir_runtime_die(str_cat2("bad header params: ", header)) }
-    let name = after_at[0:lp]
-    let params_text = after_at[lp + 1:rp]
-    let fn = mir_function_empty(name, ret_type)
-    fn.params = mrt_parse_params(params_text)
-
-    let current = mir_block_empty("")
-    let has_current = false
-    let i = 1
-    for i < len(lines) {
-        let line = lines[i]
-        if line == "}" {
-            if has_current { fn.blocks.push(current) }
-            ret fn
-        }
-        if mrt_ends_with(line, ":") {
-            if has_current { fn.blocks.push(current) }
-            current = mir_block_empty(line[0:len(line) - 1])
-            has_current = true
-        } else {
-            if !has_current { mir_runtime_die(str_cat2("statement before block: ", line)) }
-            if mrt_is_terminator(line) {
-                current.terminator = mrt_parse_terminator(line)
-                current.has_terminator = true
-            } else {
-                current.instructions.push(mrt_parse_inst(line))
-            }
-        }
-        i = i + 1
-    }
-    mir_runtime_die(str_cat2("missing closing brace: ", name))
-    ret fn
-}
-
 fun mir_runtime_helper_bundle_path(): str {
-    ret "runtime/mir/helpers.mir"
+    ret cstr_ready_path("runtime/mir/helpers.mir")
 }
 
-fun mrt_split_helper_bundle(text: str): str[] {
-    let out = new str[0]
-    let lines = mrt_split_lines(text)
-    let current = ""
-    let in_helper = false
-    let i = 0
-    for i < len(lines) {
-        let line = lines[i]
-        if mrt_starts_with(line, "define ") {
-            if in_helper { mir_runtime_die(str_cat2("nested helper definition: ", line)) }
-            current = line
-            in_helper = true
-        } else {
-            if !in_helper { mir_runtime_die(str_cat2("statement outside helper definition: ", line)) }
-            current = str_cat2(str_cat2(current, "\n"), line)
-        }
-        if line == "}" {
-            out.push(current)
-            current = ""
-            in_helper = false
-        }
-        i = i + 1
-    }
-    if in_helper { mir_runtime_die("unterminated helper definition in runtime bundle") }
-    if len(out) == 0 { mir_runtime_die("empty runtime helper bundle") }
-    ret out
-}
-
-fun mir_runtime_helper_texts(): str[] {
-    let src = str(read_file(cstr_ready_path(mir_runtime_helper_bundle_path())))
-    ret mrt_split_helper_bundle(src)
+fun mir_runtime_helper_program(): MirProgram {
+    let text = str(read_file(mir_runtime_helper_bundle_path()))
+    ret mrt_parse_program(text)
 }
 
 fun mir_inject_all_runtime_helpers(program: MirProgram): void {
@@ -404,10 +35,23 @@ fun mir_inject_all_runtime_helpers(program: MirProgram): void {
     mir_runtime_add_global(program, "str.runtime.panic.prefix", "runtime panic: ")
     mir_runtime_add_global(program, "str.runtime.slice.oob", "slice index out of bounds")
     mir_runtime_add_global(program, "str.runtime.map.missing", "map missing key")
-    let texts = mir_runtime_helper_texts()
+
+    let helpers = mir_runtime_helper_program()
     let i = 0
-    for i < len(texts) {
-        program.functions.push(mrt_parse_function(texts[i]))
+    for i < len(helpers.functions) {
+        if mir_find_function(program, helpers.functions[i].name) < 0 {
+            program.functions.push(helpers.functions[i])
+        }
+        i = i + 1
+    }
+    mir_remove_defined_externs(program)
+
+    i = 0
+    for i < len(helpers.externs) {
+        let ext = helpers.externs[i]
+        if mir_find_function(program, ext.name) < 0 && mir_find_extern(program, ext.name) < 0 {
+            program.externs.push(ext)
+        }
         i = i + 1
     }
 }

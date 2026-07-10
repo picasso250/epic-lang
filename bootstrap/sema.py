@@ -43,9 +43,6 @@ class SemanticAnalyzer:
         ("kernel32", "ReadFile"): ([I64, I64, I64, I64, I64], I64),
         ("kernel32", "WriteFile"): ([I64, I64, I64, I64, I64], I64),
         ("kernel32", "CloseHandle"): ([I64], I64),
-        ("kernel32", "CreateProcessA"): ([], I64),
-        ("kernel32", "WaitForSingleObject"): ([I64, I64], I64),
-        ("kernel32", "GetExitCodeProcess"): ([I64, I64], I64),
         ("kernel32", "GetCommandLineA"): ([], I64),
         ("user32", "MessageBoxA"): ([I64, I64, I64, I64], I64),
     }
@@ -65,7 +62,6 @@ class SemanticAnalyzer:
         self.union_names = set(self.union_defs)
         self.union_tags = {}
         self.struct_fields = {}
-        self.struct_embedded_fields = {}
         self.func_sigs = {}
         self.globals = {}
         self.scopes = []
@@ -85,18 +81,12 @@ class SemanticAnalyzer:
     def _build_types(self):
         for struct in self.program.structs:
             fields = {}
-            embedded = set()
             for field in struct.fields:
                 if field.name in fields:
                     self._fail_global(f"duplicate field {struct.name}.{field.name}")
                 field.resolved_type = self._type_name(field.type)
-                if field.embedded and (field.resolved_type.kind != "named" or field.resolved_type.name not in self.struct_names):
-                    self._fail_global(f"embedded field {struct.name}.{field.name} must be a struct")
                 fields[field.name] = field.resolved_type
-                if field.embedded:
-                    embedded.add(field.name)
             self.struct_fields[struct.name] = fields
-            self.struct_embedded_fields[struct.name] = embedded
 
     def _build_unions(self):
         for union in self.program.unions:
@@ -560,9 +550,6 @@ class SemanticAnalyzer:
         if name == "write_file":
             self._check_call_args(name, [STR, ARRAY(U8)], expr.args)
             return ExprInfo(I64)
-        if name == "system":
-            self._check_call_args(name, [STR], expr.args)
-            return ExprInfo(I64)
         if name == "push":
             self._fail("push is removed from function-call surface; use xs.push(x)")
         if name == "pop":
@@ -707,43 +694,18 @@ class SemanticAnalyzer:
             self._fail(f"unknown field {struct_name}.{field}")
         return fields[field]
 
-    def _promoted_field_type(self, struct_name, field, seen=None):
-        if seen is None:
-            seen = set()
-        if struct_name in seen:
-            self._fail(f"embedded field cycle while resolving {struct_name}.{field}")
-        seen.add(struct_name)
-        found = None
-        for embedded_name in self.struct_embedded_fields.get(struct_name, set()):
-            embedded_type = self.struct_fields[struct_name][embedded_name]
-            if embedded_type.kind != "named":
-                continue
-            embedded_fields = self.struct_fields.get(embedded_type.name, {})
-            if field in embedded_fields:
-                candidate = embedded_fields[field]
-            else:
-                candidate = self._promoted_field_type(embedded_type.name, field, seen)
-            if candidate is not None:
-                if found is not None:
-                    self._fail(f"ambiguous field {struct_name}.{field}")
-                found = candidate
-        seen.remove(struct_name)
-        return found
-
-    def _union_common_embedded_field_type(self, union_name, field):
+    def _union_common_field_type(self, union_name, field):
         found = None
         for member in self.union_defs[union_name]:
-            if field in self.struct_embedded_fields.get(member, set()):
-                candidate = self.struct_fields[member][field]
-            else:
-                candidate = self._promoted_field_type(member, field)
-                if candidate is None:
-                    self._fail(f"union {union_name} has no common embedded field {field}")
+            fields = self.struct_fields[member]
+            if field not in fields:
+                self._fail(f"union {union_name} has no common field {field}")
+            candidate = fields[field]
             if found is not None and candidate != found:
-                self._fail(f"union {union_name} embedded field {field} has inconsistent types")
+                self._fail(f"union {union_name} field {field} has inconsistent types")
             found = candidate
         if found is None:
-            self._fail(f"union {union_name} has no common embedded field {field}")
+            self._fail(f"union {union_name} has no common field {field}")
         return found
 
     def _field_guard_key(self, object_expr, field):
@@ -772,13 +734,10 @@ class SemanticAnalyzer:
             fields = self.struct_fields.get(base_type.name)
             if fields is None:
                 if base_type.name in self.union_names:
-                    return self._union_common_embedded_field_type(base_type.name, field)
+                    return self._union_common_field_type(base_type.name, field)
                 self._fail(f"field access expected struct, got {base_type}")
             if field in fields:
                 return fields[field]
-            promoted = self._promoted_field_type(base_type.name, field)
-            if promoted is not None:
-                return promoted
             self._fail(f"unknown field {base_type.name}.{field}")
         self._fail(f"field access expected aggregate, got {base_type}")
 

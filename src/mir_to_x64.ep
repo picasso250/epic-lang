@@ -3,18 +3,13 @@
 # Current milestone: integer ops plus basic branches.
 #
 
-struct MirToX64Slot {
-    name: str
-    offset: i64
-}
-
 struct MirToX64Lower {
     x64: X64Program
-    value_slots: map[str]i64
-    addr_slots: map[str]i64
-    temp_value_slots: map[str]bool
-    block_local_use_counts: map[str]i64
-    reusable_value_names: map[str]bool
+    value_slots: i64[]
+    addr_slots: i64[]
+    temp_value_slots: i64[]
+    block_local_use_counts: i64[]
+    reusable_values: i64[]
     free_value_slots: i64[]
     free_value_slot_count: i64
     string_names: str[]
@@ -40,20 +35,20 @@ struct MirToX64Lower {
 fun mir_to_x64_lower_empty(): MirToX64Lower {
     let lower = new MirToX64Lower
     lower.x64 = x64_program_empty()
-    lower.value_slots = new map[str]i64
-    lower.addr_slots = new map[str]i64
-    lower.temp_value_slots = new map[str]bool
-    lower.block_local_use_counts = new map[str]i64
-    lower.reusable_value_names = new map[str]bool
-    lower.free_value_slots = new i64[0]
+    lower.value_slots = new i64[]
+    lower.addr_slots = new i64[]
+    lower.temp_value_slots = new i64[]
+    lower.block_local_use_counts = new i64[]
+    lower.reusable_values = new i64[]
+    lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
-    lower.string_names = new str[0]
-    lower.string_lengths = new i64[0]
-    lower.global_names = new str[0]
+    lower.string_names = new str[]
+    lower.string_lengths = new i64[]
+    lower.global_names = new str[]
     lower.has_global_init = false
-    lower.struct_field_names = new str[0]
-    lower.struct_field_types = new str[0]
-    lower.struct_field_indexes = new i64[0]
+    lower.struct_field_names = new str[]
+    lower.struct_field_types = new str[]
+    lower.struct_field_indexes = new i64[]
     lower.next_slot = 0
     lower.return_label = ""
     lower.timing_plan_slots = 0
@@ -150,36 +145,29 @@ fun mir_to_x64_slot(lower: MirToX64Lower): i64 {
     ret 0 - lower.next_slot
 }
 
-fun mir_to_x64_add_value_slot(lower: MirToX64Lower, name: str): void {
-    lower.value_slots[name] = mir_to_x64_slot(lower)
+fun mir_to_x64_add_value_slot(lower: MirToX64Lower, value_id: i64): void {
+    lower.value_slots[value_id] = mir_to_x64_slot(lower)
 }
 
-fun mir_to_x64_add_addr_slot(lower: MirToX64Lower, name: str): void {
-    lower.addr_slots[name] = mir_to_x64_slot(lower)
+fun mir_to_x64_add_addr_slot(lower: MirToX64Lower, value_id: i64): void {
+    lower.addr_slots[value_id] = mir_to_x64_slot(lower)
 }
 
-fun mir_to_x64_find_slot(slots: map[str]i64, name: str): i64 {
-    if slots.has(name) {
-        ret slots[name]
-    }
-    ret 0
-}
-
-fun mir_to_x64_value_slot(lower: MirToX64Lower, name: str): i64 {
-    let offset = mir_to_x64_find_slot(lower.value_slots, name)
+fun mir_to_x64_value_slot(lower: MirToX64Lower, value_id: i64): i64 {
+    let offset = lower.value_slots[value_id]
     if offset != 0 {
         ret offset
     }
-    mir_to_x64_die(str_cat2("unknown MIR value: ", name))
+    mir_to_x64_die(str_cat2("unknown MIR value: ", str(value_id)))
     ret 0
 }
 
-fun mir_to_x64_addr_slot(lower: MirToX64Lower, name: str): i64 {
-    let offset = mir_to_x64_find_slot(lower.addr_slots, name)
+fun mir_to_x64_addr_slot(lower: MirToX64Lower, value_id: i64): i64 {
+    let offset = lower.addr_slots[value_id]
     if offset != 0 {
         ret offset
     }
-    mir_to_x64_die(str_cat2("unknown MIR address: ", name))
+    mir_to_x64_die(str_cat2("unknown MIR address: ", str(value_id)))
     ret 0
 }
 fun mir_to_x64_aligned_frame(lower: MirToX64Lower): i64 {
@@ -208,24 +196,20 @@ fun mir_to_x64_block_label(fn: MirFunction, block_name: str): str {
     ret str_cat2(str_cat2(fn.name, "."), block_name)
 }
 
-fun mir_to_x64_count_use(counts: map[str]i64, name: str): void {
-    if counts.has(name) {
-        counts[name] = counts[name] + 1
-    } else {
-        counts[name] = 1
-    }
+fun mir_to_x64_count_use(counts: i64[], value_id: i64): void {
+    counts[value_id] = counts[value_id] + 1
 }
 
-fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): map[str]i64 {
-    let counts = new map[str]i64
+fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i64[] {
+    let counts = new i64[len(lower.value_slots)]
     let ii = 0
     for ii < len(block.instructions) {
         let oi = 0
         for oi < len(block.instructions[ii].operands) {
             if mir_operand_is_value(block.instructions[ii].operands[oi]) {
-                let name = mir_operand_name(block.instructions[ii].operands[oi])
-                if lower.reusable_value_names.has(name) && lower.reusable_value_names[name] {
-                    mir_to_x64_count_use(counts, name)
+                let value_id = mir_operand_value_id(block.instructions[ii].operands[oi])
+                if lower.reusable_values[value_id] != 0 {
+                    mir_to_x64_count_use(counts, value_id)
                 }
             }
             oi = oi + 1
@@ -237,9 +221,9 @@ fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): ma
         }
         MirCondBrTerminator cond: {
             if mir_operand_is_value(cond.cond) {
-                let name = mir_operand_name(cond.cond)
-                if lower.reusable_value_names.has(name) && lower.reusable_value_names[name] {
-                    mir_to_x64_count_use(counts, name)
+                let value_id = mir_operand_value_id(cond.cond)
+                if lower.reusable_values[value_id] != 0 {
+                    mir_to_x64_count_use(counts, value_id)
                 }
             }
         }
@@ -247,9 +231,9 @@ fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): ma
         }
         MirRetValueTerminator rv: {
             if mir_operand_is_value(rv.value) {
-                let name = mir_operand_name(rv.value)
-                if lower.reusable_value_names.has(name) && lower.reusable_value_names[name] {
-                    mir_to_x64_count_use(counts, name)
+                let value_id = mir_operand_value_id(rv.value)
+                if lower.reusable_values[value_id] != 0 {
+                    mir_to_x64_count_use(counts, value_id)
                 }
             }
         }
@@ -267,15 +251,15 @@ fun mir_to_x64_reuse_or_alloc_slot(lower: MirToX64Lower): i64 {
     ret mir_to_x64_slot(lower)
 }
 
-fun mir_to_x64_release_value_name(lower: MirToX64Lower, name: str): void {
-    if lower.temp_value_slots.has(name) == false || lower.temp_value_slots[name] == false {
+fun mir_to_x64_release_value(lower: MirToX64Lower, value_id: i64): void {
+    if lower.temp_value_slots[value_id] == 0 {
         ret
     }
-    lower.temp_value_slots[name] = false
+    lower.temp_value_slots[value_id] = 0
     if lower.free_value_slot_count < len(lower.free_value_slots) {
-        lower.free_value_slots[lower.free_value_slot_count] = lower.value_slots[name]
+        lower.free_value_slots[lower.free_value_slot_count] = lower.value_slots[value_id]
     } else {
-        lower.free_value_slots.push(lower.value_slots[name])
+        lower.free_value_slots.push(lower.value_slots[value_id])
     }
     lower.free_value_slot_count = lower.free_value_slot_count + 1
 }
@@ -284,18 +268,15 @@ fun mir_to_x64_release_operand(lower: MirToX64Lower, operand: MirOperand): void 
     if mir_operand_is_value(operand) == false {
         ret
     }
-    let name = mir_operand_name(operand)
-    if lower.block_local_use_counts.has(name) == false {
-        ret
-    }
-    let remaining = lower.block_local_use_counts[name]
+    let value_id = mir_operand_value_id(operand)
+    let remaining = lower.block_local_use_counts[value_id]
     if remaining <= 0 {
         ret
     }
     remaining = remaining - 1
-    lower.block_local_use_counts[name] = remaining
+    lower.block_local_use_counts[value_id] = remaining
     if remaining == 0 {
-        mir_to_x64_release_value_name(lower, name)
+        mir_to_x64_release_value(lower, value_id)
     }
 }
 
@@ -322,44 +303,44 @@ fun mir_to_x64_release_terminator(lower: MirToX64Lower, term: MirTerminator): vo
     }
 }
 
-fun mir_to_x64_mark_cross_block_operand_use(lower: MirToX64Lower, def_blocks: map[str]str, operand: MirOperand, block_name: str): void {
+fun mir_to_x64_mark_cross_block_operand_use(lower: MirToX64Lower, def_blocks: i64[], operand: MirOperand, block_id: i64): void {
     if mir_operand_is_value(operand) == false {
         ret
     }
-    let name = mir_operand_name(operand)
-    if def_blocks.has(name) == false {
+    let value_id = mir_operand_value_id(operand)
+    if def_blocks[value_id] == 0 {
         ret
     }
-    if def_blocks[name] != block_name {
-        lower.reusable_value_names[name] = false
+    if def_blocks[value_id] != block_id {
+        lower.reusable_values[value_id] = 0
     }
 }
 
-fun mir_to_x64_mark_cross_block_terminator_use(lower: MirToX64Lower, def_blocks: map[str]str, term: MirTerminator, block_name: str): void {
+fun mir_to_x64_mark_cross_block_terminator_use(lower: MirToX64Lower, def_blocks: i64[], term: MirTerminator, block_id: i64): void {
     match term {
         MirBrTerminator br: {
         }
         MirCondBrTerminator cond: {
-            mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, cond.cond, block_name)
+            mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, cond.cond, block_id)
         }
         MirRetVoidTerminator rv: {
         }
         MirRetValueTerminator rv: {
-            mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, rv.value, block_name)
+            mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, rv.value, block_id)
         }
     }
 }
 
-fun mir_to_x64_mark_reusable_value_names(lower: MirToX64Lower, fn: MirFunction): void {
-    let def_blocks = new map[str]str
+fun mir_to_x64_mark_reusable_values(lower: MirToX64Lower, fn: MirFunction): void {
+    let def_blocks = new i64[len(lower.value_slots)]
     let bi = 0
     for bi < len(fn.blocks) {
         let ii = 0
         for ii < len(fn.blocks[bi].instructions) {
             if fn.blocks[bi].instructions[ii].op != "alloca" && fn.blocks[bi].instructions[ii].has_result {
-                let name = fn.blocks[bi].instructions[ii].result_name
-                def_blocks[name] = fn.blocks[bi].name
-                lower.reusable_value_names[name] = true
+                let value_id = fn.blocks[bi].instructions[ii].result_id
+                def_blocks[value_id] = bi + 1
+                lower.reusable_values[value_id] = 1
             }
             ii = ii + 1
         }
@@ -371,12 +352,12 @@ fun mir_to_x64_mark_reusable_value_names(lower: MirToX64Lower, fn: MirFunction):
         for ii < len(fn.blocks[bi].instructions) {
             let oi = 0
             for oi < len(fn.blocks[bi].instructions[ii].operands) {
-                mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, fn.blocks[bi].instructions[ii].operands[oi], fn.blocks[bi].name)
+                mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, fn.blocks[bi].instructions[ii].operands[oi], bi + 1)
                 oi = oi + 1
             }
             ii = ii + 1
         }
-        mir_to_x64_mark_cross_block_terminator_use(lower, def_blocks, fn.blocks[bi].terminator, fn.blocks[bi].name)
+        mir_to_x64_mark_cross_block_terminator_use(lower, def_blocks, fn.blocks[bi].terminator, bi + 1)
         bi = bi + 1
     }
 }
@@ -384,30 +365,30 @@ fun mir_to_x64_mark_reusable_value_names(lower: MirToX64Lower, fn: MirFunction):
 fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
     let i = 0
     for i < len(fn.params) {
-        mir_to_x64_add_value_slot(lower, fn.params[i].name)
+        mir_to_x64_add_value_slot(lower, fn.params[i].value_id)
         i = i + 1
     }
-    mir_to_x64_mark_reusable_value_names(lower, fn)
+    mir_to_x64_mark_reusable_values(lower, fn)
     let b = 0
     for b < len(fn.blocks) {
         lower.block_local_use_counts = mir_to_x64_count_block_local_uses(lower, fn.blocks[b])
         let j = 0
         for j < len(fn.blocks[b].instructions) {
             if fn.blocks[b].instructions[j].op == "alloca" {
-                mir_to_x64_add_addr_slot(lower, fn.blocks[b].instructions[j].result_name)
+                mir_to_x64_add_addr_slot(lower, fn.blocks[b].instructions[j].result_id)
                 j = j + 1
                 continue
             }
             mir_to_x64_release_operands(lower, fn.blocks[b].instructions[j].operands)
             if fn.blocks[b].instructions[j].has_result {
-                if lower.reusable_value_names.has(fn.blocks[b].instructions[j].result_name) && lower.reusable_value_names[fn.blocks[b].instructions[j].result_name] {
-                    lower.temp_value_slots[fn.blocks[b].instructions[j].result_name] = true
-                    lower.value_slots[fn.blocks[b].instructions[j].result_name] = mir_to_x64_reuse_or_alloc_slot(lower)
+                if lower.reusable_values[fn.blocks[b].instructions[j].result_id] != 0 {
+                    lower.temp_value_slots[fn.blocks[b].instructions[j].result_id] = 1
+                    lower.value_slots[fn.blocks[b].instructions[j].result_id] = mir_to_x64_reuse_or_alloc_slot(lower)
                 } else {
-                    lower.value_slots[fn.blocks[b].instructions[j].result_name] = mir_to_x64_slot(lower)
+                    lower.value_slots[fn.blocks[b].instructions[j].result_id] = mir_to_x64_slot(lower)
                 }
-                if lower.block_local_use_counts.has(fn.blocks[b].instructions[j].result_name) == false {
-                    mir_to_x64_release_value_name(lower, fn.blocks[b].instructions[j].result_name)
+                if lower.block_local_use_counts[fn.blocks[b].instructions[j].result_id] == 0 {
+                    mir_to_x64_release_value(lower, fn.blocks[b].instructions[j].result_id)
                 }
             }
             j = j + 1
@@ -440,22 +421,22 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
         ret
     }
     if mir_operand_is_value(operand) {
-        let name = mir_operand_name(operand)
-        let value_offset = mir_to_x64_find_slot(lower.value_slots, name)
+        let value_id = mir_operand_value_id(operand)
+        let value_offset = lower.value_slots[value_id]
         if value_offset != 0 {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_base("rbp", value_offset, 8))
             ret
         }
-        let addr_offset = mir_to_x64_find_slot(lower.addr_slots, name)
+        let addr_offset = lower.addr_slots[value_id]
         if addr_offset != 0 {
             x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_base("rbp", addr_offset, 8))
             ret
         }
-        mir_to_x64_die(str_cat2("unknown MIR value: ", name))
+        mir_to_x64_die(str_cat2("unknown MIR value: ", str(value_id)))
         ret
     }
     if mir_operand_is_symbol(operand) {
-        let name = mir_operand_name(operand)
+        let name = mir_operand_symbol_name(operand)
         if name == "argv" {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_symbol("_argv", 8))
             ret
@@ -482,15 +463,8 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
     mir_to_x64_die(str_cat2("unsupported operand: ", mir_operand_kind_text(operand)))
 }
 
-fun mir_to_x64_store_result(lower: MirToX64Lower, result_name: str, reg: str): void {
-    x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, result_name), 8), x64_reg(reg))
-}
-
-fun mir_to_x64_type_size(typ: str): i64 {
-    if typ == "i8" {
-        ret 1
-    }
-    ret 8
+fun mir_to_x64_store_result(lower: MirToX64Lower, result_id: i64, reg: str): void {
+    x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, result_id), 8), x64_reg(reg))
 }
 
 fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field_index: i64): i64 {
@@ -501,7 +475,7 @@ fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field
             if lower.struct_field_indexes[i] == field_index {
                 ret offset
             }
-            offset = offset + mir_to_x64_type_size(lower.struct_field_types[i])
+            offset = offset + 8
         }
         i = i + 1
     }
@@ -514,7 +488,7 @@ fun mir_to_x64_struct_size(lower: MirToX64Lower, struct_name: str): i64 {
     let i = 0
     for i < len(lower.struct_field_names) {
         if lower.struct_field_names[i] == struct_name {
-            size = size + mir_to_x64_type_size(lower.struct_field_types[i])
+            size = size + 8
         }
         i = i + 1
     }
@@ -602,7 +576,7 @@ fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
         }
         mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_gep_scale(lower, inst.typ))
     }
-    mir_to_x64_store_result(lower, inst.result_name, "rax")
+    mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
 fun mir_to_x64_is_binary_op(op: str): bool {
@@ -639,7 +613,7 @@ fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirInst): void {
             x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_reg("rdx"))
         }
     }
-    mir_to_x64_store_result(lower, inst.result_name, "rax")
+    mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
 fun mir_to_x64_icmp_cc(op: str): str {
@@ -663,11 +637,11 @@ fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
     x64_add_inst2(lower.x64, "cmp", x64_reg("rax"), x64_reg("rcx"))
     x64_add_inst1(lower.x64, mir_to_x64_icmp_cc(inst.op), x64_reg("al"))
     x64_add_inst2(lower.x64, "movzx", x64_reg("eax"), x64_reg("al"))
-    mir_to_x64_store_result(lower, inst.result_name, "rax")
+    mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
 fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
-    let arg_regs = new str[0]
+    let arg_regs = new str[]
     arg_regs.push("rcx")
     arg_regs.push("rdx")
     arg_regs.push("r8")
@@ -691,7 +665,7 @@ fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
     x64_add_inst1(lower.x64, "call", x64_symbol(inst.callee))
     x64_add_inst2(lower.x64, "add", x64_reg("rsp"), x64_imm(frame))
     if inst.has_result {
-        mir_to_x64_store_result(lower, inst.result_name, "rax")
+        mir_to_x64_store_result(lower, inst.result_id, "rax")
     }
 }
 
@@ -720,7 +694,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         } else {
             x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_mem_base("rax", 0, 8))
         }
-        mir_to_x64_store_result(lower, inst.result_name, "rax")
+        mir_to_x64_store_result(lower, inst.result_id, "rax")
         ret
     }
     if inst.op == "call" {
@@ -729,7 +703,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
     }
     if inst.op == "ptrtoint" {
         mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-        mir_to_x64_store_result(lower, inst.result_name, "rax")
+        mir_to_x64_store_result(lower, inst.result_id, "rax")
         ret
     }
     if inst.op == "gep" {
@@ -745,7 +719,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         x64_add_inst2(lower.x64, "test", x64_reg("rax"), x64_reg("rax"))
         x64_add_inst1(lower.x64, "sete", x64_reg("al"))
         x64_add_inst2(lower.x64, "movzx", x64_reg("eax"), x64_reg("al"))
-        mir_to_x64_store_result(lower, inst.result_name, "rax")
+        mir_to_x64_store_result(lower, inst.result_id, "rax")
         ret
     }
     if inst.op == "icmp.eq" || inst.op == "icmp.ne" || inst.op == "icmp.slt" || inst.op == "icmp.sgt" || inst.op == "icmp.sle" || inst.op == "icmp.sge" || inst.op == "icmp.ult" || inst.op == "icmp.ugt" || inst.op == "icmp.ule" || inst.op == "icmp.uge" {
@@ -812,14 +786,39 @@ fun mir_to_x64_now_ms(): i64 {
     ret os.kernel32.GetTickCount64()
 }
 
+fun mir_to_x64_value_capacity(fn: MirFunction): i64 {
+    let max_id = 0
+    let i = 0
+    for i < len(fn.params) {
+        if fn.params[i].value_id > max_id {
+            max_id = fn.params[i].value_id
+        }
+        i = i + 1
+    }
+    let b = 0
+    for b < len(fn.blocks) {
+        let j = 0
+        for j < len(fn.blocks[b].instructions) {
+            let inst = fn.blocks[b].instructions[j]
+            if inst.has_result && inst.result_id > max_id {
+                max_id = inst.result_id
+            }
+            j = j + 1
+        }
+        b = b + 1
+    }
+    ret max_id + 1
+}
+
 fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction): X64Program {
     lower.timing_functions = lower.timing_functions + 1
-    lower.value_slots = new map[str]i64
-    lower.addr_slots = new map[str]i64
-    lower.temp_value_slots = new map[str]bool
-    lower.block_local_use_counts = new map[str]i64
-    lower.reusable_value_names = new map[str]bool
-    lower.free_value_slots = new i64[0]
+    let value_capacity = mir_to_x64_value_capacity(fn)
+    lower.value_slots = new i64[value_capacity]
+    lower.addr_slots = new i64[value_capacity]
+    lower.temp_value_slots = new i64[value_capacity]
+    lower.block_local_use_counts = new i64[value_capacity]
+    lower.reusable_values = new i64[value_capacity]
+    lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
     lower.next_slot = 0
     lower.return_label = str_cat2(fn.name, ".__return")
@@ -849,7 +848,7 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     lower.timing_prologue = lower.timing_prologue + (prologue_stop - prologue_start)
 
     let params_start = mir_to_x64_now_ms()
-    let arg_regs = new str[0]
+    let arg_regs = new str[]
     arg_regs.push("rcx")
     arg_regs.push("rdx")
     arg_regs.push("r8")
@@ -857,10 +856,10 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     let i = 0
     for i < len(fn.params) {
         if i < len(arg_regs) {
-            x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].name), 8), x64_reg(arg_regs[i]))
+            x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].value_id), 8), x64_reg(arg_regs[i]))
         } else {
             x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_mem_base("rbp", 16 + i * 8, 8))
-            x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].name), 8), x64_reg("rax"))
+            x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].value_id), 8), x64_reg("rax"))
         }
         i = i + 1
     }

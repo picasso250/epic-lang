@@ -34,6 +34,7 @@ from lexer import lex
 from parser import Parser
 from sema import analyze_program
 from ast_to_mir import ast_to_mir
+from mir import MirProgram
 
 
 def run_checked(cmd, label):
@@ -77,8 +78,18 @@ def python_user_mir(path):
     with open(path, "r", encoding="utf-8") as f:
         source = f.read()
     typed = analyze_program(Parser(lex(source)).parse_program())
-    program = ast_to_mir(typed)
-    return "\n\n".join(fn.text() for fn in program.functions[: len(typed.funcs)]) + "\n"
+    lowered = ast_to_mir(typed)
+    frontend = MirProgram(
+        externs=lowered.externs,
+        globals=[
+            glob
+            for glob in lowered.globals
+            if glob.name != "argv" and not glob.name.startswith("str.runtime.")
+        ],
+        functions=lowered.functions,
+        structs=lowered.structs,
+    )
+    return frontend.text() + "\n"
 
 
 def ep_user_mir(path):

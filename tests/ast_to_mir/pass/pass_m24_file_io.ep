@@ -1,8 +1,7 @@
-# MIR-CODEGEN: read_file/write_file/system builtins.
+# MIR-CODEGEN: read_file/write_file builtins.
 fun main(): void {
     let s = "42"
     let n = write_file("test_out.txt", bytes(s))
     let inp = read_file("test_out.txt")
-    let e = system("cmd /c exit 7")
-    println(str(n + e + len(inp)))
+    println(str(n + len(inp)))
 }

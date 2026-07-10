@@ -1,7 +1,10 @@
 """Lower Epic MIR to structured X64 MachineIR."""
 
-from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID
+from backend_abi import WINAPI_ABI, validate_backend_abi
+from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand, I8, I64, Ret, SymbolOperand, ValueOperand, VOID, validate
 from x64 import I, M, MS, R, LabelRef, Symbol, X64Program
+from mir_prune import prune_unreachable_functions
+from mir_runtime_helpers import inject_all_mir_helpers
 from x64_runtime import append_runtime_helpers, emit_runtime_data, emit_startup_hook_call
 
 
@@ -12,12 +15,22 @@ class MirLowerError(RuntimeError):
     pass
 
 
+def prepare_mir_for_x64(program):
+    """Apply the x64 backend's MIR preparation contract in one place."""
+    inject_all_mir_helpers(program)
+    prune_unreachable_functions(program)
+    program.retain_referenced_externs()
+    validate(program)
+    validate_backend_abi(program)
+    return program
+
+
 class MirLower:
     def __init__(self, program):
         self.program = program
         self.x64 = X64Program()
-        self.value_slots = {}
-        self.addr_slots = {}
+        self.value_slots = []
+        self.addr_slots = []
         self.next_slot = 0
         self.return_label = None
         self.string_globals = {}
@@ -25,32 +38,38 @@ class MirLower:
         self.has_global_init = False
         self.scratch_slots = []
         self.label_counter = 0
-        self.temp_value_slots = set()
-        self.block_local_use_counts = {}
-        self.reusable_value_names = set()
+        self.temp_value_slots = []
+        self.block_local_use_counts = []
+        self.reusable_values = []
         self.free_value_slots = []
 
-    def lower(self):
+    def _prepare_program(self):
         self.x64.global_("_start")
-        for imp in self.program.imports:
-            self.x64.extern(imp.name)
+        # The x64 runtime itself calls WinAPI; those imports are backend-owned.
+        for name in sorted(WINAPI_ABI):
+            self.x64.extern(name)
         self.x64.section(".data")
         self.string_globals = emit_runtime_data(self.x64, self.program)
         self.global_slots = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is None}
         self.has_global_init = any(fn.name == "__ep_global_init" for fn in self.program.functions)
         self.x64.section(".text")
+
+    def lower(self):
+        prepare_mir_for_x64(self.program)
+        self._prepare_program()
         for fn in self.program.functions:
             self._lower_function(fn)
         append_runtime_helpers(self.x64)
         return self.x64
 
     def _lower_function(self, fn):
-        self.value_slots = {}
-        self.addr_slots = {}
+        value_capacity = self._value_capacity(fn)
+        self.value_slots = [0] * value_capacity
+        self.addr_slots = [0] * value_capacity
         self.next_slot = 0
-        self.temp_value_slots = set()
-        self.block_local_use_counts = {}
-        self.reusable_value_names = set()
+        self.temp_value_slots = [False] * value_capacity
+        self.block_local_use_counts = [0] * value_capacity
+        self.reusable_values = [False] * value_capacity
         self.free_value_slots = []
         self.return_label = f"{fn.name}.__return"
         self._plan_slots(fn)
@@ -65,10 +84,10 @@ class MirLower:
             emit_startup_hook_call(self.x64, self.has_global_init)
         for idx, param in enumerate(fn.params):
             if idx < len(ARG_REGS):
-                self.x64.inst("mov", M("rbp", self.value_slots[param.name]), R(ARG_REGS[idx]))
+                self.x64.inst("mov", M("rbp", self.value_slots[param.id]), R(ARG_REGS[idx]))
             else:
                 self.x64.inst("mov", R("rax"), M("rbp", 16 + idx * 8))
-                self.x64.inst("mov", M("rbp", self.value_slots[param.name]), R("rax"))
+                self.x64.inst("mov", M("rbp", self.value_slots[param.id]), R("rax"))
         for block in fn.blocks:
             self.x64.label(self._block_label(fn, block.name))
             for inst in block.instructions:
@@ -94,75 +113,76 @@ class MirLower:
 
     def _plan_slots(self, fn):
         for param in fn.params:
-            self.value_slots[param.name] = self._slot()
-        self.reusable_value_names = self._find_reusable_value_names(fn)
+            self.value_slots[param.id] = self._slot()
+        self._mark_reusable_values(fn)
         for block in fn.blocks:
             self.block_local_use_counts = self._count_block_local_uses(block)
             for inst in block.instructions:
                 if inst.op == "alloca":
-                    self.addr_slots[inst.result.name] = self._slot()
+                    self.addr_slots[inst.result.id] = self._slot()
                     continue
                 self._release_operands(inst.operands)
                 if inst.result is not None:
-                    if inst.result.name in self.reusable_value_names:
+                    if self.reusable_values[inst.result.id]:
                         slot = self._reuse_or_alloc_slot()
-                        self.temp_value_slots.add(inst.result.name)
+                        self.temp_value_slots[inst.result.id] = True
                     else:
                         slot = self._slot()
-                    self.value_slots[inst.result.name] = slot
-                    if self.block_local_use_counts.get(inst.result.name, 0) == 0:
-                        self._release_value_name(inst.result.name)
+                    self.value_slots[inst.result.id] = slot
+                    if self.block_local_use_counts[inst.result.id] == 0:
+                        self._release_value(inst.result.id)
             self._release_terminator(block.terminator)
         self.scratch_slots = [self._slot() for _ in range(8)]
 
-    def _find_reusable_value_names(self, fn):
-        defs = {}
-        uses = {}
+    @staticmethod
+    def _value_capacity(fn):
+        max_id = max((param.id for param in fn.params), default=0)
         for block in fn.blocks:
             for inst in block.instructions:
-                if inst.result is not None and inst.op != "alloca":
-                    defs[inst.result.name] = block.name
-                for operand in inst.operands:
-                    self._record_operand_use(uses, operand, block.name)
-            self._record_terminator_uses(uses, block.terminator, block.name)
-        reusable = set()
-        for name, block_name in defs.items():
-            use_blocks = uses.get(name, set())
-            if len(use_blocks) == 0 or use_blocks == {block_name}:
-                reusable.add(name)
-        return reusable
+                if inst.result is not None:
+                    max_id = max(max_id, inst.result.id)
+        return max_id + 1
 
-    def _record_operand_use(self, uses, operand, block_name):
+    def _mark_reusable_values(self, fn):
+        def_blocks = [0] * len(self.value_slots)
+        for block_index, block in enumerate(fn.blocks, start=1):
+            for inst in block.instructions:
+                if inst.result is not None and inst.op != "alloca":
+                    def_blocks[inst.result.id] = block_index
+                    self.reusable_values[inst.result.id] = True
+        for block_index, block in enumerate(fn.blocks, start=1):
+            for inst in block.instructions:
+                for operand in inst.operands:
+                    self._mark_cross_block_operand_use(def_blocks, operand, block_index)
+            self._mark_cross_block_terminator_use(def_blocks, block.terminator, block_index)
+
+    def _mark_cross_block_operand_use(self, def_blocks, operand, block_index):
         if not isinstance(operand, ValueOperand):
             return
-        name = operand.value.name
-        if name not in uses:
-            uses[name] = set()
-        uses[name].add(block_name)
+        value_id = operand.value.id
+        if def_blocks[value_id] != 0 and def_blocks[value_id] != block_index:
+            self.reusable_values[value_id] = False
 
-    def _record_terminator_uses(self, uses, term, block_name):
+    def _mark_cross_block_terminator_use(self, def_blocks, term, block_index):
         if isinstance(term, CondBr):
-            self._record_operand_use(uses, term.cond, block_name)
+            self._mark_cross_block_operand_use(def_blocks, term.cond, block_index)
         elif isinstance(term, Ret) and term.value is not None:
-            self._record_operand_use(uses, term.value, block_name)
+            self._mark_cross_block_operand_use(def_blocks, term.value, block_index)
 
     def _count_block_local_uses(self, block):
-        counts = {}
+        counts = [0] * len(self.value_slots)
         for inst in block.instructions:
             for operand in inst.operands:
-                if isinstance(operand, ValueOperand) and operand.value.name in self.reusable_value_names:
-                    name = operand.value.name
-                    counts[name] = counts.get(name, 0) + 1
+                if isinstance(operand, ValueOperand) and self.reusable_values[operand.value.id]:
+                    counts[operand.value.id] += 1
         if isinstance(block.terminator, CondBr):
             operand = block.terminator.cond
-            if isinstance(operand, ValueOperand) and operand.value.name in self.reusable_value_names:
-                name = operand.value.name
-                counts[name] = counts.get(name, 0) + 1
+            if isinstance(operand, ValueOperand) and self.reusable_values[operand.value.id]:
+                counts[operand.value.id] += 1
         elif isinstance(block.terminator, Ret) and block.terminator.value is not None:
             operand = block.terminator.value
-            if isinstance(operand, ValueOperand) and operand.value.name in self.reusable_value_names:
-                name = operand.value.name
-                counts[name] = counts.get(name, 0) + 1
+            if isinstance(operand, ValueOperand) and self.reusable_values[operand.value.id]:
+                counts[operand.value.id] += 1
         return counts
 
     def _reuse_or_alloc_slot(self):
@@ -174,14 +194,14 @@ class MirLower:
         for operand in operands:
             if not isinstance(operand, ValueOperand):
                 continue
-            name = operand.value.name
-            remaining = self.block_local_use_counts.get(name, 0)
+            value_id = operand.value.id
+            remaining = self.block_local_use_counts[value_id]
             if remaining <= 0:
                 continue
             remaining -= 1
-            self.block_local_use_counts[name] = remaining
+            self.block_local_use_counts[value_id] = remaining
             if remaining == 0:
-                self._release_value_name(name)
+                self._release_value(value_id)
 
     def _release_terminator(self, term):
         if isinstance(term, CondBr):
@@ -189,11 +209,11 @@ class MirLower:
         elif isinstance(term, Ret) and term.value is not None:
             self._release_operands([term.value])
 
-    def _release_value_name(self, name):
-        if name not in self.temp_value_slots:
+    def _release_value(self, value_id):
+        if not self.temp_value_slots[value_id]:
             return
-        self.temp_value_slots.remove(name)
-        self.free_value_slots.append(self.value_slots[name])
+        self.temp_value_slots[value_id] = False
+        self.free_value_slots.append(self.value_slots[value_id])
 
     def _slot(self):
         self.next_slot += 8
@@ -328,13 +348,13 @@ class MirLower:
         elif isinstance(operand, ConstNullOperand):
             self.x64.inst("mov", R(reg), I(0))
         elif isinstance(operand, ValueOperand):
-            name = operand.value.name
-            if name in self.value_slots:
-                self.x64.inst("mov", R(reg), M("rbp", self.value_slots[name]))
-            elif name in self.addr_slots:
-                self.x64.inst("lea", R(reg), M("rbp", self.addr_slots[name]))
+            value_id = operand.value.id
+            if self.value_slots[value_id] != 0:
+                self.x64.inst("mov", R(reg), M("rbp", self.value_slots[value_id]))
+            elif self.addr_slots[value_id] != 0:
+                self.x64.inst("lea", R(reg), M("rbp", self.addr_slots[value_id]))
             else:
-                raise MirLowerError(f"unknown MIR value: {name}")
+                raise MirLowerError(f"unknown MIR value: {value_id}")
         elif isinstance(operand, SymbolOperand):
             if operand.name == "argv":
                 self.x64.inst("mov", R(reg), MS("_argv"))
@@ -354,16 +374,16 @@ class MirLower:
             raise MirLowerError(f"unsupported operand: {type(operand).__name__}")
 
     def _store_result(self, value, reg):
-        self.x64.inst("mov", M("rbp", self.value_slots[value.name]), R(reg))
+        self.x64.inst("mov", M("rbp", self.value_slots[value.id]), R(reg))
 
     def _trap_if_zero(self, reg):
         self.x64.inst("test", R(reg), R(reg))
         self.x64.inst("jz", LabelRef("__epx_null_deref"))
 
     def _addr_slot(self, operand):
-        if not isinstance(operand, ValueOperand) or operand.value.name not in self.addr_slots:
+        if not isinstance(operand, ValueOperand) or self.addr_slots[operand.value.id] == 0:
             raise MirLowerError("only alloca addresses are supported in first MIR lowering")
-        return self.addr_slots[operand.value.name]
+        return self.addr_slots[operand.value.id]
 
     def _lower_gep(self, inst):
         base = inst.operands[0]

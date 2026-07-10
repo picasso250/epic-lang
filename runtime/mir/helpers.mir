@@ -1,211 +1,223 @@
-define void @__ep_runtime_panic(ptr %msg) {
+extern void @ExitProcess(i64)
+
+extern i64 @GetStdHandle(i64)
+
+extern i64 @WriteFile(i64, i64, i64, i64, i64)
+
+extern void @__ep_print_newline()
+
+extern void @__ep_print_str(ptr)
+
+extern ptr @__epx_alloc(i64)
+
+define void @__ep_runtime_panic(ptr %1) {
 entry:
   call void __ep_print_str(ptr str.runtime.panic.prefix)
-  call void __ep_print_str(ptr %msg)
+  call void __ep_print_str(ptr %1)
   call void __ep_print_newline()
   call void ExitProcess(i64 1)
   ret void
 }
 
-define ptr @__ep_str_cat(ptr %left, ptr %right) {
+define ptr @__ep_str_cat(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep struct str, ptr %left, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep struct str, ptr %right, i64 0, i32 1
-  %load3: i64 = load i64, ptr %gep2
-  %add4: i64 = add i64 %load1, i64 %load3
-  %call5: ptr = call ptr __epx_alloc(i64 24)
-  %add6: i64 = add i64 %add4, i64 1
-  %call7: ptr = call ptr __epx_alloc(i64 %add6)
-  %gep8: ptr = gep struct str, ptr %call5, i64 0, i32 0
-  store ptr %call7, ptr %gep8
-  %gep9: ptr = gep struct str, ptr %call5, i64 0, i32 1
-  store i64 %add4, ptr %gep9
-  %gep10: ptr = gep struct str, ptr %call5, i64 0, i32 2
-  store i64 %add4, ptr %gep10
-  %gep11: ptr = gep struct str, ptr %left, i64 0, i32 0
-  %load12: ptr = load ptr, ptr %gep11
-  %gep13: ptr = gep struct str, ptr %right, i64 0, i32 0
-  %load14: ptr = load ptr, ptr %gep13
-  %alloca15: ptr = alloca i64
-  store i64 0, ptr %alloca15
+  %3: ptr = gep struct str, ptr %1, i64 0, i32 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep struct str, ptr %2, i64 0, i32 1
+  %6: i64 = load i64, ptr %5
+  %7: i64 = add i64 %4, i64 %6
+  %8: ptr = call ptr __epx_alloc(i64 24)
+  %9: i64 = add i64 %7, i64 1
+  %10: ptr = call ptr __epx_alloc(i64 %9)
+  %11: ptr = gep struct str, ptr %8, i64 0, i32 0
+  store ptr %10, ptr %11
+  %12: ptr = gep struct str, ptr %8, i64 0, i32 1
+  store i64 %7, ptr %12
+  %13: ptr = gep struct str, ptr %8, i64 0, i32 2
+  store i64 %7, ptr %13
+  %14: ptr = gep struct str, ptr %1, i64 0, i32 0
+  %15: ptr = load ptr, ptr %14
+  %16: ptr = gep struct str, ptr %2, i64 0, i32 0
+  %17: ptr = load ptr, ptr %16
+  %18: ptr = alloca i64
+  store i64 0, ptr %18
   br label %left_check
 
 left_check:
-  %load16: i64 = load i64, ptr %alloca15
-  %icmp_slt17: bool = icmp.slt i64 %load16, i64 %load1
-  condbr bool %icmp_slt17, label %left_body, label %right_init
+  %19: i64 = load i64, ptr %18
+  %20: bool = icmp.slt i64 %19, i64 %4
+  condbr bool %20, label %left_body, label %right_init
 
 left_body:
-  %gep18: ptr = gep i8, ptr %load12, i64 %load16
-  %load19: i8 = load i8, ptr %gep18
-  %gep20: ptr = gep i8, ptr %call7, i64 %load16
-  store i8 %load19, ptr %gep20
-  %add21: i64 = add i64 %load16, i64 1
-  store i64 %add21, ptr %alloca15
+  %21: ptr = gep i8, ptr %15, i64 %19
+  %22: i8 = load i8, ptr %21
+  %23: ptr = gep i8, ptr %10, i64 %19
+  store i8 %22, ptr %23
+  %24: i64 = add i64 %19, i64 1
+  store i64 %24, ptr %18
   br label %left_check
 
 right_init:
-  store i64 0, ptr %alloca15
+  store i64 0, ptr %18
   br label %right_check
 
 right_check:
-  %load22: i64 = load i64, ptr %alloca15
-  %icmp_slt23: bool = icmp.slt i64 %load22, i64 %load3
-  condbr bool %icmp_slt23, label %right_body, label %done
+  %25: i64 = load i64, ptr %18
+  %26: bool = icmp.slt i64 %25, i64 %6
+  condbr bool %26, label %right_body, label %done
 
 right_body:
-  %gep24: ptr = gep i8, ptr %load14, i64 %load22
-  %load25: i8 = load i8, ptr %gep24
-  %add26: i64 = add i64 %load1, i64 %load22
-  %gep27: ptr = gep i8, ptr %call7, i64 %add26
-  store i8 %load25, ptr %gep27
-  %add28: i64 = add i64 %load22, i64 1
-  store i64 %add28, ptr %alloca15
+  %27: ptr = gep i8, ptr %17, i64 %25
+  %28: i8 = load i8, ptr %27
+  %29: i64 = add i64 %4, i64 %25
+  %30: ptr = gep i8, ptr %10, i64 %29
+  store i8 %28, ptr %30
+  %31: i64 = add i64 %25, i64 1
+  store i64 %31, ptr %18
   br label %right_check
 
 done:
-  %gep29: ptr = gep i8, ptr %call7, i64 %add4
-  store i8 0, ptr %gep29
-  ret ptr %call5
+  %32: ptr = gep i8, ptr %10, i64 %7
+  store i8 0, ptr %32
+  ret ptr %8
 }
 
-define ptr @__ep_slice_u8_alloc(i64 %len, i64 %cap) {
+define ptr @__ep_slice_u8_alloc(i64 %1, i64 %2) {
 entry:
-  %call0: ptr = call ptr __epx_alloc(i64 24)
-  %icmp_eq1: bool = icmp.eq i64 %cap, i64 0
-  condbr bool %icmp_eq1, label %data_zero, label %data_alloc
+  %3: ptr = call ptr __epx_alloc(i64 24)
+  %4: bool = icmp.eq i64 %2, i64 0
+  condbr bool %4, label %data_zero, label %data_alloc
 
 data_zero:
-  %gep2: ptr = gep struct _slice_u8, ptr %call0, i64 0, i32 0
-  store ptr null, ptr %gep2
+  %5: ptr = gep struct _slice_u8, ptr %3, i64 0, i32 0
+  store ptr null, ptr %5
   br label %init
 
 data_alloc:
-  %call3: ptr = call ptr __epx_alloc(i64 %cap)
-  %gep4: ptr = gep struct _slice_u8, ptr %call0, i64 0, i32 0
-  store ptr %call3, ptr %gep4
+  %6: ptr = call ptr __epx_alloc(i64 %2)
+  %7: ptr = gep struct _slice_u8, ptr %3, i64 0, i32 0
+  store ptr %6, ptr %7
   br label %init
 
 init:
-  %gep5: ptr = gep struct _slice_u8, ptr %call0, i64 0, i32 1
-  store i64 %len, ptr %gep5
-  %gep6: ptr = gep struct _slice_u8, ptr %call0, i64 0, i32 2
-  store i64 %cap, ptr %gep6
-  ret ptr %call0
+  %8: ptr = gep struct _slice_u8, ptr %3, i64 0, i32 1
+  store i64 %1, ptr %8
+  %9: ptr = gep struct _slice_u8, ptr %3, i64 0, i32 2
+  store i64 %2, ptr %9
+  ret ptr %3
 }
 
-define i64 @__ep_slice_u8_get(ptr %arr, i64 %idx) {
+define i64 @__ep_slice_u8_get(ptr %1, i64 %2) {
 entry:
-  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %3: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 1
+  %4: i64 = load i64, ptr %3
+  %5: bool = icmp.sge i64 %2, i64 0
+  condbr bool %5, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %6: bool = icmp.slt i64 %2, i64 %4
+  condbr bool %6, label %ok, label %fail
 
 ok:
-  %gep4: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep i8, ptr %load5, i64 %idx
-  %load7: i64 = load i8, ptr %gep6
-  ret i64 %load7
+  %7: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  %8: ptr = load ptr, ptr %7
+  %9: ptr = gep i8, ptr %8, i64 %2
+  %10: i64 = load i8, ptr %9
+  ret i64 %10
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret i64 0
 }
 
-define i64 @__ep_slice_u8_pop(ptr %arr) {
+define i64 @__ep_slice_u8_pop(ptr %1) {
 entry:
-  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sgt2: bool = icmp.sgt i64 %load1, i64 0
-  condbr bool %icmp_sgt2, label %ok, label %fail
+  %2: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 1
+  %3: i64 = load i64, ptr %2
+  %4: bool = icmp.sgt i64 %3, i64 0
+  condbr bool %4, label %ok, label %fail
 
 ok:
-  %sub3: i64 = sub i64 %load1, i64 1
-  %gep4: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep i8, ptr %load5, i64 %sub3
-  %load7: i64 = load i8, ptr %gep6
-  store i64 %sub3, ptr %gep0
-  ret i64 %load7
+  %5: i64 = sub i64 %3, i64 1
+  %6: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  %7: ptr = load ptr, ptr %6
+  %8: ptr = gep i8, ptr %7, i64 %5
+  %9: i64 = load i8, ptr %8
+  store i64 %5, ptr %2
+  ret i64 %9
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret i64 0
 }
 
-define ptr @__ep_slice_i64_new(i64 %cap) {
+define ptr @__ep_slice_i64_new(i64 %1) {
 entry:
-  %call0: ptr = call ptr __epx_alloc(i64 24)
-  %icmp_eq1: bool = icmp.eq i64 %cap, i64 0
-  condbr bool %icmp_eq1, label %data_zero, label %data_alloc
+  %2: ptr = call ptr __epx_alloc(i64 24)
+  %3: bool = icmp.eq i64 %1, i64 0
+  condbr bool %3, label %data_zero, label %data_alloc
 
 data_zero:
-  %gep2: ptr = gep ptr, ptr %call0, i64 0
-  store ptr null, ptr %gep2
+  %4: ptr = gep ptr, ptr %2, i64 0
+  store ptr null, ptr %4
   br label %init
 
 data_alloc:
-  %add3: i64 = add i64 %cap, i64 %cap
-  %add4: i64 = add i64 %add3, i64 %add3
-  %add5: i64 = add i64 %add4, i64 %add4
-  %call6: ptr = call ptr __epx_alloc(i64 %add5)
-  %gep7: ptr = gep ptr, ptr %call0, i64 0
-  store ptr %call6, ptr %gep7
+  %5: i64 = add i64 %1, i64 %1
+  %6: i64 = add i64 %5, i64 %5
+  %7: i64 = add i64 %6, i64 %6
+  %8: ptr = call ptr __epx_alloc(i64 %7)
+  %9: ptr = gep ptr, ptr %2, i64 0
+  store ptr %8, ptr %9
   br label %init
 
 init:
-  %gep8: ptr = gep ptr, ptr %call0, i64 1
-  store i64 %cap, ptr %gep8
-  %gep9: ptr = gep ptr, ptr %call0, i64 2
-  store i64 %cap, ptr %gep9
-  ret ptr %call0
+  %10: ptr = gep ptr, ptr %2, i64 1
+  store i64 %1, ptr %10
+  %11: ptr = gep ptr, ptr %2, i64 2
+  store i64 %1, ptr %11
+  ret ptr %2
 }
 
-define i64 @__ep_slice_i64_get(ptr %arr, i64 %idx) {
+define i64 @__ep_slice_i64_get(ptr %1, i64 %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: bool = icmp.sge i64 %2, i64 0
+  condbr bool %5, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %6: bool = icmp.slt i64 %2, i64 %4
+  condbr bool %6, label %ok, label %fail
 
 ok:
-  %gep4: ptr = gep ptr, ptr %arr, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep ptr, ptr %load5, i64 %idx
-  %load7: i64 = load i64, ptr %gep6
-  ret i64 %load7
+  %7: ptr = gep ptr, ptr %1, i64 0
+  %8: ptr = load ptr, ptr %7
+  %9: ptr = gep ptr, ptr %8, i64 %2
+  %10: i64 = load i64, ptr %9
+  ret i64 %10
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret i64 0
 }
 
-define void @__ep_slice_i64_set(ptr %arr, i64 %idx, i64 %val) {
+define void @__ep_slice_i64_set(ptr %1, i64 %2, i64 %3) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %4: ptr = gep ptr, ptr %1, i64 1
+  %5: i64 = load i64, ptr %4
+  %6: bool = icmp.sge i64 %2, i64 0
+  condbr bool %6, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %7: bool = icmp.slt i64 %2, i64 %5
+  condbr bool %7, label %ok, label %fail
 
 ok:
-  %gep4: ptr = gep ptr, ptr %arr, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep ptr, ptr %load5, i64 %idx
-  store i64 %val, ptr %gep6
+  %8: ptr = gep ptr, ptr %1, i64 0
+  %9: ptr = load ptr, ptr %8
+  %10: ptr = gep ptr, ptr %9, i64 %2
+  store i64 %3, ptr %10
   ret void
 
 fail:
@@ -213,188 +225,188 @@ fail:
   ret void
 }
 
-define void @__ep_slice_i64_push(ptr %arr, i64 %val) {
+define void @__ep_slice_i64_push(ptr %1, i64 %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %arr, i64 2
-  %load3: i64 = load i64, ptr %gep2
-  %icmp_sge4: bool = icmp.sge i64 %load1, i64 %load3
-  condbr bool %icmp_sge4, label %grow, label %store
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep ptr, ptr %1, i64 2
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.sge i64 %4, i64 %6
+  condbr bool %7, label %grow, label %store
 
 grow:
-  %alloca5: ptr = alloca i64
-  %alloca6: ptr = alloca ptr
-  %alloca7: ptr = alloca i64
-  %icmp_eq8: bool = icmp.eq i64 %load3, i64 0
-  condbr bool %icmp_eq8, label %grow_zero, label %grow_double
+  %8: ptr = alloca i64
+  %9: ptr = alloca ptr
+  %10: ptr = alloca i64
+  %11: bool = icmp.eq i64 %6, i64 0
+  condbr bool %11, label %grow_zero, label %grow_double
 
 store:
-  %gep26: ptr = gep ptr, ptr %arr, i64 0
-  %load27: ptr = load ptr, ptr %gep26
-  %gep28: ptr = gep ptr, ptr %load27, i64 %load1
-  store i64 %val, ptr %gep28
-  %add29: i64 = add i64 %load1, i64 1
-  store i64 %add29, ptr %gep0
+  %12: ptr = gep ptr, ptr %1, i64 0
+  %13: ptr = load ptr, ptr %12
+  %14: ptr = gep ptr, ptr %13, i64 %4
+  store i64 %2, ptr %14
+  %15: i64 = add i64 %4, i64 1
+  store i64 %15, ptr %3
   ret void
 
 grow_zero:
-  store i64 4, ptr %alloca5
-  %call9: ptr = call ptr __epx_alloc(i64 32)
-  store ptr %call9, ptr %alloca6
+  store i64 4, ptr %8
+  %16: ptr = call ptr __epx_alloc(i64 32)
+  store ptr %16, ptr %9
   br label %copy_entry
 
 grow_double:
-  %add10: i64 = add i64 %load3, i64 %load3
-  store i64 %add10, ptr %alloca5
-  %add11: i64 = add i64 %add10, i64 %add10
-  %add12: i64 = add i64 %add11, i64 %add11
-  %add13: i64 = add i64 %add12, i64 %add12
-  %call14: ptr = call ptr __epx_alloc(i64 %add13)
-  store ptr %call14, ptr %alloca6
+  %17: i64 = add i64 %6, i64 %6
+  store i64 %17, ptr %8
+  %18: i64 = add i64 %17, i64 %17
+  %19: i64 = add i64 %18, i64 %18
+  %20: i64 = add i64 %19, i64 %19
+  %21: ptr = call ptr __epx_alloc(i64 %20)
+  store ptr %21, ptr %9
   br label %copy_entry
 
 copy_entry:
-  %gep15: ptr = gep ptr, ptr %arr, i64 0
-  %load16: ptr = load ptr, ptr %gep15
-  %load17: ptr = load ptr, ptr %alloca6
-  store i64 0, ptr %alloca7
+  %22: ptr = gep ptr, ptr %1, i64 0
+  %23: ptr = load ptr, ptr %22
+  %24: ptr = load ptr, ptr %9
+  store i64 0, ptr %10
   br label %copy_check
 
 copy_check:
-  %load18: i64 = load i64, ptr %alloca7
-  %icmp_slt19: bool = icmp.slt i64 %load18, i64 %load1
-  condbr bool %icmp_slt19, label %copy_body, label %swap
+  %25: i64 = load i64, ptr %10
+  %26: bool = icmp.slt i64 %25, i64 %4
+  condbr bool %26, label %copy_body, label %swap
 
 copy_body:
-  %gep20: ptr = gep ptr, ptr %load16, i64 %load18
-  %load21: i64 = load i64, ptr %gep20
-  %gep22: ptr = gep ptr, ptr %load17, i64 %load18
-  store i64 %load21, ptr %gep22
-  %add23: i64 = add i64 %load18, i64 1
-  store i64 %add23, ptr %alloca7
+  %27: ptr = gep ptr, ptr %23, i64 %25
+  %28: i64 = load i64, ptr %27
+  %29: ptr = gep ptr, ptr %24, i64 %25
+  store i64 %28, ptr %29
+  %30: i64 = add i64 %25, i64 1
+  store i64 %30, ptr %10
   br label %copy_check
 
 swap:
-  %gep24: ptr = gep ptr, ptr %arr, i64 0
-  store ptr %load17, ptr %gep24
-  %load25: i64 = load i64, ptr %alloca5
-  store i64 %load25, ptr %gep2
+  %31: ptr = gep ptr, ptr %1, i64 0
+  store ptr %24, ptr %31
+  %32: i64 = load i64, ptr %8
+  store i64 %32, ptr %5
   br label %store
 }
 
-define i64 @__ep_slice_i64_pop(ptr %arr) {
+define i64 @__ep_slice_i64_pop(ptr %1) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sgt2: bool = icmp.sgt i64 %load1, i64 0
-  condbr bool %icmp_sgt2, label %ok, label %fail
+  %2: ptr = gep ptr, ptr %1, i64 1
+  %3: i64 = load i64, ptr %2
+  %4: bool = icmp.sgt i64 %3, i64 0
+  condbr bool %4, label %ok, label %fail
 
 ok:
-  %sub3: i64 = sub i64 %load1, i64 1
-  %gep4: ptr = gep ptr, ptr %arr, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep ptr, ptr %load5, i64 %sub3
-  %load7: i64 = load i64, ptr %gep6
-  store i64 %sub3, ptr %gep0
-  ret i64 %load7
+  %5: i64 = sub i64 %3, i64 1
+  %6: ptr = gep ptr, ptr %1, i64 0
+  %7: ptr = load ptr, ptr %6
+  %8: ptr = gep ptr, ptr %7, i64 %5
+  %9: i64 = load i64, ptr %8
+  store i64 %5, ptr %2
+  ret i64 %9
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret i64 0
 }
 
-define void @__ep_slice_i64_extend(ptr %dst, ptr %src) {
+define void @__ep_slice_i64_extend(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %src, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %alloca2: ptr = alloca i64
-  store i64 0, ptr %alloca2
+  %3: ptr = gep ptr, ptr %2, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = alloca i64
+  store i64 0, ptr %5
   br label %loop_check
 
 loop_check:
-  %load3: i64 = load i64, ptr %alloca2
-  %icmp_slt4: bool = icmp.slt i64 %load3, i64 %load1
-  condbr bool %icmp_slt4, label %loop_body, label %done
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.slt i64 %6, i64 %4
+  condbr bool %7, label %loop_body, label %done
 
 loop_body:
-  %call5: i64 = call i64 __ep_slice_i64_get(ptr %src, i64 %load3)
-  call void __ep_slice_i64_push(ptr %dst, i64 %call5)
-  %add6: i64 = add i64 %load3, i64 1
-  store i64 %add6, ptr %alloca2
+  %8: i64 = call i64 __ep_slice_i64_get(ptr %2, i64 %6)
+  call void __ep_slice_i64_push(ptr %1, i64 %8)
+  %9: i64 = add i64 %6, i64 1
+  store i64 %9, ptr %5
   br label %loop_check
 
 done:
   ret void
 }
 
-define ptr @__ep_slice_ptr_new(i64 %cap) {
+define ptr @__ep_slice_ptr_new(i64 %1) {
 entry:
-  %call0: ptr = call ptr __epx_alloc(i64 24)
-  %icmp_eq1: bool = icmp.eq i64 %cap, i64 0
-  condbr bool %icmp_eq1, label %data_zero, label %data_alloc
+  %2: ptr = call ptr __epx_alloc(i64 24)
+  %3: bool = icmp.eq i64 %1, i64 0
+  condbr bool %3, label %data_zero, label %data_alloc
 
 data_zero:
-  %gep2: ptr = gep ptr, ptr %call0, i64 0
-  store ptr null, ptr %gep2
+  %4: ptr = gep ptr, ptr %2, i64 0
+  store ptr null, ptr %4
   br label %init
 
 data_alloc:
-  %add3: i64 = add i64 %cap, i64 %cap
-  %add4: i64 = add i64 %add3, i64 %add3
-  %add5: i64 = add i64 %add4, i64 %add4
-  %call6: ptr = call ptr __epx_alloc(i64 %add5)
-  %gep7: ptr = gep ptr, ptr %call0, i64 0
-  store ptr %call6, ptr %gep7
+  %5: i64 = add i64 %1, i64 %1
+  %6: i64 = add i64 %5, i64 %5
+  %7: i64 = add i64 %6, i64 %6
+  %8: ptr = call ptr __epx_alloc(i64 %7)
+  %9: ptr = gep ptr, ptr %2, i64 0
+  store ptr %8, ptr %9
   br label %init
 
 init:
-  %gep8: ptr = gep ptr, ptr %call0, i64 1
-  store i64 %cap, ptr %gep8
-  %gep9: ptr = gep ptr, ptr %call0, i64 2
-  store i64 %cap, ptr %gep9
-  ret ptr %call0
+  %10: ptr = gep ptr, ptr %2, i64 1
+  store i64 %1, ptr %10
+  %11: ptr = gep ptr, ptr %2, i64 2
+  store i64 %1, ptr %11
+  ret ptr %2
 }
 
-define ptr @__ep_slice_ptr_get(ptr %arr, i64 %idx) {
+define ptr @__ep_slice_ptr_get(ptr %1, i64 %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: bool = icmp.sge i64 %2, i64 0
+  condbr bool %5, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %6: bool = icmp.slt i64 %2, i64 %4
+  condbr bool %6, label %ok, label %fail
 
 ok:
-  %gep4: ptr = gep ptr, ptr %arr, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep ptr, ptr %load5, i64 %idx
-  %load7: ptr = load ptr, ptr %gep6
-  ret ptr %load7
+  %7: ptr = gep ptr, ptr %1, i64 0
+  %8: ptr = load ptr, ptr %7
+  %9: ptr = gep ptr, ptr %8, i64 %2
+  %10: ptr = load ptr, ptr %9
+  ret ptr %10
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret ptr null
 }
 
-define void @__ep_slice_ptr_set(ptr %arr, i64 %idx, ptr %val) {
+define void @__ep_slice_ptr_set(ptr %1, i64 %2, ptr %3) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %4: ptr = gep ptr, ptr %1, i64 1
+  %5: i64 = load i64, ptr %4
+  %6: bool = icmp.sge i64 %2, i64 0
+  condbr bool %6, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %7: bool = icmp.slt i64 %2, i64 %5
+  condbr bool %7, label %ok, label %fail
 
 ok:
-  %gep4: ptr = gep ptr, ptr %arr, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep ptr, ptr %load5, i64 %idx
-  store ptr %val, ptr %gep6
+  %8: ptr = gep ptr, ptr %1, i64 0
+  %9: ptr = load ptr, ptr %8
+  %10: ptr = gep ptr, ptr %9, i64 %2
+  store ptr %3, ptr %10
   ret void
 
 fail:
@@ -402,140 +414,140 @@ fail:
   ret void
 }
 
-define void @__ep_slice_ptr_push(ptr %arr, ptr %val) {
+define void @__ep_slice_ptr_push(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %arr, i64 2
-  %load3: i64 = load i64, ptr %gep2
-  %icmp_sge4: bool = icmp.sge i64 %load1, i64 %load3
-  condbr bool %icmp_sge4, label %grow, label %store
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep ptr, ptr %1, i64 2
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.sge i64 %4, i64 %6
+  condbr bool %7, label %grow, label %store
 
 grow:
-  %alloca5: ptr = alloca i64
-  %alloca6: ptr = alloca ptr
-  %alloca7: ptr = alloca i64
-  %icmp_eq8: bool = icmp.eq i64 %load3, i64 0
-  condbr bool %icmp_eq8, label %grow_zero, label %grow_double
+  %8: ptr = alloca i64
+  %9: ptr = alloca ptr
+  %10: ptr = alloca i64
+  %11: bool = icmp.eq i64 %6, i64 0
+  condbr bool %11, label %grow_zero, label %grow_double
 
 store:
-  %gep26: ptr = gep ptr, ptr %arr, i64 0
-  %load27: ptr = load ptr, ptr %gep26
-  %gep28: ptr = gep ptr, ptr %load27, i64 %load1
-  store ptr %val, ptr %gep28
-  %add29: i64 = add i64 %load1, i64 1
-  store i64 %add29, ptr %gep0
+  %12: ptr = gep ptr, ptr %1, i64 0
+  %13: ptr = load ptr, ptr %12
+  %14: ptr = gep ptr, ptr %13, i64 %4
+  store ptr %2, ptr %14
+  %15: i64 = add i64 %4, i64 1
+  store i64 %15, ptr %3
   ret void
 
 grow_zero:
-  store i64 4, ptr %alloca5
-  %call9: ptr = call ptr __epx_alloc(i64 32)
-  store ptr %call9, ptr %alloca6
+  store i64 4, ptr %8
+  %16: ptr = call ptr __epx_alloc(i64 32)
+  store ptr %16, ptr %9
   br label %copy_entry
 
 grow_double:
-  %add10: i64 = add i64 %load3, i64 %load3
-  store i64 %add10, ptr %alloca5
-  %add11: i64 = add i64 %add10, i64 %add10
-  %add12: i64 = add i64 %add11, i64 %add11
-  %add13: i64 = add i64 %add12, i64 %add12
-  %call14: ptr = call ptr __epx_alloc(i64 %add13)
-  store ptr %call14, ptr %alloca6
+  %17: i64 = add i64 %6, i64 %6
+  store i64 %17, ptr %8
+  %18: i64 = add i64 %17, i64 %17
+  %19: i64 = add i64 %18, i64 %18
+  %20: i64 = add i64 %19, i64 %19
+  %21: ptr = call ptr __epx_alloc(i64 %20)
+  store ptr %21, ptr %9
   br label %copy_entry
 
 copy_entry:
-  %gep15: ptr = gep ptr, ptr %arr, i64 0
-  %load16: ptr = load ptr, ptr %gep15
-  %load17: ptr = load ptr, ptr %alloca6
-  store i64 0, ptr %alloca7
+  %22: ptr = gep ptr, ptr %1, i64 0
+  %23: ptr = load ptr, ptr %22
+  %24: ptr = load ptr, ptr %9
+  store i64 0, ptr %10
   br label %copy_check
 
 copy_check:
-  %load18: i64 = load i64, ptr %alloca7
-  %icmp_slt19: bool = icmp.slt i64 %load18, i64 %load1
-  condbr bool %icmp_slt19, label %copy_body, label %swap
+  %25: i64 = load i64, ptr %10
+  %26: bool = icmp.slt i64 %25, i64 %4
+  condbr bool %26, label %copy_body, label %swap
 
 copy_body:
-  %gep20: ptr = gep ptr, ptr %load16, i64 %load18
-  %load21: ptr = load ptr, ptr %gep20
-  %gep22: ptr = gep ptr, ptr %load17, i64 %load18
-  store ptr %load21, ptr %gep22
-  %add23: i64 = add i64 %load18, i64 1
-  store i64 %add23, ptr %alloca7
+  %27: ptr = gep ptr, ptr %23, i64 %25
+  %28: ptr = load ptr, ptr %27
+  %29: ptr = gep ptr, ptr %24, i64 %25
+  store ptr %28, ptr %29
+  %30: i64 = add i64 %25, i64 1
+  store i64 %30, ptr %10
   br label %copy_check
 
 swap:
-  %gep24: ptr = gep ptr, ptr %arr, i64 0
-  store ptr %load17, ptr %gep24
-  %load25: i64 = load i64, ptr %alloca5
-  store i64 %load25, ptr %gep2
+  %31: ptr = gep ptr, ptr %1, i64 0
+  store ptr %24, ptr %31
+  %32: i64 = load i64, ptr %8
+  store i64 %32, ptr %5
   br label %store
 }
 
-define ptr @__ep_slice_ptr_pop(ptr %arr) {
+define ptr @__ep_slice_ptr_pop(ptr %1) {
 entry:
-  %gep0: ptr = gep ptr, ptr %arr, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sgt2: bool = icmp.sgt i64 %load1, i64 0
-  condbr bool %icmp_sgt2, label %ok, label %fail
+  %2: ptr = gep ptr, ptr %1, i64 1
+  %3: i64 = load i64, ptr %2
+  %4: bool = icmp.sgt i64 %3, i64 0
+  condbr bool %4, label %ok, label %fail
 
 ok:
-  %sub3: i64 = sub i64 %load1, i64 1
-  %gep4: ptr = gep ptr, ptr %arr, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep ptr, ptr %load5, i64 %sub3
-  %load7: ptr = load ptr, ptr %gep6
-  store i64 %sub3, ptr %gep0
-  ret ptr %load7
+  %5: i64 = sub i64 %3, i64 1
+  %6: ptr = gep ptr, ptr %1, i64 0
+  %7: ptr = load ptr, ptr %6
+  %8: ptr = gep ptr, ptr %7, i64 %5
+  %9: ptr = load ptr, ptr %8
+  store i64 %5, ptr %2
+  ret ptr %9
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret ptr null
 }
 
-define void @__ep_slice_ptr_extend(ptr %dst, ptr %src) {
+define void @__ep_slice_ptr_extend(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %src, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %alloca2: ptr = alloca i64
-  store i64 0, ptr %alloca2
+  %3: ptr = gep ptr, ptr %2, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = alloca i64
+  store i64 0, ptr %5
   br label %loop_check
 
 loop_check:
-  %load3: i64 = load i64, ptr %alloca2
-  %icmp_slt4: bool = icmp.slt i64 %load3, i64 %load1
-  condbr bool %icmp_slt4, label %loop_body, label %done
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.slt i64 %6, i64 %4
+  condbr bool %7, label %loop_body, label %done
 
 loop_body:
-  %call5: ptr = call ptr __ep_slice_ptr_get(ptr %src, i64 %load3)
-  call void __ep_slice_ptr_push(ptr %dst, ptr %call5)
-  %add6: i64 = add i64 %load3, i64 1
-  store i64 %add6, ptr %alloca2
+  %8: ptr = call ptr __ep_slice_ptr_get(ptr %2, i64 %6)
+  call void __ep_slice_ptr_push(ptr %1, ptr %8)
+  %9: i64 = add i64 %6, i64 1
+  store i64 %9, ptr %5
   br label %loop_check
 
 done:
   ret void
 }
 
-define void @__ep_slice_u8_set(ptr %arr, i64 %idx, i64 %val) {
+define void @__ep_slice_u8_set(ptr %1, i64 %2, i64 %3) {
 entry:
-  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %4: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 1
+  %5: i64 = load i64, ptr %4
+  %6: bool = icmp.sge i64 %2, i64 0
+  condbr bool %6, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %7: bool = icmp.slt i64 %2, i64 %5
+  condbr bool %7, label %ok, label %fail
 
 ok:
-  %alloca4: ptr = alloca i64
-  store i64 %val, ptr %alloca4
-  %load5: i8 = load i8, ptr %alloca4
-  %gep6: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  %load7: ptr = load ptr, ptr %gep6
-  %gep8: ptr = gep i8, ptr %load7, i64 %idx
-  store i8 %load5, ptr %gep8
+  %8: ptr = alloca i64
+  store i64 %3, ptr %8
+  %9: i8 = load i8, ptr %8
+  %10: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  %11: ptr = load ptr, ptr %10
+  %12: ptr = gep i8, ptr %11, i64 %2
+  store i8 %9, ptr %12
   ret void
 
 fail:
@@ -543,192 +555,192 @@ fail:
   ret void
 }
 
-define void @__ep_slice_u8_push(ptr %arr, i64 %val) {
+define void @__ep_slice_u8_push(ptr %1, i64 %2) {
 entry:
-  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 2
-  %load3: i64 = load i64, ptr %gep2
-  %icmp_sge4: bool = icmp.sge i64 %load1, i64 %load3
-  condbr bool %icmp_sge4, label %grow, label %store
+  %3: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 2
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.sge i64 %4, i64 %6
+  condbr bool %7, label %grow, label %store
 
 grow:
-  %alloca5: ptr = alloca i64
-  %alloca6: ptr = alloca ptr
-  %alloca7: ptr = alloca i64
-  %icmp_eq8: bool = icmp.eq i64 %load3, i64 0
-  condbr bool %icmp_eq8, label %grow_zero, label %grow_double
+  %8: ptr = alloca i64
+  %9: ptr = alloca ptr
+  %10: ptr = alloca i64
+  %11: bool = icmp.eq i64 %6, i64 0
+  condbr bool %11, label %grow_zero, label %grow_double
 
 store:
-  %alloca24: ptr = alloca i64
-  store i64 %val, ptr %alloca24
-  %load25: i8 = load i8, ptr %alloca24
-  %gep26: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  %load27: ptr = load ptr, ptr %gep26
-  %gep28: ptr = gep i8, ptr %load27, i64 %load1
-  store i8 %load25, ptr %gep28
-  %add29: i64 = add i64 %load1, i64 1
-  %gep30: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
-  store i64 %add29, ptr %gep30
+  %12: ptr = alloca i64
+  store i64 %2, ptr %12
+  %13: i8 = load i8, ptr %12
+  %14: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  %15: ptr = load ptr, ptr %14
+  %16: ptr = gep i8, ptr %15, i64 %4
+  store i8 %13, ptr %16
+  %17: i64 = add i64 %4, i64 1
+  %18: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 1
+  store i64 %17, ptr %18
   ret void
 
 grow_zero:
-  store i64 4, ptr %alloca5
-  %call9: ptr = call ptr __epx_alloc(i64 4)
-  store ptr %call9, ptr %alloca6
-  condbr bool %icmp_eq8, label %copy_entry, label %copy_entry
+  store i64 4, ptr %8
+  %19: ptr = call ptr __epx_alloc(i64 4)
+  store ptr %19, ptr %9
+  condbr bool %11, label %copy_entry, label %copy_entry
 
 grow_double:
-  %add10: i64 = add i64 %load3, i64 %load3
-  store i64 %add10, ptr %alloca5
-  %call11: ptr = call ptr __epx_alloc(i64 %add10)
-  store ptr %call11, ptr %alloca6
-  condbr bool %icmp_eq8, label %copy_entry, label %copy_entry
+  %20: i64 = add i64 %6, i64 %6
+  store i64 %20, ptr %8
+  %21: ptr = call ptr __epx_alloc(i64 %20)
+  store ptr %21, ptr %9
+  condbr bool %11, label %copy_entry, label %copy_entry
 
 copy_entry:
-  %gep12: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  %load13: ptr = load ptr, ptr %gep12
-  %load14: ptr = load ptr, ptr %alloca6
-  store i64 0, ptr %alloca7
-  condbr bool %icmp_eq8, label %copy_check, label %copy_check
+  %22: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  %23: ptr = load ptr, ptr %22
+  %24: ptr = load ptr, ptr %9
+  store i64 0, ptr %10
+  condbr bool %11, label %copy_check, label %copy_check
 
 copy_check:
-  %load15: i64 = load i64, ptr %alloca7
-  %icmp_slt16: bool = icmp.slt i64 %load15, i64 %load1
-  condbr bool %icmp_slt16, label %copy_body, label %swap
+  %25: i64 = load i64, ptr %10
+  %26: bool = icmp.slt i64 %25, i64 %4
+  condbr bool %26, label %copy_body, label %swap
 
 copy_body:
-  %gep17: ptr = gep i8, ptr %load13, i64 %load15
-  %load18: i8 = load i8, ptr %gep17
-  %gep19: ptr = gep i8, ptr %load14, i64 %load15
-  store i8 %load18, ptr %gep19
-  %add20: i64 = add i64 %load15, i64 1
-  store i64 %add20, ptr %alloca7
-  condbr bool %icmp_eq8, label %copy_check, label %copy_check
+  %27: ptr = gep i8, ptr %23, i64 %25
+  %28: i8 = load i8, ptr %27
+  %29: ptr = gep i8, ptr %24, i64 %25
+  store i8 %28, ptr %29
+  %30: i64 = add i64 %25, i64 1
+  store i64 %30, ptr %10
+  condbr bool %11, label %copy_check, label %copy_check
 
 swap:
-  %gep21: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  store ptr %load14, ptr %gep21
-  %load22: i64 = load i64, ptr %alloca5
-  %gep23: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 2
-  store i64 %load22, ptr %gep23
-  condbr bool %icmp_eq8, label %store, label %store
+  %31: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  store ptr %24, ptr %31
+  %32: i64 = load i64, ptr %8
+  %33: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 2
+  store i64 %32, ptr %33
+  condbr bool %11, label %store, label %store
 }
 
-define ptr @__ep_slice_u8_slice(ptr %arr, i64 %start, i64 %end) {
+define ptr @__ep_slice_u8_slice(ptr %1, i64 %2, i64 %3) {
 entry:
-  %gep0: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %start, i64 0
-  condbr bool %icmp_sge2, label %check_order, label %fail
+  %4: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 1
+  %5: i64 = load i64, ptr %4
+  %6: bool = icmp.sge i64 %2, i64 0
+  condbr bool %6, label %check_order, label %fail
 
 check_order:
-  %icmp_sge3: bool = icmp.sge i64 %end, i64 %start
-  condbr bool %icmp_sge3, label %check_len, label %fail
+  %7: bool = icmp.sge i64 %3, i64 %2
+  condbr bool %7, label %check_len, label %fail
 
 check_len:
-  %icmp_sge4: bool = icmp.sge i64 %load1, i64 %end
-  condbr bool %icmp_sge4, label %alloc, label %fail
+  %8: bool = icmp.sge i64 %5, i64 %3
+  condbr bool %8, label %alloc, label %fail
 
 alloc:
-  %sub5: i64 = sub i64 %end, i64 %start
-  %call6: ptr = call ptr __ep_slice_u8_alloc(i64 %sub5, i64 %sub5)
-  %alloca7: ptr = alloca i64
-  store i64 0, ptr %alloca7
-  %gep8: ptr = gep struct _slice_u8, ptr %arr, i64 0, i32 0
-  %load9: ptr = load ptr, ptr %gep8
-  %gep10: ptr = gep i8, ptr %load9, i64 %start
-  %gep11: ptr = gep struct _slice_u8, ptr %call6, i64 0, i32 0
-  %load12: ptr = load ptr, ptr %gep11
+  %9: i64 = sub i64 %3, i64 %2
+  %10: ptr = call ptr __ep_slice_u8_alloc(i64 %9, i64 %9)
+  %11: ptr = alloca i64
+  store i64 0, ptr %11
+  %12: ptr = gep struct _slice_u8, ptr %1, i64 0, i32 0
+  %13: ptr = load ptr, ptr %12
+  %14: ptr = gep i8, ptr %13, i64 %2
+  %15: ptr = gep struct _slice_u8, ptr %10, i64 0, i32 0
+  %16: ptr = load ptr, ptr %15
   br label %copy_check
 
 copy_check:
-  %load13: i64 = load i64, ptr %alloca7
-  %icmp_slt14: bool = icmp.slt i64 %load13, i64 %sub5
-  condbr bool %icmp_slt14, label %copy_body, label %done
+  %17: i64 = load i64, ptr %11
+  %18: bool = icmp.slt i64 %17, i64 %9
+  condbr bool %18, label %copy_body, label %done
 
 copy_body:
-  %gep15: ptr = gep i8, ptr %gep10, i64 %load13
-  %load16: i8 = load i8, ptr %gep15
-  %gep17: ptr = gep i8, ptr %load12, i64 %load13
-  store i8 %load16, ptr %gep17
-  %add18: i64 = add i64 %load13, i64 1
-  store i64 %add18, ptr %alloca7
+  %19: ptr = gep i8, ptr %14, i64 %17
+  %20: i8 = load i8, ptr %19
+  %21: ptr = gep i8, ptr %16, i64 %17
+  store i8 %20, ptr %21
+  %22: i64 = add i64 %17, i64 1
+  store i64 %22, ptr %11
   br label %copy_check
 
 done:
-  ret ptr %call6
+  ret ptr %10
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
   ret ptr null
 }
 
-define void @__ep_slice_u8_extend(ptr %dst, ptr %src) {
+define void @__ep_slice_u8_extend(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep struct _slice_u8, ptr %src, i64 0, i32 1
-  %load1: i64 = load i64, ptr %gep0
-  %alloca2: ptr = alloca i64
-  store i64 0, ptr %alloca2
+  %3: ptr = gep struct _slice_u8, ptr %2, i64 0, i32 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = alloca i64
+  store i64 0, ptr %5
   br label %loop_check
 
 loop_check:
-  %load3: i64 = load i64, ptr %alloca2
-  %icmp_slt4: bool = icmp.slt i64 %load3, i64 %load1
-  condbr bool %icmp_slt4, label %loop_body, label %done
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.slt i64 %6, i64 %4
+  condbr bool %7, label %loop_body, label %done
 
 loop_body:
-  %call5: i64 = call i64 __ep_slice_u8_get(ptr %src, i64 %load3)
-  call void __ep_slice_u8_push(ptr %dst, i64 %call5)
-  %add6: i64 = add i64 %load3, i64 1
-  store i64 %add6, ptr %alloca2
+  %8: i64 = call i64 __ep_slice_u8_get(ptr %2, i64 %6)
+  call void __ep_slice_u8_push(ptr %1, i64 %8)
+  %9: i64 = add i64 %6, i64 1
+  store i64 %9, ptr %5
   br label %loop_check
 
 done:
   ret void
 }
 
-define i64 @__ep_str_cmp(ptr %left, ptr %right) {
+define i64 @__ep_str_cmp(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep struct str, ptr %left, i64 0, i32 0
-  %load1: ptr = load ptr, ptr %gep0
-  %gep2: ptr = gep struct str, ptr %left, i64 0, i32 1
-  %load3: i64 = load i64, ptr %gep2
-  %gep4: ptr = gep struct str, ptr %right, i64 0, i32 0
-  %load5: ptr = load ptr, ptr %gep4
-  %gep6: ptr = gep struct str, ptr %right, i64 0, i32 1
-  %load7: i64 = load i64, ptr %gep6
-  %alloca8: ptr = alloca i64
-  store i64 0, ptr %alloca8
+  %3: ptr = gep struct str, ptr %1, i64 0, i32 0
+  %4: ptr = load ptr, ptr %3
+  %5: ptr = gep struct str, ptr %1, i64 0, i32 1
+  %6: i64 = load i64, ptr %5
+  %7: ptr = gep struct str, ptr %2, i64 0, i32 0
+  %8: ptr = load ptr, ptr %7
+  %9: ptr = gep struct str, ptr %2, i64 0, i32 1
+  %10: i64 = load i64, ptr %9
+  %11: ptr = alloca i64
+  store i64 0, ptr %11
   br label %loop_check
 
 loop_check:
-  %load9: i64 = load i64, ptr %alloca8
-  %icmp_slt10: bool = icmp.slt i64 %load9, i64 %load3
-  condbr bool %icmp_slt10, label %check_right, label %left_done
+  %12: i64 = load i64, ptr %11
+  %13: bool = icmp.slt i64 %12, i64 %6
+  condbr bool %13, label %check_right, label %left_done
 
 check_right:
-  %load11: i64 = load i64, ptr %alloca8
-  %icmp_slt12: bool = icmp.slt i64 %load11, i64 %load7
-  condbr bool %icmp_slt12, label %body, label %greater
+  %14: i64 = load i64, ptr %11
+  %15: bool = icmp.slt i64 %14, i64 %10
+  condbr bool %15, label %body, label %greater
 
 body:
-  %load13: i64 = load i64, ptr %alloca8
-  %gep14: ptr = gep i8, ptr %load1, i64 %load13
-  %load15: i8 = load i8, ptr %gep14
-  %gep16: ptr = gep i8, ptr %load5, i64 %load13
-  %load17: i8 = load i8, ptr %gep16
-  %icmp_ult18: bool = icmp.ult i8 %load15, i8 %load17
-  condbr bool %icmp_ult18, label %less, label %check_gt
+  %16: i64 = load i64, ptr %11
+  %17: ptr = gep i8, ptr %4, i64 %16
+  %18: i8 = load i8, ptr %17
+  %19: ptr = gep i8, ptr %8, i64 %16
+  %20: i8 = load i8, ptr %19
+  %21: bool = icmp.ult i8 %18, i8 %20
+  condbr bool %21, label %less, label %check_gt
 
 left_done:
-  %load21: i64 = load i64, ptr %alloca8
-  %icmp_slt22: bool = icmp.slt i64 %load21, i64 %load7
-  condbr bool %icmp_slt22, label %less, label %equal
+  %22: i64 = load i64, ptr %11
+  %23: bool = icmp.slt i64 %22, i64 %10
+  condbr bool %23, label %less, label %equal
 
 next:
-  %add20: i64 = add i64 %load13, i64 1
-  store i64 %add20, ptr %alloca8
+  %24: i64 = add i64 %16, i64 1
+  store i64 %24, ptr %11
   br label %loop_check
 
 less:
@@ -744,92 +756,92 @@ right_done:
   ret i64 1
 
 check_gt:
-  %icmp_ugt19: bool = icmp.ugt i8 %load15, i8 %load17
-  condbr bool %icmp_ugt19, label %greater, label %next
+  %25: bool = icmp.ugt i8 %18, i8 %20
+  condbr bool %25, label %greater, label %next
 }
 
-define i64 @__ep_map_str_find_pos(ptr %map, ptr %key) {
+define i64 @__ep_map_str_find_pos(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 0
-  %load3: ptr = load ptr, ptr %gep2
-  %alloca4: ptr = alloca i64
-  %alloca5: ptr = alloca i64
-  store i64 0, ptr %alloca4
-  store i64 %load1, ptr %alloca5
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep ptr, ptr %1, i64 0
+  %6: ptr = load ptr, ptr %5
+  %7: ptr = alloca i64
+  %8: ptr = alloca i64
+  store i64 0, ptr %7
+  store i64 %4, ptr %8
   br label %loop_check
 
 loop_check:
-  %load6: i64 = load i64, ptr %alloca4
-  %load7: i64 = load i64, ptr %alloca5
-  %icmp_slt8: bool = icmp.slt i64 %load6, i64 %load7
-  condbr bool %icmp_slt8, label %loop_body, label %miss
+  %9: i64 = load i64, ptr %7
+  %10: i64 = load i64, ptr %8
+  %11: bool = icmp.slt i64 %9, i64 %10
+  condbr bool %11, label %loop_body, label %miss
 
 loop_body:
-  %load9: i64 = load i64, ptr %alloca4
-  %load10: i64 = load i64, ptr %alloca5
-  %add11: i64 = add i64 %load9, i64 %load10
-  %sdiv12: i64 = sdiv i64 %add11, i64 2
-  %add13: i64 = add i64 %sdiv12, i64 %sdiv12
-  %add14: i64 = add i64 %add13, i64 %sdiv12
-  %gep15: ptr = gep ptr, ptr %load3, i64 %add14
-  %gep16: ptr = gep ptr, ptr %gep15, i64 0
-  %load17: ptr = load ptr, ptr %gep16
-  %call18: i64 = call i64 __ep_str_cmp(ptr %load17, ptr %key)
-  %icmp_eq19: bool = icmp.eq i64 %call18, i64 0
-  condbr bool %icmp_eq19, label %found, label %check_less
+  %12: i64 = load i64, ptr %7
+  %13: i64 = load i64, ptr %8
+  %14: i64 = add i64 %12, i64 %13
+  %15: i64 = sdiv i64 %14, i64 2
+  %16: i64 = add i64 %15, i64 %15
+  %17: i64 = add i64 %16, i64 %15
+  %18: ptr = gep ptr, ptr %6, i64 %17
+  %19: ptr = gep ptr, ptr %18, i64 0
+  %20: ptr = load ptr, ptr %19
+  %21: i64 = call i64 __ep_str_cmp(ptr %20, ptr %2)
+  %22: bool = icmp.eq i64 %21, i64 0
+  condbr bool %22, label %found, label %check_less
 
 found:
-  ret i64 %sdiv12
+  ret i64 %15
 
 check_less:
-  %icmp_slt20: bool = icmp.slt i64 %call18, i64 0
-  condbr bool %icmp_slt20, label %move_lo, label %move_hi
+  %23: bool = icmp.slt i64 %21, i64 0
+  condbr bool %23, label %move_lo, label %move_hi
 
 move_lo:
-  %add21: i64 = add i64 %sdiv12, i64 1
-  store i64 %add21, ptr %alloca4
+  %24: i64 = add i64 %15, i64 1
+  store i64 %24, ptr %7
   br label %loop_check
 
 move_hi:
-  store i64 %sdiv12, ptr %alloca5
+  store i64 %15, ptr %8
   br label %loop_check
 
 miss:
-  %load22: i64 = load i64, ptr %alloca4
-  %sub23: i64 = sub i64 0, i64 %load22
-  %sub24: i64 = sub i64 %sub23, i64 1
-  ret i64 %sub24
+  %25: i64 = load i64, ptr %7
+  %26: i64 = sub i64 0, i64 %25
+  %27: i64 = sub i64 %26, i64 1
+  ret i64 %27
 }
 
-define i64 @__ep_map_str_len(ptr %map) {
+define i64 @__ep_map_str_len(ptr %1) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  ret i64 %load1
+  %2: ptr = gep ptr, ptr %1, i64 1
+  %3: i64 = load i64, ptr %2
+  ret i64 %3
 }
 
-define ptr @__ep_map_str_key_at(ptr %map, i64 %idx) {
+define ptr @__ep_map_str_key_at(ptr %1, i64 %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %icmp_sge2: bool = icmp.sge i64 %idx, i64 0
-  condbr bool %icmp_sge2, label %check_high, label %fail
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: bool = icmp.sge i64 %2, i64 0
+  condbr bool %5, label %check_high, label %fail
 
 check_high:
-  %icmp_slt3: bool = icmp.slt i64 %idx, i64 %load1
-  condbr bool %icmp_slt3, label %ok, label %fail
+  %6: bool = icmp.slt i64 %2, i64 %4
+  condbr bool %6, label %ok, label %fail
 
 ok:
-  %gep4: ptr = gep ptr, ptr %map, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %add6: i64 = add i64 %idx, i64 %idx
-  %add7: i64 = add i64 %add6, i64 %idx
-  %gep8: ptr = gep ptr, ptr %load5, i64 %add7
-  %gep9: ptr = gep ptr, ptr %gep8, i64 0
-  %load10: ptr = load ptr, ptr %gep9
-  ret ptr %load10
+  %7: ptr = gep ptr, ptr %1, i64 0
+  %8: ptr = load ptr, ptr %7
+  %9: i64 = add i64 %2, i64 %2
+  %10: i64 = add i64 %9, i64 %2
+  %11: ptr = gep ptr, ptr %8, i64 %10
+  %12: ptr = gep ptr, ptr %11, i64 0
+  %13: ptr = load ptr, ptr %12
+  ret ptr %13
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
@@ -838,783 +850,783 @@ fail:
 
 define ptr @__ep_map_str_i64_new() {
 entry:
-  %call0: ptr = call ptr __epx_alloc(i64 24)
-  %gep1: ptr = gep ptr, ptr %call0, i64 0
-  store ptr null, ptr %gep1
-  %gep2: ptr = gep ptr, ptr %call0, i64 1
-  store i64 0, ptr %gep2
-  %gep3: ptr = gep ptr, ptr %call0, i64 2
-  store i64 0, ptr %gep3
-  ret ptr %call0
+  %1: ptr = call ptr __epx_alloc(i64 24)
+  %2: ptr = gep ptr, ptr %1, i64 0
+  store ptr null, ptr %2
+  %3: ptr = gep ptr, ptr %1, i64 1
+  store i64 0, ptr %3
+  %4: ptr = gep ptr, ptr %1, i64 2
+  store i64 0, ptr %4
+  ret ptr %1
 }
 
-define i64 @__ep_map_str_i64_get(ptr %map, ptr %key) {
+define i64 @__ep_map_str_i64_get(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 0
-  %load1: ptr = load ptr, ptr %gep0
-  %call2: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge3: bool = icmp.sge i64 %call2, i64 0
-  condbr bool %icmp_sge3, label %found, label %miss
+  %3: ptr = gep ptr, ptr %1, i64 0
+  %4: ptr = load ptr, ptr %3
+  %5: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %6: bool = icmp.sge i64 %5, i64 0
+  condbr bool %6, label %found, label %miss
 
 found:
-  %add4: i64 = add i64 %call2, i64 %call2
-  %add5: i64 = add i64 %add4, i64 %call2
-  %gep6: ptr = gep ptr, ptr %load1, i64 %add5
-  %gep7: ptr = gep ptr, ptr %gep6, i64 1
-  %load8: i64 = load i64, ptr %gep7
-  ret i64 %load8
+  %7: i64 = add i64 %5, i64 %5
+  %8: i64 = add i64 %7, i64 %5
+  %9: ptr = gep ptr, ptr %4, i64 %8
+  %10: ptr = gep ptr, ptr %9, i64 1
+  %11: i64 = load i64, ptr %10
+  ret i64 %11
 
 miss:
   call void __ep_runtime_panic(ptr str.runtime.map.missing)
   ret i64 0
 }
 
-define void @__ep_map_str_i64_set(ptr %map, ptr %key, i64 %val) {
+define void @__ep_map_str_i64_set(ptr %1, ptr %2, i64 %3) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 2
-  %load3: i64 = load i64, ptr %gep2
-  %gep4: ptr = gep ptr, ptr %map, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %call6: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge7: bool = icmp.sge i64 %call6, i64 0
-  condbr bool %icmp_sge7, label %update, label %insert_prep
+  %4: ptr = gep ptr, ptr %1, i64 1
+  %5: i64 = load i64, ptr %4
+  %6: ptr = gep ptr, ptr %1, i64 2
+  %7: i64 = load i64, ptr %6
+  %8: ptr = gep ptr, ptr %1, i64 0
+  %9: ptr = load ptr, ptr %8
+  %10: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %11: bool = icmp.sge i64 %10, i64 0
+  condbr bool %11, label %update, label %insert_prep
 
 update:
-  %add8: i64 = add i64 %call6, i64 %call6
-  %add9: i64 = add i64 %add8, i64 %call6
-  %gep10: ptr = gep ptr, ptr %load5, i64 %add9
-  %gep11: ptr = gep ptr, ptr %gep10, i64 1
-  store i64 %val, ptr %gep11
+  %12: i64 = add i64 %10, i64 %10
+  %13: i64 = add i64 %12, i64 %10
+  %14: ptr = gep ptr, ptr %9, i64 %13
+  %15: ptr = gep ptr, ptr %14, i64 1
+  store i64 %3, ptr %15
   ret void
 
 insert_prep:
-  %alloca12: ptr = alloca i64
-  %sub13: i64 = sub i64 0, i64 %call6
-  %sub14: i64 = sub i64 %sub13, i64 1
-  store i64 %sub14, ptr %alloca12
-  %icmp_sge15: bool = icmp.sge i64 %load1, i64 %load3
-  condbr bool %icmp_sge15, label %grow, label %shift_init
+  %16: ptr = alloca i64
+  %17: i64 = sub i64 0, i64 %10
+  %18: i64 = sub i64 %17, i64 1
+  store i64 %18, ptr %16
+  %19: bool = icmp.sge i64 %5, i64 %7
+  condbr bool %19, label %grow, label %shift_init
 
 grow:
-  %alloca16: ptr = alloca i64
-  %alloca17: ptr = alloca ptr
-  %alloca18: ptr = alloca i64
-  %icmp_eq19: bool = icmp.eq i64 %load3, i64 0
-  condbr bool %icmp_eq19, label %grow_zero, label %grow_double
+  %20: ptr = alloca i64
+  %21: ptr = alloca ptr
+  %22: ptr = alloca i64
+  %23: bool = icmp.eq i64 %7, i64 0
+  condbr bool %23, label %grow_zero, label %grow_double
 
 shift_init:
-  %load34: ptr = load ptr, ptr %gep4
-  %alloca35: ptr = alloca i64
-  store i64 %load1, ptr %alloca35
+  %24: ptr = load ptr, ptr %8
+  %25: ptr = alloca i64
+  store i64 %5, ptr %25
   br label %shift_check
 
 grow_zero:
-  store i64 4, ptr %alloca16
+  store i64 4, ptr %20
   br label %copy_init
 
 grow_double:
-  %add20: i64 = add i64 %load3, i64 %load3
-  store i64 %add20, ptr %alloca16
+  %26: i64 = add i64 %7, i64 %7
+  store i64 %26, ptr %20
   br label %copy_init
 
 copy_init:
-  %load21: i64 = load i64, ptr %alloca16
-  %mul22: i64 = mul i64 %load21, i64 24
-  %call23: ptr = call ptr __epx_alloc(i64 %mul22)
-  store ptr %call23, ptr %alloca17
-  store i64 0, ptr %alloca18
+  %27: i64 = load i64, ptr %20
+  %28: i64 = mul i64 %27, i64 24
+  %29: ptr = call ptr __epx_alloc(i64 %28)
+  store ptr %29, ptr %21
+  store i64 0, ptr %22
   br label %copy_check
 
 copy_check:
-  %load24: i64 = load i64, ptr %alloca18
-  %mul25: i64 = mul i64 %load1, i64 3
-  %icmp_slt26: bool = icmp.slt i64 %load24, i64 %mul25
-  condbr bool %icmp_slt26, label %copy_body, label %swap
+  %30: i64 = load i64, ptr %22
+  %31: i64 = mul i64 %5, i64 3
+  %32: bool = icmp.slt i64 %30, i64 %31
+  condbr bool %32, label %copy_body, label %swap
 
 copy_body:
-  %gep27: ptr = gep ptr, ptr %load5, i64 %load24
-  %load28: i64 = load i64, ptr %gep27
-  %load29: ptr = load ptr, ptr %alloca17
-  %gep30: ptr = gep ptr, ptr %load29, i64 %load24
-  store i64 %load28, ptr %gep30
-  %add31: i64 = add i64 %load24, i64 1
-  store i64 %add31, ptr %alloca18
+  %33: ptr = gep ptr, ptr %9, i64 %30
+  %34: i64 = load i64, ptr %33
+  %35: ptr = load ptr, ptr %21
+  %36: ptr = gep ptr, ptr %35, i64 %30
+  store i64 %34, ptr %36
+  %37: i64 = add i64 %30, i64 1
+  store i64 %37, ptr %22
   br label %copy_check
 
 swap:
-  %load32: ptr = load ptr, ptr %alloca17
-  store ptr %load32, ptr %gep4
-  %load33: i64 = load i64, ptr %alloca16
-  store i64 %load33, ptr %gep2
+  %38: ptr = load ptr, ptr %21
+  store ptr %38, ptr %8
+  %39: i64 = load i64, ptr %20
+  store i64 %39, ptr %6
   br label %shift_init
 
 shift_check:
-  %load36: i64 = load i64, ptr %alloca35
-  %load37: i64 = load i64, ptr %alloca12
-  %icmp_sgt38: bool = icmp.sgt i64 %load36, i64 %load37
-  condbr bool %icmp_sgt38, label %shift_body, label %write_entry
+  %40: i64 = load i64, ptr %25
+  %41: i64 = load i64, ptr %16
+  %42: bool = icmp.sgt i64 %40, i64 %41
+  condbr bool %42, label %shift_body, label %write_entry
 
 shift_body:
-  %load39: i64 = load i64, ptr %alloca35
-  %sub40: i64 = sub i64 %load39, i64 1
-  %add41: i64 = add i64 %sub40, i64 %sub40
-  %add42: i64 = add i64 %add41, i64 %sub40
-  %gep43: ptr = gep ptr, ptr %load34, i64 %add42
-  %add44: i64 = add i64 %load39, i64 %load39
-  %add45: i64 = add i64 %add44, i64 %load39
-  %gep46: ptr = gep ptr, ptr %load34, i64 %add45
-  %gep47: ptr = gep ptr, ptr %gep43, i64 0
-  %load48: i64 = load i64, ptr %gep47
-  %gep49: ptr = gep ptr, ptr %gep46, i64 0
-  store i64 %load48, ptr %gep49
-  %gep50: ptr = gep ptr, ptr %gep43, i64 1
-  %load51: i64 = load i64, ptr %gep50
-  %gep52: ptr = gep ptr, ptr %gep46, i64 1
-  store i64 %load51, ptr %gep52
-  %gep53: ptr = gep ptr, ptr %gep43, i64 2
-  %load54: i64 = load i64, ptr %gep53
-  %gep55: ptr = gep ptr, ptr %gep46, i64 2
-  store i64 %load54, ptr %gep55
-  %sub56: i64 = sub i64 %load39, i64 1
-  store i64 %sub56, ptr %alloca35
+  %43: i64 = load i64, ptr %25
+  %44: i64 = sub i64 %43, i64 1
+  %45: i64 = add i64 %44, i64 %44
+  %46: i64 = add i64 %45, i64 %44
+  %47: ptr = gep ptr, ptr %24, i64 %46
+  %48: i64 = add i64 %43, i64 %43
+  %49: i64 = add i64 %48, i64 %43
+  %50: ptr = gep ptr, ptr %24, i64 %49
+  %51: ptr = gep ptr, ptr %47, i64 0
+  %52: i64 = load i64, ptr %51
+  %53: ptr = gep ptr, ptr %50, i64 0
+  store i64 %52, ptr %53
+  %54: ptr = gep ptr, ptr %47, i64 1
+  %55: i64 = load i64, ptr %54
+  %56: ptr = gep ptr, ptr %50, i64 1
+  store i64 %55, ptr %56
+  %57: ptr = gep ptr, ptr %47, i64 2
+  %58: i64 = load i64, ptr %57
+  %59: ptr = gep ptr, ptr %50, i64 2
+  store i64 %58, ptr %59
+  %60: i64 = sub i64 %43, i64 1
+  store i64 %60, ptr %25
   br label %shift_check
 
 write_entry:
-  %load57: i64 = load i64, ptr %alloca12
-  %load58: ptr = load ptr, ptr %gep4
-  %add59: i64 = add i64 %load57, i64 %load57
-  %add60: i64 = add i64 %add59, i64 %load57
-  %gep61: ptr = gep ptr, ptr %load58, i64 %add60
-  %gep62: ptr = gep ptr, ptr %gep61, i64 0
-  store ptr %key, ptr %gep62
-  %gep63: ptr = gep ptr, ptr %gep61, i64 1
-  store i64 %val, ptr %gep63
-  %gep64: ptr = gep ptr, ptr %gep61, i64 2
-  store i64 1, ptr %gep64
-  %add65: i64 = add i64 %load1, i64 1
-  store i64 %add65, ptr %gep0
+  %61: i64 = load i64, ptr %16
+  %62: ptr = load ptr, ptr %8
+  %63: i64 = add i64 %61, i64 %61
+  %64: i64 = add i64 %63, i64 %61
+  %65: ptr = gep ptr, ptr %62, i64 %64
+  %66: ptr = gep ptr, ptr %65, i64 0
+  store ptr %2, ptr %66
+  %67: ptr = gep ptr, ptr %65, i64 1
+  store i64 %3, ptr %67
+  %68: ptr = gep ptr, ptr %65, i64 2
+  store i64 1, ptr %68
+  %69: i64 = add i64 %5, i64 1
+  store i64 %69, ptr %4
   ret void
 }
 
-define bool @__ep_map_str_i64_has(ptr %map, ptr %key) {
+define bool @__ep_map_str_i64_has(ptr %1, ptr %2) {
 entry:
-  %call0: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge1: bool = icmp.sge i64 %call0, i64 0
-  ret bool %icmp_sge1
+  %3: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %4: bool = icmp.sge i64 %3, i64 0
+  ret bool %4
 }
 
-define bool @__ep_map_str_i64_del(ptr %map, ptr %key) {
+define bool @__ep_map_str_i64_del(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 0
-  %load3: ptr = load ptr, ptr %gep2
-  %call4: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge5: bool = icmp.sge i64 %call4, i64 0
-  condbr bool %icmp_sge5, label %shift_init, label %no
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep ptr, ptr %1, i64 0
+  %6: ptr = load ptr, ptr %5
+  %7: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %8: bool = icmp.sge i64 %7, i64 0
+  condbr bool %8, label %shift_init, label %no
 
 shift_init:
-  %sub6: i64 = sub i64 %load1, i64 1
-  %alloca7: ptr = alloca i64
-  store i64 %call4, ptr %alloca7
+  %9: i64 = sub i64 %4, i64 1
+  %10: ptr = alloca i64
+  store i64 %7, ptr %10
   br label %shift_check
 
 no:
   ret bool false
 
 shift_check:
-  %load8: i64 = load i64, ptr %alloca7
-  %icmp_slt9: bool = icmp.slt i64 %load8, i64 %sub6
-  condbr bool %icmp_slt9, label %shift_body, label %clear_last
+  %11: i64 = load i64, ptr %10
+  %12: bool = icmp.slt i64 %11, i64 %9
+  condbr bool %12, label %shift_body, label %clear_last
 
 shift_body:
-  %load10: i64 = load i64, ptr %alloca7
-  %add11: i64 = add i64 %load10, i64 1
-  %add12: i64 = add i64 %add11, i64 %add11
-  %add13: i64 = add i64 %add12, i64 %add11
-  %gep14: ptr = gep ptr, ptr %load3, i64 %add13
-  %add15: i64 = add i64 %load10, i64 %load10
-  %add16: i64 = add i64 %add15, i64 %load10
-  %gep17: ptr = gep ptr, ptr %load3, i64 %add16
-  %gep18: ptr = gep ptr, ptr %gep14, i64 0
-  %load19: i64 = load i64, ptr %gep18
-  %gep20: ptr = gep ptr, ptr %gep17, i64 0
-  store i64 %load19, ptr %gep20
-  %gep21: ptr = gep ptr, ptr %gep14, i64 1
-  %load22: i64 = load i64, ptr %gep21
-  %gep23: ptr = gep ptr, ptr %gep17, i64 1
-  store i64 %load22, ptr %gep23
-  %gep24: ptr = gep ptr, ptr %gep14, i64 2
-  %load25: i64 = load i64, ptr %gep24
-  %gep26: ptr = gep ptr, ptr %gep17, i64 2
-  store i64 %load25, ptr %gep26
-  %add27: i64 = add i64 %load10, i64 1
-  store i64 %add27, ptr %alloca7
+  %13: i64 = load i64, ptr %10
+  %14: i64 = add i64 %13, i64 1
+  %15: i64 = add i64 %14, i64 %14
+  %16: i64 = add i64 %15, i64 %14
+  %17: ptr = gep ptr, ptr %6, i64 %16
+  %18: i64 = add i64 %13, i64 %13
+  %19: i64 = add i64 %18, i64 %13
+  %20: ptr = gep ptr, ptr %6, i64 %19
+  %21: ptr = gep ptr, ptr %17, i64 0
+  %22: i64 = load i64, ptr %21
+  %23: ptr = gep ptr, ptr %20, i64 0
+  store i64 %22, ptr %23
+  %24: ptr = gep ptr, ptr %17, i64 1
+  %25: i64 = load i64, ptr %24
+  %26: ptr = gep ptr, ptr %20, i64 1
+  store i64 %25, ptr %26
+  %27: ptr = gep ptr, ptr %17, i64 2
+  %28: i64 = load i64, ptr %27
+  %29: ptr = gep ptr, ptr %20, i64 2
+  store i64 %28, ptr %29
+  %30: i64 = add i64 %13, i64 1
+  store i64 %30, ptr %10
   br label %shift_check
 
 clear_last:
-  %add28: i64 = add i64 %sub6, i64 %sub6
-  %add29: i64 = add i64 %add28, i64 %sub6
-  %gep30: ptr = gep ptr, ptr %load3, i64 %add29
-  %gep31: ptr = gep ptr, ptr %gep30, i64 0
-  store i64 0, ptr %gep31
-  %gep32: ptr = gep ptr, ptr %gep30, i64 1
-  store i64 0, ptr %gep32
-  %gep33: ptr = gep ptr, ptr %gep30, i64 2
-  store i64 0, ptr %gep33
-  store i64 %sub6, ptr %gep0
+  %31: i64 = add i64 %9, i64 %9
+  %32: i64 = add i64 %31, i64 %9
+  %33: ptr = gep ptr, ptr %6, i64 %32
+  %34: ptr = gep ptr, ptr %33, i64 0
+  store i64 0, ptr %34
+  %35: ptr = gep ptr, ptr %33, i64 1
+  store i64 0, ptr %35
+  %36: ptr = gep ptr, ptr %33, i64 2
+  store i64 0, ptr %36
+  store i64 %9, ptr %3
   ret bool true
 }
 
 define ptr @__ep_map_str_bool_new() {
 entry:
-  %call0: ptr = call ptr __epx_alloc(i64 24)
-  %gep1: ptr = gep ptr, ptr %call0, i64 0
-  store ptr null, ptr %gep1
-  %gep2: ptr = gep ptr, ptr %call0, i64 1
-  store i64 0, ptr %gep2
-  %gep3: ptr = gep ptr, ptr %call0, i64 2
-  store i64 0, ptr %gep3
-  ret ptr %call0
+  %1: ptr = call ptr __epx_alloc(i64 24)
+  %2: ptr = gep ptr, ptr %1, i64 0
+  store ptr null, ptr %2
+  %3: ptr = gep ptr, ptr %1, i64 1
+  store i64 0, ptr %3
+  %4: ptr = gep ptr, ptr %1, i64 2
+  store i64 0, ptr %4
+  ret ptr %1
 }
 
-define bool @__ep_map_str_bool_get(ptr %map, ptr %key) {
+define bool @__ep_map_str_bool_get(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 0
-  %load1: ptr = load ptr, ptr %gep0
-  %call2: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge3: bool = icmp.sge i64 %call2, i64 0
-  condbr bool %icmp_sge3, label %found, label %miss
+  %3: ptr = gep ptr, ptr %1, i64 0
+  %4: ptr = load ptr, ptr %3
+  %5: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %6: bool = icmp.sge i64 %5, i64 0
+  condbr bool %6, label %found, label %miss
 
 found:
-  %add4: i64 = add i64 %call2, i64 %call2
-  %add5: i64 = add i64 %add4, i64 %call2
-  %gep6: ptr = gep ptr, ptr %load1, i64 %add5
-  %gep7: ptr = gep ptr, ptr %gep6, i64 1
-  %load8: bool = load bool, ptr %gep7
-  ret bool %load8
+  %7: i64 = add i64 %5, i64 %5
+  %8: i64 = add i64 %7, i64 %5
+  %9: ptr = gep ptr, ptr %4, i64 %8
+  %10: ptr = gep ptr, ptr %9, i64 1
+  %11: bool = load bool, ptr %10
+  ret bool %11
 
 miss:
   call void __ep_runtime_panic(ptr str.runtime.map.missing)
   ret bool false
 }
 
-define void @__ep_map_str_bool_set(ptr %map, ptr %key, bool %val) {
+define void @__ep_map_str_bool_set(ptr %1, ptr %2, bool %3) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 2
-  %load3: i64 = load i64, ptr %gep2
-  %gep4: ptr = gep ptr, ptr %map, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %call6: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge7: bool = icmp.sge i64 %call6, i64 0
-  condbr bool %icmp_sge7, label %update, label %insert_prep
+  %4: ptr = gep ptr, ptr %1, i64 1
+  %5: i64 = load i64, ptr %4
+  %6: ptr = gep ptr, ptr %1, i64 2
+  %7: i64 = load i64, ptr %6
+  %8: ptr = gep ptr, ptr %1, i64 0
+  %9: ptr = load ptr, ptr %8
+  %10: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %11: bool = icmp.sge i64 %10, i64 0
+  condbr bool %11, label %update, label %insert_prep
 
 update:
-  %add8: i64 = add i64 %call6, i64 %call6
-  %add9: i64 = add i64 %add8, i64 %call6
-  %gep10: ptr = gep ptr, ptr %load5, i64 %add9
-  %gep11: ptr = gep ptr, ptr %gep10, i64 1
-  store bool %val, ptr %gep11
+  %12: i64 = add i64 %10, i64 %10
+  %13: i64 = add i64 %12, i64 %10
+  %14: ptr = gep ptr, ptr %9, i64 %13
+  %15: ptr = gep ptr, ptr %14, i64 1
+  store bool %3, ptr %15
   ret void
 
 insert_prep:
-  %alloca12: ptr = alloca i64
-  %sub13: i64 = sub i64 0, i64 %call6
-  %sub14: i64 = sub i64 %sub13, i64 1
-  store i64 %sub14, ptr %alloca12
-  %icmp_sge15: bool = icmp.sge i64 %load1, i64 %load3
-  condbr bool %icmp_sge15, label %grow, label %shift_init
+  %16: ptr = alloca i64
+  %17: i64 = sub i64 0, i64 %10
+  %18: i64 = sub i64 %17, i64 1
+  store i64 %18, ptr %16
+  %19: bool = icmp.sge i64 %5, i64 %7
+  condbr bool %19, label %grow, label %shift_init
 
 grow:
-  %alloca16: ptr = alloca i64
-  %alloca17: ptr = alloca ptr
-  %alloca18: ptr = alloca i64
-  %icmp_eq19: bool = icmp.eq i64 %load3, i64 0
-  condbr bool %icmp_eq19, label %grow_zero, label %grow_double
+  %20: ptr = alloca i64
+  %21: ptr = alloca ptr
+  %22: ptr = alloca i64
+  %23: bool = icmp.eq i64 %7, i64 0
+  condbr bool %23, label %grow_zero, label %grow_double
 
 shift_init:
-  %load34: ptr = load ptr, ptr %gep4
-  %alloca35: ptr = alloca i64
-  store i64 %load1, ptr %alloca35
+  %24: ptr = load ptr, ptr %8
+  %25: ptr = alloca i64
+  store i64 %5, ptr %25
   br label %shift_check
 
 grow_zero:
-  store i64 4, ptr %alloca16
+  store i64 4, ptr %20
   br label %copy_init
 
 grow_double:
-  %add20: i64 = add i64 %load3, i64 %load3
-  store i64 %add20, ptr %alloca16
+  %26: i64 = add i64 %7, i64 %7
+  store i64 %26, ptr %20
   br label %copy_init
 
 copy_init:
-  %load21: i64 = load i64, ptr %alloca16
-  %mul22: i64 = mul i64 %load21, i64 24
-  %call23: ptr = call ptr __epx_alloc(i64 %mul22)
-  store ptr %call23, ptr %alloca17
-  store i64 0, ptr %alloca18
+  %27: i64 = load i64, ptr %20
+  %28: i64 = mul i64 %27, i64 24
+  %29: ptr = call ptr __epx_alloc(i64 %28)
+  store ptr %29, ptr %21
+  store i64 0, ptr %22
   br label %copy_check
 
 copy_check:
-  %load24: i64 = load i64, ptr %alloca18
-  %mul25: i64 = mul i64 %load1, i64 3
-  %icmp_slt26: bool = icmp.slt i64 %load24, i64 %mul25
-  condbr bool %icmp_slt26, label %copy_body, label %swap
+  %30: i64 = load i64, ptr %22
+  %31: i64 = mul i64 %5, i64 3
+  %32: bool = icmp.slt i64 %30, i64 %31
+  condbr bool %32, label %copy_body, label %swap
 
 copy_body:
-  %gep27: ptr = gep ptr, ptr %load5, i64 %load24
-  %load28: i64 = load i64, ptr %gep27
-  %load29: ptr = load ptr, ptr %alloca17
-  %gep30: ptr = gep ptr, ptr %load29, i64 %load24
-  store i64 %load28, ptr %gep30
-  %add31: i64 = add i64 %load24, i64 1
-  store i64 %add31, ptr %alloca18
+  %33: ptr = gep ptr, ptr %9, i64 %30
+  %34: i64 = load i64, ptr %33
+  %35: ptr = load ptr, ptr %21
+  %36: ptr = gep ptr, ptr %35, i64 %30
+  store i64 %34, ptr %36
+  %37: i64 = add i64 %30, i64 1
+  store i64 %37, ptr %22
   br label %copy_check
 
 swap:
-  %load32: ptr = load ptr, ptr %alloca17
-  store ptr %load32, ptr %gep4
-  %load33: i64 = load i64, ptr %alloca16
-  store i64 %load33, ptr %gep2
+  %38: ptr = load ptr, ptr %21
+  store ptr %38, ptr %8
+  %39: i64 = load i64, ptr %20
+  store i64 %39, ptr %6
   br label %shift_init
 
 shift_check:
-  %load36: i64 = load i64, ptr %alloca35
-  %load37: i64 = load i64, ptr %alloca12
-  %icmp_sgt38: bool = icmp.sgt i64 %load36, i64 %load37
-  condbr bool %icmp_sgt38, label %shift_body, label %write_entry
+  %40: i64 = load i64, ptr %25
+  %41: i64 = load i64, ptr %16
+  %42: bool = icmp.sgt i64 %40, i64 %41
+  condbr bool %42, label %shift_body, label %write_entry
 
 shift_body:
-  %load39: i64 = load i64, ptr %alloca35
-  %sub40: i64 = sub i64 %load39, i64 1
-  %add41: i64 = add i64 %sub40, i64 %sub40
-  %add42: i64 = add i64 %add41, i64 %sub40
-  %gep43: ptr = gep ptr, ptr %load34, i64 %add42
-  %add44: i64 = add i64 %load39, i64 %load39
-  %add45: i64 = add i64 %add44, i64 %load39
-  %gep46: ptr = gep ptr, ptr %load34, i64 %add45
-  %gep47: ptr = gep ptr, ptr %gep43, i64 0
-  %load48: i64 = load i64, ptr %gep47
-  %gep49: ptr = gep ptr, ptr %gep46, i64 0
-  store i64 %load48, ptr %gep49
-  %gep50: ptr = gep ptr, ptr %gep43, i64 1
-  %load51: i64 = load i64, ptr %gep50
-  %gep52: ptr = gep ptr, ptr %gep46, i64 1
-  store i64 %load51, ptr %gep52
-  %gep53: ptr = gep ptr, ptr %gep43, i64 2
-  %load54: i64 = load i64, ptr %gep53
-  %gep55: ptr = gep ptr, ptr %gep46, i64 2
-  store i64 %load54, ptr %gep55
-  %sub56: i64 = sub i64 %load39, i64 1
-  store i64 %sub56, ptr %alloca35
+  %43: i64 = load i64, ptr %25
+  %44: i64 = sub i64 %43, i64 1
+  %45: i64 = add i64 %44, i64 %44
+  %46: i64 = add i64 %45, i64 %44
+  %47: ptr = gep ptr, ptr %24, i64 %46
+  %48: i64 = add i64 %43, i64 %43
+  %49: i64 = add i64 %48, i64 %43
+  %50: ptr = gep ptr, ptr %24, i64 %49
+  %51: ptr = gep ptr, ptr %47, i64 0
+  %52: i64 = load i64, ptr %51
+  %53: ptr = gep ptr, ptr %50, i64 0
+  store i64 %52, ptr %53
+  %54: ptr = gep ptr, ptr %47, i64 1
+  %55: i64 = load i64, ptr %54
+  %56: ptr = gep ptr, ptr %50, i64 1
+  store i64 %55, ptr %56
+  %57: ptr = gep ptr, ptr %47, i64 2
+  %58: i64 = load i64, ptr %57
+  %59: ptr = gep ptr, ptr %50, i64 2
+  store i64 %58, ptr %59
+  %60: i64 = sub i64 %43, i64 1
+  store i64 %60, ptr %25
   br label %shift_check
 
 write_entry:
-  %load57: i64 = load i64, ptr %alloca12
-  %load58: ptr = load ptr, ptr %gep4
-  %add59: i64 = add i64 %load57, i64 %load57
-  %add60: i64 = add i64 %add59, i64 %load57
-  %gep61: ptr = gep ptr, ptr %load58, i64 %add60
-  %gep62: ptr = gep ptr, ptr %gep61, i64 0
-  store ptr %key, ptr %gep62
-  %gep63: ptr = gep ptr, ptr %gep61, i64 1
-  store bool %val, ptr %gep63
-  %gep64: ptr = gep ptr, ptr %gep61, i64 2
-  store i64 1, ptr %gep64
-  %add65: i64 = add i64 %load1, i64 1
-  store i64 %add65, ptr %gep0
+  %61: i64 = load i64, ptr %16
+  %62: ptr = load ptr, ptr %8
+  %63: i64 = add i64 %61, i64 %61
+  %64: i64 = add i64 %63, i64 %61
+  %65: ptr = gep ptr, ptr %62, i64 %64
+  %66: ptr = gep ptr, ptr %65, i64 0
+  store ptr %2, ptr %66
+  %67: ptr = gep ptr, ptr %65, i64 1
+  store bool %3, ptr %67
+  %68: ptr = gep ptr, ptr %65, i64 2
+  store i64 1, ptr %68
+  %69: i64 = add i64 %5, i64 1
+  store i64 %69, ptr %4
   ret void
 }
 
-define bool @__ep_map_str_bool_has(ptr %map, ptr %key) {
+define bool @__ep_map_str_bool_has(ptr %1, ptr %2) {
 entry:
-  %call0: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge1: bool = icmp.sge i64 %call0, i64 0
-  ret bool %icmp_sge1
+  %3: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %4: bool = icmp.sge i64 %3, i64 0
+  ret bool %4
 }
 
-define bool @__ep_map_str_bool_del(ptr %map, ptr %key) {
+define bool @__ep_map_str_bool_del(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 0
-  %load3: ptr = load ptr, ptr %gep2
-  %call4: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge5: bool = icmp.sge i64 %call4, i64 0
-  condbr bool %icmp_sge5, label %shift_init, label %no
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep ptr, ptr %1, i64 0
+  %6: ptr = load ptr, ptr %5
+  %7: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %8: bool = icmp.sge i64 %7, i64 0
+  condbr bool %8, label %shift_init, label %no
 
 shift_init:
-  %sub6: i64 = sub i64 %load1, i64 1
-  %alloca7: ptr = alloca i64
-  store i64 %call4, ptr %alloca7
+  %9: i64 = sub i64 %4, i64 1
+  %10: ptr = alloca i64
+  store i64 %7, ptr %10
   br label %shift_check
 
 no:
   ret bool false
 
 shift_check:
-  %load8: i64 = load i64, ptr %alloca7
-  %icmp_slt9: bool = icmp.slt i64 %load8, i64 %sub6
-  condbr bool %icmp_slt9, label %shift_body, label %clear_last
+  %11: i64 = load i64, ptr %10
+  %12: bool = icmp.slt i64 %11, i64 %9
+  condbr bool %12, label %shift_body, label %clear_last
 
 shift_body:
-  %load10: i64 = load i64, ptr %alloca7
-  %add11: i64 = add i64 %load10, i64 1
-  %add12: i64 = add i64 %add11, i64 %add11
-  %add13: i64 = add i64 %add12, i64 %add11
-  %gep14: ptr = gep ptr, ptr %load3, i64 %add13
-  %add15: i64 = add i64 %load10, i64 %load10
-  %add16: i64 = add i64 %add15, i64 %load10
-  %gep17: ptr = gep ptr, ptr %load3, i64 %add16
-  %gep18: ptr = gep ptr, ptr %gep14, i64 0
-  %load19: i64 = load i64, ptr %gep18
-  %gep20: ptr = gep ptr, ptr %gep17, i64 0
-  store i64 %load19, ptr %gep20
-  %gep21: ptr = gep ptr, ptr %gep14, i64 1
-  %load22: i64 = load i64, ptr %gep21
-  %gep23: ptr = gep ptr, ptr %gep17, i64 1
-  store i64 %load22, ptr %gep23
-  %gep24: ptr = gep ptr, ptr %gep14, i64 2
-  %load25: i64 = load i64, ptr %gep24
-  %gep26: ptr = gep ptr, ptr %gep17, i64 2
-  store i64 %load25, ptr %gep26
-  %add27: i64 = add i64 %load10, i64 1
-  store i64 %add27, ptr %alloca7
+  %13: i64 = load i64, ptr %10
+  %14: i64 = add i64 %13, i64 1
+  %15: i64 = add i64 %14, i64 %14
+  %16: i64 = add i64 %15, i64 %14
+  %17: ptr = gep ptr, ptr %6, i64 %16
+  %18: i64 = add i64 %13, i64 %13
+  %19: i64 = add i64 %18, i64 %13
+  %20: ptr = gep ptr, ptr %6, i64 %19
+  %21: ptr = gep ptr, ptr %17, i64 0
+  %22: i64 = load i64, ptr %21
+  %23: ptr = gep ptr, ptr %20, i64 0
+  store i64 %22, ptr %23
+  %24: ptr = gep ptr, ptr %17, i64 1
+  %25: i64 = load i64, ptr %24
+  %26: ptr = gep ptr, ptr %20, i64 1
+  store i64 %25, ptr %26
+  %27: ptr = gep ptr, ptr %17, i64 2
+  %28: i64 = load i64, ptr %27
+  %29: ptr = gep ptr, ptr %20, i64 2
+  store i64 %28, ptr %29
+  %30: i64 = add i64 %13, i64 1
+  store i64 %30, ptr %10
   br label %shift_check
 
 clear_last:
-  %add28: i64 = add i64 %sub6, i64 %sub6
-  %add29: i64 = add i64 %add28, i64 %sub6
-  %gep30: ptr = gep ptr, ptr %load3, i64 %add29
-  %gep31: ptr = gep ptr, ptr %gep30, i64 0
-  store i64 0, ptr %gep31
-  %gep32: ptr = gep ptr, ptr %gep30, i64 1
-  store i64 0, ptr %gep32
-  %gep33: ptr = gep ptr, ptr %gep30, i64 2
-  store i64 0, ptr %gep33
-  store i64 %sub6, ptr %gep0
+  %31: i64 = add i64 %9, i64 %9
+  %32: i64 = add i64 %31, i64 %9
+  %33: ptr = gep ptr, ptr %6, i64 %32
+  %34: ptr = gep ptr, ptr %33, i64 0
+  store i64 0, ptr %34
+  %35: ptr = gep ptr, ptr %33, i64 1
+  store i64 0, ptr %35
+  %36: ptr = gep ptr, ptr %33, i64 2
+  store i64 0, ptr %36
+  store i64 %9, ptr %3
   ret bool true
 }
 
 define ptr @__ep_map_str_str_new() {
 entry:
-  %call0: ptr = call ptr __epx_alloc(i64 24)
-  %gep1: ptr = gep ptr, ptr %call0, i64 0
-  store ptr null, ptr %gep1
-  %gep2: ptr = gep ptr, ptr %call0, i64 1
-  store i64 0, ptr %gep2
-  %gep3: ptr = gep ptr, ptr %call0, i64 2
-  store i64 0, ptr %gep3
-  ret ptr %call0
+  %1: ptr = call ptr __epx_alloc(i64 24)
+  %2: ptr = gep ptr, ptr %1, i64 0
+  store ptr null, ptr %2
+  %3: ptr = gep ptr, ptr %1, i64 1
+  store i64 0, ptr %3
+  %4: ptr = gep ptr, ptr %1, i64 2
+  store i64 0, ptr %4
+  ret ptr %1
 }
 
-define ptr @__ep_map_str_str_get(ptr %map, ptr %key) {
+define ptr @__ep_map_str_str_get(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 0
-  %load1: ptr = load ptr, ptr %gep0
-  %call2: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge3: bool = icmp.sge i64 %call2, i64 0
-  condbr bool %icmp_sge3, label %found, label %miss
+  %3: ptr = gep ptr, ptr %1, i64 0
+  %4: ptr = load ptr, ptr %3
+  %5: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %6: bool = icmp.sge i64 %5, i64 0
+  condbr bool %6, label %found, label %miss
 
 found:
-  %add4: i64 = add i64 %call2, i64 %call2
-  %add5: i64 = add i64 %add4, i64 %call2
-  %gep6: ptr = gep ptr, ptr %load1, i64 %add5
-  %gep7: ptr = gep ptr, ptr %gep6, i64 1
-  %load8: ptr = load ptr, ptr %gep7
-  ret ptr %load8
+  %7: i64 = add i64 %5, i64 %5
+  %8: i64 = add i64 %7, i64 %5
+  %9: ptr = gep ptr, ptr %4, i64 %8
+  %10: ptr = gep ptr, ptr %9, i64 1
+  %11: ptr = load ptr, ptr %10
+  ret ptr %11
 
 miss:
   call void __ep_runtime_panic(ptr str.runtime.map.missing)
   ret ptr str.runtime.empty
 }
 
-define void @__ep_map_str_str_set(ptr %map, ptr %key, ptr %val) {
+define void @__ep_map_str_str_set(ptr %1, ptr %2, ptr %3) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 2
-  %load3: i64 = load i64, ptr %gep2
-  %gep4: ptr = gep ptr, ptr %map, i64 0
-  %load5: ptr = load ptr, ptr %gep4
-  %call6: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge7: bool = icmp.sge i64 %call6, i64 0
-  condbr bool %icmp_sge7, label %update, label %insert_prep
+  %4: ptr = gep ptr, ptr %1, i64 1
+  %5: i64 = load i64, ptr %4
+  %6: ptr = gep ptr, ptr %1, i64 2
+  %7: i64 = load i64, ptr %6
+  %8: ptr = gep ptr, ptr %1, i64 0
+  %9: ptr = load ptr, ptr %8
+  %10: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %11: bool = icmp.sge i64 %10, i64 0
+  condbr bool %11, label %update, label %insert_prep
 
 update:
-  %add8: i64 = add i64 %call6, i64 %call6
-  %add9: i64 = add i64 %add8, i64 %call6
-  %gep10: ptr = gep ptr, ptr %load5, i64 %add9
-  %gep11: ptr = gep ptr, ptr %gep10, i64 1
-  store ptr %val, ptr %gep11
+  %12: i64 = add i64 %10, i64 %10
+  %13: i64 = add i64 %12, i64 %10
+  %14: ptr = gep ptr, ptr %9, i64 %13
+  %15: ptr = gep ptr, ptr %14, i64 1
+  store ptr %3, ptr %15
   ret void
 
 insert_prep:
-  %alloca12: ptr = alloca i64
-  %sub13: i64 = sub i64 0, i64 %call6
-  %sub14: i64 = sub i64 %sub13, i64 1
-  store i64 %sub14, ptr %alloca12
-  %icmp_sge15: bool = icmp.sge i64 %load1, i64 %load3
-  condbr bool %icmp_sge15, label %grow, label %shift_init
+  %16: ptr = alloca i64
+  %17: i64 = sub i64 0, i64 %10
+  %18: i64 = sub i64 %17, i64 1
+  store i64 %18, ptr %16
+  %19: bool = icmp.sge i64 %5, i64 %7
+  condbr bool %19, label %grow, label %shift_init
 
 grow:
-  %alloca16: ptr = alloca i64
-  %alloca17: ptr = alloca ptr
-  %alloca18: ptr = alloca i64
-  %icmp_eq19: bool = icmp.eq i64 %load3, i64 0
-  condbr bool %icmp_eq19, label %grow_zero, label %grow_double
+  %20: ptr = alloca i64
+  %21: ptr = alloca ptr
+  %22: ptr = alloca i64
+  %23: bool = icmp.eq i64 %7, i64 0
+  condbr bool %23, label %grow_zero, label %grow_double
 
 shift_init:
-  %load34: ptr = load ptr, ptr %gep4
-  %alloca35: ptr = alloca i64
-  store i64 %load1, ptr %alloca35
+  %24: ptr = load ptr, ptr %8
+  %25: ptr = alloca i64
+  store i64 %5, ptr %25
   br label %shift_check
 
 grow_zero:
-  store i64 4, ptr %alloca16
+  store i64 4, ptr %20
   br label %copy_init
 
 grow_double:
-  %add20: i64 = add i64 %load3, i64 %load3
-  store i64 %add20, ptr %alloca16
+  %26: i64 = add i64 %7, i64 %7
+  store i64 %26, ptr %20
   br label %copy_init
 
 copy_init:
-  %load21: i64 = load i64, ptr %alloca16
-  %mul22: i64 = mul i64 %load21, i64 24
-  %call23: ptr = call ptr __epx_alloc(i64 %mul22)
-  store ptr %call23, ptr %alloca17
-  store i64 0, ptr %alloca18
+  %27: i64 = load i64, ptr %20
+  %28: i64 = mul i64 %27, i64 24
+  %29: ptr = call ptr __epx_alloc(i64 %28)
+  store ptr %29, ptr %21
+  store i64 0, ptr %22
   br label %copy_check
 
 copy_check:
-  %load24: i64 = load i64, ptr %alloca18
-  %mul25: i64 = mul i64 %load1, i64 3
-  %icmp_slt26: bool = icmp.slt i64 %load24, i64 %mul25
-  condbr bool %icmp_slt26, label %copy_body, label %swap
+  %30: i64 = load i64, ptr %22
+  %31: i64 = mul i64 %5, i64 3
+  %32: bool = icmp.slt i64 %30, i64 %31
+  condbr bool %32, label %copy_body, label %swap
 
 copy_body:
-  %gep27: ptr = gep ptr, ptr %load5, i64 %load24
-  %load28: i64 = load i64, ptr %gep27
-  %load29: ptr = load ptr, ptr %alloca17
-  %gep30: ptr = gep ptr, ptr %load29, i64 %load24
-  store i64 %load28, ptr %gep30
-  %add31: i64 = add i64 %load24, i64 1
-  store i64 %add31, ptr %alloca18
+  %33: ptr = gep ptr, ptr %9, i64 %30
+  %34: i64 = load i64, ptr %33
+  %35: ptr = load ptr, ptr %21
+  %36: ptr = gep ptr, ptr %35, i64 %30
+  store i64 %34, ptr %36
+  %37: i64 = add i64 %30, i64 1
+  store i64 %37, ptr %22
   br label %copy_check
 
 swap:
-  %load32: ptr = load ptr, ptr %alloca17
-  store ptr %load32, ptr %gep4
-  %load33: i64 = load i64, ptr %alloca16
-  store i64 %load33, ptr %gep2
+  %38: ptr = load ptr, ptr %21
+  store ptr %38, ptr %8
+  %39: i64 = load i64, ptr %20
+  store i64 %39, ptr %6
   br label %shift_init
 
 shift_check:
-  %load36: i64 = load i64, ptr %alloca35
-  %load37: i64 = load i64, ptr %alloca12
-  %icmp_sgt38: bool = icmp.sgt i64 %load36, i64 %load37
-  condbr bool %icmp_sgt38, label %shift_body, label %write_entry
+  %40: i64 = load i64, ptr %25
+  %41: i64 = load i64, ptr %16
+  %42: bool = icmp.sgt i64 %40, i64 %41
+  condbr bool %42, label %shift_body, label %write_entry
 
 shift_body:
-  %load39: i64 = load i64, ptr %alloca35
-  %sub40: i64 = sub i64 %load39, i64 1
-  %add41: i64 = add i64 %sub40, i64 %sub40
-  %add42: i64 = add i64 %add41, i64 %sub40
-  %gep43: ptr = gep ptr, ptr %load34, i64 %add42
-  %add44: i64 = add i64 %load39, i64 %load39
-  %add45: i64 = add i64 %add44, i64 %load39
-  %gep46: ptr = gep ptr, ptr %load34, i64 %add45
-  %gep47: ptr = gep ptr, ptr %gep43, i64 0
-  %load48: i64 = load i64, ptr %gep47
-  %gep49: ptr = gep ptr, ptr %gep46, i64 0
-  store i64 %load48, ptr %gep49
-  %gep50: ptr = gep ptr, ptr %gep43, i64 1
-  %load51: i64 = load i64, ptr %gep50
-  %gep52: ptr = gep ptr, ptr %gep46, i64 1
-  store i64 %load51, ptr %gep52
-  %gep53: ptr = gep ptr, ptr %gep43, i64 2
-  %load54: i64 = load i64, ptr %gep53
-  %gep55: ptr = gep ptr, ptr %gep46, i64 2
-  store i64 %load54, ptr %gep55
-  %sub56: i64 = sub i64 %load39, i64 1
-  store i64 %sub56, ptr %alloca35
+  %43: i64 = load i64, ptr %25
+  %44: i64 = sub i64 %43, i64 1
+  %45: i64 = add i64 %44, i64 %44
+  %46: i64 = add i64 %45, i64 %44
+  %47: ptr = gep ptr, ptr %24, i64 %46
+  %48: i64 = add i64 %43, i64 %43
+  %49: i64 = add i64 %48, i64 %43
+  %50: ptr = gep ptr, ptr %24, i64 %49
+  %51: ptr = gep ptr, ptr %47, i64 0
+  %52: i64 = load i64, ptr %51
+  %53: ptr = gep ptr, ptr %50, i64 0
+  store i64 %52, ptr %53
+  %54: ptr = gep ptr, ptr %47, i64 1
+  %55: i64 = load i64, ptr %54
+  %56: ptr = gep ptr, ptr %50, i64 1
+  store i64 %55, ptr %56
+  %57: ptr = gep ptr, ptr %47, i64 2
+  %58: i64 = load i64, ptr %57
+  %59: ptr = gep ptr, ptr %50, i64 2
+  store i64 %58, ptr %59
+  %60: i64 = sub i64 %43, i64 1
+  store i64 %60, ptr %25
   br label %shift_check
 
 write_entry:
-  %load57: i64 = load i64, ptr %alloca12
-  %load58: ptr = load ptr, ptr %gep4
-  %add59: i64 = add i64 %load57, i64 %load57
-  %add60: i64 = add i64 %add59, i64 %load57
-  %gep61: ptr = gep ptr, ptr %load58, i64 %add60
-  %gep62: ptr = gep ptr, ptr %gep61, i64 0
-  store ptr %key, ptr %gep62
-  %gep63: ptr = gep ptr, ptr %gep61, i64 1
-  store ptr %val, ptr %gep63
-  %gep64: ptr = gep ptr, ptr %gep61, i64 2
-  store i64 1, ptr %gep64
-  %add65: i64 = add i64 %load1, i64 1
-  store i64 %add65, ptr %gep0
+  %61: i64 = load i64, ptr %16
+  %62: ptr = load ptr, ptr %8
+  %63: i64 = add i64 %61, i64 %61
+  %64: i64 = add i64 %63, i64 %61
+  %65: ptr = gep ptr, ptr %62, i64 %64
+  %66: ptr = gep ptr, ptr %65, i64 0
+  store ptr %2, ptr %66
+  %67: ptr = gep ptr, ptr %65, i64 1
+  store ptr %3, ptr %67
+  %68: ptr = gep ptr, ptr %65, i64 2
+  store i64 1, ptr %68
+  %69: i64 = add i64 %5, i64 1
+  store i64 %69, ptr %4
   ret void
 }
 
-define bool @__ep_map_str_str_has(ptr %map, ptr %key) {
+define bool @__ep_map_str_str_has(ptr %1, ptr %2) {
 entry:
-  %call0: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge1: bool = icmp.sge i64 %call0, i64 0
-  ret bool %icmp_sge1
+  %3: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %4: bool = icmp.sge i64 %3, i64 0
+  ret bool %4
 }
 
-define bool @__ep_map_str_str_del(ptr %map, ptr %key) {
+define bool @__ep_map_str_str_del(ptr %1, ptr %2) {
 entry:
-  %gep0: ptr = gep ptr, ptr %map, i64 1
-  %load1: i64 = load i64, ptr %gep0
-  %gep2: ptr = gep ptr, ptr %map, i64 0
-  %load3: ptr = load ptr, ptr %gep2
-  %call4: i64 = call i64 __ep_map_str_find_pos(ptr %map, ptr %key)
-  %icmp_sge5: bool = icmp.sge i64 %call4, i64 0
-  condbr bool %icmp_sge5, label %shift_init, label %no
+  %3: ptr = gep ptr, ptr %1, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep ptr, ptr %1, i64 0
+  %6: ptr = load ptr, ptr %5
+  %7: i64 = call i64 __ep_map_str_find_pos(ptr %1, ptr %2)
+  %8: bool = icmp.sge i64 %7, i64 0
+  condbr bool %8, label %shift_init, label %no
 
 shift_init:
-  %sub6: i64 = sub i64 %load1, i64 1
-  %alloca7: ptr = alloca i64
-  store i64 %call4, ptr %alloca7
+  %9: i64 = sub i64 %4, i64 1
+  %10: ptr = alloca i64
+  store i64 %7, ptr %10
   br label %shift_check
 
 no:
   ret bool false
 
 shift_check:
-  %load8: i64 = load i64, ptr %alloca7
-  %icmp_slt9: bool = icmp.slt i64 %load8, i64 %sub6
-  condbr bool %icmp_slt9, label %shift_body, label %clear_last
+  %11: i64 = load i64, ptr %10
+  %12: bool = icmp.slt i64 %11, i64 %9
+  condbr bool %12, label %shift_body, label %clear_last
 
 shift_body:
-  %load10: i64 = load i64, ptr %alloca7
-  %add11: i64 = add i64 %load10, i64 1
-  %add12: i64 = add i64 %add11, i64 %add11
-  %add13: i64 = add i64 %add12, i64 %add11
-  %gep14: ptr = gep ptr, ptr %load3, i64 %add13
-  %add15: i64 = add i64 %load10, i64 %load10
-  %add16: i64 = add i64 %add15, i64 %load10
-  %gep17: ptr = gep ptr, ptr %load3, i64 %add16
-  %gep18: ptr = gep ptr, ptr %gep14, i64 0
-  %load19: i64 = load i64, ptr %gep18
-  %gep20: ptr = gep ptr, ptr %gep17, i64 0
-  store i64 %load19, ptr %gep20
-  %gep21: ptr = gep ptr, ptr %gep14, i64 1
-  %load22: i64 = load i64, ptr %gep21
-  %gep23: ptr = gep ptr, ptr %gep17, i64 1
-  store i64 %load22, ptr %gep23
-  %gep24: ptr = gep ptr, ptr %gep14, i64 2
-  %load25: i64 = load i64, ptr %gep24
-  %gep26: ptr = gep ptr, ptr %gep17, i64 2
-  store i64 %load25, ptr %gep26
-  %add27: i64 = add i64 %load10, i64 1
-  store i64 %add27, ptr %alloca7
+  %13: i64 = load i64, ptr %10
+  %14: i64 = add i64 %13, i64 1
+  %15: i64 = add i64 %14, i64 %14
+  %16: i64 = add i64 %15, i64 %14
+  %17: ptr = gep ptr, ptr %6, i64 %16
+  %18: i64 = add i64 %13, i64 %13
+  %19: i64 = add i64 %18, i64 %13
+  %20: ptr = gep ptr, ptr %6, i64 %19
+  %21: ptr = gep ptr, ptr %17, i64 0
+  %22: i64 = load i64, ptr %21
+  %23: ptr = gep ptr, ptr %20, i64 0
+  store i64 %22, ptr %23
+  %24: ptr = gep ptr, ptr %17, i64 1
+  %25: i64 = load i64, ptr %24
+  %26: ptr = gep ptr, ptr %20, i64 1
+  store i64 %25, ptr %26
+  %27: ptr = gep ptr, ptr %17, i64 2
+  %28: i64 = load i64, ptr %27
+  %29: ptr = gep ptr, ptr %20, i64 2
+  store i64 %28, ptr %29
+  %30: i64 = add i64 %13, i64 1
+  store i64 %30, ptr %10
   br label %shift_check
 
 clear_last:
-  %add28: i64 = add i64 %sub6, i64 %sub6
-  %add29: i64 = add i64 %add28, i64 %sub6
-  %gep30: ptr = gep ptr, ptr %load3, i64 %add29
-  %gep31: ptr = gep ptr, ptr %gep30, i64 0
-  store i64 0, ptr %gep31
-  %gep32: ptr = gep ptr, ptr %gep30, i64 1
-  store i64 0, ptr %gep32
-  %gep33: ptr = gep ptr, ptr %gep30, i64 2
-  store i64 0, ptr %gep33
-  store i64 %sub6, ptr %gep0
+  %31: i64 = add i64 %9, i64 %9
+  %32: i64 = add i64 %31, i64 %9
+  %33: ptr = gep ptr, ptr %6, i64 %32
+  %34: ptr = gep ptr, ptr %33, i64 0
+  store i64 0, ptr %34
+  %35: ptr = gep ptr, ptr %33, i64 1
+  store i64 0, ptr %35
+  %36: ptr = gep ptr, ptr %33, i64 2
+  store i64 0, ptr %36
+  store i64 %9, ptr %3
   ret bool true
 }
 
 define ptr @__ep_map_str_ptr_new() {
 entry:
-  %call0: ptr = call ptr __ep_map_str_str_new()
-  ret ptr %call0
+  %1: ptr = call ptr __ep_map_str_str_new()
+  ret ptr %1
 }
 
-define ptr @__ep_map_str_ptr_get(ptr %map, ptr %key) {
+define ptr @__ep_map_str_ptr_get(ptr %1, ptr %2) {
 entry:
-  %call0: ptr = call ptr __ep_map_str_str_get(ptr %map, ptr %key)
-  ret ptr %call0
+  %3: ptr = call ptr __ep_map_str_str_get(ptr %1, ptr %2)
+  ret ptr %3
 }
 
-define void @__ep_map_str_ptr_set(ptr %map, ptr %key, ptr %val) {
+define void @__ep_map_str_ptr_set(ptr %1, ptr %2, ptr %3) {
 entry:
-  call void __ep_map_str_str_set(ptr %map, ptr %key, ptr %val)
+  call void __ep_map_str_str_set(ptr %1, ptr %2, ptr %3)
   ret void
 }
 
-define bool @__ep_map_str_ptr_has(ptr %map, ptr %key) {
+define bool @__ep_map_str_ptr_has(ptr %1, ptr %2) {
 entry:
-  %call0: bool = call bool __ep_map_str_str_has(ptr %map, ptr %key)
-  ret bool %call0
+  %3: bool = call bool __ep_map_str_str_has(ptr %1, ptr %2)
+  ret bool %3
 }
 
-define bool @__ep_map_str_ptr_del(ptr %map, ptr %key) {
+define bool @__ep_map_str_ptr_del(ptr %1, ptr %2) {
 entry:
-  %call0: bool = call bool __ep_map_str_str_del(ptr %map, ptr %key)
-  ret bool %call0
+  %3: bool = call bool __ep_map_str_str_del(ptr %1, ptr %2)
+  ret bool %3
 }
 
-define void @__ep_debug_i64(i64 %value) {
+define void @__ep_debug_i64(i64 %1) {
 entry:
-  %buf: ptr = call ptr __epx_alloc(i64 19)
-  %written: ptr = alloca i64
-  %i: ptr = alloca i64
-  %ch_slot: ptr = alloca i64
-  %p0: ptr = gep i8, ptr %buf, i64 0
-  store i8 48, ptr %p0
-  %p1: ptr = gep i8, ptr %buf, i64 1
-  store i8 120, ptr %p1
-  %p18: ptr = gep i8, ptr %buf, i64 18
-  store i8 10, ptr %p18
-  store i64 0, ptr %i
+  %2: ptr = call ptr __epx_alloc(i64 19)
+  %3: ptr = alloca i64
+  %4: ptr = alloca i64
+  %5: ptr = alloca i64
+  %6: ptr = gep i8, ptr %2, i64 0
+  store i8 48, ptr %6
+  %7: ptr = gep i8, ptr %2, i64 1
+  store i8 120, ptr %7
+  %8: ptr = gep i8, ptr %2, i64 18
+  store i8 10, ptr %8
+  store i64 0, ptr %4
   br label %loop_check
 
 loop_check:
-  %idx0: i64 = load i64, ptr %i
-  %keep: bool = icmp.slt i64 %idx0, i64 16
-  condbr bool %keep, label %loop_body, label %write
+  %9: i64 = load i64, ptr %4
+  %10: bool = icmp.slt i64 %9, i64 16
+  condbr bool %10, label %loop_body, label %write
 
 loop_body:
-  %idx1: i64 = load i64, ptr %i
-  %mul: i64 = mul i64 %idx1, i64 4
-  %shift: i64 = sub i64 60, i64 %mul
-  %shifted: i64 = shr i64 %value, i64 %shift
-  %nib: i64 = and i64 %shifted, i64 15
-  %is_digit: bool = icmp.slt i64 %nib, i64 10
-  condbr bool %is_digit, label %digit, label %letter
+  %11: i64 = load i64, ptr %4
+  %12: i64 = mul i64 %11, i64 4
+  %13: i64 = sub i64 60, i64 %12
+  %14: i64 = shr i64 %1, i64 %13
+  %15: i64 = and i64 %14, i64 15
+  %16: bool = icmp.slt i64 %15, i64 10
+  condbr bool %16, label %digit, label %letter
 
 digit:
-  %digit_ch: i64 = add i64 %nib, i64 48
-  store i64 %digit_ch, ptr %ch_slot
+  %17: i64 = add i64 %15, i64 48
+  store i64 %17, ptr %5
   br label %store_char
 
 letter:
-  %letter_ch: i64 = add i64 %nib, i64 87
-  store i64 %letter_ch, ptr %ch_slot
+  %18: i64 = add i64 %15, i64 87
+  store i64 %18, ptr %5
   br label %store_char
 
 store_char:
-  %idx2: i64 = load i64, ptr %i
-  %pos: i64 = add i64 %idx2, i64 2
-  %addr: ptr = gep i8, ptr %buf, i64 %pos
-  %ch8: i8 = load i8, ptr %ch_slot
-  store i8 %ch8, ptr %addr
-  %next: i64 = add i64 %idx2, i64 1
-  store i64 %next, ptr %i
+  %19: i64 = load i64, ptr %4
+  %20: i64 = add i64 %19, i64 2
+  %21: ptr = gep i8, ptr %2, i64 %20
+  %22: i8 = load i8, ptr %5
+  store i8 %22, ptr %21
+  %23: i64 = add i64 %19, i64 1
+  store i64 %23, ptr %4
   br label %loop_check
 
 write:
-  %handle: i64 = call i64 GetStdHandle(i64 -11)
-  %buf_i64: i64 = ptrtoint ptr %buf to i64
-  %written_i64: i64 = ptrtoint ptr %written to i64
-  %ok: i64 = call i64 WriteFile(i64 %handle, i64 %buf_i64, i64 19, i64 %written_i64, i64 0)
+  %24: i64 = call i64 GetStdHandle(i64 -11)
+  %25: i64 = ptrtoint ptr %2 to i64
+  %26: i64 = ptrtoint ptr %3 to i64
+  %27: i64 = call i64 WriteFile(i64 %24, i64 %25, i64 19, i64 %26, i64 0)
   ret void
 }

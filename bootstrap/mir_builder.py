@@ -20,12 +20,10 @@ class MirFunctionBuilder:
         ret_type=None,
         *,
         numbered_blocks: bool = True,
-        preincrement_values: bool = True,
         clear_current_on_terminate: bool = True,
         create_entry: bool = False,
     ):
         self.numbered_blocks = numbered_blocks
-        self.preincrement_values = preincrement_values
         self.clear_current_on_terminate = clear_current_on_terminate
         self.fn = None
         self.entry_block = None
@@ -39,24 +37,19 @@ class MirFunctionBuilder:
         self.fn = MirFunction(name, params, ret_type)
         self.entry_block = None
         self.current_block = None
-        self.value_counter = 0
+        self.value_counter = max((param.id for param in params), default=0)
         self.block_counter = 0
         if create_entry:
             self.entry_block = self.new_block("entry")
             self.current_block = self.entry_block
         return self.fn
 
-    def new_value(self, typ, hint="v"):
-        if self.preincrement_values:
-            self.value_counter += 1
-            n = self.value_counter
-        else:
-            n = self.value_counter
-            self.value_counter += 1
-        return MirValue(f"{hint}{n}", typ)
+    def new_value(self, typ):
+        self.value_counter += 1
+        return MirValue(self.value_counter, typ)
 
-    def value(self, typ, hint="v"):
-        return self.new_value(typ, hint)
+    def value(self, typ):
+        return self.new_value(typ)
 
     def new_block(self, prefix):
         if self.fn is None:
@@ -84,7 +77,7 @@ class MirFunctionBuilder:
 
     def inst(self, op, operands=None, result_type=None, type=None, callee=None):
         block = self.ensure_insertable()
-        result = self.new_value(result_type, op.replace(".", "_")) if result_type is not None else None
+        result = self.new_value(result_type) if result_type is not None else None
         inst = MirInst(op, operands or [], result=result, type=type, callee=callee)
         block.instructions.append(inst)
         return result

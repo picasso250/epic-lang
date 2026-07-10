@@ -23,7 +23,6 @@ Current snapshot of functions handled specially by the active Python reference c
 | `print`  | ✓ (ln 401) | ✓ (ln 588) | ✗ | ✓ (ln 831) | Print with trailing newline — `println` handled same line |
 | `println` | ✓ (ln 401) | ✓ (ln 580) | ✗ | ✓ (ln 831) | |
 | `exit`   | ✓ (ln 414) | ✓ (ln 603) | ✗ | ✗ | Terminate process; `n` args=`i64` |
-| `system` | ✓ (ln 465) | ✓ (ln 685) | ✗ | ✓ (ln 906) | Shell command, returns `i64` |
 
 ---
 
@@ -134,9 +133,6 @@ kernel32.GetFileSize(i64, i64) -> i64
 kernel32.ReadFile(i64, i64, i64, i64, i64) -> i64
 kernel32.WriteFile(i64, i64, i64, i64, i64) -> i64
 kernel32.CloseHandle(i64) -> i64
-kernel32.CreateProcessA() -> i64
-kernel32.WaitForSingleObject(i64, i64) -> i64
-kernel32.GetExitCodeProcess(i64, i64) -> i64
 kernel32.GetCommandLineA() -> i64
 user32.MessageBoxA(i64, i64, i64, i64) -> i64
 ```
@@ -179,7 +175,7 @@ symbols used by the Python backend.
 | `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` | append one array into another |
 | `__ep_map_str_len` / `__ep_map_str_key_at` | internal map key iteration helpers |
 
-Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main`, optional `__ep_global_init`, and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). Run `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text to normalize bundle order.
+Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main`, optional `__ep_global_init`, and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). The committed bundle order is authoritative.
 
 > `__ep_str_slice`, `__ep_str_cat`
 > in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `==`, `!=`
@@ -187,7 +183,7 @@ Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity 
 
 ### x64-backed private helpers
 
-Remaining hand-written x64 private helpers are emitted from `bootstrap/x64_runtime.py` as `__epx_*` primitives. Public `__ep_*` helper symbols are semantic-layer wrappers and may later be replaced by MIR/Epic implementations. This currently covers OS/ABI-facing helpers such as `__epx_cstr`, `__epx_read_file`, `__epx_write_file`, `__epx_system_cmd`, `__epx_argv_init`, `__epx_print_str`, and `__epx_print_newline`. Slice and map helpers are MIR helpers, not x64-backed helpers.
+Hand-written x64 helpers are emitted from `bootstrap/x64_runtime.py`. MIR-visible semantic helpers such as `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, and `__ep_print_newline` own their implementation labels directly. Only backend-private primitives such as `__epx_alloc` and `__epx_argv_init` retain the `__epx_*` prefix. Slice and map helpers are MIR helpers, not x64-backed helpers.
 
 These should be treated as backend implementation details, not language builtins.
 
@@ -208,7 +204,7 @@ str_starts_with str_find push extend map_has map_del
 **But does NOT reserve:**
 
 ```
-print println exit system read_file write_file
+print println exit read_file write_file
 itoa cstr i64 u64 i32 u32 u8 bool
 ```
 

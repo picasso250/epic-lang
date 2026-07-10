@@ -75,8 +75,8 @@ done:
 
 
 def test_mir_function_to_x64_golden():
-    param = MirParam("x", I64)
-    result = MirValue("r", I64)
+    param = MirParam(1, I64)
+    result = MirValue(2, I64)
     block = MirBlock(
         "entry",
         [
@@ -115,11 +115,11 @@ add1.__return:
 
 
 def test_target_mir_memory_ops_to_x64_golden():
-    size_ptr = MirValue("size.ptr", ptr())
-    size = MirValue("size", I64)
-    obj = MirValue("obj", ptr())
-    field_ptr = MirValue("field.ptr", ptr())
-    loaded = MirValue("loaded", I64)
+    size_ptr = MirValue(1, ptr())
+    size = MirValue(2, I64)
+    obj = MirValue(3, ptr())
+    field_ptr = MirValue(4, ptr())
+    loaded = MirValue(5, I64)
     block = MirBlock(
         "entry",
         [
@@ -221,8 +221,8 @@ __epx_runtime_start:
 """
     text = program.text()
     assert text.startswith(expected)
-    assert "__ep_cstr:\n    jmp __epx_cstr" in text
-    assert "__epx_cstr:\n" in text
+    assert "__ep_cstr:\n" in text
+    assert "__epx_cstr" not in text
 
 
 def test_x64_to_machine_bytes_and_fixups_golden():

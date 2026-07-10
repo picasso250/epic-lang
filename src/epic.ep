@@ -94,19 +94,19 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
     x64_add_data_zero(x64, "_written", 4)
     x64_add_data_zero(x64, "_heap", 8)
     x64_add_data_zero(x64, "_argv", 8)
-    let newline = new i64[0]
+    let newline = new i64[]
     newline.push(10)
     x64_add_data_bytes(x64, "_newline", newline)
-    let panic_prefix = new i64[0]
+    let panic_prefix = new i64[]
     epic_push_bytes_i64(panic_prefix, bytes("panic line "))
     x64_add_data_bytes(x64, "_cstr_panic_prefix", panic_prefix)
-    let panic_suffix = new i64[0]
+    let panic_suffix = new i64[]
     epic_push_bytes_i64(panic_suffix, bytes(": invalid cstr"))
     x64_add_data_bytes(x64, "_cstr_panic_suffix", panic_suffix)
-    let slice_oob = new i64[0]
+    let slice_oob = new i64[]
     epic_push_bytes_i64(slice_oob, bytes("runtime trap: slice oob"))
     x64_add_data_bytes(x64, "_trap_slice_oob", slice_oob)
-    let null_deref = new i64[0]
+    let null_deref = new i64[]
     epic_push_bytes_i64(null_deref, bytes("runtime trap: null deref"))
     x64_add_data_bytes(x64, "_trap_null_deref", null_deref)
     let i = 0
@@ -114,7 +114,7 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
         match program.globals[i] {
             MirStringGlobal g: {
                 if g.name != "argv" {
-                    let values = new i64[0]
+                    let values = new i64[]
                     epic_push_bytes_i64(values, bytes(g.init))
                     values.push(0)
                     x64_add_data_bytes(x64, mir_to_x64_data_label(g.name), values)
@@ -123,7 +123,7 @@ fun epic_emit_runtime_data(x64: X64Program, program: MirProgram): void {
             }
             MirScalarGlobal g: {
                 if g.name != "argv" {
-                    let values = new i64[0]
+                    let values = new i64[]
                     epic_push_u64_le(values, sema_parse_i64(g.init))
                     x64_add_data_bytes(x64, g.name, values)
                 }
@@ -174,9 +174,8 @@ fun epic_lower_program(program: MirProgram): X64Program {
     epic_timing("lower total inner", start, stop)
     ret lower.x64
 }
-fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
-    let total_start = epic_now_ms()
 
+fun epic_frontend(input_paths: str[], main_path: str): MirProgram {
     let parse_start = epic_now_ms()
     let ast = epic_merge_program(input_paths, main_path)
     let parse_stop = epic_now_ms()
@@ -190,10 +189,19 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
 
     let mir_start = epic_now_ms()
     let mir = mir_ast_to_mir(ast)
+    let mir_stop = epic_now_ms()
+    epic_timing("ast->mir", mir_start, mir_stop)
+    ret mir
+}
+
+fun epic_backend(mir: MirProgram, exe_path: str): void {
+    let prepare_start = epic_now_ms()
     mir_inject_all_runtime_helpers(mir)
     mir_prune_unreachable_functions(mir)
-    let mir_stop = epic_now_ms()
-    epic_timing("ast->mir+runtime", mir_start, mir_stop)
+    mir_retain_referenced_externs(mir)
+    backend_validate_program_abi(mir)
+    let prepare_stop = epic_now_ms()
+    epic_timing("prepare mir", prepare_start, prepare_stop)
 
     let lower_start = epic_now_ms()
     let x64 = epic_lower_program(mir)
@@ -220,13 +228,18 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     link_obj(cstr_ready_path(obj_path), cstr_ready_path(exe_path))
     let link_stop = epic_now_ms()
     epic_timing("link", link_start, link_stop)
+}
 
+fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
+    let total_start = epic_now_ms()
+    let mir = epic_frontend(input_paths, main_path)
+    epic_backend(mir, exe_path)
     let total_stop = epic_now_ms()
     epic_timing("total", total_start, total_stop)
 }
 
 fun main(): i64 {
-    let inputs = new str[0]
+    let inputs = new str[]
     let main_path = ""
     let exe_path = ""
     let i = 1

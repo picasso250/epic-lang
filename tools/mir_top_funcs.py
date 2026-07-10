@@ -22,22 +22,11 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_COMPILER_SOURCES = [
-    "src/util.ep",
-    "src/lexer.ep",
-    "src/parser.ep",
-    "src/sema.ep",
-    "src/mir.ep",
-    "src/mir_runtime.ep",
-    "src/ast_to_mir.ep",
-    "src/x64.ep",
-    "src/mir_to_x64.ep",
-    "src/x64_runtime.ep",
-    "src/machine.ep",
-    "src/coff.ep",
-    "src/link.ep",
-    "src/epic.ep",
-]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
+
+DEFAULT_COMPILER_SOURCES = SELF_HOST_COMPILER_SOURCES
 
 
 @dataclass
@@ -101,10 +90,10 @@ def load_pipeline(root: Path):
     from epic import _merge_programs  # type: ignore
     from sema import analyze_program  # type: ignore
     from ast_to_mir import ast_to_mir  # type: ignore
-    from mir_to_x64 import lower_mir_to_x64  # type: ignore
+    from mir_to_x64 import lower_mir_to_x64, prepare_mir_for_x64  # type: ignore
     from x64 import X64DataBytes, X64DataZero, X64Inst, X64Label  # type: ignore
 
-    return _merge_programs, analyze_program, ast_to_mir, lower_mir_to_x64, X64Inst, X64Label, X64DataBytes, X64DataZero
+    return _merge_programs, analyze_program, ast_to_mir, prepare_mir_for_x64, lower_mir_to_x64, X64Inst, X64Label, X64DataBytes, X64DataZero
 
 
 def rel_or_abs(root: Path, value: str) -> str:
@@ -131,6 +120,7 @@ def build_report(args: argparse.Namespace) -> Report:
         merge_programs,
         analyze_program,
         ast_to_mir,
+        prepare_mir_for_x64,
         lower_mir_to_x64,
         X64Inst,
         X64Label,
@@ -148,6 +138,7 @@ def build_report(args: argparse.Namespace) -> Report:
     ast = analyze_program(ast)
     t2 = time.perf_counter()
     mir = ast_to_mir(ast)
+    prepare_mir_for_x64(mir)
     t3 = time.perf_counter()
 
     functions = [count_mir_function(fn) for fn in mir.functions]

@@ -175,12 +175,12 @@ fun coff_build_obj(obj: MachineObject): u8[] {
     let data_rel_off = text_rel_off + len(obj.text_reloc_offsets) * 10
     let symtab_off = data_rel_off + len(obj.data_reloc_offsets) * 10
 
-    let strings = new u8[0]
-    let symtab = new u8[0]
+    let strings = new u8[]
+    let symtab = new u8[]
     coff_append_symbols(symtab, obj, strings)
     let symbol_index = coff_symbol_index_build(obj)
 
-    let buf = new u8[0]
+    let buf = new u8[]
     coff_append_u16(buf, 34404)
     coff_append_u16(buf, section_count)
     coff_append_u32(buf, 0)
@@ -230,15 +230,15 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     let symtab_off = data_rel_off + len(obj.data_reloc_offsets) * 10
 
     let sym_start = coff_now_ms()
-    let strings = new u8[0]
-    let symtab = new u8[0]
+    let strings = new u8[]
+    let symtab = new u8[]
     coff_append_symbols(symtab, obj, strings)
     let symbol_index = coff_symbol_index_build(obj)
     let sym_stop = coff_now_ms()
     coff_print_timing("symbols", sym_start, sym_stop)
 
     let header_start = coff_now_ms()
-    let buf = new u8[0]
+    let buf = new u8[]
     coff_append_u16(buf, 34404)
     coff_append_u16(buf, section_count)
     coff_append_u32(buf, 0)

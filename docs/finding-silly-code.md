@@ -96,7 +96,7 @@ Likely silly work:
 - repeated `ast_kind()` checks in code that could use `match`;
 - helper functions taking `AstNode` after the caller already matched a concrete variant;
 - arrays typed as `AstNode[]` even though a specific accessor returns only one variant kind;
-- common embedded fields in all ADT variants still using tag dispatch;
+- common direct fields in all ADT variants still using tag dispatch;
 - guarded field access that redoes the guard's work.
 
 The ranking rule is:
@@ -242,12 +242,12 @@ meta    = load [payload + 0]
 
 This is safe only under a strict uniformity rule:
 
-- every union member has a direct embedded field with the same name;
+- every union member has a direct field with the same name;
 - the field has the same MIR type in every member;
 - the field has the same field index in every member;
-- non-uniform, promoted, or partial cases fall back to the old dispatch.
+- non-uniform direct fields fall back to tag dispatch; partial fields are rejected.
 
-This handles `node.AstMeta` in the AST ADT without special-casing `AstMeta` by name.
+This handles `node.meta` in the AST ADT without special-casing `AstMeta` by name.
 
 ## Pattern 5: repeated proof after a guard
 
@@ -304,7 +304,7 @@ fixed point still reaches equality
 
 ## Case study: AST ADT dogfood
 
-During the full parser AST ADT work, the compiler became much larger because common AST knowledge was lost. The worst generated code came from `ast_kind()` chains, `AstNode` helper parameters, homogeneous `AstNode[]` lists, and uniform embedded projections.
+During the full parser AST ADT work, the compiler became much larger because common AST knowledge was lost. The worst generated code came from `ast_kind()` chains, `AstNode` helper parameters, homogeneous `AstNode[]` lists, and uniform common-field projections.
 
 The cleanup series used this method to find and remove those losses. The exact wall time varies by run, but the size trend was stable:
 
@@ -354,7 +354,7 @@ let key = str_cat2(str_cat2(struct_name, "."), field_name)
 struct_field_keys.push(key)
 ```
 
-If the key is only encoding multiple known fields, introduce a small record instead. Prefer `MirStructFieldLayout { struct_name, field_name, field_type, field_index, embedded }` over parallel arrays keyed by `"Struct.field"` strings. String labels are fine for diagnostics, but they should not be the internal representation of typed layout data.
+If the key is only encoding multiple known fields, introduce a small record instead. Prefer `MirStructFieldLayout { struct_name, field_name, field_type, field_index }` over parallel arrays keyed by `"Struct.field"` strings. String labels are fine for diagnostics, but they should not be the internal representation of typed layout data.
 
 ### Pattern 5: type-name special cases before structural rules
 
@@ -366,4 +366,8 @@ if base_type == "AstNode" {
 }
 ```
 
-Prefer structural rules over type-name exceptions. For union field access, try common embedded fields first, then reject unsupported variant-only fields through the normal union rules. If source code needs a variant-only field from a union value, make the variant explicit with `match` instead of adding a type-name special case to sema or MIR lowering.
+Prefer structural rules over type-name exceptions. For union field access, allow only common direct fields, then reject variant-only fields through the normal union rules. If source code needs a variant-only field from a union value, make the variant explicit with `match` instead of adding a type-name special case to sema or MIR lowering.
+
+### Pattern 6: numeric identity disguised as a string
+
+If a value is created by a monotonic counter and its text name is used only as a lookup key, keep the counter value as the identity. MIR locals use positive numeric IDs; `%1` is text syntax, while the object model stores `1`. This lets MIR→x64 index slot, liveness and definition-block arrays directly instead of formatting generated names and maintaining several string-keyed maps.

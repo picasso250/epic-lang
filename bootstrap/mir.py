@@ -63,11 +63,11 @@ class MirSignature:
 
 @dataclass(frozen=True)
 class MirValue:
-    name: str
+    id: int
     type: MirType
 
     def __str__(self):
-        return mir_local_text(self.name)
+        return mir_local_text(self.id)
 
 
 @dataclass(frozen=True)
@@ -90,7 +90,7 @@ class ValueOperand(MirOperand):
         object.__setattr__(self, "value", value)
 
     def text(self):
-        return mir_local_text(self.value.name)
+        return mir_local_text(self.value.id)
 
 
 @dataclass(frozen=True)
@@ -135,47 +135,64 @@ class SymbolOperand(MirOperand):
 
 
 @dataclass
-class MirImport:
-    name: str
-    signature: MirSignature
-    dll: str | None = None
-
-    def text(self):
-        ret, params = self.signature.text_parts()
-        return f"import {ret} @{self.name}({params})"
-
-
-@dataclass
 class MirExtern:
     name: str
     signature: MirSignature
 
     def text(self):
         ret, params = self.signature.text_parts()
-        return f"declare {ret} @{self.name}({params})"
+        return f"extern {ret} @{self.name}({params})"
+
+
+def mir_escape_bytes(text):
+    out = []
+    for ch in text:
+        value = ord(ch)
+        if value > 0xFF:
+            raise ValueError(f"MIR byte string contains non-byte code point: U+{value:04X}")
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif 0x20 <= value <= 0x7E:
+            out.append(ch)
+        else:
+            out.append(f"\\x{value:02X}")
+    return "".join(out)
 
 
 @dataclass
 class MirGlobal:
     name: str
     type: MirType
-    init: str
+    init: str | None
 
     def text(self):
-        return f"{self.name}: {self.type} = global {self.init}"
+        prefix = f"global @{self.name}: {self.type}"
+        if self.init is None:
+            return prefix
+        if self.type.kind == "ptr":
+            return f'{prefix} = bytes "{mir_escape_bytes(self.init)}"'
+        return f"{prefix} = {self.init}"
 
 
 @dataclass
 class MirParam:
-    name: str
+    id: int
     type: MirType
 
     @property
     def value(self):
-        return MirValue(self.name, self.type)
+        return MirValue(self.id, self.type)
 
     def text(self):
-        return f"{self.type} {mir_local_text(self.name)}"
+        return f"{self.type} {mir_local_text(self.id)}"
 
 
 @dataclass
@@ -189,7 +206,7 @@ class MirInst:
     def text(self):
         prefix = ""
         if self.result is not None:
-            prefix = f"{mir_local_text(self.result.name)}: {self.result.type} = "
+            prefix = f"{mir_local_text(self.result.id)}: {self.result.type} = "
         if self.op == "alloca":
             return f"{prefix}alloca {self.type}"
         if self.op == "load":
@@ -294,6 +311,10 @@ class MirStruct:
     fields: list[MirField] = field(default_factory=list)
     size: int = 0
 
+    def text(self):
+        field_types = ", ".join(str(field.type) for field in self.fields)
+        return f"type {self.name} = struct {{ {field_types} }}"
+
     def field(self, name):
         for field_item in self.fields:
             if field_item.name == name:
@@ -312,16 +333,60 @@ class MirStruct:
 
 @dataclass
 class MirProgram:
-    imports: list[MirImport] = field(default_factory=list)
     externs: list[MirExtern] = field(default_factory=list)
     globals: list[MirGlobal] = field(default_factory=list)
     functions: list[MirFunction] = field(default_factory=list)
     structs: dict[str, MirStruct] = field(default_factory=dict)
 
+    def referenced_struct_names(self):
+        names = set()
+        for fn in self.functions:
+            for block in fn.blocks:
+                for inst in block.instructions:
+                    if inst.op == "gep" and inst.type is not None and inst.type.kind == "struct":
+                        names.add(inst.type.name)
+        return names
+
+    def referenced_external_names(self):
+        defined = {fn.name for fn in self.functions}
+        names = set()
+        for fn in self.functions:
+            for block in fn.blocks:
+                for inst in block.instructions:
+                    if inst.op == "call" and inst.callee not in defined:
+                        names.add(inst.callee)
+        return names
+
+    def retain_referenced_externs(self):
+        referenced = self.referenced_external_names()
+        declarations = self.external_declarations()
+        missing = sorted(name for name in referenced if name not in declarations)
+        if missing:
+            raise ValueError(f"missing MIR extern declaration: {missing[0]}")
+        self.externs = [declarations[name] for name in sorted(referenced)]
+
+    def external_declarations(self):
+        declarations = {}
+        for item in self.externs:
+            existing = declarations.get(item.name)
+            if existing is not None and existing.signature != item.signature:
+                raise ValueError(f"conflicting MIR extern declaration: {item.name}")
+            declarations[item.name] = MirExtern(item.name, item.signature)
+        return declarations
+
     def text(self):
         parts = []
-        parts.extend(imp.text() for imp in self.imports)
-        parts.extend(ext.text() for ext in self.externs)
+        declarations = self.external_declarations()
+        for name in sorted(self.referenced_external_names()):
+            declaration = declarations.get(name)
+            if declaration is None:
+                raise ValueError(f"missing MIR extern declaration: {name}")
+            parts.append(declaration.text())
+        for name in sorted(self.referenced_struct_names()):
+            struct_item = self.structs.get(name)
+            if struct_item is None:
+                raise ValueError(f"missing MIR struct layout: {name}")
+            parts.append(struct_item.text())
         parts.extend(glob.text() for glob in self.globals)
         parts.extend(fn.text() for fn in self.functions)
         return "\n\n".join(parts)
@@ -335,12 +400,8 @@ def is_raw_module_symbol(name):
     return not name.startswith("@")
 
 
-def is_raw_local_name(name):
-    return not name.startswith("%")
-
-
-def mir_local_text(name):
-    return name if name.startswith("%") else f"%{name}"
+def mir_local_text(value_id):
+    return f"%{value_id}"
 
 
 class MirValidator:
@@ -370,7 +431,7 @@ class MirValidator:
             raise MirValidationError("\n".join(self.errors))
 
     def _collect_symbols(self):
-        for item in [*self.program.imports, *self.program.externs, *self.program.globals, *self.program.functions]:
+        for item in [*self.program.externs, *self.program.globals, *self.program.functions]:
             if not is_raw_module_symbol(item.name):
                 self.errors.append(f"module symbol must be raw and must not include text sigil '@': {item.name}")
             if item.name in self.symbols:
@@ -401,19 +462,19 @@ class MirValidator:
             self._validate_terminator(fn, block, block.terminator, values, blocks)
 
     def _define(self, values, fn, where, value):
-        if not is_raw_local_name(value.name):
-            self.errors.append(f"{fn.name}.{where}: local value name must be raw and must not include text sigil '%': {value.name}")
-        if value.name in values:
-            self.errors.append(f"{fn.name}.{where}: duplicate value: {value.name}")
-        values[value.name] = value.type
+        if not isinstance(value.id, int) or value.id <= 0:
+            self.errors.append(f"{fn.name}.{where}: local value id must be a positive integer: {value.id}")
+        if value.id in values:
+            self.errors.append(f"{fn.name}.{where}: duplicate value: {value.id}")
+        values[value.id] = value.type
 
     def _check_operand(self, fn, where, operand, values):
         if isinstance(operand, ValueOperand):
-            name = operand.value.name
-            if name not in values:
-                self.errors.append(f"{fn.name}.{where}: undefined value: {name}")
-            elif values[name] != operand.type:
-                self.errors.append(f"{fn.name}.{where}: stale value type for {name}")
+            value_id = operand.value.id
+            if value_id not in values:
+                self.errors.append(f"{fn.name}.{where}: undefined value: {value_id}")
+            elif values[value_id] != operand.type:
+                self.errors.append(f"{fn.name}.{where}: stale value type for {value_id}")
         if isinstance(operand, SymbolOperand):
             if not is_raw_module_symbol(operand.name):
                 self.errors.append(f"{fn.name}.{where}: symbol operand must be raw and must not include text sigil '@': {operand.name}")
@@ -497,7 +558,15 @@ class MirValidator:
     def _validate_call(self, fn, where, inst):
         self._require(inst.callee is not None, fn, where, "call needs callee")
         self._require(inst.type is not None, fn, where, "call needs return type")
+        if inst.type == VOID:
+            self._require(inst.result is None, fn, where, "void call must not have a result")
+        else:
+            self._require(inst.result is not None and self._same_type(inst.result.type, inst.type), fn, where, "call result type mismatch")
+
         callee = self.symbols.get(inst.callee)
+        if callee is None:
+            self.errors.append(f"{fn.name}.{where}: undeclared callee: {inst.callee}")
+            return
         signature = getattr(callee, "signature", None)
         if signature is None:
             self.errors.append(f"{fn.name}.{where}: callee is not callable: {inst.callee}")
@@ -506,10 +575,6 @@ class MirValidator:
         self._require(len(signature.params) == len(inst.operands), fn, where, "call arity mismatch")
         for idx, (expected, operand) in enumerate(zip(signature.params, inst.operands)):
             self._require(self._same_type(expected, operand.type), fn, where, f"call argument {idx} type mismatch")
-        if inst.type == VOID:
-            self._require(inst.result is None, fn, where, "void call must not have a result")
-        else:
-            self._require(inst.result is not None and self._same_type(inst.result.type, inst.type), fn, where, "call result type mismatch")
 
     def _validate_gep(self, fn, where, inst):
         self._require(inst.result is not None, fn, where, "gep needs a result")

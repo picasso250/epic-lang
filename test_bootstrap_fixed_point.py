@@ -18,6 +18,8 @@ import subprocess
 import sys
 import time
 
+from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES
+
 
 def rel(path):
     return os.path.relpath(path, SCRIPT_DIR).replace(os.sep, "/")
@@ -27,25 +29,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
-RUNTIME_SOURCES = [
-    os.path.join("runtime", "str.ep"),
-]
-COMPILER_SOURCES = [
-    os.path.join("src", "util.ep"),
-    os.path.join("src", "lexer.ep"),
-    os.path.join("src", "parser.ep"),
-    os.path.join("src", "sema.ep"),
-    os.path.join("src", "mir.ep"),
-    os.path.join("src", "mir_runtime.ep"),
-    os.path.join("src", "ast_to_mir.ep"),
-    os.path.join("src", "x64.ep"),
-    os.path.join("src", "mir_to_x64.ep"),
-    os.path.join("src", "x64_runtime.ep"),
-    os.path.join("src", "machine.ep"),
-    os.path.join("src", "coff.ep"),
-    os.path.join("src", "link.ep"),
-    os.path.join("src", "epic.ep"),
-]
+RUNTIME_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_RUNTIME_SOURCES]
+COMPILER_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_COMPILER_SOURCES]
+
 TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "30"))
 
 

@@ -19,7 +19,6 @@ from mir import (
     MirExtern,
     MirField,
     MirGlobal,
-    MirImport,
     MirInst,
     MirParam,
     MirProgram,
@@ -32,8 +31,6 @@ from mir import (
     struct as mir_struct,
     validate,
 )
-from mir_runtime_helpers import inject_all_mir_helpers
-from mir_prune import prune_unreachable_functions
 
 
 class MirCodegenError(RuntimeError):
@@ -66,9 +63,6 @@ WINAPI_IMPORTS = [
     ("kernel32", "ReadFile", [I64, I64, I64, I64, I64], I64),
     ("kernel32", "WriteFile", [I64, I64, I64, I64, I64], I64),
     ("kernel32", "CloseHandle", [I64], I64),
-    ("kernel32", "CreateProcessA", [], I64),
-    ("kernel32", "WaitForSingleObject", [I64, I64], I64),
-    ("kernel32", "GetExitCodeProcess", [I64, I64], I64),
     ("kernel32", "GetCommandLineA", [], I64),
     ("user32", "MessageBoxA", [I64, I64, I64, I64], I64),
 ]
@@ -76,7 +70,7 @@ WINAPI_IMPORTS = [
 
 class MirCodegen(MirFunctionBuilder):
     def __init__(self):
-        super().__init__(numbered_blocks=True, preincrement_values=True)
+        super().__init__(numbered_blocks=True)
         self.program = MirProgram()
         self.func_sigs = {}
         self.globals = {}
@@ -95,8 +89,8 @@ class MirCodegen(MirFunctionBuilder):
             fn.name: MirSignature([self._type(p.resolved_type) for p in fn.params], self._type(fn.resolved_type))
             for fn in ast.funcs
         }
-        for dll, name, params, ret in WINAPI_IMPORTS:
-            self.program.imports.append(MirImport(name, MirSignature(params, ret), f"{dll}.dll"))
+        for _dll, name, params, ret in WINAPI_IMPORTS:
+            self.program.externs.append(MirExtern(name, MirSignature(params, ret)))
         if "__ep_str_from_i64" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_from_i64", MirSignature([I64], ptr())))
         if "__ep_str_from_u64" not in self.func_sigs:
@@ -111,7 +105,6 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_cstr", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_read_file", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_write_file", MirSignature([ptr(), ptr(), I64], I64)))
-        self.program.externs.append(MirExtern("__ep_system_cmd", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_alloc", MirSignature([I64, I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_u8_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_u8_set", MirSignature([ptr(), I64, I64], VOID)))
@@ -162,23 +155,22 @@ class MirCodegen(MirFunctionBuilder):
         self._emit_global_init_function(ast)
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
-        inject_all_mir_helpers(self.program)
-        prune_unreachable_functions(self.program)
+        self.program.retain_referenced_externs()
         validate(self.program)
         return self.program
 
     def _emit_function(self, ast_fn):
         self.begin_function(
             ast_fn.name,
-            [MirParam(p.name, self._type(p.resolved_type)) for p in ast_fn.params],
+            [MirParam(i + 1, self._type(p.resolved_type)) for i, p in enumerate(ast_fn.params)],
             self._type(ast_fn.resolved_type),
         )
         self.local_scopes = [{}]
         self.local_type_scopes = [{}]
         entry = self.new_block("entry")
-        for param in self.fn.params:
+        for ast_param, param in zip(ast_fn.params, self.fn.params):
             self.set_block(entry)
-            addr = self._alloc_local(param.name, param.type)
+            addr = self._alloc_local(ast_param.name, param.type)
             self.inst("store", [ValueOperand(param.value), ValueOperand(addr)])
             entry = self.current_block
         self._push_local_scope()
@@ -274,7 +266,7 @@ class MirCodegen(MirFunctionBuilder):
 
     def _alloc_local(self, name, typ):
         block = self.ensure_insertable()
-        addr = self.new_value(ptr(), f"{name}.addr")
+        addr = self.new_value(ptr())
         block.instructions.append(MirInst("alloca", result=addr, type=typ))
         self._define_local(name, addr, typ)
         return addr
@@ -348,84 +340,31 @@ class MirCodegen(MirFunctionBuilder):
         value = self.inst("load", [addr], result_type=field_type, type=field_type)
         return ValueOperand(value)
 
-    def _promoted_field_layout(self, struct_name, field, seen=None):
-        if seen is None:
-            seen = set()
-        if struct_name in seen:
-            raise MirCodegenError(f"embedded field cycle while resolving {struct_name}.{field}")
-        seen.add(struct_name)
-        try:
-            layout = self.structs[struct_name].field(field)
-            seen.remove(struct_name)
-            return layout
-        except KeyError:
-            pass
-        found = None
-        for embedded_name in self.embedded_fields.get(struct_name, set()):
-            candidate = self._promoted_field_layout(embedded_name, field, seen)
-            if candidate is not None:
-                if found is not None:
-                    raise MirCodegenError(f"ambiguous field {struct_name}.{field}")
-                found = candidate
-        seen.remove(struct_name)
-        return found
-
-    def _promoted_field_addr(self, base, struct_name, field):
-        try:
-            self.structs[struct_name].field(field)
-            return self._field_addr(base, struct_name, field)
-        except KeyError:
-            pass
-        found = None
-        for embedded_name in self.embedded_fields.get(struct_name, set()):
-            if self._promoted_field_layout(embedded_name, field) is not None:
-                if found is not None:
-                    raise MirCodegenError(f"ambiguous field {struct_name}.{field}")
-                embedded_obj = self._load_field(base, struct_name, embedded_name)
-                found = self._promoted_field_addr(embedded_obj, embedded_name, field)
-        if found is None:
-            raise MirCodegenError(f"unknown field: {struct_name}.{field}")
-        return found
-
-    def _load_promoted_field(self, base, struct_name, field):
-        field_layout = self._promoted_field_layout(struct_name, field)
-        if field_layout is None:
-            raise MirCodegenError(f"unknown field: {struct_name}.{field}")
-        addr = self._promoted_field_addr(base, struct_name, field)
-        value = self.inst("load", [addr], result_type=field_layout.type, type=field_layout.type)
-        return ValueOperand(value)
-
-    def _union_common_embedded_field_layout(self, union_name, field):
+    def _union_common_field_layout(self, union_name, field):
         found = None
         for member in self.union_defs.get(union_name, []):
-            if field in self.embedded_fields.get(member, set()):
+            try:
                 candidate = self.structs[member].field(field)
-            else:
-                candidate = self._promoted_field_layout(member, field)
-                if candidate is None:
-                    raise MirCodegenError(f"union {union_name} has no common embedded field {field}")
+            except KeyError:
+                raise MirCodegenError(f"union {union_name} has no common field {field}")
             if found is not None and candidate.type != found.type:
-                raise MirCodegenError(f"union {union_name} embedded field {field} has inconsistent types")
+                raise MirCodegenError(f"union {union_name} field {field} has inconsistent types")
             found = candidate
         if found is None:
-            raise MirCodegenError(f"union {union_name} has no common embedded field {field}")
+            raise MirCodegenError(f"union {union_name} has no common field {field}")
         return found
 
-    def _uniform_direct_embedded_field_member(self, union_name, field):
+    def _uniform_direct_field_member(self, union_name, field):
         members = list(self.union_defs.get(union_name, []))
         if not members:
             return None
         first_member = members[0]
-        if field not in self.embedded_fields.get(first_member, set()):
-            return None
         try:
             first_layout = self.structs[first_member].field(field)
             first_index = self.structs[first_member].field_index(field)
         except KeyError:
             return None
         for member in members[1:]:
-            if field not in self.embedded_fields.get(member, set()):
-                return None
             try:
                 layout = self.structs[member].field(field)
                 index = self.structs[member].field_index(field)
@@ -435,9 +374,9 @@ class MirCodegen(MirFunctionBuilder):
                 return None
         return first_member
 
-    def _load_union_common_embedded_field(self, union_value, union_name, field):
-        field_layout = self._union_common_embedded_field_layout(union_name, field)
-        uniform_member = self._uniform_direct_embedded_field_member(union_name, field)
+    def _load_union_common_field(self, union_value, union_name, field):
+        field_layout = self._union_common_field_layout(union_name, field)
+        uniform_member = self._uniform_direct_field_member(union_name, field)
         if uniform_member is not None:
             payload = self._load_field(union_value, union_name, "payload")
             return self._load_field(payload, uniform_member, field, result_type=field_layout.type)
@@ -464,7 +403,7 @@ class MirCodegen(MirFunctionBuilder):
             self.set_block(case_blocks[idx])
             wrapper = self.inst("load", [ValueOperand(wrapper_addr)], result_type=ptr(), type=ptr())
             payload = self._load_field(ValueOperand(wrapper), union_name, "payload")
-            value = self._load_promoted_field(payload, member, field)
+            value = self._load_field(payload, member, field)
             self.inst("store", [value, ValueOperand(result_addr)])
             self.br(end)
         self.set_block(end)
@@ -473,10 +412,6 @@ class MirCodegen(MirFunctionBuilder):
 
     def _store_field(self, base, struct_name, field, value):
         addr = self._field_addr(base, struct_name, field)
-        self.inst("store", [value, addr])
-
-    def _store_promoted_field(self, base, struct_name, field, value):
-        addr = self._promoted_field_addr(base, struct_name, field)
         self.inst("store", [value, addr])
 
     def _layout_struct_name(self, typ):
@@ -650,7 +585,7 @@ class MirCodegen(MirFunctionBuilder):
             struct_name = self._layout_struct_name(base_type)
             if struct_name is None:
                 raise MirCodegenError("field assignment base must be a struct pointer")
-            self._store_promoted_field(base.value, struct_name, stmt.field, value.value)
+            self._store_field(base.value, struct_name, stmt.field, value.value)
             return self._reachable(self.current_block)
         elif isinstance(stmt, SubscriptAssignNode):
             base_type = self._infer_type(stmt.base)
@@ -687,10 +622,11 @@ class MirCodegen(MirFunctionBuilder):
                     raise MirCodegenError("compound field assignment base must be a struct pointer")
                 base = self._expr_from(in_block, stmt.target.object)
                 self.set_block(base.block)
-                addr = self._promoted_field_addr(base.value, struct_name, stmt.target.field)
-                field_layout = self._promoted_field_layout(struct_name, stmt.target.field)
-                if field_layout is None:
+                try:
+                    field_layout = self.structs[struct_name].field(stmt.target.field)
+                except KeyError:
                     raise MirCodegenError(f"unknown field: {struct_name}.{stmt.target.field}")
+                addr = self._field_addr(base.value, struct_name, stmt.target.field)
                 field_type = field_layout.type
                 current = self.inst("load", [addr], result_type=field_type, type=field_type)
                 rhs = self._expr_from(self.current_block, stmt.value)
@@ -1274,7 +1210,7 @@ class MirCodegen(MirFunctionBuilder):
 
     def _emit_short_circuit_from(self, in_block, expr):
         self.set_block(in_block)
-        result_addr = self.new_value(ptr(), "logic.addr")
+        result_addr = self.new_value(ptr())
         self.current_block.instructions.append(MirInst("alloca", result=result_addr, type=BOOL))
 
         left = self._emit_expr_from(self.current_block, expr.left)
@@ -1333,7 +1269,6 @@ class MirCodegen(MirFunctionBuilder):
             "bytes",
             "read_file",
             "write_file",
-            "system",
             "len",
             "cap",
         }
@@ -1410,11 +1345,6 @@ class MirCodegen(MirFunctionBuilder):
             args = self._emit_arg_flows_from(self.current_block, expr.args)
             args.value.append(ConstIntOperand(I64, expr.line))
             result = self.inst("call", args.value, result_type=I64, type=I64, callee="__ep_write_file")
-            return ValueFlow(ValueOperand(result), self.current_block)
-        if name == "system":
-            arg = self._emit_expr_from(self.current_block, expr.args[0])
-            self.set_block(arg.block)
-            result = self.inst("call", [arg.value, ConstIntOperand(I64, expr.line)], result_type=I64, type=I64, callee="__ep_system_cmd")
             return ValueFlow(ValueOperand(result), self.current_block)
         if name == "push":
             dst_type = self._infer_type(expr.args[0])
@@ -1688,25 +1618,32 @@ class MirCodegen(MirFunctionBuilder):
         self.set_block(base.block)
         if base_type.kind == "named" and base_type.name in self.union_defs:
             try:
-                self._union_common_embedded_field_layout(base_type.name, expr.field)
+                self._union_common_field_layout(base_type.name, expr.field)
             except MirCodegenError:
                 raise MirCodegenError("field access base must be struct")
-            return ValueFlow(self._load_union_common_embedded_field(base.value, base_type.name, expr.field), self.current_block)
+            return ValueFlow(self._load_union_common_field(base.value, base_type.name, expr.field), self.current_block)
         struct_name = self._layout_struct_name(base_type)
-        field_layout = self._promoted_field_layout(struct_name, expr.field)
-        if field_layout is None:
+        try:
+            self.structs[struct_name].field(expr.field)
+        except KeyError:
             raise MirCodegenError(f"unknown field: {expr.field}")
-        return ValueFlow(self._load_promoted_field(base.value, struct_name, expr.field), self.current_block)
+        return ValueFlow(self._load_field(base.value, struct_name, expr.field), self.current_block)
 
     def _emit_os_call(self, expr):
         return self._emit_os_call_from(self.ensure_insertable(), expr).value
 
     def _emit_os_call_from(self, in_block, expr):
         self.set_block(in_block)
-        try:
-            signature = next(imp.signature for imp in self.program.imports if imp.name == expr.name and imp.dll == f"{expr.dll}.dll")
-        except StopIteration as exc:
-            raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}") from exc
+        signature = next(
+            (
+                MirSignature(params, ret)
+                for dll, name, params, ret in WINAPI_IMPORTS
+                if dll == expr.dll and name == expr.name
+            ),
+            None,
+        )
+        if signature is None:
+            raise MirCodegenError(f"unsupported os call: os.{expr.dll}.{expr.name}")
         args = self._emit_arg_flows_from(self.current_block, expr.args)
         result_type = None if signature.ret == VOID else signature.ret
         result = self.inst("call", args.value, result_type=result_type, type=signature.ret, callee=expr.name)
@@ -1841,7 +1778,6 @@ class MirCodegen(MirFunctionBuilder):
 
     def _compute_struct_layouts(self, ast):
         self.structs = {}
-        self.embedded_fields = {}
         self.union_defs = {union.name: union.members for union in ast.unions}
         self.union_tags = {union.name: {member: idx for idx, member in enumerate(union.members, start=1)} for union in ast.unions}
         for struct_name in ("str", "_slice_u8", "_slice_i64", "_slice_str"):
@@ -1858,14 +1794,10 @@ class MirCodegen(MirFunctionBuilder):
             self.structs[union_node.name] = MirStruct(union_node.name, [], 0)
         for struct_node in ast.structs:
             fields = []
-            embedded = set()
             offset = 0
             for field in struct_node.fields:
                 fields.append((field.name, self._type(field.resolved_type), offset))
-                if getattr(field, "embedded", False):
-                    embedded.add(field.name)
                 offset += 8
-            self.embedded_fields[struct_node.name] = embedded
             self.structs[struct_node.name] = self._make_struct_layout(struct_node.name, fields, size=max(offset, 1))
         for union_node in ast.unions:
             self.structs[union_node.name] = self._make_struct_layout(

@@ -8,7 +8,7 @@ struct Point {
 }
 
 struct NamedPoint {
-    Point
+    point: Point
     name: str
 }
 
@@ -20,9 +20,9 @@ fun main(): i64 {
     let p = new Point { x: 40, y: 2 }
     println(str(p.sum()))
 
-    let named = new NamedPoint { Point: p, name: "answer" }
+    let named = new NamedPoint { point: p, name: "answer" }
     println(named.name)
-    named.x += 1
-    println(str(named.x + named.y))
+    named.point.x += 1
+    println(str(named.point.x + named.point.y))
     ret 0
 }

@@ -6,7 +6,7 @@ fun build_machine_x64_fixture(): X64Program {
     x64_add_extern(program, "ExitProcess")
     x64_add_section(program, ".data")
 
-    let msg = new i64[0]
+    let msg = new i64[]
     msg.push(65)
     msg.push(0)
     x64_add_data_bytes(program, "msg", msg)
