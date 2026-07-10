@@ -115,7 +115,7 @@ MIR runtime helper body 统一提交在 `runtime/mir/helpers.mir`，Python refer
 
 ## 运行时布局 (Runtime Layouts)
 
-### 临时 `str` view / byte-slice alias
+### `str` byte-string / shared byte-slice layout
 
 ```
 str = {
@@ -131,9 +131,9 @@ _slice_u8 = {
 }
 ```
 
-当前实现把 `str` 当作 `u8[]` 布局上的临时 view。字符串字面量被深拷贝到堆存储中，末尾附加一个 NUL 字节。`len` 不包含 NUL；`cap` 至少覆盖 `len + 1` 的 NUL 结尾存储。空字符串在 `len = 0` 时可能 `data = 0`。
+当前实现保留独立的源码级 `str` 类型，但让它与 `u8[]` 共享运行时 header 布局。字符串字面量被深拷贝到堆存储中，末尾附加一个 NUL 字节。`len` 不包含 NUL；`cap` 至少覆盖 `len + 1` 的 NUL 结尾存储。空字符串在 `len = 0` 时可能 `data = 0`。
 
-> `str` 不是当前阶段的 UTF-8 字符串设计，只是 byte-slice-backed text view。
+> 当前 `str` 是 byte-oriented string，不定义 UTF-8/Unicode 字符语义。
 > 语言不承诺 string literal 物理不可变：相同内容的字面量可能共享同一 buffer，
 > 修改 `bytes(s)` 的结果对所有共享 view 可见。
 > `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节），
@@ -211,6 +211,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
 - **For 降级**：`ForRange` 保持半开 numeric cursor lowering。`ForIn` 只接受 array source，降级为 index cursor loop，保存初始 `len` 作为上限并在每轮重新检查当前 `len`。
 - **Map 删除**：内建 map 类型、语法、sema/codegen 分支和 MIR runtime helper 均已删除。需要名称查找的编译器代码使用显式数组与线性查询。
+- **字符串运算**：`str == str` / `!=` 调用 `__ep_str_eq` 做按字节内容比较；`str + str` 调用 `__ep_str_cat`，分配新的 header 和连续字节区并复制两侧内容。字符串排序比较在 sema 拒绝；`str += str` 也拒绝，避免暗示原地扩容或共享 buffer 修改。
 
 ## 链接器 (Linker)
 
@@ -225,9 +226,11 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
 | `str(x)`           | 过渡期 formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、非 `u8[]` array 不支持 | 公开但准备收缩 |
+| `str + str`         | `__ep_str_cat`，分配新字符串并复制两侧内容 | 公开语法 |
+| `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
 | `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |
 | `write_file`       | `__ep_write_file` helper                    | 公开 |
-| `str` (`u8[]`)     | zero-copy layout reinterpret；alias 迁移路径 | 公开但准备收缩 |
+| `str` / `u8[]` view | 显式 zero-copy layout reinterpret；源码类型保持不同 | 公开 |
 | `bytes`            | zero-copy layout reinterpret                | 公开 |
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |

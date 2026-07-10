@@ -1047,6 +1047,9 @@ class MirCodegen(MirFunctionBuilder):
         op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
         cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
         unsigned = self._is_unsigned_integer(left_type)
+        if expr.op == "+" and left_type == et.STR and right_type == et.STR:
+            result = self.inst("call", [left.value, right.value], result_type=ptr(), type=ptr(), callee="__ep_str_cat")
+            return ValueFlow(ValueOperand(result), self.current_block)
         if expr.op in ("==", "!=") and left_type == et.STR and right_type == et.STR:
             result = self.inst("call", [left.value, right.value], result_type=BOOL, type=BOOL, callee="__ep_str_eq")
             value = ValueOperand(result)

@@ -30,7 +30,7 @@ python epic.py --main main.ep main.ep lib.ep
 | `u8`    | 无符号 8 位字节                         |
 | `i64`   | 有符号 64 位整数                        |
 | `u64`   | 无符号 64 位整数                        |
-| `str`   | 当前阶段的临时文本 view；运行时布局与 `u8[]` 相同，未来 UTF-8 字符串另行设计 |
+| `str`   | 字节字符串/文本值；支持字面量、内容相等、切片和分配式拼接 |
 | `Name`  | 堆分配的结构体引用               |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
 | `void`  | unit 类型，表示唯一的“无信息”值；常用于函数返回和副作用表达式 |
@@ -104,7 +104,7 @@ p.peek()                       =>  Parser__peek(p)
 - 数字字面量必须落在 `i64` 正数 token 可表示范围内：`0..9223372036854775807`。需要 `i64` 最小值请写 `0 - 9223372036854775807 - 1`。
 - `u64`/`u8` 的最大值或 wrap 值必须通过显式转换和运算构造，例如 `u64(0) - u64(1)`、`u8(0) - u8(1)`。
 - `true` 和 `false` 是 `bool` 字面量。
-- 字符串字面量当前产生临时 `str` view。它不是未来 UTF-8 字符串设计；当前只表示字节序列。支持的转义：`\n \r \t \\ \" \' \0`。仅支持 ASCII。
+- 字符串字面量产生 `str`。当前字符串语义按字节定义，不提供 Unicode 字符索引。支持的转义：`\n \r \t \\ \" \' \0`。仅支持 ASCII。
 - 字符字面量产生 `u8`。支持的转义同字符串。
 
 ### Let 声明 (Let Declarations)
@@ -131,11 +131,13 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 
 算术运算符 `+`、`-`、`*`、`/`、`%` 带检查，溢出或除零时退出程序。
 
-比较运算符 `==`、`!=`、`<`、`<=`、`>`、`>=` 操作 `bool`，产生逻辑结果。
+整数支持 `==`、`!=`、`<`、`<=`、`>`、`>=`。`str` 只支持按字节内容比较的 `==` / `!=`；字符串排序比较 `<`、`<=`、`>`、`>=` 不属于当前语言语义。
 
 逻辑运算符 `&&`、`||`、`!` 操作 `bool`。整数没有隐式的布尔性；请写 `x != 0` 或 `bool(x)`。
 
 位运算符 `~`、`&`、`|`、`^` 和移位运算符 `<<`、`>>`、`>>>` 是低层操作，不经过检查。`>>` 对 `i64` 是算术移位，对无符号整数是逻辑移位。`>>>` 始终是逻辑移位。
+
+`left + right` 在两个操作数都是 `str` 时执行字符串拼接，分配并返回新的 `str`，不修改任一输入。不会把整数、布尔值或数组隐式转换为字符串；需要显式写 `str(value)` 或使用 f-string。`u8[] + u8[]` 不支持，可变字节缓冲使用 `dst.extend(src)`。
 
 ### 整数转换 (Integer Conversions)
 
@@ -148,7 +150,7 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 
 ### 复合赋值 (Compound Assignment)
 
-支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。（`str += str` 已删除。使用 `u8[]` + `.extend(...)` + `str(bytes)` 显式拼接。）
+支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`>>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。复合赋值只用于整数；`str += str` 不支持，需要显式写 `s = s + rhs`。
 
 ### 控制流 (Control Flow)
 
@@ -278,7 +280,7 @@ match n {
 }
 ```
 
-支持的检视类型：`i64`、`u64`、`u8`、`bool`、临时 `str` view。
+支持的检视类型：`i64`、`u64`、`u8`、`bool`、`str`。
 
 规则：
 - 每个分支在模式和主体之间使用冒号。
@@ -288,11 +290,11 @@ match n {
 
 ## 字符串与数组 (Strings and Arrays)
 
-### 临时 `str` view 与 `u8[]` alias 方向
+### `str` 与 `u8[]` 的语义边界
 
-当前阶段 `u8[]` 是文本/字节缓冲的真实模型。`str` 只是过渡期兼容名称：运行时 header 与 `u8[]` 相同，均为 `{data, len, cap}`。它不做 UTF-8 校验，不提供 Unicode 字符语义，也不承诺不可变。未来如果恢复 UTF-8-aware `str`，会作为新的语言设计重新引入。
+`str` 是保留的源码级字节字符串/文本类型；`u8[]` 是可变字节缓冲。字符串字面量产生 `str`，`==` / `!=` 做内容比较，`+` 分配并返回新的 `str`。`u8[]` 使用数组索引和 `push` / `pop` / `extend`，不获得隐式文本语义。
 
-字符串字面量当前仍产生 `str` view，以减少自举编译器迁移噪音。`len(s)` 计数字节数，不包含尾部 NUL。字符串布局字段不是 public surface。详见 [`str-u8-alias-plan.md`](str-u8-alias-plan.md)。
+当前两者运行时 header 相同，均为 `{data, len, cap}`，因此显式 `str(bytes)` / `bytes(str)` 是零拷贝 view。共享布局不代表源码类型相同，也不引入隐式赋值转换。`len(s)` 计数字节数，不包含尾部 NUL；当前不做 UTF-8 校验、不提供 Unicode 字符索引，也不承诺不可变。详见 [`str-u8-layout-contract.md`](str-u8-layout-contract.md)。
 
 > 当前 Python reference compiler 依赖 `str` layout 与 `u8[]` 完全一致（{data, len, cap} 均为 24 字节），
 > 使得 `str(bytes)` 和 `bytes(str)` 都是 identity cast，零分配零复制。
@@ -355,7 +357,7 @@ let d = s[0:len(s)]
 | 容量 | `cap(a)` | `a.cap`（已从 public surface 删除） |
 | 切片 | `s[start:end]` / `bytes[start:end]`（必须显式写出 start 和 end；仅支持 str 和 u8[]） | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
-| 字符串相等 | `s1 == s2` | 无 public 替代（`str_eq` 已从 public surface 删除） |
+| 字符串相等 | `s1 == s2` / `s1 != s2` | 按字节内容比较；`str_eq` 已从 public surface 删除 |
 
 **三档分类**：
 
@@ -372,9 +374,9 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 视为临时 `str` view，不分配不复制。`bytes(str)` 同理。
+`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 显式视为 `str`，不分配不复制。`bytes(str)` 同理。
 
-`str(bytes)` + `bytes(str)` 是过渡期对偶 cast。迁移目标是让 MIR 和 public API 越来越少关心 `str` 这个独立名字。
+`str(bytes)` 与 `bytes(str)` 是显式的零拷贝 view 转换。它们连接文本与可变字节缓冲边界，但不会消除 `str` 这个独立源码类型。
 
 `str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是 bytes view/cast；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])` 和 `str(bool[])` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
 
@@ -410,7 +412,7 @@ let source = str(read_file(path))
 | `str_starts_with`      | 自己写 `u8[]` 扫描；未来可提供 `s.starts_with(...)` 方法 |
 | `str_trim`             | 自己写 `u8[]` 扫描；未来可提供 `s.trim()` 方法 |
 | `str_replace_char`     | 自己写 `u8[]` 扫描                          |
-| `str_cat`              | `u8[]` + `extend` + `str(bytes)`            |
+| `str_cat`              | `s1 + s2`（语法；分配新 `str`）             |
 | `a.push(x)`             | 追加到动态数组                              |
 | `a.pop()`              | 删除并返回最后一个元素；空数组 panic            |
 | `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |

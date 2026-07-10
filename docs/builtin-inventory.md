@@ -32,13 +32,13 @@ Current snapshot of functions handled specially by the active Python reference c
 
 - `str_new` — removed entirely; use `str(bytes)`
 - `itoa` — removed entirely; use `str(n)` (internal helper `str_i64` retained)
-- `str_slice`, `str_cat` — removed from public surface, but retained as compiler-internal helpers where syntax lowering still needs them
+- `str_slice`, `str_cat` — function-style builtins removed from public surface; compiler-internal helpers remain for slice and `str + str` syntax lowering
 - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
-`str`, `bytes`, and `cstr` remain public during the alias transition, but `str` is now documented as a temporary `u8[]`-layout view rather than the future UTF-8 string design.
+`str`, `bytes`, and `cstr` remain public. `str` is a retained byte-string source type; it currently shares the `u8[]` runtime layout so explicit `str(bytes)` / `bytes(str)` views are zero-copy.
 
 | Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
 |----------|---------|----------------|---------------------|------------|-------|
-| `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Transitional formatting/view operation; `u8[]` is the text truth |
+| `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Formatting/view operation for the retained byte-string type |
 | `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to C-style (null-terminated); WinAPI interop |
 | `bytes`    | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | String → `u8[]` |
 | `str_new`  | 🚫 Public surface removed; `str(bytes)` is the recommended path |
@@ -164,7 +164,7 @@ symbols used by the Python backend.
 Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main`, optional `__ep_global_init`, and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). The committed bundle order is authoritative.
 
 > `__ep_str_slice`, `__ep_str_cat`
-> in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `==`, `!=`
+> in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `+`, `==`, and `!=`
 > but are no longer callable by user code as public builtins.
 
 ### x64-backed private helpers

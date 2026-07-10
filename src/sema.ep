@@ -755,8 +755,14 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                 }
                 ret sema_set_type(node, "bool")
             }
-            if n.op == "+" && left == "str" && right == "str" {
-                sema_die("string concatenation is removed; use u8[] + extend + str(bytes)")
+            if n.op == "+" && (left == "str" || right == "str") {
+                if left != "str" || right != "str" {
+                    sema_die(f"string concatenation requires str operands, got {left} and {right}")
+                }
+                ret sema_set_type(node, "str")
+            }
+            if (n.op == "<" || n.op == ">" || n.op == "<=" || n.op == ">=") && (left == "str" || right == "str") {
+                sema_die(f"string ordering comparison {n.op} is not supported")
             }
             if n.op == "==" || n.op == "!=" || n.op == "<" || n.op == ">" || n.op == "<=" || n.op == ">=" {
                 if sema_is_int(left) && sema_is_int(right) {
@@ -1143,7 +1149,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             let target = sema_lvalue_type(st, n.expr)
             let rhs = sema_expr_type(st, n.value_expr)
             if n.op == "+" && target == "str" {
-                sema_die("string += is removed; use u8[] + extend instead")
+                sema_die("string += is not supported; use s = s + rhs")
             }
             if sema_is_int(target) == false {
                 sema_die(f"compound assignment expected integer target, got {target}")

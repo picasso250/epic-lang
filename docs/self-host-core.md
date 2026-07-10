@@ -16,7 +16,7 @@ or **deferred** for later decision.
 ```
 ADT:            planned as struct union (v1 design)
 match:          keep literal switch and add ADT match later
-str:            temporary u8[]-layout alias; public surface contracted
+str:            retained byte-string source type; shares current u8[] layout
 naming:         unify, but only after ADT removal
 required_helpers: explicit dependency tables deferred; MIR function pruning removes unreachable helpers/functions for now
 ```
@@ -40,7 +40,7 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 |----------|-------|
 | `struct` | Heap-allocated reference; named fields, 8-byte slot layout |
 | `T[]`    | Heap-allocated dynamic array descriptor |
-| `str`    | Temporary compatibility alias over the `u8[]` layout; see Deferred and `str-u8-alias-plan.md` |
+| `str`    | Retained byte-string/text type; current runtime header matches `u8[]` |
 
 ### Control Flow
 
@@ -90,8 +90,8 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 | `xs.pop()` | Delete and return the last element; empty array panics |
 | `dst.extend(src)` | dot call for arrays with the same element type |
 | `str(x)`      | transitional formatting/view operation: only `str`, integers, `bool`, and `u8[]`; no struct/non-u8 array repr |
-| `str(bytes)`  | `u8[]` to temporary `str` view; zero-copy identity cast |
-| `bytes(s)`    | temporary `str` view to `u8[]`; zero-copy identity cast |
+| `str(bytes)`  | Explicit `u8[]` to `str` view; zero-copy identity cast |
+| `bytes(s)`    | Explicit `str` to mutable `u8[]` view; zero-copy identity cast |
 | `cstr`        | NUL-terminated C string (kept for WinAPI interop) |
 | `str_new`     | 🚫 Removed from public surface; use `str(bytes)` |
 | `itoa`        | 🚫 Removed from public surface; use `str(n)` |
@@ -176,7 +176,7 @@ after ADT removal and naming unification.
 
 | Topic | Current Status | Future Direction |
 |-------|---------------|------------------|
-| `str` vs `u8[]` | `u8[]` is the current text truth; `str` is a temporary compatibility alias over the same layout | Continue collapsing `str` toward `u8[]`; future UTF-8 `str` is a separate later design. See `str-u8-alias-plan.md`. |
+| `str` vs `u8[]` | Distinct source types with the same current `{data,len,cap}` layout | Keep text semantics on `str`, mutable-buffer semantics on `u8[]`; the representation may diverge later. See `str-u8-layout-contract.md`. |
 | `str` helpers (`str_slice`, `str_find`, etc.) | Public surface removed | Internal helpers stay; user code uses `u8[]` byte scanning directly |
 | Helper naming | `arr` → `slice` rename complete | `i8` (MIR internal) deferred |
 | `required_helpers` / lazy injection | MIR function reachability pruning | Explicit dependency tables deferred; current pass keeps `main`, optional `__ep_global_init`, and x64-runtime MIR roots. |
@@ -192,7 +192,7 @@ after ADT removal and naming unification.
 ### Features retained in core
 
 - `i64` / `u64` / `u8` / `bool`
-- `str` (temporary `u8[]`-layout alias, see Deferred)
+- `str` (retained byte-string/text source type)
 - `struct`
 - `T[]` (dynamic array)
 - `fun` / `if` / `while` / `for` / `ret` / `break` / `continue`
@@ -214,11 +214,11 @@ after ADT removal and naming unification.
 - User method lowering: `fun (p: Parser) peek(): Token` occupies the global symbol `Parser__peek`; `p.peek()` lowers to `Parser__peek(p)`.
 - Method calls do not support overloads, traits, inheritance, virtual dispatch, method values, generics, or fallback to `peek(p)`.
 - Ordinary function names may contain `__`; if a method-generated `Type__method` symbol duplicates an existing function, normal duplicate-definition checking rejects it.
-- String/byte-view builtins (retained temporarily): `len(s)` / `s[start:end]` / `s1 == s2` / `s1 != s2` as syntax; byte indexing goes through `bytes(s)[i]`; `str(bytes)` / `bytes(s)` are zero-copy identity casts; `cstr` remains an escape hatch
+- String/byte-view operations (retained temporarily): `len(s)` / `s[start:end]` / `s1 == s2` / `s1 != s2` / `s1 + s2`; `+` allocates a new `str`, equality compares contents, byte indexing goes through `bytes(s)[i]`, and `str(bytes)` / `bytes(s)` are zero-copy identity casts
 - String builtins (removed from public surface):
   - `str_new` — removed entirely; use `str(bytes)`
   - `itoa` — removed entirely; use `str(n)`
-  - `str_slice`, `str_cat` — removed from public surface; internal helpers retained where syntax lowering still needs them
+  - `str_slice`, `str_cat` — function-style builtins removed from public surface; internal helpers retained for slice and `+` syntax lowering
   - `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
 - `os.*` WinAPI calls
 - `argv` global
@@ -242,7 +242,7 @@ after ADT removal and naming unification.
 - [x] 3. Document internal helper policy
 - [x] 4. Document literal sharing / shared buffer semantics
 - [x] 5. Remove public str helper from sema
-- [x] 6. Remove `str + str` from sema
+- [x] 6. Define `str + str` as allocating concatenation and reject string ordering / `str += str`
 - [x] 7. Add zero-copy behavior test (`tests/e2e/pass/v5_zero_copy_str_bytes.ep`)
 
 ### Phase 1: ADT Removal (completed)
@@ -271,10 +271,10 @@ Older names such as `str_bool`, `str_i64`, `str_arr_i8`, `bytes_str`, and
 `__epic_arr_*` have been removed from implementation code. The old Phase 2
 plan to rename helpers to bare names is obsolete.
 
-### Phase 3: `str` → `u8[]` Convergence (active)
+### Phase 3: String / byte-buffer boundary cleanup (active)
 
 Completed:
-- The byte-buffer-first text model is documented.
+- The source-level distinction between `str` text values and mutable `u8[]` buffers is documented.
 - `read_file` / `write_file` use `u8[]` as the data carrier.
 - `str(u8[])` and `bytes(str)` are zero-copy identity casts. `str(struct)` and `str(T[])` for non-`u8` arrays are not supported; f-string interpolation uses the same convertibility rule as `str(expr)`.
 - The zero-copy shared-buffer behavior is covered by `tests/e2e/pass/v5_zero_copy_str_bytes.ep`.
@@ -285,7 +285,7 @@ Completed:
 Remaining:
 - No retained `src/*.ep` source currently calls removed public string helpers. `src/link.ep` uses local `u8[]` byte scanning plus `str(n)`, and `src/parser.ep` no longer reserves `str_new`.
 
-Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to make `str` a temporary `u8[]`-layout alias first, then remove the temporary spelling after public APIs, runtime ABI, argv, and self-hosted sources no longer depend on it. See [`str-u8-alias-plan.md`](str-u8-alias-plan.md).
+Conclusion: `str` remains a source-level byte-string/text type. The active direction is to keep text operations (`+`, `==`, `!=`, slicing, formatting) on `str`, keep mutable/binary operations on `u8[]`, and preserve explicit zero-copy views while the layouts match. See [`str-u8-layout-contract.md`](str-u8-layout-contract.md).
 
 ---
 
@@ -294,6 +294,6 @@ Conclusion: Phase 3 is no longer just helper cleanup. The active direction is to
 - [`design.md`](design.md) — Epic language design (will be updated)
 - [`impl.md`](impl.md) — Epic implementation notes (will be updated)
 - [`builtin-inventory.md`](builtin-inventory.md) — Full builtin function inventory
-- [`str-u8-alias-plan.md`](str-u8-alias-plan.md) — staged `str` to `u8[]` alias plan
+- [`str-u8-layout-contract.md`](str-u8-layout-contract.md) — source-type and shared-layout contract
 - [`todo.md`](../todo.md) — Project todo
 

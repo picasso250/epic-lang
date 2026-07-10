@@ -139,6 +139,18 @@ Program
       Let again : str
         Call str : str
           Var bs : u8[]
+      Let joined : str
+        Binary + : str
+          String hello,  : str
+          Var again : str
+      Let same : bool
+        Binary == : bool
+          Var joined : str
+          String hello, hello : str
+      Let different : bool
+        Binary != : bool
+          Var joined : str
+          Var text : str
       Let first : u8
         Subscript : u8
           Var bs : u8[]
@@ -221,18 +233,25 @@ Program
             Var bsub : u8[]
             FStringText  
             Var b0 : u8
-      Return
-        Binary + : i64
-          Binary + : i64
+      If
+        Block
+          Return
             Binary + : i64
               Binary + : i64
-                Var n : i64
-                Var c : i64
-              Subscript : i64
-                Var xs : i64[]
-                Literal 0 : i64
-            Var popped : i64
-          Var index_sum : i64
+                Binary + : i64
+                  Binary + : i64
+                    Var n : i64
+                    Var c : i64
+                  Subscript : i64
+                    Var xs : i64[]
+                    Literal 0 : i64
+                Var popped : i64
+              Var index_sum : i64
+        Binary && : bool
+          Var same : bool
+          Var different : bool
+      Return
+        Literal 0 : i64
   FunDef use_structs : i64
     Block
       Let p : Point

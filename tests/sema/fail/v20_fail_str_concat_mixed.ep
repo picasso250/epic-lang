@@ -1,0 +1,4 @@
+# COMPILE_FAIL: string concatenation requires str operands, got str and i64
+fun main(): void {
+    let text = "value=" + 1
+}

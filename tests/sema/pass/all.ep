@@ -57,6 +57,9 @@ fun use_arrays_and_strings(): i64 {
     let text = "hello"
     let bs = bytes(text)
     let again = str(bs)
+    let joined = "hello, " + again
+    let same = joined == "hello, hello"
+    let different = joined != text
     let first: u8 = bs[0]
     let b0: u8 = bs[0]
     let sub = text[0:2]
@@ -77,7 +80,10 @@ fun use_arrays_and_strings(): i64 {
     }
     let popped = xs.pop()
     println(f"{again} {sub} {bsub} {b0}")
-    ret n + c + xs[0] + popped + index_sum
+    if same && different {
+        ret n + c + xs[0] + popped + index_sum
+    }
+    ret 0
 }
 
 fun use_structs(): i64 {

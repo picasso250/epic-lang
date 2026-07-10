@@ -297,7 +297,7 @@ class SemanticAnalyzer:
         target_type = self._lvalue_type(stmt.target)
         rhs = self._expr(stmt.value)
         if stmt.op == "+" and target_type == STR:
-            self._fail("string += is removed; use u8[] + extend instead")
+            self._fail("string += is not supported; use s = s + rhs")
             return
         if not self._is_integer(target_type):
             self._fail(f"compound assignment expected integer target, got {target_type}")
@@ -459,8 +459,12 @@ class SemanticAnalyzer:
             self._expect_bool(left, expr.op)
             self._expect_bool(right, expr.op)
             return ExprInfo(BOOL)
-        if expr.op == "+" and left.type == STR and right.type == STR:
-            self._fail("string concatenation is removed; use u8[] + extend + str(bytes)")
+        if expr.op == "+" and (left.type == STR or right.type == STR):
+            if left.type != STR or right.type != STR:
+                self._fail(f"string concatenation requires str operands, got {left.type} and {right.type}")
+            return ExprInfo(STR)
+        if expr.op in ("<", ">", "<=", ">=") and (left.type == STR or right.type == STR):
+            self._fail(f"string ordering comparison {expr.op} is not supported")
         if expr.op in ("==", "!=", "<", ">", "<=", ">="):
             if self._is_integer(left.type) and self._is_integer(right.type):
                 if left.type != right.type:

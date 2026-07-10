@@ -1,0 +1,4 @@
+# COMPILE_FAIL: string ordering comparison < is not supported
+fun main(): void {
+    let ordered = "a" < "b"
+}

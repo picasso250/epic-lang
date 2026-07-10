@@ -46,7 +46,7 @@ Epic currently supports:
 - functions, local variables, returns, `if`, `while`, `for in range`, `break`,
   and `continue`
 - integer and boolean operations, including signed / unsigned arithmetic cases
-- strings as byte-slice-backed text views during the current migration stage
+- strings as byte-slice-backed text views, with literals, content equality, slicing, and allocating `str + str` concatenation
 - dynamic arrays (`T[]`) backed by slice headers, with `len`, `cap`, checked indexing, and `push`
 - byte-oriented `u8[]` helpers such as slicing and `extend`
 - heap-backed structs with explicit named fields, initialization, and user-defined

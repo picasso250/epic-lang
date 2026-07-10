@@ -1180,6 +1180,12 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             st.current_block = right_flow.block
             let left_type = ast_resolved_type(n.left)
             let right_type = ast_resolved_type(n.right)
+            if left_type == "str" && right_type == "str" && n.op == "+" {
+                let args = new MirOperand[]
+                args.push(left_flow.value)
+                args.push(right_flow.value)
+                ret mir_value_flow(mir_emit_call_inst(st, "__ep_str_cat", "ptr", args), st.current_block)
+            }
             if left_type == "str" && right_type == "str" && (n.op == "==" || n.op == "!=") {
                 let args = new MirOperand[]
                 args.push(left_flow.value)

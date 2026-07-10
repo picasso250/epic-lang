@@ -1,6 +1,7 @@
 fun main(): i64 {
     let name = "epic"
     let bs = bytes(name)
-    let msg = f"hello {name} {len(bs)} {true}"
-    ret len(msg)
+    let prefix = "hello " + name
+    let msg = f"{prefix} {len(bs)} {true}"
+    ret len(msg + "!")
 }

@@ -4,10 +4,11 @@ fun main(): void {
     let a = "hello"
     let b = " "
     let c = "world"
-    let buf = new u8[]
-    buf.extend(bytes(a))
-    buf.extend(bytes(b))
-    buf.extend(bytes(c))
-    println(str(buf))
+    let joined = a + b + c
+    assert(joined == "hello world")
+    assert(a == "hello")
+    assert(("" + "x") == "x")
+    assert(("x" + "") == "x")
+    println(joined)
     exit(0)
 }
