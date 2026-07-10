@@ -174,9 +174,8 @@ fun epic_lower_program(program: MirProgram): X64Program {
     epic_timing("lower total inner", start, stop)
     ret lower.x64
 }
-fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
-    let total_start = epic_now_ms()
 
+fun epic_frontend(input_paths: str[], main_path: str): MirProgram {
     let parse_start = epic_now_ms()
     let ast = epic_merge_program(input_paths, main_path)
     let parse_stop = epic_now_ms()
@@ -190,11 +189,20 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
 
     let mir_start = epic_now_ms()
     let mir = mir_ast_to_mir(ast)
+    let mir_stop = epic_now_ms()
+    epic_timing("ast->mir", mir_start, mir_stop)
+    ret mir
+}
+
+fun epic_prepare_mir(mir: MirProgram): void {
+    let start = epic_now_ms()
     mir_inject_all_runtime_helpers(mir)
     mir_prune_unreachable_functions(mir)
-    let mir_stop = epic_now_ms()
-    epic_timing("ast->mir+runtime", mir_start, mir_stop)
+    let stop = epic_now_ms()
+    epic_timing("prepare mir", start, stop)
+}
 
+fun epic_backend(mir: MirProgram, exe_path: str): void {
     let lower_start = epic_now_ms()
     let x64 = epic_lower_program(mir)
     let lower_stop = epic_now_ms()
@@ -220,7 +228,13 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     link_obj(cstr_ready_path(obj_path), cstr_ready_path(exe_path))
     let link_stop = epic_now_ms()
     epic_timing("link", link_start, link_stop)
+}
 
+fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
+    let total_start = epic_now_ms()
+    let mir = epic_frontend(input_paths, main_path)
+    epic_prepare_mir(mir)
+    epic_backend(mir, exe_path)
     let total_stop = epic_now_ms()
     epic_timing("total", total_start, total_stop)
 }
