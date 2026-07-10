@@ -108,7 +108,7 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 
 ### Runtime Helpers (MIR-implemented)
 
-These are core runtime helpers. MIR helper bodies used by both compilers live in the committed bundle `runtime/mir/helpers.mir`; both compilers load the bundle and then prune unreachable MIR functions. Update the bundle with `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text:
+These are core runtime helpers. MIR helper bodies used by both compilers live in the committed bundle `runtime/mir/helpers.mir`; both compilers load the bundle and then prune unreachable MIR functions. Edit the canonical bundle directly; its function order is authoritative:
 
 - `__ep_str_from_bool` — bool to static string
 - `__ep_str_eq` — string equality

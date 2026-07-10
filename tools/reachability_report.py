@@ -14,24 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-DEFAULT_COMPILER_SOURCES = [
-    "src/util.ep",
-    "src/lexer.ep",
-    "src/parser.ep",
-    "src/sema.ep",
-    "src/mir.ep",
-    "src/mir_text.ep",
-    "src/mir_runtime.ep",
-    "src/backend_abi.ep",
-    "src/ast_to_mir.ep",
-    "src/x64.ep",
-    "src/mir_to_x64.ep",
-    "src/x64_runtime.ep",
-    "src/machine.ep",
-    "src/coff.ep",
-    "src/link.ep",
-    "src/epic.ep",
-]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
+
+DEFAULT_COMPILER_SOURCES = SELF_HOST_COMPILER_SOURCES
 
 
 @dataclass
@@ -63,7 +50,7 @@ def load_pipeline(root: Path, sources: list[str], main: str) -> Pipeline:
     from epic import _merge_programs  # type: ignore
     from sema import analyze_program  # type: ignore
     from ast_to_mir import ast_to_mir  # type: ignore
-    from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS  # type: ignore
+    from mir_runtime_helpers import runtime_mir_helper_names  # type: ignore
     from mir_to_x64 import lower_mir_to_x64  # type: ignore
 
     input_paths = [rel_or_abs(root, source) for source in sources]
@@ -71,7 +58,7 @@ def load_pipeline(root: Path, sources: list[str], main: str) -> Pipeline:
     ast = analyze_program(_merge_programs(input_paths, main_path, verbose=False))
     mir = ast_to_mir(ast)
     x64 = lower_mir_to_x64(mir)
-    return Pipeline(ast=ast, mir=mir, x64=x64, runtime_mir_helpers=set(IMPLEMENTED_MIR_HELPERS))
+    return Pipeline(ast=ast, mir=mir, x64=x64, runtime_mir_helpers=set(runtime_mir_helper_names()))
 
 
 def walk_ast(node):

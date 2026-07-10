@@ -15,33 +15,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "bootstrap"
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(BOOTSTRAP))
 
+from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES  # noqa: E402
 import epic  # noqa: E402
 import machine  # noqa: E402
 from machine import MachineObjectBuilder  # noqa: E402
 from mir_to_x64 import MirLower, prepare_mir_for_x64  # noqa: E402
 
 
-RUNTIME_SOURCES = [Path("runtime") / "str.ep"]
-COMPILER_SOURCES = [
-    Path("src") / "util.ep",
-    Path("src") / "lexer.ep",
-    Path("src") / "parser.ep",
-    Path("src") / "sema.ep",
-    Path("src") / "mir.ep",
-    Path("src") / "mir_text.ep",
-    Path("src") / "mir_runtime.ep",
-    Path("src") / "backend_abi.ep",
-    Path("src") / "ast_to_mir.ep",
-    Path("src") / "x64.ep",
-    Path("src") / "mir_to_x64.ep",
-    Path("src") / "x64_runtime.ep",
-    Path("src") / "machine.ep",
-    Path("src") / "coff.ep",
-    Path("src") / "link.ep",
-    Path("src") / "epic.ep",
-]
+RUNTIME_SOURCES = [Path(path) for path in SELF_HOST_RUNTIME_SOURCES]
+COMPILER_SOURCES = [Path(path) for path in SELF_HOST_COMPILER_SOURCES]
+
 
 
 def rel(path: Path) -> str:

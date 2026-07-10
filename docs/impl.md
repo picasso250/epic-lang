@@ -94,7 +94,7 @@ machine backend 验收入口。
 ## 运行时辅助代码 (Runtime Helpers)
 
 Python machine backend 的 x64 运行时片段在 `bootstrap/x64_runtime.py` 中发射。
-MIR runtime helper body 统一提交在 `runtime/mir/helpers.mir`，Python reference compiler 和 Epic 自举编译器都读取这个 bundle；修改 helper MIR 文本后运行 `python scripts/write_mir_runtime_bundle.py` 规范化顺序。旧 `runtime/*.asm` 路线已删除。
+MIR runtime helper body 统一提交在 `runtime/mir/helpers.mir`，Python reference compiler 和 Epic 自举编译器都读取这个 bundle；helper 的文本顺序就是规范 bundle 顺序。旧 `runtime/*.asm` 路线已删除。
 
 ## 类型降级 (Type Lowering)
 

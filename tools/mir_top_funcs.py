@@ -22,24 +22,11 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_COMPILER_SOURCES = [
-    "src/util.ep",
-    "src/lexer.ep",
-    "src/parser.ep",
-    "src/sema.ep",
-    "src/mir.ep",
-    "src/mir_text.ep",
-    "src/mir_runtime.ep",
-    "src/backend_abi.ep",
-    "src/ast_to_mir.ep",
-    "src/x64.ep",
-    "src/mir_to_x64.ep",
-    "src/x64_runtime.ep",
-    "src/machine.ep",
-    "src/coff.ep",
-    "src/link.ep",
-    "src/epic.ep",
-]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
+
+DEFAULT_COMPILER_SOURCES = SELF_HOST_COMPILER_SOURCES
 
 
 @dataclass

@@ -13,7 +13,7 @@ from mir import BOOL, I32, I64, I8, Br, CondBr, MirBlock, MirField, MirFunction,
 from mir import MirGlobal, MirProgram, MirStruct, MirValue, Ret, SymbolOperand, ValueOperand, ConstIntOperand, ConstNullOperand
 from mir import MirValidationError, validate, ptr, struct as mir_struct
 from ast_to_mir import ast_to_mir
-from mir_runtime_helpers import IMPLEMENTED_MIR_HELPERS, inject_all_mir_helpers
+from mir_runtime_helpers import inject_all_mir_helpers
 from mir_prune import prune_unreachable_functions
 from mir_parser import parse_mir_file, parse_mir_text
 from parser import Parser
@@ -342,7 +342,6 @@ def test_runtime_mir_bundle_declares_external_contracts():
         "ExitProcess", "GetStdHandle", "WriteFile",
         "__ep_print_newline", "__ep_print_str", "__epx_alloc",
     }
-    assert [fn.name for fn in program.functions] == list(IMPLEMENTED_MIR_HELPERS)
     parsed_fn = next(fn for fn in program.functions if fn.name == "__ep_slice_i64_get")
     assert parsed_fn.text() in text
 

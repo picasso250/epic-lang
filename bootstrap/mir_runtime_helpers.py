@@ -8,55 +8,6 @@ from mir import MirGlobal, MirProgram, ptr
 from mir_parser import parse_mir_file
 
 
-IMPLEMENTED_MIR_HELPERS = (
-    "__ep_runtime_panic",
-    "__ep_str_cat",
-    "__ep_slice_u8_alloc",
-    "__ep_slice_u8_get",
-    "__ep_slice_u8_pop",
-    "__ep_slice_i64_new",
-    "__ep_slice_i64_get",
-    "__ep_slice_i64_set",
-    "__ep_slice_i64_push",
-    "__ep_slice_i64_pop",
-    "__ep_slice_i64_extend",
-    "__ep_slice_ptr_new",
-    "__ep_slice_ptr_get",
-    "__ep_slice_ptr_set",
-    "__ep_slice_ptr_push",
-    "__ep_slice_ptr_pop",
-    "__ep_slice_ptr_extend",
-    "__ep_slice_u8_set",
-    "__ep_slice_u8_push",
-    "__ep_slice_u8_slice",
-    "__ep_slice_u8_extend",
-    "__ep_str_cmp",
-    "__ep_map_str_find_pos",
-    "__ep_map_str_len",
-    "__ep_map_str_key_at",
-    "__ep_map_str_i64_new",
-    "__ep_map_str_i64_get",
-    "__ep_map_str_i64_set",
-    "__ep_map_str_i64_has",
-    "__ep_map_str_i64_del",
-    "__ep_map_str_bool_new",
-    "__ep_map_str_bool_get",
-    "__ep_map_str_bool_set",
-    "__ep_map_str_bool_has",
-    "__ep_map_str_bool_del",
-    "__ep_map_str_str_new",
-    "__ep_map_str_str_get",
-    "__ep_map_str_str_set",
-    "__ep_map_str_str_has",
-    "__ep_map_str_str_del",
-    "__ep_map_str_ptr_new",
-    "__ep_map_str_ptr_get",
-    "__ep_map_str_ptr_set",
-    "__ep_map_str_ptr_has",
-    "__ep_map_str_ptr_del",
-    "__ep_debug_i64",
-)
-
 
 _RUNTIME_STRING_GLOBALS = (
     ("str.runtime.bool.true", "true"),
@@ -80,15 +31,13 @@ def _parsed_runtime_program():
         raise RuntimeError(f"missing MIR runtime helper bundle: {_RUNTIME_MIR_BUNDLE}")
 
     parsed = parse_mir_file(_RUNTIME_MIR_BUNDLE, validate_program=False)
-    helpers = {fn.name: fn for fn in parsed.functions}
-    expected = set(IMPLEMENTED_MIR_HELPERS)
-    missing = [name for name in IMPLEMENTED_MIR_HELPERS if name not in helpers]
-    extra = sorted(name for name in helpers if name not in expected)
-    if missing or extra:
-        raise RuntimeError(f"MIR runtime helper bundle mismatch: missing={missing}, extra={extra}")
-
     _PARSED_RUNTIME_PROGRAM = parsed
     return parsed
+
+
+def runtime_mir_helper_names() -> tuple[str, ...]:
+    """Return helper names in the canonical bundle order."""
+    return tuple(fn.name for fn in _parsed_runtime_program().functions)
 
 
 def inject_all_mir_helpers(program: MirProgram) -> None:
