@@ -1101,10 +1101,13 @@ fun mir_emit_array_literal_storage(st: MirCodegenState, elem_type: str, count: M
 fun mir_emit_new_array(st: MirCodegenState, block: MirBlock, expr: AstNewArray): MirValueFlow {
     st.current_block = block
     let count = mir_const_int("i64", 0)
-    if ast_kind(expr.count) != "" {
-        let count_flow = mir_emit_expr(st, st.current_block, expr.count)
-        st.current_block = count_flow.block
-        count = count_flow.value
+    match expr.count {
+        AstEmpty e: {}
+        _: {
+            let count_flow = mir_emit_expr(st, st.current_block, expr.count)
+            st.current_block = count_flow.block
+            count = count_flow.value
+        }
     }
     let arr = mir_emit_empty_array(st, epic_type_array_elem(expr.AstMeta.resolved_type), count)
     ret mir_value_flow(arr, st.current_block)
@@ -1668,7 +1671,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             ret mir_value_flow(mir_emit_call_inst(st, n.name, ret_type, args), st.current_block)
         }
         _: {
-            ast_to_mir_die(f"unsupported expr {ast_kind(expr)}")
+            ast_to_mir_die("unsupported expr")
         }
     }
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
@@ -1685,10 +1688,13 @@ fun mir_emit_assert(st: MirCodegenState, block: MirBlock, stmt: AstAssert): MirB
 
     st.current_block = fail_block
     mir_emit_print_text(st, str_cat2(str_cat2("assert line ", str(stmt.AstMeta.line)), ": "))
-    if ast_kind(stmt.value_expr) == "" {
-        mir_emit_print_text(st, "assertion failed")
-    } else {
-        mir_emit_print_expr(st, stmt.value_expr)
+    match stmt.value_expr {
+        AstEmpty e: {
+            mir_emit_print_text(st, "assertion failed")
+        }
+        _: {
+            mir_emit_print_expr(st, stmt.value_expr)
+        }
     }
     mir_emit_print_newline(st)
     mir_emit_exit_current_block(st, 1)
@@ -2403,7 +2409,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             ret mir_unreachable_flow()
         }
         _: {
-            ast_to_mir_die(f"unsupported stmt {ast_kind(stmt)}")
+            ast_to_mir_die("unsupported stmt")
         }
     }
     ret mir_unreachable_flow()

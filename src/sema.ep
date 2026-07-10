@@ -30,57 +30,6 @@ fun sema_die(msg: str): void {
     panic str_cat2("Sema error: ", msg)
 }
 
-fun ast_kind(node: AstNode): str {
-    match node {
-        AstEmpty n: { ret "" }
-        AstProgram n: { ret "Program" }
-        AstStructDef n: { ret "StructDef" }
-        AstUnionDef n: { ret "UnionDef" }
-        AstFunDef n: { ret "FunDef" }
-        AstParam n: { ret "Param" }
-        AstStructField n: { ret "StructField" }
-        AstBlock n: { ret "Block" }
-        AstLet n: { ret "Let" }
-        AstReturn n: { ret "Return" }
-        AstAssign n: { ret "Assign" }
-        AstAssignOp n: { ret "AssignOp" }
-        AstFieldSet n: { ret "FieldSet" }
-        AstSubscriptAssign n: { ret "SubscriptAssign" }
-        AstIf n: { ret "If" }
-        AstWhile n: { ret "While" }
-        AstForRange n: { ret "ForRange" }
-        AstForIn n: { ret "ForIn" }
-        AstBreak n: { ret "Break" }
-        AstContinue n: { ret "Continue" }
-        AstPanic n: { ret "Panic" }
-        AstAssert n: { ret "Assert" }
-        AstMatch n: { ret "Match" }
-        AstMatchCase n: { ret "MatchCase" }
-        AstExprStmt n: { ret "ExprStmt" }
-        AstLiteral n: { ret "Literal" }
-        AstChar n: { ret "Char" }
-        AstBool n: { ret "Bool" }
-        AstString n: { ret "String" }
-        AstFString n: { ret "FString" }
-        AstFStringText n: { ret "FStringText" }
-        AstVar n: { ret "Var" }
-        AstBinary n: { ret "Binary" }
-        AstUnary n: { ret "Unary" }
-        AstCall n: { ret "Call" }
-        AstDotCall n: { ret "DotCall" }
-        AstFieldAccess n: { ret "FieldAccess" }
-        AstNullCheck n: { ret "NullCheck" }
-        AstSubscript n: { ret "Subscript" }
-        AstSlice n: { ret "Slice" }
-        AstNewArray n: { ret "NewArray" }
-        AstArrayLiteral n: { ret "ArrayLiteral" }
-        AstStructInit n: { ret "StructInit" }
-        AstInitField n: { ret "InitField" }
-        AstUnionInit n: { ret "UnionInit" }
-        AstMapInit n: { ret "MapInit" }
-    }
-    ret ""
-}
 fun sema_key2(a: str, b: str): str {
     let out = new u8[]
     out.extend(bytes(a))
@@ -339,71 +288,71 @@ fun sema_check_decimal_i64_literal(s: str, context: str): void {
 }
 
 fun sema_has_literal_int(node: AstNode): bool {
-    if ast_kind(node) == "Literal" || ast_kind(node) == "Char" {
-        ret true
-    }
-    if ast_kind(node) == "Unary" {
-        ret sema_has_literal_int(ast_expr(node))
-    }
-    if ast_kind(node) == "Binary" {
-        ret sema_has_literal_int(ast_left(node)) && sema_has_literal_int(ast_right(node))
+    match node {
+        AstLiteral n: { ret true }
+        AstChar n: { ret true }
+        AstUnary n: { ret sema_has_literal_int(n.expr) }
+        AstBinary n: { ret sema_has_literal_int(n.left) && sema_has_literal_int(n.right) }
+        _: {}
     }
     ret false
 }
 
 fun sema_literal_int(node: AstNode): i64 {
-    if ast_kind(node) == "Literal" || ast_kind(node) == "Char" {
-        ret sema_parse_i64(ast_value(node))
-    }
-    if ast_kind(node) == "Unary" {
-        let inner = sema_literal_int(ast_expr(node))
-        if ast_op(node) == "-" {
-            ret 0 - inner
-        }
-        if ast_op(node) == "~" {
-            ret 0 - inner - 1
-        }
-        ret inner
-    }
-    if ast_kind(node) == "Binary" {
-        let left = sema_literal_int(ast_left(node))
-        let right = sema_literal_int(ast_right(node))
-        if ast_op(node) == "+" {
-            ret left + right
-        }
-        if ast_op(node) == "-" {
-            ret left - right
-        }
-        if ast_op(node) == "*" {
-            ret left * right
-        }
-        if ast_op(node) == "/" {
-            if right == 0 {
-                ret 0
+    match node {
+        AstLiteral n: { ret sema_parse_i64(n.value) }
+        AstChar n: { ret sema_parse_i64(n.value) }
+        AstUnary n: {
+            let inner = sema_literal_int(n.expr)
+            if n.op == "-" {
+                ret 0 - inner
             }
-            ret left / right
-        }
-        if ast_op(node) == "%" {
-            if right == 0 {
-                ret 0
+            if n.op == "~" {
+                ret 0 - inner - 1
             }
-            ret left % right
+            ret inner
         }
-        if ast_op(node) == "&" {
-            ret left & right
+        AstBinary n: {
+            let left = sema_literal_int(n.left)
+            let right = sema_literal_int(n.right)
+            if n.op == "+" {
+                ret left + right
+            }
+            if n.op == "-" {
+                ret left - right
+            }
+            if n.op == "*" {
+                ret left * right
+            }
+            if n.op == "/" {
+                if right == 0 {
+                    ret 0
+                }
+                ret left / right
+            }
+            if n.op == "%" {
+                if right == 0 {
+                    ret 0
+                }
+                ret left % right
+            }
+            if n.op == "&" {
+                ret left & right
+            }
+            if n.op == "|" {
+                ret left | right
+            }
+            if n.op == "^" {
+                ret left ^ right
+            }
+            if n.op == "<<" {
+                ret left << right
+            }
+            if n.op == ">>" || n.op == ">>>" {
+                ret left >> right
+            }
         }
-        if ast_op(node) == "|" {
-            ret left | right
-        }
-        if ast_op(node) == "^" {
-            ret left ^ right
-        }
-        if ast_op(node) == "<<" {
-            ret left << right
-        }
-        if ast_op(node) == ">>" || ast_op(node) == ">>>" {
-            ret left >> right
-        }
+        _: {}
     }
     ret 0
 }
@@ -910,7 +859,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             sema_die(f"new expected map, got {typ}")
         }
         _: {
-            sema_die(f"unsupported expression: {ast_kind(node)}")
+            sema_die("unsupported expression")
         }
     }
     ret ""
@@ -1170,13 +1119,13 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
 }
 
 fun sema_lvalue_type(st: SemaState, node: AstNode): str {
-    if ast_kind(node) == "Var" {
-        ret sema_set_type(node, sema_lookup(st, ast_name(node)))
+    match node {
+        AstVar n: { ret sema_set_type(node, sema_lookup(st, n.name)) }
+        AstFieldAccess n: { ret sema_expr_type(st, node) }
+        AstSubscript n: { ret sema_expr_type(st, node) }
+        _: {}
     }
-    if ast_kind(node) == "FieldAccess" || ast_kind(node) == "Subscript" {
-        ret sema_expr_type(st, node)
-    }
-    sema_die(f"unsupported assignment target {ast_kind(node)}")
+    sema_die("unsupported assignment target")
     ret ""
 }
 
@@ -1338,7 +1287,11 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 let seen = new map[str]bool
                 for i in n.fields {
                     let c = n.fields[i]
-                    if ast_kind(c.expr) != "" || c.variant_name == "" || c.binding_name == "" {
+                    match c.expr {
+                        AstEmpty e: {}
+                        _: { sema_die(f"ADT match on {scrutinee} requires variant binding cases") }
+                    }
+                    if c.variant_name == "" || c.binding_name == "" {
                         sema_die(f"ADT match on {scrutinee} requires variant binding cases")
                     }
                     if st.union_members.has(sema_key2(scrutinee, c.variant_name)) == false {
@@ -1386,7 +1339,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             ret
         }
         _: {
-            sema_die(f"unsupported statement: {ast_kind(node)}")
+            sema_die("unsupported statement")
         }
     }
 }
