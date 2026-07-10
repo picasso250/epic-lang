@@ -9,8 +9,6 @@ from mir_parser import parse_mir_file
 
 
 IMPLEMENTED_MIR_HELPERS = (
-    "__ep_slice_u8_from_str",
-    "__ep_str_from_slice_u8",
     "__ep_runtime_panic",
     "__ep_str_cat",
     "__ep_slice_u8_alloc",

@@ -791,7 +791,7 @@ fun mir_emit_str_conversion(st: MirCodegenState, block: MirBlock, expr: AstNode)
         ret mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_bool", "ptr", args), st.current_block)
     }
     if mir_is_u8_array_type(typ) {
-        ret mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_slice_u8", "ptr", args), st.current_block)
+        ret mir_value_flow(arg_flow.value, st.current_block)
     }
     if typ == "u64" {
         ret mir_value_flow(mir_emit_call_inst(st, "__ep_str_from_u64", "ptr", args), st.current_block)
@@ -1551,11 +1551,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 ret mir_emit_str_conversion(st, st.current_block, n.args[0])
             }
             if n.name == "bytes" {
-                let args = new MirOperand[0]
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
-                args.push(arg_flow.value)
-                ret mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_from_str", "ptr", args), st.current_block)
+                ret mir_value_flow(arg_flow.value, st.current_block)
             }
             if n.name == "read_file" {
                 let args = new MirOperand[0]

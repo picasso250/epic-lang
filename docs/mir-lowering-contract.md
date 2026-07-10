@@ -383,7 +383,7 @@ ret
 - `__ep_print_str` / `__ep_print_newline`
 - `__epx_slice_oob`
 
-MIR-implemented helpers such as `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_str_from_bool`,
+MIR-implemented helpers such as `__ep_str_from_bool`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
@@ -393,6 +393,8 @@ in the self-hosted compiler. After injection, both compilers prune unreachable
 MIR functions from the final program; roots include `main`, optional
 `__ep_global_init`, and MIR/Epic functions directly called by hand-written x64
 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). They no longer have same-named x64 fallback bodies.
+`bytes(str)` and `str(u8[])` are lowered as identity casts, so they do not
+require MIR runtime functions.
 Remaining x64 labels and function bodies are hand-written in `mir_to_x64.py`
 `_emit_*()` methods.
 

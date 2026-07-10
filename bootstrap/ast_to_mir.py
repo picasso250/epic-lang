@@ -103,13 +103,11 @@ class MirCodegen(MirFunctionBuilder):
             self.program.externs.append(MirExtern("__ep_str_from_u64", MirSignature([I64], ptr())))
         if "__ep_str_from_bool" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_from_bool", MirSignature([BOOL], ptr())))
-        self.program.externs.append(MirExtern("__ep_str_from_slice_u8", MirSignature([ptr()], ptr())))
         self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr(), ptr()], ptr())))
         if "__ep_str_eq" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_eq", MirSignature([ptr(), ptr()], BOOL)))
         if "__ep_str_slice" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_slice", MirSignature([ptr(), I64, I64], ptr())))
-        self.program.externs.append(MirExtern("__ep_slice_u8_from_str", MirSignature([ptr()], ptr())))
         self.program.externs.append(MirExtern("__ep_cstr", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_read_file", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_write_file", MirSignature([ptr(), ptr(), I64], I64)))
@@ -1360,8 +1358,7 @@ class MirCodegen(MirFunctionBuilder):
         if name == "bytes":
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
-            result = self.inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_slice_u8_from_str")
-            return ValueFlow(ValueOperand(result), self.current_block)
+            return ValueFlow(arg.value, self.current_block)
         if name == "read_file":
             arg = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(arg.block)
@@ -1706,8 +1703,7 @@ class MirCodegen(MirFunctionBuilder):
             result = self.inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_bool")
             return ValueFlow(ValueOperand(result), self.current_block)
         if self._is_u8_array_type(typ):
-            result = self.inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_slice_u8")
-            return ValueFlow(ValueOperand(result), self.current_block)
+            return ValueFlow(arg.value, self.current_block)
         if source_type == et.U64:
             result = self.inst("call", [arg.value], result_type=ptr(), type=ptr(), callee="__ep_str_from_u64")
             return ValueFlow(ValueOperand(result), self.current_block)

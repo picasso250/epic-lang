@@ -352,12 +352,15 @@ the Epic implementation grows around them.
 Runtime data, startup hook emission, and runtime append policy now live in
 `x64_runtime.py`.
 
-MIR helper bodies for `__ep_slice_u8_from_str`, `__ep_str_from_slice_u8`, `__ep_str_eq`, `__ep_str_cat`,
+MIR helper bodies for `__ep_str_eq`, `__ep_str_cat`,
 `__ep_str_slice`, `__ep_str_from_bool`,
 `__ep_slice_u8_alloc`, `__ep_slice_u8_alloc`,
 `__ep_slice_u8_get`, `__ep_slice_u8_set`, `__ep_slice_u8_push`, `__ep_slice_u8_slice`, and `__ep_slice_u8_extend`
 are injected as ordinary
 `MirFunction`s by `ast_to_mir.py`.
+
+`bytes(str)` and `str(u8[])` are identity casts in lowering, not runtime helper
+calls.
 
 Remaining hand-written x64 helper bodies live in `bootstrap/x64_runtime.py`, not on `MirLower`. Public `__ep_*` helper symbols are semantic-layer entry points; hand-written x64 implementations use `__epx_*` primitive symbols. Current public wrappers tail-jump to the matching primitive so frontend/codegen call sites stay stable while individual helpers migrate to MIR or Epic runtime source.
 

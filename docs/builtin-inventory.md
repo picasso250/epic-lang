@@ -164,8 +164,6 @@ symbols used by the Python backend.
 
 | helper | purpose |
 |---|---|
-| `__ep_slice_u8_from_str` | convert `str` to `_slice_u8` |
-| `__ep_str_from_slice_u8` | view/convert `_slice_u8` as `str` |
 | `__ep_str_from_bool` | convert `bool` to a static runtime string |
 | `__ep_str_eq` | compare two strings for equality |
 | `__ep_runtime_panic` | print runtime panic text and exit with status 1 |
@@ -181,7 +179,7 @@ symbols used by the Python backend.
 | `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` | append one array into another |
 | `__ep_map_str_len` / `__ep_map_str_key_at` | internal map key iteration helpers |
 
-Python and self-hosted compilers load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main`, optional `__ep_global_init`, and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). Run `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text to normalize bundle order.
+Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main`, optional `__ep_global_init`, and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). Run `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text to normalize bundle order.
 
 > `__ep_str_slice`, `__ep_str_cat`
 > in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `==`, `!=`

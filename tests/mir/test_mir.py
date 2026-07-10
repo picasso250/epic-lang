@@ -308,13 +308,13 @@ def test_mir_helper_injection():
             assert name not in externs, f"{name} should be removed from externs, got externs={externs}"
         return prog
 
-    check(
+    bytes_prog = check(
         """fun main(): i64 {
     let b = bytes("AB")
     ret 0
-}""",
-        ["__ep_slice_u8_from_str"],
+}"""
     )
+    assert "__ep_slice_u8_from_str" not in bytes_prog.text()
 
     parsed_helper_path = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir", "helpers.mir"))
     parsed_helper_program = parse_mir_file(parsed_helper_path, validate_program=False)
@@ -329,14 +329,14 @@ def test_mir_helper_injection():
     parsed_fn = next(fn for fn in parsed_prog.functions if fn.name == "__ep_slice_i64_get")
     assert parsed_fn.text() == parsed_helper_text
 
-    check(
+    str_prog = check(
         """fun main(): i64 {
     let a = new u8[] { u8(65) }
     println(str(a))
     ret 0
-}""",
-        ["__ep_str_from_slice_u8"],
+}"""
     )
+    assert "__ep_str_from_slice_u8" not in str_prog.text()
 
     check(
         """fun main(): i64 {

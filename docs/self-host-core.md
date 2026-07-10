@@ -110,8 +110,6 @@ required_helpers: explicit dependency tables deferred; MIR function pruning remo
 
 These are core runtime helpers. MIR helper bodies used by both compilers live in the committed bundle `runtime/mir/helpers.mir`; both compilers load the bundle and then prune unreachable MIR functions. Update the bundle with `python scripts/write_mir_runtime_bundle.py` after changing helper MIR text:
 
-- `__ep_slice_u8_from_str` — str to `_slice_u8`
-- `__ep_str_from_slice_u8` — `_slice_u8` to str
 - `__ep_str_from_bool` — bool to static string
 - `__ep_str_eq` — string equality
 - `__ep_str_cat` — string concatenation
@@ -274,8 +272,7 @@ Current direction names:
 - `__ep_str_from_bool` — bool → str
 - `__ep_str_from_i64` — i64 → str, implemented in `runtime/str.ep`
 - `__ep_str_from_u64` — u64 → str, implemented in `runtime/str.ep`
-- `__ep_str_from_slice_u8` — u8[] → str
-- `__ep_slice_u8_from_str` — str → u8[]
+- `str(u8[])` / `bytes(str)` — identity casts lowered without helper calls
 - `__ep_slice_i64_*` — i64[] operations
 - `__ep_slice_ptr_*` — pointer slice operations
 

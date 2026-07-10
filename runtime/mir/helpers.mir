@@ -1,13 +1,3 @@
-define ptr @__ep_slice_u8_from_str(ptr %s) {
-entry:
-  ret ptr %s
-}
-
-define ptr @__ep_str_from_slice_u8(ptr %input) {
-entry:
-  ret ptr %input
-}
-
 define void @__ep_runtime_panic(ptr %msg) {
 entry:
   call void __ep_print_str(ptr str.runtime.panic.prefix)
