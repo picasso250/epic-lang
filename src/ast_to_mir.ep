@@ -23,7 +23,7 @@ struct MirCodegenState {
     value_counter: i64
     block_counter: i64
     local_names: str[]
-    local_addr_names: str[]
+    local_addr_ids: i64[]
     local_types: str[]
     func_names: str[]
     func_return_types: str[]
@@ -88,9 +88,9 @@ fun mir_epic_type(type_name: str): str {
     ret "ptr"
 }
 
-fun mir_new_value(st: MirCodegenState, hint: str): str {
+fun mir_new_value(st: MirCodegenState): i64 {
     st.value_counter = st.value_counter + 1
-    ret str_cat2(hint, str(st.value_counter))
+    ret st.value_counter
 }
 
 fun mir_new_block(st: MirCodegenState, prefix: str): MirBlock {
@@ -105,12 +105,12 @@ fun mir_emit_inst(st: MirCodegenState, inst: MirInst): void {
 }
 
 fun mir_alloc_local(st: MirCodegenState, name: str, typ: str): MirOperand {
-    let addr_name = mir_new_value(st, str_cat2(name, ".addr"))
-    mir_emit_inst(st, mir_alloca(addr_name, typ))
+    let addr_id = mir_new_value(st)
+    mir_emit_inst(st, mir_alloca(addr_id, typ))
     st.local_names.push(name)
-    st.local_addr_names.push(addr_name)
+    st.local_addr_ids.push(addr_id)
     st.local_types.push(typ)
-    ret mir_value_operand("ptr", addr_name)
+    ret mir_value_operand("ptr", addr_id)
 }
 
 fun mir_local_index(st: MirCodegenState, name: str): i64 {
@@ -160,7 +160,7 @@ fun mir_emit_global_init_function(st: MirCodegenState, ast: AstProgram): void {
     st.value_counter = 0
     st.block_counter = 0
     st.local_names = new str[]
-    st.local_addr_names = new str[]
+    st.local_addr_ids = new i64[]
     st.local_types = new str[]
     st.continue_targets = new str[]
     st.break_targets = new str[]
@@ -292,21 +292,6 @@ fun mir_func_return_type(st: MirCodegenState, name: str): str {
     ret "i64"
 }
 
-fun str_replace_char_local(s: str, from_ch: i64, to_ch: i64): str {
-    let out = make_str_buf()
-    let bs = bytes(s)
-    let i = 0
-    for i < len(bs) {
-        if i64(bs[i]) == from_ch {
-            out.push(u8(to_ch))
-        } else {
-            out.push(bs[i])
-        }
-        i = i + 1
-    }
-    ret str(out)
-}
-
 fun mir_is_unsigned_int_type(type_name: str): bool {
     ret type_name == "u64" || type_name == "u32" || type_name == "u8"
 }
@@ -374,14 +359,14 @@ fun mir_emit_shift_count_check(st: MirCodegenState, count: MirOperand, source_ty
     nonneg.operands.push(count)
     nonneg.operands.push(mir_const_int("i64", 0))
     mir_emit_inst(st, nonneg)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", nonneg.result_name), high_block.name, fail_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", nonneg.result_id), high_block.name, fail_block.name)
     st.current_block.has_terminator = true
     st.current_block = high_block
     let in_range = mir_make_result_inst(st, "icmp.slt", "bool")
     in_range.operands.push(count)
     in_range.operands.push(mir_const_int("i64", width))
     mir_emit_inst(st, in_range)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", in_range.result_name), ok_block.name, fail_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", in_range.result_id), ok_block.name, fail_block.name)
     st.current_block.has_terminator = true
     st.current_block = fail_block
     let print_args = new MirOperand[]
@@ -402,7 +387,7 @@ fun mir_make_gep(st: MirCodegenState, source_type: str, operands: MirOperand[]):
     inst.typ = source_type
     inst.operands = operands
     mir_emit_inst(st, inst)
-    ret mir_value_operand("ptr", inst.result_name)
+    ret mir_value_operand("ptr", inst.result_id)
 }
 
 fun mir_make_ptrtoint(st: MirCodegenState, operand: MirOperand, target_type: str): MirOperand {
@@ -410,7 +395,7 @@ fun mir_make_ptrtoint(st: MirCodegenState, operand: MirOperand, target_type: str
     inst.typ = target_type
     inst.operands.push(operand)
     mir_emit_inst(st, inst)
-    ret mir_value_operand(target_type, inst.result_name)
+    ret mir_value_operand(target_type, inst.result_id)
 }
 
 fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: MirOperand[]): MirOperand {
@@ -423,17 +408,17 @@ fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: Mi
         mir_emit_inst(st, inst)
         ret mir_const_int("i64", 0)
     }
-    inst.result_name = mir_new_value(st, "call")
+    inst.result_id = mir_new_value(st)
     inst.result_type = ret_type
     inst.has_result = true
     mir_emit_inst(st, inst)
-    ret mir_value_operand(ret_type, inst.result_name)
+    ret mir_value_operand(ret_type, inst.result_id)
 }
 
 fun mir_make_result_inst(st: MirCodegenState, op: str, result_type: str): MirInst {
     let inst = mir_inst_empty()
     inst.op = op
-    inst.result_name = mir_new_value(st, str_replace_char_local(op, 46, 95))
+    inst.result_id = mir_new_value(st)
     inst.result_type = result_type
     inst.has_result = true
     ret inst
@@ -450,9 +435,9 @@ fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
 fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
     let field_typ = mir_field_type(st, struct_name, field_name)
     let addr = mir_field_addr(st, base, struct_name, field_name)
-    let result_name = mir_new_value(st, "load")
-    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
-    ret mir_value_operand(field_typ, result_name)
+    let result_id = mir_new_value(st)
+    mir_emit_inst(st, mir_load(result_id, field_typ, field_typ, addr))
+    ret mir_value_operand(field_typ, result_id)
 }
 
 fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
@@ -548,14 +533,14 @@ fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, un
         if ci < len(members) - 1 {
             next_block = next_blocks[ci]
         }
-        let wrapper_name = mir_new_value(st, "load")
+        let wrapper_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
         let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
         let cond = mir_make_result_inst(st, "icmp.eq", "bool")
         cond.operands.push(tag)
         cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, members[ci])))
         mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
         st.current_block.has_terminator = true
         if ci < len(members) - 1 {
             check_block = next_blocks[ci]
@@ -568,7 +553,7 @@ fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, un
     }
     for bi in members {
         st.current_block = case_blocks[bi]
-        let wrapper_name = mir_new_value(st, "load")
+        let wrapper_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
         let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
         let value = mir_load_field(st, payload, members[bi], field_name)
@@ -577,9 +562,9 @@ fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, un
         st.current_block.has_terminator = true
     }
     st.current_block = end_block
-    let result_name = mir_new_value(st, "load")
-    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, result_addr))
-    ret mir_value_flow(mir_value_operand(field_typ, result_name), st.current_block)
+    let result_id = mir_new_value(st)
+    mir_emit_inst(st, mir_load(result_id, field_typ, field_typ, result_addr))
+    ret mir_value_flow(mir_value_operand(field_typ, result_id), st.current_block)
 }
 
 fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
@@ -595,7 +580,7 @@ fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
     call.callee = "__epx_alloc"
     call.operands = args
     mir_emit_inst(st, call)
-    ret mir_value_operand("ptr", call.result_name)
+    ret mir_value_operand("ptr", call.result_id)
 }
 
 fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstStructInit): MirValueFlow {
@@ -630,7 +615,7 @@ fun mir_trunc_uint_value(st: MirCodegenState, value: MirOperand, mask: i64): Mir
     inst.operands.push(value)
     inst.operands.push(mir_const_int("i64", mask))
     mir_emit_inst(st, inst)
-    ret mir_value_operand("i64", inst.result_name)
+    ret mir_value_operand("i64", inst.result_id)
 }
 
 fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
@@ -639,10 +624,10 @@ fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
     shl_inst.operands.push(mir_const_int("i64", 32))
     mir_emit_inst(st, shl_inst)
     let sar_inst = mir_make_result_inst(st, "sar", "i64")
-    sar_inst.operands.push(mir_value_operand("i64", shl_inst.result_name))
+    sar_inst.operands.push(mir_value_operand("i64", shl_inst.result_id))
     sar_inst.operands.push(mir_const_int("i64", 32))
     mir_emit_inst(st, sar_inst)
-    ret mir_value_operand("i64", sar_inst.result_name)
+    ret mir_value_operand("i64", sar_inst.result_id)
 }
 
 fun mir_normalize_int_value(st: MirCodegenState, value: MirOperand, source_type: str): MirOperand {
@@ -1083,7 +1068,7 @@ fun mir_emit_os_call(st: MirCodegenState, expr: AstCall): MirValueFlow {
 
 fun mir_emit_short_circuit(st: MirCodegenState, block: MirBlock, expr: AstBinary): MirValueFlow {
     st.current_block = block
-    let addr_name = mir_new_value(st, "logic.addr")
+    let addr_name = mir_new_value(st)
     let result_addr = mir_value_operand("ptr", addr_name)
     mir_emit_inst(st, mir_alloca(addr_name, "bool"))
 
@@ -1114,9 +1099,9 @@ fun mir_emit_short_circuit(st: MirCodegenState, block: MirBlock, expr: AstBinary
     st.current_block.has_terminator = true
 
     st.current_block = end_block
-    let result_name = mir_new_value(st, "load")
-    mir_emit_inst(st, mir_load(result_name, "bool", "bool", result_addr))
-    ret mir_value_flow(mir_value_operand("bool", result_name), st.current_block)
+    let result_id = mir_new_value(st)
+    mir_emit_inst(st, mir_load(result_id, "bool", "bool", result_addr))
+    ret mir_value_flow(mir_value_operand("bool", result_id), st.current_block)
 }
 
 fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstSubscript): MirValueFlow {
@@ -1269,16 +1254,16 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             let gidx = mir_global_index(st, n.name)
             if gidx >= 0 {
-                let result_name = mir_new_value(st, "load")
+                let result_id = mir_new_value(st)
                 let addr = mir_symbol_operand("ptr", mir_global_label(n.name))
-                mir_emit_inst(st, mir_load(result_name, st.global_types[gidx], st.global_types[gidx], addr))
-                ret mir_value_flow(mir_value_operand(st.global_types[gidx], result_name), st.current_block)
+                mir_emit_inst(st, mir_load(result_id, st.global_types[gidx], st.global_types[gidx], addr))
+                ret mir_value_flow(mir_value_operand(st.global_types[gidx], result_id), st.current_block)
             }
             let idx = mir_local_index(st, n.name)
-            let result_name = mir_new_value(st, "load")
-            let addr = mir_value_operand("ptr", st.local_addr_names[idx])
-            mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
-            ret mir_value_flow(mir_value_operand(st.local_types[idx], result_name), st.current_block)
+            let result_id = mir_new_value(st)
+            let addr = mir_value_operand("ptr", st.local_addr_ids[idx])
+            mir_emit_inst(st, mir_load(result_id, st.local_types[idx], st.local_types[idx], addr))
+            ret mir_value_flow(mir_value_operand(st.local_types[idx], result_id), st.current_block)
         }
         AstUnary n: {
             let inner_flow = mir_emit_expr(st, st.current_block, n.expr)
@@ -1288,13 +1273,13 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 inst.operands.push(mir_const_int("i64", 0))
                 inst.operands.push(inner_flow.value)
                 mir_emit_inst(st, inst)
-                ret mir_value_flow(mir_value_operand("i64", inst.result_name), st.current_block)
+                ret mir_value_flow(mir_value_operand("i64", inst.result_id), st.current_block)
             }
             if n.op == "!" {
                 let inst = mir_make_result_inst(st, "not", "bool")
                 inst.operands.push(inner_flow.value)
                 mir_emit_inst(st, inst)
-                ret mir_value_flow(mir_value_operand("bool", inst.result_name), st.current_block)
+                ret mir_value_flow(mir_value_operand("bool", inst.result_id), st.current_block)
             }
             ast_to_mir_die(f"unsupported unary op {n.op}")
         }
@@ -1317,7 +1302,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                     let not_inst = mir_make_result_inst(st, "not", "bool")
                     not_inst.operands.push(eq)
                     mir_emit_inst(st, not_inst)
-                    ret mir_value_flow(mir_value_operand("bool", not_inst.result_name), st.current_block)
+                    ret mir_value_flow(mir_value_operand("bool", not_inst.result_id), st.current_block)
                 }
                 ret mir_value_flow(eq, st.current_block)
             }
@@ -1330,7 +1315,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             inst.operands.push(left_flow.value)
             inst.operands.push(right_flow.value)
             mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), n.meta.resolved_type), st.current_block)
+            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), n.meta.resolved_type), st.current_block)
         }
         AstNewArray n: {
             ret mir_emit_new_array(st, st.current_block, n)
@@ -1360,7 +1345,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             inst.operands.push(value_flow.value)
             inst.operands.push(mir_operand_null())
             mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_value_operand("bool", inst.result_name), st.current_block)
+            ret mir_value_flow(mir_value_operand("bool", inst.result_id), st.current_block)
         }
         AstFieldAccess n: {
             let base_type = ast_resolved_type(n.object)
@@ -1604,15 +1589,15 @@ fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstPanic): MirBlo
 
 fun mir_truncate_locals(st: MirCodegenState, count: i64): void {
     let names = new str[]
-    let addrs = new str[]
+    let addrs = new i64[]
     let types = new str[]
     for i in 0:count {
         names.push(st.local_names[i])
-        addrs.push(st.local_addr_names[i])
+        addrs.push(st.local_addr_ids[i])
         types.push(st.local_types[i])
     }
     st.local_names = names
-    st.local_addr_names = addrs
+    st.local_addr_ids = addrs
     st.local_types = types
 }
 
@@ -1647,14 +1632,14 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
         if ci < len(stmt.fields) - 1 {
             next_block = next_blocks[ci]
         }
-        let wrapper_name = mir_new_value(st, "load")
+        let wrapper_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", match_addr))
         let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
         let cond = mir_make_result_inst(st, "icmp.eq", "bool")
         cond.operands.push(tag)
         cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, stmt.fields[ci].variant_name)))
         mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
         st.current_block.has_terminator = true
         if ci < len(stmt.fields) - 1 {
             check_block = next_blocks[ci]
@@ -1669,7 +1654,7 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
     for bi in stmt.fields {
         st.current_block = case_blocks[bi]
         let local_count = len(st.local_names)
-        let wrapper_name = mir_new_value(st, "load")
+        let wrapper_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", match_addr))
         let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
         let bind_addr = mir_alloc_local(st, stmt.fields[bi].binding_name, "ptr")
@@ -1730,7 +1715,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
         if ci < len(stmt.fields) - 1 {
             next_block = next_blocks[ci]
         }
-        let scrut_name = mir_new_value(st, "load")
+        let scrut_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(scrut_name, mir_operand_type(scrutinee_flow.value), mir_operand_type(scrutinee_flow.value), match_addr))
         let pat_flow = mir_emit_expr(st, st.current_block, stmt.fields[ci].expr)
         st.current_block = pat_flow.block
@@ -1738,7 +1723,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
         cond.operands.push(mir_value_operand(mir_operand_type(scrutinee_flow.value), scrut_name))
         cond.operands.push(pat_flow.value)
         mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_name), case_blocks[ci].name, next_block.name)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
         st.current_block.has_terminator = true
         if ci < len(stmt.fields) - 1 {
             check_block = next_blocks[ci]
@@ -1852,15 +1837,15 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     st.current_block.has_terminator = true
 
     st.current_block = cond_block
-    let cur_name = mir_new_value(st, "load")
+    let cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(cur_name, "i64", "i64", var_addr))
-    let end_load_name = mir_new_value(st, "load")
+    let end_load_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(end_load_name, "i64", "i64", end_addr))
     let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
     cond_inst.operands.push(mir_value_operand("i64", cur_name))
     cond_inst.operands.push(mir_value_operand("i64", end_load_name))
     mir_emit_inst(st, cond_inst)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_name), body_block.name, end_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_id), body_block.name, end_block.name)
     st.current_block.has_terminator = true
 
     mir_push_loop(st, inc_block.name, end_block.name)
@@ -1872,13 +1857,13 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     mir_pop_loop(st)
 
     st.current_block = inc_block
-    let inc_cur_name = mir_new_value(st, "load")
+    let inc_cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(inc_cur_name, "i64", "i64", var_addr))
     let add_inst = mir_make_result_inst(st, "add", "i64")
     add_inst.operands.push(mir_value_operand("i64", inc_cur_name))
     add_inst.operands.push(mir_const_int("i64", 1))
     mir_emit_inst(st, add_inst)
-    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), var_addr))
+    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_id), var_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
     mir_truncate_locals(st, local_count)
@@ -1923,26 +1908,26 @@ fun mir_emit_for_in_array(st: MirCodegenState, block: MirBlock, stmt: AstForIn, 
     st.current_block.has_terminator = true
 
     st.current_block = cond_block
-    let cur_name = mir_new_value(st, "load")
+    let cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(cur_name, "i64", "i64", var_addr))
-    let limit_load_name = mir_new_value(st, "load")
+    let limit_load_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(limit_load_name, "i64", "i64", limit_addr))
     let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
     cond_inst.operands.push(mir_value_operand("i64", cur_name))
     cond_inst.operands.push(mir_value_operand("i64", limit_load_name))
     mir_emit_inst(st, cond_inst)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_name), len_block.name, end_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_id), len_block.name, end_block.name)
     st.current_block.has_terminator = true
 
     st.current_block = len_block
-    let cur2_name = mir_new_value(st, "load")
+    let cur2_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(cur2_name, "i64", "i64", var_addr))
     let current_len = mir_load_field(st, source_flow.value, struct_name, "len")
     let len_cond = mir_make_result_inst(st, "icmp.slt", "bool")
     len_cond.operands.push(mir_value_operand("i64", cur2_name))
     len_cond.operands.push(current_len)
     mir_emit_inst(st, len_cond)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", len_cond.result_name), body_block.name, end_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", len_cond.result_id), body_block.name, end_block.name)
     st.current_block.has_terminator = true
 
     mir_push_loop(st, inc_block.name, end_block.name)
@@ -1954,13 +1939,13 @@ fun mir_emit_for_in_array(st: MirCodegenState, block: MirBlock, stmt: AstForIn, 
     mir_pop_loop(st)
 
     st.current_block = inc_block
-    let inc_cur_name = mir_new_value(st, "load")
+    let inc_cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(inc_cur_name, "i64", "i64", var_addr))
     let add_inst = mir_make_result_inst(st, "add", "i64")
     add_inst.operands.push(mir_value_operand("i64", inc_cur_name))
     add_inst.operands.push(mir_const_int("i64", 1))
     mir_emit_inst(st, add_inst)
-    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), var_addr))
+    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_id), var_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
     mir_truncate_locals(st, local_count)
@@ -1994,19 +1979,19 @@ fun mir_emit_for_in_map(st: MirCodegenState, block: MirBlock, stmt: AstForIn, so
     st.current_block.has_terminator = true
 
     st.current_block = cond_block
-    let idx_name = mir_new_value(st, "load")
+    let idx_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(idx_name, "i64", "i64", index_addr))
-    let limit_load_name = mir_new_value(st, "load")
+    let limit_load_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(limit_load_name, "i64", "i64", limit_addr))
     let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
     cond_inst.operands.push(mir_value_operand("i64", idx_name))
     cond_inst.operands.push(mir_value_operand("i64", limit_load_name))
     mir_emit_inst(st, cond_inst)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_name), len_block.name, end_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_id), len_block.name, end_block.name)
     st.current_block.has_terminator = true
 
     st.current_block = len_block
-    let idx2_name = mir_new_value(st, "load")
+    let idx2_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(idx2_name, "i64", "i64", index_addr))
     let len_args2 = new MirOperand[]
     len_args2.push(source_flow.value)
@@ -2015,11 +2000,11 @@ fun mir_emit_for_in_map(st: MirCodegenState, block: MirBlock, stmt: AstForIn, so
     len_cond.operands.push(mir_value_operand("i64", idx2_name))
     len_cond.operands.push(current_len)
     mir_emit_inst(st, len_cond)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", len_cond.result_name), key_block.name, end_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", len_cond.result_id), key_block.name, end_block.name)
     st.current_block.has_terminator = true
 
     st.current_block = key_block
-    let idx3_name = mir_new_value(st, "load")
+    let idx3_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(idx3_name, "i64", "i64", index_addr))
     let key_args = new MirOperand[]
     key_args.push(source_flow.value)
@@ -2038,13 +2023,13 @@ fun mir_emit_for_in_map(st: MirCodegenState, block: MirBlock, stmt: AstForIn, so
     mir_pop_loop(st)
 
     st.current_block = inc_block
-    let idx4_name = mir_new_value(st, "load")
+    let idx4_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(idx4_name, "i64", "i64", index_addr))
     let add_inst = mir_make_result_inst(st, "add", "i64")
     add_inst.operands.push(mir_value_operand("i64", idx4_name))
     add_inst.operands.push(mir_const_int("i64", 1))
     mir_emit_inst(st, add_inst)
-    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_name), index_addr))
+    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_id), index_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
     mir_truncate_locals(st, local_count)
@@ -2143,7 +2128,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                 ret mir_reachable_flow(st.current_block)
             }
             let idx = mir_local_index(st, n.name)
-            let addr = mir_value_operand("ptr", st.local_addr_names[idx])
+            let addr = mir_value_operand("ptr", st.local_addr_ids[idx])
             mir_emit_inst(st, mir_store(value_flow.value, addr))
             ret mir_reachable_flow(st.current_block)
         }
@@ -2151,9 +2136,9 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             match n.expr {
                 AstVar target: {
                     let idx = mir_local_index(st, target.name)
-                    let result_name = mir_new_value(st, "load")
-                    let addr = mir_value_operand("ptr", st.local_addr_names[idx])
-                    mir_emit_inst(st, mir_load(result_name, st.local_types[idx], st.local_types[idx], addr))
+                    let result_id = mir_new_value(st)
+                    let addr = mir_value_operand("ptr", st.local_addr_ids[idx])
+                    mir_emit_inst(st, mir_load(result_id, st.local_types[idx], st.local_types[idx], addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
                     let target_type = target.meta.resolved_type
@@ -2163,10 +2148,10 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
-                    inst.operands.push(mir_value_operand(st.local_types[idx], result_name))
+                    inst.operands.push(mir_value_operand(st.local_types[idx], result_id))
                     inst.operands.push(rhs_flow.value)
                     mir_emit_inst(st, inst)
-                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type), addr))
+                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), addr))
                     ret mir_reachable_flow(st.current_block)
                 }
                 AstFieldAccess target: {
@@ -2179,8 +2164,8 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     st.current_block = base_flow.block
                     let addr = mir_field_addr(st, base_flow.value, struct_name, target.name)
                     let field_typ = mir_field_type(st, struct_name, target.name)
-                    let result_name = mir_new_value(st, "load")
-                    mir_emit_inst(st, mir_load(result_name, field_typ, field_typ, addr))
+                    let result_id = mir_new_value(st)
+                    mir_emit_inst(st, mir_load(result_id, field_typ, field_typ, addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
                     let target_type = target.meta.resolved_type
@@ -2190,10 +2175,10 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
-                    inst.operands.push(mir_value_operand(field_typ, result_name))
+                    inst.operands.push(mir_value_operand(field_typ, result_id))
                     inst.operands.push(rhs_flow.value)
                     mir_emit_inst(st, inst)
-                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type), addr))
+                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), addr))
                     ret mir_reachable_flow(st.current_block)
                 }
                 AstSubscript target: {
@@ -2231,7 +2216,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     let set_args = new MirOperand[]
                     set_args.push(dst_flow.value)
                     set_args.push(index_flow.value)
-                    set_args.push(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_name), target_type))
+                    set_args.push(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type))
                     let map_set_helper2 = mir_map_helper(st, base_type, "set")
                     if map_set_helper2 != "" {
                         mir_emit_call_inst(st, map_set_helper2, "void", set_args)
@@ -2341,9 +2326,9 @@ fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): M
     ret flow
 }
 
-fun mir_param(name: str, typ: str): MirParam {
+fun mir_param(value_id: i64, typ: str): MirParam {
     let p = new MirParam
-    p.name = name
+    p.value_id = value_id
     p.typ = typ
     ret p
 }
@@ -2352,7 +2337,7 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     st.value_counter = 0
     st.block_counter = 0
     st.local_names = new str[]
-    st.local_addr_names = new str[]
+    st.local_addr_ids = new i64[]
     st.local_types = new str[]
     st.continue_targets = new str[]
     st.break_targets = new str[]
@@ -2361,7 +2346,7 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     let pi = 0
     for pi < len(fn_ast.params) {
         let param = fn_ast.params[pi]
-        st.current_fn.params.push(mir_param(param.name, mir_epic_type(param.meta.resolved_type)))
+        st.current_fn.params.push(mir_param(mir_new_value(st), mir_epic_type(param.meta.resolved_type)))
         pi = pi + 1
     }
 
@@ -2369,8 +2354,8 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
 
     let i = 0
     for i < len(st.current_fn.params) {
-        let addr = mir_alloc_local(st, st.current_fn.params[i].name, st.current_fn.params[i].typ)
-        mir_emit_inst(st, mir_store(mir_value_operand(st.current_fn.params[i].typ, st.current_fn.params[i].name), addr))
+        let addr = mir_alloc_local(st, fn_ast.params[i].name, st.current_fn.params[i].typ)
+        mir_emit_inst(st, mir_store(mir_value_operand(st.current_fn.params[i].typ, st.current_fn.params[i].value_id), addr))
         i = i + 1
     }
 
@@ -2416,7 +2401,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.value_counter = 0
     st.block_counter = 0
     st.local_names = new str[]
-    st.local_addr_names = new str[]
+    st.local_addr_ids = new i64[]
     st.local_types = new str[]
     st.func_names = new str[]
     st.func_return_types = new str[]

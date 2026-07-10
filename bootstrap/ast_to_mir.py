@@ -70,7 +70,7 @@ WINAPI_IMPORTS = [
 
 class MirCodegen(MirFunctionBuilder):
     def __init__(self):
-        super().__init__(numbered_blocks=True, preincrement_values=True)
+        super().__init__(numbered_blocks=True)
         self.program = MirProgram()
         self.func_sigs = {}
         self.globals = {}
@@ -162,15 +162,15 @@ class MirCodegen(MirFunctionBuilder):
     def _emit_function(self, ast_fn):
         self.begin_function(
             ast_fn.name,
-            [MirParam(p.name, self._type(p.resolved_type)) for p in ast_fn.params],
+            [MirParam(i + 1, self._type(p.resolved_type)) for i, p in enumerate(ast_fn.params)],
             self._type(ast_fn.resolved_type),
         )
         self.local_scopes = [{}]
         self.local_type_scopes = [{}]
         entry = self.new_block("entry")
-        for param in self.fn.params:
+        for ast_param, param in zip(ast_fn.params, self.fn.params):
             self.set_block(entry)
-            addr = self._alloc_local(param.name, param.type)
+            addr = self._alloc_local(ast_param.name, param.type)
             self.inst("store", [ValueOperand(param.value), ValueOperand(addr)])
             entry = self.current_block
         self._push_local_scope()
@@ -266,7 +266,7 @@ class MirCodegen(MirFunctionBuilder):
 
     def _alloc_local(self, name, typ):
         block = self.ensure_insertable()
-        addr = self.new_value(ptr(), f"{name}.addr")
+        addr = self.new_value(ptr())
         block.instructions.append(MirInst("alloca", result=addr, type=typ))
         self._define_local(name, addr, typ)
         return addr
@@ -1210,7 +1210,7 @@ class MirCodegen(MirFunctionBuilder):
 
     def _emit_short_circuit_from(self, in_block, expr):
         self.set_block(in_block)
-        result_addr = self.new_value(ptr(), "logic.addr")
+        result_addr = self.new_value(ptr())
         self.current_block.instructions.append(MirInst("alloca", result=result_addr, type=BOOL))
 
         left = self._emit_expr_from(self.current_block, expr.left)

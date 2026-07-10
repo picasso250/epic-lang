@@ -21,11 +21,11 @@ import sema
 
 
 def build_smoke_program():
-    x_addr = MirValue("x.addr", ptr())
-    x0 = MirValue("x0", I64)
-    c0 = MirValue("c0", BOOL)
-    x1 = MirValue("x1", I64)
-    r = MirValue("r", I64)
+    x_addr = MirValue(1, ptr())
+    x0 = MirValue(2, I64)
+    c0 = MirValue(3, BOOL)
+    x1 = MirValue(4, I64)
+    r = MirValue(5, I64)
 
     entry = MirBlock(
         "entry",
@@ -67,23 +67,23 @@ def test_smoke_text_and_validation():
     validate(program)
     expected = """define i64 @main() {
 entry:
-  %x.addr: ptr = alloca i64
-  store i64 0, ptr %x.addr
+  %1: ptr = alloca i64
+  store i64 0, ptr %1
   br label %loop
 
 loop:
-  %x0: i64 = load i64, ptr %x.addr
-  %c0: bool = icmp.slt i64 %x0, i64 3
-  condbr bool %c0, label %body, label %done
+  %2: i64 = load i64, ptr %1
+  %3: bool = icmp.slt i64 %2, i64 3
+  condbr bool %3, label %body, label %done
 
 body:
-  %x1: i64 = add i64 %x0, i64 1
-  store i64 %x1, ptr %x.addr
+  %4: i64 = add i64 %2, i64 1
+  store i64 %4, ptr %1
   br label %loop
 
 done:
-  %r: i64 = load i64, ptr %x.addr
-  ret i64 %r
+  %5: i64 = load i64, ptr %1
+  ret i64 %5
 }"""
     assert program.text() == expected
 
@@ -98,9 +98,9 @@ def assert_mir_invalid(program, message):
 
 
 def test_gep_null_and_ptrtoint_text_and_validation():
-    size_ptr = MirValue("size.ptr", ptr())
-    size = MirValue("size", I64)
-    field_ptr = MirValue("field.ptr", ptr())
+    size_ptr = MirValue(1, ptr())
+    size = MirValue(2, I64)
+    field_ptr = MirValue(3, ptr())
     block = MirBlock(
         "entry",
         [
@@ -124,25 +124,21 @@ def test_gep_null_and_ptrtoint_text_and_validation():
 
 define i64 @main() {
 entry:
-  %size.ptr: ptr = gep struct Pair, ptr null, i64 1
-  %size: i64 = ptrtoint ptr %size.ptr to i64
-  %field.ptr: ptr = gep struct Pair, ptr null, i64 0, i32 1
-  ret i64 %size
+  %1: ptr = gep struct Pair, ptr null, i64 1
+  %2: i64 = ptrtoint ptr %1 to i64
+  %3: ptr = gep struct Pair, ptr null, i64 0, i32 1
+  ret i64 %2
 }"""
     assert program.text() == expected
 
 
-def test_validator_rejects_text_sigils_in_local_names():
-    bad_value = MirValue("%x", I64)
-    bad_value_program = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [], Ret(ValueOperand(bad_value)))])])
-    assert_mir_invalid(bad_value_program, "local value name must be raw")
-
-    bad_param_program = MirProgram(functions=[MirFunction("main", [MirParam("%p", I64)], I64, [MirBlock("entry", [], Ret(ValueOperand(MirValue("%p", I64))))])])
-    assert_mir_invalid(bad_param_program, "local value name must be raw")
+def test_validator_rejects_non_positive_local_ids():
+    bad_param_program = MirProgram(functions=[MirFunction("main", [MirParam(0, I64)], I64, [MirBlock("entry", [], Ret(ValueOperand(MirValue(0, I64))))])])
+    assert_mir_invalid(bad_param_program, "local value id must be a positive integer")
 
 
 def test_validator_rejects_text_sigils_in_module_symbols():
-    value = MirValue("x", I64)
+    value = MirValue(1, I64)
     bad_fn = MirProgram(functions=[MirFunction("@main", [], I64, [MirBlock("entry", [], Ret(ConstIntOperand(I64, 0)))])])
     assert_mir_invalid(bad_fn, "module symbol must be raw")
 
@@ -152,7 +148,7 @@ def test_validator_rejects_text_sigils_in_module_symbols():
 
 
 def test_validator_rejects_unknown_and_high_level_ops():
-    result = MirValue("x", I64)
+    result = MirValue(1, I64)
     unknown = MirProgram(functions=[MirFunction("main", [], I64, [MirBlock("entry", [MirInst("mystery", result=result)], Ret(ValueOperand(result)))])])
     assert_mir_invalid(unknown, "unknown MIR op: mystery")
 
@@ -200,8 +196,8 @@ type Data = struct { i8, i64 }
 
 define i64 @main() {
 entry:
-  %zed: ptr = gep struct Zed, ptr null, i64 1
-  %data: ptr = gep struct Data, ptr null, i64 1
+  %1: ptr = gep struct Zed, ptr null, i64 1
+  %2: ptr = gep struct Data, ptr null, i64 1
   ret i64 0
 }
 """
@@ -216,8 +212,8 @@ type Zed = struct { ptr }
 
 define i64 @main() {
 entry:
-  %zed: ptr = gep struct Zed, ptr null, i64 1
-  %data: ptr = gep struct Data, ptr null, i64 1
+  %1: ptr = gep struct Zed, ptr null, i64 1
+  %2: ptr = gep struct Data, ptr null, i64 1
   ret i64 0
 }"""
     assert program.text() == expected
@@ -241,9 +237,9 @@ def test_global_text_round_trip_uses_canonical_bytes_literals():
 
 def test_mir_parser_rejects_unsigned_integer_types():
     for typ in ("u64", "u8"):
-        source = f"""define {typ} @main({typ} %x) {{
+        source = f"""define {typ} @main({typ} %1) {{
 entry:
-  ret {typ} %x
+  ret {typ} %1
 }}
 """
         try:
@@ -254,26 +250,40 @@ entry:
             raise AssertionError(f"MIR parser accepted unsigned integer type: {typ}")
 
 
-def test_mir_parser_strips_text_sigils():
-    source = """define ptr @helper(ptr %value) {
+def test_mir_parser_reads_numeric_local_ids():
+    source = """define ptr @helper(ptr %1) {
 entry:
-  ret ptr %value
+  ret ptr %1
 }
 
-define ptr @main(ptr %arg) {
+define ptr @main(ptr %1) {
 entry:
-  %tmp: ptr = call ptr @helper(ptr %arg)
-  ret ptr %tmp
+  %2: ptr = call ptr @helper(ptr %1)
+  ret ptr %2
 }
 """
     program = parse_mir_text(source)
     fn = program.functions[1]
     assert fn.name == "main"
-    assert fn.params[0].name == "arg"
+    assert fn.params[0].id == 1
     inst = fn.blocks[0].instructions[0]
-    assert inst.result.name == "tmp"
+    assert inst.result.id == 2
     assert inst.callee == "helper"
-    assert fn.text().startswith("define ptr @main(ptr %arg)")
+    assert fn.text().startswith("define ptr @main(ptr %1)")
+
+
+def test_mir_parser_rejects_named_local_values():
+    source = """define i64 @main(i64 %value) {
+entry:
+  ret i64 %value
+}
+"""
+    try:
+        parse_mir_text(source)
+    except Exception as exc:
+        assert "local value id must be a positive integer" in str(exc), str(exc)
+    else:
+        raise AssertionError("MIR parser accepted a named local value")
 
 
 def test_text_mir_uses_target_neutral_extern_contracts():
@@ -391,7 +401,7 @@ fun main(): i64 {
     typed = sema.analyze_program(ast)
     prog = ast_to_mir(typed)
     text = prog.text()
-    assert "define i64 @Counter__add(ptr %c, i64 %delta)" in text
+    assert "define i64 @Counter__add(ptr %1, i64 %2)" in text
     assert "call i64 Counter__add" in text
 
 
@@ -423,12 +433,15 @@ fun main(): i64 {
 def main():
     test_smoke_text_and_validation()
     test_gep_null_and_ptrtoint_text_and_validation()
+    test_validator_rejects_non_positive_local_ids()
+    test_validator_rejects_text_sigils_in_module_symbols()
     test_validator_rejects_unknown_and_high_level_ops()
     test_codegen_emits_target_mir_only_for_aggregates()
     test_struct_type_text_round_trip_and_v0_slot_layout()
     test_global_text_round_trip_uses_canonical_bytes_literals()
     test_mir_parser_rejects_unsigned_integer_types()
-    test_mir_parser_strips_text_sigils()
+    test_mir_parser_reads_numeric_local_ids()
+    test_mir_parser_rejects_named_local_values()
     test_text_mir_uses_target_neutral_extern_contracts()
     test_undeclared_calls_are_rejected()
     test_backend_abi_rejects_unsupported_extern()

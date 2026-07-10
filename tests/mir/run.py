@@ -76,8 +76,8 @@ global @str.0: ptr = bytes "A\\n\\\"\\\\\\x00\\xFF//tail"
 
 define i64 @main() {
 entry:
-  %zed: ptr = gep struct Zed, ptr null, i64 1
-  %data: ptr = gep struct Data, ptr null, i64 1
+  %1: ptr = gep struct Zed, ptr null, i64 1
+  %2: ptr = gep struct Data, ptr null, i64 1
   call void ExitProcess(i64 0)
   ret i64 0
 }

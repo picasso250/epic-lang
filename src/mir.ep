@@ -6,7 +6,7 @@
 
 struct MirValueOperand {
     typ: str
-    name: str
+    value_id: i64
 }
 
 struct MirIntOperand {
@@ -32,7 +32,7 @@ type MirOperand = MirValueOperand | MirIntOperand | MirBoolOperand | MirNullOper
 struct MirInst {
     op: str
     operands: MirOperand[]
-    result_name: str
+    result_id: i64
     result_type: str
     typ: str
     callee: str
@@ -67,7 +67,7 @@ struct MirBlock {
 }
 
 struct MirParam {
-    name: str
+    value_id: i64
     typ: str
 }
 
@@ -135,8 +135,8 @@ fun mir_const_bool(value: bool): MirOperand {
     ret new MirOperand(new MirBoolOperand { value: value })
 }
 
-fun mir_value_operand(typ: str, name: str): MirOperand {
-    ret new MirOperand(new MirValueOperand { typ: typ, name: name })
+fun mir_value_operand(typ: str, value_id: i64): MirOperand {
+    ret new MirOperand(new MirValueOperand { typ: typ, value_id: value_id })
 }
 
 fun mir_symbol_operand(typ: str, name: str): MirOperand {
@@ -164,23 +164,31 @@ fun mir_operand_type(op: MirOperand): str {
     ret ""
 }
 
-fun mir_operand_name(op: MirOperand): str {
+fun mir_operand_value_id(op: MirOperand): i64 {
     match op {
         MirValueOperand v: {
-            ret v.name
+            ret v.value_id
         }
         MirIntOperand i: {
-            ret ""
+            ret 0
         }
         MirBoolOperand b: {
-            ret ""
+            ret 0
         }
         MirNullOperand n: {
-            ret ""
+            ret 0
         }
         MirSymbolOperand s: {
-            ret s.name
+            ret 0
         }
+    }
+    ret 0
+}
+
+fun mir_operand_symbol_name(op: MirOperand): str {
+    match op {
+        MirSymbolOperand s: { ret s.name }
+        _: {}
     }
     ret ""
 }
@@ -356,7 +364,7 @@ fun mir_operand_kind_text(op: MirOperand): str {
 fun mir_operand_text(op: MirOperand): str {
     match op {
         MirValueOperand v: {
-            ret str_cat2("%", v.name)
+            ret str_cat2("%", str(v.value_id))
         }
         MirIntOperand i: {
             ret str(i.value)
@@ -389,7 +397,7 @@ fun mir_inst_empty(): MirInst {
     let inst = new MirInst
     inst.op = ""
     inst.operands = new MirOperand[]
-    inst.result_name = ""
+    inst.result_id = 0
     inst.result_type = ""
     inst.typ = ""
     inst.callee = ""
@@ -397,20 +405,20 @@ fun mir_inst_empty(): MirInst {
     ret inst
 }
 
-fun mir_alloca(result_name: str, elem_type: str): MirInst {
+fun mir_alloca(result_id: i64, elem_type: str): MirInst {
     let inst = mir_inst_empty()
     inst.op = "alloca"
-    inst.result_name = result_name
+    inst.result_id = result_id
     inst.result_type = "ptr"
     inst.typ = elem_type
     inst.has_result = true
     ret inst
 }
 
-fun mir_load(result_name: str, result_type: str, access_type: str, addr: MirOperand): MirInst {
+fun mir_load(result_id: i64, result_type: str, access_type: str, addr: MirOperand): MirInst {
     let inst = mir_inst_empty()
     inst.op = "load"
-    inst.result_name = result_name
+    inst.result_id = result_id
     inst.result_type = result_type
     inst.typ = access_type
     inst.has_result = true
@@ -438,7 +446,7 @@ fun mir_call(callee: str, ret_type: str, args: MirOperand[]): MirInst {
 fun mir_inst_result_prefix(inst: MirInst, buf: u8[]): void {
     if inst.has_result {
         str_buf_extend(buf, "%")
-        str_buf_extend(buf, inst.result_name)
+        str_buf_extend(buf, str(inst.result_id))
         str_buf_extend(buf, ": ")
         str_buf_extend(buf, inst.result_type)
         str_buf_extend(buf, " = ")
@@ -1081,7 +1089,7 @@ fun mir_print_function(fn: MirFunction): void {
         }
         str_buf_extend(header, fn.params[i].typ)
         str_buf_extend(header, " %")
-        str_buf_extend(header, fn.params[i].name)
+        str_buf_extend(header, str(fn.params[i].value_id))
         i = i + 1
     }
     str_buf_extend(header, ") {")

@@ -21,11 +21,13 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | 注入策略 | 按需注入（`required_helpers` tracking） | ⚠️ 当前先加载 helper bundle，再按 MIR call reachability prune function；尚无显式 required_helpers 表 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ✅ `MirProgram.structs` 使用 `dict[str, MirStruct]`，字段为 `MirField` 列表 |
 | symbol contract | object model 使用 raw module symbol；`@` 只保留给未来 text MIR syntax | ✅ 当前 `MirFunction` / `MirExtern` / `MirGlobal` / `SymbolOperand` 都应存 raw name |
+| local value identity | function-local positive numeric ID；text MIR 写成 `%1`、`%2` | ✅ 参数、指令结果和 value operand 均存 `i64`/`int` ID；named local value text 不再接受 |
 | 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ✅ 前缀已分层 `__ep_*`/`__epx_*`，语义名留待后续 commit |
 | 前缀分层 | `__epx_` = x64 primitive（`__epx_alloc`），`__ep_` = compiler-internal MIR helper（`__ep_str_eq`） | ✅ 已分离 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
 
 > **使用本文档时请注意**：所有 code block 中的 MIR 示例是 target 格式，不代表当前 `ast_to_mir.py` 的实际输出。当前实现的实际 MIR 行为通过 `docs/x64-instruction-subset.md`（lowering 后的 X64IR 合约）和 `docs/mir-lowering-contract.md`（lowering 规则）描述。
+> 后续章节保留的 `%x` / `%sum` 等写法只作为数据流讲解中的助记别名；canonical text MIR 与 parser 只接受 `%1` 这类正整数 local ID。
 
 当前实现债的跟踪见 `docs/x64-instruction-subset.md §8 Design audit`。
 
@@ -75,8 +77,8 @@ text MIR 只是 pretty printer 输出，用于：
 - 参考 LLVM IR 的核心结构，但不兼容 LLVM IR。
 - 使用 basic block + terminator 表达控制流。
 - 使用三地址临时值 + mutable local address，不直接做 SSA。
-- 源码局部变量 lowering 成地址，例如 `%x.addr`。
-- 表达式结果 lowering 成不可变临时 value，例如 `%x0`、`%x1`、`%sum`。
+- 源码局部变量 lowering 成 numeric-ID 地址 value，例如 `%1`。
+- 表达式结果 lowering 成不可变 numeric-ID value，例如 `%2`、`%3`。
 - 变量读取是 `load`。
 - 变量赋值是 `store`。
 - 结构体字段、数组元素、字符串数据等地址通过 `gep` 计算，再由 `load/store` 访问。
@@ -93,26 +95,25 @@ text MIR 只是 pretty printer 输出，用于：
 
 ### 4.1 Local value
 
-局部 value 使用 `%` 前缀：
+局部 value 的 object model identity 是函数内唯一的正整数，text MIR 使用 `%` 前缀：
 
 ```text
-%x0
-%x1
-%sum
-%tmp3
+%1
+%2
+%3
 ```
 
-这些 value 是不可变的。一个 value 一旦定义，后面不能被重新赋值。
+named local value（如 `%sum`）不属于 canonical MIR，也不由 parser 接受。这些 value 是不可变的；一个 ID 一旦定义，后面不能被重新赋值。
 
 ### 4.2 Local variable address
 
-源码局部变量的存储位置使用 `%name.addr`：
+源码局部变量名只存在于 frontend symbol table。它在 MIR 中的存储位置同样是 numeric-ID value：
 
 ```text
-%x.addr: ptr = alloca i64
+%1: ptr = alloca i64
 ```
 
-`%x.addr` 表示变量 `x` 的地址/槽位，类似 C 里的 `&x`。
+frontend 另行记录源码变量 `x -> value id 1`；MIR 本身不重复保存 `x`。
 
 ### 4.3 Block label
 
@@ -181,30 +182,30 @@ array N x i8
 源码变量、MIR 地址和值是三种不同概念：
 
 ```text
-源码变量 x      -> %x.addr 这个地址
-读取 x          -> load 出一个值，比如 %x0
-计算 x + 1      -> add 生成新值，比如 %x1
-赋值 x = x + 1  -> store 回 %x.addr
+源码变量 x      -> frontend 记录的 %1 地址
+读取 x          -> load 出一个新值 %2
+计算 x + 1      -> add 生成新值 %3
+赋值 x = x + 1  -> store 回 %1
 ```
 
 示例：
 
 ```text
-%x.addr: ptr = alloca i64
-store i64 0, ptr %x.addr
-%x0: i64 = load i64, ptr %x.addr
-%x1: i64 = add i64 %x0, i64 1
-store i64 %x1, ptr %x.addr
-ret i64 %x1
+%1: ptr = alloca i64
+store i64 0, ptr %1
+%2: i64 = load i64, ptr %1
+%3: i64 = add i64 %2, i64 1
+store i64 %3, ptr %1
+ret i64 %3
 ```
 
 含义：
 
-- `%x.addr` 是变量 `x` 的存储位置。
-- `%x0` 是某一刻从 `%x.addr` 读出来的值。
-- `%x1` 是 `%x0 + 1` 的计算结果。
-- `%x0`、`%x1` 一旦定义就不再改变。
-- 真正会改变的是 `%x.addr` 指向的位置里存放的内容。
+- `%1` 是变量 `x` 的存储位置。
+- `%2` 是某一刻从 `%1` 读出来的值。
+- `%3` 是 `%2 + 1` 的计算结果。
+- `%2`、`%3` 一旦定义就不再改变。
+- 真正会改变的是 `%1` 指向的位置里存放的内容。
 
 这让第一版 MIR 不需要立即实现 SSA / phi，也能保持清晰的数据流。
 
@@ -647,7 +648,7 @@ MirFunction
   blocks: list[MirBlock]
 
 MirParam
-  name: str                  # %x
+  value_id: int             # %1
   type: MirType
 
 MirBlock
@@ -668,7 +669,7 @@ MirTerminator
   Ret(value: MirOperand?)
 
 MirOperand
-  Value(name, type)
+  Value(value_id, type)
   ConstInt(value, type)
   ConstBool(value)
   ConstNull(type=ptr)
@@ -762,7 +763,7 @@ global @str.0: ptr = bytes "hello\n"
 - 每个 block 有且只有一个 terminator。
 - terminator 只出现在 block 末尾。
 - value 使用前已定义。
-- value 名称在 function 内唯一。
+- value ID 是正整数，并在 function 内唯一。
 - `load T, ptr` 的地址 operand 必须是 `ptr`，result 必须是 `T`。
 - `store T value, ptr addr` 的 value 类型必须是 `T`，addr 必须是 `ptr`。
 - `gep SourceType, ptr base, indices...` 的 base 必须是 `ptr`，result 必须是 `ptr`，indices 必须匹配 `SourceType`。

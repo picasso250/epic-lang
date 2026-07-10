@@ -63,11 +63,11 @@ class MirSignature:
 
 @dataclass(frozen=True)
 class MirValue:
-    name: str
+    id: int
     type: MirType
 
     def __str__(self):
-        return mir_local_text(self.name)
+        return mir_local_text(self.id)
 
 
 @dataclass(frozen=True)
@@ -90,7 +90,7 @@ class ValueOperand(MirOperand):
         object.__setattr__(self, "value", value)
 
     def text(self):
-        return mir_local_text(self.value.name)
+        return mir_local_text(self.value.id)
 
 
 @dataclass(frozen=True)
@@ -184,15 +184,15 @@ class MirGlobal:
 
 @dataclass
 class MirParam:
-    name: str
+    id: int
     type: MirType
 
     @property
     def value(self):
-        return MirValue(self.name, self.type)
+        return MirValue(self.id, self.type)
 
     def text(self):
-        return f"{self.type} {mir_local_text(self.name)}"
+        return f"{self.type} {mir_local_text(self.id)}"
 
 
 @dataclass
@@ -206,7 +206,7 @@ class MirInst:
     def text(self):
         prefix = ""
         if self.result is not None:
-            prefix = f"{mir_local_text(self.result.name)}: {self.result.type} = "
+            prefix = f"{mir_local_text(self.result.id)}: {self.result.type} = "
         if self.op == "alloca":
             return f"{prefix}alloca {self.type}"
         if self.op == "load":
@@ -400,12 +400,8 @@ def is_raw_module_symbol(name):
     return not name.startswith("@")
 
 
-def is_raw_local_name(name):
-    return not name.startswith("%")
-
-
-def mir_local_text(name):
-    return name if name.startswith("%") else f"%{name}"
+def mir_local_text(value_id):
+    return f"%{value_id}"
 
 
 class MirValidator:
@@ -466,19 +462,19 @@ class MirValidator:
             self._validate_terminator(fn, block, block.terminator, values, blocks)
 
     def _define(self, values, fn, where, value):
-        if not is_raw_local_name(value.name):
-            self.errors.append(f"{fn.name}.{where}: local value name must be raw and must not include text sigil '%': {value.name}")
-        if value.name in values:
-            self.errors.append(f"{fn.name}.{where}: duplicate value: {value.name}")
-        values[value.name] = value.type
+        if not isinstance(value.id, int) or value.id <= 0:
+            self.errors.append(f"{fn.name}.{where}: local value id must be a positive integer: {value.id}")
+        if value.id in values:
+            self.errors.append(f"{fn.name}.{where}: duplicate value: {value.id}")
+        values[value.id] = value.type
 
     def _check_operand(self, fn, where, operand, values):
         if isinstance(operand, ValueOperand):
-            name = operand.value.name
-            if name not in values:
-                self.errors.append(f"{fn.name}.{where}: undefined value: {name}")
-            elif values[name] != operand.type:
-                self.errors.append(f"{fn.name}.{where}: stale value type for {name}")
+            value_id = operand.value.id
+            if value_id not in values:
+                self.errors.append(f"{fn.name}.{where}: undefined value: {value_id}")
+            elif values[value_id] != operand.type:
+                self.errors.append(f"{fn.name}.{where}: stale value type for {value_id}")
         if isinstance(operand, SymbolOperand):
             if not is_raw_module_symbol(operand.name):
                 self.errors.append(f"{fn.name}.{where}: symbol operand must be raw and must not include text sigil '@': {operand.name}")

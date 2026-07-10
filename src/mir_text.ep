@@ -167,12 +167,27 @@ fun mrt_is_int_text(s: str): bool {
     ret true
 }
 
+fun mrt_parse_local_id(text: str): i64 {
+    if len(text) < 2 || text[0:1] != "%" {
+        mir_text_die(str_cat2("local value must use numeric %id: ", text))
+    }
+    let raw = text[1:len(text)]
+    if mrt_is_int_text(raw) == false {
+        mir_text_die(str_cat2("local value must use numeric %id: ", text))
+    }
+    let value_id = mrt_parse_i64(raw)
+    if value_id <= 0 {
+        mir_text_die(str_cat2("local value id must be positive: ", text))
+    }
+    ret value_id
+}
+
 fun mrt_parse_typed_operand(text: str): MirOperand {
     let typ_raw = mrt_first_word(text)
     let typ = mrt_strip_trailing_comma(typ_raw)
     let value = mrt_after_first_word(text)
     if len(value) == 0 { mir_text_die(str_cat2("missing operand: ", text)) }
-    if value[0:1] == "%" { ret mir_value_operand(typ, value[1:len(value)]) }
+    if value[0:1] == "%" { ret mir_value_operand(typ, mrt_parse_local_id(value)) }
     if value == "null" { ret mir_operand_null() }
     if value == "true" { ret mir_const_bool(true) }
     if value == "false" { ret mir_const_bool(false) }
@@ -190,9 +205,7 @@ fun mrt_parse_params(text: str): MirParam[] {
         let part = parts[i]
         let p = new MirParam
         p.typ = mrt_first_word(part)
-        let name = mrt_after_first_word(part)
-        if len(name) > 0 && name[0:1] == "%" { name = name[1:len(name)] }
-        p.name = name
+        p.value_id = mrt_parse_local_id(mrt_after_first_word(part))
         out.push(p)
         i = i + 1
     }
@@ -212,10 +225,10 @@ fun mrt_parse_operands(text: str): MirOperand[] {
     ret out
 }
 
-fun mrt_inst_with_result(inst: MirInst, result_name: str, result_type: str): MirInst {
-    if len(result_name) > 0 {
+fun mrt_inst_with_result(inst: MirInst, result_id: i64, result_type: str): MirInst {
+    if result_id > 0 {
         inst.has_result = true
-        inst.result_name = result_name
+        inst.result_id = result_id
         inst.result_type = result_type
     }
     ret inst
@@ -223,7 +236,7 @@ fun mrt_inst_with_result(inst: MirInst, result_name: str, result_type: str): Mir
 
 fun mrt_parse_inst(line: str): MirInst {
     let body = line
-    let result_name = ""
+    let result_id = 0
     let result_type = ""
     let eq = mrt_find(line, " = ")
     if eq >= 0 {
@@ -231,19 +244,18 @@ fun mrt_parse_inst(line: str): MirInst {
         body = line[eq + 3:len(line)]
         let colon = mrt_find(lhs, ":")
         if colon < 0 { mir_text_die(str_cat2("bad result lhs: ", line)) }
-        result_name = mrt_trim(lhs[0:colon])
-        if len(result_name) > 0 && result_name[0:1] == "%" { result_name = result_name[1:len(result_name)] }
+        result_id = mrt_parse_local_id(mrt_trim(lhs[0:colon]))
         result_type = mrt_trim(lhs[colon + 1:len(lhs)])
     }
 
     if mrt_starts_with(body, "alloca ") {
-        ret mir_alloca(result_name, mrt_trim(body[7:len(body)]))
+        ret mir_alloca(result_id, mrt_trim(body[7:len(body)]))
     }
     if mrt_starts_with(body, "load ") {
         let rest = body[5:len(body)]
         let comma = mrt_find(rest, ",")
         if comma < 0 { mir_text_die(str_cat2("bad load: ", line)) }
-        ret mir_load(result_name, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
+        ret mir_load(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "store ") {
         let ops = mrt_parse_operands(body[6:len(body)])
@@ -258,7 +270,7 @@ fun mrt_parse_inst(line: str): MirInst {
         inst.op = "gep"
         inst.typ = mrt_trim(rest[0:comma])
         inst.operands = mrt_parse_operands(rest[comma + 1:len(rest)])
-        ret mrt_inst_with_result(inst, result_name, result_type)
+        ret mrt_inst_with_result(inst, result_id, result_type)
     }
     if mrt_starts_with(body, "call ") {
         let rest = body[5:len(body)]
@@ -269,7 +281,7 @@ fun mrt_parse_inst(line: str): MirInst {
         if lp < 0 || rp < lp { mir_text_die(str_cat2("bad call: ", line)) }
         let callee = after_ret[0:lp]
         let args = mrt_parse_operands(after_ret[lp + 1:rp])
-        ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_name, result_type)
+        ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_id, result_type)
     }
     if mrt_starts_with(body, "ptrtoint ") {
         let rest = body[9:len(body)]
@@ -279,20 +291,20 @@ fun mrt_parse_inst(line: str): MirInst {
         inst.op = "ptrtoint"
         inst.typ = mrt_trim(rest[to_pos + 4:len(rest)])
         inst.operands.push(mrt_parse_typed_operand(rest[0:to_pos]))
-        ret mrt_inst_with_result(inst, result_name, result_type)
+        ret mrt_inst_with_result(inst, result_id, result_type)
     }
     if mrt_starts_with(body, "not ") {
         let inst = mir_inst_empty()
         inst.op = "not"
         inst.operands.push(mrt_parse_typed_operand(body[4:len(body)]))
-        ret mrt_inst_with_result(inst, result_name, result_type)
+        ret mrt_inst_with_result(inst, result_id, result_type)
     }
 
     let op = mrt_first_word(body)
     let inst = mir_inst_empty()
     inst.op = op
     inst.operands = mrt_parse_operands(mrt_after_first_word(body))
-    ret mrt_inst_with_result(inst, result_name, result_type)
+    ret mrt_inst_with_result(inst, result_id, result_type)
 }
 
 fun mrt_is_terminator(line: str): bool {

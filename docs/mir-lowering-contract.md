@@ -112,8 +112,10 @@ aligned_frame = ((next_slot + 15) // 16) * 16
 
 | Slot 类型 | 存放内容 | 加载方式 |
 |-----------|----------|----------|
-| `value_slots[name]` | 计算出的值 | `mov reg, [rbp+slot]` |
-| `addr_slots[name]` | 指向 `alloca` 的指针 | `lea reg, [rbp+slot]` |
+| `value_slots[value_id]` | 计算出的值 | `mov reg, [rbp+slot]` |
+| `addr_slots[value_id]` | 指向 `alloca` 的指针 | `lea reg, [rbp+slot]` |
+
+函数局部 MIR value 使用正整数 ID。`value_slots`、`addr_slots`、临时槽标志、block-local use counts、可复用标志和 definition block 都是由最大 ID 定长后直接索引的数组；MIR→x64 不再维护 string-keyed map。
 
 ## 4. Operand loading
 
@@ -125,8 +127,8 @@ aligned_frame = ((next_slot + 15) // 16) * 16
 | `ConstBoolOperand(false)` | `mov reg, 0` |
 | `ConstIntOperand(value)` | `mov reg, imm(value)` |
 | `ConstNullOperand` | `mov reg, 0` |
-| `ValueOperand(name)` — value slot | `mov reg, [rbp+slot]` |
-| `ValueOperand(name)` — address slot | `lea reg, [rbp+slot]` |
+| `ValueOperand(value_id)` — value slot | `mov reg, [rbp+slot]` |
+| `ValueOperand(value_id)` — address slot | `lea reg, [rbp+slot]` |
 | `SymbolOperand("argv")` | `mov reg, [_argv]` |
 | `SymbolOperand(string_global)` | 构造 string header 到 reg（见下文） |
 
@@ -426,4 +428,3 @@ imm32 support.
 ### 9.6 No `.data` relocations
 
 `machine.py` 支持 `data_relocs` API 但当前不发射任何 `.data` section relocations。string header 初始化由 runtime `_load_operand` 以代码形式生成（lea + mov 序列），而非数据重定位。
-

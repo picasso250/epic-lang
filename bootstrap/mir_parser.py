@@ -73,10 +73,13 @@ def _strip_module_sigil(name):
     return name[1:] if name.startswith("@") else name
 
 
-def _strip_local_sigil(name):
+def _parse_local_id(name):
     if not name.startswith("%"):
         raise MirParseError(f"local value must use % sigil in text MIR: {name}")
-    return name[1:]
+    raw = name[1:]
+    if not re.fullmatch(r"[1-9][0-9]*", raw):
+        raise MirParseError(f"local value id must be a positive integer in text MIR: {name}")
+    return int(raw)
 
 
 class _MirTextParser:
@@ -237,7 +240,7 @@ class _MirTextParser:
         params = []
         for part in self._split_commas(text):
             typ, name = self._parse_typed_name(part, line_no)
-            params.append(MirParam(_strip_local_sigil(name), typ))
+            params.append(MirParam(_parse_local_id(name), typ))
         return params
 
     def _parse_signature_parts(self, params_text, ret_text, line_no):
@@ -269,8 +272,8 @@ class _MirTextParser:
         result_type = None
         if " = " in line:
             lhs, line = line.split(" = ", 1)
-            result_name, result_type = self._parse_result_lhs(lhs, line_no)
-            result = MirValue(_strip_local_sigil(result_name), result_type)
+            result_id, result_type = self._parse_result_lhs(lhs, line_no)
+            result = MirValue(_parse_local_id(result_id), result_type)
 
         if line.startswith("alloca "):
             return MirInst("alloca", result=result, type=self._parse_type(line[len("alloca "):]))
@@ -330,7 +333,7 @@ class _MirTextParser:
         if not value:
             self._error(line_no, f"missing operand value: {text}")
         if value.startswith("%"):
-            return ValueOperand(MirValue(_strip_local_sigil(value), typ))
+            return ValueOperand(MirValue(_parse_local_id(value), typ))
         if value.startswith("@"):
             return SymbolOperand(typ, _strip_module_sigil(value))
         if value == "null":

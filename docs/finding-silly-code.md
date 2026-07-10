@@ -367,3 +367,7 @@ if base_type == "AstNode" {
 ```
 
 Prefer structural rules over type-name exceptions. For union field access, allow only common direct fields, then reject variant-only fields through the normal union rules. If source code needs a variant-only field from a union value, make the variant explicit with `match` instead of adding a type-name special case to sema or MIR lowering.
+
+### Pattern 6: numeric identity disguised as a string
+
+If a value is created by a monotonic counter and its text name is used only as a lookup key, keep the counter value as the identity. MIR locals use positive numeric IDs; `%1` is text syntax, while the object model stores `1`. This lets MIR→x64 index slot, liveness and definition-block arrays directly instead of formatting generated names and maintaining several string-keyed maps.

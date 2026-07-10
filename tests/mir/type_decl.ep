@@ -10,7 +10,7 @@ fun main(): void {
     text.push(u8(92))
     str_buf_extend(text, "x00")
     text.push(u8(92))
-    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %zed: ptr = gep struct Zed, ptr null, i64 1\n  %data: ptr = gep struct Data, ptr null, i64 1\n  call void ExitProcess(i64 0)\n  ret i64 0\n}\n")
+    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %1: ptr = gep struct Zed, ptr null, i64 1\n  %2: ptr = gep struct Data, ptr null, i64 1\n  call void ExitProcess(i64 0)\n  ret i64 0\n}\n")
 
     let program = mrt_parse_program(str_buf_finish(text))
     backend_validate_program_abi(program)
