@@ -84,6 +84,8 @@ python test_bootstrap_fixed_point.py -o build\epic.exe
 
 `v0` 标签包含可复现的 bootstrap 构建入口。脚本将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，校验已提交的 SHA-256，随后清理 worktree：
 
+这是发布与复现路径，不是日常编译路径；临时 worktree 用来隔离当前工作区的未提交改动。
+
 ```powershell
 python build_epic_v0.py --require-expected
 ```
@@ -122,10 +124,10 @@ bootstrap/          Python 参考编译器（当前语言）
 src/                用 Epic 编写的编译器模块和工具
 runtime/            MIR 运行时辅助代码和后端运行时支持
 examples/           正向学习示例
-tests/              模块级编译测试与负向测试
+tests/              测试、验收入口与负向用例
 docs/               设计笔记与实现契约
 editors/            编辑器集成资源
-tools/              本地工具二进制文件（如 lld-link.exe）
+tools/              开发辅助脚本与可选本地工具（如 lld-link.exe）
 build/              忽略的本地构建输出
 ```
 
@@ -135,7 +137,7 @@ build/              忽略的本地构建输出
 
 ```powershell
 python tests/run.py                    # 模块级编译测试
-python test_examples.py                # examples/ 正向示例
+python tests/examples/run.py           # examples/ 正向示例
 python test_bootstrap_fixed_point.py   # 从 Python 开始的完整自举不动点检查
 ```
 

@@ -11,6 +11,10 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT_DIR))
 
 from compiler_sources import SELF_HOST_COMPILER_SOURCES
 
@@ -18,7 +22,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
     sys.stderr.reconfigure(errors="replace")
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = str(ROOT_DIR)
 TESTS_DIR = os.path.join(SCRIPT_DIR, "tests")
 sys.path.insert(0, TESTS_DIR)
 
