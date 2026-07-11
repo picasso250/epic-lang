@@ -43,24 +43,65 @@ def print_exe_size(path, label):
     print(f"  {label} exe size: {format_size(os.path.getsize(path))}", flush=True)
 
 
+def process_peak_memory(process):
+    """Return Windows peak working-set and committed bytes for a Popen process."""
+    if os.name != "nt":
+        return None
+
+    import ctypes
+    from ctypes import wintypes
+
+    class ProcessMemoryCounters(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+        ]
+
+    counters = ProcessMemoryCounters()
+    counters.cb = ctypes.sizeof(counters)
+    get_process_memory_info = ctypes.windll.psapi.GetProcessMemoryInfo
+    get_process_memory_info.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(ProcessMemoryCounters),
+        wintypes.DWORD,
+    ]
+    get_process_memory_info.restype = wintypes.BOOL
+    if not get_process_memory_info(process._handle, ctypes.byref(counters), counters.cb):
+        raise ctypes.WinError()
+    return counters.PeakWorkingSetSize, counters.PeakPagefileUsage
+
+
 def run_checked(cmd, label):
     start = time.perf_counter()
+    process = subprocess.Popen(
+        cmd,
+        cwd=SCRIPT_DIR,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     try:
-        result = subprocess.run(
-            cmd,
-            cwd=SCRIPT_DIR,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as e:
+        stdout, stderr = process.communicate(timeout=TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        process.kill()
+        stdout, stderr = process.communicate()
         raise RuntimeError(
             f"{label} timed out after {TIMEOUT_SECONDS}s\n"
-            + (e.stdout or "")[-4000:]
-            + (e.stderr or "")[-4000:]
-        ) from e
+            + stdout[-4000:]
+            + stderr[-4000:]
+        ) from exc
+    peak_memory = process_peak_memory(process)
+    result = subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
     if result.returncode != 0:
         raise RuntimeError(
             f"{label} failed with exit {result.returncode}\n"
@@ -75,6 +116,13 @@ def run_checked(cmd, label):
     for line in result.stdout.splitlines():
         if line.startswith("  timing: ") or line.startswith("  stats: "):
             print(f"  {label} {line.strip()}", flush=True)
+    if peak_memory is not None:
+        peak_working_set, peak_commit = peak_memory
+        print(
+            f"  {label} memory: peak working set={format_size(peak_working_set)} "
+            + f"peak commit={format_size(peak_commit)}",
+            flush=True,
+        )
     print(f"{label}: {elapsed:.2f}s", flush=True)
     return result
 
