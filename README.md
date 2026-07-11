@@ -1,14 +1,14 @@
 # Epic
 
-从零自举的 **Windows x64** 原生编程语言。v0 契约已冻结。
+一个已完成自举的 **Windows x64** 原生编程语言。v0 公开语言契约已冻结。
 
-- **从零自举**：编译器用自己编译自己，完整不动点验证
-- **生成原生 PE 二进制**：无运行时依赖，Hello World 仅 **5.5 KB**
-- **未优化已快于 CPython**：自托管编译器编译自身 2.50s（Python 参考编译器 2.79s）
+- **可复现自举**：从 Python stage-0 构建 self-hosted compiler，并达到字节一致的不动点
+- **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World 为 **5632 bytes（5.5 KiB）**
+- **完整编译器栈在仓库内**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
 
 包含一个 Python 参考编译器、一个用 Epic 自身编写的自托管编译器、一个类型化的 LLVM 风格 MIR、一个结构化的 x64 后端、一个小型 COFF/PE 工具链，以及用于构建真实 Windows 可执行文件的运行时辅助代码。
 
-## 5 秒上手
+## 快速上手
 
 先看一段 Epic 代码：
 
@@ -18,12 +18,23 @@ fun main(): void {
 }
 ```
 
-编译并运行：
+仓库中的 `examples/00_hello_world.ep` 就是上面的程序。先生成达到不动点的 self-hosted compiler，再用它编译并运行 Hello World：
 
 ```powershell
-python bootstrap/epic.py examples/00_hello_world.ep
-.\build\examples\00_hello_world.exe
+python test_bootstrap_fixed_point.py -o build\epic.exe
+
+.\build\epic.exe `
+  runtime\array.ep `
+  runtime\panic.ep `
+  runtime\str.ep `
+  examples\00_hello_world.ep `
+  --main examples\00_hello_world.ep `
+  -o build\hello.exe
+
+.\build\hello.exe
 ```
+
+第一条命令从 Python stage-0 启动完整 bootstrap，只用于生成稳定的 `build\epic.exe`。self-hosted compiler 当前显式接收三份 runtime 源码和目标程序源码；之后的 examples 可以沿用同一形式，只替换目标 `.ep` 文件。
 
 输出：
 
@@ -33,24 +44,42 @@ Hello, Epic!
 
 从 **examples/00_hello_world.ep** 到 **examples/08_builtin_fun.ep** 按编号渐进学习。
 
+## 语言特性
+
+Epic 目前支持：
+
+- 函数与结构体接收者方法、局部变量、块尾部值、显式返回
+- `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
+- `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`；`_:` 是唯一的默认分支形式
+- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、显式整数类型转换、带检查的算术运算
+- 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
+- 动态数组（`T[]`）——字面量、定长零初始化、带检查的索引、`len`、`push`、`pop`、`extend`
+- 堆分配结构体——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
+- 封闭的结构体-联合 ADT——`type Name = A | B` 声明、显式包装构造、公共字段访问
+- 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
+
+主要语言特性可通过 `examples/` 渐进学习；完整语言边界由 `docs/` 和意图级测试共同定义。
+
+v0 的公开语言特性由当前编译器、`examples/` 和 `docs/` 共同定义并保持稳定。内部实现（编译器、runtime、GC、IR、后端）不属于冻结边界，可持续演进。
+
 ## 自举不动点
 
-项目已通过完整自举验证（bootstrap fixed point）：使用 Python 参考编译器编译 Epic 编译器源码，得到 `epic-py.exe`；再用它编译自身源码，输出与下一轮字节一致。
+项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。
 
-| 阶段 | 编译器 | 目标 | 耗时 | exe 体积 |
-|------|--------|------|------|----------|
-| 1 | Python → | epic-py.exe | 2.79s | 0.70 MiB |
-| 2 | epic-py → | epic-epic.exe | 2.50s | 0.70 MiB |
-| 3 | epic-epic → | epic-epic-epic.exe | 2.52s | 0.70 MiB |
-| 4 | epic-epic-epic → | epic-epic-epic-epic.exe | 2.51s | 0.70 MiB |
+| 世代 | 使用的编译器 | 生成产物 | 本次耗时 | exe 体积 |
+|------|--------------|----------|----------|----------|
+| 1 | Python reference compiler | `epic-py.exe` | 2.79s | 0.70 MiB |
+| 2 | `epic-py.exe` | `epic-epic.exe` | 2.50s | 0.70 MiB |
+| 3 | `epic-epic.exe` | `epic-epic-epic.exe` | 2.52s | 0.70 MiB |
+| 4 | `epic-epic-epic.exe` | `epic-epic-epic-epic.exe` | 2.51s | 0.70 MiB |
 
-- **不动点收敛于第 4 轮**：epic-epic 之后字节一致
-- **自托管比 Python 参考编译器快 ~10%**（未优化）
+- **self-hosted 产物已达到字节不动点**：连续三个 self-hosted generations 字节一致
+- 表中的时间来自一次本机构建记录，用于观察 bootstrap 过程，不是跨环境 benchmark
 
-生成不动点的最终编译器：
+生成并保留最终收敛的编译器：
 
 ```powershell
-python test_bootstrap_fixed_point.py -o build/fixed-point/epic.exe
+python test_bootstrap_fixed_point.py -o build\epic.exe
 ```
 
 ### 重建 v0 bootstrap compiler
@@ -69,31 +98,13 @@ build/bootstrap-v0/epic-v0.exe.sha256
 build/bootstrap-v0/manifest.json
 ```
 
-后续编译器、GC 或后端开发可以用该 v0 编译器作为稳定 seed，并检查当前源码能否再次收敛：
+后续编译器、GC 或后端开发可以用该 v0 compiler 作为稳定 seed，并检查当前源码能否再次收敛：
 
 ```powershell
 python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
 ```
 
-Python 参考编译器继续作为语言判定基准（oracle）和完整 bootstrap 的恢复入口；日常 self-hosted 演进可以从 `epic-v0.exe` 起步。
-
-## 语言特性
-
-Epic 目前支持：
-
-- 函数与结构体接收者方法、局部变量、块尾部值、显式返回
-- `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
-- `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`；`_:` 是唯一的默认分支形式
-- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、显式整数类型转换、带检查的算术运算
-- 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
-- 动态数组（`T[]`）——字面量、定长零初始化、带检查的索引、`len`、`push`、`pop`、`extend`
-- 堆分配结构体——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
-- 封闭的结构体-联合 ADT——`type Name = A | B` 声明、显式包装构造、公共字段访问
-- 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
-
-上述特性在 `examples/` 中均有对应示例。
-
-v0 的公开语言特性由当前编译器、`examples/` 和 `docs/` 共同定义并保持稳定。内部实现（编译器、runtime、GC、IR、后端）不属于冻结边界，可持续演进。
+Python reference compiler 继续作为语言判定基准（oracle）和完整 bootstrap 的恢复入口；日常 self-hosted 演进可以从 `epic-v0.exe` 起步。
 
 ## 当前边界
 
