@@ -98,7 +98,7 @@ python test_bootstrap_fixed_point.py
 
 `tests/run.py` 运行模块级 Python/self-hosted 对拍和 e2e；`test_examples.py` 验证正向用户示例；`test_bootstrap_fixed_point.py` 是活跃的自举不动点验收。需要单独验证 self-hosted 编译用户示例时，可运行 `python test_examples.py --self-hosted`。
 
-`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，在目标 revision 自己的构建脚本和 canonical source list 上完成不动点构建，并导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest。提交在 `bootstrap/v0/epic-v0.sha256` 的 digest 是冻结产物的预期值。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代，适合 GC 和后端开发期间的日常 bootstrap 验证。
+`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，在目标 revision 自己的构建脚本和 canonical source list 上完成不动点构建，并导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest。提交在 `bootstrap/v0/epic-v0.sha256` 的 digest 是冻结产物的预期值。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代，适合 GC 和后端开发期间的日常 bootstrap 验证；`-o <compiler.exe>` 将验证后的最终收敛世代写到指定位置。
 
 ## 工具链 (Toolchain)
 

@@ -187,20 +187,20 @@ def parse_args():
         help="build the current compiler from this existing Epic compiler instead of Python",
     )
     parser.add_argument(
-        "--export",
-        dest="export_path",
-        help="copy the converged compiler to this path after verification",
+        "-o",
+        "--output",
+        help="write the converged compiler to this path after verification",
     )
     return parser.parse_args()
 
 
-def export_compiler(source_path, destination_path):
+def write_output(source_path, destination_path):
     destination = os.path.abspath(destination_path)
     parent = os.path.dirname(destination)
     if parent:
         os.makedirs(parent, exist_ok=True)
     shutil.copyfile(source_path, destination)
-    print(f"exported converged compiler: {destination}", flush=True)
+    print(f"wrote converged compiler: {destination}", flush=True)
 
 
 def main():
@@ -252,8 +252,8 @@ def main():
             )
 
     print("bootstrap fixed point reached")
-    if args.export_path:
-        export_compiler(converged, args.export_path)
+    if args.output:
+        write_output(converged, args.output)
     return 0
 
 

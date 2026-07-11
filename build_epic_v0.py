@@ -151,7 +151,7 @@ def main() -> int:
             raise RuntimeError(f"target revision lacks {fixed_point_script.name}")
 
         run(
-            [sys.executable, str(fixed_point_script), "--export", str(staged_exe)],
+            [sys.executable, str(fixed_point_script), "-o", str(staged_exe)],
             cwd=worktree,
         )
         if not staged_exe.is_file():

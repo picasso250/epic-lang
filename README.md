@@ -127,6 +127,12 @@ build/bootstrap-v0/manifest.json
 python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
 ```
 
+需要保留最终收敛的编译器时，使用标准输出参数：
+
+```powershell
+python test_bootstrap_fixed_point.py -o build/fixed-point/epic.exe
+```
+
 Python reference compiler 继续作为语言 oracle 和完整 bootstrap 的恢复入口；日常 self-hosted 演进可以从 `epic-v0.exe` 起步。
 
 也可运行特定模块的测试：
