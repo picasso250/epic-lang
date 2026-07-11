@@ -135,7 +135,7 @@ fun use_control(limit: i64): i64 {
         10: {
             ret total
         }
-        else: {
+        _: {
             ret total + 1
         }
     }

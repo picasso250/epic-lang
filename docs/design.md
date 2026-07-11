@@ -283,7 +283,7 @@ match e {
 match n {
     0:  { println("zero") }
     1:  { println("one") }
-    else: { println("many") }
+    _: { println("many") }
 }
 ```
 
@@ -291,7 +291,7 @@ match n {
 
 规则：
 - 每个分支在模式和主体之间使用冒号。
-- `else` 可选，必须置于最后（如果存在）。
+- `_` 是唯一的默认分支拼法，可选且必须置于最后（如果存在）；`else:` 只属于 `if`，不属于 `match`。
 - 没有 fallthrough（向下穿透）。
 - 不进行穷尽性检查 — 缺失的分支会产生运行时 panic。
 

@@ -401,7 +401,7 @@ require MIR runtime functions.
 Remaining x64 labels and function bodies are hand-written in `mir_to_x64.py`
 `_emit_*()` methods.
 
-Current helper ownership is documented by this contract plus `docs/builtin-inventory.md` and `docs/self-host-core.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.
+Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.
 
 ## 9. Known debts
 

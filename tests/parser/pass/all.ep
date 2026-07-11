@@ -116,7 +116,7 @@ fun statements_and_control(flag: bool): void {
         1: {
             println("one")
         }
-        else: {
+        _: {
             println("many")
         }
     }
@@ -125,7 +125,7 @@ fun statements_and_control(flag: bool): void {
         'a': {
             println("a")
         }
-        else: {
+        _: {
             println("other")
         }
     }
@@ -134,7 +134,7 @@ fun statements_and_control(flag: bool): void {
         "hello": {
             println("hello")
         }
-        else: {
+        _: {
             println("text")
         }
     }

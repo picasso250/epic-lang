@@ -4,17 +4,17 @@ fun main(): i64 {
     match n {
         0: { print("zero") }
         1: { print("one") }
-        else: { print("many") }
+        _: { print("many") }
     }
     let b = true
     match b {
         true: { print("T") }
-        else: { print("F") }
+        _: { print("F") }
     }
     let s = "x"
     match s {
         "x": { print("S") }
-        else: { print("N") }
+        _: { print("N") }
     }
     ret 0
 }

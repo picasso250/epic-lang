@@ -1,0 +1,8 @@
+# COMPILE_FAIL: Expected match literal case
+fun main(): void {
+    let pattern = 1
+    match 1 {
+        pattern: { ret }
+        _: { ret }
+    }
+}

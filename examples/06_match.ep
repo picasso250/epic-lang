@@ -10,7 +10,7 @@ fun main(): i64 {
         1: {
             println("int")
         }
-        else: {
+        _: {
             println("many")
         }
     }
@@ -20,7 +20,7 @@ fun main(): i64 {
         "epic": {
             println("str")
         }
-        else: {
+        _: {
             println("other")
         }
     }

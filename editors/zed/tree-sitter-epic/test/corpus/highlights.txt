@@ -1,83 +1,428 @@
 ==================
-basic program
+declarations and methods
 ==================
 
-# EXIT: 0
-struct Point {
-    x: i64
-    y: i64
+extern "kernel32.dll" fun GetTickCount64(): u64
+
+struct Parser {
+    pos: i64
+    name: str
 }
 
-fun main(): void {
-    let p = new Point
-    p.x = 40 + 2
-    if p.x == 42 {
-        os.ExitProcess(0)
-    } else {
-        ret
-    }
+struct Lit {
+    value: str
+}
+
+struct Add {
+    left: i64
+    right: i64
+}
+
+type Expr = Lit | Add
+
+fun (p: Parser) peek(offset: i64): Expr {
+    ret new Expr(new Lit { value: p.name })
 }
 
 ---
 
 (source_file
-  (comment)
+  (extern_definition
+    (string)
+    (identifier)
+    (parameters)
+    (type
+      (identifier)))
   (struct_definition
-    name: (identifier)
+    (identifier)
     (struct_field
-      name: (identifier)
-      type: (type
+      (identifier)
+      (type
         (identifier)))
     (struct_field
-      name: (identifier)
-      type: (type
+      (identifier)
+      (type
         (identifier))))
+  (struct_definition
+    (identifier)
+    (struct_field
+      (identifier)
+      (type
+        (identifier))))
+  (struct_definition
+    (identifier)
+    (struct_field
+      (identifier)
+      (type
+        (identifier)))
+    (struct_field
+      (identifier)
+      (type
+        (identifier))))
+  (union_definition
+    (identifier)
+    (identifier)
+    (identifier))
   (function_definition
-    name: (identifier)
-    (parameters)
-    return_type: (type
+    (method_receiver
+      (identifier)
+      (type
+        (identifier)))
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (type
+          (identifier))))
+    (type
       (identifier))
-    body: (block
+    (block
+      (statement
+        (return_statement
+          (expression
+            (new_expression
+              (union_initializer
+                (identifier)
+                (expression
+                  (new_expression
+                    (struct_initializer
+                      (identifier)
+                      (field_initializer_list
+                        (field_initializer
+                          (identifier)
+                          (expression
+                            (postfix_expression
+                              (identifier)
+                              (field_suffix
+                                (identifier)))))))))))))))))
+
+==================
+control flow and expressions
+==================
+
+fun demo(flag: bool, parser: Parser): void {
+    let xs: i64[] = new i64[] { 1, 2, 3 }
+    let buf = new u8[16]
+    let text = f"name={parser.name} len={len(xs)}"
+    let view = text[0:len(text)]
+
+    for flag {
+        xs[0] += 1
+        break
+    }
+
+    for i: 0:len(xs) {
+        if i == 1 {
+            continue
+        } else if parser.name? {
+            parser.pos = parser.pos + xs[i]
+        }
+    }
+
+    match xs[0] {
+        0: { println("zero") }
+        _: { println(text) }
+    }
+
+    let expr: Expr = new Expr(new Add { left: 20, right: 22 })
+    match expr {
+        Lit lit: { println(lit.value) }
+        Add add: { println(str(add.left + add.right)) }
+        _: { panic "unreachable" }
+    }
+
+    buf.push('A')
+    if parser.name? {
+        println(view)
+    }
+    ret
+}
+
+---
+
+(source_file
+  (function_definition
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (type
+          (identifier)))
+      (parameter
+        (identifier)
+        (type
+          (identifier))))
+    (type
+      (identifier))
+    (block
       (statement
         (let_statement
-          name: (identifier)
-          value: (expression
+          (identifier)
+          (type
+            (identifier))
+          (expression
             (new_expression
-              type: (identifier)))))
+              (array_literal
+                (identifier)
+                (expression
+                  (number))
+                (expression
+                  (number))
+                (expression
+                  (number)))))))
       (statement
-        (assignment_statement
-          left: (field_expression
-            object: (expression
+        (let_statement
+          (identifier)
+          (expression
+            (new_expression
+              (array_allocation
+                (identifier)
+                (expression
+                  (number)))))))
+      (statement
+        (let_statement
+          (identifier)
+          (expression
+            (fstring
+              (fstring_text)
+              (fstring_interpolation
+                (expression
+                  (postfix_expression
+                    (identifier)
+                    (field_suffix
+                      (identifier)))))
+              (fstring_text)
+              (fstring_interpolation
+                (expression
+                  (postfix_expression
+                    (identifier)
+                    (call_suffix
+                      (arguments
+                        (expression
+                          (identifier)))))))))))
+      (statement
+        (let_statement
+          (identifier)
+          (expression
+            (postfix_expression
+              (identifier)
+              (slice_suffix
+                (expression
+                  (number))
+                (expression
+                  (postfix_expression
+                    (identifier)
+                    (call_suffix
+                      (arguments
+                        (expression
+                          (identifier)))))))))))
+      (statement
+        (for_statement
+          (for_condition_statement
+            (expression
               (identifier))
-            field: (identifier))
-          right: (expression
-            (binary_expression
-              left: (expression
+            (block
+              (statement
+                (assignment_statement
+                  (postfix_expression
+                    (identifier)
+                    (subscript_suffix
+                      (expression
+                        (number))))
+                  (expression
+                    (number))))
+              (statement
+                (break_statement))))))
+      (statement
+        (for_statement
+          (for_range_statement
+            (identifier)
+            (expression
+              (number))
+            (expression
+              (postfix_expression
+                (identifier)
+                (call_suffix
+                  (arguments
+                    (expression
+                      (identifier))))))
+            (block
+              (statement
+                (if_statement
+                  (expression
+                    (binary_expression
+                      (expression
+                        (identifier))
+                      (expression
+                        (number))))
+                  (block
+                    (statement
+                      (continue_statement)))
+                  (if_statement
+                    (expression
+                      (postfix_expression
+                        (identifier)
+                        (field_suffix
+                          (identifier))
+                        (null_check_suffix)))
+                    (block
+                      (statement
+                        (assignment_statement
+                          (postfix_expression
+                            (identifier)
+                            (field_suffix
+                              (identifier)))
+                          (expression
+                            (binary_expression
+                              (expression
+                                (postfix_expression
+                                  (identifier)
+                                  (field_suffix
+                                    (identifier))))
+                              (expression
+                                (postfix_expression
+                                  (identifier)
+                                  (subscript_suffix
+                                    (expression
+                                      (identifier)))))))))))))))))
+      (statement
+        (match_statement
+          (expression
+            (postfix_expression
+              (identifier)
+              (subscript_suffix
+                (expression
+                  (number)))))
+          (match_case
+            (match_literal_case
+              (match_literal_pattern
                 (number))
-              right: (expression
-                (number))))))
+              (block
+                (statement
+                  (expression_statement
+                    (expression
+                      (postfix_expression
+                        (identifier)
+                        (call_suffix
+                          (arguments
+                            (expression
+                              (string)))))))))))
+          (match_default_case
+            (block
+              (statement
+                (expression_statement
+                  (expression
+                    (postfix_expression
+                      (identifier)
+                      (call_suffix
+                        (arguments
+                          (expression
+                            (identifier))))))))))))
+      (statement
+        (let_statement
+          (identifier)
+          (type
+            (identifier))
+          (expression
+            (new_expression
+              (union_initializer
+                (identifier)
+                (expression
+                  (new_expression
+                    (struct_initializer
+                      (identifier)
+                      (field_initializer_list
+                        (field_initializer
+                          (identifier)
+                          (expression
+                            (number)))
+                        (field_initializer
+                          (identifier)
+                          (expression
+                            (number))))))))))))
+      (statement
+        (match_statement
+          (expression
+            (identifier))
+          (match_case
+            (match_variant_case
+              (identifier)
+              (identifier)
+              (block
+                (statement
+                  (expression_statement
+                    (expression
+                      (postfix_expression
+                        (identifier)
+                        (call_suffix
+                          (arguments
+                            (expression
+                              (postfix_expression
+                                (identifier)
+                                (field_suffix
+                                  (identifier)))))))))))))
+          (match_case
+            (match_variant_case
+              (identifier)
+              (identifier)
+              (block
+                (statement
+                  (expression_statement
+                    (expression
+                      (postfix_expression
+                        (identifier)
+                        (call_suffix
+                          (arguments
+                            (expression
+                              (postfix_expression
+                                (identifier)
+                                (call_suffix
+                                  (arguments
+                                    (expression
+                                      (binary_expression
+                                        (expression
+                                          (postfix_expression
+                                            (identifier)
+                                            (field_suffix
+                                              (identifier))))
+                                        (expression
+                                          (postfix_expression
+                                            (identifier)
+                                            (field_suffix
+                                              (identifier)))))))))))))))))))
+          (match_default_case
+            (block
+              (statement
+                (panic_statement
+                  (expression
+                    (string))))))))
+      (statement
+        (expression_statement
+          (expression
+            (postfix_expression
+              (identifier)
+              (dot_call_suffix
+                (identifier)
+                (arguments
+                  (expression
+                    (char))))))))
       (statement
         (if_statement
-          condition: (expression
-            (binary_expression
-              left: (expression
-                (field_expression
-                  object: (expression
-                    (identifier))
-                  field: (identifier)))
-              right: (expression
-                (number))))
-          consequence: (block
+          (expression
+            (postfix_expression
+              (identifier)
+              (field_suffix
+                (identifier))
+              (null_check_suffix)))
+          (block
             (statement
               (expression_statement
                 (expression
-                  (call_expression
-                    function: (field_expression
-                      object: (expression
-                        (identifier))
-                      field: (identifier))
-                    (expression
-                      (number)))))))
-          alternative: (block
-            (statement
-              (return_statement))))))))
+                  (postfix_expression
+                    (identifier)
+                    (call_suffix
+                      (arguments
+                        (expression
+                          (identifier)))))))))))
+      (statement
+        (return_statement)))))

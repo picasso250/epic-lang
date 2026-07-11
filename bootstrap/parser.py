@@ -394,23 +394,39 @@ class Parser:
         self.expect_stmt_end()
         return PanicNode(message=message, line=t[2])
 
+    def parse_match_literal(self):
+        token = self.advance()
+        kind = token[0]
+        if kind == "NUMBER":
+            return LiteralNode(value=token[1], line=token[2])
+        if kind == "CHAR":
+            return CharNode(value=token[1], line=token[2])
+        if kind == "STRING":
+            return StringNode(value=token[1], line=token[2])
+        if kind == "TRUE":
+            return BoolNode(value=1, line=token[2])
+        if kind == "FALSE":
+            return BoolNode(value=0, line=token[2])
+        raise ParseError("Expected match literal case", token[2])
+
     def parse_match_stmt(self):
         self.expect("MATCH")
         expr = self.parse_expr()
         self.expect("LBRACE")
         self.skip_newlines()
         cases = []
+        saw_default = False
         while not self.peek_kind("RBRACE"):
-            if self.peek_kind("ELSE"):
+            if saw_default:
+                raise ParseError("match default must be last", self.peek()[2])
+            if self.peek_kind("ID") and self.peek()[1] == "_":
                 self.advance()
                 self.expect("COLON")
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=None, body=body, is_else=True))
-            elif self.peek_kind("ID") and self.peek()[1] == "_":
-                self.advance()
-                self.expect("COLON")
-                body = self.parse_block()
-                cases.append(MatchCase(pattern=None, body=body, is_else=True))
+                saw_default = True
+            elif self.peek_kind("ELSE"):
+                raise ParseError("match default uses _:, not else:", self.peek()[2])
             elif self.peek_kind("ID") and self.peek_ahead(1)[0] == "ID" and self.peek_ahead(2)[0] == "COLON":
                 variant = self.expect("ID")
                 binding = self.expect("ID")
@@ -418,7 +434,7 @@ class Parser:
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=None, body=body, variant_name=variant[1], binding_name=binding[1], line=variant[2]))
             else:
-                pattern = self.parse_expr()
+                pattern = self.parse_match_literal()
                 self.expect("COLON")
                 body = self.parse_block()
                 cases.append(MatchCase(pattern=pattern, body=body, line=getattr(pattern, "line", 0)))

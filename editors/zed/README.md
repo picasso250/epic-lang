@@ -1,17 +1,19 @@
 # Epic for Zed
 
-Minimal Zed language extension for Epic syntax highlighting.
+Zed language extension for the current Epic syntax.
 
 ## Local development
 
-1. Generate the parser:
+1. Generate and test the parser:
 
    ```powershell
    cd tree-sitter-epic
    npm install
    npm run generate
+   npm test
    ```
 
 2. Open Zed, run `zed: extensions`, choose `Install Dev Extension`, and select `editors/zed`.
 
-The extension intentionally keeps the Tree-sitter grammar broad and lightweight. It is for editor highlighting, not for compiler validation.
+The compiler remains the semantic oracle, while the tracked Tree-sitter grammar is
+kept aligned with the accepted source syntax rather than preserving removed forms.

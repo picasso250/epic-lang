@@ -43,17 +43,15 @@ compiler pieces written in Epic itself.
 
 Epic currently supports:
 
-- functions, local variables, returns, `if`, `while`, `for in range`, `break`,
-  and `continue`
-- integer and boolean operations, including signed / unsigned arithmetic cases
-- strings as byte-slice-backed text views, with literals, content equality, slicing, and allocating `str + str` concatenation
-- dynamic arrays (`T[]`) backed by slice headers, with `len`, `cap`, checked indexing, and `push`
-- byte-oriented `u8[]` helpers such as slicing and `extend`
-- heap-backed structs with explicit named fields, initialization, and user-defined
-  methods on struct receivers
-- ADTs backed by struct-union lowering, plus `match`
-- file I/O helpers, `argv`, process exit, and direct WinAPI import
-  calls on Windows
+- functions and struct-receiver methods, local variables, block tail values, and explicit returns
+- `if` / `else`, condition loops written `for condition`, and half-open ranges written `for i: start:end`
+- `break`, `continue`, `panic`, literal `match`, and exhaustive ADT `match`; `_:` is the only match default branch
+- `i64`, `u64`, `i32`, `u32`, `u8`, `bool`, explicit integer conversions, and checked arithmetic
+- byte-oriented `str`, character and f-string literals, content equality, slicing, and allocating `str + str`
+- dynamic arrays (`T[]`) with literals, capacity allocation, checked indexing, `len`, `cap`, `push`, `pop`, and `extend`
+- heap-backed structs with named and partial initialization; omitted reference fields are null and can be tested with postfix `?`
+- closed struct-union ADTs declared with `type Name = A | B`, explicit wrapper construction, and common-field access
+- byte-oriented file I/O, `argv`, process exit, and typed direct WinAPI imports on Windows
 
 The language is intentionally moving fast. Public surface is documented by the
 current compiler, examples, and `docs/`; old convenience builtins and old backend

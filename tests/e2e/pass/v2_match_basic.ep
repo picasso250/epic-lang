@@ -10,7 +10,7 @@ fun main(): i64 {
         1: {
             print("one")
         }
-        else: {
+        _: {
             print("many")
         }
     }
@@ -21,7 +21,7 @@ fun main(): i64 {
         "x": {
             print("s")
         }
-        else: {
+        _: {
             print("no")
         }
     }
@@ -32,7 +32,7 @@ fun main(): i64 {
         true: {
             print("true")
         }
-        else: {
+        _: {
             print("false")
         }
     }
@@ -43,7 +43,7 @@ fun main(): i64 {
         1: {
             print("bad")
         }
-        else: {
+        _: {
             print("else")
         }
     }

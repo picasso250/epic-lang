@@ -1,75 +1,103 @@
 (comment) @comment
 
 [
-  (function_definition)
-  (struct_definition)
-  (let_statement)
-  (return_statement)
-  (if_statement)
-  (while_statement)
-  (new_expression)
-  (break_statement)
-  (continue_statement)
+  "extern"
+  "fun"
+  "struct"
+  "type"
+  "let"
+  "ret"
+  "if"
+  "else"
+  "for"
+  "panic"
+  "match"
+  "new"
 ] @keyword
 
+(break_statement) @keyword
+(continue_statement) @keyword
+(boolean) @boolean
+
 ((identifier) @type.builtin
-  (#match? @type.builtin "^(i64|i8|void|str)$"))
+  (#match? @type.builtin "^(i64|u64|i32|u32|u8|bool|void|str)$"))
 
 (number) @number
 (string) @string
+(fstring) @string
 (char) @character
 
 (function_definition
   name: (identifier) @function)
 
-(call_expression
-  function: (identifier) @function)
+(extern_definition
+  name: (identifier) @function)
+
+(postfix_expression
+  object: (identifier) @function.call
+  (call_suffix))
+
+(dot_call_suffix
+  method: (identifier) @function.method.call)
 
 (struct_definition
   name: (identifier) @type)
 
+(union_definition
+  name: (identifier) @type)
+
+(union_definition
+  member: (identifier) @type)
+
 (type
-  (identifier) @type)
+  name: (identifier) @type)
+
+(method_receiver
+  type: (type
+    name: (identifier) @type))
 
 (parameter
+  name: (identifier) @variable.parameter)
+
+(method_receiver
   name: (identifier) @variable.parameter)
 
 (let_statement
   name: (identifier) @variable)
 
-(field_expression
+(for_range_statement
+  cursor: (identifier) @variable)
+
+(struct_field
+  name: (identifier) @property)
+
+(field_initializer
+  name: (identifier) @property)
+
+(field_suffix
   field: (identifier) @property)
 
-[
-  "+"
-  "-"
-  "*"
-  "/"
-  "%"
-  "=="
-  "!="
-  "<"
-  "<="
-  ">"
-  ">="
-  "&&"
-  "||"
-  "!"
-  "&"
-  "="
-] @operator
+(match_variant_case
+  variant: (identifier) @type)
+
+(match_variant_case
+  binding: (identifier) @variable)
 
 [
-  "("
-  ")"
-  "{"
-  "}"
-  "["
-  "]"
+  "=" "+=" "-=" "*=" "/=" "%="
+  "<<=" ">>=" ">>>=" "&=" "|=" "^="
+  "+" "-" "*" "/" "%"
+  "==" "!=" "<" "<=" ">" ">="
+  "&&" "||" "&" "|" "^" "~"
+  "<<" ">>" ">>>" "!"
+] @operator
+
+(null_check_suffix) @operator
+
+[
+  "(" ")" "{" "}" "[" "]"
 ] @punctuation.bracket
 
 [
-  ","
-  ":"
-  "."
+  "," ":" "."
 ] @punctuation.delimiter

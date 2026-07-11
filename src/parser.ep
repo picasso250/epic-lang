@@ -57,7 +57,7 @@ fun type_array_of(elem: TypeExpr): TypeExpr {
 fun type_expr_is_missing(t: TypeExpr): bool {
     match t {
         TypeMissing n: { ret true }
-        else: {}
+        _: {}
     }
     ret false
 }
@@ -389,7 +389,7 @@ fun ast_expr(node: AstNode): AstNode {
         AstUnary n: { ret n.expr }
         AstNullCheck n: { ret n.expr }
         AstUnionInit n: { ret n.expr }
-        else: {}
+        _: {}
     }
     ret ast_empty()
 }
@@ -633,7 +633,7 @@ fun (p: Parser) parse_block(): AstBlock {
                     node.value_expr = expr_stmt.expr
                     node.has_value = true
                 }
-                else: {
+                _: {
                     node.stmts.push(stmt)
                 }
             }
@@ -747,7 +747,7 @@ fun (p: Parser) parse_assign_stmt(): AstNode {
         AstSubscript n: {
             ret new AstNode(new AstSubscriptAssign { meta: ast_meta(token_line(name)), base: n.base, index: n.index, value_expr: value })
         }
-        else: {}
+        _: {}
     }
     parse_error(token_line(name), "Invalid assignment target")
     ret ast_empty()
@@ -847,23 +847,21 @@ fun (p: Parser) parse_match_stmt(): AstNode {
     let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }, has_else: false }
     p.expect("LBRACE")
     p.skip_newlines()
-    let saw_else = 0
+    let saw_default = 0
     for p.peek_kind("RBRACE") == 0 {
-        if saw_else == 1 {
+        if saw_default == 1 {
             let bad = p.peek()
-            parse_error(token_line(bad), "match else must be last")
+            parse_error(token_line(bad), "match default must be last")
         }
-        if p.check("ELSE") == 1 {
-            p.expect("COLON")
-            node.else_block = p.parse_block()
-            node.has_else = true
-            saw_else = 1
-        } else if p.peek_kind("ID") == 1 && token_text(p.peek()) == "_" {
+        if p.peek_kind("ID") == 1 && token_text(p.peek()) == "_" {
             p.advance()
             p.expect("COLON")
             node.else_block = p.parse_block()
             node.has_else = true
-            saw_else = 1
+            saw_default = 1
+        } else if p.peek_kind("ELSE") == 1 {
+            let bad = p.peek()
+            parse_error(token_line(bad), "match default uses _:, not else:")
         } else if p.peek_kind("ID") == 1 && p.pos + 2 < len(p.tokens) && token_kind(p.tokens[p.pos + 1]) == "ID" && token_kind(p.tokens[p.pos + 2]) == "COLON" {
             let variant = p.expect("ID")
             let binding = p.expect("ID")
@@ -947,7 +945,7 @@ fun is_expr_first(kind: str): i64 {
         "TILDE": {
             ret 1
         }
-        else: {
+        _: {
         }
     }
     ret 0
@@ -991,7 +989,7 @@ fun is_assignment_op_kind(kind: str): i64 {
         "CARET_ASSIGN": {
             ret 1
         }
-        else: {
+        _: {
         }
     }
     ret 0
@@ -1035,7 +1033,7 @@ fun assignment_op_from_kind(kind: str): str {
         "CARET_ASSIGN": {
             ret "^"
         }
-        else: {
+        _: {
         }
     }
     ret ""
@@ -1144,7 +1142,7 @@ fun op_text(kind: str): str {
         "TILDE": {
             ret "~"
         }
-        else: {
+        _: {
         }
     }
     ret ""
@@ -1269,7 +1267,7 @@ fun (p: Parser) parse_primary(): AstNode {
                         ret p.parse_postfix(p.parse_array_literal(t))
                     }
                 }
-                else: {}
+                _: {}
             }
             ret p.parse_postfix(new AstNode(new AstNewArray { meta: ast_meta(token_line(t)), elem_type: type_name_expr(token_text(t)), count: count }))
         }
