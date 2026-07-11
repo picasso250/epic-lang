@@ -6,6 +6,12 @@ extern i64 @GetProcessHeap()
 
 extern ptr @HeapAlloc(i64, i64, i64)
 
+extern i64 @HeapFree(i64, i64, ptr)
+
+extern i64 @HeapSize(i64, i64, ptr)
+
+extern void @GetCurrentThreadStackLimits(ptr, ptr)
+
 extern i64 @CreateFileA(i64, i64, i64, i64, i64, i64, i64)
 
 extern i64 @GetFileSize(i64, i64)

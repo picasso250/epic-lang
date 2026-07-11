@@ -1,0 +1,549 @@
+global @gc_objects: ptr
+
+global @gc_object_count: i64
+
+global @gc_object_cap: i64
+
+global @gc_live_bytes: i64
+
+global @gc_threshold: i64 = 268435456
+
+global @gc_stack_high: ptr
+
+global @gc_table: ptr
+
+global @gc_table_cap: i64
+
+global @gc_marks: ptr
+
+global @gc_work: ptr
+
+global @gc_work_count: i64
+
+global @gc_collection_count: i64
+
+define ptr @__ep_gc_raw_try_alloc(i64 %1) {
+entry:
+  %2: i64 = load i64, ptr heap
+  %3: ptr = call ptr HeapAlloc(i64 %2, i64 8, i64 %1)
+  ret ptr %3
+}
+
+define ptr @__ep_gc_raw_alloc(i64 %1) {
+entry:
+  %2: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
+  %3: bool = icmp.eq ptr %2, ptr null
+  condbr bool %3, label %fail, label %ok
+
+fail:
+  call void ExitProcess(i64 1)
+  ret ptr null
+
+ok:
+  ret ptr %2
+}
+
+define void @__ep_gc_raw_free(ptr %1) {
+entry:
+  %2: i64 = load i64, ptr heap
+  %3: i64 = call i64 HeapFree(i64 %2, i64 0, ptr %1)
+  ret void
+}
+
+define void @__ep_gc_grow_objects(i64 %1) {
+entry:
+  %2: i64 = mul i64 %1, i64 8
+  %3: ptr = call ptr __ep_gc_raw_alloc(i64 %2)
+  %4: ptr = load ptr, ptr gc_objects
+  %5: i64 = load i64, ptr gc_object_count
+  %6: ptr = alloca i64
+  store i64 0, ptr %6
+  br label %copy
+
+copy:
+  %7: i64 = load i64, ptr %6
+  %8: bool = icmp.ult i64 %7, i64 %5
+  condbr bool %8, label %copy_one, label %replace
+
+copy_one:
+  %9: ptr = gep ptr, ptr %4, i64 %7
+  %10: ptr = load ptr, ptr %9
+  %11: ptr = gep ptr, ptr %3, i64 %7
+  store ptr %10, ptr %11
+  %12: i64 = add i64 %7, i64 1
+  store i64 %12, ptr %6
+  br label %copy
+
+replace:
+  %13: bool = icmp.eq ptr %4, ptr null
+  condbr bool %13, label %store, label %free_old
+
+free_old:
+  call void __ep_gc_raw_free(ptr %4)
+  br label %store
+
+store:
+  store ptr %3, ptr gc_objects
+  store i64 %1, ptr gc_object_cap
+  ret void
+}
+
+define void @__ep_gc_ensure_object_capacity() {
+entry:
+  %1: i64 = load i64, ptr gc_object_count
+  %2: i64 = load i64, ptr gc_object_cap
+  %3: bool = icmp.ult i64 %1, i64 %2
+  condbr bool %3, label %done, label %grow
+
+grow:
+  %4: bool = icmp.eq i64 %2, i64 0
+  condbr bool %4, label %initial, label %double
+
+initial:
+  call void __ep_gc_grow_objects(i64 1024)
+  ret void
+
+double:
+  %5: i64 = mul i64 %2, i64 2
+  call void __ep_gc_grow_objects(i64 %5)
+  ret void
+
+done:
+  ret void
+}
+
+define void @__ep_gc_table_insert(ptr %1) {
+entry:
+  %2: ptr = load ptr, ptr gc_table
+  %3: i64 = load i64, ptr gc_table_cap
+  %4: i64 = ptrtoint ptr %1 to i64
+  %5: i64 = udiv i64 %4, i64 8
+  %6: i64 = mul i64 %5, i64 6364136223846793005
+  %7: i64 = urem i64 %6, i64 %3
+  %8: ptr = alloca i64
+  store i64 %7, ptr %8
+  br label %probe
+
+probe:
+  %9: i64 = load i64, ptr %8
+  %10: ptr = gep ptr, ptr %2, i64 %9
+  %11: ptr = load ptr, ptr %10
+  %12: bool = icmp.eq ptr %11, ptr null
+  condbr bool %12, label %insert, label %next
+
+next:
+  %13: i64 = add i64 %9, i64 1
+  %14: i64 = urem i64 %13, i64 %3
+  store i64 %14, ptr %8
+  br label %probe
+
+insert:
+  store ptr %1, ptr %10
+  ret void
+}
+
+define i64 @__ep_gc_lookup(ptr %1) {
+entry:
+  %2: bool = icmp.eq ptr %1, ptr null
+  condbr bool %2, label %none, label %hash
+
+hash:
+  %3: ptr = load ptr, ptr gc_table
+  %4: i64 = load i64, ptr gc_table_cap
+  %5: i64 = ptrtoint ptr %1 to i64
+  %6: i64 = udiv i64 %5, i64 8
+  %7: i64 = mul i64 %6, i64 6364136223846793005
+  %8: i64 = urem i64 %7, i64 %4
+  %9: ptr = alloca i64
+  %10: ptr = alloca i64
+  store i64 %8, ptr %9
+  store i64 0, ptr %10
+  br label %probe
+
+probe:
+  %11: i64 = load i64, ptr %10
+  %12: bool = icmp.uge i64 %11, i64 %4
+  condbr bool %12, label %none, label %read
+
+read:
+  %13: i64 = load i64, ptr %9
+  %14: ptr = gep ptr, ptr %3, i64 %13
+  %15: ptr = load ptr, ptr %14
+  %16: bool = icmp.eq ptr %15, ptr null
+  condbr bool %16, label %none, label %compare
+
+compare:
+  %17: bool = icmp.eq ptr %15, ptr %1
+  condbr bool %17, label %found, label %next
+
+next:
+  %18: i64 = add i64 %13, i64 1
+  %19: i64 = urem i64 %18, i64 %4
+  store i64 %19, ptr %9
+  %20: i64 = add i64 %11, i64 1
+  store i64 %20, ptr %10
+  br label %probe
+
+found:
+  %21: i64 = add i64 %13, i64 1
+  ret i64 %21
+
+none:
+  ret i64 0
+}
+
+define void @__ep_gc_prepare_collection() {
+entry:
+  %1: i64 = load i64, ptr gc_object_count
+  %2: i64 = mul i64 %1, i64 2
+  %3: ptr = alloca i64
+  store i64 1024, ptr %3
+  br label %choose
+
+choose:
+  %4: i64 = load i64, ptr %3
+  %5: bool = icmp.ult i64 %4, i64 %2
+  condbr bool %5, label %double, label %allocate
+
+double:
+  %6: i64 = mul i64 %4, i64 2
+  store i64 %6, ptr %3
+  br label %choose
+
+allocate:
+  %7: i64 = mul i64 %4, i64 8
+  %8: ptr = call ptr __ep_gc_raw_alloc(i64 %7)
+  %9: ptr = call ptr __ep_gc_raw_alloc(i64 %4)
+  %10: i64 = mul i64 %1, i64 8
+  %11: bool = icmp.eq i64 %10, i64 0
+  condbr bool %11, label %empty_work, label %full_work
+
+empty_work:
+  %12: ptr = call ptr __ep_gc_raw_alloc(i64 8)
+  br label %store_empty
+
+store_empty:
+  store ptr %12, ptr gc_work
+  br label %store
+
+full_work:
+  %13: ptr = call ptr __ep_gc_raw_alloc(i64 %10)
+  store ptr %13, ptr gc_work
+  br label %store
+
+store:
+  store ptr %8, ptr gc_table
+  store i64 %4, ptr gc_table_cap
+  store ptr %9, ptr gc_marks
+  store i64 0, ptr gc_work_count
+  %14: ptr = load ptr, ptr gc_objects
+  %15: ptr = alloca i64
+  store i64 0, ptr %15
+  br label %build
+
+build:
+  %16: i64 = load i64, ptr %15
+  %17: bool = icmp.ult i64 %16, i64 %1
+  condbr bool %17, label %insert, label %done
+
+insert:
+  %18: ptr = gep ptr, ptr %14, i64 %16
+  %19: ptr = load ptr, ptr %18
+  call void __ep_gc_table_insert(ptr %19)
+  %20: i64 = add i64 %16, i64 1
+  store i64 %20, ptr %15
+  br label %build
+
+done:
+  ret void
+}
+
+define void @__ep_gc_release_collection() {
+entry:
+  %1: ptr = load ptr, ptr gc_table
+  %2: ptr = load ptr, ptr gc_marks
+  %3: ptr = load ptr, ptr gc_work
+  call void __ep_gc_raw_free(ptr %1)
+  call void __ep_gc_raw_free(ptr %2)
+  call void __ep_gc_raw_free(ptr %3)
+  store ptr null, ptr gc_table
+  store ptr null, ptr gc_marks
+  store ptr null, ptr gc_work
+  store i64 0, ptr gc_table_cap
+  ret void
+}
+
+define void @__ep_gc_mark_ptr(ptr %1) {
+entry:
+  %2: i64 = call i64 __ep_gc_lookup(ptr %1)
+  %3: bool = icmp.eq i64 %2, i64 0
+  condbr bool %3, label %done, label %check
+
+check:
+  %4: i64 = sub i64 %2, i64 1
+  %5: ptr = load ptr, ptr gc_marks
+  %6: ptr = gep i8, ptr %5, i64 %4
+  %7: i8 = load i8, ptr %6
+  %8: bool = icmp.ne i8 %7, i8 0
+  condbr bool %8, label %done, label %mark
+
+mark:
+  store i8 1, ptr %6
+  %9: ptr = load ptr, ptr gc_work
+  %10: i64 = load i64, ptr gc_work_count
+  %11: ptr = gep ptr, ptr %9, i64 %10
+  store ptr %1, ptr %11
+  %12: i64 = add i64 %10, i64 1
+  store i64 %12, ptr gc_work_count
+  ret void
+
+done:
+  ret void
+}
+
+define void @__ep_gc_mark_roots() {
+entry:
+  %1: ptr = load ptr, ptr argv
+  call void __ep_gc_mark_ptr(ptr %1)
+  %2: ptr = alloca i64
+  %3: ptr = alloca ptr
+  store ptr %2, ptr %3
+  %4: ptr = load ptr, ptr gc_stack_high
+  br label %scan
+
+scan:
+  %5: ptr = load ptr, ptr %3
+  %6: bool = icmp.ult ptr %5, ptr %4
+  condbr bool %6, label %word, label %done
+
+word:
+  %7: ptr = load ptr, ptr %5
+  call void __ep_gc_mark_ptr(ptr %7)
+  %8: ptr = gep i8, ptr %5, i64 8
+  store ptr %8, ptr %3
+  br label %scan
+
+done:
+  ret void
+}
+
+define void @__ep_gc_drain_marks() {
+entry:
+  br label %next_object
+
+next_object:
+  %1: i64 = load i64, ptr gc_work_count
+  %2: bool = icmp.eq i64 %1, i64 0
+  condbr bool %2, label %done, label %pop
+
+pop:
+  %3: i64 = sub i64 %1, i64 1
+  store i64 %3, ptr gc_work_count
+  %4: ptr = load ptr, ptr gc_work
+  %5: ptr = gep ptr, ptr %4, i64 %3
+  %6: ptr = load ptr, ptr %5
+  %7: i64 = load i64, ptr heap
+  %8: i64 = call i64 HeapSize(i64 %7, i64 0, ptr %6)
+  %9: ptr = alloca i64
+  store i64 0, ptr %9
+  br label %scan
+
+scan:
+  %10: i64 = load i64, ptr %9
+  %11: i64 = add i64 %10, i64 8
+  %12: bool = icmp.ule i64 %11, i64 %8
+  condbr bool %12, label %word, label %next_object
+
+word:
+  %13: ptr = gep i8, ptr %6, i64 %10
+  %14: ptr = load ptr, ptr %13
+  call void __ep_gc_mark_ptr(ptr %14)
+  store i64 %11, ptr %9
+  br label %scan
+
+done:
+  ret void
+}
+
+define void @__ep_gc_sweep() {
+entry:
+  %1: ptr = load ptr, ptr gc_objects
+  %2: i64 = load i64, ptr gc_object_count
+  %3: ptr = alloca i64
+  %4: ptr = alloca i64
+  %5: ptr = alloca i64
+  store i64 0, ptr %3
+  store i64 0, ptr %4
+  store i64 0, ptr %5
+  br label %loop
+
+loop:
+  %6: i64 = load i64, ptr %3
+  %7: bool = icmp.ult i64 %6, i64 %2
+  condbr bool %7, label %read, label %done
+
+read:
+  %8: ptr = gep ptr, ptr %1, i64 %6
+  %9: ptr = load ptr, ptr %8
+  %10: i64 = call i64 __ep_gc_lookup(ptr %9)
+  %11: i64 = sub i64 %10, i64 1
+  %12: ptr = load ptr, ptr gc_marks
+  %13: ptr = gep i8, ptr %12, i64 %11
+  %14: i8 = load i8, ptr %13
+  %15: bool = icmp.eq i8 %14, i8 0
+  condbr bool %15, label %free, label %keep
+
+free:
+  call void __ep_gc_raw_free(ptr %9)
+  br label %advance
+
+keep:
+  %16: i64 = load i64, ptr %4
+  %17: ptr = gep ptr, ptr %1, i64 %16
+  store ptr %9, ptr %17
+  %18: i64 = add i64 %16, i64 1
+  store i64 %18, ptr %4
+  %19: i64 = load i64, ptr heap
+  %20: i64 = call i64 HeapSize(i64 %19, i64 0, ptr %9)
+  %21: i64 = load i64, ptr %5
+  %22: i64 = add i64 %21, i64 %20
+  store i64 %22, ptr %5
+  br label %advance
+
+advance:
+  %23: i64 = add i64 %6, i64 1
+  store i64 %23, ptr %3
+  br label %loop
+
+done:
+  %24: i64 = load i64, ptr %4
+  %25: i64 = load i64, ptr %5
+  store i64 %24, ptr gc_object_count
+  store i64 %25, ptr gc_live_bytes
+  %26: i64 = mul i64 %25, i64 2
+  %27: bool = icmp.ult i64 %26, i64 268435456
+  condbr bool %27, label %minimum, label %adaptive
+
+minimum:
+  store i64 268435456, ptr gc_threshold
+  ret void
+
+adaptive:
+  store i64 %26, ptr gc_threshold
+  ret void
+}
+
+define void @__ep_gc_collect() {
+entry:
+  call void __ep_gc_prepare_collection()
+  call void __ep_gc_mark_roots()
+  call void __ep_gc_drain_marks()
+  call void __ep_gc_sweep()
+  call void __ep_gc_release_collection()
+  %1: i64 = load i64, ptr gc_collection_count
+  %2: i64 = add i64 %1, i64 1
+  store i64 %2, ptr gc_collection_count
+  ret void
+}
+
+define void @__ep_gc_init() {
+entry:
+  %1: ptr = alloca ptr
+  %2: ptr = alloca ptr
+  call void GetCurrentThreadStackLimits(ptr %1, ptr %2)
+  %3: ptr = load ptr, ptr %2
+  store ptr %3, ptr gc_stack_high
+  call void __ep_gc_grow_objects(i64 1024)
+  ret void
+}
+
+define void @__ep_runtime_start() {
+entry:
+  %1: i64 = call i64 GetProcessHeap()
+  store i64 %1, ptr heap
+  call void __ep_gc_init()
+  %2: ptr = call ptr __ep_argv_init()
+  store ptr %2, ptr argv
+  ret void
+}
+
+define ptr @__ep_alloc(i64 %1) {
+entry:
+  %2: bool = icmp.slt i64 %1, i64 0
+  condbr bool %2, label %fail, label %threshold
+
+threshold:
+  %3: i64 = load i64, ptr gc_live_bytes
+  %4: i64 = add i64 %3, i64 %1
+  %5: i64 = load i64, ptr gc_threshold
+  %6: bool = icmp.ugt i64 %4, i64 %5
+  condbr bool %6, label %collect, label %allocate
+
+collect:
+  call void __ep_gc_collect()
+  br label %allocate
+
+allocate:
+  call void __ep_gc_ensure_object_capacity()
+  %7: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
+  %8: bool = icmp.eq ptr %7, ptr null
+  condbr bool %8, label %retry, label %record
+
+retry:
+  call void __ep_gc_collect()
+  %9: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
+  %10: bool = icmp.eq ptr %9, ptr null
+  condbr bool %10, label %fail, label %record_retry
+
+record_retry:
+  %11: ptr = alloca ptr
+  store ptr %9, ptr %11
+  br label %record_from_retry
+
+record_from_retry:
+  %12: ptr = load ptr, ptr %11
+  %13: ptr = load ptr, ptr gc_objects
+  %14: i64 = load i64, ptr gc_object_count
+  %15: ptr = gep ptr, ptr %13, i64 %14
+  store ptr %12, ptr %15
+  %16: i64 = add i64 %14, i64 1
+  store i64 %16, ptr gc_object_count
+  %17: i64 = load i64, ptr gc_live_bytes
+  %18: i64 = add i64 %17, i64 %1
+  store i64 %18, ptr gc_live_bytes
+  ret ptr %12
+
+record:
+  %19: ptr = load ptr, ptr gc_objects
+  %20: i64 = load i64, ptr gc_object_count
+  %21: ptr = gep ptr, ptr %19, i64 %20
+  store ptr %7, ptr %21
+  %22: i64 = add i64 %20, i64 1
+  store i64 %22, ptr gc_object_count
+  %23: i64 = load i64, ptr gc_live_bytes
+  %24: i64 = add i64 %23, i64 %1
+  store i64 %24, ptr gc_live_bytes
+  ret ptr %7
+
+fail:
+  call void ExitProcess(i64 1)
+  ret ptr null
+}
+
+define void @__ep_gc_force_collect() {
+entry:
+  call void __ep_gc_collect()
+  ret void
+}
+
+define i64 @__ep_gc_live_byte_count() {
+entry:
+  %1: i64 = load i64, ptr gc_live_bytes
+  ret i64 %1
+}
+
+define i64 @__ep_gc_collection_count_value() {
+entry:
+  %1: i64 = load i64, ptr gc_collection_count
+  ret i64 %1
+}

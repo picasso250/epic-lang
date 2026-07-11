@@ -1,0 +1,24 @@
+struct Box {
+    value: i64
+}
+
+fun main(): void {
+    let kept = new Box[]
+    for i: 0:2000000 {
+        let box = new Box { value: i }
+        let waste = new i64[64]
+        waste[0] = i
+        if i % 10000 == 0 {
+            kept.push(box)
+        }
+    }
+    if len(kept) != 200 {
+        panic "GC lost retained objects"
+    }
+    for i: 0:len(kept) {
+        if kept[i].value != i * 10000 {
+            panic "GC corrupted retained object"
+        }
+    }
+    println("gc stress ok")
+}

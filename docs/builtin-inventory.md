@@ -99,7 +99,7 @@ whitelist. The removed `os.*` pseudo-namespace is not part of the current interf
 Backend-private helpers are ordinary MIR functions, not language builtins. Current
 categories include:
 
-- allocation and startup: `__ep_alloc`, `__ep_runtime_start`;
+- allocation, GC, and startup: `__ep_alloc`, collector helpers, `__ep_runtime_start`;
 - string output/conversion: `__ep_print_str`, `__ep_print_newline`, `__ep_cstr`, scalar-to-string helpers;
 - string operations used by syntax: equality, concatenation, and slicing;
 - file operations: `__ep_read_file`, `__ep_write_file`;

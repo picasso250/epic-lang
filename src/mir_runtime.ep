@@ -26,9 +26,22 @@ fun mir_runtime_helper_bundle_path(): str {
     ret cstr_ready_path("runtime/mir/helpers.mir")
 }
 
+fun mir_runtime_gc_bundle_path(): str {
+    ret cstr_ready_path("runtime/mir/gc.mir")
+}
+
 fun mir_runtime_helper_program(): MirProgram {
     let text = str(read_file(mir_runtime_helper_bundle_path()))
-    ret mrt_parse_program(text)
+    let helpers = mrt_parse_program(text)
+    let gc_text = str(read_file(mir_runtime_gc_bundle_path()))
+    let gc = mrt_parse_program(gc_text)
+    # GC definitions come first. The frozen v0 seed only knows helpers.mir,
+    # whose legacy allocator lets it build the first current generation. A
+    # current compiler sees gc.mir first and skips that duplicate allocator.
+    gc.externs.extend(helpers.externs)
+    gc.globals.extend(helpers.globals)
+    gc.functions.extend(helpers.functions)
+    ret gc
 }
 
 fun mir_runtime_i64_in(values: i64[], value: i64): bool {

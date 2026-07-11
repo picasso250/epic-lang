@@ -4,7 +4,8 @@
 
 - **可复现自举**：从冻结的 v0 compiler 构建当前 self-hosted compiler，并达到字节一致的不动点
 - **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 15 个 Epic 模块组成
-- **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World 为 **5632 bytes（5.5 KiB）**
+- **自动内存管理**：内置 non-moving conservative mark-sweep GC，无需额外 runtime 部署
+- **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World（含 GC）为 **10752 bytes（10.5 KiB）**
 - **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
 
 包含一个用 Epic 自身编写的自托管编译器、一个类型化的 LLVM 风格 MIR、一个结构化的 x64 后端、一个小型 COFF/PE 工具链，以及用于构建真实 Windows 可执行文件的运行时辅助代码。
@@ -54,6 +55,7 @@ Epic 目前支持：
 - 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
 - 动态数组（`T[]`）——字面量、定长零初始化、带检查的索引、`len`、`push`、`pop`、`extend`
 - 堆分配结构体——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
+- 自动垃圾回收；对象地址在生命周期内保持稳定
 - 封闭的结构体-联合 ADT——`type Name = A | B` 声明、显式包装构造、公共字段访问
 - 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
 

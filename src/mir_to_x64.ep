@@ -331,7 +331,14 @@ fun mir_to_x64_mark_reusable_values(lower: MirToX64Lower, fn: MirFunction): void
             if fn.blocks[bi].instructions[ii].op != "alloca" && fn.blocks[bi].instructions[ii].has_result {
                 let value_id = fn.blocks[bi].instructions[ii].result_id
                 def_blocks[value_id] = bi + 1
-                lower.reusable_values[value_id] = 1
+                # Conservative GC recognizes managed object base addresses.
+                # Keep every non-GEP pointer result in a stable stack slot so
+                # an interior address is never its only trace at a safepoint.
+                if fn.blocks[bi].instructions[ii].result_type == "ptr" && fn.blocks[bi].instructions[ii].op != "gep" {
+                    lower.reusable_values[value_id] = 0
+                } else {
+                    lower.reusable_values[value_id] = 1
+                }
             }
             ii = ii + 1
         }

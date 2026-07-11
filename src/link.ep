@@ -423,6 +423,9 @@ fun kernel32_hint(name: str): i64 {
     if name == "GetProcessHeap" { ret 740 }
     if name == "GetStdHandle" { ret 805 }
     if name == "HeapAlloc" { ret 892 }
+    if name == "HeapFree" { ret 0 }
+    if name == "HeapSize" { ret 0 }
+    if name == "GetCurrentThreadStackLimits" { ret 0 }
     if name == "ReadFile" { ret 1193 }
     if name == "WriteFile" { ret 1632 }
     ret 0

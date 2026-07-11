@@ -8,6 +8,9 @@ fun backend_abi_is_winapi(name: str): bool {
     if name == "GetStdHandle" { ret true }
     if name == "GetProcessHeap" { ret true }
     if name == "HeapAlloc" { ret true }
+    if name == "HeapFree" { ret true }
+    if name == "HeapSize" { ret true }
+    if name == "GetCurrentThreadStackLimits" { ret true }
     if name == "CreateFileA" { ret true }
     if name == "GetFileSize" { ret true }
     if name == "ReadFile" { ret true }
@@ -18,7 +21,7 @@ fun backend_abi_is_winapi(name: str): bool {
 }
 
 fun backend_abi_return_type(name: str): str {
-    if name == "ExitProcess" { ret "void" }
+    if name == "ExitProcess" || name == "GetCurrentThreadStackLimits" { ret "void" }
     if name == "HeapAlloc" || name == "GetCommandLineA" { ret "ptr" }
     if backend_abi_is_winapi(name) { ret "i64" }
     ret ""
@@ -30,12 +33,17 @@ fun backend_abi_param_count(name: str): i64 {
     if name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
     if name == "GetFileSize" { ret 2 }
     if name == "HeapAlloc" { ret 3 }
+    if name == "HeapFree" { ret 3 }
+    if name == "HeapSize" { ret 3 }
+    if name == "GetCurrentThreadStackLimits" { ret 2 }
     if name == "CreateFileA" { ret 7 }
     if name == "ReadFile" || name == "WriteFile" { ret 5 }
     ret 0 - 1
 }
 
 fun backend_abi_param_type(name: str, index: i64): str {
+    if (name == "HeapFree" || name == "HeapSize") && index == 2 { ret "ptr" }
+    if name == "GetCurrentThreadStackLimits" { ret "ptr" }
     if backend_abi_is_winapi(name) { ret "i64" }
     ret ""
 }
