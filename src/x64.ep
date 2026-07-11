@@ -100,18 +100,6 @@ fun x64_mem_symbol(symbol: str, size: i64): X64Operand {
     ret new X64Operand(new X64MemSymbolOperand { symbol: symbol, size: size })
 }
 
-fun x64_operand_kind_text(op: X64Operand): str {
-    match op {
-        X64RegOperand r: { ret "reg" }
-        X64ImmOperand i: { ret "imm" }
-        X64SymbolOperand s: { ret "symbol" }
-        X64LabelRefOperand l: { ret "label_ref" }
-        X64MemBaseOperand m: { ret "mem" }
-        X64MemSymbolOperand m: { ret "mem" }
-    }
-    ret "<bad operand>"
-}
-
 fun x64_operand_name(op: X64Operand): str {
     match op {
         X64RegOperand r: { ret r.name }
@@ -220,11 +208,46 @@ fun x64_operand_has_symbol(op: X64Operand): bool {
     ret false
 }
 
-fun x64_operand_is_reg(op: X64Operand): bool { ret x64_operand_kind_text(op) == "reg" }
-fun x64_operand_is_imm(op: X64Operand): bool { ret x64_operand_kind_text(op) == "imm" }
-fun x64_operand_is_symbol(op: X64Operand): bool { ret x64_operand_kind_text(op) == "symbol" }
-fun x64_operand_is_label_ref(op: X64Operand): bool { ret x64_operand_kind_text(op) == "label_ref" }
-fun x64_operand_is_mem(op: X64Operand): bool { ret x64_operand_kind_text(op) == "mem" }
+fun x64_operand_is_reg(op: X64Operand): bool {
+    match op {
+        X64RegOperand r: { ret true }
+        _: { ret false }
+    }
+    ret false
+}
+
+fun x64_operand_is_imm(op: X64Operand): bool {
+    match op {
+        X64ImmOperand i: { ret true }
+        _: { ret false }
+    }
+    ret false
+}
+
+fun x64_operand_is_symbol(op: X64Operand): bool {
+    match op {
+        X64SymbolOperand s: { ret true }
+        _: { ret false }
+    }
+    ret false
+}
+
+fun x64_operand_is_label_ref(op: X64Operand): bool {
+    match op {
+        X64LabelRefOperand l: { ret true }
+        _: { ret false }
+    }
+    ret false
+}
+
+fun x64_operand_is_mem(op: X64Operand): bool {
+    match op {
+        X64MemBaseOperand m: { ret true }
+        X64MemSymbolOperand m: { ret true }
+        _: { ret false }
+    }
+    ret false
+}
 
 fun x64_program_empty(): X64Program {
     let program = new X64Program

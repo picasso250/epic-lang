@@ -82,12 +82,7 @@ def ast_call_names(ast) -> set[str]:
     names = set()
     for node in walk_ast(ast):
         if isinstance(node, CallNode):
-            if node.namespace == "os":
-                names.add(f"os.{node.dll}.{node.name}")
-            elif node.namespace:
-                names.add(f"{node.namespace}.{node.name}")
-            else:
-                names.add(node.name)
+            names.add(node.name)
         elif isinstance(node, DotCallNode):
             receiver_type = getattr(node.object, "resolved_type", None)
             if getattr(receiver_type, "kind", "") == "named":
