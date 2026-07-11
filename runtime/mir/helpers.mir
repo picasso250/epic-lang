@@ -24,6 +24,8 @@ extern ptr @__ep_str_from_i64(i64)
 
 global @argv: ptr
 
+global @heap: i64
+
 global @str.runtime.newline: ptr = bytes "\n"
 
 global @str.runtime.slice.oob: ptr = bytes "slice index out of bounds"
@@ -36,7 +38,7 @@ global @str.runtime.cstr.suffix: ptr = bytes ": invalid cstr"
 
 define ptr @__ep_alloc(i64 %1) {
 entry:
-  %2: i64 = call i64 GetProcessHeap()
+  %2: i64 = load i64, ptr heap
   %3: ptr = call ptr HeapAlloc(i64 %2, i64 8, i64 %1)
   ret ptr %3
 }
@@ -322,8 +324,10 @@ done:
 
 define void @__ep_runtime_start() {
 entry:
-  %1: ptr = call ptr __ep_argv_init()
-  store ptr %1, ptr argv
+  %1: i64 = call i64 GetProcessHeap()
+  store i64 %1, ptr heap
+  %2: ptr = call ptr __ep_argv_init()
+  store ptr %2, ptr argv
   ret void
 }
 

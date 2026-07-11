@@ -341,14 +341,15 @@ jmp  LabelRef(fn_name.else_target)
 
 `emit_program_data()` 在 `.data` section 按 MIR globals 生成：
 
-- 无初始化 global：8-byte zero slot，例如 `argv`
+- 无初始化 global：8-byte zero slot，例如 `argv` 和 cached process `heap`
 - ptr/string global：零结尾 data bytes 与 24-byte header
 - scalar global：8-byte little-endian value
 
 ### 8.2 Startup hook
 
-MIR preparation 在 `main` entry 插入 `__ep_runtime_start`。该 MIR helper 调用
-`__ep_argv_init` 并把结果存入 `argv` global，随后与普通函数一样 lowering。
+MIR preparation 在 `main` entry 插入 `__ep_runtime_start`。该 MIR helper 缓存
+`GetProcessHeap()` 的结果，再调用 `__ep_argv_init` 并把结果存入 `argv`
+global；`__ep_alloc` 直接读取 cached heap，随后与普通函数一样 lowering。
 
 ### 8.3 Runtime helper emission
 

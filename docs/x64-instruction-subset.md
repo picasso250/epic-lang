@@ -111,7 +111,7 @@ MIR lowering 当前固定面向 Windows x64：
 - 每次 call 前预留 32 字节 shadow space。
 - 返回值在 `rax`。
 - `main` 降成 PE entry symbol `_start`。
-- `main` starts with an injected MIR call to `__ep_runtime_start` to initialize `argv`。
+- `main` starts with an injected MIR call to `__ep_runtime_start` to cache the process heap and initialize `argv`。
 - `main` 的 `ret value` 降成 `ExitProcess(value)`，不走普通 `ret`。
 - Win32 `LPDWORD` output 参数只写 32 位。当前 helper 如果复用 8 字节栈槽
   存放这类输出，必须在 call 前清零整个 qword，或者后续改成显式 32-bit
@@ -421,5 +421,4 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `bootstrap/link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
 Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
-
 
