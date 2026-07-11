@@ -53,8 +53,9 @@ UTF-8 validation and do not allocate merely to change the static source type.
 | `xs.pop()` | removes and returns the final value; an empty array panics |
 | `dst.extend(src)` | appends an array with the same element type; returns `void` |
 
-The old function-call forms `push(xs, value)`, `pop(xs)`, and `extend(dst, src)` are
-removed and are explicitly rejected by sema.
+These names are not reserved globally. `push(...)`, `pop(...)`, and `extend(...)` are
+ordinary user-function or extern calls when written without a receiver; only the dot
+forms above receive array-method semantics.
 
 ## Pseudo-builtins
 
@@ -77,7 +78,7 @@ The following historical function-style APIs are not part of the current languag
 - `str_starts_with`
 - `str_find`
 - `str_trim`
-- function-style `push`, `pop`, and `extend`
+- the historical global builtin forms of `push`, `pop`, and `extend` (the names may still be used by ordinary user functions or externs)
 
 Private runtime helpers may retain similar names because syntax lowering still needs
 string concatenation, slicing, comparison, or array operations. Their existence does
@@ -116,20 +117,13 @@ compiled from `runtime/*.ep`, and prune unreachable functions. Reachability begi
 `main`; startup and runtime dependencies are normal MIR calls. The x64 backend lowers
 this MIR and imports only the WinAPI symbols that remain reachable.
 
-## Known reservation mismatches
+## Name reservation
 
-The callable behavior is aligned between Python and self-hosted sema, but declaration
-reservation is not yet represented by one shared source of truth:
+Python and self-hosted sema reserve names whose call syntax is always interpreted as a
+builtin or pseudo-builtin, including `print`, `println`, `exit`, conversions such as
+`i64`/`u8`/`bool`, file I/O, `len`, `cap`, and `argv`.
 
-1. Python sema reserves the numeric and boolean constructor names `i64`, `u64`, `i32`,
-   `u32`, `u8`, and `bool` through `BUILTIN_FUNCTIONS`. `src/sema.ep` currently omits
-   those names from `sema_is_reserved_func`. A self-hosted declaration may therefore
-   pass the declaration check even though calls with that name are still interpreted as
-   builtin conversions.
-2. `pop` is not in `BUILTIN_FUNCTIONS` and is also absent from
-   `sema_is_reserved_func`, while function-style `pop(...)` is hard-rejected before
-   ordinary user-function lookup. A user function named `pop` can be declared but
-   cannot be called normally.
-
-These are compiler consistency issues, not additional public language features. The
-current public surface remains the one documented above.
+Array operations are different: their builtin meaning is selected by receiver syntax.
+Therefore `push`, `pop`, and `extend` are intentionally not reserved as global names.
+A program may define or import global functions with those names while continuing to
+use `xs.push(...)`, `xs.pop()`, and `xs.extend(...)` for arrays.

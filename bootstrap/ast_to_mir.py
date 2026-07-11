@@ -1111,18 +1111,6 @@ class MirCodegen(MirFunctionBuilder):
             args.value.append(ConstIntOperand(I64, expr.line))
             result = self.inst("call", args.value, result_type=I64, type=I64, callee="__ep_write_file")
             return ValueFlow(ValueOperand(result), self.current_block)
-        if name == "push":
-            dst_type = self._infer_type(expr.args[0])
-            dst = self._emit_expr_from(self.current_block, expr.args[0])
-            rest = self._emit_arg_flows_from(dst.block, expr.args[1:])
-            args = [dst.value, *rest.value]
-            if self._is_u8_array_type(dst_type):
-                self.inst("call", args, type=VOID, callee="__ep_slice_u8_push")
-            elif self._is_i64_array_type(dst_type):
-                self.inst("call", args, type=VOID, callee="__ep_slice_i64_push")
-            else:
-                self.inst("call", args, type=VOID, callee="__ep_slice_ptr_push")
-            return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
         if name in ("len", "cap"):
             base_type = self._infer_type(expr.args[0])
             base = self._emit_expr_from(self.current_block, expr.args[0])
@@ -1131,16 +1119,6 @@ class MirCodegen(MirFunctionBuilder):
             if struct_name is None:
                 raise MirCodegenError(f"{name} expects an aggregate pointer")
             return ValueFlow(self._load_field(base.value, struct_name, name, result_type=I64), self.current_block)
-        if name == "extend":
-            dst_type = self._infer_type(expr.args[0])
-            helper = self._array_extend_helper(dst_type)
-            if helper is None:
-                raise MirCodegenError("extend expects supported array type")
-            dst = self._emit_expr_from(self.current_block, expr.args[0])
-            src = self._emit_expr_from(dst.block, expr.args[1])
-            self.set_block(src.block)
-            self.inst("call", [dst.value, src.value], type=VOID, callee=helper)
-            return ValueFlow(ConstIntOperand(I64, 0), self.current_block)
         raise MirCodegenError(f"unsupported builtin call: {name}")
 
     def _emit_dot_call_from(self, in_block, expr):

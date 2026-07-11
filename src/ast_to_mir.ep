@@ -1276,54 +1276,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 mir_emit_inst(st, mir_call("ExitProcess", "void", args))
                 ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
             }
-            if n.name == "push" {
-                let base_type = ast_resolved_type(n.args[0])
-                let dst_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = dst_flow.block
-                let args = new MirOperand[]
-                args.push(dst_flow.value)
-                let value_flow = mir_emit_expr(st, st.current_block, n.args[1])
-                st.current_block = value_flow.block
-                args.push(value_flow.value)
-                if mir_is_u8_array_type(base_type) {
-                    mir_emit_call_inst(st, "__ep_slice_u8_push", "void", args)
-                } else {
-                    if mir_is_ptr_array_type(st, base_type) {
-                        mir_emit_call_inst(st, "__ep_slice_ptr_push", "void", args)
-                    } else {
-                        mir_emit_call_inst(st, "__ep_slice_i64_push", "void", args)
-                    }
-                }
-                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-            }
-            if n.name == "pop" {
-                let base_type = ast_resolved_type(n.args[0])
-                let helper = mir_array_pop_helper(st, base_type)
-                if helper == "" {
-                    ast_to_mir_die("pop expects supported array type")
-                }
-                let dst_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = dst_flow.block
-                let args = new MirOperand[]
-                args.push(dst_flow.value)
-                ret mir_value_flow(mir_emit_call_inst(st, helper, mir_array_pop_return_type(st, base_type), args), st.current_block)
-            }
-            if n.name == "extend" {
-                let base_type = ast_resolved_type(n.args[0])
-                let helper = mir_array_extend_helper(st, base_type)
-                if helper == "" {
-                    ast_to_mir_die("extend expects supported array type")
-                }
-                let dst_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = dst_flow.block
-                let src_flow = mir_emit_expr(st, st.current_block, n.args[1])
-                st.current_block = src_flow.block
-                let args = new MirOperand[]
-                args.push(dst_flow.value)
-                args.push(src_flow.value)
-                mir_emit_call_inst(st, helper, "void", args)
-                ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
-            }
             let ret_type = mir_func_return_type(st, n.name)
             let args = new MirOperand[]
             let i = 0

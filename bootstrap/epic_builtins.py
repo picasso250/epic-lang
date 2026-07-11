@@ -14,8 +14,6 @@ BUILTIN_FUNCTIONS = frozenset({
     "bytes",
     "len",
     "cap",
-    "push",
-    "extend",
     "i64",
     "u64",
     "i32",

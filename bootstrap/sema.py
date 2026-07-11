@@ -486,12 +486,6 @@ class SemanticAnalyzer:
         if name == "write_file":
             self._check_call_args(name, [STR, ARRAY(U8)], expr.args)
             return ExprInfo(I64)
-        if name == "push":
-            self._fail("push is removed from function-call surface; use xs.push(x)")
-        if name == "pop":
-            self._fail("pop is removed from function-call surface; use xs.pop()")
-        if name == "extend":
-            self._fail("extend is removed from function-call surface; use dst.extend(src)")
         if name == "len":
             self._check_arity(name, 1, expr.args)
             arg = self._expr(expr.args[0])

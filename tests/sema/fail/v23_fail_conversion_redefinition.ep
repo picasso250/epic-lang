@@ -1,0 +1,7 @@
+# COMPILE_FAIL: reserved builtin function name: i64
+fun i64(value: i64): i64 {
+    ret value
+}
+
+fun main(): void {
+}

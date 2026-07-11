@@ -118,7 +118,10 @@ fun sema_is_reserved_func(name: str): bool {
     if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" {
         ret true
     }
-    if name == "read_file" || name == "write_file" || name == "len" || name == "cap" || name == "push" || name == "extend" {
+    if name == "read_file" || name == "write_file" || name == "len" || name == "cap" {
+        ret true
+    }
+    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" || name == "bool" {
         ret true
     }
     ret false
@@ -939,15 +942,6 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
             sema_die(f"cap expected array, got {arg}")
         }
         ret "i64"
-    }
-    if node.name == "push" {
-        sema_die("push is removed from function-call surface; use xs.push(x)")
-    }
-    if node.name == "pop" {
-        sema_die("pop is removed from function-call surface; use xs.pop()")
-    }
-    if node.name == "extend" {
-        sema_die("extend is removed from function-call surface; use dst.extend(src)")
     }
     let extern_index = sema_extern_index(st, node.name)
     if extern_index >= 0 {

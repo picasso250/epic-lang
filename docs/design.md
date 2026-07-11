@@ -195,6 +195,8 @@ dst.extend(src)
 
 这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别数组操作或用户结构体方法。
 
+`push`、`pop`、`extend` 不是全局保留名。没有 receiver 的 `push(...)`、`pop(...)`、`extend(...)` 按普通用户函数或 extern 解析；只有 `xs.push(...)`、`xs.pop()`、`xs.extend(...)` 获得数组内建语义。
+
 ### 结构体初始化 (Struct Initialization)
 
 结构体是 heap-only reference type。local variable 必须显式初始化：

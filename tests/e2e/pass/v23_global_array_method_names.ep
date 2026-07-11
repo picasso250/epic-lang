@@ -1,0 +1,28 @@
+# EXIT: 0
+# STDOUT: 66
+# STDOUT: 9
+# STDOUT: 2
+
+fun push(x: i64): i64 {
+    ret x + 10
+}
+
+fun pop(x: i64): i64 {
+    ret x + 20
+}
+
+fun extend(x: i64): i64 {
+    ret x + 30
+}
+
+fun main(): void {
+    println(str(push(1) + pop(2) + extend(3)))
+
+    let xs = new i64[]
+    xs.push(7)
+    xs.push(8)
+    let more = new i64[] { 9 }
+    xs.extend(more)
+    println(str(xs.pop()))
+    println(str(len(xs)))
+}
