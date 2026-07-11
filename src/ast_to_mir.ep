@@ -1356,17 +1356,11 @@ fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstPanic): MirBlo
 }
 
 fun mir_truncate_locals(st: MirCodegenState, count: i64): void {
-    let names = new str[]
-    let addrs = new i64[]
-    let types = new str[]
-    for i: 0:count {
-        names.push(st.local_names[i])
-        addrs.push(st.local_addr_ids[i])
-        types.push(st.local_types[i])
+    for len(st.local_names) > count {
+        let removed_name = st.local_names.pop()
+        let removed_addr = st.local_addr_ids.pop()
+        let removed_type = st.local_types.pop()
     }
-    st.local_names = names
-    st.local_addr_ids = addrs
-    st.local_types = types
 }
 
 fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlockFlow {
@@ -1571,16 +1565,8 @@ fun mir_push_loop(st: MirCodegenState, continue_target: str, break_target: str):
 }
 
 fun mir_pop_loop(st: MirCodegenState): void {
-    let c = new str[]
-    let b = new str[]
-    let i = 0
-    for i < len(st.continue_targets) - 1 {
-        c.push(st.continue_targets[i])
-        b.push(st.break_targets[i])
-        i = i + 1
-    }
-    st.continue_targets = c
-    st.break_targets = b
+    let removed_continue = st.continue_targets.pop()
+    let removed_break = st.break_targets.pop()
 }
 
 fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange): MirBlockFlow {

@@ -182,14 +182,10 @@ fun sema_push_scope(st: SemaState): void {
 
 fun sema_pop_scope(st: SemaState): void {
     let mark = st.local_scope_marks.pop()
-    let names = new str[]
-    let types = new str[]
-    for i: 0:mark {
-        names.push(st.local_names[i])
-        types.push(st.local_types[i])
+    for len(st.local_names) > mark {
+        let removed_name = st.local_names.pop()
+        let removed_type = st.local_types.pop()
     }
-    st.local_names = names
-    st.local_types = types
 }
 
 fun sema_direct_field_type_or_empty(st: SemaState, base_type: str, field: str): str {
@@ -853,9 +849,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         }
         let args = new AstNode[]
         args.push(node.object)
-        for i: 0:len(node.args) {
-            args.push(node.args[i])
-        }
+        args.extend(node.args)
         sema_check_func_call_args(st, method_symbol, args)
         ret st.funcs[method_index].meta.resolved_type
     }

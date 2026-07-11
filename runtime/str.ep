@@ -32,9 +32,7 @@ fun __ep_str_from_i64(value: i64): str {
         let digits = bytes(__ep_str_from_u64(u64(0 - value)))
         let out = new u8[] {}
         out.push('-')
-        for i: 0:len(digits) {
-            out.push(digits[i])
-        }
+        out.extend(digits)
         ret str(out)
     }
     ret __ep_str_from_u64(u64(value))

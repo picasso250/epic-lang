@@ -564,9 +564,7 @@ fun (p: Parser) parse_fn_def(): AstFunDef {
     }
     p.expect("LPAREN")
     let more_params = p.parse_params()
-    for i: 0:len(more_params) {
-        params.push(more_params[i])
-    }
+    params.extend(more_params)
     p.expect("RPAREN")
     p.expect("COLON")
     let ret_type = p.parse_type()

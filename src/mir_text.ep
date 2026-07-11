@@ -415,11 +415,7 @@ fun mrt_parse_extern(line: str): MirExtern {
     let param_types = new str[]
     if len(params_text) > 0 {
         let parts = mrt_split_commas(params_text)
-        let i = 0
-        for i < len(parts) {
-            param_types.push(parts[i])
-            i = i + 1
-        }
+        param_types.extend(parts)
     }
     ret mir_extern(name, return_type, param_types)
 }
