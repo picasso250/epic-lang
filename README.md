@@ -1,131 +1,111 @@
 # Epic
 
-Epic is a small self-hosted systems language targeting Windows x64.
+Epic 是一个小巧的自托管（self-hosted）系统编程语言，目标平台为 Windows x64。
 
-It includes a Python reference compiler, an Epic-written self-hosted compiler,
-a typed LLVM-like MIR, a structured x64 backend, a small COFF/PE toolchain, and
-runtime helpers for building real Windows executables.
+它包含一个 Python 参考编译器、一个用 Epic 自身编写的自托管编译器、一个类型化的 LLVM 风格 MIR、一个结构化的 x64 后端、一个小型 COFF/PE 工具链，以及用于构建真实 Windows 可执行文件的运行时辅助代码。
 
 ```text
-Epic source
+Epic 源码
   -> AST
   -> typed MIR
   -> structured X64IR / LowIR
-  -> machine bytes
-  -> AMD64 COFF object
-  -> PE executable
+  -> 机器字节码
+  -> AMD64 COFF 目标文件
+  -> PE 可执行文件
 ```
 
-Epic is still experimental, but it has crossed the self-hosting milestone and
-already supports enough language surface to write non-trivial programs, including
-compiler pieces written in Epic itself.
+Epic 目前仍是实验性语言，但已跨越自托管里程碑，支持足够的语言特性来编写有意义的程序——包括用 Epic 本身编写的编译器模块。
 
-## Highlights
+## 亮点
 
-- **Self-hosted language work**: `bootstrap/` is the Python reference compiler;
-  `src/` contains Epic-written compiler modules and tools kept close to the
-  current language.
-- **Typed LLVM-like MIR**: Epic has its own middle IR with typed values, basic
-  blocks, terminators, `load` / `store`, `gep`, calls, branches, and validation.
-  It is inspired by LLVM-style compiler construction, not by LLVM compatibility.
-- **Structured x64 backend**: MIR lowers into X64IR / LowIR, a structured object
-  model for registers, stack slots, labels, symbols, data items, and Windows x64
-  ABI calls. The `.asm` output is a debug pretty print, not the active backend.
-- **Machine backend**: X64IR is encoded directly into machine bytes, written as
-  AMD64 COFF, and linked into PE executables by the in-repo Python linker.
-- **Runtime helper migration**: MIR runtime helper bodies are bundled in
-  `runtime/mir/helpers.mir` so the Python reference compiler and self-hosted
-  compiler consume the same runtime text.
-- **No legacy compatibility tax**: when the language changes, active compiler
-  sources move with it instead of preserving old source compatibility.
+- **自托管语言工作**：`bootstrap/` 是 Python 参考编译器；`src/` 包含用 Epic 编写的编译器模块和工具，跟随当前语言设计更新。
+- **类型化 LLVM 风格 MIR**：Epic 拥有自己的中间表示（MIR），具有类型化值、基本块、终结指令（terminator）、`load`/`store`、`gep`、函数调用、分支和验证。其灵感来自 LLVM 风格的编译器构造，而非追求 LLVM 兼容性。
+- **结构化 x64 后端**：MIR 降级为 X64IR / LowIR，这是一个结构化的对象模型，涵盖寄存器、栈槽位、标签、符号、数据项和 Windows x64 ABI 调用。`.asm` 输出仅用于调试打印，而非活跃后端。
+- **机器码后端**：X64IR 直接编码为机器字节码，写入 AMD64 COFF 目标文件，并由仓库内的 Python 链接器链接为 PE 可执行文件。
+- **运行时辅助代码迁移**：MIR 运行时辅助代码（runtime helper）的主体已集中到 `runtime/mir/helpers.mir`，使得 Python 参考编译器和自托管编译器使用同一份运行时源码。
+- **无历史兼容负担**：语言变更时，活跃的编译器源码随新设计一起演进，不保留旧版本的源码兼容性。
 
-## Language Features
+## 语言特性
 
-Epic currently supports:
+Epic 目前支持：
 
-- functions and struct-receiver methods, local variables, block tail values, and explicit returns
-- `if` / `else`, condition loops written `for condition`, and half-open ranges written `for i: start:end`
-- `break`, `continue`, `panic`, literal `match`, and exhaustive ADT `match`; `_:` is the only match default branch
-- `i64`, `u64`, `i32`, `u32`, `u8`, `bool`, explicit integer conversions, and checked arithmetic
-- byte-oriented `str`, character and f-string literals, content equality, slicing, and allocating `str + str`
-- dynamic arrays (`T[]`) with literals, capacity allocation, checked indexing, `len`, `cap`, `push`, `pop`, and `extend`
-- heap-backed structs with named and partial initialization; omitted reference fields are null and can be tested with postfix `?`
-- closed struct-union ADTs declared with `type Name = A | B`, explicit wrapper construction, and common-field access
-- byte-oriented file I/O, `argv`, process exit, and typed direct WinAPI imports on Windows
+- 函数与结构体接收者方法、局部变量、块尾部值、显式返回
+- `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
+- `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`
+- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、显式整数类型转换、带检查的算术运算
+- 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
+- 动态数组（`T[]`）——支持字面量、容量分配、带检查的索引、`len`、`cap`、`push`、`pop`、`extend`
+- 堆分配结构体——支持具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
+- 封闭的结构体-联合 ADT——`type Name = A | B` 声明、显式包装构造、公共字段访问
+- 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
 
-The language is intentionally moving fast. Public surface is documented by the
-current compiler, examples, and `docs/`; old convenience builtins and old backend
-paths are removed instead of kept as compatibility shims.
+语言有意快速迭代。当前编译器、`examples/` 和 `docs/` 中记录了公开的语言特性；旧的便捷内建函数和旧后端路径会被移除，而非保留为兼容垫片。
 
-## Compiler Pipeline
+## 编译器流水线
 
-The active compiler path is:
+当前活跃的编译路径：
 
 ```text
-parse / merge
-  -> semantic analysis
-  -> AST to MIR
-  -> MIR validation
-  -> MIR to X64IR
-  -> X64IR validation
-  -> machine bytes + COFF relocations
-  -> PE linking
+解析 / 合并（parse / merge）
+  -> 语义分析（semantic analysis）
+  -> AST 到 MIR
+  -> MIR 验证（MIR validation）
+  -> MIR 到 X64IR
+  -> X64IR 验证（X64IR validation）
+  -> 机器字节码 + COFF 重定位（machine bytes + COFF relocations）
+  -> PE 链接（PE linking）
 ```
 
-Key implementation files:
+关键实现文件：
 
 ```text
-bootstrap/epic.py          compiler driver
-bootstrap/lexer.py         lexer
-bootstrap/parser.py        parser
-bootstrap/sema.py          semantic analysis
+bootstrap/epic.py          编译器驱动
+bootstrap/lexer.py         词法分析器
+bootstrap/parser.py        语法解析器
+bootstrap/sema.py          语义分析
 bootstrap/ast_to_mir.py    AST -> MIR
-bootstrap/mir.py           typed MIR model and validator
-bootstrap/mir_to_x64.py    MIR -> structured X64IR
-bootstrap/x64.py           X64IR model and pretty printer
-bootstrap/machine.py       X64IR -> machine bytes + COFF records
-bootstrap/coff.py          minimal AMD64 COFF writer
-bootstrap/link.py          minimal PE linker
+bootstrap/mir.py           类型化 MIR 模型与验证器
+bootstrap/mir_to_x64.py    MIR -> 结构化 X64IR
+bootstrap/x64.py           X64IR 模型与美化打印
+bootstrap/machine.py       X64IR -> 机器字节码 + COFF 记录
+bootstrap/coff.py          最小 AMD64 COFF 写入器
+bootstrap/link.py          最小 PE 链接器
 ```
 
-The Python reference compiler is the oracle for the current language. Epic-written
-compiler code should match the reference path before growing separate optimized
-behavior. Future optimization work belongs behind an explicit optimization mode,
-not in the default oracle path.
+Python 参考编译器是当前语言的「真言」（oracle）。用 Epic 编写的编译器代码应先与参考路径保持一致，再发展独立的优化行为。未来的优化工作应置于显式的优化模式之下，而非放在默认的真言路径中。
 
-## Repository Layout
+## 仓库布局
 
 ```text
-bootstrap/          Python reference compiler for the current language
-src/                Epic-written compiler modules and tools
-runtime/            MIR runtime helpers and backend runtime support
-examples/           positive learning examples
-tests/              module-level compiler tests and negative tests
-docs/               design notes and implementation contracts
-editors/            editor integration assets
-tools/              local tool binaries such as lld-link.exe
-build/              ignored local build output
+bootstrap/          Python 参考编译器（当前语言）
+src/                用 Epic 编写的编译器模块和工具
+runtime/            MIR 运行时辅助代码和后端运行时支持
+examples/           正向学习示例
+tests/              模块级编译测试与负向测试
+docs/               设计笔记与实现契约
+editors/            编辑器集成资源
+tools/              本地工具二进制文件（如 lld-link.exe）
+build/              忽略的本地构建输出
 ```
 
-Earlier staged bootstrap directories are preserved in Git history and tags, not
-as maintained source directories. Useful archive tags include:
+早期阶段的自举目录保存在 Git 历史与标签中，不作为维护中的源码目录。有用的存档标签包括：
 
 ```text
 staged-bootstrap-archive-2026-06-30
 python-asm-archive-2026-07-02
 ```
 
-## Running Tests
+## 运行测试
 
-Recommended test entry points from the repository root:
+从仓库根目录推荐的测试入口：
 
 ```powershell
-python tests/run.py                    # module-level compiler tests
-python test_examples.py             # examples/ positive learning programs
-python test_bootstrap_fixed_point.py   # self-hosting fixed-point check
+python tests/run.py                    # 模块级编译测试
+python test_examples.py                # examples/ 正向学习示例
+python test_bootstrap_fixed_point.py   # 自举不动点检查（fixed-point check）
 ```
 
-Module-specific checks are also available:
+也可运行特定模块的测试：
 
 ```powershell
 python tests/mir/run.py
@@ -135,45 +115,38 @@ python tests/parser/run.py
 python tests/link/run.py
 ```
 
-`test_*.py` files are direct script tests. Do not treat `python -m pytest` as the
-supported test entry point.
+`test_*.py` 文件是可直接运行的脚本测试。请勿将 `python -m pytest` 当作支持的测试入口。
 
-## Building and Running Examples
+## 构建与运行示例
 
-Examples live under `examples/` and are intended to be positive, typical programs
-that help new readers learn the current language.
+示例代码位于 `examples/` 下，旨在作为正向、典型的程序，帮助新读者学习当前语言。
 
 ```powershell
 python test_examples.py
 ```
 
-Individual examples can be compiled through the Python reference compiler. Build
-artifacts are written under `build/`.
+也可以通过 Python 参考编译器编译单个示例。构建产物写入 `build/` 目录。
 
 ```powershell
 python bootstrap/epic.py examples/00_hello_world.ep
 ```
 
-The default path uses the in-repo Python PE linker. `lld-link` is optional for
-comparison when present in `tools/`.
+默认路径使用仓库内的 Python PE 链接器。`lld-link`（若存在于 `tools/` 中）可作为可选的对照工具。
 
-## Current Boundaries
+## 当前边界
 
-Epic is not trying to be a stable general-purpose language yet. Current explicit
-boundaries include:
+Epic 尚不追求成为稳定的通用语言。目前明确的边界包括：
 
-- Windows x64 first; no cross-platform ABI promise yet
-- MIR is LLVM-like, but not LLVM IR compatible
-- first-class user pointer types are not part of the public language surface
-- no full SSA / phi-node optimizer pipeline yet
-- no general-purpose assembler or general-purpose register allocator
-- old NASM text-assembly backend paths are archived, not active
+- 仅面向 Windows x64；尚无跨平台 ABI 承诺
+- MIR 是 LLVM 风格，但并非 LLVM IR 兼容
+- 一级用户指针类型不纳入公开语言特性
+- 尚无完整的 SSA / phi-node 优化器流水线
+- 尚无通用汇编器或通用寄存器分配器
+- 旧的 NASM 文本汇编后端路径已归档，不再活跃
 
-## Development Rules
+## 开发规则
 
-- Read the relevant `docs/` files before changing a compiler area.
-- Keep examples positive and beginner-friendly; put negative tests under
-  `tests/<module>/fail/`.
-- Prefer clear compiler code over premature performance work.
-- Do not preserve forward compatibility for its own sake. When the language
-  changes, active compiler sources should move with the current design.
+- 修改编译器某个区域之前，先阅读对应的 `docs/` 文件。
+- 保持示例正向友好；负向测试放在 `tests/<module>/fail/`。
+- 倾向清晰的编译器代码，而非过早的性能优化。
+- 不为了向前兼容而保留旧设计。语言变更时，活跃的编译器源码应跟随当前设计演进。
