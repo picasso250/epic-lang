@@ -7,8 +7,9 @@ import shlex
 import subprocess
 import sys
 
+from compiler_runner import compiler_path
+
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
 EXEC_TIMEOUT = 1  # seconds, prevent linker/runtime bugs from hanging tests
 
 
@@ -100,8 +101,8 @@ def compiled_exe_path(ep_file, root_dir=ROOT_DIR):
     return os.path.join(root_dir, "build", os.path.splitext(rel)[0] + ".exe")
 
 
-def run_python_case(ep_file, linker="py", root_dir=ROOT_DIR, epicc=EPICC):
-    """Compile and run a single .ep file with the Python reference compiler."""
+def run_epic_case(ep_file, root_dir=ROOT_DIR, epicc=None):
+    """Compile and run a single .ep file with the current Epic compiler."""
     annotations = read_annotations(ep_file)
     if not has_expectations(annotations):
         return True, "no annotations — skipped"
@@ -111,8 +112,11 @@ def run_python_case(ep_file, linker="py", root_dir=ROOT_DIR, epicc=EPICC):
     except RuntimeError as e:
         return False, str(e)
 
+    epicc = str(compiler_path()) if epicc is None else epicc
+    exe_path = compiled_exe_path(ep_file, root_dir=root_dir)
+    os.makedirs(os.path.dirname(exe_path), exist_ok=True)
     result = subprocess.run(
-        [sys.executable, epicc, ep_file, "--linker", linker],
+        [epicc, ep_file, "--main", ep_file, "-o", exe_path],
         capture_output=True,
         text=True,
         cwd=root_dir,
@@ -133,7 +137,6 @@ def run_python_case(ep_file, linker="py", root_dir=ROOT_DIR, epicc=EPICC):
     if annotations["compile_only"]:
         return True, "compile only"
 
-    exe_path = compiled_exe_path(ep_file, root_dir=root_dir)
     if not os.path.exists(exe_path):
         return False, f"no exe produced: {exe_path}"
 

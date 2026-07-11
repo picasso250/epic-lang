@@ -1,5 +1,5 @@
 # Epic minimal PE linker.
-# MVP: one NASM COFF obj -> PE64 console exe, matching link.py's support shape.
+# MVP: one generated COFF obj -> PE64 console exe.
 
 struct Section {
     name: str

@@ -1,6 +1,6 @@
 #
-# Minimal AMD64 COFF object writer for self-hosted bootstrap tests.
-# Mirrors bootstrap/coff.py for two sections: .text and .data.
+# Minimal AMD64 COFF object writer for the self-hosted compiler.
+# Emits the two active sections: .text and .data.
 #
 
 struct CoffSectionSpec {

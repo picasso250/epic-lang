@@ -1,36 +1,47 @@
 #!/usr/bin/env python3
-"""X64 backend test runner."""
+"""X64IR canonical pretty-print test for the Epic implementation."""
 
-import os
 import subprocess
 import sys
+from pathlib import Path
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-TEST_FILES = [
-    ("test_x64_layers.py", "x64 layers"),
-    ("test_self_hosted.py", "x64 self-hosted"),
-]
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests"))
+from compiler_runner import compile_tool
+
+
+FIXTURE = ROOT / "tests" / "x64" / "fixture.ep"
+EXE = ROOT / "build" / "tests" / "x64.exe"
+EXPECTED = """global _start
+extern ExitProcess
+section .data
+msg: db 65, 0
+scratch: times 8 db 0
+section .text
+_start:
+    mov rax, 1
+    cmp rax, 1
+    jz .L1
+    mov rax, 2
+.L1:
+    lea rdx, qword [msg]
+    mov rcx, rax
+    call ExitProcess
+    ret
+"""
 
 
 def main():
-    for filename, label in TEST_FILES:
-        test_file = os.path.join(SCRIPT_DIR, filename)
-        if not os.path.isfile(test_file):
-            print(f"  FAIL  {filename} not found")
-            sys.exit(1)
-
-        result = subprocess.run(
-            [sys.executable, test_file],
-            cwd=SCRIPT_DIR,
-        )
-        if result.returncode != 0:
-            print(f"  FAIL  {label} (exit {result.returncode})")
-            sys.exit(result.returncode)
-
-    print("  PASS  x64")
-    sys.exit(0)
+    compile_tool(FIXTURE, [ROOT / "src" / "util.ep", ROOT / "src" / "x64.ep", FIXTURE], EXE)
+    result = subprocess.run([str(EXE)], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+    if result.returncode != 0 or result.stdout != EXPECTED:
+        print("  FAIL  X64IR canonical pretty print")
+        print(result.stdout)
+        return 1
+    print("  PASS  X64IR canonical pretty print")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

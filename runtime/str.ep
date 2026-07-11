@@ -1,5 +1,5 @@
 # Internal runtime helpers written in Epic.
-# This file is automatically merged by the Python reference compiler.
+# This file is automatically merged by the Epic compiler.
 
 
 fun __ep_str_cat(left: str, right: str): str {

@@ -1,7 +1,7 @@
 #
 # Minimal self-hosted MIR DTO and text output helpers.
 # This is intentionally not a complete MIR library; it only serves the
-# first EP typed-AST -> MIR oracle comparison path.
+# shared by typed-AST lowering, runtime preparation, and the backend.
 #
 
 struct MirValueOperand {

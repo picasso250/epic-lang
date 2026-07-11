@@ -1,7 +1,7 @@
 #
 # Epic self-hosted semantic typed dump.
 #
-# Type names are stored as canonical strings in typed AST dumps for oracle
+# Type names are stored as canonical strings in typed AST dumps for stable
 # comparison, but construction and structural queries go through parser.ep's
 # epic_type_* helpers instead of ad hoc string slicing.
 #

@@ -1,6 +1,6 @@
 #
 # Minimal self-hosted typed AST -> AST-to-MIR.
-# First milestone path: user-function MIR text oracle comparison against Python.
+# Source AST to canonical typed MIR lowering.
 #
 
 struct MirStructFieldLayout {

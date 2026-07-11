@@ -5,49 +5,19 @@
 ## 仓库布局 (Repository Layout)
 
 ```
-bootstrap/          Python reference compiler（Python 参考编译器）
 src/                Epic-written compiler modules and tools
+runtime/            runtime sources and MIR helper bundle
 examples/           正向学习示例程序
-tools/              开发辅助脚本与可选本地工具；LLD-Link 可选
+tests/              self-hosted 模块测试、e2e 与负向用例
+tools/              开发辅助脚本与可选本地工具
 docs/               文档
 editors/            编辑器支持
-tree-sitter-epic/   Tree-sitter 语法
 ```
 
-## Python 参考编译器 (Python Reference Compiler)
+当前活跃实现只有 `src/` 下的 Epic self-hosted compiler。冻结的 Python stage-0
+只存在于 `v0` 标签中，用于重建 `epic-v0.exe`；当前分支不维护双实现或阶段对拍。
 
-`bootstrap/` 包含 Python 实现：
-
-```
-bootstrap/epic.py
-bootstrap/lexer.py
-bootstrap/parser.py
-bootstrap/ast_nodes.py
-bootstrap/sema.py
-bootstrap/ast_to_mir.py
-bootstrap/mir_to_x64.py
-bootstrap/machine.py
-```
-
-驱动程序从仓库根目录读取源码，将构建输出写到 `build/` 下，执行：
-
-```text
-parse/merge -> semantic analysis -> MIR -> X64IR -> machine obj -> link
-```
-
-`compile_files()` 仍会写一个 `.asm` 形式的 X64IR pretty print 作为调试输出，
-但 Python reference compiler 不再支持 `--backend asm`，也不再调用
-`tools/nasm.exe`。旧 Python asm 后端已归档到 tag
-`python-asm-archive-2026-07-02`，需要排查历史行为时从该 tag 对比。
-
-Python parser 直接在 AST 声明位置保存 `EpicType`，语义分析只负责校验和补齐
-`resolved_type`，后端不再接受旧的字符串类型协议。`let` 的 initializer 是 parser
-级必需项：AST 中不存在“缺 initializer、等待 sema 拒绝”的 `LetNode` 状态。
-
-`src/` 下保留当前活跃的 Epic-written compiler modules/tools。旧的 NASM-oriented `src/codegen_support.ep` / `src/codegen.ep` 后端线已经删除；当前的 `src/epic.ep` 是新的自托管编译器 driver，执行 parser -> sema -> MIR -> X64IR -> machine -> COFF -> link 管线。Python reference compiler 仍是默认语言 oracle，两条实现共享当前语言界面和运行时来源。
-
-Epic 自举源码当前仍在 typed AST dump 中保存规范化类型文本，以保持 Python/Epic
-oracle 对拍稳定；但 `src/parser.ep` 的源码类型表达已经使用 `TypeExpr`
+Epic 自举源码在 typed AST dump 中保存规范化类型文本。`src/parser.ep` 的源码类型表达使用 `TypeExpr`
 结构表示。每个 AST payload 在 parser 已知源码位置时直接以 `ast_meta(line)`
 构造；literal value、name、child expression 等必需字段也在同一个 `new` 中给齐，
 不再经过会产生半初始化节点的 `ast_new_*` placeholder constructor。
@@ -62,7 +32,7 @@ Self-hosted sema
 
 ### 构造器简写 (Constructor Shorthand)
 
-Python parser 将构造器简写降低为与空初始化器相同的 AST 形式：`new S` → `new S {}`，`new A.V` → `new A.V {}`。Codegen 没有单独的简写路径。
+Parser 将构造器简写降低为与空初始化器相同的 AST 形式：`new S` → `new S {}`，`new A.V` → `new A.V {}`。Codegen 没有单独的简写路径。
 
 ## Epic 编译器 (Epic Compiler)
 
@@ -96,23 +66,19 @@ python tests/examples/run.py
 python test_bootstrap_fixed_point.py
 ```
 
-`tests/run.py` 运行模块级 Python/self-hosted 对拍和 e2e；`tests/examples/run.py` 验证正向用户示例；`test_bootstrap_fixed_point.py` 是活跃的自举不动点验收。需要单独验证 self-hosted 编译用户示例时，可运行 `python tests/examples/run.py --self-hosted`。
+`tests/run.py` 使用当前 self-hosted compiler 运行模块级意图测试和 e2e；`tests/examples/run.py` 验证正向用户示例；`test_bootstrap_fixed_point.py` 从冻结 v0 seed 验证当前编译器的不动点。
 
-`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，在目标 revision 自己的构建脚本和 canonical source list 上完成不动点构建，并导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest。提交在 `bootstrap/v0/epic-v0.sha256` 的 digest 是冻结产物的预期值。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代，适合 GC 和后端开发期间的日常 bootstrap 验证；`-o <compiler.exe>` 将验证后的最终收敛世代写到指定位置。
+`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，在目标 revision 自己的构建脚本和 canonical source list 上完成历史 stage-0 构建，并导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest。digest 从目标 revision 自己读取。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时自动使用或重建冻结 v0 seed。
 
-Self-hosted `epic.exe` 会自动把当前工作目录下的 `runtime/array.ep`、`runtime/panic.ep`、`runtime/str.ep` 放在用户输入之前，因此普通调用只需提供用户源码。当前工作目录仍需包含 `runtime/mir/helpers.mir`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。Python reference CLI 接受相同的 `--verbose` 开关。
+Self-hosted `epic.exe` 会自动把当前工作目录下的 `runtime/array.ep`、`runtime/panic.ep`、`runtime/str.ep` 放在用户输入之前，因此普通调用只需提供用户源码。当前工作目录仍需包含 `runtime/mir/helpers.mir`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
 
 ## 工具链 (Toolchain)
 
-当前 Python reference compiler 工具链路径：
-
-- `bootstrap/link.py`（Python PE 链接器，默认）
-- `tools/lld-link.exe`（可选；仅用于没有源码 `extern` 的程序）
-- Windows SDK 中的 `kernel32.lib` 和 `user32.lib`
+当前默认使用 `src/link.ep` 生成 PE；`src/machine.ep` 和 `src/coff.ep` 直接生成 COFF object，不依赖外部汇编器或系统 SDK import library。
 
 ## 运行时辅助代码 (Runtime Helpers)
 
-运行时统一在 MIR 层表达。基础 helper body 提交在 `runtime/mir/helpers.mir`，复合数组、panic 和字符串 helper 写在 `runtime/*.ep`；Python reference compiler 和 Epic 自举编译器消费同一组来源。x64 后端不再附加手写运行时。
+运行时统一在 MIR 层表达。基础 helper body 提交在 `runtime/mir/helpers.mir`，复合数组、panic 和字符串 helper 写在 `runtime/*.ep`；Epic 编译器统一消费这些来源。x64 后端不再附加手写运行时。
 
 ## 类型降级 (Type Lowering)
 
@@ -211,7 +177,7 @@ payload:
 
 ## 代码生成模型 (Codegen Model)
 
-Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
+Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 面向 Windows x64。
 
 - 进程入口符号：`_start`
@@ -235,9 +201,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 ## 链接器 (Linker)
 
-`bootstrap/link.py` 是默认的 Python PE 链接器，支持生成的示例所需的窄单对象 PE64 路径。`src/link.ep` 是一个面向相同路径的 Epic MVP 链接器，用当前 Epic 编译器编译。
-
-也可以通过 `--linker lld-link` 使用 `lld-link`。
+`src/link.ep` 是当前默认的窄单对象 PE64 linker，并由 Epic compiler 自身编译。
 
 ## 内置函数降级 (Builtin Lowering)
 

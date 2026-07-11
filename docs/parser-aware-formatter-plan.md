@@ -7,7 +7,7 @@
 - 不向前兼容旧格式器行为。
 - Formatter 以语法结构为准，不靠 `{` / `}` 文本拆行猜测结构。
 - Comment 必须保留；comment 不进入语义 AST 主干，但 formatter 要知道它们的位置。
-- Formatter 输出必须能被 Python reference parser 重新解析。
+- Formatter 输出必须能被当前 Epic parser 重新解析。
 
 ## 最小长期路线
 

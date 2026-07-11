@@ -1,6 +1,6 @@
 #
 # Minimal self-hosted X64IR -> machine byte encoder.
-# First milestone: enough structured encoding for the X64IR fixture oracle.
+# Structured encoding for the active X64IR subset.
 #
 
 struct MachineObject {

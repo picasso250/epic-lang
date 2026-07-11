@@ -1,7 +1,7 @@
 #
 # Minimal self-hosted X64IR DTO and text output helpers.
-# This intentionally covers the pretty-print oracle first; validation and
-# machine encoding belong to later bootstrap stages.
+# This intentionally keeps pretty-printing separate from validation and
+# machine encoding belongs to the next compiler stage.
 #
 
 struct X64RegOperand {

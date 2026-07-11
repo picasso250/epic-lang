@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
-"""
-Check that the compiler reaches a bootstrap fixed point.
-
-Stages:
-  epic-py: Python compiler builds the Epic compiler.
-  epic-epic: epic-py builds the Epic compiler.
-  epic-epic-epic: epic-epic builds the Epic compiler again.
-
-The later stages should be byte-identical. If they are not, self-hosting is not
-yet a stable bootstrap anchor.
-"""
+"""Check that the compiler reaches a fixed point from the frozen v0 seed."""
 
 import argparse
 import filecmp
@@ -27,9 +17,9 @@ def rel(path):
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
+DEFAULT_SEED = os.path.join(BUILD_DIR, "bootstrap-v0", "epic-v0.exe")
 RUNTIME_SOURCES = list(SELF_HOST_RUNTIME_SOURCES)
 COMPILER_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_COMPILER_SOURCES]
 
@@ -139,30 +129,6 @@ def run_checked(cmd, label):
     return result
 
 
-def build_with_python(output_path):
-    stage0_dir = os.path.join(BOOT_DIR, "stage0")
-    run_checked(
-        [
-            sys.executable,
-            EPICC,
-            "--main",
-            os.path.join("src", "epic.ep"),
-            *COMPILER_SOURCES,
-            "--out-dir",
-            stage0_dir,
-            "--linker",
-            "py",
-            "--verbose",
-        ],
-        "python -> epic-py",
-    )
-    produced = os.path.join(stage0_dir, "src", "epic.exe")
-    if not os.path.exists(produced):
-        raise RuntimeError(f"expected compiler output missing: {produced}")
-    shutil.copyfile(produced, output_path)
-    print_exe_size(output_path, "python -> epic-py")
-
-
 def build_with_epic(compiler, output_path, label):
     run_checked(
         [
@@ -186,7 +152,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--seed",
-        help="build the current compiler from this existing Epic compiler instead of Python",
+        help="existing Epic seed compiler (default: frozen build/bootstrap-v0/epic-v0.exe)",
     )
     parser.add_argument(
         "-o",
@@ -205,44 +171,39 @@ def write_output(source_path, destination_path):
     print(f"wrote converged compiler: {destination}", flush=True)
 
 
+def resolve_seed(requested):
+    seed = os.path.abspath(requested or DEFAULT_SEED)
+    if os.path.isfile(seed):
+        return seed
+    if requested:
+        raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
+    build_script = os.path.join(SCRIPT_DIR, "build_epic_v0.py")
+    run_checked(
+        [sys.executable, build_script, "--require-expected"],
+        "rebuild frozen v0 seed",
+    )
+    if not os.path.isfile(seed):
+        raise RuntimeError(f"v0 rebuild did not produce seed compiler: {seed}")
+    return seed
+
+
 def main():
     args = parse_args()
     if os.path.exists(BOOT_DIR):
         remove_tree_with_retry(BOOT_DIR)
     os.makedirs(BOOT_DIR, exist_ok=True)
 
-    if args.seed:
-        seed = os.path.abspath(args.seed)
-        if not os.path.isfile(seed):
-            raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
+    seed = resolve_seed(args.seed)
+    generation1 = os.path.join(BOOT_DIR, "epic-seed-1.exe")
+    generation2 = os.path.join(BOOT_DIR, "epic-seed-2.exe")
+    generation3 = os.path.join(BOOT_DIR, "epic-seed-3.exe")
 
-        generation1 = os.path.join(BOOT_DIR, "epic-seed-1.exe")
-        generation2 = os.path.join(BOOT_DIR, "epic-seed-2.exe")
-        generation3 = os.path.join(BOOT_DIR, "epic-seed-3.exe")
+    build_with_epic(seed, generation1, "v0 seed -> epic-seed-1")
+    build_with_epic(generation1, generation2, "epic-seed-1 -> epic-seed-2")
+    build_with_epic(generation2, generation3, "epic-seed-2 -> epic-seed-3")
 
-        build_with_epic(seed, generation1, "seed -> epic-seed-1")
-        build_with_epic(generation1, generation2, "epic-seed-1 -> epic-seed-2")
-        build_with_epic(generation2, generation3, "epic-seed-2 -> epic-seed-3")
-
-        checks = [(generation2, generation3)]
-        converged = generation3
-    else:
-        epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
-        epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
-        epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
-        epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
-
-        build_with_python(epic_py)
-        build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
-        build_with_epic(epic_epic, epic_epic_epic, "epic-epic -> epic-epic-epic")
-        build_with_epic(
-            epic_epic_epic,
-            epic_epic_epic_epic,
-            "epic-epic-epic -> epic-epic-epic-epic",
-        )
-
-        checks = [(epic_epic, epic_epic_epic), (epic_epic_epic, epic_epic_epic_epic)]
-        converged = epic_epic_epic_epic
+    checks = [(generation2, generation3)]
+    converged = generation3
 
     for left, right in checks:
         if not filecmp.cmp(left, right, shallow=False):

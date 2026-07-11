@@ -5,20 +5,15 @@ This document describes the current compiler, not removed NASM-era code.
 
 ## Implementation ownership
 
-| Concern | Python reference compiler | Self-hosted compiler |
-|---|---|---|
-| Reserved public names | `bootstrap/epic_builtins.py`, consumed by `bootstrap/sema.py` | `sema_is_reserved_func` in `src/sema.ep` |
-| Type checking | `bootstrap/sema.py` | `src/sema.ep` |
-| MIR lowering | `bootstrap/ast_to_mir.py` | `src/ast_to_mir.ep` |
-| Runtime definitions | `runtime/mir/helpers.mir`, `runtime/*.ep`, `bootstrap/mir_runtime_helpers.py` | the same runtime sources through `src/mir_runtime.ep` |
+| Concern | Active implementation |
+|---|---|
+| Reserved public names | `sema_is_reserved_func` in `src/sema.ep` |
+| Type checking | `src/sema.ep` |
+| MIR lowering | `src/ast_to_mir.ep` |
+| Runtime definitions | `runtime/mir/helpers.mir`, `runtime/*.ep`, injected through `src/mir_runtime.ep` |
 
-The parser does not own builtin semantics or builtin-name reservation. Both compiler
-implementations parse ordinary calls first and resolve builtin behavior during sema and
-MIR lowering.
-
-`bootstrap/epic_builtins.py` is the central Python-side name inventory. It is already
-used by Python sema to reject builtin and pseudo-builtin redefinitions; it does not by
-itself implement typing or lowering.
+The parser does not own builtin semantics or builtin-name reservation. Calls are parsed
+normally and builtin behavior is resolved during sema and MIR lowering.
 
 ## Public function-call surface
 
@@ -62,8 +57,7 @@ forms above receive array-method semantics.
 |---|---|
 | `argv` | implicit local `str[]` available in every function; startup initializes it from the process command line |
 
-`argv` is not a callable function and cannot be redefined as a function or extern in the
-Python reference compiler.
+`argv` is not a callable function and cannot be redefined as a function or extern.
 
 ## Removed public surface
 
@@ -112,14 +106,14 @@ categories include:
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
 - panic and bounds/null failure paths.
 
-Python and self-hosted compilers load the committed MIR helper bundle, merge helpers
-compiled from `runtime/*.ep`, and prune unreachable functions. Reachability begins at
+The self-hosted compiler loads the committed MIR helper bundle, merges helpers compiled
+from `runtime/*.ep`, and prunes unreachable functions. Reachability begins at
 `main`; startup and runtime dependencies are normal MIR calls. The x64 backend lowers
 this MIR and imports only the WinAPI symbols that remain reachable.
 
 ## Name reservation
 
-Python and self-hosted sema reserve names whose call syntax is always interpreted as a
+Sema reserves names whose call syntax is always interpreted as a
 builtin or pseudo-builtin, including `print`, `println`, `exit`, conversions such as
 `i64`/`u8`/`bool`, file I/O, `len`, and `argv`.
 

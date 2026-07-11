@@ -2,22 +2,18 @@
 
 ## Scope
 
-本文档记录 **当前实现** 的 MIR → X64Program lowering 规则。它不是目标设计，也不是理想合约，而是 `bootstrap/mir_to_x64.py` 的真实行为。
+本文档记录 **当前实现** 的 MIR → X64Program lowering 规则。它不是目标设计，也不是理想合约，而是 `src/mir_to_x64.ep` 的真实行为。
 
 目标 MIR 设计见 `docs/mir-design.md`。X64IR 合约见 `docs/x64-instruction-subset.md`。
 
 ```text
-MIR -> MirLower -> X64Program -> X64IR text (debug) / machine -> COFF -> PE
+MIR -> MirToX64Lower -> X64Program -> machine -> COFF -> PE
 ```
 
 ## 1. 总体流程
 
 ```
-MirLower.__init__(program)
-  ├─ self.x64 = X64Program()
-  └─ 初始化栈槽、scratch、临时状态
-
-lower():
+mir_to_x64_lower_program(program):
   ├─ x64.global("_start")
   ├─ x64.extern(...) for each referenced WinAPI/source extern
   ├─ x64.section(".data")
@@ -26,7 +22,7 @@ lower():
   └─ for each fn: _lower_function(fn)
 ```
 
-`lower()` 后，`X64Program` 包含：
+lowering 后，`X64Program` 包含：
 1. 数据段：MIR program globals 与 string headers
 2. 代码段：prune 后保留的所有 MIR functions
 
@@ -359,15 +355,13 @@ Helpers such as `__ep_alloc`, `__ep_cstr`, `__ep_read_file`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
-`bootstrap/mir_runtime_helpers.py` in the Python compiler and `src/mir_runtime.ep`
-in the self-hosted compiler. Composite helpers also come from `runtime/*.ep`.
-After injection, both compilers prune unreachable MIR functions from the final
+`src/mir_runtime.ep`. Composite helpers also come from `runtime/*.ep`.
+After injection, the compiler prunes unreachable MIR functions from the final
 program starting at `main`; startup and helper dependencies remain reachable
 through explicit MIR calls.
 `bytes(str)` and `str(u8[])` are lowered as identity casts, so they do not
 require MIR runtime functions.
-The x64 backend contains only generic instruction lowering in `mir_to_x64.py`
-`_emit_*()` methods.
+The x64 backend contains only generic instruction lowering in `src/mir_to_x64.ep`.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.
 

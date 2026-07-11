@@ -1,4 +1,4 @@
-# Source-to-X64IR driver for self-hosted MIR-to-X64 oracle tests.
+# Source-to-X64IR driver for deterministic lowering tests.
 
 fun main(): void {
     if len(argv) < 2 {

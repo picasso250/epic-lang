@@ -1,4 +1,4 @@
-# Source-to-machine-byte driver for self-hosted machine oracle tests.
+# Source-to-machine-byte driver for deterministic machine tests.
 
 fun machine_dump_user_program(path: str): void {
     let src = str(read_file(path))

@@ -1,127 +1,33 @@
 #!/usr/bin/env python3
-"""
-tests/ast_to_mir/run.py — compare EP AST-to-MIR against the Python MIR oracle.
+"""AST-to-MIR deterministic output tests for the Epic implementation."""
 
-Compare the complete target-neutral frontend MIR emitted by both compilers.
-"""
-
-import difflib
-import os
 import subprocess
 import sys
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
-EPICC = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
-BUILD_DIR = os.path.join(ROOT_DIR, "build", "mir-codegen-bootstrap")
-AST_TO_MIR_EXE = os.path.join(BUILD_DIR, "src", "ast_to_mir.exe")
-EXAMPLES_DIR = os.path.join(ROOT_DIR, "examples")
-PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
-CASES = [
-    os.path.join(PASS_DIR, name)
-    for name in sorted(os.listdir(PASS_DIR))
-    if name.endswith(".ep")
-]
-EXAMPLE_CASES = [
-    os.path.join(EXAMPLES_DIR, name)
-    for name in sorted(os.listdir(EXAMPLES_DIR))
-    if name.endswith(".ep")
-]
-sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
-from lexer import lex
-from parser import Parser
-from sema import analyze_program
-from ast_to_mir import ast_to_mir
-from mir import MirProgram
+from pathlib import Path
 
 
-def run_checked(cmd, label):
-    result = subprocess.run(
-        cmd,
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"{label} failed:\n" + result.stdout[-3000:] + result.stderr[-3000:])
-    return result
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests"))
+from compiler_runner import compile_tool
 
 
-def ensure_ep_ast_to_mir():
-    os.makedirs(BUILD_DIR, exist_ok=True)
-    run_checked(
-        [
-            sys.executable,
-            EPICC,
-            "--main",
-            os.path.join("src", "ast_to_mir.ep"),
-            os.path.join("src", "util.ep"),
-            os.path.join("src", "lexer.ep"),
-            os.path.join("src", "parser.ep"),
-            os.path.join("src", "sema.ep"),
-            os.path.join("src", "mir.ep"),
-            os.path.join("src", "ast_to_mir.ep"),
-            "--out-dir",
-            BUILD_DIR,
-        ],
-        "compile src/ast_to_mir.ep",
-    )
-    if not os.path.isfile(AST_TO_MIR_EXE):
-        raise RuntimeError(f"expected ast_to_mir.exe at {AST_TO_MIR_EXE}")
-
-
-def python_user_mir(path):
-    with open(path, "r", encoding="utf-8") as f:
-        source = f.read()
-    typed = analyze_program(Parser(lex(source)).parse_program())
-    lowered = ast_to_mir(typed)
-    return lowered.text() + "\n"
-
-
-def ep_user_mir(path):
-    result = run_checked([AST_TO_MIR_EXE, path], f"EP AST-to-MIR {os.path.relpath(path, ROOT_DIR)}")
-    return result.stdout
-
-
-def print_diff(expected, actual):
-    for i, line in enumerate(difflib.unified_diff(
-        expected.splitlines(),
-        actual.splitlines(),
-        fromfile="python-oracle",
-        tofile="ep-mir-codegen",
-        lineterm="",
-    )):
-        if i >= 120:
-            print("  ... diff truncated ...")
-            break
-        print(line)
+TOOL = ROOT / "build" / "tests" / "ast_to_mir.exe"
 
 
 def main():
-    ensure_ep_ast_to_mir()
-    failed = 0
-    for path in CASES + EXAMPLE_CASES:
-        rel = os.path.relpath(path, ROOT_DIR)
-        try:
-            expected = python_user_mir(path)
-            actual = ep_user_mir(path)
-        except Exception as exc:
-            failed += 1
-            print(f"  FAIL  {rel}")
-            print(f"        {exc}")
-            continue
-        if actual == expected:
-            print(f"  PASS  {rel}")
-        else:
-            failed += 1
-            print(f"  FAIL  {rel}")
-            print_diff(expected, actual)
-    return 1 if failed else 0
+    sources = [ROOT / "src" / name for name in ("util.ep", "lexer.ep", "parser.ep", "sema.ep", "mir.ep", "ast_to_mir.ep")]
+    compile_tool(ROOT / "src" / "ast_to_mir.ep", sources, TOOL)
+    cases = sorted((ROOT / "tests" / "ast_to_mir" / "pass").glob("*.ep")) + sorted((ROOT / "examples").glob("*.ep"))
+    for path in cases:
+        first = subprocess.run([str(TOOL), str(path)], cwd=ROOT, capture_output=True)
+        second = subprocess.run([str(TOOL), str(path)], cwd=ROOT, capture_output=True)
+        if first.returncode != 0 or first.stdout != second.stdout or b"define " not in first.stdout:
+            print(f"  FAIL  {path.relative_to(ROOT)}")
+            print((first.stdout + first.stderr).decode("utf-8", errors="replace")[-1000:])
+            return 1
+        print(f"  PASS  {path.relative_to(ROOT)}")
+    return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

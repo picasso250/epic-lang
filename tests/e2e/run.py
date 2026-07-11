@@ -32,7 +32,7 @@ def run_cases(search_dir):
 
         ep_path = os.path.join(search_dir, ep_name)
         try:
-            ok, detail = ep_runner.run_python_case(ep_path, linker="py", root_dir=ROOT_DIR)
+            ok, detail = ep_runner.run_epic_case(ep_path, root_dir=ROOT_DIR)
         except subprocess.TimeoutExpired:
             ok, detail = False, "TIMEOUT"
         except Exception as e:

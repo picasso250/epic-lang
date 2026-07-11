@@ -1,68 +1,21 @@
 #!/usr/bin/env python3
-"""
-tests/mir/run.py — MVP MIR test runner.
-"""
+"""Canonical MIR text and backend ABI tests for the Epic implementation."""
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests"))
+from compiler_runner import compile_tool
 
 
-def main():
-    test_file = os.path.join(SCRIPT_DIR, "test_mir.py")
-    if not os.path.isfile(test_file):
-        print("  FAIL  test_mir.py not found")
-        sys.exit(1)
+SOURCES = [ROOT / "src" / name for name in ("util.ep", "mir.ep", "mir_text.ep", "backend_abi.ep")]
+BUILD = ROOT / "build" / "tests" / "mir"
 
-    result = subprocess.run(
-        [sys.executable, test_file],
-        cwd=SCRIPT_DIR,
-    )
-    if result.returncode != 0:
-        print(f"  FAIL  mir (exit {result.returncode})")
-        sys.exit(result.returncode)
 
-    root = Path(SCRIPT_DIR).resolve().parents[1]
-    build_dir = root / "build" / "mir-type-decl-bootstrap"
-    compile_result = subprocess.run(
-        [
-            sys.executable,
-            str(root / "bootstrap" / "epic.py"),
-            "--main",
-            "tests/mir/type_decl.ep",
-            "src/util.ep",
-            "src/mir.ep",
-            "src/mir_text.ep",
-            "src/backend_abi.ep",
-            "tests/mir/type_decl.ep",
-            "--out-dir",
-            str(build_dir),
-        ],
-        cwd=root,
-    )
-    if compile_result.returncode != 0:
-        print(f"  FAIL  MIR struct type declaration compile (exit {compile_result.returncode})")
-        sys.exit(compile_result.returncode)
-
-    exe = build_dir / "tests" / "mir" / "type_decl.exe"
-    run_result = subprocess.run(
-        [str(exe)],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        encoding="ascii",
-        errors="strict",
-    )
-    if run_result.returncode != 0:
-        print(f"  FAIL  MIR canonical text run (exit {run_result.returncode})")
-        print(run_result.stdout)
-        print(run_result.stderr)
-        sys.exit(run_result.returncode)
-
-    expected = """extern void @ExitProcess(i64)
+EXPECTED = """extern void @ExitProcess(i64)
 
 type Data = struct { i8, i64 }
 
@@ -82,60 +35,27 @@ entry:
   ret i64 0
 }
 """
-    actual = run_result.stdout.replace("\r\n", "\n")
-    if actual != expected:
-        print("  FAIL  MIR canonical text output mismatch")
-        print("--- expected ---")
-        print(expected)
-        print("--- actual ---")
-        print(actual)
-        sys.exit(1)
 
-    print("  PASS  MIR canonical text round-trip")
 
-    fail_compile = subprocess.run(
-        [
-            sys.executable,
-            str(root / "bootstrap" / "epic.py"),
-            "--main",
-            "tests/mir/backend_abi_fail.ep",
-            "src/util.ep",
-            "src/mir.ep",
-            "src/mir_text.ep",
-            "src/backend_abi.ep",
-            "tests/mir/backend_abi_fail.ep",
-            "--out-dir",
-            str(build_dir),
-        ],
-        cwd=root,
-        capture_output=True,
-        text=True,
-    )
-    if fail_compile.returncode != 0:
-        print("  FAIL  backend ABI negative fixture compile")
-        print(fail_compile.stdout)
-        print(fail_compile.stderr)
-        sys.exit(fail_compile.returncode)
+def main():
+    canonical = compile_tool(ROOT / "tests" / "mir" / "type_decl.ep", [*SOURCES, ROOT / "tests" / "mir" / "type_decl.ep"], BUILD / "type_decl.exe")
+    result = subprocess.run([str(canonical)], cwd=ROOT, capture_output=True, text=True, encoding="ascii")
+    if result.returncode != 0 or result.stdout.replace("\r\n", "\n") != EXPECTED:
+        print("  FAIL  MIR canonical text")
+        print(result.stdout)
+        return 1
+    print("  PASS  MIR canonical text")
 
-    fail_exe = build_dir / "tests" / "mir" / "backend_abi_fail.exe"
-    fail_run = subprocess.run(
-        [str(fail_exe)],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        encoding="ascii",
-        errors="replace",
-    )
-    fail_output = fail_run.stdout + fail_run.stderr
-    if fail_run.returncode == 0 or "unsupported backend extern: ExitProces" not in fail_output:
-        print("  FAIL  backend ABI accepted unknown Epic callee")
-        print(fail_output)
-        sys.exit(1)
-
-    print("  PASS  backend ABI rejects unsupported Epic extern")
-    print("  PASS  mir")
-    sys.exit(0)
+    negative = compile_tool(ROOT / "tests" / "mir" / "backend_abi_fail.ep", [*SOURCES, ROOT / "tests" / "mir" / "backend_abi_fail.ep"], BUILD / "backend_abi_fail.exe")
+    result = subprocess.run([str(negative)], cwd=ROOT, capture_output=True, text=True, encoding="ascii", errors="replace")
+    output = result.stdout + result.stderr
+    if result.returncode == 0 or "unsupported backend extern: ExitProces" not in output:
+        print("  FAIL  backend ABI negative fixture")
+        print(output)
+        return 1
+    print("  PASS  backend ABI negative fixture")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

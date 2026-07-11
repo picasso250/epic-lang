@@ -1,319 +1,59 @@
 #!/usr/bin/env python3
-"""
-tests/lexer/run.py — Formal lexer test runner.
-
-Default mode: golden (frozen) check of Python lexer against token_list.txt,
-then self-hosted comparison.
-
-Self-hosted comparison builds src/lexer.ep, then compares its output with the
-Python lexer oracle on src/lexer.ep, all.ep, a dynamic CRLF sample, and
-examples/*.ep.
-
-Skip self-hosted comparison:
-  python tests/lexer/run.py --no-self-hosted
-
-Regenerate token_list.txt from Python lexer oracle:
-  python tests/lexer/run.py --regen
-
-Golden spec:
-  tests/lexer/pass/all.ep     — comprehensive lexer fixture (all token kinds)
-  tests/lexer/pass/token_list.txt — oracle dump from bootstrap/lexer.py
-"""
+"""Lexer golden and line-ending tests using the current Epic implementation."""
 
 import argparse
-import os
 import subprocess
 import sys
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))  # repo root
-
-# Import Python lexer oracle
-sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
-from lexer import dump_tokens, lex
-
-ALL_EP = os.path.join(SCRIPT_DIR, "pass", "all.ep")
-TOKEN_LIST = os.path.join(SCRIPT_DIR, "pass", "token_list.txt")
-CRLF_SAMPLE_LF = """# line ending contract
-fun main(): void {
-    # comment before CRLF
-    let x = 1
-    println(f"x={x}")
-    return x - 1
-}
-"""
+from pathlib import Path
 
 
-def python_lexer_dump_source(source: str) -> str:
-    return dump_tokens(lex(source))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests"))
+from compiler_runner import compile_tool
 
 
-def python_lexer_dump(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as f:
-        source = f.read()
-    return python_lexer_dump_source(source)
+FIXTURE = ROOT / "tests" / "lexer" / "pass" / "all.ep"
+GOLDEN = ROOT / "tests" / "lexer" / "pass" / "token_list.txt"
+LEXER_EXE = ROOT / "build" / "tests" / "lexer.exe"
 
 
-def read_golden() -> str:
-    with open(TOKEN_LIST, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def check_golden() -> bool:
-    """Check that Python lexer output matches token_list.txt."""
-    if not os.path.isfile(ALL_EP):
-        print(f"  FAIL  missing golden fixture: {ALL_EP}")
-        return False
-    if not os.path.isfile(TOKEN_LIST):
-        print(f"  FAIL  missing golden: {TOKEN_LIST}")
-        return False
-
-    expected = read_golden()
-    actual = python_lexer_dump(ALL_EP)
-
-    if actual == expected:
-        print(f"  PASS  tokens/all.ep matches token_list.txt")
-        return True
-    else:
-        # Show diff
-        exp_lines = expected.splitlines()
-        act_lines = actual.splitlines()
-        mismatch = False
-        for i in range(min(len(exp_lines), len(act_lines))):
-            if exp_lines[i] != act_lines[i]:
-                print(f"  FAIL  line {i+1}")
-                print(f"    expected: {exp_lines[i]!r}")
-                print(f"    actual:   {act_lines[i]!r}")
-                mismatch = True
-                break
-        if not mismatch:
-            print(f"  FAIL  expected {len(exp_lines)} lines, got {len(act_lines)}")
-        return False
-
-
-def check_cli_dump_tokens() -> bool:
-    expected = read_golden()
-    epicc = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
-    result = subprocess.run(
-        [sys.executable, epicc, ALL_EP, "--dump-tokens"],
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    actual = result.stdout
+def run_dump(path):
+    result = subprocess.run([str(LEXER_EXE), str(path)], cwd=ROOT, capture_output=True)
     if result.returncode != 0:
-        print("  FAIL  epic.py --dump-tokens failed")
-        print((result.stdout + result.stderr)[-2000:])
-        return False
-    if actual == expected:
-        print("  PASS  epic.py --dump-tokens matches token_list.txt")
-        return True
+        raise RuntimeError((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
+    return result.stdout.decode("utf-8", errors="strict")
 
-    exp_lines = expected.splitlines()
-    act_lines = actual.splitlines()
-    for i in range(min(len(exp_lines), len(act_lines))):
-        if exp_lines[i] != act_lines[i]:
-            print(f"  FAIL  epic.py --dump-tokens line {i+1}")
-            print(f"    expected: {exp_lines[i]!r}")
-            print(f"    actual:   {act_lines[i]!r}")
-            break
-    else:
-        print(f"  FAIL  epic.py --dump-tokens expected {len(exp_lines)} lines, got {len(act_lines)}")
-    return False
-
-
-def check_python_line_endings() -> bool:
-    """LF and CRLF source text must produce the same token dump."""
-    lf_dump = python_lexer_dump_source(CRLF_SAMPLE_LF)
-    crlf_source = CRLF_SAMPLE_LF.replace("\n", "\r\n")
-    crlf_dump = python_lexer_dump_source(crlf_source)
-    if crlf_dump == lf_dump:
-        print("  PASS  Python lexer LF/CRLF equivalence")
-        return True
-
-    print("  FAIL  Python lexer LF/CRLF equivalence")
-    exp_lines = lf_dump.splitlines()
-    act_lines = crlf_dump.splitlines()
-    for i in range(min(len(exp_lines), len(act_lines))):
-        if exp_lines[i] != act_lines[i]:
-            print(f"    line {i+1}")
-            print(f"    expected: {exp_lines[i]!r}")
-            print(f"    actual:   {act_lines[i]!r}")
-            break
-    else:
-        print(f"    expected {len(exp_lines)} lines, got {len(act_lines)}")
-    return False
-
-
-def write_crlf_sample() -> str:
-    path = os.path.join(ROOT_DIR, "build", "tests", "lexer_crlf.ep")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "wb") as f:
-        f.write(CRLF_SAMPLE_LF.replace("\n", "\r\n").encode("utf-8"))
-    return path
-
-
-def ensure_bootstrap_lexer() -> str:
-    """Build src/lexer.ep -> build/src/lexer.exe via bootstrap/epic.py."""
-    lexer_ep = os.path.join(ROOT_DIR, "src", "lexer.ep")
-    epicc = os.path.join(ROOT_DIR, "bootstrap", "epic.py")
-    result = subprocess.run(
-        [sys.executable, epicc, lexer_ep],
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stdout + result.stderr)
-
-    lexer_exe = os.path.join(ROOT_DIR, "build", "src", "lexer.exe")
-    if not os.path.isfile(lexer_exe):
-        raise RuntimeError(f"expected lexer.exe at {lexer_exe}")
-    return lexer_exe
-
-
-def check_self_hosted_lexer(lexer_exe: str, path: str, label: str) -> bool:
-    """Compare Python lexer dump vs self-hosted lexer.exe dump for one file."""
-    expected = python_lexer_dump(path)
-
-    result = subprocess.run(
-        [lexer_exe, path],
-        cwd=ROOT_DIR,
-        capture_output=True,
-    )
-    stdout = result.stdout.decode("utf-8", errors="replace")
-    stderr = result.stderr.decode("utf-8", errors="replace")
-    if result.returncode != 0:
-        print(f"  FAIL  {label}  lexer.exe failed:\n{stdout}{stderr}")
-        return False
-
-    if stdout == expected:
-        print(f"  PASS  {label}")
-        return True
-    else:
-        exp_lines = expected.splitlines()
-        act_lines = stdout.splitlines()
-        mismatch = False
-        for i in range(min(len(exp_lines), len(act_lines))):
-            if exp_lines[i] != act_lines[i]:
-                print(f"  FAIL  {label}  line {i+1}")
-                print(f"    expected: {exp_lines[i]!r}")
-                print(f"    actual:   {act_lines[i]!r}")
-                mismatch = True
-                break
-        if not mismatch:
-            print(f"  FAIL  {label}  expected {len(exp_lines)} lines, got {len(act_lines)}")
-        return False
-
-
-def regen_golden():
-    """Regenerate token_list.txt from Python lexer oracle."""
-    if not os.path.isfile(ALL_EP):
-        print(f"FAIL: {ALL_EP} not found")
-        sys.exit(1)
-
-    output = python_lexer_dump(ALL_EP)
-    with open(TOKEN_LIST, "w", encoding="utf-8") as f:
-        f.write(output)
-    print(f"Regenerated {TOKEN_LIST} ({len(output.splitlines())} lines)")
-    print("Please review with: git diff tests/lexer/pass/token_list.txt")
-    print("Do not commit without review.")
-
-
-
-def check_dump_format_unit_tests() -> bool:
-    test_file = os.path.join(SCRIPT_DIR, "test_dump_format.py")
-    result = subprocess.run(
-        [sys.executable, test_file],
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if result.returncode == 0:
-        print(result.stdout, end="")
-        return True
-    print("  FAIL  lexer dump format")
-    print((result.stdout + result.stderr)[-2000:])
-    return False
 
 def main():
-    parser = argparse.ArgumentParser(description="Epic lexer test runner")
-    parser.add_argument("--regen", action="store_true",
-                        help="Regenerate golden token_list.txt from Python lexer")
-    parser.add_argument("--no-self-hosted", action="store_true",
-                        help="Skip self-hosted lexer.exe comparison")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--regen", action="store_true")
     args = parser.parse_args()
-
+    compile_tool(ROOT / "src" / "lexer.ep", [ROOT / "src" / "util.ep", ROOT / "src" / "lexer.ep"], LEXER_EXE)
+    actual = run_dump(FIXTURE)
     if args.regen:
-        regen_golden()
-        sys.exit(0)
+        GOLDEN.write_text(actual, encoding="utf-8", newline="\n")
+        print(f"regenerated {GOLDEN.relative_to(ROOT)}")
+        return 0
+    if actual != GOLDEN.read_text(encoding="utf-8"):
+        print("  FAIL  lexer token golden mismatch")
+        return 1
+    print("  PASS  lexer token golden")
 
-    print("--- dump format unit tests ---")
-    if not check_dump_format_unit_tests():
-        sys.exit(1)
-
-    # --- Normal mode: frozen golden check ---
-    print("--- golden check ---")
-    golden_ok = check_golden()
-    if not golden_ok:
-        sys.exit(1)
-
-    print("--- line ending check ---")
-    line_ending_ok = check_python_line_endings()
-    if not line_ending_ok:
-        sys.exit(1)
-
-    print("--- CLI dump check ---")
-    cli_dump_ok = check_cli_dump_tokens()
-    if not cli_dump_ok:
-        sys.exit(1)
-
-    # --- Self-hosted lexer comparison ---
-    if not args.no_self_hosted:
-        print("--- self-hosted lexer comparison ---")
-        try:
-            lexer_exe = ensure_bootstrap_lexer()
-        except (RuntimeError, subprocess.TimeoutExpired) as e:
-            print(f"  FAIL  self-hosted lexer build: {e}")
-            sys.exit(1)
-
-        lexer_ep = os.path.join(ROOT_DIR, "src", "lexer.ep")
-        all_ok = check_self_hosted_lexer(
-            lexer_exe, lexer_ep, "src/lexer.ep"
-        )
-
-        all_ok = check_self_hosted_lexer(
-            lexer_exe, ALL_EP, "all.ep"
-        ) and all_ok
-
-        crlf_path = write_crlf_sample()
-        all_ok = check_self_hosted_lexer(
-            lexer_exe, crlf_path, "dynamic CRLF sample"
-        ) and all_ok
-
-        # Compare on all examples/*.ep
-        examples_dir = os.path.join(ROOT_DIR, "examples")
-        if os.path.isdir(examples_dir):
-            for name in sorted(os.listdir(examples_dir)):
-                if not name.endswith(".ep"):
-                    continue
-                ep_path = os.path.join(examples_dir, name)
-                ok = check_self_hosted_lexer(lexer_exe, ep_path, name)
-                if not ok:
-                    all_ok = False
-
-        if not all_ok:
-            sys.exit(1)
-
-    print("\n  PASS  lexer")
-    sys.exit(0)
+    build = ROOT / "build" / "tests"
+    lf = build / "lexer_lf.ep"
+    crlf = build / "lexer_crlf.ep"
+    source = "fun main(): void {\n    println(\"ok\")\n}\n"
+    lf.write_bytes(source.encode())
+    crlf.write_bytes(source.replace("\n", "\r\n").encode())
+    if run_dump(lf) != run_dump(crlf):
+        print("  FAIL  lexer LF/CRLF equivalence")
+        return 1
+    print("  PASS  lexer LF/CRLF equivalence")
+    for path in sorted((ROOT / "examples").glob("*.ep")):
+        run_dump(path)
+    print("  PASS  lexer examples")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

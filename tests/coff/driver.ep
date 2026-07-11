@@ -1,4 +1,4 @@
-# Source-to-COFF-byte driver for self-hosted COFF oracle tests.
+# Source-to-COFF-byte driver for deterministic COFF tests.
 
 fun coff_dump_user_program(path: str): void {
     let src = str(read_file(path))

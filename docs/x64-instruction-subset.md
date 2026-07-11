@@ -1,19 +1,19 @@
 # Epic LowIR / X64IR 规格
 
-本文档记录当前 Python machine backend 的真实合约。它不是通用 x64
+本文档记录当前 Epic machine backend 的真实合约。它不是通用 x64
 汇编器说明，也不是未来完整后端设计；目标是给 `MIR -> X64IR ->
 machine bytes -> COFF -> PE` 这条线建立可测试边界。
 
 对应实现：
 
-- `bootstrap/mir.py`: typed MIR data model and validator。
-- `bootstrap/ast_to_mir.py`: AST -> MIR。
-- `bootstrap/mir_to_x64.py`: MIR -> structured X64IR。
-- `bootstrap/mir_runtime_helpers.py`: MIR runtime injection and preparation。
-- `bootstrap/x64.py`: X64IR data model and text pretty printer。
-- `bootstrap/machine.py`: X64IR -> machine bytes + COFF reloc records。
-- `bootstrap/coff.py`: minimal AMD64 COFF object writer。
-- `bootstrap/link.py`: minimal PE linker for generated COFF objects。
+- `src/mir.ep`: typed MIR data model and validator。
+- `src/ast_to_mir.ep`: AST -> MIR。
+- `src/mir_to_x64.ep`: MIR -> structured X64IR。
+- `src/mir_runtime.ep`: MIR runtime injection and preparation。
+- `src/x64.ep`: X64IR data model and text pretty printer。
+- `src/machine.ep`: X64IR -> machine bytes + COFF reloc records。
+- `src/coff.ep`: minimal AMD64 COFF object writer。
+- `src/link.ep`: minimal PE linker for generated COFF objects。
 
 ## 1. 分层边界
 
@@ -25,13 +25,12 @@ AST
   -> X64Program
   -> MachineObjectBuilder(text bytes, data bytes, relocs, symbols)
   -> COFF obj
-  -> bootstrap/link.py / lld-link
+  -> src/link.ep
   -> PE exe
 ```
 
-`compile_files()` 仍会把 `X64Program.text()` 写到 `.asm` 文件，但这个文件只是
-debug pretty print，不参与 obj 生成。Python reference compiler 已移除
-`--backend asm`，旧 Python asm 后端归档在 tag `python-asm-archive-2026-07-02`。
+X64IR text 只用于 driver fixture 和诊断，不参与 obj 生成。旧 asm 后端归档在
+tag `python-asm-archive-2026-07-02`。
 
 Runtime preparation happens before MIR lowering:
 
@@ -321,20 +320,18 @@ External or section symbol references:
 
 COFF contract:
 
-- `bootstrap/coff.py` writes exactly two sections: `.text` and `.data`。
+- `src/coff.ep` writes exactly two sections: `.text` and `.data`。
 - Relocation type is currently always `IMAGE_REL_AMD64_REL32`。
 - Symbols use section number 1 for `.text`, 2 for `.data`, 0 for external。
 - 只有 named text label 进入 symbol table；匿名 block/return label 不进入 COFF。
 - Symbol 顺序固定为 named text、data、按 ASCII 排序的 extern。
-- Python reference backend 使用 CPython 原生 `dict` / `set` 保存 symbol name，
-  `bootstrap/coff.py` 在序列化时建立 COFF symbol index。
-- Self-hosted backend 使用固定容量、u64 FNV hash 的开放寻址
+- Backend 使用固定容量、u64 FNV hash 的开放寻址
   `MachineNameIndex` 做私有查询，relocation 在 `src/machine.ep` 中直接取得
   最终 COFF symbol index；索引从不参与迭代，因此 hash 桶布局不会影响
   输出顺序或自举固定点。
 - `data_relocs` exists in the writer API but current machine backend does not emit it。
 
-`bootstrap/link.py` contract:
+`src/link.ep` contract:
 
 - Reads the generated COFF object.
 - Builds import thunks in `.text`。
@@ -372,15 +369,15 @@ the Epic implementation grows around them.
 
 Runtime helper bodies, globals, startup, allocation, I/O, argv parsing, panic,
 and safety checks are represented as ordinary MIR definitions and calls.
-`bootstrap/mir_runtime_helpers.py` and `src/mir_runtime.ep` inject the shared
-runtime, insert preparation calls, and prune unreachable functions.
+`src/mir_runtime.ep` injects the shared runtime, inserts preparation calls, and
+prunes unreachable functions.
 
 `bytes(str)` and `str(u8[])` are identity casts in lowering, not runtime helper
 calls.
 
 Base helper bodies are bundled in `runtime/mir/helpers.mir`; composite helpers
-are written in `runtime/*.ep`. Python and self-hosted compilers consume the same
-sources. The x64 layer owns only ABI lowering, program data emission, and WinAPI
+are written in `runtime/*.ep`. The self-hosted compiler consumes these sources.
+The x64 layer owns only ABI lowering, program data emission, and WinAPI
 imports.
 
 ### 8.2 X64Program validator exists
@@ -421,4 +418,3 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old NASM-oriented driver and `src/codegen_support.ep` / `src/codegen.ep` backend line have been removed. The current `src/epic.ep` is a new active driver: it runs the Epic-written frontend, lowers through MIR and X64IR, emits machine code and COFF through `src/machine.ep` and `src/coff.ep`, and links through `src/link.ep`.
 
 `compiler_sources.py` defines the canonical source order used to build this compiler. `test_bootstrap_fixed_point.py` repeatedly compiles the self-hosted compiler with the generated compiler and verifies that later generations stabilize.
-
