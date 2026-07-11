@@ -3,6 +3,7 @@
 一个已完成自举的 **Windows x64** 原生编程语言。v0 公开语言契约已冻结。
 
 - **可复现自举**：从 Python stage-0 构建 self-hosted compiler，并达到字节一致的不动点
+- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 15 个 Epic 模块组成
 - **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World 为 **5632 bytes（5.5 KiB）**
 - **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
 
