@@ -3,12 +3,6 @@
 from __future__ import annotations
 
 
-X64_RUNTIME_MIR_ROOTS = {
-    "__ep_str_from_i64",
-    "__ep_slice_u8_alloc",
-}
-
-
 def _function_calls(fn) -> set[str]:
     calls = set()
     for block in fn.blocks:
@@ -21,7 +15,7 @@ def _function_calls(fn) -> set[str]:
 def prune_unreachable_functions(program) -> None:
     """Remove MIR functions that are not reachable from program/runtime roots."""
     functions = {fn.name: fn for fn in program.functions}
-    roots = {"main"} | X64_RUNTIME_MIR_ROOTS
+    roots = {"main"}
     reachable = set()
     stack = [name for name in sorted(roots) if name in functions]
 

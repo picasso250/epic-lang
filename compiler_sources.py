@@ -1,6 +1,8 @@
 """Canonical source order for building the self-hosted Epic compiler."""
 
 SELF_HOST_RUNTIME_SOURCES = [
+    "runtime/array.ep",
+    "runtime/panic.ep",
     "runtime/str.ep",
 ]
 
@@ -16,7 +18,6 @@ SELF_HOST_COMPILER_SOURCES = [
     "src/ast_to_mir.ep",
     "src/x64.ep",
     "src/mir_to_x64.ep",
-    "src/x64_runtime.ep",
     "src/machine.ep",
     "src/coff.ep",
     "src/link.ep",

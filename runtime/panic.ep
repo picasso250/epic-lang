@@ -1,0 +1,7 @@
+# Runtime failure composition written in Epic.
+
+fun __ep_runtime_panic(message: str): void {
+    print("runtime panic: ")
+    println(message)
+    exit(1)
+}

@@ -19,13 +19,8 @@ fun backend_abi_is_winapi(name: str): bool {
 
 fun backend_abi_return_type(name: str): str {
     if name == "ExitProcess" { ret "void" }
+    if name == "HeapAlloc" || name == "GetCommandLineA" { ret "ptr" }
     if backend_abi_is_winapi(name) { ret "i64" }
-    if name == "__ep_cstr" { ret "i64" }
-    if name == "__ep_write_file" { ret "i64" }
-    if name == "__ep_read_file" { ret "ptr" }
-    if name == "__ep_print_str" { ret "void" }
-    if name == "__ep_print_newline" { ret "void" }
-    if name == "__epx_alloc" { ret "ptr" }
     ret ""
 }
 
@@ -37,31 +32,11 @@ fun backend_abi_param_count(name: str): i64 {
     if name == "HeapAlloc" { ret 3 }
     if name == "CreateFileA" { ret 7 }
     if name == "ReadFile" || name == "WriteFile" { ret 5 }
-    if name == "__ep_cstr" { ret 2 }
-    if name == "__ep_write_file" { ret 3 }
-    if name == "__ep_read_file" { ret 2 }
-    if name == "__ep_print_str" { ret 1 }
-    if name == "__ep_print_newline" { ret 0 }
-    if name == "__epx_alloc" { ret 1 }
     ret 0 - 1
 }
 
 fun backend_abi_param_type(name: str, index: i64): str {
     if backend_abi_is_winapi(name) { ret "i64" }
-    if name == "__ep_cstr" {
-        if index == 0 { ret "ptr" }
-        ret "i64"
-    }
-    if name == "__ep_write_file" {
-        if index < 2 { ret "ptr" }
-        ret "i64"
-    }
-    if name == "__ep_read_file" {
-        if index == 0 { ret "ptr" }
-        ret "i64"
-    }
-    if name == "__ep_print_str" { ret "ptr" }
-    if name == "__epx_alloc" { ret "i64" }
     ret ""
 }
 

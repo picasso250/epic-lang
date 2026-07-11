@@ -5,7 +5,6 @@ from mir import Br, CondBr, ConstBoolOperand, ConstIntOperand, ConstNullOperand,
 from x64 import I, M, MS, R, Symbol, X64Program
 from mir_prune import prune_unreachable_functions
 from mir_runtime_helpers import inject_all_mir_helpers
-from x64_runtime import append_runtime_helpers, emit_runtime_data, emit_startup_hook_call
 
 
 ARG_REGS = ["rcx", "rdx", "r8", "r9"]
@@ -13,6 +12,32 @@ ARG_REGS = ["rcx", "rdx", "r8", "r9"]
 
 class MirLowerError(RuntimeError):
     pass
+
+
+def _data_label(name):
+    return name + "_data"
+
+
+def _header_label(name):
+    return name + "_header"
+
+
+def emit_program_data(x64, program):
+    string_globals = {}
+    for glob in program.globals:
+        if glob.init is None:
+            x64.data_zero(glob.name, 8)
+        elif glob.type.kind == "ptr":
+            data_label = _data_label(glob.name)
+            header_label = _header_label(glob.name)
+            values = list(glob.init.encode("latin1")) + [0]
+            string_globals[glob.name] = (header_label, data_label, len(glob.init))
+            x64.data_bytes(data_label, values)
+            x64.data_zero(header_label, 24)
+        else:
+            value = int(glob.init)
+            x64.data_bytes(glob.name, [(value >> (8 * i)) & 0xff for i in range(8)])
+    return string_globals
 
 
 def prepare_mir_for_x64(program):
@@ -34,7 +59,6 @@ class MirLower:
         self.next_slot = 0
         self.return_label = None
         self.block_labels = {}
-        self.null_deref_label = self.x64.new_symbol_label("__epx_null_deref")
         self.string_globals = {}
         self.global_slots = set()
         self.scratch_slots = []
@@ -46,15 +70,12 @@ class MirLower:
 
     def _prepare_program(self):
         self.x64.global_("_start")
-        # The x64 runtime itself calls WinAPI; those imports are backend-owned.
-        for name in sorted(WINAPI_ABI):
-            self.x64.extern(name)
         for ext in self.program.externs:
-            if ext.name.startswith("__ep_import$"):
+            if ext.name in WINAPI_ABI or ext.name.startswith("__ep_import$"):
                 self.x64.extern(ext.name)
         self.x64.section(".data")
-        self.string_globals = emit_runtime_data(self.x64, self.program)
-        self.global_slots = {glob.name for glob in self.program.globals if glob.name != "argv" and glob.init is None}
+        self.string_globals = emit_program_data(self.x64, self.program)
+        self.global_slots = {glob.name for glob in self.program.globals if glob.init is None}
         self.x64.section(".text")
 
     def lower(self):
@@ -62,7 +83,6 @@ class MirLower:
         self._prepare_program()
         for fn in self.program.functions:
             self._lower_function(fn)
-        append_runtime_helpers(self.x64, self.null_deref_label)
         return self.x64
 
     def _lower_function(self, fn):
@@ -85,8 +105,6 @@ class MirLower:
         self.x64.inst("mov", R("rbp"), R("rsp"))
         if frame:
             self._emit_stack_alloc(frame)
-        if fn.name == "main":
-            emit_startup_hook_call(self.x64)
         for idx, param in enumerate(fn.params):
             if idx < len(ARG_REGS):
                 self.x64.inst("mov", M("rbp", self.value_slots[param.id]), R(ARG_REGS[idx]))
@@ -240,12 +258,10 @@ class MirLower:
             value, addr = inst.operands
             self._load_operand("rax", value)
             self._load_operand("rcx", addr)
-            self._trap_if_zero("rcx")
             self.x64.inst("mov", M("rcx", 0, 1 if value.type == I8 else 8), R("al") if value.type == I8 else R("rax"))
             return
         if inst.op == "load":
             self._load_operand("rax", inst.operands[0])
-            self._trap_if_zero("rax")
             if inst.type == I8:
                 self.x64.inst("movzx", R("rax"), M("rax", 0, 1))
             else:
@@ -364,9 +380,6 @@ class MirLower:
             else:
                 raise MirLowerError(f"unknown MIR value: {value_id}")
         elif isinstance(operand, SymbolOperand):
-            if operand.name == "argv":
-                self.x64.inst("mov", R(reg), MS("_argv"))
-                return
             if operand.name in self.global_slots:
                 self.x64.inst("lea", R(reg), MS(operand.name))
                 return
@@ -384,9 +397,6 @@ class MirLower:
     def _store_result(self, value, reg):
         self.x64.inst("mov", M("rbp", self.value_slots[value.id]), R(reg))
 
-    def _trap_if_zero(self, reg):
-        self.x64.inst("test", R(reg), R(reg))
-        self.x64.inst("jz", self.x64.label_ref(self.null_deref_label))
 
     def _addr_slot(self, operand):
         if not isinstance(operand, ValueOperand) or self.addr_slots[operand.value.id] == 0:
@@ -396,8 +406,6 @@ class MirLower:
     def _lower_gep(self, inst):
         base = inst.operands[0]
         self._load_operand("rax", base)
-        if not isinstance(base, ConstNullOperand):
-            self._trap_if_zero("rax")
         source = inst.type
         indices = inst.operands[1:]
         if source.kind == "struct":

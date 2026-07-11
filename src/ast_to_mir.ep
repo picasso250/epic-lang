@@ -536,7 +536,7 @@ fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
     args.push(size_i64)
     let call = mir_make_result_inst(st, "call", "ptr")
     call.typ = "ptr"
-    call.callee = "__epx_alloc"
+    call.callee = "__ep_alloc"
     call.operands = args
     mir_emit_inst(st, call)
     ret mir_value_operand("ptr", call.result_id)
@@ -1069,7 +1069,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         }
         AstVar n: {
             if n.name == "argv" {
-                ret mir_value_flow(mir_symbol_operand("ptr", "argv"), st.current_block)
+                let result_id = mir_new_value(st)
+                mir_emit_inst(st, mir_load(result_id, "ptr", "ptr", mir_symbol_operand("ptr", "argv")))
+                ret mir_value_flow(mir_value_operand("ptr", result_id), st.current_block)
             }
             let idx = mir_local_index(st, n.name)
             let result_id = mir_new_value(st)
@@ -2041,6 +2043,8 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 st.func_source_returns.push(ast_require_resolved_type(fn.meta))
                 fi = fi + 1
             }
+
+            st.program.globals.push(mir_global_decl("argv", "ptr"))
 
             let i = 0
             for i < len(program.funcs) {

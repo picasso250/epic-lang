@@ -9,7 +9,7 @@ machine bytes -> COFF -> PE` 这条线建立可测试边界。
 - `bootstrap/mir.py`: typed MIR data model and validator。
 - `bootstrap/ast_to_mir.py`: AST -> MIR。
 - `bootstrap/mir_to_x64.py`: MIR -> structured X64IR。
-- `bootstrap/x64_runtime.py`: runtime data, startup hook, and runtime append policy。
+- `bootstrap/mir_runtime_helpers.py`: MIR runtime injection and preparation。
 - `bootstrap/x64.py`: X64IR data model and text pretty printer。
 - `bootstrap/machine.py`: X64IR -> machine bytes + COFF reloc records。
 - `bootstrap/coff.py`: minimal AMD64 COFF object writer。
@@ -33,12 +33,12 @@ AST
 debug pretty print，不参与 obj 生成。Python reference compiler 已移除
 `--backend asm`，旧 Python asm 后端归档在 tag `python-asm-archive-2026-07-02`。
 
-Runtime emission is split from MIR lowering at the policy boundary:
+Runtime preparation happens before MIR lowering:
 
-- `MirLower` lowers MIR into X64IR and emits a startup hook call for `main`。
-- `x64_runtime.py` emits runtime data and appends the current full runtime。
-- The current policy is still full runtime emission. Used-only emission is a
-  future policy, not a current requirement。
+- runtime definitions and globals are injected into the program as MIR；
+- startup and null-dereference checks are explicit MIR calls；
+- reachability pruning keeps only functions reachable from `main`；
+- `MirLower` emits program globals and lowers the remaining MIR without appending backend helpers。
 
 ### 1.1 MIR
 
@@ -111,7 +111,7 @@ MIR lowering 当前固定面向 Windows x64：
 - 每次 call 前预留 32 字节 shadow space。
 - 返回值在 `rax`。
 - `main` 降成 PE entry symbol `_start`。
-- `main` prologue calls `__epx_runtime_start` to initialize runtime state。
+- `main` starts with an injected MIR call to `__ep_runtime_start` to initialize `argv`。
 - `main` 的 `ret value` 降成 `ExitProcess(value)`，不走普通 `ret`。
 - Win32 `LPDWORD` output 参数只写 32 位。当前 helper 如果复用 8 字节栈槽
   存放这类输出，必须在 call 前清零整个 qword，或者后续改成显式 32-bit
@@ -368,27 +368,20 @@ encoding rule; use a tiny X64Program with one or two labels and one relocation.
 The current route is still sound, but several choices should be corrected before
 the Epic implementation grows around them.
 
-### 8.1 Runtime emission is too global
+### 8.1 Runtime is represented in MIR
 
-Runtime data, startup hook emission, and runtime append policy now live in
-`x64_runtime.py`.
-
-MIR helper bodies for `__ep_str_eq`, `__ep_str_cat`,
-`__ep_str_slice`, `__ep_str_from_bool`,
-`__ep_slice_u8_alloc`, `__ep_slice_u8_alloc`,
-`__ep_slice_u8_get`, `__ep_slice_u8_set`, `__ep_slice_u8_push`, `__ep_slice_u8_slice`, and `__ep_slice_u8_extend`
-are injected as ordinary
-`MirFunction`s by `ast_to_mir.py`.
+Runtime helper bodies, globals, startup, allocation, I/O, argv parsing, panic,
+and safety checks are represented as ordinary MIR definitions and calls.
+`bootstrap/mir_runtime_helpers.py` and `src/mir_runtime.ep` inject the shared
+runtime, insert preparation calls, and prune unreachable functions.
 
 `bytes(str)` and `str(u8[])` are identity casts in lowering, not runtime helper
 calls.
 
-Remaining hand-written x64 helper bodies live in `bootstrap/x64_runtime.py`, not on `MirLower`. Public `__ep_*` helper symbols are semantic-layer entry points; hand-written x64 implementations use `__epx_*` primitive symbols. Current public wrappers tail-jump to the matching primitive so frontend/codegen call sites stay stable while individual helpers migrate to MIR or Epic runtime source.
-
-MIR helper bodies are bundled in `runtime/mir/helpers.mir` so the Python and self-hosted
-compilers consume the same runtime text. Continue replacing `__ep_*` wrappers with MIR/Epic
-implementations one family at a time; keep only true machine/runtime primitives such as heap
-setup, process startup, OS calls, and traps in `x64_runtime.py` as `__epx_*`.
+Base helper bodies are bundled in `runtime/mir/helpers.mir`; composite helpers
+are written in `runtime/*.ep`. Python and self-hosted compilers consume the same
+sources. The x64 layer owns only ABI lowering, program data emission, and WinAPI
+imports.
 
 ### 8.2 X64Program validator exists
 
@@ -428,6 +421,5 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `bootstrap/link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
 
 Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
-
 
 

@@ -13,7 +13,6 @@ from mir import MirValue, Ret, ValueOperand, ptr, struct as mir_struct
 from mir_to_x64 import MirLower
 from x64 import I, M, MS, R, Symbol, X64Program
 from x64 import X64ValidationError, validate_x64_program
-from x64_runtime import append_runtime_helpers, emit_startup_hook_call
 
 
 def build_x64_fixture():
@@ -101,14 +100,14 @@ add1:
     mov rbp, rsp
     sub rsp, 80
     mov qword [rbp-8], rcx
-.L2:
+.L1:
     mov rax, qword [rbp-8]
     mov rcx, 1
     add rax, rcx
     mov qword [rbp-16], rax
     mov rax, qword [rbp-16]
-    jmp .L3
-.L3:
+    jmp .L2
+.L2:
     add rsp, 80
     pop rbp
     ret
@@ -127,7 +126,7 @@ def test_target_mir_memory_ops_to_x64_golden():
         [
             MirInst("gep", [ConstNullOperand(), ConstIntOperand(I64, 1)], result=size_ptr, type=mir_struct("Pair")),
             MirInst("ptrtoint", [ValueOperand(size_ptr)], result=size, type=I64),
-            MirInst("call", [ValueOperand(size)], result=obj, type=ptr(), callee="__epx_alloc"),
+            MirInst("call", [ValueOperand(size)], result=obj, type=ptr(), callee="__ep_alloc"),
             MirInst(
                 "gep",
                 [ValueOperand(obj), ConstIntOperand(I64, 0), ConstIntOperand(I64, 1)],
@@ -141,7 +140,7 @@ def test_target_mir_memory_ops_to_x64_golden():
     )
     fn = MirFunction("pair_field", [], I64, [block])
     program = MirProgram(
-        externs=[MirExtern("__epx_alloc", MirSignature([I64], ptr()))],
+        externs=[MirExtern("__ep_alloc", MirSignature([I64], ptr()))],
         functions=[fn],
         structs={"Pair": MirStruct("Pair", [MirField("left", I64, 0), MirField("right", I64, 8)], 16)},
     )
@@ -154,7 +153,7 @@ pair_field:
     push rbp
     mov rbp, rsp
     sub rsp, 80
-.L2:
+.L1:
     mov rax, 0
     add rax, 16
     mov qword [rbp-8], rax
@@ -162,27 +161,21 @@ pair_field:
     mov qword [rbp-8], rax
     mov rcx, qword [rbp-8]
     sub rsp, 32
-    call __epx_alloc
+    call __ep_alloc
     add rsp, 32
     mov qword [rbp-8], rax
     mov rax, qword [rbp-8]
-    test rax, rax
-    jz __epx_null_deref
     add rax, 8
     mov qword [rbp-8], rax
     mov rax, 42
     mov rcx, qword [rbp-8]
-    test rcx, rcx
-    jz __epx_null_deref
     mov qword [rcx], rax
     mov rax, qword [rbp-8]
-    test rax, rax
-    jz __epx_null_deref
     mov rax, qword [rax]
     mov qword [rbp-8], rax
     mov rax, qword [rbp-8]
-    jmp .L3
-.L3:
+    jmp .L2
+.L2:
     add rsp, 80
     pop rbp
     ret
@@ -190,42 +183,6 @@ pair_field:
     assert lower.x64.text() == expected
 
 
-def test_startup_hook_call_golden():
-    program = X64Program()
-    program.section(".text")
-    emit_startup_hook_call(program)
-    expected = """section .text
-    sub rsp, 32
-    call __epx_runtime_start
-    add rsp, 32
-"""
-    assert program.text() == expected
-
-
-def test_runtime_start_helper_golden():
-    program = X64Program()
-    null_deref = program.new_symbol_label("__epx_null_deref")
-    program.section(".text")
-    append_runtime_helpers(program, null_deref)
-    expected = """section .text
-__epx_runtime_start:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 32
-    call GetProcessHeap
-    add rsp, 32
-    mov qword [_heap], rax
-    sub rsp, 32
-    call __epx_argv_init
-    add rsp, 32
-    mov qword [_argv], rax
-    pop rbp
-    ret
-"""
-    text = program.text()
-    assert text.startswith(expected)
-    assert "__ep_cstr:\n" in text
-    assert "__epx_cstr" not in text
 
 
 def test_x64_to_machine_bytes_and_fixups_golden():
@@ -282,18 +239,6 @@ def test_numeric_label_fixup_contract():
     assert_x64_invalid(unbound, "unbound anonymous label")
 
 
-def test_shared_null_trap_label_is_patched_directly():
-    program = X64Program()
-    trap = program.new_symbol_label("__epx_null_deref")
-    program.section(".text")
-    for _ in range(128):
-        program.inst("jz", program.label_ref(trap))
-    program.bind_label(trap)
-    builder = build_machine_state(program)
-    assert len(builder.internal_fixups) == 128
-    assert builder.text_relocs == []
-    assert builder.text_labels == {"__epx_null_deref": 128 * 6}
-
 
 def test_x64_validator_rejects_bad_forms():
     validate_x64_program(build_x64_fixture())
@@ -318,11 +263,8 @@ def main():
     test_x64_pretty_print_golden()
     test_mir_function_to_x64_golden()
     test_target_mir_memory_ops_to_x64_golden()
-    test_startup_hook_call_golden()
-    test_runtime_start_helper_golden()
     test_x64_to_machine_bytes_and_fixups_golden()
     test_numeric_label_fixup_contract()
-    test_shared_null_trap_label_is_patched_directly()
     test_x64_validator_rejects_bad_forms()
     print("PASS test_x64_layers")
 

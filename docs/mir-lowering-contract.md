@@ -19,17 +19,16 @@ MirLower.__init__(program)
 
 lower():
   ├─ x64.global("_start")
-  ├─ x64.extern(...) for each referenced program extern and backend-owned runtime import
+  ├─ x64.extern(...) for each referenced WinAPI/source extern
   ├─ x64.section(".data")
-  ├─ emit_runtime_data(x64, program)    # 数据全局、string header
+  ├─ emit_program_data(x64, program)    # MIR globals、string header
   ├─ x64.section(".text")
-  ├─ for each fn: _lower_function(fn)
-  └─ append_runtime_helpers(self)       # runtime helper x64 标签 + 函数体
+  └─ for each fn: _lower_function(fn)
 ```
 
 `lower()` 后，`X64Program` 包含：
-1. 数据段：运行时数据（`_heap`、`_argv`、string headers 等）
-2. 代码段：每个用户函数 + runtime helpers
+1. 数据段：MIR program globals 与 string headers
+2. 代码段：prune 后保留的所有 MIR functions
 
 ## 2. Function lowering
 
@@ -48,12 +47,10 @@ mov  rbp, rsp
 sub  rsp, aligned_frame   # 仅当 frame > 0
 ```
 
-对 `main`：prologue 后插入 `__epx_runtime_start` 调用（初始化 `_heap` 和 `_argv`）：
+对 `main` 的启动初始化在 MIR preparation 阶段插入为 entry block 的第一条普通调用：
 
 ```
-sub  rsp, 32
-call __epx_runtime_start
-add  rsp, 32
+call void __ep_runtime_start()
 ```
 
 ### 2.3 Parameter setup
@@ -304,8 +301,7 @@ if inst.result is not None:
 - 用户函数名（如 `main`、`foo`）
 - backend-owned WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
 - source extern 编码名（`__ep_import$<dll>$<symbol>`）
-- Runtime helper 名（如 `__ep_print_str`、`__epx_alloc`）
-- `__epx_alloc`
+- Runtime helper 名（如 `__ep_print_str`、`__ep_alloc`）
 
 ### 6.2 Frame alignment
 
@@ -341,64 +337,35 @@ jmp  LabelRef(fn_name.else_target)
 
 ## 8. Runtime boundary
 
-### 8.1 Runtime data
+### 8.1 Program data
 
-`emit_runtime_data()` 在 `.data` section 生成：
+`emit_program_data()` 在 `.data` section 按 MIR globals 生成：
 
-- `_written`: 4-byte zeroed integer slot
-- `_heap: qword` (8 bytes zero) — 进程堆句柄
-- `_argv: qword` (8 bytes zero) — 命令行参数数组
-- `_newline: byte 0x0a`
-- `_cstr_panic_prefix: "panic line "`
-- `_cstr_panic_suffix: ": invalid cstr"`
-- runtime string globals injected by MIR helpers, such as
-  `str.runtime.bool.true` / `str.runtime.bool.false`
-- 每个程序全局 string 的 `data_label` 和 `header_label`
+- 无初始化 global：8-byte zero slot，例如 `argv`
+- ptr/string global：零结尾 data bytes 与 24-byte header
+- scalar global：8-byte little-endian value
 
 ### 8.2 Startup hook
 
-`__epx_runtime_start` 在 `main` 的 prologue 中被调用：
-
-```
-push  rbp
-mov   rbp, rsp
-sub   rsp, 32
-call  GetProcessHeap
-add   rsp, 32
-mov   [_heap], rax
-sub   rsp, 32
-call __epx_argv_init
-add   rsp, 32
-mov   [_argv], rax
-pop   rbp
-ret
-```
+MIR preparation 在 `main` entry 插入 `__ep_runtime_start`。该 MIR helper 调用
+`__ep_argv_init` 并把结果存入 `argv` global，随后与普通函数一样 lowering。
 
 ### 8.3 Runtime helper emission
 
-`append_runtime_helpers()` 在当前实现下无条件发射所有 helper：
-
-- `__epx_alloc` (x64 primitive)
-- x64 primitives and still-x64 helpers:
-- `cstr` (`__ep_cstr`)
-- `__ep_write_file` / `__ep_read_file`
-- `__epx_argv_init`
-- `__ep_print_str` / `__ep_print_newline`
-- `__epx_slice_oob`
-
-MIR-implemented helpers such as `__ep_str_from_bool`,
+Helpers such as `__ep_alloc`, `__ep_cstr`, `__ep_read_file`,
+`__ep_write_file`, `__ep_print_str`, `__ep_print_newline`, `__ep_str_from_bool`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
 `bootstrap/mir_runtime_helpers.py` in the Python compiler and `src/mir_runtime.ep`
-in the self-hosted compiler. After injection, both compilers prune unreachable
-MIR functions from the final program; roots include `main` and MIR/Epic
-functions directly called by hand-written x64 runtime
-(`__ep_str_from_i64`, `__ep_slice_u8_alloc`). They no longer have same-named x64 fallback bodies.
+in the self-hosted compiler. Composite helpers also come from `runtime/*.ep`.
+After injection, both compilers prune unreachable MIR functions from the final
+program starting at `main`; startup and helper dependencies remain reachable
+through explicit MIR calls.
 `bytes(str)` and `str(u8[])` are lowered as identity casts, so they do not
 require MIR runtime functions.
-Remaining x64 labels and function bodies are hand-written in `mir_to_x64.py`
+The x64 backend contains only generic instruction lowering in `mir_to_x64.py`
 `_emit_*()` methods.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.

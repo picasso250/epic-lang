@@ -146,15 +146,15 @@ symbols used by the Python backend.
 | `__ep_slice_u8_slice` | copy a half-open byte-array slice |
 | `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` | append one array into another |
 
-Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, then prune unreachable MIR functions from the final program. The prune roots are `main` and MIR/Epic functions called directly by hand-written x64 runtime (`__ep_str_from_i64`, `__ep_slice_u8_alloc`). The committed bundle order is authoritative.
+Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, merge helpers compiled from `runtime/*.ep`, then prune unreachable MIR functions from the final program. Reachability starts at `main`; startup and all runtime dependencies are ordinary MIR calls. The committed bundle order is authoritative.
 
 > `__ep_str_slice`, `__ep_str_cat`
 > in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `+`, `==`, and `!=`
 > but are no longer callable by user code as public builtins.
 
-### x64-backed private helpers
+### Private runtime helpers
 
-Hand-written x64 helpers are emitted from `bootstrap/x64_runtime.py`. MIR-visible semantic helpers such as `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, and `__ep_print_newline` own their implementation labels directly. Only backend-private primitives such as `__epx_alloc` and `__epx_argv_init` retain the `__epx_*` prefix. Slice helpers are MIR helpers, not x64-backed helpers.
+Helpers such as `__ep_alloc`, `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, `__ep_print_newline`, and slice operations are ordinary MIR functions. The x64 backend only lowers their MIR and imports the WinAPI symbols they call.
 
 These should be treated as backend implementation details, not language builtins.
 

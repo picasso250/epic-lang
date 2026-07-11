@@ -17,88 +17,13 @@ from parser import Parser  # noqa: E402
 from sema import analyze_program  # noqa: E402
 EPICC = ROOT / "bootstrap" / "epic.py"
 BUILD_DIR = ROOT / "build" / "mir-to-x64"
-FIXTURE = ROOT / "tests" / "mir_to_x64" / "fixture.ep"
 DRIVER = ROOT / "tests" / "mir_to_x64" / "driver.ep"
-FIXTURE_EXE = BUILD_DIR / "tests" / "mir_to_x64" / "fixture.exe"
 DRIVER_EXE = BUILD_DIR / "tests" / "mir_to_x64" / "driver.exe"
 EXAMPLES_DIR = ROOT / "examples"
 AST_TO_MIR_PASS_DIR = ROOT / "tests" / "ast_to_mir" / "pass"
 EXAMPLE_CASES = sorted(EXAMPLES_DIR.glob("*.ep"))
 AST_TO_MIR_PASS_CASES = sorted(AST_TO_MIR_PASS_DIR.glob("*.ep"))
 USER_CASES = EXAMPLE_CASES + AST_TO_MIR_PASS_CASES
-
-EXPECTED = """section .text
-add1:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 80
-    mov qword [rbp-8], rcx
-.L2:
-    mov rax, qword [rbp-8]
-    mov rcx, 1
-    add rax, rcx
-    mov qword [rbp-16], rax
-    mov rax, qword [rbp-16]
-    jmp .L3
-.L3:
-    add rsp, 80
-    pop rbp
-    ret
-section .text
-arith_mix:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 80
-    mov qword [rbp-8], rcx
-.L2:
-    mov rax, qword [rbp-8]
-    mov rcx, 2
-    sub rax, rcx
-    mov qword [rbp-16], rax
-    mov rax, qword [rbp-16]
-    mov rcx, 3
-    imul rax, rcx
-    mov qword [rbp-16], rax
-    mov rax, qword [rbp-16]
-    mov rcx, 7
-    and rax, rcx
-    mov qword [rbp-16], rax
-    mov rax, qword [rbp-16]
-    jmp .L3
-.L3:
-    add rsp, 80
-    pop rbp
-    ret
-section .text
-max2:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 96
-    mov qword [rbp-8], rcx
-    mov qword [rbp-16], rdx
-.L2:
-    mov rax, qword [rbp-8]
-    mov rcx, qword [rbp-16]
-    cmp rax, rcx
-    setg al
-    movzx eax, al
-    mov qword [rbp-24], rax
-    mov rax, qword [rbp-24]
-    test rax, rax
-    jnz .L3
-    jmp .L4
-.L3:
-    mov rax, qword [rbp-8]
-    jmp .L5
-.L4:
-    mov rax, qword [rbp-16]
-    jmp .L5
-.L5:
-    add rsp, 96
-    pop rbp
-    ret
-"""
-
 
 def run_checked(cmd: list[str], label: str) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
@@ -117,8 +42,6 @@ def run_checked(cmd: list[str], label: str) -> subprocess.CompletedProcess[str]:
 def python_string_globals(program) -> dict[str, tuple[str, str, int]]:
     out: dict[str, tuple[str, str, int]] = {}
     for glob in program.globals:
-        if glob.name == "argv":
-            continue
         if glob.init is None:
             continue
         out[glob.name] = (glob.name + "_header", glob.name + "_data", len(glob.init))
@@ -189,18 +112,11 @@ def check_text_case(label: str, expected: str, actual: str) -> bool:
 
 def main() -> int:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    fixture_exe = compile_ep_tool(FIXTURE, "compile tests/mir_to_x64/fixture.ep")
-    if fixture_exe != FIXTURE_EXE or not FIXTURE_EXE.exists():
-        raise RuntimeError(f"expected fixture exe at {FIXTURE_EXE}")
     driver_exe = compile_ep_tool(DRIVER, "compile tests/mir_to_x64/driver.ep")
     if driver_exe != DRIVER_EXE or not DRIVER_EXE.exists():
         raise RuntimeError(f"expected driver exe at {DRIVER_EXE}")
 
     failed = 0
-    result = run_checked([str(FIXTURE_EXE)], "run tests/mir_to_x64/fixture.exe")
-    if not check_text_case("mir_to_x64 self-hosted integer ops and branches", EXPECTED, result.stdout):
-        failed += 1
-
     for path in USER_CASES:
         rel = str(path.relative_to(ROOT))
         try:

@@ -1,6 +1,14 @@
 # Internal runtime helpers written in Epic.
 # This file is automatically merged by the Python reference compiler.
 
+
+fun __ep_str_cat(left: str, right: str): str {
+    let out = new u8[] {}
+    out.extend(bytes(left))
+    out.extend(bytes(right))
+    ret str(out)
+}
+
 fun __ep_str_eq(left: str, right: str): bool {
     let left_len = len(left)
     if left_len != len(right) {

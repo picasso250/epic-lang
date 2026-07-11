@@ -15,25 +15,17 @@ WINAPI_ABI = {
     "ExitProcess": MirSignature([I64], VOID),
     "GetStdHandle": MirSignature([I64], I64),
     "GetProcessHeap": MirSignature([], I64),
-    "HeapAlloc": MirSignature([I64, I64, I64], I64),
+    "HeapAlloc": MirSignature([I64, I64, I64], ptr()),
     "CreateFileA": MirSignature([I64, I64, I64, I64, I64, I64, I64], I64),
     "GetFileSize": MirSignature([I64, I64], I64),
     "ReadFile": MirSignature([I64, I64, I64, I64, I64], I64),
     "WriteFile": MirSignature([I64, I64, I64, I64, I64], I64),
     "CloseHandle": MirSignature([I64], I64),
-    "GetCommandLineA": MirSignature([], I64),
+    "GetCommandLineA": MirSignature([], ptr()),
 }
 
-RUNTIME_ABI = {
-    "__ep_cstr": MirSignature([ptr(), I64], I64),
-    "__ep_write_file": MirSignature([ptr(), ptr(), I64], I64),
-    "__ep_read_file": MirSignature([ptr(), I64], ptr()),
-    "__ep_print_str": MirSignature([ptr()], VOID),
-    "__ep_print_newline": MirSignature([], VOID),
-    "__epx_alloc": MirSignature([I64], ptr()),
-}
 
-X64_WINDOWS_V0_ABI = {**WINAPI_ABI, **RUNTIME_ABI}
+X64_WINDOWS_V0_ABI = dict(WINAPI_ABI)
 
 
 def validate_backend_abi(program, abi=None):

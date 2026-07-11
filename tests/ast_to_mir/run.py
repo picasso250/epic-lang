@@ -2,9 +2,7 @@
 """
 tests/ast_to_mir/run.py — compare EP AST-to-MIR against the Python MIR oracle.
 
-First milestone compares user functions only. Python ast_to_mir injects runtime
-helpers unconditionally; the EP self-hosted path does not implement helper
-injection yet.
+Compare the complete target-neutral frontend MIR emitted by both compilers.
 """
 
 import difflib
@@ -79,17 +77,7 @@ def python_user_mir(path):
         source = f.read()
     typed = analyze_program(Parser(lex(source)).parse_program())
     lowered = ast_to_mir(typed)
-    frontend = MirProgram(
-        externs=lowered.externs,
-        globals=[
-            glob
-            for glob in lowered.globals
-            if glob.name != "argv" and not glob.name.startswith("str.runtime.")
-        ],
-        functions=lowered.functions,
-        structs=lowered.structs,
-    )
-    return frontend.text() + "\n"
+    return lowered.text() + "\n"
 
 
 def ep_user_mir(path):

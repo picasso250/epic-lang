@@ -320,7 +320,7 @@ entry:
     assert program.externs[0].name == "ExitProcess"
     assert program.text() == source.rstrip()
 
-    for directive in ("import void @ExitProcess(i64)", "declare ptr @__epx_alloc(i64)"):
+    for directive in ("import void @ExitProcess(i64)", "declare ptr @__ep_alloc(i64)"):
         try:
             parse_mir_text(directive)
         except Exception as exc:
@@ -360,41 +360,6 @@ entry:
     else:
         raise AssertionError("backend ABI accepted an unsupported extern")
 
-
-def test_runtime_mir_bundle_declares_external_contracts():
-    runtime_mir_dir = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "runtime", "mir"))
-    path = runtime_mir_dir / "helpers.mir"
-    assert sorted(p.name for p in runtime_mir_dir.glob("*.mir")) == ["helpers.mir"]
-    text = path.read_text(encoding="utf-8")
-    assert "import " not in text
-    assert "declare " not in text
-    program = parse_mir_text(text, filename=str(path), validate_program=False)
-    assert {ext.name for ext in program.externs} == {
-        "ExitProcess", "GetStdHandle", "WriteFile",
-        "__ep_print_newline", "__ep_print_str", "__epx_alloc",
-    }
-    parsed_fn = next(fn for fn in program.functions if fn.name == "__ep_slice_i64_get")
-    assert parsed_fn.text() in text
-
-
-def test_backend_preparation_replaces_runtime_extern_with_definition():
-    source = """fun main(): i64 {
-    let xs = new i64[] { 10, 20 }
-    ret xs[1]
-}"""
-    typed = sema.analyze_program(Parser(lex(source)).parse_program())
-    program = ast_to_mir(typed)
-
-    assert "__ep_slice_i64_get" in {ext.name for ext in program.externs}
-    assert "__ep_slice_i64_get" not in {fn.name for fn in program.functions}
-
-    inject_all_mir_helpers(program)
-    prune_unreachable_functions(program)
-    validate(program)
-    validate_backend_abi(program)
-
-    assert "__ep_slice_i64_get" not in {ext.name for ext in program.externs}
-    assert "__ep_slice_i64_get" in {fn.name for fn in program.functions}
 
 
 
@@ -467,8 +432,6 @@ def main():
     test_text_mir_uses_target_neutral_extern_contracts()
     test_undeclared_calls_are_rejected()
     test_backend_abi_rejects_unsupported_extern()
-    test_runtime_mir_bundle_declares_external_contracts()
-    test_backend_preparation_replaces_runtime_extern_with_definition()
     test_user_method_lowers_to_mangled_function_call()
     test_user_method_conflicts_with_mangled_function_name()
     print("PASS test_mir")

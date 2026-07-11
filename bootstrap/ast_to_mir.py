@@ -85,7 +85,8 @@ class MirCodegen(MirFunctionBuilder):
             self.program.externs.append(MirExtern("__ep_str_from_u64", MirSignature([I64], ptr())))
         if "__ep_str_from_bool" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_from_bool", MirSignature([BOOL], ptr())))
-        self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr(), ptr()], ptr())))
+        if "__ep_str_cat" not in self.func_sigs:
+            self.program.externs.append(MirExtern("__ep_str_cat", MirSignature([ptr(), ptr()], ptr())))
         if "__ep_str_eq" not in self.func_sigs:
             self.program.externs.append(MirExtern("__ep_str_eq", MirSignature([ptr(), ptr()], BOOL)))
         if "__ep_str_slice" not in self.func_sigs:
@@ -98,23 +99,26 @@ class MirCodegen(MirFunctionBuilder):
         self.program.externs.append(MirExtern("__ep_slice_u8_set", MirSignature([ptr(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_push", MirSignature([ptr(), I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_u8_pop", MirSignature([ptr()], I64)))
-        self.program.externs.append(MirExtern("__ep_slice_u8_slice", MirSignature([ptr(), I64, I64], ptr())))
+        if "__ep_slice_u8_slice" not in self.func_sigs:
+            self.program.externs.append(MirExtern("__ep_slice_u8_slice", MirSignature([ptr(), I64, I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_i64_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_i64_get", MirSignature([ptr(), I64], I64)))
         self.program.externs.append(MirExtern("__ep_slice_i64_set", MirSignature([ptr(), I64, I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_i64_push", MirSignature([ptr(), I64], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_i64_pop", MirSignature([ptr()], I64)))
-        self.program.externs.append(MirExtern("__ep_slice_i64_extend", MirSignature([ptr(), ptr()], VOID)))
+        if "__ep_slice_i64_extend" not in self.func_sigs:
+            self.program.externs.append(MirExtern("__ep_slice_i64_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_new", MirSignature([I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_get", MirSignature([ptr(), I64], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_set", MirSignature([ptr(), I64, ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_push", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_slice_ptr_pop", MirSignature([ptr()], ptr())))
         self.program.externs.append(MirExtern("__ep_slice_ptr_extend", MirSignature([ptr(), ptr()], VOID)))
-        self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr(), ptr()], VOID)))
+        if "__ep_slice_u8_extend" not in self.func_sigs:
+            self.program.externs.append(MirExtern("__ep_slice_u8_extend", MirSignature([ptr(), ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_str", MirSignature([ptr()], VOID)))
         self.program.externs.append(MirExtern("__ep_print_newline", MirSignature([], VOID)))
-        self.program.externs.append(MirExtern("__epx_alloc", MirSignature([I64], ptr())))
+        self.program.externs.append(MirExtern("__ep_alloc", MirSignature([I64], ptr())))
         self.program.globals.append(MirGlobal("argv", ptr(), None))
         for fn in ast.funcs:
             self.program.functions.append(self._emit_function(fn))
@@ -271,7 +275,7 @@ class MirCodegen(MirFunctionBuilder):
             [ValueOperand(size)],
             result_type=ptr(),
             type=ptr(),
-            callee="__epx_alloc",
+            callee="__ep_alloc",
         )
         return ValueOperand(obj)
 
@@ -856,7 +860,8 @@ class MirCodegen(MirFunctionBuilder):
             return self._emit_fstring_from(self.current_block, expr)
         if isinstance(expr, VarNode):
             if expr.name == "argv":
-                return ValueFlow(SymbolOperand(ptr(), "argv"), self.current_block)
+                value = self.inst("load", [SymbolOperand(ptr(), "argv")], result_type=ptr(), type=ptr())
+                return ValueFlow(ValueOperand(value), self.current_block)
             typ = self._local_type(expr.name)
             value = self.inst("load", [ValueOperand(self._local_addr(expr.name))], result_type=typ, type=typ)
             return ValueFlow(ValueOperand(value), self.current_block)
