@@ -18,7 +18,6 @@ fun add_one(xs: i64[]): void {
 fun run(): i64 {
     let s = new S { xs: new i64[] }
     check(len(s.xs) == 0)
-    check(cap(s.xs) == 0)
     s.xs.push(7)
     add_one(s.xs)
     check(len(s.xs) == 2)

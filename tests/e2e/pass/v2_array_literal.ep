@@ -4,9 +4,6 @@ fun run(): i64 {
     if len(xs) != 3 {
         ret 1
     }
-    if cap(xs) != 3 {
-        ret 2
-    }
     ret xs[0] + xs[1] + xs[2]
 }
 

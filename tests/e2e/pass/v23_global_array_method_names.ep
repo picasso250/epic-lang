@@ -1,5 +1,5 @@
 # EXIT: 0
-# STDOUT: 66
+# STDOUT: 110
 # STDOUT: 9
 # STDOUT: 2
 
@@ -15,8 +15,12 @@ fun extend(x: i64): i64 {
     ret x + 30
 }
 
+fun cap(x: i64): i64 {
+    ret x + 40
+}
+
 fun main(): void {
-    println(str(push(1) + pop(2) + extend(3)))
+    println(str(push(1) + pop(2) + extend(3) + cap(4)))
 
     let xs = new i64[]
     xs.push(7)

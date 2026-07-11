@@ -1204,13 +1204,13 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 mir_emit_call_inst(st, "__ep_print_str", "void", args)
                 ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
             }
-            if n.name == "len" || n.name == "cap" {
+            if n.name == "len" {
                 let base_type = ast_resolved_type(n.args[0])
                 let base_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = base_flow.block
                 let struct_name = mir_layout_struct_name(st, base_type)
                 if struct_name == "" {
-                    ast_to_mir_die("len/cap expects aggregate pointer")
+                    ast_to_mir_die("len expects aggregate pointer")
                 }
                 ret mir_value_flow(mir_load_field(st, base_flow.value, struct_name, n.name), st.current_block)
             }

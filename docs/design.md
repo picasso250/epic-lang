@@ -127,7 +127,7 @@ let xs = new u8[]
 
 `let` 绑定是 lexical block scoped：只在当前 `{ ... }` block 及其内部嵌套 block 中可见。内层 block 可以 shadow 外层同名绑定；离开 block 后恢复外层绑定。
 
-`str`、`T[]`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
+`str`、`T[]`、用户结构体和 ADT wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
 
 Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / 条件 `for` 仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
 
@@ -187,7 +187,7 @@ let last = xs.pop()
 dst.extend(src)
 ```
 
-这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`cap`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别数组操作或用户结构体方法。
+这些不是通用用户方法系统；不支持重载、继承、trait 或方法值。`len`、`str`、`bytes` 保持函数调用形式。parser 统一把 `expr.ID(args)` 解析为 DotCall，语义层再识别数组操作或用户结构体方法。
 
 `push`、`pop`、`extend` 不是全局保留名。没有 receiver 的 `push(...)`、`pop(...)`、`extend(...)` 按普通用户函数或 extern 解析；只有 `xs.push(...)`、`xs.pop()`、`xs.extend(...)` 获得数组内建语义。
 
@@ -218,7 +218,7 @@ let xs = new i64[] { 1, 2, 3 }
 let bs = new u8[] { 65, 66, 67 }
 ```
 
-分配一个动态数组，其 `len` 和 `cap` 等于元素个数。`new T[n]` 分配一个空数组，容量至少为 `n` 个元素。
+分配一个动态数组，其逻辑长度等于元素个数。`new T[n]` 创建长度为 `n` 的零初始化数组，可立即索引 `0` 到 `n - 1`。
 
 ### ADT (代数数据类型, Algebraic Data Types)
 
@@ -317,14 +317,13 @@ match n {
 
 | 表达式                | 含义                                              |
 |-----------------------|---------------------------------------------------|
-| `new T[]`             | 空数组，容量为 0                                  |
-| `new T[n]`            | 空数组，容量至少为 `n`                            |
+| `new T[]`             | 空数组                                             |
+| `new T[n]`            | 长度为 `n` 的零初始化数组                         |
 | `a.push(x)`          | 追加并扩容                                        |
 | `a.pop()`            | 删除并返回最后一个元素；空数组 runtime panic      |
 | `dst.extend(src)`    | `dst` 和 `src` 必须是相同元素类型的 `T[]`；将 `src` 的当前元素追加到 `dst` |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
-| `cap(a)`              | 当前容量（推荐）                                  |
 
 ### 索引与切片 (Indexing and Slices)
 
@@ -348,15 +347,14 @@ let d = s[0:len(s)]
 - `start > end` 或 `end > len` 会退出
 - 成功的切片会分配并复制
 
-### 长度与容量 (Length and Capacity，内置函数)
+### 长度 (Length，内置函数)
 
 | 内置函数                 | 含义                     |
 |-------------------------|--------------------------|
 | `len(s: str): i64`      | 字符串字节长度           |
 | `len(xs: T[]): i64`     | 数组元素个数             |
-| `cap(xs: T[]): i64`     | 数组容量                 |
 
-`cap(str)` 非法。
+数组的实际预留容量和增长策略属于 runtime 私有实现，不是源码级可观察行为。Epic 不提供 public `cap()`。
 
 ### 过时写法
 
@@ -365,14 +363,14 @@ let d = s[0:len(s)]
 | 数组索引 | `a[i]` | `a.data[i]`（已从 public surface 删除） |
 | 字符串字节索引 | `bytes(s)[i]` | `s[i]` 和 `s.data[i]`（已从 public surface 删除） |
 | 长度 | `len(x)` | `x.len`（已从 public surface 删除） |
-| 容量 | `cap(a)` | `a.cap`（已从 public surface 删除） |
+| 内部容量 | 无 public API | `a.cap`（已从 public surface 删除） |
 | 切片 | `s[start:end]` / `bytes[start:end]`（必须显式写出 start 和 end；仅支持 str 和 u8[]） | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
 | 字符串相等 | `s1 == s2` / `s1 != s2` | 按字节内容比较；`str_eq` 已从 public surface 删除 |
 
 **三档分类**：
 
-1. **推荐语法** — 普通代码应使用：`a[i]`、`bytes(s)[i]`、`len(a)`、`cap(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
+1. **推荐语法** — 普通代码应使用：`a[i]`、`bytes(s)[i]`、`len(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
 2. **底层接口** — compiler / runtime 内部 helper 和 MIR helper 可使用布局；Epic 源码不可直接访问 `data/len/cap` layout 字段。
 3. **历史写法** — 旧的 `a.data`、`s.data`、`x.len`、`a.cap` 字段访问已删除。
 

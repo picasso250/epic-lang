@@ -19,9 +19,7 @@ fun main(): void {
 
     let buf1 = new u8[]
     check(len(buf1) == 0)
-    check(cap(buf1) == 0)
     buf1.extend(bytes(a))
-    check(cap(buf1) == 4)
     buf1.push(',')
     buf1.extend(bytes(b))
     print(str(buf1))
@@ -40,18 +38,14 @@ fun main(): void {
 
     let nums = new i64[]
     check(len(nums) == 0)
-    check(cap(nums) == 0)
     nums.push(40)
-    check(cap(nums) == 4)
     nums.push(2)
     check(nums[0] + nums[1] == 42)
     let pairs = new Pair[]
     check(len(pairs) == 0)
-    check(cap(pairs) == 0)
     let p = new Pair {}
     p.value = 7
     pairs.push(p)
-    check(cap(pairs) == 4)
     check(pairs[0].value == 7)
     exit(0)
 }

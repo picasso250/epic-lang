@@ -13,7 +13,6 @@ BUILTIN_FUNCTIONS = frozenset({
     "cstr",
     "bytes",
     "len",
-    "cap",
     "i64",
     "u64",
     "i32",

@@ -1042,7 +1042,6 @@ class MirCodegen(MirFunctionBuilder):
             "read_file",
             "write_file",
             "len",
-            "cap",
         }
 
     def _emit_builtin(self, expr):
@@ -1111,7 +1110,7 @@ class MirCodegen(MirFunctionBuilder):
             args.value.append(ConstIntOperand(I64, expr.line))
             result = self.inst("call", args.value, result_type=I64, type=I64, callee="__ep_write_file")
             return ValueFlow(ValueOperand(result), self.current_block)
-        if name in ("len", "cap"):
+        if name == "len":
             base_type = self._infer_type(expr.args[0])
             base = self._emit_expr_from(self.current_block, expr.args[0])
             self.set_block(base.block)

@@ -84,7 +84,6 @@ fun use_arrays_and_strings(): i64 {
     zs.push(first)
     zs.extend(bs)
     let n = len(xs)
-    let c = cap(xs)
     xs[0] = add(xs[1], xs[2])
     xs[1] += 1
     let index_sum = 0
@@ -94,7 +93,7 @@ fun use_arrays_and_strings(): i64 {
     let popped = xs.pop()
     println(f"{again} {sub} {bsub} {b0}")
     if same && different {
-        ret n + c + xs[0] + popped + index_sum
+        ret n + xs[0] + popped + index_sum
     }
     ret 0
 }

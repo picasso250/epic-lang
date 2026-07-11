@@ -118,7 +118,7 @@ fun sema_is_reserved_func(name: str): bool {
     if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" {
         ret true
     }
-    if name == "read_file" || name == "write_file" || name == "len" || name == "cap" {
+    if name == "read_file" || name == "write_file" || name == "len" {
         ret true
     }
     if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" || name == "bool" {
@@ -940,14 +940,6 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
         let arg = sema_expr_type(st, node.args[0])
         if arg != "str" && sema_is_array(arg) == false {
             sema_die(f"len expected str or array, got {arg}")
-        }
-        ret "i64"
-    }
-    if node.name == "cap" {
-        sema_check_arity("cap", 1, node.args)
-        let arg = sema_expr_type(st, node.args[0])
-        if sema_is_array(arg) == false {
-            sema_die(f"cap expected array, got {arg}")
         }
         ret "i64"
     }

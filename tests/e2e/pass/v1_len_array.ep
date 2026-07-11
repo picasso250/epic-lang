@@ -1,4 +1,4 @@
-# EXIT: 41
+# EXIT: 32
 # STDOUT: 3
 # STDOUT: 9
 fun main(): void {
@@ -8,5 +8,5 @@ fun main(): void {
     xs[1] = 20
     println(str(len(s)))
     println(str(len(xs)))
-    exit(len(s) + len(xs) + cap(xs) + xs[1])
+    exit(len(s) + len(xs) + xs[1])
 }

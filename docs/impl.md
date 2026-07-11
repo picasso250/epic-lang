@@ -157,6 +157,8 @@ _slice_u8 = {
 
 Epic 用户层的 dynamic array（`T[]`）和实现层的 slice header（`_slice_T`）是同一个容器概念：header 持有 `data`、`len`、`cap`，并拥有可增长的 backing storage。这里的 “slice header” 是运行时布局命名，不表示只有 view 语义。
 
+`cap` 字段及数组增长策略完全属于 runtime 私有实现。源码层不提供 `cap()`，用户程序只能观察逻辑长度和元素行为。
+
 ```
 _slice_T = {
     data,
@@ -167,7 +169,7 @@ _slice_T = {
 
 基本类型 dynamic array 存储基本类型的值。结构体和 `str` dynamic array 存储引用。
 
-`str` 和 `T[]` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、`cap`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误。slice header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` 可在首次写入时再分配。
+`str` 和 `T[]` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误。slice header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` 可在首次写入时再分配。
 
 ### 结构体 (Struct)
 
@@ -254,7 +256,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 | `xs.push(x)`      | 由 codegen 为动态数组发射                   | 公开容器点调用 |
 | `xs.pop()`        | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_pop`、`__ep_slice_i64_pop`、`__ep_slice_ptr_pop`；空数组 panic | 公开容器点调用 |
 | `dst.extend(src)`  | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_extend`、`__ep_slice_i64_extend`、`__ep_slice_ptr_extend` | 公开容器点调用 |
-| `len` / `cap`      | 直接内联发射                                | 公开 |
+| `len`              | 直接内联发射                                | 公开 |
 | 切片语法           | 字符串用 `__ep_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
 
 小端加载/存储辅助函数不属于内置函数。`link.ep` 和示例使用 `u8[]`、`u64`、带检查的索引和位运算将其实现为普通的 Epic 函数。

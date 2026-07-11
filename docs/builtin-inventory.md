@@ -32,7 +32,6 @@ itself implement typing or lowering.
 | `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
 | `cstr(text)` | `str -> u64` | validates/creates a NUL-terminated buffer through `__ep_cstr` |
 | `len(value)` | `str` or any array -> `i64` | reads the public logical length |
-| `cap(array)` | any array -> `i64` | reads array capacity |
 | `i64(x)` | integer -> `i64` | integer conversion |
 | `u64(x)` | integer -> `u64` | integer conversion |
 | `i32(x)` | integer -> `i32` | truncates to 32 bits, then keeps canonical sign extension |
@@ -79,6 +78,7 @@ The following historical function-style APIs are not part of the current languag
 - `str_find`
 - `str_trim`
 - the historical global builtin forms of `push`, `pop`, and `extend` (the names may still be used by ordinary user functions or externs)
+- `cap(array)`; capacity and growth strategy are runtime-private, and `cap` may be used as an ordinary user-function or extern name
 
 Private runtime helpers may retain similar names because syntax lowering still needs
 string concatenation, slicing, comparison, or array operations. Their existence does
@@ -121,9 +121,9 @@ this MIR and imports only the WinAPI symbols that remain reachable.
 
 Python and self-hosted sema reserve names whose call syntax is always interpreted as a
 builtin or pseudo-builtin, including `print`, `println`, `exit`, conversions such as
-`i64`/`u8`/`bool`, file I/O, `len`, `cap`, and `argv`.
+`i64`/`u8`/`bool`, file I/O, `len`, and `argv`.
 
 Array operations are different: their builtin meaning is selected by receiver syntax.
-Therefore `push`, `pop`, and `extend` are intentionally not reserved as global names.
-A program may define or import global functions with those names while continuing to
-use `xs.push(...)`, `xs.pop()`, and `xs.extend(...)` for arrays.
+Therefore `push`, `pop`, `extend`, and the removed builtin name `cap` are intentionally
+not reserved as global names. A program may define or import global functions with those
+names while continuing to use `xs.push(...)`, `xs.pop()`, and `xs.extend(...)` for arrays.

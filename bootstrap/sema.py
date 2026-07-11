@@ -497,12 +497,6 @@ class SemanticAnalyzer:
             if arg.type != STR and arg.type.kind != "array":
                 self._fail(f"len expected str or array, got {arg.type}")
             return ExprInfo(I64)
-        if name == "cap":
-            self._check_arity(name, 1, expr.args)
-            arg = self._expr(expr.args[0])
-            if arg.type.kind != "array":
-                self._fail(f"cap expected array, got {arg.type}")
-            return ExprInfo(I64)
 
         if name not in self.func_sigs:
             self._fail(f"unknown function {name}")
