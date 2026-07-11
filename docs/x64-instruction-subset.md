@@ -416,9 +416,9 @@ MIR object model stores raw module symbols such as `main`, `__ep_str_eq`,
 syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 `MirGlobal.name`, or `SymbolOperand.name`. Local SSA values also use raw names in `MirValue.name` / `MirParam.name`; the `%` sigil belongs to text MIR printing/parsing only.
 
-### 8.6 Self-hosted compiler driver is removed
+### 8.6 Self-hosted compiler uses the MIR/X64IR/machine path
 
-The old `src/epic.ep` driver emitted text ASM and invoked `tools\nasm.exe` plus `bootstrap/link.py`. That backend line no longer exists in active source, so the driver has been removed instead of being kept as a misleading entry point.
+The old NASM-oriented driver and `src/codegen_support.ep` / `src/codegen.ep` backend line have been removed. The current `src/epic.ep` is a new active driver: it runs the Epic-written frontend, lowers through MIR and X64IR, emits machine code and COFF through `src/machine.ep` and `src/coff.ep`, and links through `src/link.ep`.
 
-Python machine backend passing examples is still not the same as an Epic-written compiler supporting the machine path. A future self-hosted driver should target MIR/X64IR/machine directly.
+`compiler_sources.py` defines the canonical source order used to build this compiler. `test_bootstrap_fixed_point.py` repeatedly compiles the self-hosted compiler with the generated compiler and verifies that later generations stabilize.
 

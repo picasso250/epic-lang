@@ -1,7 +1,8 @@
-"""Central inventory of Epic builtins.
+"""Central Python-side inventory of Epic builtin and pseudo-builtin names.
 
-This module is currently an inventory only. Parser, sema, and codegen still
-own behavior until they are migrated in small commits.
+Python sema consumes these sets to reject reserved-name redefinitions. Typing
+and MIR lowering remain implemented in ``sema.py`` and ``ast_to_mir.py``;
+the self-hosted compiler currently maintains its reservation list separately.
 """
 
 BUILTIN_FUNCTIONS = frozenset({

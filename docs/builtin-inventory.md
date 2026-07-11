@@ -1,105 +1,87 @@
 # Builtin Inventory
 
-Current snapshot of functions handled specially by the active Python reference compiler pipeline. Historical self-hosted codegen notes may remain for context only.
+Current snapshot of Epic's public builtins and the active implementation paths.
+This document describes the current compiler, not removed NASM-era code.
 
-> **2026-07-03 update**: Some `str_*` builtins have been removed from public surface.
-> See [design.md](design.md) for the current public string surface.
-> This document records the **status quo** of the compiler codebase — internal helpers
-> still exist even after public removal.
-> `bootstrap/epic_builtins.py` now records the Python-side builtin inventory,
-> but it is not wired into parser, sema, or codegen yet.
-> Active Python-side builtin handling lives in:
-> - `bootstrap/sema.py` — type checking
-> - `bootstrap/ast_to_mir.py` — typed AST to MIR
->
-> `src/parser.ep` still has a reserved-name list. The old NASM-oriented `src/codegen_support.ep` / `src/codegen.ep` path has been deleted; any remaining `codegen.ep` column below is historical and should be removed in a later inventory refresh.
+## Implementation ownership
 
----
+| Concern | Python reference compiler | Self-hosted compiler |
+|---|---|---|
+| Reserved public names | `bootstrap/epic_builtins.py`, consumed by `bootstrap/sema.py` | `sema_is_reserved_func` in `src/sema.ep` |
+| Type checking | `bootstrap/sema.py` | `src/sema.ep` |
+| MIR lowering | `bootstrap/ast_to_mir.py` | `src/ast_to_mir.ep` |
+| Runtime definitions | `runtime/mir/helpers.mir`, `runtime/*.ep`, `bootstrap/mir_runtime_helpers.py` | the same runtime sources through `src/mir_runtime.ep` |
 
-## I/O / Process
+The parser does not own builtin semantics or builtin-name reservation. Both compiler
+implementations parse ordinary calls first and resolve builtin behavior during sema and
+MIR lowering.
 
-| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
-|----------|---------|----------------|---------------------|------------|-------|
-| `print`  | ✓ (ln 401) | ✓ (ln 588) | ✗ | ✓ (ln 831) | Print with trailing newline — `println` handled same line |
-| `println` | ✓ (ln 401) | ✓ (ln 580) | ✗ | ✓ (ln 831) | |
-| `exit`   | ✓ (ln 414) | ✓ (ln 603) | ✗ | ✗ | Terminate process; `n` args=`i64` |
+`bootstrap/epic_builtins.py` is the central Python-side name inventory. It is already
+used by Python sema to reject builtin and pseudo-builtin redefinitions; it does not by
+itself implement typing or lowering.
 
----
+## Public function-call surface
 
-## String / Byte Conversion
+| Call | Type / behavior | Lowering intent |
+|---|---|---|
+| `print(text)` | `str -> void`; writes text without adding a newline | `__ep_print_str` |
+| `println()` | `() -> void`; writes one newline | `__ep_print_newline` |
+| `println(text)` | `str -> void`; writes text and one newline | `__ep_print_str`, then `__ep_print_newline` |
+| `exit(code)` | `i64 -> void`; terminates the process | `ExitProcess` |
+| `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity view for `str`/`u8[]`, runtime formatting for scalar values |
+| `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
+| `cstr(text)` | `str -> u64` | validates/creates a NUL-terminated buffer through `__ep_cstr` |
+| `len(value)` | `str` or any array -> `i64` | reads the public logical length |
+| `cap(array)` | any array -> `i64` | reads array capacity |
+| `i64(x)` | integer -> `i64` | integer conversion |
+| `u64(x)` | integer -> `u64` | integer conversion |
+| `i32(x)` | integer -> `i32` | truncates to 32 bits, then keeps canonical sign extension |
+| `u32(x)` | integer -> `u32` | truncates to 32 bits, then keeps canonical zero extension |
+| `u8(x)` | integer -> `u8` | truncates to 8 bits |
+| `bool(x)` | integer or `bool` -> `bool` | zero/nonzero conversion or identity |
+| `read_file(path)` | `str -> u8[]` | `__ep_read_file` |
+| `write_file(path, data)` | `(str, u8[]) -> i64` | `__ep_write_file` |
 
-**Public surface status**: `str_new`, `itoa`, `str_slice`, `str_replace_char`, `str_starts_with`, `str_find`, `str_trim` are **removed from public surface**.
+`str(u8[])` and `bytes(str)` are representation-preserving views. They do not perform
+UTF-8 validation and do not allocate merely to change the static source type.
 
-- `str_new` — removed entirely; use `str(bytes)`
-- `itoa` — removed entirely; use `str(n)` (internal helper `str_i64` retained)
-- `str_slice`, `str_cat` — function-style builtins removed from public surface; compiler-internal helpers remain for slice and `str + str` syntax lowering
-- `str_replace_char`, `str_trim` — removed entirely; write byte scanning in Epic
-`str`, `bytes`, and `cstr` remain public. `str` is a retained byte-string source type; it currently shares the `u8[]` runtime layout so explicit `str(bytes)` / `bytes(str)` views are zero-copy.
+## Public array methods
 
-| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
-|----------|---------|----------------|---------------------|------------|-------|
-| `str`      | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | Formatting/view operation for the retained byte-string type |
-| `cstr`     | ✓ (sema) | ✓ (mir) | ✗ | ✗ | String to NUL-terminated opaque `u64` address for extern calls |
-| `bytes`    | ✓ (sema) | ✓ (mir) | ✓ (parser) | ✓ (codegen) | String → `u8[]` |
-| `str_new`  | 🚫 Public surface removed; `str(bytes)` is the recommended path |
-| `itoa`     | 🚫 Public surface removed; `str(n)` is the recommended path |
-| `str_slice` | ✓ (ln 452) | ✓ (auto handled) | ✓ (ln 320) | ✓ (ln 940) | 🚫 Public surface removed; internal helper only |
-| `str_replace_char` | 🚫 Removed entirely | 🚫 Removed entirely | 🚫 Removed entirely | 🚫 Removed entirely | Write byte scanning in Epic |
-| `str_starts_with` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 326) | ✓ (ln 960) | 🚫 Public surface removed |
-| `str_find` | ✓ (ln 455) | ✓ (auto handled) | ✓ (ln 329) | ✓ (ln 969) | 🚫 Public surface removed |
-| `str_trim` | 🚫 Removed entirely | 🚫 Removed entirely | 🚫 Removed entirely | 🚫 Removed entirely | Write byte scanning in Epic |
+| Method | Type / behavior |
+|---|---|
+| `xs.push(value)` | appends one value; returns `void` |
+| `xs.pop()` | removes and returns the final value; an empty array panics |
+| `dst.extend(src)` | appends an array with the same element type; returns `void` |
 
----
+The old function-call forms `push(xs, value)`, `pop(xs)`, and `extend(dst, src)` are
+removed and are explicitly rejected by sema.
 
-## Array
+## Pseudo-builtins
 
-| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
-|----------|---------|----------------|---------------------|------------|-------|
-| `len`    | ✓ (ln 482) | ✓ (auto handled) | ✓ (ln 299) | ✓ (ln 1011) | `str` and `array` |
-| `cap`    | ✓ (ln 488) | ✓ (auto handled) | ✓ (ln 302) | ✓ (ln 1023) | `array` only |
-| `xs.push(x)` | ✓ | ✓ | ✓ | ✓ | Array append dot call; old `push(xs,x)` removed |
-| `xs.pop()` | ✓ | ✓ | ✓ | ✓ | Delete and return last array element; empty array panics; old `pop(xs)` removed |
-| `dst.extend(src)` | ✓ | ✓ | ✓ | ✓ | Same-element array dot call; old `extend(dst,src)` removed |
+| Name | Type / behavior |
+|---|---|
+| `argv` | implicit local `str[]` available in every function; startup initializes it from the process command line |
 
----
+`argv` is not a callable function and cannot be redefined as a function or extern in the
+Python reference compiler.
 
-## Type Conversion (constructors)
+## Removed public surface
 
-`str(x)` public surface is intentionally narrow: `str`, integer types, `bool`, and `u8[]` only. `str(u8[])` is a zero-copy byte-slice view, not UTF-8 validation or allocation. Struct and non-`u8[]` array repr is not supported, and f-string interpolation follows the same rule.
+The following historical function-style APIs are not part of the current language:
 
-These are all in `bootstrap/sema.py` lines 613–629, `src/codegen.ep`.
+- `str_new`
+- `itoa` (use `str(n)`)
+- `str_slice` (use `s[start:end]`)
+- `str_cat` (use `left + right`)
+- `str_replace_char`
+- `str_starts_with`
+- `str_find`
+- `str_trim`
+- function-style `push`, `pop`, and `extend`
 
-| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
-|----------|---------|----------------|---------------------|------------|-------|
-| `i64`  | ✓ (ln 613) | ✗ delegated | ✗ | ✓ (ln 869) | |
-| `u64`  | ✓ (ln 615) | ✗ delegated | ✗ | ✓ (ln 869) | |
-| `i32`  | ✓ | ✓ | ✓ | historical | Signed 32-bit semantics; canonical sign-extended 8-byte slot |
-| `u32`  | ✓ | ✓ | ✓ | historical | Unsigned 32-bit semantics; canonical zero-extended 8-byte slot |
-
-| `u8`   | ✓ (ln 623) | ✗ delegated | ✗ | ✓ (ln 886) | |
-| `bool` | ✓ (ln 430, 625) | ✗ delegated | ✗ | ✓ (ln 876) | |
-| `void` | ✓ (ln 627) | ✗ delegated | ✗ | ✗ | Unit type; not bindable as local/parameter/container element |
-
-`i32` and `u32` are implemented in both the Python and self-hosted MIR paths. Arithmetic and casts re-normalize to 32 bits. `i8` has been removed from public surface; `u8` is Epic's only byte type.
-
----
-
-## File I/O
-
-| Function | sema.py | ast_to_mir.py | parser.ep reserved | codegen.ep | Notes |
-|----------|---------|----------------|---------------------|------------|-------|
-| `read_file`  | ✓ (ln 439) | ✓ (ln 654) | ✗ | ✓ (ln 1035) | Returns `u8[]` |
-| `write_file` | ✓ (ln 442) | ✓ (ln 664) | ✗ | ✓ (ln 1043) | Returns `i64` |
-
----
-
-## Pseudo-builtins / Globals
-
-| Name | Handled by | Notes |
-|------|-----------|-------|
-| `argv` | `sema.py` ln 148 (`self.locals`), `codegen.ep` ln 267, 280 | Implicit global `str[]`, not a function. Special-cased in codegen. |
-
----
+Private runtime helpers may retain similar names because syntax lowering still needs
+string concatenation, slicing, comparison, or array operations. Their existence does
+not make them user-callable builtins.
 
 ## Source extern declarations
 
@@ -109,76 +91,45 @@ Syntax:
 extern "kernel32.dll" fun Sleep(milliseconds: u32): void
 ```
 
-The public ABI types are `i32`, `u32`, `i64`, `u64`, plus `void` returns. Foreign pointers and handles are represented as opaque `u64` values; `cstr(str)` returns `u64`. The compiler lowers source imports to self-describing symbols of the form `__ep_import$<dll>$<symbol>`, and the built-in linker groups them by DLL without a function whitelist. `os.*` is removed.
+The public extern ABI accepts `i32`, `u32`, `i64`, and `u64` parameters, plus those
+integer types or `void` as returns. Foreign pointers and handles are represented as
+opaque `u64` values; `cstr(str)` supplies a NUL-terminated address for C APIs.
 
----
+The compiler lowers source imports to self-describing symbols of the form
+`__ep_import$<dll>$<symbol>`. The linker groups them by DLL and does not use a function
+whitelist. The removed `os.*` pseudo-namespace is not part of the current interface.
 
-## Obsolete / Unimplemented
+## Private MIR/runtime helpers
 
-| Function | Status | Evidence |
-|----------|--------|----------|
-| `puti` | **Removed from docs examples.** No implementation exists or existed — was a legacy concept. | |
-| `putstr` | **Removed from public builtin surface.** Replaced by `print(s)`. | |
-| `putc` | **Removed from public builtin surface.** Replaced by `print(str(new u8[]{u8(c)}))` for raw byte output. The old backend-private `__epx_putc` label and `_putc_buf` data have been removed. | |
+Backend-private helpers are ordinary MIR functions, not language builtins. Current
+categories include:
 
----
+- allocation and startup: `__ep_alloc`, `__ep_runtime_start`;
+- string output/conversion: `__ep_print_str`, `__ep_print_newline`, `__ep_cstr`, scalar-to-string helpers;
+- string operations used by syntax: equality, concatenation, and slicing;
+- file operations: `__ep_read_file`, `__ep_write_file`;
+- array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
+- panic and bounds/null failure paths.
 
-## Backend Private Helpers
+Python and self-hosted compilers load the committed MIR helper bundle, merge helpers
+compiled from `runtime/*.ep`, and prune unreachable functions. Reachability begins at
+`main`; startup and runtime dependencies are normal MIR calls. The x64 backend lowers
+this MIR and imports only the WinAPI symbols that remain reachable.
 
-Backend private helpers are not public Epic builtins. They are implementation
-symbols used by the Python backend.
+## Known reservation mismatches
 
-### MIR-implemented private helpers
+The callable behavior is aligned between Python and self-hosted sema, but declaration
+reservation is not yet represented by one shared source of truth:
 
-| helper | purpose |
-|---|---|
-| `__ep_str_from_bool` | convert `bool` to a static runtime string |
-| `__ep_str_eq` | compare two strings for equality |
-| `__ep_runtime_panic` | print runtime panic text and exit with status 1 |
-| `__ep_str_cat` | concatenate two strings |
-| `__ep_str_slice` | copy a half-open string slice |
-| `__ep_slice_u8_alloc` | allocate initialized-capacity byte array |
-| `__ep_slice_u8_alloc` | allocate empty byte array with capacity |
-| `__ep_slice_u8_get` | bounds-checked byte array read |
-| `__ep_slice_u8_set` | bounds-checked byte array write |
-| `__ep_slice_u8_push` | append one byte to a byte array |
-| `__ep_slice_u8_pop` / `__ep_slice_i64_pop` / `__ep_slice_ptr_pop` | remove and return last array element |
-| `__ep_slice_u8_slice` | copy a half-open byte-array slice |
-| `__ep_slice_u8_extend` / `__ep_slice_i64_extend` / `__ep_slice_ptr_extend` | append one array into another |
+1. Python sema reserves the numeric and boolean constructor names `i64`, `u64`, `i32`,
+   `u32`, `u8`, and `bool` through `BUILTIN_FUNCTIONS`. `src/sema.ep` currently omits
+   those names from `sema_is_reserved_func`. A self-hosted declaration may therefore
+   pass the declaration check even though calls with that name are still interpreted as
+   builtin conversions.
+2. `pop` is not in `BUILTIN_FUNCTIONS` and is also absent from
+   `sema_is_reserved_func`, while function-style `pop(...)` is hard-rejected before
+   ordinary user-function lookup. A user function named `pop` can be declared but
+   cannot be called normally.
 
-Python and self-hosted compilers lower `bytes(str)` and `str(u8[])` as identity casts, not runtime calls. They load the committed bundle at `runtime/mir/helpers.mir`, merge helpers compiled from `runtime/*.ep`, then prune unreachable MIR functions from the final program. Reachability starts at `main`; startup and all runtime dependencies are ordinary MIR calls. The committed bundle order is authoritative.
-
-> `__ep_str_slice`, `__ep_str_cat`
-> in the list above are **internal helpers** — they remain for lowering `s[start:end]`, `+`, `==`, and `!=`
-> but are no longer callable by user code as public builtins.
-
-### Private runtime helpers
-
-Helpers such as `__ep_alloc`, `__ep_cstr`, `__ep_read_file`, `__ep_write_file`, `__ep_print_str`, `__ep_print_newline`, and slice operations are ordinary MIR functions. The x64 backend only lowers their MIR and imports the WinAPI symbols they call.
-
-These should be treated as backend implementation details, not language builtins.
-
----
-
-## Known Mismatches
-
-### `src/parser.ep` reserved list is incomplete
-
-The self-hosted parser (`src/parser.ep` ln 299–337) reserves these names to prevent
-user code from redefining them:
-
-```
-len cap bytes str str_new str_slice
-str_starts_with str_find push extend
-```
-
-**But does NOT reserve:**
-
-```
-print println exit read_file write_file
-itoa cstr i64 u64 i32 u32 u8 bool
-```
-
-This means a user function named `print()` or `exit()` would parse successfully
-but then fail in codegen — or worse, silently shadow the builtin. The reserved
-list should be kept in sync with the actual builtin set.
+These are compiler consistency issues, not additional public language features. The
+current public surface remains the one documented above.
