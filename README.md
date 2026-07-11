@@ -102,8 +102,32 @@ python-asm-archive-2026-07-02
 ```powershell
 python tests/run.py                    # 模块级编译测试
 python test_examples.py                # examples/ 正向学习示例
-python test_bootstrap_fixed_point.py   # 自举不动点检查（fixed-point check）
+python test_bootstrap_fixed_point.py   # 从 Python 开始的完整自举不动点检查
 ```
+
+### 重建 v0 bootstrap compiler
+
+`v0` 标签包含可复现的 bootstrap 构建入口。脚本会将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，校验已提交的 SHA-256，随后清理 worktree：
+
+```powershell
+python build_epic_v0.py --require-expected
+```
+
+产物写入被 Git 忽略的目录：
+
+```text
+build/bootstrap-v0/epic-v0.exe
+build/bootstrap-v0/epic-v0.exe.sha256
+build/bootstrap-v0/manifest.json
+```
+
+后续编译器、GC 或后端开发可以用该 v0 编译器作为稳定 seed，并检查当前源码能否再次收敛：
+
+```powershell
+python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
+```
+
+Python reference compiler 继续作为语言 oracle 和完整 bootstrap 的恢复入口；日常 self-hosted 演进可以从 `epic-v0.exe` 起步。
 
 也可运行特定模块的测试：
 

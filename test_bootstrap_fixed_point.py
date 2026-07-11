@@ -11,6 +11,7 @@ The later stages should be byte-identical. If they are not, self-hosting is not
 yet a stable bootstrap anchor.
 """
 
+import argparse
 import filecmp
 import os
 import shutil
@@ -41,6 +42,17 @@ def format_size(num_bytes):
 
 def print_exe_size(path, label):
     print(f"  {label} exe size: {format_size(os.path.getsize(path))}", flush=True)
+
+
+def remove_tree_with_retry(path, attempts=5):
+    for attempt in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return
+        except PermissionError:
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(1)
 
 
 def process_peak_memory(process):
@@ -168,22 +180,68 @@ def build_with_epic(compiler, output_path, label):
     print_exe_size(output_path, label)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--seed",
+        help="build the current compiler from this existing Epic compiler instead of Python",
+    )
+    parser.add_argument(
+        "--export",
+        dest="export_path",
+        help="copy the converged compiler to this path after verification",
+    )
+    return parser.parse_args()
+
+
+def export_compiler(source_path, destination_path):
+    destination = os.path.abspath(destination_path)
+    parent = os.path.dirname(destination)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    shutil.copyfile(source_path, destination)
+    print(f"exported converged compiler: {destination}", flush=True)
+
+
 def main():
+    args = parse_args()
     if os.path.exists(BOOT_DIR):
-        shutil.rmtree(BOOT_DIR)
+        remove_tree_with_retry(BOOT_DIR)
     os.makedirs(BOOT_DIR, exist_ok=True)
 
-    epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
-    epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
-    epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
-    epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
+    if args.seed:
+        seed = os.path.abspath(args.seed)
+        if not os.path.isfile(seed):
+            raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
 
-    build_with_python(epic_py)
-    build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
-    build_with_epic(epic_epic, epic_epic_epic, "epic-epic -> epic-epic-epic")
-    build_with_epic(epic_epic_epic, epic_epic_epic_epic, "epic-epic-epic -> epic-epic-epic-epic")
+        generation1 = os.path.join(BOOT_DIR, "epic-seed-1.exe")
+        generation2 = os.path.join(BOOT_DIR, "epic-seed-2.exe")
+        generation3 = os.path.join(BOOT_DIR, "epic-seed-3.exe")
 
-    checks = [(epic_epic, epic_epic_epic), (epic_epic_epic, epic_epic_epic_epic)]
+        build_with_epic(seed, generation1, "seed -> epic-seed-1")
+        build_with_epic(generation1, generation2, "epic-seed-1 -> epic-seed-2")
+        build_with_epic(generation2, generation3, "epic-seed-2 -> epic-seed-3")
+
+        checks = [(generation2, generation3)]
+        converged = generation3
+    else:
+        epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
+        epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
+        epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
+        epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
+
+        build_with_python(epic_py)
+        build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
+        build_with_epic(epic_epic, epic_epic_epic, "epic-epic -> epic-epic-epic")
+        build_with_epic(
+            epic_epic_epic,
+            epic_epic_epic_epic,
+            "epic-epic-epic -> epic-epic-epic-epic",
+        )
+
+        checks = [(epic_epic, epic_epic_epic), (epic_epic_epic, epic_epic_epic_epic)]
+        converged = epic_epic_epic_epic
+
     for left, right in checks:
         if not filecmp.cmp(left, right, shallow=False):
             raise RuntimeError(
@@ -194,6 +252,8 @@ def main():
             )
 
     print("bootstrap fixed point reached")
+    if args.export_path:
+        export_compiler(converged, args.export_path)
     return 0
 
 
