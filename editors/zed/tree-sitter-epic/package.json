@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "generate": "tree-sitter generate",
-    "test": "tree-sitter test",
+    "test": "tree-sitter test && python ../check_extension.py",
     "parse": "tree-sitter parse"
   },
   "devDependencies": {

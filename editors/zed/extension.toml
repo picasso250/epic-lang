@@ -1,6 +1,6 @@
 id = "epic"
 name = "Epic"
-version = "0.1.0"
+version = "0.1.1"
 schema_version = 1
 authors = ["picasso250"]
 description = "Epic language support for Zed"
@@ -8,5 +8,5 @@ repository = "https://github.com/picasso250/epic-lang"
 
 [grammars.epic]
 repository = "https://github.com/picasso250/epic-lang"
-rev = "0c5ddf983ed917d6dda6e485286c344a2dddc714"
+rev = "32aead328a5beccc0bd14955511df24e66f3fc5b"
 path = "editors/zed/tree-sitter-epic"
