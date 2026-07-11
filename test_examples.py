@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
@@ -88,7 +88,6 @@ def run_test_self_hosted(ep_file, compiler_exe):
     exe_rel = os.path.relpath(exe_path, SCRIPT_DIR).replace(os.sep, "/")
     cmd = [
         compiler_exe,
-        *SELF_HOST_RUNTIME_SOURCES,
         ep_rel,
         "--main",
         ep_rel,
@@ -104,6 +103,8 @@ def run_test_self_hosted(ep_file, compiler_exe):
     )
     if result.returncode != 0:
         return False, "self-hosted compile failed:\n" + (result.stdout + result.stderr)[-1000:]
+    if "timing:" in result.stdout or "stats:" in result.stdout:
+        return False, "self-hosted compiler printed verbose diagnostics without --verbose"
     if annotations["compile_only"]:
         return True, "compile only"
     if not os.path.exists(exe_path):

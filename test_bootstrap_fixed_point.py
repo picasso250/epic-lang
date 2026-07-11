@@ -30,7 +30,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
-RUNTIME_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_RUNTIME_SOURCES]
+RUNTIME_SOURCES = list(SELF_HOST_RUNTIME_SOURCES)
 COMPILER_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_COMPILER_SOURCES]
 
 TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "30"))
@@ -152,6 +152,7 @@ def build_with_python(output_path):
             stage0_dir,
             "--linker",
             "py",
+            "--verbose",
         ],
         "python -> epic-py",
     )
@@ -172,6 +173,7 @@ def build_with_epic(compiler, output_path, label):
             os.path.join("src", "epic.ep"),
             "-o",
             rel(output_path),
+            "--verbose",
         ],
         label,
     )

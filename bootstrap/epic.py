@@ -186,46 +186,58 @@ def _merge_programs(input_paths, main_path, verbose=True, include_runtime=True):
     return ProgramNode(funcs=funcs, structs=structs, unions=unions, externs=externs)
 
 
-def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
+def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR, verbose=False):
     total_start = _now()
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
 
-    print(f"[1/5] Reading {len(input_paths)} file(s)")
+    if verbose:
+        print(f"[1/5] Reading {len(input_paths)} file(s)")
     stage_start = _now()
-    ast = _merge_programs(input_paths, main_path)
-    _print_timing("read+lex+parse+merge", stage_start)
+    ast = _merge_programs(input_paths, main_path, verbose=verbose)
+    if verbose:
+        _print_timing("read+lex+parse+merge", stage_start)
     if linker != "py" and ast.externs:
         raise RuntimeError("source extern declarations require --linker py")
 
-    print("[2/5] Semantic analysis")
+    if verbose:
+        print("[2/5] Semantic analysis")
     stage_start = _now()
     ast = analyze_program(ast)
-    _print_timing("sema", stage_start)
+    if verbose:
+        _print_timing("sema", stage_start)
 
-    print(f"[3/5] Compiling → {asm_path}")
+    if verbose:
+        print(f"[3/5] Compiling → {asm_path}")
     stage_start = _now()
     mir_start = _now()
     mir_program = ast_to_mir(ast)
-    _print_timing("ast->mir", mir_start)
-    _print_mir_stats(mir_program)
+    if verbose:
+        _print_timing("ast->mir", mir_start)
+        _print_mir_stats(mir_program)
     x64_start = _now()
     machine_program = lower_mir_to_x64(mir_program)
-    _print_timing("mir->x64", x64_start)
+    if verbose:
+        _print_timing("mir->x64", x64_start)
     text_start = _now()
     asm_text = machine_program.text()
-    _print_timing("x64 text", text_start)
-    _print_x64_stats(machine_program, asm_text)
+    if verbose:
+        _print_timing("x64 text", text_start)
+        _print_x64_stats(machine_program, asm_text)
     with open(asm_path, "w", encoding="utf-8", newline="\n") as out:
         out.write(asm_text)
-    _print_timing("emit machine", stage_start)
+    if verbose:
+        _print_timing("emit machine", stage_start)
 
-    print(f"[4/5] Assembling → {obj_path}")
+    if verbose:
+        print(f"[4/5] Assembling → {obj_path}")
     stage_start = _now()
     write_machine_obj(machine_program, obj_path)
-    _print_timing("assemble", stage_start)
+    if verbose:
+        _print_timing("assemble", stage_start)
 
-    print(f"[5/5] Linking (via {linker}) → {exe_path}")
+    if verbose:
+        print(f"[5/5] Linking (via {linker}) → {exe_path}")
     stage_start = _now()
     if linker == "py":
         _link_with_python(obj_path, exe_path)
@@ -240,16 +252,18 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
         )
     if result.returncode != 0:
         raise RuntimeError("Link error:\n" + result.stderr[:500])
-    _print_timing("link", stage_start)
+    if verbose:
+        _print_timing("link", stage_start)
 
     size = os.path.getsize(exe_path)
-    print(f"  OK: {exe_path} ({size} bytes)")
-    _print_timing("total", total_start)
+    print(f"OK: {exe_path} ({size} bytes)")
+    if verbose:
+        _print_timing("total", total_start)
     return exe_path
 
 
-def compile_file(input_path, linker="py", out_dir=BUILD_DIR):
-    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir)
+def compile_file(input_path, linker="py", out_dir=BUILD_DIR, verbose=False):
+    return compile_files([input_path], main_path=input_path, linker=linker, out_dir=out_dir, verbose=verbose)
 
 
 def dump_token_files(input_paths):
@@ -294,6 +308,8 @@ def parse_args(argv):
                         help="linker to use (default: py)")
     parser.add_argument("--out-dir", default=BUILD_DIR,
                         help="output directory (default: build)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="print compilation stages, timing, and statistics")
     parser.add_argument("--dump-tokens", action="store_true",
                         help="print lexer token dump and exit")
     parser.add_argument("--dump-ast", action="store_true",
@@ -337,6 +353,7 @@ def main(argv=None):
                 main_path=args.main or args.inputs[0],
                 linker=args.linker,
                 out_dir=args.out_dir,
+                verbose=args.verbose,
             )
     except (LexError, ParseError, SemanticError) as e:
         print(f"Error: {e}", file=sys.stderr)

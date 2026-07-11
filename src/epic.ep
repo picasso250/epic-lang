@@ -12,12 +12,34 @@ fun epic_obj_path(exe_path: str): str {
     ret (exe_path + ".obj")
 }
 
+fun epic_is_standard_runtime_path(path: str): bool {
+    if path == "runtime/array.ep" { ret true }
+    if path == "runtime/panic.ep" { ret true }
+    if path == "runtime/str.ep" { ret true }
+    ret false
+}
+
+fun epic_with_runtime_sources(user_inputs: str[]): str[] {
+    let inputs = new str[]
+    inputs.push("runtime/array.ep")
+    inputs.push("runtime/panic.ep")
+    inputs.push("runtime/str.ep")
+    for i: 0:len(user_inputs) {
+        if !epic_is_standard_runtime_path(user_inputs[i]) {
+            inputs.push(user_inputs[i])
+        }
+    }
+    ret inputs
+}
+
 fun epic_now_ms(): i64 {
     ret i64(GetTickCount64())
 }
 
-fun epic_timing(label: str, start: i64, stop: i64): void {
-    println(f"  timing: {label}: {stop - start} ms")
+fun epic_timing(verbose: bool, label: str, start: i64, stop: i64): void {
+    if verbose {
+        println(f"  timing: {label}: {stop - start} ms")
+    }
 }
 
 fun epic_parse_file(path: str): AstNode {
@@ -100,7 +122,7 @@ fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
     }
 }
 
-fun epic_lower_program(program: MirProgram): X64Program {
+fun epic_lower_program(program: MirProgram, verbose: bool): X64Program {
     let lower = mir_to_x64_lower_empty()
     let start = epic_now_ms()
     x64_add_global(lower.x64, "_start")
@@ -115,12 +137,12 @@ fun epic_lower_program(program: MirProgram): X64Program {
     let data_start = epic_now_ms()
     epic_emit_program_data(lower.x64, program)
     let data_stop = epic_now_ms()
-    epic_timing("lower program data", data_start, data_stop)
+    epic_timing(verbose, "lower program data", data_start, data_stop)
 
     let prepare_start = epic_now_ms()
     mir_to_x64_prepare_program_globals(lower, program)
     let prepare_stop = epic_now_ms()
-    epic_timing("lower prepare globals", prepare_start, prepare_stop)
+    epic_timing(verbose, "lower prepare globals", prepare_start, prepare_stop)
 
     let funcs_start = epic_now_ms()
     let i = 0
@@ -129,83 +151,101 @@ fun epic_lower_program(program: MirProgram): X64Program {
         i = i + 1
     }
     let funcs_stop = epic_now_ms()
-    epic_timing("lower functions", funcs_start, funcs_stop)
+    epic_timing(verbose, "lower functions", funcs_start, funcs_stop)
 
 
     let stop = epic_now_ms()
-    println(f"  timing: lower function parts: plan={lower.timing_plan_slots} ms prologue={lower.timing_prologue} ms params={lower.timing_params} ms insts={lower.timing_insts} ms terms={lower.timing_terms} ms epilogue={lower.timing_epilogue} ms")
-    println(f"  timing: lower counts: functions={len(program.functions)} lowered_functions={lower.timing_functions} blocks={lower.timing_blocks} instructions={lower.timing_instructions} globals={len(program.globals)} struct_fields={len(program.struct_fields)} x64_items={len(lower.x64.items)}")
-    epic_timing("lower total inner", start, stop)
+    if verbose {
+        println(f"  timing: lower function parts: plan={lower.timing_plan_slots} ms prologue={lower.timing_prologue} ms params={lower.timing_params} ms insts={lower.timing_insts} ms terms={lower.timing_terms} ms epilogue={lower.timing_epilogue} ms")
+        println(f"  timing: lower counts: functions={len(program.functions)} lowered_functions={lower.timing_functions} blocks={lower.timing_blocks} instructions={lower.timing_instructions} globals={len(program.globals)} struct_fields={len(program.struct_fields)} x64_items={len(lower.x64.items)}")
+    }
+    epic_timing(verbose, "lower total inner", start, stop)
     ret lower.x64
 }
 
-fun epic_frontend(input_paths: str[], main_path: str): MirProgram {
+fun epic_machine_object(x64: X64Program, verbose: bool): MachineObject {
+    if verbose {
+        ret machine_build_object_timed(x64)
+    }
+    ret machine_build_object(x64)
+}
+
+fun epic_coff_bytes(machine: MachineObject, verbose: bool): u8[] {
+    if verbose {
+        ret coff_build_obj_timed(machine)
+    }
+    ret coff_build_obj(machine)
+}
+
+fun epic_frontend(input_paths: str[], main_path: str, verbose: bool): MirProgram {
     let parse_start = epic_now_ms()
     let ast = epic_merge_program(input_paths, main_path)
     let parse_stop = epic_now_ms()
-    epic_timing("read+lex+parse+merge", parse_start, parse_stop)
+    epic_timing(verbose, "read+lex+parse+merge", parse_start, parse_stop)
 
     let sema_start = epic_now_ms()
     let st = make_sema_state()
     sema_program(st, ast)
     let sema_stop = epic_now_ms()
-    epic_timing("sema", sema_start, sema_stop)
+    epic_timing(verbose, "sema", sema_start, sema_stop)
 
     let mir_start = epic_now_ms()
     let mir = mir_ast_to_mir(ast)
     let mir_stop = epic_now_ms()
-    epic_timing("ast->mir", mir_start, mir_stop)
+    epic_timing(verbose, "ast->mir", mir_start, mir_stop)
     ret mir
 }
 
-fun epic_backend(mir: MirProgram, exe_path: str): void {
+fun epic_backend(mir: MirProgram, exe_path: str, verbose: bool): void {
     let prepare_start = epic_now_ms()
     mir_inject_all_runtime_helpers(mir)
     mir_prune_unreachable_functions(mir)
     mir_retain_referenced_externs(mir)
     backend_validate_program_abi(mir)
     let prepare_stop = epic_now_ms()
-    epic_timing("prepare mir", prepare_start, prepare_stop)
+    epic_timing(verbose, "prepare mir", prepare_start, prepare_stop)
 
     let lower_start = epic_now_ms()
-    let x64 = epic_lower_program(mir)
+    let x64 = epic_lower_program(mir, verbose)
     let lower_stop = epic_now_ms()
-    epic_timing("lower x64", lower_start, lower_stop)
+    epic_timing(verbose, "lower x64", lower_start, lower_stop)
 
     let machine_start = epic_now_ms()
-    let machine = machine_build_object_timed(x64)
+    let machine = epic_machine_object(x64, verbose)
     let machine_stop = epic_now_ms()
-    epic_timing("machine object", machine_start, machine_stop)
+    epic_timing(verbose, "machine object", machine_start, machine_stop)
 
     let coff_start = epic_now_ms()
-    let obj_bytes = coff_build_obj_timed(machine)
+    let obj_bytes = epic_coff_bytes(machine, verbose)
     let coff_stop = epic_now_ms()
-    epic_timing("coff bytes", coff_start, coff_stop)
+    epic_timing(verbose, "coff bytes", coff_start, coff_stop)
     let obj_path = epic_obj_path(exe_path)
 
     let write_start = epic_now_ms()
     write_file(cstr_ready_path(obj_path), obj_bytes)
     let write_stop = epic_now_ms()
-    epic_timing("write obj", write_start, write_stop)
+    epic_timing(verbose, "write obj", write_start, write_stop)
 
     let link_start = epic_now_ms()
     link_obj(cstr_ready_path(obj_path), cstr_ready_path(exe_path))
     let link_stop = epic_now_ms()
-    epic_timing("link", link_start, link_stop)
+    epic_timing(verbose, "link", link_start, link_stop)
 }
 
-fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
+fun epic_compile(input_paths: str[], main_path: str, exe_path: str, verbose: bool): void {
     let total_start = epic_now_ms()
-    let mir = epic_frontend(input_paths, main_path)
-    epic_backend(mir, exe_path)
+    let mir = epic_frontend(input_paths, main_path, verbose)
+    epic_backend(mir, exe_path, verbose)
     let total_stop = epic_now_ms()
-    epic_timing("total", total_start, total_stop)
+    epic_timing(verbose, "total", total_start, total_stop)
+    println("OK: " + exe_path)
 }
 
 fun main(): void {
-    let inputs = new str[]
+    let user_inputs = new str[]
     let main_path = ""
     let exe_path = ""
+    let verbose = false
     let i = 1
     for i < len(argv) {
         if argv[i] == "--main" {
@@ -220,20 +260,24 @@ fun main(): void {
             }
             exe_path = argv[i + 1]
             i = i + 2
+        } else if argv[i] == "--verbose" {
+            verbose = true
+            i = i + 1
         } else {
-            inputs.push(argv[i])
+            user_inputs.push(argv[i])
             i = i + 1
         }
     }
-    if len(inputs) == 0 {
-        println("usage: epic <runtime-and-source.ep...> --main <main.ep> -o <out.exe>")
+    if len(user_inputs) == 0 {
+        println("usage: epic <source.ep...> [--main <main.ep>] -o <out.exe> [--verbose]")
         exit(1)
     }
     if len(main_path) == 0 {
-        main_path = inputs[len(inputs) - 1]
+        main_path = user_inputs[len(user_inputs) - 1]
     }
     if len(exe_path) == 0 {
-        epic_die("-o is required for the self-hosted test driver")
+        epic_die("-o is required")
     }
-    epic_compile(inputs, main_path, exe_path)
+    let inputs = epic_with_runtime_sources(user_inputs)
+    epic_compile(inputs, main_path, exe_path, verbose)
 }

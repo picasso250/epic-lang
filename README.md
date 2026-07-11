@@ -24,19 +24,21 @@ fun main(): void {
 python test_bootstrap_fixed_point.py -o build\epic.exe
 
 .\build\epic.exe `
-  runtime\array.ep `
-  runtime\panic.ep `
-  runtime\str.ep `
   examples\00_hello_world.ep `
-  --main examples\00_hello_world.ep `
   -o build\hello.exe
 
 .\build\hello.exe
 ```
 
-第一条命令从 Python stage-0 启动完整 bootstrap，只用于生成稳定的 `build\epic.exe`。self-hosted compiler 当前显式接收三份 runtime 源码和目标程序源码；之后的 examples 可以沿用同一形式，只替换目标 `.ep` 文件。
+默认输出只包含成功结果或错误。需要查看编译阶段、timing 和 stats 时加 `--verbose`：
 
-输出：
+```powershell
+.\build\epic.exe examples\00_hello_world.ep -o build\hello.exe --verbose
+```
+
+第一条命令从 Python stage-0 启动完整 bootstrap，只用于生成稳定的 `build\epic.exe`。self-hosted compiler 会自动从当前工作目录的 `runtime/` 加入标准 runtime 源码；之后的 examples 可以沿用同一形式，只替换目标 `.ep` 文件。
+
+程序输出：
 
 ```
 Hello, Epic!

@@ -100,6 +100,8 @@ python test_bootstrap_fixed_point.py
 
 `build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，在目标 revision 自己的构建脚本和 canonical source list 上完成不动点构建，并导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest。提交在 `bootstrap/v0/epic-v0.sha256` 的 digest 是冻结产物的预期值。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代，适合 GC 和后端开发期间的日常 bootstrap 验证；`-o <compiler.exe>` 将验证后的最终收敛世代写到指定位置。
 
+Self-hosted `epic.exe` 会自动把当前工作目录下的 `runtime/array.ep`、`runtime/panic.ep`、`runtime/str.ep` 放在用户输入之前，因此普通调用只需提供用户源码。当前工作目录仍需包含 `runtime/mir/helpers.mir`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。Python reference CLI 接受相同的 `--verbose` 开关。
+
 ## 工具链 (Toolchain)
 
 当前 Python reference compiler 工具链路径：
