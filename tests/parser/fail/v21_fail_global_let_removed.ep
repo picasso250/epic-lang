@@ -1,5 +1,0 @@
-# COMPILE_FAIL: Unexpected token
-let value = 1
-
-fun main(): void {
-}

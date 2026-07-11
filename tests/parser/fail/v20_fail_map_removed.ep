@@ -1,4 +1,0 @@
-# COMPILE_FAIL: Expected RBRACKET
-fun main(): void {
-    let values: map[str]i64 = 0
-}

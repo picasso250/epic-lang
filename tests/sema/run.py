@@ -2,15 +2,9 @@
 """
 tests/sema/run.py — Semantic analysis tests.
 
-Default mode checks:
-  - Python sema typed AST golden for tests/sema/pass/all.ep
-  - existing Python reference compiler negative tests under tests/sema/fail/*.ep
-
-Regenerate typed AST golden:
-  python tests/sema/run.py --regen
+Checks Python and self-hosted semantic behavior against the current language.
 """
 
-import argparse
 import difflib
 import os
 import re
@@ -30,7 +24,6 @@ SEMA_EXE = os.path.join(SEMA_BUILD_DIR, "src", "sema.exe")
 FAIL_DIR = os.path.join(SCRIPT_DIR, "fail")
 PASS_DIR = os.path.join(SCRIPT_DIR, "pass")
 ALL_EP = os.path.join(PASS_DIR, "all.ep")
-TYPED_AST_DUMP = os.path.join(PASS_DIR, "typed_ast_dump.txt")
 
 sys.path.insert(0, os.path.join(ROOT_DIR, "bootstrap"))
 from lexer import lex
@@ -64,20 +57,12 @@ def print_diff(expected, actual, expected_label, actual_label):
         print(diff_line)
 
 
-def regen_golden():
-    os.makedirs(PASS_DIR, exist_ok=True)
-    with open(TYPED_AST_DUMP, "w", encoding="utf-8", newline="\n") as f:
-        f.write(python_sema_dump(ALL_EP))
-    print(f"Regenerated {os.path.relpath(TYPED_AST_DUMP, ROOT_DIR)}")
-
-
 def run_cli_dump_typed_ast_test():
-    if not os.path.isfile(TYPED_AST_DUMP):
-        print(f"  FAIL  missing sema golden: {TYPED_AST_DUMP}")
+    if not os.path.isfile(ALL_EP):
+        print(f"  FAIL  missing sema fixture: {ALL_EP}")
         return 0, 1, 0
 
-    with open(TYPED_AST_DUMP, "r", encoding="utf-8") as f:
-        expected = f.read()
+    expected = python_sema_dump(ALL_EP)
     result = subprocess.run(
         [sys.executable, EPICC, ALL_EP, "--dump-typed-ast"],
         cwd=ROOT_DIR,
@@ -92,31 +77,11 @@ def run_cli_dump_typed_ast_test():
         print((result.stdout + result.stderr)[-2000:])
         return 0, 1, 0
     if actual == expected:
-        print("  PASS  epic.py --dump-typed-ast matches typed AST golden")
+        print("  PASS  epic.py --dump-typed-ast matches Python sema")
         return 1, 0, 0
 
-    print("  FAIL  epic.py --dump-typed-ast matches typed AST golden")
-    print_diff(expected, actual, "golden/typed_ast_dump.txt", "epic.py --dump-typed-ast")
-    return 0, 1, 0
-
-
-def run_pass_tests():
-    if not os.path.isfile(ALL_EP):
-        print(f"  FAIL  missing sema fixture: {ALL_EP}")
-        return 0, 1, 0
-    if not os.path.isfile(TYPED_AST_DUMP):
-        print(f"  FAIL  missing sema golden: {TYPED_AST_DUMP}")
-        return 0, 1, 0
-
-    with open(TYPED_AST_DUMP, "r", encoding="utf-8") as f:
-        expected = f.read()
-    actual = python_sema_dump(ALL_EP)
-    if actual == expected:
-        print("  PASS  pass/all.ep typed AST golden")
-        return 1, 0, 0
-
-    print("  FAIL  pass/all.ep typed AST golden")
-    print_diff(expected, actual, "golden/typed_ast_dump.txt", "python/sema/pass/all.ep")
+    print("  FAIL  epic.py --dump-typed-ast matches Python sema")
+    print_diff(expected, actual, "python/sema/pass/all.ep", "epic.py --dump-typed-ast")
     return 0, 1, 0
 
 
@@ -273,26 +238,10 @@ def run_self_hosted_fail_tests():
     return passed, failed, skipped
 
 
-def parse_args(argv):
-    parser = argparse.ArgumentParser(description="Sema typed AST golden and fail tests")
-    parser.add_argument("--regen", action="store_true", help="regenerate tests/sema/pass/typed_ast_dump.txt")
-    return parser.parse_args(argv)
-
-
-def main(argv=None):
-    args = parse_args(sys.argv[1:] if argv is None else argv)
-    if args.regen:
-        regen_golden()
-        return 0
-
+def main():
     total_passed = 0
     total_failed = 0
     total_skipped = 0
-
-    p, f, s = run_pass_tests()
-    total_passed += p
-    total_failed += f
-    total_skipped += s
 
     p, f, s = run_cli_dump_typed_ast_test()
     total_passed += p

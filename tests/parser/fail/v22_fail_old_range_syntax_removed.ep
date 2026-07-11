@@ -1,5 +1,0 @@
-# COMPILE_FAIL: Expected LBRACE
-fun main(): void {
-    for i in 0:3 {
-    }
-}

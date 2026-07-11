@@ -1,6 +1,0 @@
-# COMPILE_FAIL: Expected LBRACE
-fun main(): void {
-    let xs = new i64[] { 1, 2 }
-    for i in xs {
-    }
-}

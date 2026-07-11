@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES
+from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
