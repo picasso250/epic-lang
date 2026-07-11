@@ -234,19 +234,6 @@ fun x64_values_text(values: i64[]): str {
     ret str_buf_finish(buf)
 }
 
-fun x64_item_kind_text(item: X64Item): str {
-    match item {
-        X64GlobalItem it: { ret "global" }
-        X64ExternItem it: { ret "extern" }
-        X64SectionItem it: { ret "section" }
-        X64LabelItem it: { ret "label" }
-        X64InstItem it: { ret "inst" }
-        X64DataBytesItem it: { ret "data_bytes" }
-        X64DataZeroItem it: { ret "data_zero" }
-    }
-    ret "<bad item>"
-}
-
 fun x64_item_text(item: X64Item): str {
     match item {
         X64GlobalItem it: {

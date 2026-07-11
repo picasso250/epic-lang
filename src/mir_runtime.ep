@@ -59,12 +59,15 @@ fun mir_runtime_insert_startup(program: MirProgram): void {
 }
 
 fun mir_runtime_address_needs_check(address: MirOperand, safe_values: i64[], checked_values: i64[]): bool {
-    if mir_operand_is_symbol(address) { ret false }
-    if mir_operand_is_value(address) {
-        let value_id = mir_operand_value_id(address)
-        ret !mir_runtime_i64_in(safe_values, value_id) && !mir_runtime_i64_in(checked_values, value_id)
+    match address {
+        MirSymbolOperand value: { ret false }
+        MirValueOperand value: {
+            ret !mir_runtime_i64_in(safe_values, value.value_id) && !mir_runtime_i64_in(checked_values, value.value_id)
+        }
+        MirNullOperand value: { ret false }
+        _: { ret true }
     }
-    ret !mir_operand_is_null(address)
+    ret false
 }
 
 fun mir_runtime_insert_null_checks(program: MirProgram): void {
@@ -78,8 +81,11 @@ fun mir_runtime_insert_null_checks(program: MirProgram): void {
                 if inst.op == "alloca" && inst.has_result {
                     mir_runtime_push_unique_i64(safe_values, inst.result_id)
                 }
-                if inst.op == "gep" && inst.has_result && len(inst.operands) > 0 && !mir_operand_is_null(inst.operands[0]) {
-                    mir_runtime_push_unique_i64(safe_values, inst.result_id)
+                if inst.op == "gep" && inst.has_result && len(inst.operands) > 0 {
+                    match inst.operands[0] {
+                        MirNullOperand value: {}
+                        _: { mir_runtime_push_unique_i64(safe_values, inst.result_id) }
+                    }
                 }
             }
         }
@@ -92,9 +98,14 @@ fun mir_runtime_insert_null_checks(program: MirProgram): void {
                 let inst = block.instructions[ii]
                 let has_address = false
                 let address = mir_operand_null()
-                if inst.op == "gep" && len(inst.operands) > 0 && !mir_operand_is_null(inst.operands[0]) {
-                    has_address = true
-                    address = inst.operands[0]
+                if inst.op == "gep" && len(inst.operands) > 0 {
+                    match inst.operands[0] {
+                        MirNullOperand value: {}
+                        _: {
+                            has_address = true
+                            address = inst.operands[0]
+                        }
+                    }
                 } else if inst.op == "load" && len(inst.operands) > 0 {
                     has_address = true
                     address = inst.operands[0]
@@ -106,8 +117,9 @@ fun mir_runtime_insert_null_checks(program: MirProgram): void {
                     let args = new MirOperand[]
                     args.push(address)
                     instructions.push(mir_call("__ep_require_nonnull", "void", args))
-                    if mir_operand_is_value(address) {
-                        mir_runtime_push_unique_i64(checked_values, mir_operand_value_id(address))
+                    match address {
+                        MirValueOperand value: { mir_runtime_push_unique_i64(checked_values, value.value_id) }
+                        _: {}
                     }
                 }
                 instructions.push(inst)

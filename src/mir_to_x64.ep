@@ -193,11 +193,13 @@ fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i6
     for ii < len(block.instructions) {
         let oi = 0
         for oi < len(block.instructions[ii].operands) {
-            if mir_operand_is_value(block.instructions[ii].operands[oi]) {
-                let value_id = mir_operand_value_id(block.instructions[ii].operands[oi])
-                if lower.reusable_values[value_id] != 0 {
-                    mir_to_x64_count_use(counts, value_id)
+            match block.instructions[ii].operands[oi] {
+                MirValueOperand value: {
+                    if lower.reusable_values[value.value_id] != 0 {
+                        mir_to_x64_count_use(counts, value.value_id)
+                    }
                 }
+                _: {}
             }
             oi = oi + 1
         }
@@ -207,21 +209,25 @@ fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i6
         MirBrTerminator br: {
         }
         MirCondBrTerminator cond: {
-            if mir_operand_is_value(cond.cond) {
-                let value_id = mir_operand_value_id(cond.cond)
-                if lower.reusable_values[value_id] != 0 {
-                    mir_to_x64_count_use(counts, value_id)
+            match cond.cond {
+                MirValueOperand value: {
+                    if lower.reusable_values[value.value_id] != 0 {
+                        mir_to_x64_count_use(counts, value.value_id)
+                    }
                 }
+                _: {}
             }
         }
         MirRetVoidTerminator rv: {
         }
         MirRetValueTerminator rv: {
-            if mir_operand_is_value(rv.value) {
-                let value_id = mir_operand_value_id(rv.value)
-                if lower.reusable_values[value_id] != 0 {
-                    mir_to_x64_count_use(counts, value_id)
+            match rv.value {
+                MirValueOperand value: {
+                    if lower.reusable_values[value.value_id] != 0 {
+                        mir_to_x64_count_use(counts, value.value_id)
+                    }
                 }
+                _: {}
             }
         }
     }
@@ -252,18 +258,17 @@ fun mir_to_x64_release_value(lower: MirToX64Lower, value_id: i64): void {
 }
 
 fun mir_to_x64_release_operand(lower: MirToX64Lower, operand: MirOperand): void {
-    if mir_operand_is_value(operand) == false {
-        ret
-    }
-    let value_id = mir_operand_value_id(operand)
-    let remaining = lower.block_local_use_counts[value_id]
-    if remaining <= 0 {
-        ret
-    }
-    remaining = remaining - 1
-    lower.block_local_use_counts[value_id] = remaining
-    if remaining == 0 {
-        mir_to_x64_release_value(lower, value_id)
+    match operand {
+        MirValueOperand value: {
+            let remaining = lower.block_local_use_counts[value.value_id]
+            if remaining <= 0 { ret }
+            remaining = remaining - 1
+            lower.block_local_use_counts[value.value_id] = remaining
+            if remaining == 0 {
+                mir_to_x64_release_value(lower, value.value_id)
+            }
+        }
+        _: {}
     }
 }
 
@@ -291,15 +296,14 @@ fun mir_to_x64_release_terminator(lower: MirToX64Lower, term: MirTerminator): vo
 }
 
 fun mir_to_x64_mark_cross_block_operand_use(lower: MirToX64Lower, def_blocks: i64[], operand: MirOperand, block_id: i64): void {
-    if mir_operand_is_value(operand) == false {
-        ret
-    }
-    let value_id = mir_operand_value_id(operand)
-    if def_blocks[value_id] == 0 {
-        ret
-    }
-    if def_blocks[value_id] != block_id {
-        lower.reusable_values[value_id] = 0
+    match operand {
+        MirValueOperand value: {
+            if def_blocks[value.value_id] == 0 { ret }
+            if def_blocks[value.value_id] != block_id {
+                lower.reusable_values[value.value_id] = 0
+            }
+        }
+        _: {}
     }
 }
 
@@ -391,59 +395,53 @@ fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
 }
 
 fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand): void {
-    if mir_operand_is_int(operand) {
-        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(mir_operand_int_value(operand)))
-        ret
-    }
-    if mir_operand_is_bool(operand) {
-        if mir_operand_bool_value(operand) {
-            x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(1))
-        } else {
+    match operand {
+        MirIntOperand value: {
+            x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(value.value))
+        }
+        MirBoolOperand value: {
+            if value.value {
+                x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(1))
+            } else {
+                x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
+            }
+        }
+        MirNullOperand value: {
             x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
         }
-        ret
-    }
-    if mir_operand_is_null(operand) {
-        x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_imm(0))
-        ret
-    }
-    if mir_operand_is_value(operand) {
-        let value_id = mir_operand_value_id(operand)
-        let value_offset = lower.value_slots[value_id]
-        if value_offset != 0 {
-            x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_base("rbp", value_offset, 8))
-            ret
+        MirValueOperand value: {
+            let value_offset = lower.value_slots[value.value_id]
+            if value_offset != 0 {
+                x64_add_inst2(lower.x64, "mov", x64_reg(reg), x64_mem_base("rbp", value_offset, 8))
+                ret
+            }
+            let addr_offset = lower.addr_slots[value.value_id]
+            if addr_offset != 0 {
+                x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_base("rbp", addr_offset, 8))
+                ret
+            }
+            mir_to_x64_die(("unknown MIR value: " + str(value.value_id)))
         }
-        let addr_offset = lower.addr_slots[value_id]
-        if addr_offset != 0 {
-            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_base("rbp", addr_offset, 8))
-            ret
+        MirSymbolOperand value: {
+            let string_index = mir_to_x64_string_index(lower, value.name)
+            if string_index >= 0 {
+                let data_label = mir_to_x64_data_label(value.name)
+                let header_label = mir_to_x64_header_label(value.name)
+                x64_add_inst2(lower.x64, "lea", x64_reg("r11"), x64_mem_symbol(data_label, 8))
+                x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(header_label, 8))
+                x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 0, 8), x64_reg("r11"))
+                x64_add_inst2(lower.x64, "mov", x64_reg("r11"), x64_imm(lower.string_lengths[string_index]))
+                x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 8, 8), x64_reg("r11"))
+                ret
+            }
+            let global_index = mir_to_x64_global_index(lower, value.name)
+            if global_index >= 0 {
+                x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(value.name, 8))
+                ret
+            }
+            mir_to_x64_die(("unsupported symbol operand: " + value.name))
         }
-        mir_to_x64_die(("unknown MIR value: " + str(value_id)))
-        ret
     }
-    if mir_operand_is_symbol(operand) {
-        let name = mir_operand_symbol_name(operand)
-        let string_index = mir_to_x64_string_index(lower, name)
-        if string_index >= 0 {
-            let data_label = mir_to_x64_data_label(name)
-            let header_label = mir_to_x64_header_label(name)
-            x64_add_inst2(lower.x64, "lea", x64_reg("r11"), x64_mem_symbol(data_label, 8))
-            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(header_label, 8))
-            x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 0, 8), x64_reg("r11"))
-            x64_add_inst2(lower.x64, "mov", x64_reg("r11"), x64_imm(lower.string_lengths[string_index]))
-            x64_add_inst2(lower.x64, "mov", x64_mem_base(reg, 8, 8), x64_reg("r11"))
-            ret
-        }
-        let global_index = mir_to_x64_global_index(lower, name)
-        if global_index >= 0 {
-            x64_add_inst2(lower.x64, "lea", x64_reg(reg), x64_mem_symbol(name, 8))
-            ret
-        }
-        mir_to_x64_die(("unsupported symbol operand: " + name))
-        ret
-    }
-    mir_to_x64_die(("unsupported operand: " + mir_operand_kind_text(operand)))
 }
 
 fun mir_to_x64_store_result(lower: MirToX64Lower, result_id: i64, reg: str): void {
@@ -510,9 +508,12 @@ fun mir_to_x64_scale_rcx_by_8(lower: MirToX64Lower): void {
 }
 
 fun mir_to_x64_add_scaled_index(lower: MirToX64Lower, operand: MirOperand, scale: i64): void {
-    if mir_operand_is_int(operand) {
-        mir_to_x64_add_rax_imm(lower, mir_operand_int_value(operand) * scale)
-        ret
+    match operand {
+        MirIntOperand index: {
+            mir_to_x64_add_rax_imm(lower, index.value * scale)
+            ret
+        }
+        _: {}
     }
     mir_to_x64_load_operand(lower, "rcx", operand)
     if scale == 8 {
@@ -542,10 +543,12 @@ fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
             mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
         } else if len(inst.operands) == 3 {
             mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
-            if mir_operand_is_int(inst.operands[2]) == false {
-                mir_to_x64_die("struct field gep needs a constant field index")
+            match inst.operands[2] {
+                MirIntOperand field: {
+                    mir_to_x64_add_rax_imm(lower, mir_to_x64_struct_field_offset(lower, struct_name, field.value))
+                }
+                _: { mir_to_x64_die("struct field gep needs a constant field index") }
             }
-            mir_to_x64_add_rax_imm(lower, mir_to_x64_struct_field_offset(lower, struct_name, mir_operand_int_value(inst.operands[2])))
         } else {
             mir_to_x64_die("struct gep needs one or two indices")
         }
@@ -740,7 +743,6 @@ fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTermin
             ret
         }
     }
-    mir_to_x64_die(("unsupported MIR terminator: " + mir_terminator_kind_text(term)))
 }
 
 fun mir_to_x64_lower_function_with_program(program: MirProgram, fn: MirFunction): X64Program {

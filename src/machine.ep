@@ -925,7 +925,6 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             ret
         }
     }
-    machine_die(("unsupported item: " + x64_item_kind_text(item)))
 }
 
 fun machine_now_ms(): i64 {

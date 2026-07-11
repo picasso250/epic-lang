@@ -660,15 +660,18 @@ fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstFString): Mi
                 piece = piece_flow.value
             }
         }
-        if mir_operand_is_null(piece) == false {
-            if has_out == false {
-                out = piece
-                has_out = true
-            } else {
-                let args = new MirOperand[]
-                args.push(out)
-                args.push(piece)
-                out = mir_emit_call_inst(st, "__ep_str_cat", "ptr", args)
+        match piece {
+            MirNullOperand value: {}
+            _: {
+                if has_out == false {
+                    out = piece
+                    has_out = true
+                } else {
+                    let args = new MirOperand[]
+                    args.push(out)
+                    args.push(piece)
+                    out = mir_emit_call_inst(st, "__ep_str_cat", "ptr", args)
+                }
             }
         }
         i = i + 1
