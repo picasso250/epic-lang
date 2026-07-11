@@ -1,5 +1,9 @@
 # COMPILE_FAIL: return expected i64, got void
 
-fun main(): i64 {
+fun run(): i64 {
     ret
+}
+
+fun main(): void {
+    exit(run())
 }

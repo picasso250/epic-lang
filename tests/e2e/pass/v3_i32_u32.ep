@@ -18,7 +18,7 @@ fun takes_i64(x: i64): i64 {
     ret x
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let lo: i32 = i32(0 - 2147483647 - 1)
     let hi: i32 = i32(2147483647)
     let zero: u32 = u32(0)
@@ -62,4 +62,8 @@ fun main(): i64 {
 
     print("ok")
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

@@ -1,6 +1,10 @@
-fun main(): i64 {
+fun run(): i64 {
     let b = new u8[]
     b.push(u8(255))
     b[0] = u8(7)
     ret i64(b[0])
+}
+
+fun main(): void {
+    exit(run())
 }

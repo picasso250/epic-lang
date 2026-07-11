@@ -4,6 +4,10 @@ fun sum6(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64): i64 {
     ret a + b + c + d + e + f
 }
 
-fun main(): i64 {
+fun run(): i64 {
     ret sum6(1, 2, 3, 4, 5, 27)
+}
+
+fun main(): void {
+    exit(run())
 }

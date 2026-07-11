@@ -126,6 +126,11 @@ class SemanticAnalyzer:
             if fn.name in BUILTIN_FUNCTIONS or fn.name in PSEUDO_BUILTINS:
                 self._fail_global(f"reserved builtin function name: {fn.name}")
             fn.resolved_type = self._type_name(fn.ret_type)
+            if fn.name == "main":
+                if params:
+                    self._fail_global("main function cannot have parameters")
+                if fn.resolved_type != VOID:
+                    self._fail_global(f"main function must return void, got {fn.resolved_type}")
             self.func_sigs[fn.name] = (params, fn.resolved_type)
 
 

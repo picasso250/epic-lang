@@ -1759,7 +1759,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
     ret 0
 }
 
-fun main(): i64 {
+fun main(): void {
     if len(argv) < 2 {
         panic "usage: parser <file>"
     }
@@ -1768,5 +1768,5 @@ fun main(): i64 {
     let p = make_parser(tokens)
     let ast = p.parse_program()
     dump_node(ast, 0)
-    ret 0
+    ret
 }

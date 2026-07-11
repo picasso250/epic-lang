@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: ok
 
-fun main(): i64 {
+fun run(): i64 {
     let xs = new i64[]
     if false && xs[0] == 1 {
         ret 1
@@ -11,4 +11,8 @@ fun main(): i64 {
         ret 0
     }
     ret 2
+}
+
+fun main(): void {
+    exit(run())
 }

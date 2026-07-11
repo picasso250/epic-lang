@@ -1,5 +1,9 @@
 # COMPILE_FAIL: integer literal 9223372036854775808 out of range for i64
 
-fun main(): i64 {
+fun run(): i64 {
     ret 9223372036854775808
+}
+
+fun main(): void {
+    exit(run())
 }

@@ -35,7 +35,7 @@ from lexer import dump_tokens, lex
 ALL_EP = os.path.join(SCRIPT_DIR, "pass", "all.ep")
 TOKEN_LIST = os.path.join(SCRIPT_DIR, "pass", "token_list.txt")
 CRLF_SAMPLE_LF = """# line ending contract
-fun main(): i64 {
+fun main(): void {
     # comment before CRLF
     let x = 1
     println(f"x={x}")

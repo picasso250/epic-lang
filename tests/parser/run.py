@@ -28,7 +28,7 @@ LEXER_EP = os.path.join(ROOT_DIR, "src", "lexer.ep")
 PARSER_EP = os.path.join(ROOT_DIR, "src", "parser.ep")
 PARSER_EXE = os.path.join(ROOT_DIR, "build", "src", "parser.exe")
 SELF_HOSTED_PARSER_SOURCES = [LEXER_EP, PARSER_EP]
-CRLF_SAMPLE_LF = """# parser line ending contract\nfun main(): i64 {\n    # comment before CRLF\n    let x = 1\n    if x == 1 {\n        ret 0\n    }\n    ret 1\n}\n"""
+CRLF_SAMPLE_LF = """# parser line ending contract\nfun main(): void {\n    # comment before CRLF\n    let x = 1\n    if x == 1 {\n        exit(0)\n    }\n    exit(1)\n}\n"""
 
 
 def python_parser_dump_source(source):

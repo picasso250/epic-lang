@@ -15,7 +15,7 @@ fun show_u64(x: u64): void {
     println(str(x))
 }
 
-fun main(): i64 {
+fun run(): i64 {
     println(str(0 - 3))
     println(str(u64(3)))
     show_u64(u64(9223372036854775807))
@@ -29,4 +29,8 @@ fun main(): i64 {
     println(str(new u8[] { u8(65), u8(66) }))
 
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

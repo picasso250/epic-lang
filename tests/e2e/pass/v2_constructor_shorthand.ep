@@ -5,9 +5,13 @@ struct Box {
     n: i64
 }
 
-fun main(): i64 {
+fun run(): i64 {
     # constructor shorthand: new StructName → new StructName {}
     let b = new Box
     print(str(b.n))
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

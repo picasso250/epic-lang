@@ -7,6 +7,5 @@ struct Node {
     Meta
 }
 
-fun main(): i64 {
-    ret 0
+fun main(): void {
 }

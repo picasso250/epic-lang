@@ -202,7 +202,7 @@ fun epic_compile(input_paths: str[], main_path: str, exe_path: str): void {
     epic_timing("total", total_start, total_stop)
 }
 
-fun main(): i64 {
+fun main(): void {
     let inputs = new str[]
     let main_path = ""
     let exe_path = ""
@@ -227,7 +227,7 @@ fun main(): i64 {
     }
     if len(inputs) == 0 {
         println("usage: epic <runtime-and-source.ep...> --main <main.ep> -o <out.exe>")
-        ret 1
+        exit(1)
     }
     if len(main_path) == 0 {
         main_path = inputs[len(inputs) - 1]
@@ -236,5 +236,4 @@ fun main(): i64 {
         epic_die("-o is required for the self-hosted test driver")
     }
     epic_compile(inputs, main_path, exe_path)
-    ret 0
 }

@@ -1,4 +1,8 @@
-fun main(): i64 {
+fun run(): i64 {
     let a = new i64[] { 1, 2 }
     ret a[1]
+}
+
+fun main(): void {
+    exit(run())
 }

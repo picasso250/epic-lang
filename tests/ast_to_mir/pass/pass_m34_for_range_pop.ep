@@ -1,4 +1,4 @@
-fun main(): i64 {
+fun run(): i64 {
     let xs = new i64[] { 1, 2, 3 }
     let total = 0
     for i: 0:len(xs) {
@@ -6,4 +6,8 @@ fun main(): i64 {
     }
     total += xs.pop()
     ret total
+}
+
+fun main(): void {
+    exit(run())
 }

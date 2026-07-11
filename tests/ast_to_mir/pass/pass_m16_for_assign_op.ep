@@ -1,7 +1,11 @@
-fun main(): i64 {
+fun run(): i64 {
     let sum = 0
     for i: 0:4 {
         sum += i
     }
     ret sum
+}
+
+fun main(): void {
+    exit(run())
 }

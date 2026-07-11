@@ -4,10 +4,14 @@ struct Box {
     missing: i64
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let b = new Box { n: 9 }
     if b.missing == 0 {
         ret b.n
     }
     ret 1
+}
+
+fun main(): void {
+    exit(run())
 }

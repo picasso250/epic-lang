@@ -19,6 +19,10 @@ fun classify(n: i64): i64 {
     }
 }
 
-fun main(): i64 {
+fun run(): i64 {
     ret choose(0) + classify(1) - 9
+}
+
+fun main(): void {
+    exit(run())
 }

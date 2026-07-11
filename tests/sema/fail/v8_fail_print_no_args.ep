@@ -1,6 +1,10 @@
 # COMPILE_FAIL: print expects 1 argument
 
-fun main(): i64 {
+fun run(): i64 {
     print()
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

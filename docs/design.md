@@ -57,20 +57,14 @@ fun add(a: i64, b: i64): i64 {
 
 Epic 调用遵循 Windows x64 ABI：前四个整数参数使用寄存器，更多参数使用 8 字节栈槽。函数体是一个 block：非 `void` 函数可以用最后一个裸表达式作为返回值，也可以显式 `ret expr`；`void` 函数可以使用 `ret` 或自然结束，尾表达式如果存在必须是 `void`。
 
-程序入口函数名为 `main`，不接收参数，返回类型可以是 `void` 或 `i64`：
+程序入口函数必须是不接收参数、返回 `void` 的 `main`：
 
 ```epic
 fun main(): void {
 }
 ```
 
-```epic
-fun main(): i64 {
-    ret 0
-}
-```
-
-`void` 入口自然结束时进程退出码为 `0`；`i64` 入口的返回值作为进程退出码传给 `ExitProcess`。
+自然结束时进程退出码为 `0`。需要其他退出状态时必须显式调用 `exit(code)`；入口函数本身不通过返回值表达进程状态。普通非 `void` 函数仍可使用 `ret expr` 或尾表达式返回值。
 
 ### 用户方法 (User Methods)
 
@@ -453,6 +447,29 @@ Epic 不公开 `ptr` 类型。外部指针、C 字符串地址、Windows handle 
 `cstr(s)` 返回 `u64`，并要求字符串不含内嵌 NUL。extern 不提供隐式字符串转换。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
 
 源码 extern 通过自带 PE linker 的编码导入符号传递 DLL metadata，因此 Python 驱动下要求默认的 `--linker py`；`lld-link` 仍可用于没有源码 extern 的程序。普通退出继续使用 `exit(code)`。
+
+## v0 稳定边界 (Stability Boundary)
+
+v0 稳定的是用户可见的语言与工具行为，而不是当前实现的内部形状。
+
+以下内容属于稳定边界：
+
+- 本文档描述的源码语法、类型规则、求值语义和控制流行为；
+- public 类型、运算符、builtin、数组点方法、`main` 入口签名和 source `extern` 形式；
+- 已文档化 CLI 选项的含义和默认行为；
+- 程序可观察行为，包括标准输出/错误输出的语义、退出状态、panic/边界检查触发条件；
+- 诊断的意图和必要信息。具体措辞、标点、行序和格式不承诺逐字节稳定。
+
+以下内容不属于稳定边界，可以为 GC、优化、可维护性或新后端而演进：
+
+- AST、typed AST、MIR、X64IR 的文本格式、顺序和内部节点/操作名称；
+- compiler/runtime 私有 helper 名称、调用约定、对象布局和私有 ABI；
+- 分配器、GC、对象生命周期、内存布局和其他 runtime 实现策略；
+- 指令选择、寄存器/栈布局、COFF/PE 字节、符号顺序和 linker 内部实现；
+- Python reference compiler 与 self-hosted compiler 的模块划分、文件结构和中间数据结构；
+- 性能、内存占用和未显式承诺的优化结果。
+
+保持稳定边界不要求内部 lockstep 永久不变。只要公开语义和可观察行为保持一致，内部表示可以重构。任何有意破坏公开边界的改动必须在同一提交中更新设计文档和意图级测试，不能依赖旧行为的隐式兼容。
 
 ## 自举模型 (Bootstrap Model)
 

@@ -1,5 +1,5 @@
 # EXIT: 0
-fun main(): i64 {
+fun run(): i64 {
     let signed: i64 = -1
     let unsigned: u64 = u64(signed)
     if unsigned != (u64(0) - u64(1)) { ret 12 }
@@ -8,4 +8,8 @@ fun main(): i64 {
     if signed_again != (0 - 1) { ret 13 }
 
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

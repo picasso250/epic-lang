@@ -729,12 +729,12 @@ fun dump_tokens(tokens: Token[]): i64 {
 
 # ── Main ────────────────────────────────────────────────────────────────
 
-fun main(): i64 {
+fun main(): void {
     if len(argv) < 2 {
         panic "usage: lexer <file>"
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
     dump_tokens(tokens)
-    ret 0
+    ret
 }

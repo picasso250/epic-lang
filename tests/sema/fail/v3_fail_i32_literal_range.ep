@@ -1,6 +1,10 @@
 # COMPILE_FAIL: let x expected i32, got i64; use i32(... ) for an explicit conversion
 
-fun main(): i64 {
+fun run(): i64 {
     let x: i32 = 2147483648
     ret x
+}
+
+fun main(): void {
+    exit(run())
 }

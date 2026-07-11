@@ -1,7 +1,11 @@
-fun main(): i64 {
+fun run(): i64 {
     let x = 0
     for x < 3 {
         x = x + 1
     }
     ret x
+}
+
+fun main(): void {
+    exit(run())
 }

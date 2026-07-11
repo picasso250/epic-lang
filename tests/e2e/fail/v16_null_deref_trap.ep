@@ -9,11 +9,15 @@ struct Outer {
     inner: Inner
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let o = new Outer
     let x = o.inner
     if x.ok {
         ret 1
     }
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

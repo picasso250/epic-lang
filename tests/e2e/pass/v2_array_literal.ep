@@ -1,5 +1,5 @@
 # EXIT: 12
-fun main(): i64 {
+fun run(): i64 {
     let xs = new i64[] { 2, 4, 6 }
     if len(xs) != 3 {
         ret 1
@@ -8,4 +8,8 @@ fun main(): i64 {
         ret 2
     }
     ret xs[0] + xs[1] + xs[2]
+}
+
+fun main(): void {
+    exit(run())
 }

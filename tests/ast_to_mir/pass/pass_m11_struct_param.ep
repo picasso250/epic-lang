@@ -7,7 +7,11 @@ fun sum(p: Pair): i64 {
     ret p.a + p.b
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let p = new Pair { a: 4, b: 5 }
     ret sum(p)
+}
+
+fun main(): void {
+    exit(run())
 }

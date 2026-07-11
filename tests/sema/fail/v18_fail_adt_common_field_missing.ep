@@ -10,8 +10,12 @@ struct Pair {
     value: i64
 }
 type Node = Leaf | Pair
-fun main(): i64 {
+fun run(): i64 {
     let m = new Meta { line: 1 }
     let n: Node = new Node(new Leaf { meta: m, value: 1 })
     ret n.meta.line
+}
+
+fun main(): void {
+    exit(run())
 }

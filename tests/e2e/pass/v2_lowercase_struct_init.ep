@@ -5,7 +5,11 @@ struct point {
     y: i64
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let p = new point { x: 7, y: 3 }
     ret p.x
+}
+
+fun main(): void {
+    exit(run())
 }

@@ -1,5 +1,5 @@
 # EXIT: 0
-fun main(): i64 {
+fun run(): i64 {
     let b: u8 = u8(300)
     if i64(b) != 44 { ret 10 }
 
@@ -11,4 +11,8 @@ fun main(): i64 {
     if i64(bs[1]) != 255 { ret 13 }
 
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

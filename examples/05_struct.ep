@@ -16,7 +16,7 @@ fun (p: Point) sum(): i64 {
     ret p.x + p.y
 }
 
-fun main(): i64 {
+fun main(): void {
     let p = new Point { x: 40, y: 2 }
     println(str(p.sum()))
 
@@ -24,5 +24,4 @@ fun main(): i64 {
     println(named.name)
     named.point.x += 1
     println(str(named.point.x + named.point.y))
-    ret 0
 }

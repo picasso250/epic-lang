@@ -1,7 +1,11 @@
-fun main(): i64 {
+fun run(): i64 {
     if 1 < 2 {
         ret 0
     } else {
         ret 1
     }
+}
+
+fun main(): void {
+    exit(run())
 }

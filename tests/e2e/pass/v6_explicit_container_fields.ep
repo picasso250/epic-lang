@@ -15,7 +15,7 @@ fun add_one(xs: i64[]): void {
     xs.push(1)
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let s = new S { xs: new i64[] }
     check(len(s.xs) == 0)
     check(cap(s.xs) == 0)
@@ -26,5 +26,9 @@ fun main(): i64 {
     check(s.xs[1] == 1)
     println("ok")
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }
 

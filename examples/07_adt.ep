@@ -24,8 +24,7 @@ fun eval(e: Expr): i64 {
     ret out
 }
 
-fun main(): i64 {
+fun main(): void {
     let e: Expr = new Expr(new Add { left: 20, right: 22 })
     println(str(eval(e)))
-    ret 0
 }

@@ -615,6 +615,14 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                         sema_die(f"function {f.name} parameter {p.name} cannot have type void")
                     }
                 }
+                if f.name == "main" {
+                    if len(f.params) != 0 {
+                        sema_die("main function cannot have parameters")
+                    }
+                    if f.meta.resolved_type != "void" {
+                        sema_die(f"main function must return void, got {f.meta.resolved_type}")
+                    }
+                }
                 if f.method_name? {
                     if len(f.params) == 0 {
                         sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")

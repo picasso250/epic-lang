@@ -8,7 +8,11 @@ struct Outer {
     inner: Inner
 }
 
-fun main(): i64 {
+fun run(): i64 {
     println(str(new Outer {}))
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

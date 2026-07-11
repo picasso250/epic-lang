@@ -855,7 +855,7 @@ fun default_out_path(obj_path: str): str {
     ret (obj_path + ".exe")
 }
 
-fun main(): i64 {
+fun main(): void {
     if len(argv) < 2 {
         panic "Usage: link.ep <file.obj> [-o out.exe]"
     }
@@ -877,5 +877,4 @@ fun main(): i64 {
     print(" (")
     print(str(sz))
     print(" bytes)\n")
-    ret 0
 }

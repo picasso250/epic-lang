@@ -9,7 +9,11 @@ fun unit_tail(): void {
     xs.push(1)
 }
 
-fun main(): i64 {
+fun run(): i64 {
     unit_tail()
     add(20, 22) - 42
+}
+
+fun main(): void {
+    exit(run())
 }

@@ -184,11 +184,15 @@ struct Point {
     y: i64
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let p = new Point { y: 2, x: 1 }
     let xs = new i64[] { 4 }
     xs.push(5)
     ret xs[0]
+}
+
+fun main(): void {
+    exit(run())
 }
 """
     program = ast_to_mir(sema.analyze_program(Parser(lex(source)).parse_program()))
@@ -372,9 +376,13 @@ fun (c: Counter) add(delta: i64): i64 {
     ret c.value + delta
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let c = new Counter { value: 40 }
     ret c.add(2)
+}
+
+fun main(): void {
+    exit(run())
 }
 """
     ast = Parser(lex(source)).parse_program()
@@ -404,9 +412,9 @@ fun (c: Counter) add(delta: i64): i64 {
     ret c.value + delta
 }
 
-fun main(): i64 {
+fun main(): void {
     let c = new Counter { value: 1 }
-    ret c.add(2)
+    exit(c.add(2))
 }
 """
     try:

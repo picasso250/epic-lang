@@ -1,5 +1,8 @@
 # COMPILE_FAIL: return expected str, got i64
 
-fun main(): str {
+fun bad(): str {
     ret 1
+}
+
+fun main(): void {
 }

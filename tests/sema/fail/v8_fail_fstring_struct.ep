@@ -4,8 +4,12 @@ struct Val {
     val: i64
 }
 
-fun main(): i64 {
+fun run(): i64 {
     println(f"value {new Val { val: 3 }}")
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }
 

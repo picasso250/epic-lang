@@ -1,7 +1,11 @@
-fun main(): i64 {
+fun run(): i64 {
     let name = "epic"
     let bs = bytes(name)
     let prefix = "hello " + name
     let msg = f"{prefix} {len(bs)} {true}"
     ret len(msg + "!")
+}
+
+fun main(): void {
+    exit(run())
 }

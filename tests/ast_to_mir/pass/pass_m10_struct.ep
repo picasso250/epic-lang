@@ -3,8 +3,12 @@ struct Pair {
     b: i64
 }
 
-fun main(): i64 {
+fun run(): i64 {
     let p = new Pair { a: 2, b: 3 }
     p.b = p.a + p.b
     ret p.b
+}
+
+fun main(): void {
+    exit(run())
 }

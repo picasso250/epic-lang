@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: int
 # STDOUT: str
-fun main(): i64 {
+fun main(): void {
     let n = 1
     match n {
         0: {
@@ -24,5 +24,4 @@ fun main(): i64 {
             println("other")
         }
     }
-    ret 0
 }

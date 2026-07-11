@@ -1,5 +1,5 @@
 # MIR-CODEGEN: literal match over integer, bool, and string cases.
-fun main(): i64 {
+fun run(): i64 {
     let n = 1
     match n {
         0: { print("zero") }
@@ -17,4 +17,8 @@ fun main(): i64 {
         _: { print("N") }
     }
     ret 0
+}
+
+fun main(): void {
+    exit(run())
 }

@@ -1,6 +1,10 @@
 # COMPILE_FAIL: integer literal 18446744073709551615 out of range for i64
 
-fun main(): i64 {
+fun run(): i64 {
     let x: u64 = u64(18446744073709551615)
     ret i64(x)
+}
+
+fun main(): void {
+    exit(run())
 }
