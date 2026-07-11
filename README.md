@@ -4,7 +4,7 @@
 
 - **可复现自举**：从 Python stage-0 构建 self-hosted compiler，并达到字节一致的不动点
 - **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World 为 **5632 bytes（5.5 KiB）**
-- **完整编译器栈在仓库内**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
+- **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
 
 包含一个 Python 参考编译器、一个用 Epic 自身编写的自托管编译器、一个类型化的 LLVM 风格 MIR、一个结构化的 x64 后端、一个小型 COFF/PE 工具链，以及用于构建真实 Windows 可执行文件的运行时辅助代码。
 
@@ -22,11 +22,7 @@ fun main(): void {
 
 ```powershell
 python test_bootstrap_fixed_point.py -o build\epic.exe
-
-.\build\epic.exe `
-  examples\00_hello_world.ep `
-  -o build\hello.exe
-
+.\build\epic.exe examples\00_hello_world.ep -o build\hello.exe
 .\build\hello.exe
 ```
 
