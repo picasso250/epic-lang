@@ -650,7 +650,12 @@ fun mir_to_x64_fused_icmp_jcc(op: str): str {
     if op == "icmp.ne" { ret "jnz" }
     if op == "icmp.slt" { ret "jl" }
     if op == "icmp.sle" { ret "jle" }
+    if op == "icmp.sgt" { ret "jg" }
     if op == "icmp.sge" { ret "jge" }
+    if op == "icmp.ult" { ret "jb" }
+    if op == "icmp.ule" { ret "jbe" }
+    if op == "icmp.ugt" { ret "ja" }
+    if op == "icmp.uge" { ret "jae" }
     ret ""
 }
 
@@ -658,7 +663,7 @@ fun mir_to_x64_can_fuse_block_icmp(lower: MirToX64Lower, block: MirBlock): bool 
     if len(block.instructions) == 0 { ret false }
     let inst = block.instructions[len(block.instructions) - 1]
     let jcc = mir_to_x64_fused_icmp_jcc(inst.op)
-    if len(jcc) == 0 && inst.op != "icmp.sgt" { ret false }
+    if len(jcc) == 0 { ret false }
     if lower.reusable_values[inst.result_id] == 0 { ret false }
     match block.terminator {
         MirCondBrTerminator cond: {
@@ -676,13 +681,8 @@ fun mir_to_x64_emit_fused_icmp_term(lower: MirToX64Lower, inst: MirInst, term: M
     match term {
         MirCondBrTerminator cond: {
             mir_to_x64_emit_icmp_compare(lower, inst)
-            if inst.op == "icmp.sgt" {
-                x64_add_inst1(lower.x64, "jle", x64_label_ref(mir_to_x64_block_label(lower, cond.else_target)))
-                x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
-            } else {
-                x64_add_inst1(lower.x64, mir_to_x64_fused_icmp_jcc(inst.op), x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
-                x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(lower, cond.else_target)))
-            }
+            x64_add_inst1(lower.x64, mir_to_x64_fused_icmp_jcc(inst.op), x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
+            x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(lower, cond.else_target)))
             ret
         }
         _: { mir_to_x64_die("fused icmp requires condbr") }

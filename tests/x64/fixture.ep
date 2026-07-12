@@ -47,13 +47,29 @@ fun check_local_peephole(): void {
         _: { panic "inverted branch must remain an instruction" }
     }
 
-    let unsupported = x64_program_empty()
-    let unsupported_next = x64_new_label(unsupported)
-    let unsupported_away = x64_new_label(unsupported)
-    x64_add_inst1(unsupported, "jle", x64_label_ref(unsupported_next))
-    x64_add_inst1(unsupported, "jmp", x64_label_ref(unsupported_away))
-    x64_bind_label(unsupported, unsupported_next)
-    if len(unsupported.items) != 3 { panic "branch without supported inverse must remain" }
+    let conditions = new str[]
+    conditions.push("jo")
+    conditions.push("jno")
+    conditions.push("jb")
+    conditions.push("jae")
+    conditions.push("jz")
+    conditions.push("jnz")
+    conditions.push("jbe")
+    conditions.push("ja")
+    conditions.push("js")
+    conditions.push("jns")
+    conditions.push("jp")
+    conditions.push("jnp")
+    conditions.push("jl")
+    conditions.push("jge")
+    conditions.push("jle")
+    conditions.push("jg")
+    for i: 0:len(conditions) {
+        let inverse = x64_invert_jcc(conditions[i])
+        if len(inverse) == 0 || x64_invert_jcc(inverse) != conditions[i] {
+            panic "jcc inverse mapping must be complete and symmetric"
+        }
+    }
 }
 
 fun build_x64_fixture(): X64Program {

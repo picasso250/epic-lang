@@ -19,42 +19,68 @@ fun has_op(program: X64Program, op: str): bool {
     ret false
 }
 
-fun main(): void {
+fun has_materialized_bool(program: X64Program): bool {
+    if has_op(program, "sete") || has_op(program, "setne") { ret true }
+    if has_op(program, "setl") || has_op(program, "setle") { ret true }
+    if has_op(program, "setg") || has_op(program, "setge") { ret true }
+    if has_op(program, "setb") || has_op(program, "setbe") { ret true }
+    if has_op(program, "seta") || has_op(program, "setae") { ret true }
+    ret has_op(program, "movzx") || has_op(program, "test")
+}
+
+fun assert_fused(op: str, typ: str, expected_jcc: str): void {
     let program = mir_program_empty()
     let fused = mir_function_empty("fused", "i64")
-    fused.params.push(new MirParam { typ: "i64", value_id: 1 })
-    fused.params.push(new MirParam { typ: "i64", value_id: 2 })
+    fused.params.push(new MirParam { typ: typ, value_id: 1 })
+    fused.params.push(new MirParam { typ: typ, value_id: 2 })
     let entry = mir_block_empty("entry")
-    entry.instructions.push(comparison("icmp.slt", 3, mir_value_operand("i64", 1), mir_value_operand("i64", 2)))
+    entry.instructions.push(comparison(op, 3, mir_value_operand(typ, 1), mir_value_operand(typ, 2)))
     entry.terminator = mir_condbr(mir_value_operand("bool", 3), "yes", "no")
     entry.has_terminator = true
-    let yes = mir_block_empty("yes")
-    yes.terminator = mir_ret_value(mir_const_int("i64", 1))
-    yes.has_terminator = true
     let no = mir_block_empty("no")
     no.terminator = mir_ret_value(mir_const_int("i64", 0))
     no.has_terminator = true
+    let yes = mir_block_empty("yes")
+    yes.terminator = mir_ret_value(mir_const_int("i64", 1))
+    yes.has_terminator = true
     fused.blocks.push(entry)
-    fused.blocks.push(yes)
     fused.blocks.push(no)
-    let fused_x64 = mir_to_x64_lower_function_with_program(program, fused)
-    if !has_op(fused_x64, "cmp") || (!has_op(fused_x64, "jl") && !has_op(fused_x64, "jge")) {
-        panic "single-use terminal icmp must branch directly"
+    fused.blocks.push(yes)
+    let lowered = mir_to_x64_lower_function_with_program(program, fused)
+    if !has_op(lowered, "cmp") || !has_op(lowered, expected_jcc) {
+        panic "terminal icmp must use its canonical direct branch"
     }
-    if has_op(fused_x64, "setl") || has_op(fused_x64, "movzx") || has_op(fused_x64, "test") {
+    if has_materialized_bool(lowered) {
         panic "fused icmp must not materialize a boolean"
     }
+}
 
+fun assert_materialized_value(): void {
+    let program = mir_program_empty()
     let materialized = mir_function_empty("materialized", "bool")
     materialized.params.push(new MirParam { typ: "i64", value_id: 1 })
     materialized.params.push(new MirParam { typ: "i64", value_id: 2 })
-    let value_entry = mir_block_empty("entry")
-    value_entry.instructions.push(comparison("icmp.slt", 3, mir_value_operand("i64", 1), mir_value_operand("i64", 2)))
-    value_entry.terminator = mir_ret_value(mir_value_operand("bool", 3))
-    value_entry.has_terminator = true
-    materialized.blocks.push(value_entry)
-    let value_x64 = mir_to_x64_lower_function_with_program(program, materialized)
-    if !has_op(value_x64, "setl") || !has_op(value_x64, "movzx") {
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(comparison("icmp.slt", 3, mir_value_operand("i64", 1), mir_value_operand("i64", 2)))
+    entry.terminator = mir_ret_value(mir_value_operand("bool", 3))
+    entry.has_terminator = true
+    materialized.blocks.push(entry)
+    let lowered = mir_to_x64_lower_function_with_program(program, materialized)
+    if !has_op(lowered, "setl") || !has_op(lowered, "movzx") {
         panic "icmp used as a value must remain materialized"
     }
+}
+
+fun main(): void {
+    assert_fused("icmp.eq", "i64", "jz")
+    assert_fused("icmp.ne", "i64", "jnz")
+    assert_fused("icmp.slt", "i64", "jl")
+    assert_fused("icmp.sle", "i64", "jle")
+    assert_fused("icmp.sgt", "i64", "jg")
+    assert_fused("icmp.sge", "i64", "jge")
+    assert_fused("icmp.ult", "u64", "jb")
+    assert_fused("icmp.ule", "u64", "jbe")
+    assert_fused("icmp.ugt", "u64", "ja")
+    assert_fused("icmp.uge", "u64", "jae")
+    assert_materialized_value()
 }

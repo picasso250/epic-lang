@@ -332,26 +332,34 @@ fun machine_emit_mov_reg_reg(b: MachineBuilder, dst: str, src: str): void {
     machine_modrm(b, 3, s, d)
 }
 
+fun machine_jcc_opcode(op: str): i64 {
+    if op == "jo" { ret 128 }
+    if op == "jno" { ret 129 }
+    if op == "jb" { ret 130 }
+    if op == "jae" { ret 131 }
+    if op == "jz" { ret 132 }
+    if op == "jnz" { ret 133 }
+    if op == "jbe" { ret 134 }
+    if op == "ja" { ret 135 }
+    if op == "js" { ret 136 }
+    if op == "jns" { ret 137 }
+    if op == "jp" { ret 138 }
+    if op == "jnp" { ret 139 }
+    if op == "jl" { ret 140 }
+    if op == "jge" { ret 141 }
+    if op == "jle" { ret 142 }
+    if op == "jg" { ret 143 }
+    ret -1
+}
+
 fun machine_emit_jump(b: MachineBuilder, op: str, label: X64Label): void {
     if op == "jmp" {
         machine_append_byte(b.text, 233)
-    } else if op == "jz" {
-        machine_append_byte(b.text, 15)
-        machine_append_byte(b.text, 132)
-    } else if op == "jnz" {
-        machine_append_byte(b.text, 15)
-        machine_append_byte(b.text, 133)
-    } else if op == "jl" {
-        machine_append_byte(b.text, 15)
-        machine_append_byte(b.text, 140)
-    } else if op == "jge" {
-        machine_append_byte(b.text, 15)
-        machine_append_byte(b.text, 141)
-    } else if op == "jle" {
-        machine_append_byte(b.text, 15)
-        machine_append_byte(b.text, 142)
     } else {
-        machine_die(("unsupported jump: " + op))
+        let opcode = machine_jcc_opcode(op)
+        if opcode < 0 { machine_die(("unsupported jump: " + op)) }
+        machine_append_byte(b.text, 15)
+        machine_append_byte(b.text, opcode)
     }
     let off = len(b.text)
     machine_append_i32(b.text, 0)
@@ -889,7 +897,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
     }
     if op == "mov" && machine_emit_mov_inst(b, ops) { ret }
     if op == "cmp" && machine_emit_cmp_inst(b, ops) { ret }
-    if (op == "jmp" || op == "jz" || op == "jnz" || op == "jl" || op == "jge" || op == "jle") && len(ops) == 1 {
+    if (op == "jmp" || machine_jcc_opcode(op) >= 0) && len(ops) == 1 {
         match ops[0] {
             X64LabelRefOperand target: {
                 machine_emit_jump(b, op, target.label)

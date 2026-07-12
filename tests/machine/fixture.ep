@@ -174,9 +174,56 @@ fun assert_machine_immediate_bytes(): void {
     }
 }
 
+fun build_machine_jcc_fixture(): X64Program {
+    let program = x64_program_empty()
+    x64_add_section(program, ".text")
+    let ops = new str[]
+    ops.push("jo")
+    ops.push("jno")
+    ops.push("jb")
+    ops.push("jae")
+    ops.push("jz")
+    ops.push("jnz")
+    ops.push("jbe")
+    ops.push("ja")
+    ops.push("js")
+    ops.push("jns")
+    ops.push("jp")
+    ops.push("jnp")
+    ops.push("jl")
+    ops.push("jge")
+    ops.push("jle")
+    ops.push("jg")
+    let labels = new X64Label[]
+    for i: 0:len(ops) {
+        labels.push(x64_new_label(program))
+    }
+    for i: 0:len(ops) {
+        x64_add_inst1(program, ops[i], x64_label_ref(labels[i]))
+    }
+    x64_add_inst0(program, "ret")
+    for i: 0:len(labels) {
+        x64_bind_label(program, labels[i])
+    }
+    ret program
+}
+
+fun assert_machine_jcc_bytes(): void {
+    let obj = machine_build_object(build_machine_jcc_fixture())
+    if len(obj.text) != 97 { panic "machine jcc byte length mismatch" }
+    for i: 0:16 {
+        let offset = i * 6
+        if obj.text[offset] != 15 || obj.text[offset + 1] != 128 + i {
+            panic "machine jcc opcode mismatch"
+        }
+    }
+    if obj.text[96] != 195 { panic "machine jcc fixture must end in ret" }
+}
+
 fun main(): void {
     assert_machine_generic_register_bytes()
     assert_machine_immediate_bytes()
+    assert_machine_jcc_bytes()
     let index = machine_name_index_new(2)
     machine_name_index_insert(index, "symbol_0", 7)
     machine_name_index_insert(index, "symbol_8", 11)

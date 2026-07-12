@@ -137,10 +137,22 @@ fun x64_add_section(program: X64Program, name: str): void {
 }
 
 fun x64_invert_jcc(op: str): str {
+    if op == "jo" { ret "jno" }
+    if op == "jno" { ret "jo" }
+    if op == "jb" { ret "jae" }
+    if op == "jae" { ret "jb" }
     if op == "jz" { ret "jnz" }
     if op == "jnz" { ret "jz" }
+    if op == "jbe" { ret "ja" }
+    if op == "ja" { ret "jbe" }
+    if op == "js" { ret "jns" }
+    if op == "jns" { ret "js" }
+    if op == "jp" { ret "jnp" }
+    if op == "jnp" { ret "jp" }
     if op == "jl" { ret "jge" }
     if op == "jge" { ret "jl" }
+    if op == "jle" { ret "jg" }
+    if op == "jg" { ret "jle" }
     ret ""
 }
 
