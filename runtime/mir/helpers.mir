@@ -26,6 +26,8 @@ extern ptr @GetCommandLineA()
 
 extern i64 @__ep_import$kernel32.dll$GetTickCount64()
 
+extern ptr @__ep_import$kernel32.dll$VirtualAlloc(ptr, i64, i64, i64)
+
 extern void @__ep_runtime_panic(ptr)
 
 extern ptr @__ep_str_from_i64(i64)

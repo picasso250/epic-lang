@@ -5,9 +5,14 @@ Epic 当前使用单线程、non-moving、conservative mark-sweep GC。它是 ru
 
 ## Allocation
 
-所有 managed allocation 必须经过 `__ep_alloc`。payload 直接由 Win32 process
-heap 分配，地址在生命周期内不移动。runtime 长期维护紧凑的 payload 基址和请求大小
-并行数组；正常分配路径只执行 HeapAlloc 和记录追加，不给每个对象增加 GC header。
+所有 managed allocation 必须经过 `__ep_alloc`。`<=32B` 请求进入 8/16/24/32B
+四级 small-object slab；`>32B` payload 由 Win32 process heap 分配。两条路径地址均在
+生命周期内不移动，也都不给每个对象增加 GC header。
+
+small allocator reserve 1 GiB 连续虚拟地址 arena，并将它划分为 64 KiB slab，使用
+`VirtualAlloc` 按需 commit。slab class、bump/free-list 状态和 allocation/mark byte map
+保存在常驻 side table；slot 每次分配和复用时按 class size 清零。large allocator 继续
+长期维护紧凑的 payload 基址和请求大小并行数组。
 
 冻结的 v0 seed 只读取 `runtime/mir/helpers.mir`，因此该文件保留 legacy
 `__ep_alloc` 作为单代 bootstrap bridge。当前 compiler 先加载
@@ -18,22 +23,25 @@ heap 分配，地址在生命周期内不移动。runtime 长期维护紧凑的 
 - 初始 payload 阈值为 8 MiB，对象数量阈值为 262,144；任一达到即触发
   collection。每轮 collection 后分别使用 `max(8 MiB, 2 * live_bytes)` 和
   `max(262,144, 2 * live_objects)`。
-- collection 临时建立 payload-address hash table、mark byte table 和迭代 work stack，
-  结束后立即释放。hash slot 保存 `object_index + 1`，因此 mark、work 和 sweep 共享
-  同一对象索引；lookup 先以历史 `low_addr/high_addr` 快速拒绝。
+- collection 只为 large objects 临时建立 payload-address hash table 和 mark byte table；
+  small candidate 通过 arena range、slab class、slot alignment 和 allocation byte map
+  直接识别。两条路径共用 tagged integer work stack，结束后释放临时 metadata。
 - roots 包括活动线程栈和 `argv`。后端为非 `gep` 的 `ptr` 结果保留稳定栈槽，
   保证 allocation safepoint 上存在 managed object 基址。
 - heap payload 按对齐的 8-byte word 保守扫描。natural struct layout 保证所有 managed
   reference 字段仍按 8 字节对齐；窄 scalar 字段和清零 padding 只可能造成 conservative
   false retention，不会隐藏活引用。
-- sweep 直接按 object index 读取 mark，并原地压紧 payload/size 记录。对象大小来自长期
-  side metadata，不调用 `HeapSize`。
+- large sweep 直接按 object index 读取 mark，并原地压紧 payload/size 记录。small sweep
+  清理 allocation/mark byte map、重建 dead-slot free list，并选择各 class 的 active slab。
+  对象大小均来自 side metadata，不调用 `HeapSize`。
 - 每次 stop-the-world collection 完成后向 stderr 输出 `gc stw: <ms> ms`；计时不包含日志写出本身。
 - 正常退出时，若进程至少发生过一次 collection，则向 stderr 输出一次累计 allocation profile，
   包含总请求数/字节数、`<=8/16/24/32/64B` 累计桶，以及精确 `16/24/32B` 计数。
 
 当前自举 workload 的 allocation size 分布、固定尺寸结论和 allocator 启示记录在
 [`gc-allocation-profile.md`](gc-allocation-profile.md)。
+slab 实验的具体实现边界和性能结果记录在
+[`gc-slab-experiment.md`](gc-slab-experiment.md)。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
 reference 或精确 stack map。公开 WinAPI 调用是同步的；runtime 不承诺管理由

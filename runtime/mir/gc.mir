@@ -8,6 +8,32 @@ global @gc_object_cap: i64
 
 global @gc_live_bytes: i64
 
+global @gc_large_live_bytes: i64
+
+global @gc_small_live_bytes: i64
+
+global @gc_small_object_count: i64
+
+global @gc_small_arena: ptr
+
+global @gc_small_arena_end: ptr
+
+global @gc_small_page_states: ptr
+
+global @gc_small_page_bumps: ptr
+
+global @gc_small_page_free_heads: ptr
+
+global @gc_small_page_alloc_counts: ptr
+
+global @gc_small_page_alloc_maps: ptr
+
+global @gc_small_page_mark_maps: ptr
+
+global @gc_small_active_pages: ptr
+
+global @gc_small_page_count: i64
+
 global @gc_threshold: i64 = 8388608
 
 global @gc_object_threshold: i64 = 262144
@@ -122,6 +148,220 @@ entry:
   %2: i64 = load i64, ptr heap
   %3: i64 = call i64 HeapFree(i64 %2, i64 0, ptr %1)
   ret void
+}
+
+define void @__ep_gc_small_init() {
+entry:
+  %1: ptr = call ptr __ep_import$kernel32.dll$VirtualAlloc(ptr null, i64 1073741824, i64 8192, i64 4)
+  %2: bool = icmp.eq ptr %1, ptr null
+  condbr bool %2, label %fail, label %metadata
+
+metadata:
+  %3: ptr = gep i8, ptr %1, i64 1073741824
+  store ptr %1, ptr gc_small_arena
+  store ptr %3, ptr gc_small_arena_end
+  %4: ptr = call ptr __ep_gc_raw_alloc(i64 16384)
+  %5: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %6: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %7: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %8: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %9: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %10: ptr = call ptr __ep_gc_raw_alloc(i64 32)
+  store ptr %4, ptr gc_small_page_states
+  store ptr %5, ptr gc_small_page_bumps
+  store ptr %6, ptr gc_small_page_free_heads
+  store ptr %7, ptr gc_small_page_alloc_counts
+  store ptr %8, ptr gc_small_page_alloc_maps
+  store ptr %9, ptr gc_small_page_mark_maps
+  store ptr %10, ptr gc_small_active_pages
+  ret void
+
+fail:
+  call void ExitProcess(i64 1)
+  ret void
+}
+
+define i64 @__ep_gc_small_acquire_page(i64 %1) {
+entry:
+  %2: i64 = load i64, ptr gc_small_page_count
+  %3: bool = icmp.uge i64 %2, i64 16384
+  condbr bool %3, label %fail, label %commit
+
+commit:
+  %4: i64 = mul i64 %2, i64 65536
+  %5: ptr = load ptr, ptr gc_small_arena
+  %6: ptr = gep i8, ptr %5, i64 %4
+  %7: ptr = call ptr __ep_import$kernel32.dll$VirtualAlloc(ptr %6, i64 65536, i64 4096, i64 4)
+  %8: bool = icmp.eq ptr %7, ptr null
+  condbr bool %8, label %fail, label %maps
+
+maps:
+  %9: i64 = mul i64 %1, i64 8
+  %10: i64 = udiv i64 65536, i64 %9
+  %11: ptr = call ptr __ep_gc_raw_alloc(i64 %10)
+  %12: ptr = call ptr __ep_gc_raw_alloc(i64 %10)
+  %13: ptr = load ptr, ptr gc_small_page_states
+  %14: ptr = gep i8, ptr %13, i64 %2
+  %15: ptr = alloca i64
+  store i64 %1, ptr %15
+  %16: i8 = load i8, ptr %15
+  store i8 %16, ptr %14
+  %17: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %18: ptr = gep ptr, ptr %17, i64 %2
+  store ptr %11, ptr %18
+  %19: ptr = load ptr, ptr gc_small_page_mark_maps
+  %20: ptr = gep ptr, ptr %19, i64 %2
+  store ptr %12, ptr %20
+  %21: i64 = add i64 %2, i64 1
+  store i64 %21, ptr gc_small_page_count
+  %22: ptr = load ptr, ptr gc_small_active_pages
+  %23: i64 = sub i64 %1, i64 1
+  %24: ptr = gep i64, ptr %22, i64 %23
+  store i64 %21, ptr %24
+  ret i64 %21
+
+fail:
+  ret i64 0
+}
+
+define ptr @__ep_gc_small_alloc(i64 %1) {
+entry:
+  %67: ptr = alloca i64
+  %68: ptr = alloca i64
+  %2: i64 = add i64 %1, i64 7
+  %3: i64 = udiv i64 %2, i64 8
+  %69: bool = icmp.eq i64 %3, i64 0
+  condbr bool %69, label %zero_class, label %store_class
+
+zero_class:
+  store i64 1, ptr %68
+  br label %setup
+
+store_class:
+  store i64 %3, ptr %68
+  br label %setup
+
+setup:
+  %70: i64 = load i64, ptr %68
+  %4: ptr = load ptr, ptr gc_small_active_pages
+  %5: i64 = sub i64 %70, i64 1
+  %6: ptr = gep i64, ptr %4, i64 %5
+  %7: i64 = load i64, ptr %6
+  %8: bool = icmp.eq i64 %7, i64 0
+  condbr bool %8, label %acquire, label %select
+
+acquire:
+  %9: i64 = call i64 __ep_gc_small_acquire_page(i64 %70)
+  %10: bool = icmp.eq i64 %9, i64 0
+  condbr bool %10, label %fail, label %select_acquired
+
+select_acquired:
+  store i64 %9, ptr %6
+  br label %select
+
+select:
+  %11: i64 = load i64, ptr %6
+  %12: i64 = sub i64 %11, i64 1
+  %13: i64 = mul i64 %70, i64 8
+  %14: i64 = udiv i64 65536, i64 %13
+  %15: ptr = load ptr, ptr gc_small_page_free_heads
+  %16: ptr = gep i64, ptr %15, i64 %12
+  %17: i64 = load i64, ptr %16
+  %18: bool = icmp.ne i64 %17, i64 0
+  condbr bool %18, label %pop_free, label %bump
+
+pop_free:
+  %19: i64 = sub i64 %17, i64 1
+  %20: i64 = mul i64 %12, i64 65536
+  %21: i64 = mul i64 %19, i64 %13
+  %22: i64 = add i64 %20, i64 %21
+  %23: ptr = load ptr, ptr gc_small_arena
+  %24: ptr = gep i8, ptr %23, i64 %22
+  %25: i64 = load i64, ptr %24
+  store i64 %25, ptr %16
+  br label %record_free
+
+record_free:
+  store i64 %19, ptr %67
+  br label %record
+
+bump:
+  %27: ptr = load ptr, ptr gc_small_page_bumps
+  %28: ptr = gep i64, ptr %27, i64 %12
+  %29: i64 = load i64, ptr %28
+  %30: bool = icmp.uge i64 %29, i64 %14
+  condbr bool %30, label %page_full, label %use_bump
+
+page_full:
+  store i64 0, ptr %6
+  %31: i64 = call i64 __ep_gc_small_acquire_page(i64 %70)
+  %32: bool = icmp.eq i64 %31, i64 0
+  condbr bool %32, label %fail, label %select
+
+use_bump:
+  %33: i64 = add i64 %29, i64 1
+  store i64 %33, ptr %28
+  %34: i64 = mul i64 %12, i64 65536
+  %35: i64 = mul i64 %29, i64 %13
+  %36: i64 = add i64 %34, i64 %35
+  %37: ptr = load ptr, ptr gc_small_arena
+  %38: ptr = gep i8, ptr %37, i64 %36
+  store i64 %29, ptr %67
+  br label %record
+
+record:
+  %41: i64 = load i64, ptr %67
+  %42: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %43: ptr = gep ptr, ptr %42, i64 %12
+  %44: ptr = load ptr, ptr %43
+  %45: ptr = gep i8, ptr %44, i64 %41
+  store i8 1, ptr %45
+  %46: ptr = load ptr, ptr gc_small_page_alloc_counts
+  %47: ptr = gep i64, ptr %46, i64 %12
+  %48: i64 = load i64, ptr %47
+  %49: i64 = add i64 %48, i64 1
+  store i64 %49, ptr %47
+  %50: i64 = load i64, ptr gc_small_object_count
+  %51: i64 = add i64 %50, i64 1
+  store i64 %51, ptr gc_small_object_count
+  %52: i64 = load i64, ptr gc_small_live_bytes
+  %53: i64 = add i64 %52, i64 %13
+  store i64 %53, ptr gc_small_live_bytes
+  %54: i64 = load i64, ptr gc_live_bytes
+  %55: i64 = add i64 %54, i64 %13
+  store i64 %55, ptr gc_live_bytes
+  call void __ep_gc_record_alloc_profile(i64 %1)
+  %56: i64 = mul i64 %12, i64 65536
+  %57: i64 = mul i64 %41, i64 %13
+  %58: i64 = add i64 %56, i64 %57
+  %59: ptr = load ptr, ptr gc_small_arena
+  %60: ptr = gep i8, ptr %59, i64 %58
+  store i64 0, ptr %60
+  %61: bool = icmp.ugt i64 %13, i64 8
+  condbr bool %61, label %zero16, label %done
+
+zero16:
+  %62: ptr = gep i8, ptr %60, i64 8
+  store i64 0, ptr %62
+  %63: bool = icmp.ugt i64 %13, i64 16
+  condbr bool %63, label %zero24, label %done
+
+zero24:
+  %64: ptr = gep i8, ptr %60, i64 16
+  store i64 0, ptr %64
+  %65: bool = icmp.ugt i64 %13, i64 24
+  condbr bool %65, label %zero32, label %done
+
+zero32:
+  %66: ptr = gep i8, ptr %60, i64 24
+  store i64 0, ptr %66
+  br label %done
+
+done:
+  ret ptr %60
+
+fail:
+  ret ptr null
 }
 
 define void @__ep_gc_grow_objects(i64 %1) {
@@ -309,22 +549,23 @@ double:
 allocate:
   %7: i64 = mul i64 %4, i64 8
   %8: ptr = call ptr __ep_gc_raw_alloc(i64 %7)
+  %22: i64 = load i64, ptr gc_small_object_count
+  %23: i64 = add i64 %1, i64 %22
+  %24: i64 = add i64 %23, i64 1
+  %25: i64 = mul i64 %24, i64 8
+  %26: ptr = call ptr __ep_gc_raw_alloc(i64 %25)
+  store ptr %26, ptr gc_work
   %9: bool = icmp.eq i64 %1, i64 0
   condbr bool %9, label %empty, label %full
 
 empty:
   %10: ptr = call ptr __ep_gc_raw_alloc(i64 1)
-  %11: ptr = call ptr __ep_gc_raw_alloc(i64 8)
   store ptr %10, ptr gc_marks
-  store ptr %11, ptr gc_work
   br label %store
 
 full:
   %12: ptr = call ptr __ep_gc_raw_alloc(i64 %1)
-  %13: i64 = mul i64 %1, i64 8
-  %14: ptr = call ptr __ep_gc_raw_alloc(i64 %13)
   store ptr %12, ptr gc_marks
-  store ptr %14, ptr gc_work
   br label %store
 
 store:
@@ -368,7 +609,7 @@ entry:
   ret void
 }
 
-define void @__ep_gc_mark_ptr(ptr %1) {
+define void @__ep_gc_mark_large_ptr(ptr %1) {
 entry:
   %2: i64 = call i64 __ep_gc_lookup(ptr %1)
   %3: bool = icmp.eq i64 %2, i64 0
@@ -387,9 +628,105 @@ mark:
   %9: ptr = load ptr, ptr gc_work
   %10: i64 = load i64, ptr gc_work_count
   %11: ptr = gep i64, ptr %9, i64 %10
-  store i64 %4, ptr %11
+  %13: i64 = mul i64 %4, i64 2
+  store i64 %13, ptr %11
   %12: i64 = add i64 %10, i64 1
   store i64 %12, ptr gc_work_count
+  ret void
+
+done:
+  ret void
+}
+
+define bool @__ep_gc_mark_small_ptr(ptr %1) {
+entry:
+  %2: ptr = load ptr, ptr gc_small_arena
+  %3: bool = icmp.ult ptr %1, ptr %2
+  condbr bool %3, label %miss, label %range_high
+
+range_high:
+  %4: ptr = load ptr, ptr gc_small_arena_end
+  %5: bool = icmp.uge ptr %1, ptr %4
+  condbr bool %5, label %miss, label %locate
+
+locate:
+  %6: i64 = ptrtoint ptr %1 to i64
+  %7: i64 = ptrtoint ptr %2 to i64
+  %8: i64 = sub i64 %6, i64 %7
+  %9: i64 = udiv i64 %8, i64 65536
+  %10: i64 = load i64, ptr gc_small_page_count
+  %11: bool = icmp.uge i64 %9, i64 %10
+  condbr bool %11, label %owned_dead, label %class
+
+class:
+  %12: ptr = load ptr, ptr gc_small_page_states
+  %13: ptr = gep i8, ptr %12, i64 %9
+  %16: i64 = load i8, ptr %13
+  %17: bool = icmp.eq i64 %16, i64 0
+  condbr bool %17, label %owned_dead, label %slot
+
+slot:
+  %18: i64 = mul i64 %16, i64 8
+  %19: i64 = urem i64 %8, i64 65536
+  %20: i64 = urem i64 %19, i64 %18
+  %21: bool = icmp.ne i64 %20, i64 0
+  condbr bool %21, label %owned_dead, label %allocated
+
+allocated:
+  %22: i64 = udiv i64 %19, i64 %18
+  %23: i64 = udiv i64 65536, i64 %18
+  %24: bool = icmp.uge i64 %22, i64 %23
+  condbr bool %24, label %owned_dead, label %allocation_bit
+
+allocation_bit:
+  %25: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %26: ptr = gep ptr, ptr %25, i64 %9
+  %27: ptr = load ptr, ptr %26
+  %28: ptr = gep i8, ptr %27, i64 %22
+  %29: i8 = load i8, ptr %28
+  %30: bool = icmp.eq i8 %29, i8 0
+  condbr bool %30, label %owned_dead, label %mark_bit
+
+mark_bit:
+  %31: ptr = load ptr, ptr gc_small_page_mark_maps
+  %32: ptr = gep ptr, ptr %31, i64 %9
+  %33: ptr = load ptr, ptr %32
+  %34: ptr = gep i8, ptr %33, i64 %22
+  %35: i8 = load i8, ptr %34
+  %36: bool = icmp.ne i8 %35, i8 0
+  condbr bool %36, label %owned_live, label %mark
+
+mark:
+  store i8 1, ptr %34
+  %37: i64 = mul i64 %9, i64 8192
+  %38: i64 = add i64 %37, i64 %22
+  %39: i64 = mul i64 %38, i64 2
+  %40: i64 = add i64 %39, i64 1
+  %41: ptr = load ptr, ptr gc_work
+  %42: i64 = load i64, ptr gc_work_count
+  %43: ptr = gep i64, ptr %41, i64 %42
+  store i64 %40, ptr %43
+  %44: i64 = add i64 %42, i64 1
+  store i64 %44, ptr gc_work_count
+  ret bool true
+
+owned_live:
+  ret bool true
+
+owned_dead:
+  ret bool true
+
+miss:
+  ret bool false
+}
+
+define void @__ep_gc_mark_ptr(ptr %1) {
+entry:
+  %2: bool = call bool __ep_gc_mark_small_ptr(ptr %1)
+  condbr bool %2, label %done, label %large
+
+large:
+  call void __ep_gc_mark_large_ptr(ptr %1)
   ret void
 
 done:
@@ -424,6 +761,9 @@ done:
 
 define void @__ep_gc_drain_marks() {
 entry:
+  %30: ptr = alloca ptr
+  %31: ptr = alloca i64
+  %32: ptr = alloca i64
   br label %next_object
 
 next_object:
@@ -437,34 +777,64 @@ pop:
   %4: ptr = load ptr, ptr gc_work
   %5: ptr = gep i64, ptr %4, i64 %3
   %6: i64 = load i64, ptr %5
+  %33: i64 = urem i64 %6, i64 2
+  %34: bool = icmp.eq i64 %33, i64 1
+  condbr bool %34, label %small, label %large
+
+large:
+  %35: i64 = udiv i64 %6, i64 2
   %7: ptr = load ptr, ptr gc_objects
-  %8: ptr = gep ptr, ptr %7, i64 %6
+  %8: ptr = gep ptr, ptr %7, i64 %35
   %9: ptr = load ptr, ptr %8
   %10: ptr = load ptr, ptr gc_sizes
-  %11: ptr = gep i64, ptr %10, i64 %6
+  %11: ptr = gep i64, ptr %10, i64 %35
   %12: i64 = load i64, ptr %11
-  %13: ptr = alloca i64
-  store i64 0, ptr %13
+  store ptr %9, ptr %30
+  store i64 %12, ptr %31
+  br label %start_scan
+
+small:
+  %36: i64 = sub i64 %6, i64 1
+  %37: i64 = udiv i64 %36, i64 2
+  %38: i64 = udiv i64 %37, i64 8192
+  %39: i64 = urem i64 %37, i64 8192
+  %40: ptr = load ptr, ptr gc_small_page_states
+  %41: ptr = gep i8, ptr %40, i64 %38
+  %44: i64 = load i8, ptr %41
+  %45: i64 = mul i64 %44, i64 8
+  %46: i64 = mul i64 %38, i64 65536
+  %47: i64 = mul i64 %39, i64 %45
+  %48: i64 = add i64 %46, i64 %47
+  %49: ptr = load ptr, ptr gc_small_arena
+  %50: ptr = gep i8, ptr %49, i64 %48
+  store ptr %50, ptr %30
+  store i64 %45, ptr %31
+  br label %start_scan
+
+start_scan:
+  store i64 0, ptr %32
   br label %scan
 
 scan:
-  %14: i64 = load i64, ptr %13
+  %14: i64 = load i64, ptr %32
   %15: i64 = add i64 %14, i64 8
-  %16: bool = icmp.ule i64 %15, i64 %12
+  %51: i64 = load i64, ptr %31
+  %16: bool = icmp.ule i64 %15, i64 %51
   condbr bool %16, label %word, label %next_object
 
 word:
-  %17: ptr = gep i8, ptr %9, i64 %14
+  %52: ptr = load ptr, ptr %30
+  %17: ptr = gep i8, ptr %52, i64 %14
   %18: ptr = load ptr, ptr %17
   call void __ep_gc_mark_ptr(ptr %18)
-  store i64 %15, ptr %13
+  store i64 %15, ptr %32
   br label %scan
 
 done:
   ret void
 }
 
-define void @__ep_gc_sweep() {
+define void @__ep_gc_sweep_large() {
 entry:
   %1: ptr = load ptr, ptr gc_objects
   %2: ptr = load ptr, ptr gc_sizes
@@ -519,8 +889,138 @@ done:
   %24: i64 = load i64, ptr %6
   %25: i64 = load i64, ptr %7
   store i64 %24, ptr gc_object_count
-  store i64 %25, ptr gc_live_bytes
-  %26: i64 = mul i64 %24, i64 2
+  store i64 %25, ptr gc_large_live_bytes
+  ret void
+}
+
+define void @__ep_gc_sweep_small() {
+entry:
+  %1: ptr = alloca i64
+  %2: ptr = alloca i64
+  %3: ptr = alloca i64
+  %4: ptr = alloca i64
+  store i64 0, ptr %1
+  store i64 0, ptr %2
+  store i64 0, ptr %3
+  %5: ptr = load ptr, ptr gc_small_active_pages
+  store i64 0, ptr %5
+  %6: ptr = gep i64, ptr %5, i64 1
+  store i64 0, ptr %6
+  %7: ptr = gep i64, ptr %5, i64 2
+  store i64 0, ptr %7
+  %8: ptr = gep i64, ptr %5, i64 3
+  store i64 0, ptr %8
+  br label %page
+
+page:
+  %9: i64 = load i64, ptr %1
+  %10: i64 = load i64, ptr gc_small_page_count
+  %11: bool = icmp.ult i64 %9, i64 %10
+  condbr bool %11, label %page_setup, label %done
+
+page_setup:
+  %12: ptr = load ptr, ptr gc_small_page_states
+  %13: ptr = gep i8, ptr %12, i64 %9
+  %16: i64 = load i8, ptr %13
+  %17: i64 = mul i64 %16, i64 8
+  %18: i64 = udiv i64 65536, i64 %17
+  store i64 0, ptr %4
+  %19: ptr = load ptr, ptr gc_small_page_alloc_counts
+  %20: ptr = gep i64, ptr %19, i64 %9
+  store i64 0, ptr %20
+  br label %slot
+
+slot:
+  %21: i64 = load i64, ptr %4
+  %22: bool = icmp.ult i64 %21, i64 %18
+  condbr bool %22, label %allocation, label %page_finish
+
+allocation:
+  %23: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %24: ptr = gep ptr, ptr %23, i64 %9
+  %25: ptr = load ptr, ptr %24
+  %26: ptr = gep i8, ptr %25, i64 %21
+  %27: i8 = load i8, ptr %26
+  %28: bool = icmp.eq i8 %27, i8 0
+  condbr bool %28, label %slot_next, label %mark
+
+mark:
+  %29: ptr = load ptr, ptr gc_small_page_mark_maps
+  %30: ptr = gep ptr, ptr %29, i64 %9
+  %31: ptr = load ptr, ptr %30
+  %32: ptr = gep i8, ptr %31, i64 %21
+  %33: i8 = load i8, ptr %32
+  %34: bool = icmp.eq i8 %33, i8 0
+  condbr bool %34, label %free, label %keep
+
+keep:
+  store i8 0, ptr %32
+  %35: i64 = load i64, ptr %20
+  %36: i64 = add i64 %35, i64 1
+  store i64 %36, ptr %20
+  %37: i64 = load i64, ptr %2
+  %38: i64 = add i64 %37, i64 1
+  store i64 %38, ptr %2
+  %39: i64 = load i64, ptr %3
+  %40: i64 = add i64 %39, i64 %17
+  store i64 %40, ptr %3
+  br label %slot_next
+
+free:
+  store i8 0, ptr %26
+  %41: i64 = mul i64 %9, i64 65536
+  %42: i64 = mul i64 %21, i64 %17
+  %43: i64 = add i64 %41, i64 %42
+  %44: ptr = load ptr, ptr gc_small_arena
+  %45: ptr = gep i8, ptr %44, i64 %43
+  %46: ptr = load ptr, ptr gc_small_page_free_heads
+  %47: ptr = gep i64, ptr %46, i64 %9
+  %48: i64 = load i64, ptr %47
+  store i64 %48, ptr %45
+  %49: i64 = add i64 %21, i64 1
+  store i64 %49, ptr %47
+  br label %slot_next
+
+slot_next:
+  %50: i64 = add i64 %21, i64 1
+  store i64 %50, ptr %4
+  br label %slot
+
+page_finish:
+  %51: i64 = load i64, ptr %20
+  %52: bool = icmp.ult i64 %51, i64 %18
+  condbr bool %52, label %make_active, label %page_next
+
+make_active:
+  %53: i64 = sub i64 %16, i64 1
+  %54: ptr = gep i64, ptr %5, i64 %53
+  %55: i64 = add i64 %9, i64 1
+  store i64 %55, ptr %54
+  br label %page_next
+
+page_next:
+  %56: i64 = add i64 %9, i64 1
+  store i64 %56, ptr %1
+  br label %page
+
+done:
+  %57: i64 = load i64, ptr %2
+  %58: i64 = load i64, ptr %3
+  store i64 %57, ptr gc_small_object_count
+  store i64 %58, ptr gc_small_live_bytes
+  ret void
+}
+
+define void @__ep_gc_update_thresholds() {
+entry:
+  %1: i64 = load i64, ptr gc_object_count
+  %2: i64 = load i64, ptr gc_small_object_count
+  %3: i64 = add i64 %1, i64 %2
+  %4: i64 = load i64, ptr gc_large_live_bytes
+  %5: i64 = load i64, ptr gc_small_live_bytes
+  %6: i64 = add i64 %4, i64 %5
+  store i64 %6, ptr gc_live_bytes
+  %26: i64 = mul i64 %3, i64 2
   %27: bool = icmp.ult i64 %26, i64 262144
   condbr bool %27, label %object_minimum, label %object_adaptive
 
@@ -533,7 +1033,7 @@ object_adaptive:
   br label %bytes_threshold
 
 bytes_threshold:
-  %28: i64 = mul i64 %25, i64 2
+  %28: i64 = mul i64 %6, i64 2
   %29: bool = icmp.ult i64 %28, i64 8388608
   condbr bool %29, label %bytes_minimum, label %bytes_adaptive
 
@@ -683,7 +1183,9 @@ entry:
   call void __ep_gc_prepare_collection()
   call void __ep_gc_mark_roots()
   call void __ep_gc_drain_marks()
-  call void __ep_gc_sweep()
+  call void __ep_gc_sweep_large()
+  call void __ep_gc_sweep_small()
+  call void __ep_gc_update_thresholds()
   call void __ep_gc_release_collection()
   %2: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
   %3: i64 = sub i64 %2, i64 %1
@@ -702,6 +1204,7 @@ entry:
   %3: ptr = load ptr, ptr %2
   store ptr %3, ptr gc_stack_high
   call void __ep_gc_grow_objects(i64 1024)
+  call void __ep_gc_small_init()
   ret void
 }
 
@@ -833,6 +1336,9 @@ entry:
   %9: i64 = load i64, ptr gc_live_bytes
   %10: i64 = add i64 %9, i64 %2
   store i64 %10, ptr gc_live_bytes
+  %16: i64 = load i64, ptr gc_large_live_bytes
+  %17: i64 = add i64 %16, i64 %2
+  store i64 %17, ptr gc_large_live_bytes
   %11: bool = icmp.eq i64 %5, i64 0
   condbr bool %11, label %initial_bounds, label %check_low
 
@@ -874,7 +1380,9 @@ threshold:
   %5: i64 = load i64, ptr gc_threshold
   %6: bool = icmp.uge i64 %4, i64 %5
   %7: i64 = load i64, ptr gc_object_count
-  %8: i64 = add i64 %7, i64 1
+  %16: i64 = load i64, ptr gc_small_object_count
+  %17: i64 = add i64 %7, i64 %16
+  %8: i64 = add i64 %17, i64 1
   %9: i64 = load i64, ptr gc_object_threshold
   %10: bool = icmp.uge i64 %8, i64 %9
   %11: bool = or bool %6, bool %10
@@ -885,6 +1393,27 @@ collect:
   br label %allocate
 
 allocate:
+  %18: bool = icmp.ule i64 %1, i64 32
+  condbr bool %18, label %allocate_small, label %allocate_large
+
+allocate_small:
+  %19: ptr = call ptr __ep_gc_small_alloc(i64 %1)
+  %20: bool = icmp.eq ptr %19, ptr null
+  condbr bool %20, label %retry_small, label %return_small
+
+retry_small:
+  call void __ep_gc_collect()
+  %21: ptr = call ptr __ep_gc_small_alloc(i64 %1)
+  %22: bool = icmp.eq ptr %21, ptr null
+  condbr bool %22, label %fail, label %return_small_retry
+
+return_small_retry:
+  ret ptr %21
+
+return_small:
+  ret ptr %19
+
+allocate_large:
   call void __ep_gc_ensure_object_capacity()
   %12: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
   %13: bool = icmp.eq ptr %12, ptr null
