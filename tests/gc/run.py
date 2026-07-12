@@ -36,22 +36,28 @@ def peak_working_set(process):
     return counters.PeakWorkingSetSize
 
 
-def main():
-    source = ROOT / "tests" / "gc" / "stress.ep"
-    exe = compile_program(source, ROOT / "build" / "tests" / "gc-stress.exe")
+def run_case(name, expected, limit_mib):
+    source = ROOT / "tests" / "gc" / f"{name}.ep"
+    exe = compile_program(source, ROOT / "build" / "tests" / f"gc-{name}.exe")
     process = subprocess.Popen([str(exe)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate(timeout=60)
     peak = peak_working_set(process)
-    if process.returncode != 0 or stdout.strip() != b"gc stress ok":
-        print("  FAIL  GC stress behavior")
+    if process.returncode != 0 or stdout.strip() != expected:
+        print(f"  FAIL  GC {name} behavior")
         print((stdout + stderr).decode("utf-8", errors="replace")[-2000:])
-        return 1
-    limit = 512 * 1024 * 1024
+        return False
+    limit = limit_mib * 1024 * 1024
     if peak > limit:
-        print(f"  FAIL  GC stress peak memory {peak / 1024 / 1024:.1f} MiB > 512 MiB")
-        return 1
-    print(f"  PASS  GC stress peak memory {peak / 1024 / 1024:.1f} MiB")
-    return 0
+        print(f"  FAIL  GC {name} peak memory {peak / 1024 / 1024:.1f} MiB > {limit_mib} MiB")
+        return False
+    print(f"  PASS  GC {name} peak memory {peak / 1024 / 1024:.1f} MiB")
+    return True
+
+
+def main():
+    ok = run_case("stress", b"gc stress ok", 256)
+    ok = run_case("tiny", b"gc tiny ok", 128) and ok
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

@@ -6,7 +6,9 @@ global @gc_object_cap: i64
 
 global @gc_live_bytes: i64
 
-global @gc_threshold: i64 = 268435456
+global @gc_threshold: i64 = 8388608
+
+global @gc_object_threshold: i64 = 262144
 
 global @gc_stack_high: ptr
 
@@ -420,16 +422,29 @@ done:
   %25: i64 = load i64, ptr %5
   store i64 %24, ptr gc_object_count
   store i64 %25, ptr gc_live_bytes
-  %26: i64 = mul i64 %25, i64 2
-  %27: bool = icmp.ult i64 %26, i64 268435456
-  condbr bool %27, label %minimum, label %adaptive
+  %26: i64 = mul i64 %24, i64 2
+  %27: bool = icmp.ult i64 %26, i64 262144
+  condbr bool %27, label %object_minimum, label %object_adaptive
 
-minimum:
-  store i64 268435456, ptr gc_threshold
+object_minimum:
+  store i64 262144, ptr gc_object_threshold
+  br label %bytes_threshold
+
+object_adaptive:
+  store i64 %26, ptr gc_object_threshold
+  br label %bytes_threshold
+
+bytes_threshold:
+  %28: i64 = mul i64 %25, i64 2
+  %29: bool = icmp.ult i64 %28, i64 8388608
+  condbr bool %29, label %bytes_minimum, label %bytes_adaptive
+
+bytes_minimum:
+  store i64 8388608, ptr gc_threshold
   ret void
 
-adaptive:
-  store i64 %26, ptr gc_threshold
+bytes_adaptive:
+  store i64 %28, ptr gc_threshold
   ret void
 }
 
@@ -476,8 +491,13 @@ threshold:
   %3: i64 = load i64, ptr gc_live_bytes
   %4: i64 = add i64 %3, i64 %1
   %5: i64 = load i64, ptr gc_threshold
-  %6: bool = icmp.ugt i64 %4, i64 %5
-  condbr bool %6, label %collect, label %allocate
+  %6: bool = icmp.uge i64 %4, i64 %5
+  %25: i64 = load i64, ptr gc_object_count
+  %26: i64 = add i64 %25, i64 1
+  %27: i64 = load i64, ptr gc_object_threshold
+  %28: bool = icmp.uge i64 %26, i64 %27
+  %29: bool = or bool %6, bool %28
+  condbr bool %29, label %collect, label %allocate
 
 collect:
   call void __ep_gc_collect()

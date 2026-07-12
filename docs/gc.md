@@ -15,8 +15,9 @@ heap 分配，地址在生命周期内不移动。runtime 维护一个紧凑的 
 
 ## Collection
 
-- 初始阈值为 256 MiB；每轮 collection 后使用
-  `max(256 MiB, 2 * live_bytes)`。
+- 初始 payload 阈值为 8 MiB，对象数量阈值为 262,144；任一达到即触发
+  collection。每轮 collection 后分别使用 `max(8 MiB, 2 * live_bytes)` 和
+  `max(262,144, 2 * live_objects)`。
 - collection 临时建立 payload-address hash table、mark byte table 和迭代
   work stack，结束后立即释放。
 - roots 包括活动线程栈和 `argv`。后端为非 `gep` 的 `ptr` 结果保留稳定栈槽，
