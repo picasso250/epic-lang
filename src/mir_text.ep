@@ -258,7 +258,15 @@ fun mrt_parse_inst(line: str): MirInst {
         ret mir_load(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "store ") {
-        let ops = mrt_parse_operands(body[6:len(body)])
+        let store_body = body[6:len(body)]
+        let from_pos = mrt_find(store_body, " from ")
+        if from_pos >= 0 {
+            let access_type = mrt_trim(store_body[0:from_pos])
+            let ops = mrt_parse_operands(store_body[from_pos + 6:len(store_body)])
+            if len(ops) != 2 { mir_text_die(("bad store: " + line)) }
+            ret mir_store_as(ops[0], access_type, ops[1])
+        }
+        let ops = mrt_parse_operands(store_body)
         if len(ops) != 2 { mir_text_die(("bad store: " + line)) }
         ret mir_store(ops[0], ops[1])
     }
@@ -445,7 +453,7 @@ fun mrt_parse_global(line: str): MirGlobal {
 }
 fun mrt_parse_struct_type(program: MirProgram, line: str): void {
     let prefix = "type "
-    let marker = " = struct {"
+    let marker = " = struct size "
     if !mrt_starts_with(line, prefix) || !mrt_ends_with(line, "}") {
         mir_text_die(("bad struct type declaration: " + line))
     }
@@ -457,15 +465,28 @@ fun mrt_parse_struct_type(program: MirProgram, line: str): void {
     if len(name) == 0 {
         mir_text_die(("missing struct type name: " + line))
     }
-    let fields_text = mrt_trim(line[marker_pos + len(marker):len(line) - 1])
-    if len(fields_text) == 0 {
-        mir_text_die(("empty struct type is not supported in v0: " + name))
-    }
-    let field_types = mrt_split_commas(fields_text)
-    let i = 0
-    for i < len(field_types) {
-        mir_program_add_struct_field(program, name, field_types[i], i)
-        i = i + 1
+    let after_size = line[marker_pos + len(marker):len(line)]
+    let align_marker = " align "
+    let align_pos = mrt_find(after_size, align_marker)
+    if align_pos <= 0 { mir_text_die(("missing struct align: " + line)) }
+    let size = mrt_parse_i64(mrt_trim(after_size[0:align_pos]))
+    let after_align = after_size[align_pos + len(align_marker):len(after_size)]
+    let fields_marker = " {"
+    let fields_pos = mrt_find(after_align, fields_marker)
+    if fields_pos <= 0 { mir_text_die(("missing struct fields: " + line)) }
+    let align = mrt_parse_i64(mrt_trim(after_align[0:fields_pos]))
+    if size <= 0 || align <= 0 { mir_text_die(("invalid struct layout: " + line)) }
+    mir_program_add_struct_layout(program, name, size, align)
+    let fields_text = mrt_trim(after_align[fields_pos + len(fields_marker):len(after_align) - 1])
+    if len(fields_text) == 0 { ret }
+    let fields = mrt_split_commas(fields_text)
+    for i: 0:len(fields) {
+        let field = mrt_trim(fields[i])
+        let at_pos = mrt_find(field, " @")
+        if at_pos <= 0 { mir_text_die(("bad struct field layout: " + field)) }
+        let field_type = mrt_trim(field[0:at_pos])
+        let field_offset = mrt_parse_i64(mrt_trim(field[at_pos + 2:len(field)]))
+        mir_program_add_struct_field(program, name, field_type, i, field_offset)
     }
 }
 

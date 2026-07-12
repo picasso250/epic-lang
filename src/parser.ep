@@ -3,7 +3,7 @@
 #
 
 fun epic_type_is_int(t: str): bool {
-    ret t == "i64" || t == "u64" || t == "i32" || t == "u32" || t == "u8"
+    ret t == "i64" || t == "u64" || t == "i32" || t == "u32" || t == "i16" || t == "u16" || t == "u8"
 }
 
 fun epic_type_ends_with(s: str, suffix: str): bool {

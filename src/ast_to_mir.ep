@@ -7,7 +7,9 @@ struct MirStructFieldLayout {
     struct_name: str
     field_name: str
     field_type: str
+    access_type: str
     field_index: i64
+    field_offset: i64
 }
 
 struct MirUnionMemberLayout {
@@ -82,7 +84,7 @@ fun mir_epic_type(type_name: str): str {
     if type_name == "bool" {
         ret "bool"
     }
-    if type_name == "i64" || type_name == "i32" || type_name == "u64" || type_name == "u32" || type_name == "u8" {
+    if type_name == "i64" || type_name == "i32" || type_name == "u64" || type_name == "u32" || type_name == "i16" || type_name == "u16" || type_name == "u8" {
         ret "i64"
     }
     ret "ptr"
@@ -125,24 +127,50 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
     ret 0
 }
 
-fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, field_index: i64): MirStructFieldLayout {
-    ret new MirStructFieldLayout { struct_name: struct_name, field_name: field_name, field_type: field_type, field_index: field_index }
+fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, access_type: str, field_index: i64, field_offset: i64): MirStructFieldLayout {
+    ret new MirStructFieldLayout { struct_name: struct_name, field_name: field_name, field_type: field_type, access_type: access_type, field_index: field_index, field_offset: field_offset }
+}
+
+fun mir_align_to(value: i64, align: i64): i64 {
+    ret ((value + align - 1) / align) * align
+}
+
+fun mir_storage_type(source_type: str): str {
+    if source_type == "u8" || source_type == "bool" { ret "i8" }
+    if source_type == "i16" { ret "i16" }
+    if source_type == "u16" { ret "u16" }
+    if source_type == "i32" { ret "i32" }
+    if source_type == "u32" { ret "u32" }
+    if source_type == "i64" || source_type == "u64" { ret "i64" }
+    ret "ptr"
+}
+
+fun mir_storage_size(storage_type: str): i64 {
+    if storage_type == "i8" { ret 1 }
+    if storage_type == "i16" || storage_type == "u16" { ret 2 }
+    if storage_type == "i32" || storage_type == "u32" { ret 4 }
+    ret 8
+}
+
+fun mir_storage_align(storage_type: str): i64 {
+    ret mir_storage_size(storage_type)
 }
 
 fun mir_union_member_layout(union_name: str, member_name: str, tag: i64): MirUnionMemberLayout {
     ret new MirUnionMemberLayout { union_name: union_name, member_name: member_name, tag: tag }
 }
 
-fun mir_register_struct_field(st: MirCodegenState, struct_name: str, field_name: str, field_type: str, field_index: i64): void {
-    st.struct_fields.push(mir_struct_field_layout(struct_name, field_name, field_type, field_index))
-    mir_program_add_struct_field(st.program, struct_name, field_type, field_index)
+fun mir_register_struct_field(st: MirCodegenState, struct_name: str, field_name: str, field_type: str, access_type: str, field_index: i64, field_offset: i64): void {
+    st.struct_fields.push(mir_struct_field_layout(struct_name, field_name, field_type, access_type, field_index, field_offset))
+    mir_program_add_struct_field(st.program, struct_name, access_type, field_index, field_offset)
 }
 
 fun mir_register_runtime_struct3(st: MirCodegenState, struct_name: str, first_field: str): void {
     st.struct_names.push(struct_name)
-    mir_register_struct_field(st, struct_name, first_field, "ptr", 0)
-    mir_register_struct_field(st, struct_name, "len", "i64", 1)
-    mir_register_struct_field(st, struct_name, "cap", "i64", 2)
+    mir_program_add_struct_layout(st.program, struct_name, 24, 8)
+    mir_register_struct_field(st, struct_name, first_field, "ptr", "ptr", 0, 0)
+    mir_register_struct_field(st, struct_name, "len", "i64", "i64", 1, 8)
+    mir_register_struct_field(st, struct_name, "cap", "i64", "i64", 2, 16)
 }
 
 fun mir_is_union_name(st: MirCodegenState, name: str): bool {
@@ -209,12 +237,33 @@ fun mir_direct_field_type(st: MirCodegenState, struct_name: str, field_name: str
     ret ""
 }
 
+fun mir_direct_field_offset(st: MirCodegenState, struct_name: str, field_name: str): i64 {
+    for i: 0:len(st.struct_fields) {
+        let field = st.struct_fields[i]
+        if field.struct_name == struct_name && field.field_name == field_name {
+            ret field.field_offset
+        }
+    }
+    ret 0 - 1
+}
+
 fun mir_field_type(st: MirCodegenState, struct_name: str, field_name: str): str {
     let typ = mir_direct_field_type(st, struct_name, field_name)
     if typ != "" {
         ret typ
     }
     ast_to_mir_die(f"unknown struct field {struct_name}.{field_name}")
+    ret "i64"
+}
+
+fun mir_field_access_type(st: MirCodegenState, struct_name: str, field_name: str): str {
+    for i: 0:len(st.struct_fields) {
+        let field = st.struct_fields[i]
+        if field.struct_name == struct_name && field.field_name == field_name {
+            ret field.access_type
+        }
+    }
+    ast_to_mir_die(f"unknown struct field access {struct_name}.{field_name}")
     ret "i64"
 }
 
@@ -252,7 +301,7 @@ fun mir_func_source_return(st: MirCodegenState, name: str): str {
 }
 
 fun mir_is_unsigned_int_type(type_name: str): bool {
-    ret type_name == "u64" || type_name == "u32" || type_name == "u8"
+    ret type_name == "u64" || type_name == "u32" || type_name == "u16" || type_name == "u8"
 }
 
 fun mir_binary_op(expr_op: str, source_type: str): str {
@@ -305,6 +354,7 @@ fun mir_op_result_type(op: str): str {
 
 fun mir_shift_width(source_type: str): i64 {
     if source_type == "u8" { ret 8 }
+    if source_type == "i16" || source_type == "u16" { ret 16 }
     if source_type == "i32" || source_type == "u32" { ret 32 }
     ret 64
 }
@@ -395,7 +445,7 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     let field_typ = mir_field_type(st, struct_name, field_name)
     let addr = mir_field_addr(st, base, struct_name, field_name)
     let result_id = mir_new_value(st)
-    mir_emit_inst(st, mir_load(result_id, field_typ, field_typ, addr))
+    mir_emit_inst(st, mir_load(result_id, field_typ, mir_field_access_type(st, struct_name, field_name), addr))
     ret mir_value_operand(field_typ, result_id)
 }
 
@@ -437,7 +487,8 @@ fun mir_uniform_direct_field_member(st: MirCodegenState, union_name: str, field_
     let first_member = members[0]
     let first_type = mir_direct_field_type(st, first_member, field_name)
     let first_index = mir_direct_field_index(st, first_member, field_name)
-    if first_type == "" || first_index < 0 {
+    let first_offset = mir_direct_field_offset(st, first_member, field_name)
+    if first_type == "" || first_index < 0 || first_offset < 0 {
         ret ""
     }
     for i: 1:len(members) {
@@ -445,6 +496,9 @@ fun mir_uniform_direct_field_member(st: MirCodegenState, union_name: str, field_
             ret ""
         }
         if mir_direct_field_index(st, members[i], field_name) != first_index {
+            ret ""
+        }
+        if mir_direct_field_offset(st, members[i], field_name) != first_offset {
             ret ""
         }
     }
@@ -551,7 +605,7 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstStructIn
         let value_flow = mir_emit_expr(st, st.current_block, field.value_expr)
         st.current_block = value_flow.block
         let addr = mir_field_addr(st, obj, expr.name, field.name)
-        mir_emit_inst(st, mir_store(value_flow.value, addr))
+        mir_emit_inst(st, mir_store_as(value_flow.value, mir_field_access_type(st, expr.name, field.name), addr))
         i = i + 1
     }
     ret mir_value_flow(obj, st.current_block)
@@ -563,9 +617,9 @@ fun mir_emit_union_init(st: MirCodegenState, block: MirBlock, expr: AstUnionInit
     st.current_block = payload_flow.block
     let obj = mir_alloc_struct(st, expr.type_name)
     let tag_addr = mir_field_addr(st, obj, expr.type_name, "tag")
-    mir_emit_inst(st, mir_store(mir_const_int("i64", mir_union_tag(st, expr.type_name, ast_resolved_type(expr.expr))), tag_addr))
+    mir_emit_inst(st, mir_store_as(mir_const_int("i64", mir_union_tag(st, expr.type_name, ast_resolved_type(expr.expr))), mir_field_access_type(st, expr.type_name, "tag"), tag_addr))
     let payload_addr = mir_field_addr(st, obj, expr.type_name, "payload")
-    mir_emit_inst(st, mir_store(payload_flow.value, payload_addr))
+    mir_emit_inst(st, mir_store_as(payload_flow.value, mir_field_access_type(st, expr.type_name, "payload"), payload_addr))
     ret mir_value_flow(obj, st.current_block)
 }
 
@@ -577,21 +631,35 @@ fun mir_trunc_uint_value(st: MirCodegenState, value: MirOperand, mask: i64): Mir
     ret mir_value_operand("i64", inst.result_id)
 }
 
-fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
+fun mir_trunc_signed_value(st: MirCodegenState, value: MirOperand, shift: i64): MirOperand {
     let shl_inst = mir_make_result_inst(st, "shl", "i64")
     shl_inst.operands.push(value)
-    shl_inst.operands.push(mir_const_int("i64", 32))
+    shl_inst.operands.push(mir_const_int("i64", shift))
     mir_emit_inst(st, shl_inst)
     let sar_inst = mir_make_result_inst(st, "sar", "i64")
     sar_inst.operands.push(mir_value_operand("i64", shl_inst.result_id))
-    sar_inst.operands.push(mir_const_int("i64", 32))
+    sar_inst.operands.push(mir_const_int("i64", shift))
     mir_emit_inst(st, sar_inst)
     ret mir_value_operand("i64", sar_inst.result_id)
+}
+
+fun mir_trunc_i16_value(st: MirCodegenState, value: MirOperand): MirOperand {
+    ret mir_trunc_signed_value(st, value, 48)
+}
+
+fun mir_trunc_i32_value(st: MirCodegenState, value: MirOperand): MirOperand {
+    ret mir_trunc_signed_value(st, value, 32)
 }
 
 fun mir_normalize_int_value(st: MirCodegenState, value: MirOperand, source_type: str): MirOperand {
     if source_type == "u8" {
         ret mir_trunc_uint_value(st, value, 255)
+    }
+    if source_type == "u16" {
+        ret mir_trunc_uint_value(st, value, 65535)
+    }
+    if source_type == "i16" {
+        ret mir_trunc_i16_value(st, value)
     }
     if source_type == "u32" {
         ret mir_trunc_uint_value(st, value, 4294967295)
@@ -690,7 +758,7 @@ fun mir_array_elem_type(type_name: str): str {
 }
 
 fun mir_is_i64_array_elem_type(elem_type: str): bool {
-    ret elem_type == "i64" || elem_type == "i32" || elem_type == "u64" || elem_type == "u32" || elem_type == "bool"
+    ret elem_type == "i64" || elem_type == "i32" || elem_type == "u64" || elem_type == "u32" || elem_type == "i16" || elem_type == "u16" || elem_type == "bool"
 }
 
 fun mir_is_i64_array_type(type_name: str): bool {
@@ -1233,6 +1301,16 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 st.current_block = arg_flow.block
                 ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 255), st.current_block)
             }
+            if n.name == "u16" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                ret mir_value_flow(mir_trunc_uint_value(st, arg_flow.value, 65535), st.current_block)
+            }
+            if n.name == "i16" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                ret mir_value_flow(mir_trunc_i16_value(st, arg_flow.value), st.current_block)
+            }
             if n.name == "u32" {
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
@@ -1290,6 +1368,8 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             let value = mir_emit_call_inst(st, mir_func_callee(st, n.name), ret_type, args)
             let source_ret = mir_func_source_return(st, n.name)
+            if source_ret == "u16" { value = mir_trunc_uint_value(st, value, 65535) }
+            if source_ret == "i16" { value = mir_trunc_i16_value(st, value) }
             if source_ret == "u32" { value = mir_trunc_uint_value(st, value, 4294967295) }
             if source_ret == "i32" { value = mir_trunc_i32_value(st, value) }
             ret mir_value_flow(value, st.current_block)
@@ -1655,7 +1735,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                 ast_to_mir_die("field assignment base must be struct")
             }
             let addr = mir_field_addr(st, base_flow.value, struct_name, n.name)
-            mir_emit_inst(st, mir_store(value_flow.value, addr))
+            mir_emit_inst(st, mir_store_as(value_flow.value, mir_field_access_type(st, struct_name, n.name), addr))
             ret mir_reachable_flow(st.current_block)
         }
         AstAssign n: {
@@ -1699,7 +1779,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     let addr = mir_field_addr(st, base_flow.value, struct_name, target.name)
                     let field_typ = mir_field_type(st, struct_name, target.name)
                     let result_id = mir_new_value(st)
-                    mir_emit_inst(st, mir_load(result_id, field_typ, field_typ, addr))
+                    mir_emit_inst(st, mir_load(result_id, field_typ, mir_field_access_type(st, struct_name, target.name), addr))
                     let rhs_flow = mir_emit_expr(st, st.current_block, n.value_expr)
                     st.current_block = rhs_flow.block
                     let target_type = ast_require_resolved_type(target.meta)
@@ -1712,7 +1792,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     inst.operands.push(mir_value_operand(field_typ, result_id))
                     inst.operands.push(rhs_flow.value)
                     mir_emit_inst(st, inst)
-                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), addr))
+                    mir_emit_inst(st, mir_store_as(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), mir_field_access_type(st, struct_name, target.name), addr))
                     ret mir_reachable_flow(st.current_block)
                 }
                 AstSubscript target: {
@@ -1942,12 +2022,23 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 let sdef = program.structs[si]
                 st.struct_names.push(sdef.name)
                 let fi2 = 0
+                let offset = 0
+                let struct_align = 1
                 for fi2 < len(sdef.fields) {
                     let field = sdef.fields[fi2]
-                    let field_mir_type = mir_epic_type(ast_require_resolved_type(field.meta))
-                    mir_register_struct_field(st, sdef.name, field.name, field_mir_type, fi2)
+                    let source_type = ast_require_resolved_type(field.meta)
+                    let field_mir_type = mir_epic_type(source_type)
+                    let access_type = mir_storage_type(source_type)
+                    let field_align = mir_storage_align(access_type)
+                    offset = mir_align_to(offset, field_align)
+                    mir_register_struct_field(st, sdef.name, field.name, field_mir_type, access_type, fi2, offset)
+                    offset = offset + mir_storage_size(access_type)
+                    if field_align > struct_align { struct_align = field_align }
                     fi2 = fi2 + 1
                 }
+                let struct_size = mir_align_to(offset, struct_align)
+                if struct_size == 0 { struct_size = 1 }
+                mir_program_add_struct_layout(st.program, sdef.name, struct_size, struct_align)
                 si = si + 1
             }
             for ui: 0:len(program.unions) {
@@ -1957,8 +2048,9 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 for mi2: 0:len(union.members) {
                     st.union_members.push(mir_union_member_layout(union.name, union.members[mi2], mi2 + 1))
                 }
-                mir_register_struct_field(st, union.name, "tag", "i64", 0)
-                mir_register_struct_field(st, union.name, "payload", "ptr", 1)
+                mir_program_add_struct_layout(st.program, union.name, 16, 8)
+                mir_register_struct_field(st, union.name, "tag", "i64", "i64", 0, 0)
+                mir_register_struct_field(st, union.name, "payload", "ptr", "ptr", 1, 8)
             }
 
             mir_register_runtime_struct3(st, "str", "data")

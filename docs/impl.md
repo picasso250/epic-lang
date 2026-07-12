@@ -90,9 +90,11 @@ mark-sweep。managed payload 由 `__ep_alloc` 统一登记；collector 扫描活
 | 用户类型    | 内部类型          |
 |------------|-------------------|
 | `bool`     | `bool`            |
-| `u8`       | `u8`              |
-| `i32`      | 8 字节整数槽，值保持 32-bit signed 规范扩展 |
-| `u32`      | 8 字节整数槽，值保持 32-bit unsigned 规范扩展 |
+| `u8`       | 64-bit value；struct/storage lane 为 1 byte |
+| `i16`      | 64-bit value；struct/storage lane 为 2 bytes，读取时符号扩展 |
+| `u16`      | 64-bit value；struct/storage lane 为 2 bytes，读取时零扩展 |
+| `i32`      | 64-bit value；struct/storage lane 为 4 bytes，读取时符号扩展 |
+| `u32`      | 64-bit value；struct/storage lane 为 4 bytes，读取时零扩展 |
 | `i64`      | `i64`             |
 | `u64`      | `u64`             |
 | `str`      | `&str` today; migration target is the same representation as `&_slice_u8` |
@@ -148,7 +150,12 @@ _slice_T = {
 
 ### 结构体 (Struct)
 
-用户结构体字段使用固定的 8 字节槽位。字段偏移为 `index * 8`。结构体大小为 `field_count * 8`。`u8` 和 `bool` 字段在其 8 字节槽位内加载/存储一个字节。
+用户结构体使用统一的 natural layout。前端按字段真实 storage size/alignment 计算 offset，最终 size
+向最大 alignment 取整，并把 `size`、`align`、每字段 `offset` 显式写入 MIR。scalar/reference 的
+storage size 分别为 1/2/4/8 字节；reference 始终按 8 字节对齐。后端不再从 field index 推导 offset。
+
+Epic 表达式值仍统一经过 64-bit value representation：窄字段 load 后符号扩展或零扩展，store 时仅写目标
+lane。heap allocation 使用显式 struct size；`gep struct` 的 element stride 同样使用该 size。
 
 ### ADT (Algebraic Data Types)
 

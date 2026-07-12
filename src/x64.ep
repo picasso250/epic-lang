@@ -170,9 +170,9 @@ fun x64_add_data_zero(program: X64Program, label: str, count: i64): void {
 }
 
 fun x64_size_prefix(size: i64): str {
-    if size == 1 {
-        ret "byte "
-    }
+    if size == 1 { ret "byte " }
+    if size == 2 { ret "word " }
+    if size == 4 { ret "dword " }
     ret "qword "
 }
 

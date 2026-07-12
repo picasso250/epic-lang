@@ -1,0 +1,28 @@
+fun main(): void {
+    let program = mir_program_empty()
+    mir_program_add_struct_layout(program, "Twelve", 12, 4)
+    mir_program_add_struct_field(program, "Twelve", "i32", 0, 0)
+    mir_program_add_struct_field(program, "Twelve", "u16", 1, 4)
+    mir_program_add_struct_field(program, "Twelve", "u16", 2, 6)
+    mir_program_add_struct_field(program, "Twelve", "i32", 3, 8)
+
+    let fn = mir_function_empty("step", "ptr")
+    fn.params.push(new MirParam { value_id: 1, typ: "ptr" })
+    fn.params.push(new MirParam { value_id: 2, typ: "i64" })
+    let block = mir_block_empty("entry")
+    let gep = mir_inst_empty()
+    gep.op = "gep"
+    gep.result_id = 3
+    gep.result_type = "ptr"
+    gep.typ = "struct Twelve"
+    gep.has_result = true
+    gep.operands.push(mir_value_operand("ptr", 1))
+    gep.operands.push(mir_value_operand("i64", 2))
+    block.instructions.push(gep)
+    block.terminator = mir_ret_value(mir_value_operand("ptr", 3))
+    block.has_terminator = true
+    fn.blocks.push(block)
+    program.functions.push(fn)
+
+    print(x64_program_text(mir_to_x64_lower_function_with_program(program, fn)))
+}

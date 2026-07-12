@@ -102,15 +102,23 @@ struct MirExtern {
     param_types: str[]
 }
 
+struct MirStructLayout {
+    name: str
+    size: i64
+    align: i64
+}
+
 struct MirStructField {
     struct_name: str
     field_type: str
     field_index: i64
+    field_offset: i64
 }
 
 struct MirProgram {
     externs: MirExtern[]
     globals: MirGlobal[]
+    struct_layouts: MirStructLayout[]
     struct_fields: MirStructField[]
     functions: MirFunction[]
 }
@@ -229,12 +237,17 @@ fun mir_load(result_id: i64, result_type: str, access_type: str, addr: MirOperan
     ret inst
 }
 
-fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
+fun mir_store_as(value: MirOperand, access_type: str, addr: MirOperand): MirInst {
     let inst = mir_inst_empty()
     inst.op = "store"
+    inst.typ = access_type
     inst.operands.push(value)
     inst.operands.push(addr)
     ret inst
+}
+
+fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
+    ret mir_store_as(value, mir_operand_type(value), addr)
 }
 
 fun mir_call(callee: str, ret_type: str, args: MirOperand[]): MirInst {
@@ -274,6 +287,10 @@ fun mir_inst_text(inst: MirInst): str {
     }
     if inst.op == "store" {
         str_buf_extend(buf, "store ")
+        if inst.typ != mir_operand_type(inst.operands[0]) {
+            str_buf_extend(buf, inst.typ)
+            str_buf_extend(buf, " from ")
+        }
         str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
         str_buf_extend(buf, ", ")
         str_buf_extend(buf, mir_operand_typed_text(inst.operands[1]))
@@ -407,16 +424,25 @@ fun mir_global_scalar(name: str, typ: str, init: str): MirGlobal {
     ret new MirGlobal(new MirScalarGlobal { name: name, typ: typ, init: init })
 }
 
-fun mir_struct_field(struct_name: str, field_type: str, field_index: i64): MirStructField {
+fun mir_struct_layout(name: str, size: i64, align: i64): MirStructLayout {
+    ret new MirStructLayout { name: name, size: size, align: align }
+}
+
+fun mir_struct_field(struct_name: str, field_type: str, field_index: i64, field_offset: i64): MirStructField {
     let field = new MirStructField
     field.struct_name = struct_name
     field.field_type = field_type
     field.field_index = field_index
+    field.field_offset = field_offset
     ret field
 }
 
-fun mir_program_add_struct_field(program: MirProgram, struct_name: str, field_type: str, field_index: i64): void {
-    program.struct_fields.push(mir_struct_field(struct_name, field_type, field_index))
+fun mir_program_add_struct_layout(program: MirProgram, name: str, size: i64, align: i64): void {
+    program.struct_layouts.push(mir_struct_layout(name, size, align))
+}
+
+fun mir_program_add_struct_field(program: MirProgram, struct_name: str, field_type: str, field_index: i64, field_offset: i64): void {
+    program.struct_fields.push(mir_struct_field(struct_name, field_type, field_index, field_offset))
 }
 
 fun mir_name_in(names: str[], name: str): bool {
@@ -623,6 +649,7 @@ fun mir_program_empty(): MirProgram {
     let p = new MirProgram
     p.externs = new MirExtern[]
     p.globals = new MirGlobal[]
+    p.struct_layouts = new MirStructLayout[]
     p.struct_fields = new MirStructField[]
     p.functions = new MirFunction[]
     ret p
@@ -813,17 +840,42 @@ fun mir_struct_field_type_at(program: MirProgram, struct_name: str, field_index:
     panic ("missing MIR struct field: " + struct_name)
 }
 
+fun mir_struct_field_offset_at(program: MirProgram, struct_name: str, field_index: i64): i64 {
+    for i: 0:len(program.struct_fields) {
+        let field = program.struct_fields[i]
+        if field.struct_name == struct_name && field.field_index == field_index {
+            ret field.field_offset
+        }
+    }
+    panic ("missing MIR struct field offset: " + struct_name)
+}
+
+fun mir_struct_layout_index(program: MirProgram, struct_name: str): i64 {
+    for i: 0:len(program.struct_layouts) {
+        if program.struct_layouts[i].name == struct_name { ret i }
+    }
+    ret 0 - 1
+}
+
 fun mir_print_struct_type(program: MirProgram, struct_name: str): void {
+    let layout_index = mir_struct_layout_index(program, struct_name)
+    if layout_index < 0 { panic ("missing MIR struct layout: " + struct_name) }
+    let layout = program.struct_layouts[layout_index]
     let buf = make_str_buf()
     str_buf_extend(buf, "type ")
     str_buf_extend(buf, struct_name)
-    str_buf_extend(buf, " = struct { ")
+    str_buf_extend(buf, " = struct size ")
+    str_buf_extend(buf, str(layout.size))
+    str_buf_extend(buf, " align ")
+    str_buf_extend(buf, str(layout.align))
+    str_buf_extend(buf, " { ")
     let count = mir_struct_field_count(program, struct_name)
-    if count == 0 { panic ("missing MIR struct layout: " + struct_name) }
     let i = 0
     for i < count {
         if i > 0 { str_buf_extend(buf, ", ") }
         str_buf_extend(buf, mir_struct_field_type_at(program, struct_name, i))
+        str_buf_extend(buf, " @")
+        str_buf_extend(buf, str(mir_struct_field_offset_at(program, struct_name, i)))
         i = i + 1
     }
     str_buf_extend(buf, " }")

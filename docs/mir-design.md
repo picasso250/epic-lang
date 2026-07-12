@@ -701,23 +701,22 @@ MirType
 前后端通过模块级 type declaration 传递后端所需的 struct layout：
 
 ```text
-type Point = struct { i64, i64 }
-type Slice_u8 = struct { ptr, i64, i64 }
+type Point = struct size 8 align 4 { i32 @0, i32 @4 }
+type Slice_u8 = struct size 24 align 8 { ptr @0, i64 @8, i64 @16 }
 ```
 
-声明只保存字段类型序列，不保存源语言字段名或 ADT 信息。
-`gep struct Point, ... i64 1` 中的常量字段索引引用该序列。所有 GEP index 统一使用 `i64`；struct 的最后一个 index 仍必须是编译期常量字段编号。
+声明保存最终物理 `size`、`align`、字段 storage type 和 byte offset，不保存源语言字段名或 ADT 信息。
+`gep struct Point, ... i64 1` 中的常量字段索引引用字段序列；lowering 直接读取对应 offset。
+所有 GEP index 统一使用 `i64`；struct 的最后一个 index 仍必须是编译期常量字段编号。
 
-bootstrap v0 使用固定的简单布局：
+Epic struct 使用 natural layout，不支持 packed layout。当前 storage lanes 为 `i8`、`i16/u16`、
+`i32/u32`、`i64` 和 `ptr`，大小分别为 1、2、4、8 字节；`ptr` 按 8 字节对齐。
+MIR value type 与 memory access type 可以不同，例如 source `i16` 值使用 64-bit value representation，
+但字段访问写作 `%value: i64 = load i16, ptr %address`，窄 store 的 canonical spelling 为
+`store i16 from i64 %value, ptr %address`。
 
-- 每个 struct 字段占一个 8-byte slot；
-- 字段 `i` 的 offset 是 `i * 8`；
-- struct size 是 `field_count * 8`；
-- 不支持 packed / compact struct，也不接受每字段显式 offset；
-- `i8` 在 byte array 中仍占 1 byte，但作为 struct 字段仍占一个 8-byte slot。
-
-这使文本 MIR 能完整承载当前 `MirProgram.structs` / `MirProgram.struct_fields`
-侧表，同时让后端不依赖 AST 或源语言字段语义。
+显式布局使 text MIR 完整承载当前 `MirProgram.struct_layouts` / `MirProgram.struct_fields`，
+后端不依赖 AST，也不再重复计算 layout。
 
 bootstrap v0 的规范文本 MIR 使用 `extern` 声明。backend-owned extern 保持普通符号名；源码 FFI 为了把 DLL metadata 带入 COFF，使用自描述符号名 `__ep_import$<dll>$<symbol>`：
 

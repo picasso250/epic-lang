@@ -152,22 +152,29 @@ mov  [reg+8], r11             # header.len = length
 ```
 _load_operand("rax", value)
 _load_operand("rcx", addr)
-mov [rcx], rax                    # qword
-mov byte [rcx], al                # i8 (value.type == I8)
+mov qword [rcx], rax              # i64 / ptr
+mov dword [rcx], eax              # i32 / u32
+mov word [rcx], ax                # i16 / u16
+mov byte [rcx], al                # i8
 ```
 
-注意：i8 store 只能使用 `al` 寄存器，由 `_load_operand` 保证值在 `rax`。
+store width 由 `inst.typ` 的 memory access type 决定；value 本身仍可使用 64-bit representation。
 
 ### 5.3 `load`
 
 ```
 _load_operand("rax", operand)     # 加载地址到 rax
-movzx rax, byte [rax]             # i8 (zero-extend, byte load)
-mov   rax, qword [rax]            # 其他类型
+movzx  rax, byte [rax]            # i8
+movsx  rax, word [rax]            # i16
+movzx  rax, word [rax]            # u16
+movsxd rax, dword [rax]           # i32
+mov    eax, dword [rax]           # u32, architectural zero extension
+mov    rax, qword [rax]           # i64 / ptr
 _store_result(inst.result, "rax")
 ```
 
-**重要语义**：Epic MIR 沿用 LLVM-like spelling，`i8` 表示 8-bit integer / byte lane，不表示 signed source type。Epic public surface 只暴露 `u8` 作为 byte 类型。8-bit load 零扩展到 i64，结果范围 0..255；signedness 由 opcode 表达，不由 `i8` 类型名表达。
+memory access type carries lane width and signed load behavior. MIR result values remain normalized 64-bit values;
+`i8` is the unsigned byte lane used by public `u8`/`bool` storage.
 
 ### 5.4 Arithmetic
 
@@ -239,6 +246,8 @@ GEP lowering 依赖于 source type 和 indices：
 | `struct` | 1 | `base_ptr + index0 * sizeof(struct)` |
 | `struct` | 2 | `base_ptr + index0 * sizeof(struct) + field_offset(index1)` |
 | `i8` | 1 | `base_ptr + index0 * 1` |
+| `i16`/`u16` | 1 | `base_ptr + index0 * 2` |
+| `i32`/`u32` | 1 | `base_ptr + index0 * 4` |
 | `i64`/`ptr` | 1 | `base_ptr + index0 * 8` |
 | `array` | 1 | `base_ptr + index0 * sizeof(elem)` |
 
@@ -248,14 +257,19 @@ _load_operand("rax", operands[0])   # 基址
 for each index:
   if index is ConstIntOperand:
     rax += index.value * scale         # imm8 用 add rax, imm；否则 mov rcx, imm; add rax, rcx
-  else:
+  else if scale == 1 or scale == 8:
     _load_operand("rcx", index)
-    if scale == 8:  rcx = rcx*8       # scale_rcx_by_8: add rcx x 3
-    rax += rcx                         # add rax, rcx
+    if scale == 8: rcx = rcx * 8
+    rax += rcx
+  else:
+    preserve base
+    _load_operand("rax", index)
+    rax *= scale
+    rax += preserved base
 _store_result(inst.result, "rax")
 ```
 
-**scale_rcx_by_8** 通过三次 `add rcx, rcx` 实现 `rcx *= 8`。这只在 scale == 8 时使用，scale == 1 时直加。
+动态 GEP 支持任意正 element size；1 和 8 保留简单 fast path，其余使用 `imul`。
 
 Struct field offset 通过 `program.structs[struct_name].field_by_index(index).offset` 查表获取，field index 必须是编译期常量。
 
@@ -381,7 +395,9 @@ No known unused runtime helper label is intentionally emitted. The old `__epx_pu
 
 ### 9.4 Dynamic GEP scale
 
-`_add_scaled_index` 在动态 index 且 `scale != 1` / `scale != 8` 时抛出 `MirLowerError`。常量 index 不受此限制，因为 offset 会在 lowering 时折叠成立即数。当前这足够覆盖 `u8` buffer（scale=1）、word/pointer array（scale=8）和常量 struct field offset；未来若支持紧凑 4-byte integer array、value struct array，或更通用 aggregate GEP，需要补通用 `index * element_size` 地址计算。scale=8 仅通过三次 `add rcx, rcx` 实现，不是真正的 shift。
+动态 index 已支持任意显式 element size。scale 1/8 使用直接加法或三次 doubling；其他 scale 使用
+`imul index, element_size` 后与 preserved base 相加。struct stride 必须来自 MIR 的显式 layout size，
+不能由字段数量推导。
 
 ### 9.5 `_add_rax_imm` only uses current machine-supported immediates
 

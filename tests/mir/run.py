@@ -17,9 +17,9 @@ BUILD = ROOT / "build" / "tests" / "mir"
 
 EXPECTED = """extern void @ExitProcess(i64)
 
-type Data = struct { i8, i64 }
+type Data = struct size 16 align 8 { i8 @0, i16 @2, i32 @4, i64 @8 }
 
-type Zed = struct { ptr }
+type Zed = struct size 8 align 8 { ptr @0 }
 
 global @argv: ptr
 

@@ -121,7 +121,7 @@ fun sema_is_reserved_func(name: str): bool {
     if name == "read_file" || name == "write_file" || name == "len" {
         ret true
     }
-    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" || name == "bool" {
+    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "i16" || name == "u16" || name == "u8" || name == "bool" {
         ret true
     }
     ret false
@@ -131,7 +131,7 @@ fun sema_type_atom(st: SemaState, name: str): str {
     if name == "" {
         ret "void"
     }
-    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "u8" {
+    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "i16" || name == "u16" || name == "u8" {
         ret name
     }
     if name == "bool" || name == "void" || name == "str" {
@@ -389,6 +389,16 @@ fun sema_literal_int(node: AstNode): i64 {
 fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
     if target == "u8" {
         if value < 0 || value > 255 {
+            sema_die(f"{context} literal {value} out of range for {target}")
+        }
+    }
+    if target == "i16" {
+        if value < (0 - 32767 - 1) || value > 32767 {
+            sema_die(f"{context} literal {value} out of range for {target}")
+        }
+    }
+    if target == "u16" {
+        if value < 0 || value > 65535 {
             sema_die(f"{context} literal {value} out of range for {target}")
         }
     }
@@ -906,7 +916,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
         sema_check_assign(st, "str", node.args[0], "cstr argument 1")
         ret "u64"
     }
-    if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "u8" {
+    if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "i16" || node.name == "u16" || node.name == "u8" {
         sema_check_arity(node.name, 1, node.args)
         sema_expect_int(st, node.args[0], f"{node.name} argument")
         ret sema_type_atom(st, node.name)

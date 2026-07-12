@@ -97,7 +97,7 @@ linker 可见的 text symbol。创建、绑定和引用分别使用
 | `LabelRef(label)` | 持有数字 label handle 的 branch target。 |
 | `Mem(base, disp, symbol, size)` | base+disp memory 或 RIP-relative symbol memory。 |
 
-`Mem(size=1)` 打印 `byte [...]`，`Mem(size=8)` 打印 `qword [...]`。
+`Mem(size=1/2/4/8)` 分别打印 `byte/word/dword/qword [...]`。
 匿名 label 的 debug 文本是 `.L<id>`；函数入口和 runtime helper 等 named
 label 保留 `symbol_name`，因此其汇编审查文本和链接名稳定。
 
@@ -181,8 +181,9 @@ ret
 | `cmp` | `cmp r64, r64`, `cmp r64, imm32/imm8` |
 | `sete/setne/setg/setl/setge/setle` | target `al` |
 | `movzx` | `movzx eax, al` |
-| `movsx` | `movsx r64, byte [r64+disp]` |
-| `movzx` | `movzx r64, byte [r64+disp]` (also `movzx eax, al` for setcc) |
+| `movsx` | `movsx r64, byte/word [r64+disp]` |
+| `movzx` | `movzx r64, byte/word [r64+disp]` (also `movzx eax, al` for setcc) |
+| `movsxd` | `movsxd r64, dword [r64+disp]` |
 | `test` | intended contract: `test r64, same r64` |
 | `xor` | `xor r64, r64` |
 | `shl/sar/shr` | `op rax, cl` |
@@ -228,8 +229,8 @@ ret
 | `mov qword [mem], imm` | ✅ 支持 | 需 `Mem(size=8)` |
 | `mov r64, byte [mem]` | ❌ 不支持 | 使用 `movsx r64, byte [mem]` |
 | `movzx r64, byte [mem]` | ✅ 新增 | 零扩展 byte load；`0F B6 /r` + REX.W |
-| `mov r64, dword [mem]` | ❌ 不支持 | 当前只有 qword 和 byte 两种 size |
-| `mov [mem], dword` | ❌ 不支持 | 同上 |
+| `mov r32, dword [mem]` | ✅ 支持 | 写入 32-bit register 时自动零扩展到对应 r64 |
+| `mov [mem], r16/r32` | ✅ 支持 | word/dword narrow store |
 | `mov [rsp+disp], r64` | ✅ 支持 | 通过 `Mem("rsp", disp)` |
 | `mov [rbp+disp], r64` | ✅ 支持 | 通过 `Mem("rbp", disp)` |
 | `mov [reg+disp], r64` | ✅ 支持 | base 需属于当前 REG64 集合（`rax`–`r11`） |
@@ -268,7 +269,7 @@ ret
 | `[symbol]` | ✅ | RIP-relative symbol load/store |
 | `[base+index*scale+disp]` | ❌ | SIB 未实现 |
 | `[base]` | ✅ | disp=0 的 `Mem(base, 0)` |
-| `Mem(size=N)` | ✅ | size=1 (byte), size=8 (qword) — 仅支持这两种 |
+| `Mem(size=N)` | ✅ | size=1/2/4/8 |
 
 #### Branch/call contract
 

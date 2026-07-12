@@ -25,6 +25,12 @@ def main():
             print(f"  FAIL  {path.relative_to(ROOT)}")
             print((first.stdout + first.stderr).decode("utf-8", errors="replace")[-1000:])
             return 1
+        if path.name == "pass_m36_natural_struct_layout.ep":
+            layout = b"type Compact = struct size 32 align 8 { i8 @0, u16 @2, i16 @4, u32 @8, i32 @12, i8 @16, i64 @24 }"
+            if layout not in first.stdout:
+                print("  FAIL  natural struct layout contract")
+                print(first.stdout.decode("utf-8", errors="replace")[-2000:])
+                return 1
         print(f"  PASS  {path.relative_to(ROOT)}")
     return 0
 

@@ -22,8 +22,9 @@ heap 分配，地址在生命周期内不移动。runtime 维护一个紧凑的 
   work stack，结束后立即释放。
 - roots 包括活动线程栈和 `argv`。后端为非 `gep` 的 `ptr` 结果保留稳定栈槽，
   保证 allocation safepoint 上存在 managed object 基址。
-- heap payload 按对齐的 8-byte word 保守扫描。随机整数可能造成 false
-  retention，但不能造成活对象误回收。
+- heap payload 按对齐的 8-byte word 保守扫描。natural struct layout 保证所有 managed
+  reference 字段仍按 8 字节对齐；窄 scalar 字段和清零 padding 只可能造成 conservative
+  false retention，不会隐藏活引用。
 - sweep 释放未标记 payload，并原地压紧 tracked-object array。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak

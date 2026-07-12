@@ -6,7 +6,7 @@ fun check(ok: bool): void {
 
 fun main(): void {
     let text = make_str_buf()
-    str_buf_extend(text, "extern void @ExitProcess(i64)\n\ntype Zed = struct { ptr }\n\ntype Unused = struct { i64 }\n\ntype Data = struct { i8, i64 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
+    str_buf_extend(text, "extern void @ExitProcess(i64)\n\ntype Zed = struct size 8 align 8 { ptr @0 }\n\ntype Unused = struct size 8 align 8 { i64 @0 }\n\ntype Data = struct size 16 align 8 { i8 @0, i16 @2, i32 @4, i64 @8 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
     text.push(u8(92))
     text.push(u8(110))
     text.push(u8(92))
@@ -20,12 +20,22 @@ fun main(): void {
 
     let program = mrt_parse_program(str_buf_finish(text))
     backend_validate_program_abi(program)
-    check(len(program.struct_fields) == 4)
+    check(len(program.struct_layouts) == 3)
+    check(program.struct_layouts[2].name == "Data")
+    check(program.struct_layouts[2].size == 16)
+    check(program.struct_layouts[2].align == 8)
+    check(len(program.struct_fields) == 6)
     check(program.struct_fields[2].struct_name == "Data")
     check(program.struct_fields[2].field_type == "i8")
     check(program.struct_fields[2].field_index == 0)
-    check(program.struct_fields[3].field_type == "i64")
+    check(program.struct_fields[2].field_offset == 0)
+    check(program.struct_fields[3].field_type == "i16")
     check(program.struct_fields[3].field_index == 1)
+    check(program.struct_fields[3].field_offset == 2)
+    check(program.struct_fields[4].field_type == "i32")
+    check(program.struct_fields[4].field_offset == 4)
+    check(program.struct_fields[5].field_type == "i64")
+    check(program.struct_fields[5].field_offset == 8)
     check(len(program.globals) == 3)
     match program.globals[0] {
         MirDeclGlobal g: { check(g.name == "argv" && g.typ == "ptr") }

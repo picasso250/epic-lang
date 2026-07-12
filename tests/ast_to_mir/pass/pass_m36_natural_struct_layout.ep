@@ -1,0 +1,14 @@
+struct Compact {
+    a: u8
+    b: u16
+    c: i16
+    d: u32
+    e: i32
+    f: u8
+    tail: u64
+}
+
+fun main(): void {
+    let item = new Compact {}
+    item.b = u16(1)
+}

@@ -1,0 +1,56 @@
+# EXIT: 0
+struct Compact {
+    a: u8
+    b: u16
+    c: i16
+    d: u32
+    e: i32
+    f: u8
+    tail: u64
+}
+
+fun check(value: bool, code: i64): void {
+    if !value { exit(code) }
+}
+
+fun main(): void {
+    let item = new Compact {
+        a: u8(250),
+        b: u16(65530),
+        c: i16(0) - i16(1234),
+        d: u32(4000000000),
+        e: i32(0) - i32(2000000000),
+        f: u8(77),
+        tail: u64(9000000000),
+    }
+
+    check(item.a == u8(250), 10)
+    check(item.b == u16(65530), 11)
+    check(item.c == i16(0) - i16(1234), 12)
+    check(item.d == u32(4000000000), 13)
+    check(item.e == i32(0) - i32(2000000000), 14)
+    check(item.f == u8(77), 15)
+    check(item.tail == u64(9000000000), 16)
+
+    item.b = u16(42)
+    check(item.a == u8(250), 20)
+    check(item.c == i16(0) - i16(1234), 21)
+    check(item.d == u32(4000000000), 22)
+
+    item.c = i16(0) - i16(7)
+    check(item.b == u16(42), 30)
+    check(item.d == u32(4000000000), 31)
+
+    item.d = u32(1234567890)
+    check(item.e == i32(0) - i32(2000000000), 40)
+    check(item.f == u8(77), 41)
+
+    item.f = u8(9)
+    check(item.e == i32(0) - i32(2000000000), 50)
+    check(item.tail == u64(9000000000), 51)
+
+    item.b += u16(65535)
+    check(item.b == u16(41), 60)
+    item.c -= i16(32767)
+    check(item.c == i16(32762), 61)
+}
