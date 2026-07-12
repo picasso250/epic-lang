@@ -1104,6 +1104,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
         }
         AstMatch n: {
             let scrutinee = sema_expr_type(st, n.expr)
+            n.is_exhaustive = false
             if sema_union_index(st, scrutinee) >= 0 {
                 let seen = new str[]
                 for i: 0:len(n.fields) {
@@ -1136,6 +1137,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                         sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
                     }
                 }
+                n.is_exhaustive = true
                 ret
             }
             for i: 0:len(n.fields) {
@@ -1148,6 +1150,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             }
             if n.has_else {
                 sema_block(st, n.else_block)
+                n.is_exhaustive = true
             }
             ret
         }
@@ -1203,7 +1206,7 @@ fun sema_stmt_returns(node: AstNode): bool {
             ret sema_block_returns(stmt.then_block) && sema_block_returns(stmt.else_block)
         }
         AstMatch stmt: {
-            if stmt.has_else == false {
+            if stmt.is_exhaustive == false {
                 ret false
             }
             for i: 0:len(stmt.fields) {
@@ -1212,7 +1215,10 @@ fun sema_stmt_returns(node: AstNode): bool {
                     ret false
                 }
             }
-            ret sema_block_returns(stmt.else_block)
+            if stmt.has_else {
+                ret sema_block_returns(stmt.else_block)
+            }
+            ret true
         }
         _: {}
     }

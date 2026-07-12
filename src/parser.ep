@@ -222,6 +222,7 @@ struct AstMatch {
     fields: AstMatchCase[]
     else_block: AstBlock
     has_else: bool
+    is_exhaustive: bool
 }
 
 struct AstMatchCase {
@@ -842,7 +843,7 @@ fun (p: Parser) parse_match_literal(): AstNode {
 fun (p: Parser) parse_match_stmt(): AstNode {
     let t = p.expect("MATCH")
     let expr = p.parse_expr()
-    let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }, has_else: false }
+    let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }, has_else: false, is_exhaustive: false }
     p.expect("LBRACE")
     p.skip_newlines()
     let saw_default = 0

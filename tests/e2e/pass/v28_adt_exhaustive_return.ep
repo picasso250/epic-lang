@@ -1,0 +1,31 @@
+# EXIT: 0
+# STDOUT: 42,7
+
+struct LeftValue {
+    value: i64
+}
+
+struct RightValue {
+    value: i64
+}
+
+type EitherValue = LeftValue | RightValue
+
+fun unwrap(value: EitherValue): i64 {
+    match value {
+        LeftValue left: {
+            ret left.value
+        }
+        RightValue right: {
+            ret right.value
+        }
+    }
+}
+
+fun main(): void {
+    let left: EitherValue = new EitherValue(new LeftValue { value: 42 })
+    let right: EitherValue = new EitherValue(new RightValue { value: 7 })
+    print(str(unwrap(left)))
+    print(",")
+    println(str(unwrap(right)))
+}

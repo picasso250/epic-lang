@@ -257,7 +257,7 @@ type Expr = LiteralExpr | BinaryExpr
 - 构造必须显式：`new Expr(new LiteralExpr { ... })`。
 - `Expr` 是独立 heap-backed wrapper 类型，构造后的静态类型就是 `Expr`，不保留内部 variant 类型信息。
 - 不开放 tag/kind/is API，ADT 只能通过 `match` 解包。
-- `match` 必须覆盖全部 variant，或者提供 `_` 分支。
+- `match` 必须覆盖全部 variant，或者提供 `_` 分支；覆盖全部 variant 的 match 在控制流分析中视为穷尽分支。
 - payload 仍然是普通 struct，可以作为函数参数类型。
 - 不支持 union extension。
 
