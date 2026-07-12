@@ -1,4 +1,4 @@
-# COMPILE_FAIL: return expected str, got i64
+# COMPILE_FAIL_CONTAINS: return expected str, got i64
 
 fun bad(): str {
     ret 1

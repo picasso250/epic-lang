@@ -1,4 +1,4 @@
-# COMPILE_FAIL: reserved builtin function name: i64
+# COMPILE_FAIL_CONTAINS: reserved builtin function name: i64
 fun i64(value: i64): i64 {
     ret value
 }

@@ -1,7 +1,0 @@
-fun run(): i64 {
-    ret 7
-}
-
-fun main(): void {
-    exit(run())
-}

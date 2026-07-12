@@ -1,4 +1,4 @@
-# COMPILE_FAIL: unknown field i64[].cap
+# COMPILE_FAIL_CONTAINS: unknown field i64[].cap
 
 fun main(): void {
     let xs = new i64[]

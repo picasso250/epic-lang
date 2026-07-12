@@ -1,4 +1,4 @@
-# COMPILE_FAIL: return expected void, got i64
+# COMPILE_FAIL_CONTAINS: return expected void, got i64
 
 fun main(): void {
     ret 1

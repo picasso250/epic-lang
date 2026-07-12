@@ -1,4 +1,4 @@
-# COMPILE_FAIL: unknown field str.len
+# COMPILE_FAIL_CONTAINS: unknown field str.len
 
 fun main(): void {
     let s = "abc"

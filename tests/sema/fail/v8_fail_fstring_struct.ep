@@ -1,4 +1,4 @@
-# COMPILE_FAIL: f-string expression expected str, integer, bool, or u8[], got Val
+# COMPILE_FAIL_CONTAINS: f-string expression expected str, integer, bool, or u8[], got Val
 
 struct Val {
     val: i64

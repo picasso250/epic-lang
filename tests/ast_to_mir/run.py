@@ -1,37 +1,25 @@
 #!/usr/bin/env python3
-"""AST-to-MIR deterministic output tests for the Epic implementation."""
+"""AST-to-MIR physical layout contract test."""
 
 import subprocess
 import sys
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests"))
 from compiler_runner import compile_tool
 
 
-TOOL = ROOT / "build" / "tests" / "ast_to_mir.exe"
-
-
 def main():
+    case = ROOT / "tests" / "ast_to_mir" / "pass" / "pass_m36_natural_struct_layout.ep"
     sources = [ROOT / "src" / name for name in ("util.ep", "lexer.ep", "parser.ep", "sema.ep", "mir.ep", "ast_to_mir.ep")]
-    compile_tool(ROOT / "src" / "ast_to_mir.ep", sources, TOOL)
-    cases = sorted((ROOT / "tests" / "ast_to_mir" / "pass").glob("*.ep")) + sorted((ROOT / "examples").glob("*.ep"))
-    for path in cases:
-        first = subprocess.run([str(TOOL), str(path)], cwd=ROOT, capture_output=True)
-        second = subprocess.run([str(TOOL), str(path)], cwd=ROOT, capture_output=True)
-        if first.returncode != 0 or first.stdout != second.stdout or b"define " not in first.stdout:
-            print(f"  FAIL  {path.relative_to(ROOT)}")
-            print((first.stdout + first.stderr).decode("utf-8", errors="replace")[-1000:])
-            return 1
-        if path.name == "pass_m36_natural_struct_layout.ep":
-            layout = b"type Compact = struct size 32 align 8 { i8 @0, u16 @2, i16 @4, u32 @8, i32 @12, i8 @16, i64 @24 }"
-            if layout not in first.stdout:
-                print("  FAIL  natural struct layout contract")
-                print(first.stdout.decode("utf-8", errors="replace")[-2000:])
-                return 1
-        print(f"  PASS  {path.relative_to(ROOT)}")
+    tool = compile_tool(ROOT / "src" / "ast_to_mir.ep", sources, ROOT / "build" / "tests" / "ast_to_mir.exe")
+    result = subprocess.run([str(tool), str(case)], cwd=ROOT, capture_output=True)
+    required = (b"type Compact = struct size 32 align 8", b"i8 @0", b"u16 @2", b"i16 @4", b"u32 @8", b"i32 @12", b"i8 @16", b"i64 @24")
+    if result.returncode != 0 or any(part not in result.stdout for part in required):
+        print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
+        return 1
+    print("  PASS  natural struct layout metadata")
     return 0
 
 

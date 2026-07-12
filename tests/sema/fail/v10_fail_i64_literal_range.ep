@@ -1,4 +1,4 @@
-# COMPILE_FAIL: integer literal 9223372036854775808 out of range for i64
+# COMPILE_FAIL_CONTAINS: integer literal 9223372036854775808 out of range for i64
 
 fun run(): i64 {
     ret 9223372036854775808

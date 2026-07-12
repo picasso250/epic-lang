@@ -1,4 +1,4 @@
-# COMPILE_FAIL: extend expects an array with the same element type
+# COMPILE_FAIL_CONTAINS: extend expects an array with the same element type
 struct Box {
     value: i64
 }

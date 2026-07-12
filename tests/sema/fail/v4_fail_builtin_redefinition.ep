@@ -1,4 +1,4 @@
-# COMPILE_FAIL: reserved builtin function name: len
+# COMPILE_FAIL_CONTAINS: reserved builtin function name: len
 fun len(): i64 {
     ret 1
 }

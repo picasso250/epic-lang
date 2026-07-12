@@ -1,4 +1,4 @@
-# COMPILE_FAIL: use i32(... ) for an explicit conversion
+# COMPILE_FAIL_CONTAINS: use i32(... ) for an explicit conversion
 
 fun run(): i64 {
     let y = 1

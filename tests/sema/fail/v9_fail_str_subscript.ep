@@ -1,4 +1,4 @@
-# COMPILE_FAIL: str subscript is removed; use bytes(s)[i]
+# COMPILE_FAIL_CONTAINS: str subscript is removed; use bytes(s)[i]
 fun main(): void {
     let s = "Epic"
     let c = s[0]

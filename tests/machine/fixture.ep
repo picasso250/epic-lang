@@ -39,5 +39,10 @@ fun main(): void {
     if len(obj.symbol_names) != 4 || obj.symbol_names[0] != "_start" || obj.symbol_names[1] != "msg" || obj.symbol_names[2] != "scratch" || obj.symbol_names[3] != "ExitProcess" {
         panic "machine symbol order mismatch"
     }
-    machine_print_object(obj)
+    if len(obj.text) != 40 || obj.text[0] != 72 || obj.text[39] != 195 || len(obj.data) != 10 || obj.data[0] != 65 {
+        panic "machine bytes mismatch"
+    }
+    if len(obj.text_reloc_offsets) != 2 || len(obj.data_reloc_offsets) != 0 {
+        panic "machine relocation mismatch"
+    }
 }

@@ -1,4 +1,4 @@
-# COMPILE_FAIL: for range end expected i64, got u32
+# COMPILE_FAIL_CONTAINS: for range end expected i64, got u32
 fun main(): void {
     for i: 0:u32(3) {
     }

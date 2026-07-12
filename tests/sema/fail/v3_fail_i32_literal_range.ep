@@ -1,4 +1,4 @@
-# COMPILE_FAIL: let x expected i32, got i64; use i32(... ) for an explicit conversion
+# COMPILE_FAIL_CONTAINS: let x expected i32, got i64; use i32(... ) for an explicit conversion
 
 fun run(): i64 {
     let x: i32 = 2147483648

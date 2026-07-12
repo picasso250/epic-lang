@@ -1,4 +1,4 @@
-# COMPILE_FAIL: requires an initializer
+# COMPILE_FAIL_CONTAINS: requires an initializer
 struct Box {
     value: i64
 }

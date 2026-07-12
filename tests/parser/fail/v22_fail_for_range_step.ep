@@ -1,4 +1,4 @@
-# COMPILE_FAIL: Expected LBRACE
+# COMPILE_FAIL_CONTAINS: Expected LBRACE
 fun main(): void {
     for i: 0:10:2 {
     }

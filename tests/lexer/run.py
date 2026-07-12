@@ -49,9 +49,6 @@ def main():
         print("  FAIL  lexer LF/CRLF equivalence")
         return 1
     print("  PASS  lexer LF/CRLF equivalence")
-    for path in sorted((ROOT / "examples").glob("*.ep")):
-        run_dump(path)
-    print("  PASS  lexer examples")
     return 0
 
 

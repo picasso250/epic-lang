@@ -1,4 +1,4 @@
-# COMPILE_FAIL: function must return i64 on all paths
+# COMPILE_FAIL_CONTAINS: function must return i64 on all paths
 
 fun run(): i64 {
     for true {

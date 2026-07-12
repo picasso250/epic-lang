@@ -1,4 +1,4 @@
-# COMPILE_FAIL: let x expected u32, got i64; use u32(... ) for an explicit conversion
+# COMPILE_FAIL_CONTAINS: let x expected u32, got i64; use u32(... ) for an explicit conversion
 
 fun run(): i64 {
     let x: u32 = -1

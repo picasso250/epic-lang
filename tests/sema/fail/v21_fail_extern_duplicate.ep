@@ -1,4 +1,4 @@
-# COMPILE_FAIL: duplicate function Tick
+# COMPILE_FAIL_CONTAINS: duplicate function Tick
 extern "a.dll" fun Tick(): u64
 extern "b.dll" fun Tick(): u64
 fun main(): void {}

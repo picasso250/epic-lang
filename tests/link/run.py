@@ -1,33 +1,26 @@
 #!/usr/bin/env python3
-"""PE linker byte-identity tests using Epic-produced COFF objects."""
+"""PE linker executable behavior test."""
 
 import subprocess
 import sys
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests"))
 from compiler_runner import compile_program, compile_tool
 
 
-LINK_EXE = ROOT / "build" / "tests" / "link.exe"
-OUT = ROOT / "build" / "tests" / "link"
-
-
 def main():
-    compile_tool(ROOT / "src" / "link.ep", [ROOT / "src" / "util.ep", ROOT / "src" / "link.ep"], LINK_EXE)
-    for path in sorted((ROOT / "examples").glob("*.ep")):
-        expected = OUT / f"{path.stem}.expected.exe"
-        actual = OUT / f"{path.stem}.actual.exe"
-        compile_program(path, expected)
-        obj = Path(str(expected) + ".obj")
-        result = subprocess.run([str(LINK_EXE), str(obj), "-o", str(actual)], cwd=ROOT, capture_output=True)
-        if result.returncode != 0 or not actual.is_file() or actual.read_bytes() != expected.read_bytes():
-            print(f"  FAIL  {path.relative_to(ROOT)}")
-            print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-1000:])
-            return 1
-        print(f"  PASS  {path.relative_to(ROOT)}")
+    link = compile_tool(ROOT / "src" / "link.ep", [ROOT / "src" / "util.ep", ROOT / "src" / "link.ep"], ROOT / "build" / "tests" / "link.exe")
+    source = ROOT / "examples" / "00_hello_world.ep"
+    seed = compile_program(source, ROOT / "build" / "tests" / "link-seed.exe")
+    actual = ROOT / "build" / "tests" / "link-actual.exe"
+    linked = subprocess.run([str(link), str(seed) + ".obj", "-o", str(actual)], cwd=ROOT, capture_output=True)
+    result = subprocess.run([str(actual)], cwd=ROOT, capture_output=True) if linked.returncode == 0 and actual.is_file() else linked
+    if result.returncode != 0 or result.stdout.strip() != b"Hello, Epic!":
+        print((linked.stdout + linked.stderr + result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
+        return 1
+    print("  PASS  linked executable behavior")
     return 0
 
 

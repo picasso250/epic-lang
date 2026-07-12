@@ -1,4 +1,4 @@
-# COMPILE_FAIL: string += is not supported; use s = s + rhs
+# COMPILE_FAIL_CONTAINS: string += is not supported; use s = s + rhs
 fun main(): void {
     let text = "a"
     text += "b"

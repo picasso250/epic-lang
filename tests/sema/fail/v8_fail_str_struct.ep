@@ -1,4 +1,4 @@
-# COMPILE_FAIL: str expected str, integer, bool, or u8[], got Val
+# COMPILE_FAIL_CONTAINS: str expected str, integer, bool, or u8[], got Val
 
 struct Val {
     val: i64

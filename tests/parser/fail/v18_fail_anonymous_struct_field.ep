@@ -1,4 +1,4 @@
-# COMPILE_FAIL: Expected COLON
+# COMPILE_FAIL_CONTAINS: Expected COLON
 struct Meta {
     line: i64
 }

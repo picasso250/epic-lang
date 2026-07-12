@@ -1,4 +1,4 @@
-# COMPILE_FAIL: return expected i64, got void
+# COMPILE_FAIL_CONTAINS: return expected i64, got void
 
 fun run(): i64 {
     ret

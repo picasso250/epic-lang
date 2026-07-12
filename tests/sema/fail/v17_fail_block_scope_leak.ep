@@ -1,4 +1,4 @@
-# COMPILE_FAIL: undefined variable x
+# COMPILE_FAIL_CONTAINS: undefined variable x
 fun run(): i64 {
     if true {
         let x = 1

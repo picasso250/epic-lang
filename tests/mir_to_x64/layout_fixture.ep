@@ -1,28 +1,38 @@
 fun main(): void {
     let program = mir_program_empty()
     mir_program_add_struct_layout(program, "Twelve", 12, 4)
-    mir_program_add_struct_field(program, "Twelve", "i32", 0, 0)
-    mir_program_add_struct_field(program, "Twelve", "u16", 1, 4)
-    mir_program_add_struct_field(program, "Twelve", "u16", 2, 6)
-    mir_program_add_struct_field(program, "Twelve", "i32", 3, 8)
-
-    let fn = mir_function_empty("step", "ptr")
-    fn.params.push(new MirParam { value_id: 1, typ: "ptr" })
-    fn.params.push(new MirParam { value_id: 2, typ: "i64" })
-    let block = mir_block_empty("entry")
+    let fn = mir_function_empty("stride", "ptr")
+    fn.params.push(new MirParam { typ: "ptr", value_id: 1 })
+    fn.params.push(new MirParam { typ: "i64", value_id: 2 })
+    let entry = mir_block_empty("entry")
     let gep = mir_inst_empty()
     gep.op = "gep"
     gep.result_id = 3
     gep.result_type = "ptr"
     gep.typ = "struct Twelve"
     gep.has_result = true
-    gep.operands.push(mir_value_operand("ptr", 1))
-    gep.operands.push(mir_value_operand("i64", 2))
-    block.instructions.push(gep)
-    block.terminator = mir_ret_value(mir_value_operand("ptr", 3))
-    block.has_terminator = true
-    fn.blocks.push(block)
-    program.functions.push(fn)
+    gep.operands = new MirOperand[] { mir_value_operand("ptr", 1), mir_value_operand("i64", 2) }
+    entry.instructions.push(gep)
+    entry.terminator = mir_ret_value(mir_value_operand("ptr", 3))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
 
-    print(x64_program_text(mir_to_x64_lower_function_with_program(program, fn)))
+    let lowered = mir_to_x64_lower_function_with_program(program, fn)
+    let saw_scale = false
+    let saw_multiply = false
+    for i: 0:len(lowered.items) {
+        match lowered.items[i] {
+            X64InstItem inst: {
+                if inst.op == "imul" { saw_multiply = true }
+                for j: 0:len(inst.operands) {
+                    match inst.operands[j] {
+                        X64ImmOperand imm: { if imm.value == 12 { saw_scale = true } }
+                        _: {}
+                    }
+                }
+            }
+            _: {}
+        }
+    }
+    if !saw_scale || !saw_multiply { panic "dynamic struct GEP must multiply by explicit size" }
 }

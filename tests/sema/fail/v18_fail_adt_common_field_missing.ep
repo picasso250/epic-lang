@@ -1,4 +1,4 @@
-# COMPILE_FAIL: union Node has no common field meta
+# COMPILE_FAIL_CONTAINS: union Node has no common field meta
 struct Meta {
     line: i64
 }

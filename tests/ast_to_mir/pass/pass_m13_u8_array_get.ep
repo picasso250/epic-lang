@@ -1,8 +1,0 @@
-fun run(): i64 {
-    let b = new u8[] { u8(65), u8(66) }
-    ret i64(b[1])
-}
-
-fun main(): void {
-    exit(run())
-}

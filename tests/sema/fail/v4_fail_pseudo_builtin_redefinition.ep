@@ -1,4 +1,4 @@
-# COMPILE_FAIL: reserved builtin function name: argv
+# COMPILE_FAIL_CONTAINS: reserved builtin function name: argv
 fun argv(): i64 {
     ret 1
 }

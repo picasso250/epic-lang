@@ -1,4 +1,4 @@
-# COMPILE_FAIL: let e expected Expr, got Leaf
+# COMPILE_FAIL_CONTAINS: let e expected Expr, got Leaf
 struct Leaf { value: i64 }
 type Expr = Leaf
 fun main(): void {

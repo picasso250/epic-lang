@@ -1,4 +1,4 @@
-# COMPILE_FAIL: slice only supports str and u8[]
+# COMPILE_FAIL_CONTAINS: slice only supports str and u8[]
 fun main(): void {
     let xs = new i64[] { 1, 2 }
     let ys = xs[0:1]

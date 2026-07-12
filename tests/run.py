@@ -27,6 +27,7 @@ MODULES = [
     "machine",
     "coff",
     "link",
+    "examples",
     "gc",
     "e2e",
 ]

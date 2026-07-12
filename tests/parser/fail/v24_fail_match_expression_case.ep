@@ -1,4 +1,4 @@
-# COMPILE_FAIL: Expected match literal case
+# COMPILE_FAIL_CONTAINS: Expected match literal case
 fun main(): void {
     let pattern = 1
     match 1 {

@@ -1,4 +1,4 @@
-# COMPILE_FAIL: break outside loop
+# COMPILE_FAIL_CONTAINS: break outside loop
 
 fun main(): void {
     break

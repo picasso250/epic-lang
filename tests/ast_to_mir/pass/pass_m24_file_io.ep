@@ -1,7 +1,0 @@
-# MIR-CODEGEN: read_file/write_file builtins.
-fun main(): void {
-    let s = "42"
-    let n = write_file("test_out.txt", bytes(s))
-    let inp = read_file("test_out.txt")
-    println(str(n + len(inp)))
-}

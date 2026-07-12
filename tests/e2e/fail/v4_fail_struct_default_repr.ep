@@ -1,4 +1,4 @@
-# COMPILE_FAIL: str expected str, integer, bool, or u8[], got Outer
+# COMPILE_FAIL_CONTAINS: str expected str, integer, bool, or u8[], got Outer
 
 struct Inner {
     x: i64

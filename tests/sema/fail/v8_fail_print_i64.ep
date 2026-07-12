@@ -1,4 +1,4 @@
-# COMPILE_FAIL: print expected str, got i64
+# COMPILE_FAIL_CONTAINS: print expected str, got i64
 
 fun run(): i64 {
     print(1)

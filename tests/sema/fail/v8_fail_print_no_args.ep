@@ -1,4 +1,4 @@
-# COMPILE_FAIL: print expects 1 argument
+# COMPILE_FAIL_CONTAINS: print expects 1 argument
 
 fun run(): i64 {
     print()

@@ -1,0 +1,30 @@
+fun expect_byte(data: u8[], index: i64, expected: i64): void {
+    if i64(data[index]) != expected { panic f"COFF byte {index} mismatch" }
+}
+
+fun main(): void {
+    let obj = new MachineObject
+    obj.text = new i64[] { 195 }
+    obj.data = new i64[] { 1, 2 }
+    obj.text_reloc_offsets = new i64[] { 0 }
+    obj.text_reloc_symbol_indexes = new i64[] { 1 }
+    obj.data_reloc_offsets = new i64[]
+    obj.data_reloc_symbol_indexes = new i64[]
+    obj.symbol_names = new str[] { "entry", "ExitProcess" }
+    obj.symbol_sections = new i64[] { 1, 0 }
+    obj.symbol_values = new i64[] { 0, 0 }
+
+    let data = coff_build_obj(obj)
+    if len(data) != 165 { panic "COFF size mismatch" }
+    expect_byte(data, 0, 100)       # AMD64 machine 0x8664
+    expect_byte(data, 1, 134)
+    expect_byte(data, 2, 2)         # two sections
+    expect_byte(data, 8, 113)       # symbol table offset
+    expect_byte(data, 12, 2)        # symbol count
+    expect_byte(data, 100, 195)     # .text
+    expect_byte(data, 101, 1)       # .data
+    expect_byte(data, 102, 2)
+    expect_byte(data, 107, 1)       # relocation symbol index
+    expect_byte(data, 111, 4)       # IMAGE_REL_AMD64_REL32
+    expect_byte(data, 149, 16)       # string table size with long symbol
+}

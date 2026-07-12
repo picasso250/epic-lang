@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Semantic pass/fail tests using the current Epic implementation."""
 
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -9,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests"))
-from compiler_runner import compile_tool
+from compiler_runner import compile_fail_contains, compile_tool
 
 
 SEMA_EXE = ROOT / "build" / "tests" / "sema.exe"
@@ -33,8 +32,7 @@ def main():
             return 1
         print(f"  PASS  {path.relative_to(ROOT)}")
     for path in sorted((ROOT / "tests" / "sema" / "fail").glob("*.ep")):
-        match = re.search(r"#\s*COMPILE_FAIL:\s*(.*)$", path.read_text(encoding="utf-8"), re.MULTILINE)
-        expected = match.group(1).strip() if match else None
+        expected = compile_fail_contains(path)
         result = run(path)
         output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
         if expected is None or result.returncode == 0 or expected not in output:

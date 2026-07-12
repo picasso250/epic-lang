@@ -1,4 +1,4 @@
-# COMPILE_FAIL: str expected str, integer, bool, or u8[], got i64[]
+# COMPILE_FAIL_CONTAINS: str expected str, integer, bool, or u8[], got i64[]
 
 fun run(): i64 {
     println(str(new i64[] { 1, 2, 3 }))

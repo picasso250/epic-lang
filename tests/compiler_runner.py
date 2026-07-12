@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +29,12 @@ def compiler_path() -> Path:
     if result.returncode != 0 or not compiler.is_file():
         raise RuntimeError("failed to build current self-hosted test compiler")
     return compiler
+
+
+def compile_fail_contains(path: str | Path) -> str | None:
+    text = Path(path).read_text(encoding="utf-8")
+    match = re.search(r"#\s*COMPILE_FAIL_CONTAINS:\s*(.*)$", text, re.MULTILINE)
+    return match.group(1).strip() if match else None
 
 
 def relative(path: str | Path) -> str:

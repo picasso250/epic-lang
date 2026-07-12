@@ -21,7 +21,7 @@ def parse_annotations(source):
         "stdout_contains": [],
         "argv": [],
         "clean_paths": [],
-        "compile_fail": None,
+        "compile_fail_contains": None,
         "compile_only": False,
     }
     stdout_lines = []
@@ -37,8 +37,8 @@ def parse_annotations(source):
             annotations["argv"] = shlex.split(m.group(1) or "")
         elif m := re.match(r'#\s*CLEAN:\s*(.+)$', line):
             annotations["clean_paths"].extend(shlex.split(m.group(1)))
-        elif m := re.match(r'#\s*COMPILE_FAIL:\s*(.*)$', line):
-            annotations["compile_fail"] = m.group(1).strip() or ""
+        elif m := re.match(r'#\s*COMPILE_FAIL_CONTAINS:\s*(.*)$', line):
+            annotations["compile_fail_contains"] = m.group(1).strip() or ""
         elif re.match(r'#\s*COMPILE_ONLY\b', line):
             annotations["compile_only"] = True
     annotations["stdout"] = "\n".join(stdout_lines) if stdout_lines else None
@@ -55,7 +55,7 @@ def has_expectations(annotations):
         annotations["exit_code"] is not None,
         annotations["stdout"] is not None,
         bool(annotations["stdout_contains"]),
-        annotations["compile_fail"] is not None,
+        annotations["compile_fail_contains"] is not None,
         annotations["compile_only"],
     ])
 
@@ -123,7 +123,7 @@ def run_epic_case(ep_file, root_dir=ROOT_DIR, epicc=None):
         timeout=30,
     )
 
-    expected_compile_fail = annotations["compile_fail"]
+    expected_compile_fail = annotations["compile_fail_contains"]
     if expected_compile_fail is not None:
         output = result.stdout + result.stderr
         if result.returncode == 0:

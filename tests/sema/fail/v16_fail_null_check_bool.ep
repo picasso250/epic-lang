@@ -1,4 +1,4 @@
-# COMPILE_FAIL: null check expected reference, got bool
+# COMPILE_FAIL_CONTAINS: null check expected reference, got bool
 struct Foo {
     b: bool
 }

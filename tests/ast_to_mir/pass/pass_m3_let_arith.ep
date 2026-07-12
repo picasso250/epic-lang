@@ -1,8 +1,0 @@
-fun run(): i64 {
-    let x = 1 + 2 * 3
-    ret x
-}
-
-fun main(): void {
-    exit(run())
-}

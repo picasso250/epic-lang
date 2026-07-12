@@ -1,4 +1,4 @@
-# COMPILE_FAIL: for range start expected i64, got u64
+# COMPILE_FAIL_CONTAINS: for range start expected i64, got u64
 fun main(): void {
     for i: u64(0):3 {
     }

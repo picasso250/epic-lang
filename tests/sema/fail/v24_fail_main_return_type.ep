@@ -1,4 +1,4 @@
-# COMPILE_FAIL: main function must return void, got i64
+# COMPILE_FAIL_CONTAINS: main function must return void, got i64
 fun main(): i64 {
     ret 0
 }
