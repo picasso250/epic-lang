@@ -4,8 +4,6 @@ global @gc_sizes: ptr
 
 global @gc_object_count: i64
 
-global @gc_sorted_count: i64
-
 global @gc_object_cap: i64
 
 global @gc_live_bytes: i64
@@ -19,6 +17,10 @@ global @gc_stack_high: ptr
 global @gc_low_addr: ptr
 
 global @gc_high_addr: ptr
+
+global @gc_table: ptr
+
+global @gc_table_cap: i64
 
 global @gc_marks: ptr
 
@@ -130,132 +132,34 @@ done:
   ret void
 }
 
-define void @__ep_gc_swap_records(i64 %1, i64 %2) {
+define void @__ep_gc_table_insert(ptr %1, i64 %2) {
 entry:
-  %3: ptr = load ptr, ptr gc_objects
-  %4: ptr = load ptr, ptr gc_sizes
-  %5: ptr = gep ptr, ptr %3, i64 %1
-  %6: ptr = gep ptr, ptr %3, i64 %2
-  %7: ptr = load ptr, ptr %5
-  %8: ptr = load ptr, ptr %6
-  store ptr %8, ptr %5
-  store ptr %7, ptr %6
-  %9: ptr = gep i64, ptr %4, i64 %1
-  %10: ptr = gep i64, ptr %4, i64 %2
-  %11: i64 = load i64, ptr %9
-  %12: i64 = load i64, ptr %10
-  store i64 %12, ptr %9
-  store i64 %11, ptr %10
-  ret void
-}
+  %3: ptr = load ptr, ptr gc_table
+  %4: i64 = load i64, ptr gc_table_cap
+  %5: i64 = ptrtoint ptr %1 to i64
+  %6: i64 = udiv i64 %5, i64 8
+  %7: i64 = mul i64 %6, i64 6364136223846793005
+  %8: i64 = urem i64 %7, i64 %4
+  %9: ptr = alloca i64
+  store i64 %8, ptr %9
+  br label %probe
 
-define void @__ep_gc_sift_down(i64 %1, i64 %2, i64 %3) {
-entry:
-  %4: ptr = load ptr, ptr gc_objects
-  %5: ptr = alloca i64
-  %6: ptr = alloca i64
-  store i64 %2, ptr %5
-  br label %loop
+probe:
+  %10: i64 = load i64, ptr %9
+  %11: ptr = gep i64, ptr %3, i64 %10
+  %12: i64 = load i64, ptr %11
+  %13: bool = icmp.eq i64 %12, i64 0
+  condbr bool %13, label %insert, label %next
 
-loop:
-  %7: i64 = load i64, ptr %5
-  %8: i64 = mul i64 %7, i64 2
-  %9: i64 = add i64 %8, i64 1
-  %10: bool = icmp.uge i64 %9, i64 %3
-  condbr bool %10, label %done, label %choose_left
+next:
+  %14: i64 = add i64 %10, i64 1
+  %15: i64 = urem i64 %14, i64 %4
+  store i64 %15, ptr %9
+  br label %probe
 
-choose_left:
-  store i64 %7, ptr %6
-  %11: i64 = add i64 %1, i64 %7
-  %12: i64 = add i64 %1, i64 %9
-  %13: ptr = gep ptr, ptr %4, i64 %11
-  %14: ptr = load ptr, ptr %13
-  %15: ptr = gep ptr, ptr %4, i64 %12
-  %16: ptr = load ptr, ptr %15
-  %17: bool = icmp.ult ptr %14, ptr %16
-  condbr bool %17, label %set_left, label %check_right
-
-set_left:
-  store i64 %9, ptr %6
-  br label %check_right
-
-check_right:
-  %18: i64 = add i64 %9, i64 1
-  %19: bool = icmp.ult i64 %18, i64 %3
-  condbr bool %19, label %compare_right, label %decide
-
-compare_right:
-  %20: i64 = load i64, ptr %6
-  %21: i64 = add i64 %1, i64 %20
-  %22: i64 = add i64 %1, i64 %18
-  %23: ptr = gep ptr, ptr %4, i64 %21
-  %24: ptr = load ptr, ptr %23
-  %25: ptr = gep ptr, ptr %4, i64 %22
-  %26: ptr = load ptr, ptr %25
-  %27: bool = icmp.ult ptr %24, ptr %26
-  condbr bool %27, label %set_right, label %decide
-
-set_right:
-  store i64 %18, ptr %6
-  br label %decide
-
-decide:
-  %28: i64 = load i64, ptr %6
-  %29: i64 = load i64, ptr %5
-  %30: bool = icmp.eq i64 %28, i64 %29
-  condbr bool %30, label %done, label %swap
-
-swap:
-  %31: i64 = add i64 %1, i64 %29
-  %32: i64 = add i64 %1, i64 %28
-  call void __ep_gc_swap_records(i64 %31, i64 %32)
-  store i64 %28, ptr %5
-  br label %loop
-
-done:
-  ret void
-}
-
-define void @__ep_gc_sort_range(i64 %1, i64 %2) {
-entry:
-  %3: bool = icmp.ult i64 %2, i64 2
-  condbr bool %3, label %done, label %heap_init
-
-heap_init:
-  %4: i64 = udiv i64 %2, i64 2
-  %5: ptr = alloca i64
-  store i64 %4, ptr %5
-  br label %heap_loop
-
-heap_loop:
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.eq i64 %6, i64 0
-  condbr bool %7, label %sort_init, label %heap_one
-
-heap_one:
-  %8: i64 = sub i64 %6, i64 1
-  store i64 %8, ptr %5
-  call void __ep_gc_sift_down(i64 %1, i64 %8, i64 %2)
-  br label %heap_loop
-
-sort_init:
-  store i64 %2, ptr %5
-  br label %sort_loop
-
-sort_loop:
-  %9: i64 = load i64, ptr %5
-  %10: bool = icmp.ule i64 %9, i64 1
-  condbr bool %10, label %done, label %sort_one
-
-sort_one:
-  %11: i64 = sub i64 %9, i64 1
-  store i64 %11, ptr %5
-  %12: i64 = add i64 %1, i64 %11
-  call void __ep_gc_swap_records(i64 %1, i64 %12)
-  call void __ep_gc_sift_down(i64 %1, i64 0, i64 %11)
-  br label %sort_loop
-
-done:
+insert:
+  %16: i64 = add i64 %2, i64 1
+  store i64 %16, ptr %11
   ret void
 }
 
@@ -272,62 +176,51 @@ range_low:
 range_high:
   %5: ptr = load ptr, ptr gc_high_addr
   %6: bool = icmp.ugt ptr %1, ptr %5
-  condbr bool %6, label %none, label %search
+  condbr bool %6, label %none, label %hash
 
-search:
-  %7: ptr = load ptr, ptr gc_objects
-  %8: i64 = load i64, ptr gc_sorted_count
-  %9: i64 = load i64, ptr gc_object_count
-  %10: ptr = alloca i64
-  %11: ptr = alloca i64
-  %12: ptr = alloca i64
-  store i64 0, ptr %10
-  store i64 %8, ptr %11
-  store i64 0, ptr %12
-  br label %loop
-
-loop:
-  %13: i64 = load i64, ptr %10
-  %14: i64 = load i64, ptr %11
-  %15: bool = icmp.uge i64 %13, i64 %14
-  condbr bool %15, label %exhausted, label %probe
-
-exhausted:
-  %16: i64 = load i64, ptr %12
-  %17: bool = icmp.eq i64 %16, i64 0
-  condbr bool %17, label %tail, label %none
-
-tail:
-  store i64 %8, ptr %10
-  store i64 %9, ptr %11
-  store i64 1, ptr %12
-  br label %loop
+hash:
+  %7: ptr = load ptr, ptr gc_table
+  %8: i64 = load i64, ptr gc_table_cap
+  %9: ptr = load ptr, ptr gc_objects
+  %10: i64 = ptrtoint ptr %1 to i64
+  %11: i64 = udiv i64 %10, i64 8
+  %12: i64 = mul i64 %11, i64 6364136223846793005
+  %13: i64 = urem i64 %12, i64 %8
+  %14: ptr = alloca i64
+  %15: ptr = alloca i64
+  store i64 %13, ptr %14
+  store i64 0, ptr %15
+  br label %probe
 
 probe:
-  %18: i64 = sub i64 %14, i64 %13
-  %19: i64 = udiv i64 %18, i64 2
-  %20: i64 = add i64 %13, i64 %19
-  %21: ptr = gep ptr, ptr %7, i64 %20
-  %22: ptr = load ptr, ptr %21
-  %23: bool = icmp.eq ptr %22, ptr %1
-  condbr bool %23, label %found, label %choose
+  %16: i64 = load i64, ptr %15
+  %17: bool = icmp.uge i64 %16, i64 %8
+  condbr bool %17, label %none, label %read
 
-choose:
-  %24: bool = icmp.ult ptr %22, ptr %1
-  condbr bool %24, label %higher, label %lower
+read:
+  %18: i64 = load i64, ptr %14
+  %19: ptr = gep i64, ptr %7, i64 %18
+  %20: i64 = load i64, ptr %19
+  %21: bool = icmp.eq i64 %20, i64 0
+  condbr bool %21, label %none, label %compare
 
-higher:
-  %25: i64 = add i64 %20, i64 1
-  store i64 %25, ptr %10
-  br label %loop
+compare:
+  %22: i64 = sub i64 %20, i64 1
+  %23: ptr = gep ptr, ptr %9, i64 %22
+  %24: ptr = load ptr, ptr %23
+  %25: bool = icmp.eq ptr %24, ptr %1
+  condbr bool %25, label %found, label %next
 
-lower:
-  store i64 %20, ptr %11
-  br label %loop
+next:
+  %26: i64 = add i64 %18, i64 1
+  %27: i64 = urem i64 %26, i64 %8
+  store i64 %27, ptr %14
+  %28: i64 = add i64 %16, i64 1
+  store i64 %28, ptr %15
+  br label %probe
 
 found:
-  %26: i64 = add i64 %20, i64 1
-  ret i64 %26
+  ret i64 %20
 
 none:
   ret i64 0
@@ -336,38 +229,80 @@ none:
 define void @__ep_gc_prepare_collection() {
 entry:
   %1: i64 = load i64, ptr gc_object_count
-  %2: i64 = load i64, ptr gc_sorted_count
-  %3: i64 = sub i64 %1, i64 %2
-  call void __ep_gc_sort_range(i64 %2, i64 %3)
-  %4: bool = icmp.eq i64 %1, i64 0
-  condbr bool %4, label %empty, label %full
+  %2: i64 = mul i64 %1, i64 2
+  %3: ptr = alloca i64
+  store i64 1024, ptr %3
+  br label %choose
+
+choose:
+  %4: i64 = load i64, ptr %3
+  %5: bool = icmp.ult i64 %4, i64 %2
+  condbr bool %5, label %double, label %allocate
+
+double:
+  %6: i64 = mul i64 %4, i64 2
+  store i64 %6, ptr %3
+  br label %choose
+
+allocate:
+  %7: i64 = mul i64 %4, i64 8
+  %8: ptr = call ptr __ep_gc_raw_alloc(i64 %7)
+  %9: bool = icmp.eq i64 %1, i64 0
+  condbr bool %9, label %empty, label %full
 
 empty:
-  %5: ptr = call ptr __ep_gc_raw_alloc(i64 1)
-  %6: ptr = call ptr __ep_gc_raw_alloc(i64 8)
-  store ptr %5, ptr gc_marks
-  store ptr %6, ptr gc_work
-  store i64 0, ptr gc_work_count
-  ret void
+  %10: ptr = call ptr __ep_gc_raw_alloc(i64 1)
+  %11: ptr = call ptr __ep_gc_raw_alloc(i64 8)
+  store ptr %10, ptr gc_marks
+  store ptr %11, ptr gc_work
+  br label %store
 
 full:
-  %7: ptr = call ptr __ep_gc_raw_alloc(i64 %1)
-  %8: i64 = mul i64 %1, i64 8
-  %9: ptr = call ptr __ep_gc_raw_alloc(i64 %8)
-  store ptr %7, ptr gc_marks
-  store ptr %9, ptr gc_work
+  %12: ptr = call ptr __ep_gc_raw_alloc(i64 %1)
+  %13: i64 = mul i64 %1, i64 8
+  %14: ptr = call ptr __ep_gc_raw_alloc(i64 %13)
+  store ptr %12, ptr gc_marks
+  store ptr %14, ptr gc_work
+  br label %store
+
+store:
+  store ptr %8, ptr gc_table
+  store i64 %4, ptr gc_table_cap
   store i64 0, ptr gc_work_count
+  %15: ptr = load ptr, ptr gc_objects
+  %16: ptr = alloca i64
+  store i64 0, ptr %16
+  br label %build
+
+build:
+  %17: i64 = load i64, ptr %16
+  %18: bool = icmp.ult i64 %17, i64 %1
+  condbr bool %18, label %insert, label %done
+
+insert:
+  %19: ptr = gep ptr, ptr %15, i64 %17
+  %20: ptr = load ptr, ptr %19
+  call void __ep_gc_table_insert(ptr %20, i64 %17)
+  %21: i64 = add i64 %17, i64 1
+  store i64 %21, ptr %16
+  br label %build
+
+done:
   ret void
 }
 
 define void @__ep_gc_release_collection() {
 entry:
-  %1: ptr = load ptr, ptr gc_marks
-  %2: ptr = load ptr, ptr gc_work
+  %1: ptr = load ptr, ptr gc_table
+  %2: ptr = load ptr, ptr gc_marks
+  %3: ptr = load ptr, ptr gc_work
   call void __ep_gc_raw_free(ptr %1)
   call void __ep_gc_raw_free(ptr %2)
+  call void __ep_gc_raw_free(ptr %3)
+  store ptr null, ptr gc_table
   store ptr null, ptr gc_marks
   store ptr null, ptr gc_work
+  store i64 0, ptr gc_table_cap
   ret void
 }
 
@@ -472,139 +407,80 @@ entry:
   %1: ptr = load ptr, ptr gc_objects
   %2: ptr = load ptr, ptr gc_sizes
   %3: i64 = load i64, ptr gc_object_count
-  %4: i64 = load i64, ptr gc_sorted_count
-  %5: ptr = load ptr, ptr gc_marks
-  %6: i64 = add i64 %3, i64 1
-  %7: i64 = mul i64 %6, i64 8
-  %8: ptr = call ptr __ep_gc_raw_alloc(i64 %7)
-  %9: ptr = call ptr __ep_gc_raw_alloc(i64 %7)
-  %10: ptr = alloca i64
-  %11: ptr = alloca i64
-  %12: ptr = alloca i64
-  %13: ptr = alloca i64
-  %14: ptr = alloca i64
-  store i64 0, ptr %10
-  store i64 %4, ptr %11
-  store i64 0, ptr %12
-  store i64 0, ptr %13
-  br label %merge
+  %4: ptr = load ptr, ptr gc_marks
+  %5: ptr = alloca i64
+  %6: ptr = alloca i64
+  %7: ptr = alloca i64
+  store i64 0, ptr %5
+  store i64 0, ptr %6
+  store i64 0, ptr %7
+  br label %loop
 
-merge:
-  %15: i64 = load i64, ptr %10
-  %16: i64 = load i64, ptr %11
-  %17: bool = icmp.uge i64 %15, i64 %4
-  condbr bool %17, label %left_done, label %check_right_done
+loop:
+  %8: i64 = load i64, ptr %5
+  %9: bool = icmp.ult i64 %8, i64 %3
+  condbr bool %9, label %read, label %done
 
-left_done:
-  %18: bool = icmp.uge i64 %16, i64 %3
-  condbr bool %18, label %copy_init, label %choose_right
-
-check_right_done:
-  %19: bool = icmp.uge i64 %16, i64 %3
-  condbr bool %19, label %choose_left, label %compare
-
-compare:
-  %20: ptr = gep ptr, ptr %1, i64 %15
-  %21: ptr = load ptr, ptr %20
-  %22: ptr = gep ptr, ptr %1, i64 %16
-  %23: ptr = load ptr, ptr %22
-  %24: bool = icmp.ult ptr %21, ptr %23
-  condbr bool %24, label %choose_left, label %choose_right
-
-choose_left:
-  store i64 %15, ptr %14
-  %25: i64 = add i64 %15, i64 1
-  store i64 %25, ptr %10
-  br label %process
-
-choose_right:
-  store i64 %16, ptr %14
-  %26: i64 = add i64 %16, i64 1
-  store i64 %26, ptr %11
-  br label %process
-
-process:
-  %27: i64 = load i64, ptr %14
-  %28: ptr = gep ptr, ptr %1, i64 %27
-  %29: ptr = load ptr, ptr %28
-  %30: ptr = gep i64, ptr %2, i64 %27
-  %31: i64 = load i64, ptr %30
-  %32: ptr = gep i8, ptr %5, i64 %27
-  %33: i8 = load i8, ptr %32
-  %34: bool = icmp.eq i8 %33, i8 0
-  condbr bool %34, label %free, label %keep
+read:
+  %10: ptr = gep ptr, ptr %1, i64 %8
+  %11: ptr = load ptr, ptr %10
+  %12: ptr = gep i64, ptr %2, i64 %8
+  %13: i64 = load i64, ptr %12
+  %14: ptr = gep i8, ptr %4, i64 %8
+  %15: i8 = load i8, ptr %14
+  %16: bool = icmp.eq i8 %15, i8 0
+  condbr bool %16, label %free, label %keep
 
 free:
-  call void __ep_gc_raw_free(ptr %29)
-  br label %merge
+  call void __ep_gc_raw_free(ptr %11)
+  br label %advance
 
 keep:
-  %35: i64 = load i64, ptr %12
-  %36: ptr = gep ptr, ptr %8, i64 %35
-  store ptr %29, ptr %36
-  %37: ptr = gep i64, ptr %9, i64 %35
-  store i64 %31, ptr %37
-  %38: i64 = add i64 %35, i64 1
-  store i64 %38, ptr %12
-  %39: i64 = load i64, ptr %13
-  %40: i64 = add i64 %39, i64 %31
-  store i64 %40, ptr %13
-  br label %merge
+  %17: i64 = load i64, ptr %6
+  %18: ptr = gep ptr, ptr %1, i64 %17
+  store ptr %11, ptr %18
+  %19: ptr = gep i64, ptr %2, i64 %17
+  store i64 %13, ptr %19
+  %20: i64 = add i64 %17, i64 1
+  store i64 %20, ptr %6
+  %21: i64 = load i64, ptr %7
+  %22: i64 = add i64 %21, i64 %13
+  store i64 %22, ptr %7
+  br label %advance
 
-copy_init:
-  store i64 0, ptr %14
-  br label %copy
+advance:
+  %23: i64 = add i64 %8, i64 1
+  store i64 %23, ptr %5
+  br label %loop
 
-copy:
-  %41: i64 = load i64, ptr %14
-  %42: i64 = load i64, ptr %12
-  %43: bool = icmp.ult i64 %41, i64 %42
-  condbr bool %43, label %copy_one, label %finish
-
-copy_one:
-  %44: ptr = gep ptr, ptr %8, i64 %41
-  %45: ptr = load ptr, ptr %44
-  %46: ptr = gep ptr, ptr %1, i64 %41
-  store ptr %45, ptr %46
-  %47: ptr = gep i64, ptr %9, i64 %41
-  %48: i64 = load i64, ptr %47
-  %49: ptr = gep i64, ptr %2, i64 %41
-  store i64 %48, ptr %49
-  %50: i64 = add i64 %41, i64 1
-  store i64 %50, ptr %14
-  br label %copy
-
-finish:
-  call void __ep_gc_raw_free(ptr %8)
-  call void __ep_gc_raw_free(ptr %9)
-  %51: i64 = load i64, ptr %12
-  %52: i64 = load i64, ptr %13
-  store i64 %51, ptr gc_object_count
-  store i64 %51, ptr gc_sorted_count
-  store i64 %52, ptr gc_live_bytes
-  %53: i64 = mul i64 %51, i64 2
-  %54: bool = icmp.ult i64 %53, i64 262144
-  condbr bool %54, label %object_minimum, label %object_adaptive
+done:
+  %24: i64 = load i64, ptr %6
+  %25: i64 = load i64, ptr %7
+  store i64 %24, ptr gc_object_count
+  store i64 %25, ptr gc_live_bytes
+  %26: i64 = mul i64 %24, i64 2
+  %27: bool = icmp.ult i64 %26, i64 262144
+  condbr bool %27, label %object_minimum, label %object_adaptive
 
 object_minimum:
   store i64 262144, ptr gc_object_threshold
   br label %bytes_threshold
 
 object_adaptive:
-  store i64 %53, ptr gc_object_threshold
+  store i64 %26, ptr gc_object_threshold
   br label %bytes_threshold
 
 bytes_threshold:
-  %55: i64 = mul i64 %52, i64 2
-  %56: bool = icmp.ult i64 %55, i64 8388608
-  condbr bool %56, label %bytes_minimum, label %bytes_adaptive
+  %28: i64 = mul i64 %25, i64 2
+  %29: bool = icmp.ult i64 %28, i64 8388608
+  condbr bool %29, label %bytes_minimum, label %bytes_adaptive
 
 bytes_minimum:
   store i64 8388608, ptr gc_threshold
   ret void
 
 bytes_adaptive:
-  store i64 %55, ptr gc_threshold
+  store i64 %28, ptr gc_threshold
   ret void
 }
 
