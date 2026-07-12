@@ -1,0 +1,23 @@
+# EXIT: 0
+# STDOUT: 16
+# STDOUT: true
+
+struct WinSystemTime {
+    year: u16
+    month: u16
+    day_of_week: u16
+    day: u16
+    hour: u16
+    minute: u16
+    second: u16
+    milliseconds: u16
+}
+
+extern "kernel32.dll" fun GetSystemTime(value: WinSystemTime): void
+
+fun main(): void {
+    let now = new WinSystemTime
+    GetSystemTime(now)
+    println(str(sizeof(WinSystemTime)))
+    println(str(now.month >= u16(1) && now.month <= u16(12)))
+}

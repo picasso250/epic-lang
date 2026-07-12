@@ -89,8 +89,26 @@ fun sema_is_int(t: str): bool {
     ret epic_type_is_int(t)
 }
 
-fun sema_is_extern_abi_type(t: str): bool {
-    ret t == "i32" || t == "u32" || t == "i64" || t == "u64"
+fun sema_is_extern_scalar_abi_type(t: str): bool {
+    ret sema_is_int(t)
+}
+
+fun sema_validate_extern_struct_param(st: SemaState, extern_name: str, param_name: str, type_name: str): void {
+    let struct_index = sema_struct_index(st, type_name)
+    if struct_index < 0 {
+        sema_die(f"extern {extern_name} parameter {param_name} has unsupported ABI type {type_name}")
+    }
+    let def = st.structs[struct_index]
+    if len(def.fields) == 0 {
+        sema_die(f"extern {extern_name} parameter {param_name} struct {type_name} must not be empty")
+    }
+    for i: 0:len(def.fields) {
+        let field = def.fields[i]
+        let field_type = field.meta.resolved_type
+        if sema_is_extern_scalar_abi_type(field_type) == false {
+            sema_die(f"extern {extern_name} parameter {param_name} struct {type_name} field {field.name} has unsupported FFI type {field_type}")
+        }
+    }
 }
 
 fun sema_validate_extern_library(name: str, library: str): void {
@@ -115,7 +133,7 @@ fun sema_array_elem(t: str): str {
 }
 
 fun sema_is_reserved_func(name: str): bool {
-    if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" {
+    if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" || name == "sizeof" {
         ret true
     }
     if name == "read_file" || name == "write_file" || name == "len" {
@@ -590,14 +608,14 @@ fun sema_build_funcs(st: SemaState, ast: AstNode): void {
                     sema_die(f"duplicate function {ext.name}")
                 }
                 ext.meta.resolved_type = sema_type_name(st, ext.source_type)
-                if ext.meta.resolved_type != "void" && sema_is_extern_abi_type(ext.meta.resolved_type) == false {
+                if ext.meta.resolved_type != "void" && sema_is_extern_scalar_abi_type(ext.meta.resolved_type) == false {
                     sema_die(f"extern {ext.name} has unsupported ABI return type {ext.meta.resolved_type}")
                 }
                 for pi: 0:len(ext.params) {
                     let p = ext.params[pi]
                     p.meta.resolved_type = sema_type_name(st, p.source_type)
-                    if sema_is_extern_abi_type(p.meta.resolved_type) == false {
-                        sema_die(f"extern {ext.name} parameter {p.name} has unsupported ABI type {p.meta.resolved_type}")
+                    if sema_is_extern_scalar_abi_type(p.meta.resolved_type) == false {
+                        sema_validate_extern_struct_param(st, ext.name, p.name, p.meta.resolved_type)
                     }
                 }
             }
@@ -765,6 +783,12 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         AstCall n: {
             ret sema_set_type(node, sema_call_type(st, n))
+        }
+        AstSizeOf n: {
+            if sema_struct_index(st, n.type_name) < 0 {
+                sema_die(f"sizeof expects user struct type, got {n.type_name}")
+            }
+            ret sema_set_type(node, "u64")
         }
         AstDotCall n: {
             ret sema_set_type(node, sema_dot_call_type(st, n))

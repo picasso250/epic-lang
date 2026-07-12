@@ -156,6 +156,17 @@ fun mir_storage_align(storage_type: str): i64 {
     ret mir_storage_size(storage_type)
 }
 
+fun mir_registered_struct_size(st: MirCodegenState, struct_name: str): i64 {
+    for i: 0:len(st.program.struct_layouts) {
+        let layout = st.program.struct_layouts[i]
+        if layout.name == struct_name {
+            ret layout.size
+        }
+    }
+    ast_to_mir_die(f"missing struct layout: {struct_name}")
+    ret 0
+}
+
 fun mir_union_member_layout(union_name: str, member_name: str, tag: i64): MirUnionMemberLayout {
     ret new MirUnionMemberLayout { union_name: union_name, member_name: member_name, tag: tag }
 }
@@ -1240,6 +1251,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         AstDotCall n: {
             ret mir_emit_dot_call(st, block, n)
         }
+        AstSizeOf n: {
+            ret mir_value_flow(mir_const_int("i64", mir_registered_struct_size(st, n.type_name)), st.current_block)
+        }
         AstCall n: {
             if n.name == "println" {
                 if len(n.args) == 1 {
@@ -1350,6 +1364,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             let value = mir_emit_call_inst(st, mir_func_callee(st, n.name), ret_type, args)
             let source_ret = mir_func_source_return(st, n.name)
+            if source_ret == "u8" { value = mir_trunc_uint_value(st, value, 255) }
             if source_ret == "u16" { value = mir_trunc_uint_value(st, value, 65535) }
             if source_ret == "i16" { value = mir_trunc_i16_value(st, value) }
             if source_ret == "u32" { value = mir_trunc_uint_value(st, value, 4294967295) }

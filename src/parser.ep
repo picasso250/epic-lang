@@ -292,6 +292,11 @@ struct AstCall {
     args: AstNode[]
 }
 
+struct AstSizeOf {
+    meta: AstMeta
+    type_name: str
+}
+
 struct AstDotCall {
     meta: AstMeta
     object: AstNode
@@ -353,7 +358,7 @@ struct AstUnionInit {
     expr: AstNode
 }
 
-type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstSizeOf | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_empty(): AstNode {
     ret new AstNode(new AstEmpty { meta: ast_meta(0) })
@@ -1305,6 +1310,11 @@ fun (p: Parser) parse_primary(): AstNode {
     }
     if p.peek_kind("ID") == 1 {
         let t = p.advance()
+        if token_text(t) == "sizeof" && p.check("LPAREN") == 1 {
+            let type_name = p.expect("ID")
+            p.expect("RPAREN")
+            ret p.parse_postfix(new AstNode(new AstSizeOf { meta: ast_meta(token_line(t)), type_name: token_text(type_name) }))
+        }
         if p.check("LPAREN") == 1 {
             let args = p.parse_args()
             p.expect("RPAREN")
@@ -1694,6 +1704,10 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstCall n: {
             dump_node_line(node, depth, "Call", n.name, "", false, "", "", false)
             dump_list(n.args, depth + 1)
+            ret 0
+        }
+        AstSizeOf n: {
+            dump_node_line(node, depth, "SizeOf", n.type_name, "", false, "", "", false)
             ret 0
         }
         AstDotCall n: {

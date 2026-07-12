@@ -415,6 +415,7 @@ let source = str(read_file(path))
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
 | `cstr(s: str): u64`                    | 检查并返回可传给 C API 的 NUL 结尾地址值    |
+| `sizeof(T): u64`                        | 返回用户 struct 的 natural-layout 字节大小  |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 
@@ -446,9 +447,15 @@ extern "kernel32.dll" fun GetTickCount64(): u64
 extern "kernel32.dll" fun lstrcmpA(left: u64, right: u64): i32
 ```
 
-extern 参数只允许 `i32`、`u32`、`i64`、`u64`，返回类型还可为 `void`。`DWORD`/`UINT` 使用 `u32`，C `int`/`LONG` 使用 `i32`，64 位整数使用对应的 `i64/u64`。32 位返回值在调用边界立即符号扩展或零扩展。
+extern scalar 参数和返回值允许 `u8`、`i16`、`u16`、`i32`、`u32`、`i64`、`u64`，返回类型还可为 `void`。`DWORD`/`UINT` 使用 `u32`，C `int`/`LONG` 使用 `i32`，64 位整数使用对应的 `i64/u64`；窄整数返回值在调用边界立即规范化到 Epic 的 64-bit value representation。
 
-Epic 不公开 `ptr` 类型。外部指针、C 字符串地址、Windows handle 和其他 pointer-sized opaque value 使用 `u64` bit pattern；`0` 写作 `u64(0)`，`INVALID_HANDLE_VALUE` 可写作 `u64(0) - u64(1)`。这些值不能解引用，也不使用 postfix `?`；空地址检查显式写 `value != u64(0)`。
+extern 参数还可使用非空的 FFI-safe 用户 struct。此时源码参数 `value: T` **固定表示同步 borrowed `T*`**，不是 C by-value `T`；lowering 直接传递 Epic heap-backed struct payload 的稳定地址。FFI-safe struct 的字段只允许整数 scalar，不允许 `bool`、`str`、array、其他 struct 或 ADT。Win32 `BOOL` 应写作 `i32`，一字节 `BOOLEAN` 才写作 `u8`。nested C struct 第一版使用字段 flatten，C union/bitfield 使用相同大小的整数 raw storage 表达。
+
+struct extern 返回值和 struct by-value 参数均不支持。只有在用户已经独立确认目标 ABI 把 1/2/4/8 字节 aggregate 放在普通整数 lane 时，才可把它手工声明成对应整数并用位运算解码；未使用高位必须由用户 mask。`sizeof(T)` 只接受用户 struct，返回该类型 natural layout 的字节大小，适合初始化 `cbSize`/`dwLength` 字段。
+
+extern struct pointer 只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。当前没有 callback/function pointer，因此 extern 调用期间不会重新进入 Epic；未来若开放 callback，需要重新审视 safepoint 和 root 契约。
+
+Epic 不公开 `ptr` 类型。外部指针、C 字符串地址、Windows handle 和其他 pointer-sized opaque value 使用 `u64` bit pattern；`0` 写作 `u64(0)`，`INVALID_HANDLE_VALUE` 可写作 `u64(0) - u64(1)`。这些值不能解引用，也不使用 postfix `?`；空地址检查显式写 `value != u64(0)`。可空 C struct pointer 继续声明为 `u64`，因为 Epic struct 参数本身不可传 null。
 
 `cstr(s)` 返回 `u64`，并要求字符串不含内嵌 NUL。extern 不提供隐式字符串转换。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
 

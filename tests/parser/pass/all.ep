@@ -53,6 +53,7 @@ fun statements_and_control(flag: bool): void {
     let typed: i64 = 2
     let empty: u8[] = new u8[]
     let p = new Point
+    let point_size = sizeof(Point)
     let p2 = new Point {}
     let p3 = new Point { x: 1, y: 2, name: "origin" }
     let xs = new i64[] { 1, 2, 3 }

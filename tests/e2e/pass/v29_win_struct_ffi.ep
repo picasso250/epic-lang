@@ -1,0 +1,28 @@
+# EXIT: 0
+# STDOUT: true
+
+struct WinSystemTime {
+    year: u16
+    month: u16
+    day_of_week: u16
+    day: u16
+    hour: u16
+    minute: u16
+    second: u16
+    milliseconds: u16
+}
+
+extern "kernel32.dll" fun GetSystemTime(value: WinSystemTime): void
+extern "kernel32.dll" fun GetSystemDefaultUILanguage(): u16
+
+fun main(): void {
+    let value = new WinSystemTime
+    GetSystemTime(value)
+    let language = GetSystemDefaultUILanguage()
+    let valid = language > u16(0) && sizeof(WinSystemTime) == u64(16) && value.year >= u16(1601) && value.month >= u16(1) && value.month <= u16(12) && value.day_of_week <= u16(6) && value.day >= u16(1) && value.day <= u16(31) && value.hour <= u16(23) && value.minute <= u16(59) && value.second <= u16(60) && value.milliseconds <= u16(999)
+    println(str(valid))
+    if valid {
+        exit(0)
+    }
+    exit(1)
+}

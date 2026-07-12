@@ -1,0 +1,9 @@
+# COMPILE_FAIL_CONTAINS: extern UseBad parameter value struct BadWinStruct field enabled has unsupported FFI type bool
+
+struct BadWinStruct {
+    enabled: bool
+}
+
+extern "demo.dll" fun UseBad(value: BadWinStruct): void
+
+fun main(): void {}

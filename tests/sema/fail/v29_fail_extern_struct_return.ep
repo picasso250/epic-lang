@@ -1,0 +1,9 @@
+# COMPILE_FAIL_CONTAINS: extern MakeValue has unsupported ABI return type WinValue
+
+struct WinValue {
+    bits: u64
+}
+
+extern "demo.dll" fun MakeValue(): WinValue
+
+fun main(): void {}
