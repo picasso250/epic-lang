@@ -424,3 +424,17 @@ syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 The old NASM-oriented driver and `src/codegen_support.ep` / `src/codegen.ep` backend line have been removed. The current `src/epic.ep` is a new active driver: it runs the Epic-written frontend, lowers through MIR and X64IR, emits machine code and COFF through `src/machine.ep` and `src/coff.ep`, and links through `src/link.ep`.
 
 `compiler_sources.py` defines the canonical source order used to build this compiler. `test_bootstrap_fixed_point.py` repeatedly compiles the self-hosted compiler with the generated compiler and verifies that later generations stabilize.
+
+
+## Local X64IR append-time simplification
+
+X64IR construction performs only adjacency-proven simplifications:
+
+- remove `mov reg, [mem]` immediately following `mov [mem], reg` when reg/base/disp/width all match;
+- remove `jmp label` when `label` is bound immediately afterward;
+- rewrite `jcc next; jmp other; next:` to `inverse-jcc other; next:` for the existing
+  `jz/jnz` and `jl/jge` inverse pairs.
+
+A label or any intervening X64IR item blocks these rewrites. This is local instruction selection, not a CFG or
+register-allocation pass. Measurement and safety details are recorded in
+[`local-x64-peepholes-experiment.md`](local-x64-peepholes-experiment.md).
