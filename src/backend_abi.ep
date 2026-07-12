@@ -67,7 +67,7 @@ fun backend_validate_extern(ext: MirExtern): void {
         if ext.param_types[i] != expected_type {
             panic f"backend ABI error: extern argument type mismatch for {ext.name} at {i}: expected {expected_type}, got {ext.param_types[i]}"
         }
-        i = i + 1
+        i += 1
     }
 }
 
@@ -76,6 +76,6 @@ fun backend_validate_program_abi(program: MirProgram): void {
     let i = 0
     for i < len(program.externs) {
         backend_validate_extern(program.externs[i])
-        i = i + 1
+        i += 1
     }
 }

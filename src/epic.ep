@@ -71,12 +71,12 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
                     } else {
                         merged.funcs.push(ast.funcs[fi])
                     }
-                    fi = fi + 1
+                    fi += 1
                 }
             }
             _: { epic_die("internal: expected parsed program") }
         }
-        i = i + 1
+        i += 1
     }
     if !found_main {
         epic_die(("main file has no main function: " + main_path))
@@ -88,7 +88,7 @@ fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
     let i = 0
     for i < len(bs) {
         out.push(i64(bs[i]))
-        i = i + 1
+        i += 1
     }
 }
 
@@ -96,7 +96,7 @@ fun epic_push_u64_le(out: i64[], value: i64): void {
     let v = value
     for i: 0:8 {
         out.push(v & 255)
-        v = v / 256
+        v /= 256
     }
 }
 
@@ -148,7 +148,7 @@ fun epic_lower_program(program: MirProgram, verbose: bool): X64Program {
     let i = 0
     for i < len(program.functions) {
         mir_to_x64_lower_function_with_lower(lower, program.functions[i])
-        i = i + 1
+        i += 1
     }
     let funcs_stop = epic_now_ms()
     epic_timing(verbose, "lower functions", funcs_start, funcs_stop)
@@ -253,19 +253,19 @@ fun main(): void {
                 epic_die("--main needs a path")
             }
             main_path = argv[i + 1]
-            i = i + 2
+            i += 2
         } else if argv[i] == "-o" {
             if i + 1 >= len(argv) {
                 epic_die("-o needs a path")
             }
             exe_path = argv[i + 1]
-            i = i + 2
+            i += 2
         } else if argv[i] == "--verbose" {
             verbose = true
-            i = i + 1
+            i += 1
         } else {
             user_inputs.push(argv[i])
-            i = i + 1
+            i += 1
         }
     }
     if len(user_inputs) == 0 {

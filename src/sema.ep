@@ -168,7 +168,7 @@ fun sema_lookup(st: SemaState, name: str): str {
         if st.local_names[i] == name {
             ret st.local_types[i]
         }
-        i = i - 1
+        i -= 1
     }
     sema_die(f"undefined variable {name}")
     ret ""

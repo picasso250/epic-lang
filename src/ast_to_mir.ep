@@ -91,12 +91,12 @@ fun mir_epic_type(type_name: str): str {
 }
 
 fun mir_new_value(st: MirCodegenState): i64 {
-    st.value_counter = st.value_counter + 1
+    st.value_counter += 1
     ret st.value_counter
 }
 
 fun mir_new_block(st: MirCodegenState, prefix: str): MirBlock {
-    st.block_counter = st.block_counter + 1
+    st.block_counter += 1
     let block = mir_block_empty((prefix + str(st.block_counter)))
     st.current_fn.blocks.push(block)
     ret block
@@ -121,7 +121,7 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
         if st.local_names[i] == name {
             ret i
         }
-        i = i - 1
+        i -= 1
     }
     ast_to_mir_die(f"undefined variable: {name}")
     ret 0
@@ -203,7 +203,7 @@ fun mir_layout_struct_name(st: MirCodegenState, type_name: str): str {
         if st.struct_names[i] == type_name {
             ret type_name
         }
-        i = i + 1
+        i += 1
     }
     ret ""
 }
@@ -271,7 +271,7 @@ fun mir_func_index(st: MirCodegenState, name: str): i64 {
     let i = 0
     for i < len(st.func_names) {
         if st.func_names[i] == name { ret i }
-        i = i + 1
+        i += 1
     }
     ret -1
 }
@@ -282,7 +282,7 @@ fun mir_func_return_type(st: MirCodegenState, name: str): str {
         if st.func_names[i] == name {
             ret st.func_return_types[i]
         }
-        i = i + 1
+        i += 1
     }
     ast_to_mir_die(f"undefined function: {name}")
     ret "i64"
@@ -606,7 +606,7 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstStructIn
         st.current_block = value_flow.block
         let addr = mir_field_addr(st, obj, expr.name, field.name)
         mir_emit_inst(st, mir_store_as(value_flow.value, mir_field_access_type(st, expr.name, field.name), addr))
-        i = i + 1
+        i += 1
     }
     ret mir_value_flow(obj, st.current_block)
 }
@@ -676,9 +676,9 @@ fun mir_string_label(st: MirCodegenState, value: str): str {
         if st.string_values[i] == value {
             ret st.string_labels[i]
         }
-        i = i + 1
+        i += 1
     }
-    st.string_counter = st.string_counter + 1
+    st.string_counter += 1
     let label = ("str." + str(st.string_counter))
     st.string_values.push(value)
     st.string_labels.push(label)
@@ -742,7 +742,7 @@ fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstFString): Mi
                 }
             }
         }
-        i = i + 1
+        i += 1
     }
     if has_out == false {
         out = mir_symbol_operand("ptr", mir_string_label(st, ""))
@@ -783,7 +783,7 @@ fun mir_is_struct_name(st: MirCodegenState, name: str): bool {
         if st.struct_names[i] == name {
             ret true
         }
-        i = i + 1
+        i += 1
     }
     ret false
 }
@@ -985,7 +985,7 @@ fun mir_emit_array_literal(st: MirCodegenState, block: MirBlock, expr: AstArrayL
                 mir_emit_call_inst(st, "__ep_slice_i64_set", "void", args)
             }
         }
-        i = i + 1
+        i += 1
     }
     ret mir_value_flow(arr, st.current_block)
 }
@@ -1344,7 +1344,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                     let arg_flow = mir_emit_expr(st, st.current_block, n.args[i])
                     st.current_block = arg_flow.block
                     args.push(arg_flow.value)
-                    i = i + 1
+                    i += 1
                 }
                 args.push(mir_const_int("i64", n.meta.line))
                 ret mir_value_flow(mir_emit_call_inst(st, "__ep_write_file", "i64", args), st.current_block)
@@ -1364,7 +1364,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[i])
                 st.current_block = arg_flow.block
                 args.push(arg_flow.value)
-                i = i + 1
+                i += 1
             }
             let value = mir_emit_call_inst(st, mir_func_callee(st, n.name), ret_type, args)
             let source_ret = mir_func_source_return(st, n.name)
@@ -1492,7 +1492,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
     let i = 0
     for i < len(stmt.fields) {
         case_blocks.push(mir_new_block(st, "match.case"))
-        i = i + 1
+        i += 1
     }
     let has_else = stmt.has_else
     let else_block = end_block
@@ -1503,7 +1503,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
     let ni = 0
     for ni < len(stmt.fields) - 1 {
         next_blocks.push(mir_new_block(st, "match.next"))
-        ni = ni + 1
+        ni += 1
     }
 
     let check_block = st.current_block
@@ -1527,7 +1527,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
         if ci < len(stmt.fields) - 1 {
             check_block = next_blocks[ci]
         }
-        ci = ci + 1
+        ci += 1
     }
     if len(stmt.fields) == 0 {
         st.current_block = check_block
@@ -1542,7 +1542,7 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
             case_flow.block.terminator = mir_br(end_block.name)
             case_flow.block.has_terminator = true
         }
-        bi = bi + 1
+        bi += 1
     }
     if has_else {
         let else_flow = mir_emit_block(st, else_block, stmt.else_block)
@@ -1903,7 +1903,7 @@ fun mir_emit_block_stmts(st: MirCodegenState, block: MirBlock, ast_block: AstBlo
             ret flow
         }
         current = flow.block
-        i = i + 1
+        i += 1
     }
     ret mir_reachable_flow(current)
 }
@@ -1945,7 +1945,7 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     for pi < len(fn_ast.params) {
         let param = fn_ast.params[pi]
         st.current_fn.params.push(mir_param(mir_new_value(st), mir_epic_type(ast_require_resolved_type(param.meta))))
-        pi = pi + 1
+        pi += 1
     }
 
     st.current_block = mir_new_block(st, "entry")
@@ -1954,7 +1954,7 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
     for i < len(st.current_fn.params) {
         let addr = mir_alloc_local(st, fn_ast.params[i].name, st.current_fn.params[i].typ)
         mir_emit_inst(st, mir_store(mir_value_operand(st.current_fn.params[i].typ, st.current_fn.params[i].value_id), addr))
-        i = i + 1
+        i += 1
     }
 
     let body_local_count = len(st.local_names)
@@ -2032,14 +2032,14 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                     let field_align = mir_storage_align(access_type)
                     offset = mir_align_to(offset, field_align)
                     mir_register_struct_field(st, sdef.name, field.name, field_mir_type, access_type, fi2, offset)
-                    offset = offset + mir_storage_size(access_type)
+                    offset += mir_storage_size(access_type)
                     if field_align > struct_align { struct_align = field_align }
-                    fi2 = fi2 + 1
+                    fi2 += 1
                 }
                 let struct_size = mir_align_to(offset, struct_align)
                 if struct_size == 0 { struct_size = 1 }
                 mir_program_add_struct_layout(st.program, sdef.name, struct_size, struct_align)
-                si = si + 1
+                si += 1
             }
             for ui: 0:len(program.unions) {
                 let union = program.unions[ui]
@@ -2063,7 +2063,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
             for asi < len(program.structs) {
                 let sdef = program.structs[asi]
                 mir_register_slice_layout(st, ("_slice_" + sdef.name))
-                asi = asi + 1
+                asi += 1
             }
             for aui: 0:len(program.unions) {
                 let union = program.unions[aui]
@@ -2088,7 +2088,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 st.func_return_types.push(mir_epic_type(ast_require_resolved_type(fn.meta)))
                 st.func_callees.push(fn.name)
                 st.func_source_returns.push(ast_require_resolved_type(fn.meta))
-                fi = fi + 1
+                fi += 1
             }
 
             st.program.globals.push(mir_global_decl("argv", "ptr"))
@@ -2098,7 +2098,7 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
                 let fn_ast = program.funcs[i]
                 let fn = mir_emit_function(st, fn_ast)
                 st.program.functions.push(fn)
-                i = i + 1
+                i += 1
             }
             mir_declare_unresolved_calls(st.program)
             ret st.program

@@ -109,13 +109,13 @@ fun x64_program_empty(): X64Program {
 
 fun x64_new_label(program: X64Program): X64Label {
     let label = new X64Label { id: program.label_count, symbol_name: "" }
-    program.label_count = program.label_count + 1
+    program.label_count += 1
     ret label
 }
 
 fun x64_new_symbol_label(program: X64Program, symbol_name: str): X64Label {
     let label = new X64Label { id: program.label_count, symbol_name: symbol_name }
-    program.label_count = program.label_count + 1
+    program.label_count += 1
     ret label
 }
 
@@ -224,7 +224,7 @@ fun x64_operands_text(operands: X64Operand[]): str {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, x64_operand_text(operands[i]))
-        i = i + 1
+        i += 1
     }
     ret str_buf_finish(buf)
 }
@@ -237,7 +237,7 @@ fun x64_values_text(values: i64[]): str {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, str(values[i]))
-        i = i + 1
+        i += 1
     }
     ret str_buf_finish(buf)
 }
@@ -277,7 +277,7 @@ fun x64_program_text(program: X64Program): str {
     let i = 0
     for i < len(program.items) {
         str_buf_extend(buf, x64_item_text(program.items[i]))
-        i = i + 1
+        i += 1
     }
     ret str_buf_finish(buf)
 }
