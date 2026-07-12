@@ -175,9 +175,9 @@ ret
 | `jmp` | `jmp LabelRef` |
 | `jo/jz/jnz/jl/jge/jle/jg/jns` | `jcc LabelRef` |
 | `cqo` | no operands |
-| `idiv/div` | `idiv rcx`, `div rcx` |
-| `imul` | `imul rax, rcx` |
-| `neg` | `neg rax` |
+| `idiv/div` | `idiv r64`, `div r64`; dividend/result still use implicit `RDX:RAX` |
+| `imul` | `imul r64, r64` |
+| `neg` | `neg r64` |
 | `cmp` | `cmp r64, r64`, `cmp r64, imm32/imm8` |
 | `sete/setne/setg/setl/setge/setle` | target `al` |
 | `movzx` | `movzx eax, al` |
@@ -186,7 +186,7 @@ ret
 | `movsxd` | `movsxd r64, dword [r64+disp]` |
 | `test` | intended contract: `test r64, same r64` |
 | `xor` | `xor r64, r64` |
-| `shl/sar/shr` | `op rax, cl` |
+| `shl/sar/shr` | `op r64, cl`; variable count remains fixed to `cl` |
 | `inc/dec` | `inc r64`, `dec r64` |
 | `add/sub/and/or/xor` | `op r64, r64` |
 | `add` | `add r64, imm8`, `add r8, imm8` |
@@ -257,9 +257,11 @@ ret
 | `cmp r64, imm32/imm8` | ✅ | imm32 和 imm8 均支持 |
 | `test r64, r64` | ✅ | 当前合约只允许两个 operand 相同寄存器 |
 | `test r64, imm` | ❌ 不支持 | |
-| `imul rax, rcx` | ✅ | 仅此一种支持形式 |
-| `cqo; idiv rcx` | ✅ | signed divide 的标准形式 |
-| `div rcx` | ✅ | unsigned divide，used by runtime helpers |
+| `neg r64` | ✅ | Group 3 `/3` encoding |
+| `shl/sar/shr r64, cl` | ✅ | target is generic; count register is architecturally fixed |
+| `imul r64, r64` | ✅ | two-operand low-64-bit multiply |
+| `cqo; idiv r64` | ✅ | dividend and quotient/remainder use implicit `RDX:RAX` |
+| `div r64` | ✅ | dividend and quotient/remainder use implicit `RDX:RAX` |
 
 #### Memory addressing contract
 

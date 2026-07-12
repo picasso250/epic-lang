@@ -28,7 +28,58 @@ fun build_machine_x64_fixture(): X64Program {
     ret program
 }
 
+fun build_machine_generic_register_fixture(): X64Program {
+    let program = x64_program_empty()
+    x64_add_section(program, ".text")
+    x64_add_inst2(program, "imul", x64_reg("r10"), x64_reg("r9"))
+    x64_add_inst1(program, "neg", x64_reg("r10"))
+    x64_add_inst1(program, "idiv", x64_reg("r9"))
+    x64_add_inst1(program, "div", x64_reg("rsi"))
+    x64_add_inst2(program, "shl", x64_reg("r10"), x64_reg("cl"))
+    x64_add_inst2(program, "shr", x64_reg("rsi"), x64_reg("cl"))
+    x64_add_inst2(program, "sar", x64_reg("r9"), x64_reg("cl"))
+    ret program
+}
+
+fun assert_machine_generic_register_bytes(): void {
+    let obj = machine_build_object(build_machine_generic_register_fixture())
+    let expected = new i64[]
+    expected.push(77)
+    expected.push(15)
+    expected.push(175)
+    expected.push(209)
+    expected.push(73)
+    expected.push(247)
+    expected.push(218)
+    expected.push(73)
+    expected.push(247)
+    expected.push(249)
+    expected.push(72)
+    expected.push(247)
+    expected.push(246)
+    expected.push(73)
+    expected.push(211)
+    expected.push(226)
+    expected.push(72)
+    expected.push(211)
+    expected.push(238)
+    expected.push(73)
+    expected.push(211)
+    expected.push(249)
+    if len(obj.text) != len(expected) {
+        panic "machine generic register byte length mismatch"
+    }
+    let i = 0
+    for i < len(expected) {
+        if obj.text[i] != expected[i] {
+            panic "machine generic register bytes mismatch"
+        }
+        i = i + 1
+    }
+}
+
 fun main(): void {
+    assert_machine_generic_register_bytes()
     let index = machine_name_index_new(2)
     machine_name_index_insert(index, "symbol_0", 7)
     machine_name_index_insert(index, "symbol_8", 11)

@@ -629,15 +629,37 @@ fun machine_emit_inc_dec(b: MachineBuilder, op: str, reg_name: str): void {
     if op == "inc" { machine_modrm(b, 3, 0, r) } else { machine_modrm(b, 3, 1, r) }
 }
 
-fun machine_emit_shift_rax_cl(b: MachineBuilder, op: str): void {
+fun machine_emit_imul_reg_reg(b: MachineBuilder, dst: str, src: str): void {
+    let d = machine_reg64(dst)
+    let s = machine_reg64(src)
+    machine_rex(b, true, d / 8, s / 8)
+    machine_append_byte(b.text, 15)
+    machine_append_byte(b.text, 175)
+    machine_modrm(b, 3, d, s)
+}
+
+fun machine_emit_group3_reg(b: MachineBuilder, op: str, reg_name: str): void {
+    let ext = 0
+    if op == "neg" { ext = 3 }
+    else if op == "div" { ext = 6 }
+    else if op == "idiv" { ext = 7 }
+    else { machine_die(("unsupported group 3 op: " + op)) }
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, 0, r / 8)
+    machine_append_byte(b.text, 247)
+    machine_modrm(b, 3, ext, r)
+}
+
+fun machine_emit_shift_reg_cl(b: MachineBuilder, op: str, reg_name: str): void {
     let ext = 0
     if op == "shl" { ext = 4 }
     else if op == "shr" { ext = 5 }
     else if op == "sar" { ext = 7 }
     else { machine_die(("unsupported shift: " + op)) }
-    machine_rex(b, true, 0, 0)
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, 0, r / 8)
     machine_append_byte(b.text, 211)
-    machine_modrm(b, 3, ext, machine_reg64("rax"))
+    machine_modrm(b, 3, ext, r)
 }
 
 fun machine_emit_movx_reg_mem(b: MachineBuilder, op: str, dst: str, base: str, disp: i64, size: i64): void {
@@ -859,30 +881,28 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
         machine_append_byte(b.text, 153)
         ret
     }
-    if op == "idiv" && len(ops) == 1 && machine_is_reg(ops[0], "rcx") {
-        machine_append_byte(b.text, 72)
-        machine_append_byte(b.text, 247)
-        machine_append_byte(b.text, 249)
-        ret
+    if (op == "idiv" || op == "div" || op == "neg") && len(ops) == 1 {
+        match ops[0] {
+            X64RegOperand reg: {
+                machine_emit_group3_reg(b, op, reg.name)
+                ret
+            }
+            _: {}
+        }
     }
-    if op == "div" && len(ops) == 1 && machine_is_reg(ops[0], "rcx") {
-        machine_append_byte(b.text, 72)
-        machine_append_byte(b.text, 247)
-        machine_append_byte(b.text, 241)
-        ret
-    }
-    if op == "imul" && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "rcx") {
-        machine_append_byte(b.text, 72)
-        machine_append_byte(b.text, 15)
-        machine_append_byte(b.text, 175)
-        machine_append_byte(b.text, 193)
-        ret
-    }
-    if op == "neg" && len(ops) == 1 && machine_is_reg(ops[0], "rax") {
-        machine_append_byte(b.text, 72)
-        machine_append_byte(b.text, 247)
-        machine_append_byte(b.text, 216)
-        ret
+    if op == "imul" && len(ops) == 2 {
+        match ops[0] {
+            X64RegOperand dst: {
+                match ops[1] {
+                    X64RegOperand src: {
+                        machine_emit_imul_reg_reg(b, dst.name, src.name)
+                        ret
+                    }
+                    _: {}
+                }
+            }
+            _: {}
+        }
     }
     if (op == "add" || op == "sub" || op == "and" || op == "or" || op == "xor") && len(ops) == 2 {
         match ops[0] {
@@ -932,9 +952,14 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
     }
     if (op == "movzx" || op == "movsx") && machine_emit_movx_inst(b, op, ops) { ret }
     if op == "movsxd" && machine_emit_movsxd_inst(b, ops) { ret }
-    if (op == "shl" || op == "sar" || op == "shr") && len(ops) == 2 && machine_is_reg(ops[0], "rax") && machine_is_reg(ops[1], "cl") {
-        machine_emit_shift_rax_cl(b, op)
-        ret
+    if (op == "shl" || op == "sar" || op == "shr") && len(ops) == 2 && machine_is_reg(ops[1], "cl") {
+        match ops[0] {
+            X64RegOperand target: {
+                machine_emit_shift_reg_cl(b, op, target.name)
+                ret
+            }
+            _: {}
+        }
     }
     if (op == "inc" || op == "dec") && len(ops) == 1 {
         match ops[0] {
