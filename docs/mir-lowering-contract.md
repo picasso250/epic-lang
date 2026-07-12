@@ -145,7 +145,9 @@ mov  [reg+8], r11             # header.len = length
 
 ### 5.1 `alloca`
 
-不发射任何 x64 指令。只是分配一个 `addr_slot`，后续 `lea` 访问。
+不发射任何 x64 指令，只分配一个 `addr_slot`。当 load/store 的地址 operand 直接是该
+`alloca` result 时，lowering 使用 `[rbp+addr_slot]` 直接访问，不再先发射 `lea`；GEP、
+parameter、global 和普通 pointer value 仍先加载地址再间接访问。
 
 ### 5.2 `store`
 
