@@ -71,6 +71,31 @@ fun mir_runtime_insert_startup(program: MirProgram): void {
     entry.instructions = instructions
 }
 
+fun mir_runtime_insert_shutdown(program: MirProgram): void {
+    let main_index = mir_find_function(program, "main")
+    if main_index < 0 { ret }
+    let main_fn = program.functions[main_index]
+    for bi: 0:len(main_fn.blocks) {
+        let block = main_fn.blocks[bi]
+        let returns = false
+        match block.terminator {
+            MirRetVoidTerminator rv: { returns = true }
+            MirRetValueTerminator rv: { returns = true }
+            _: {}
+        }
+        if returns {
+            let already_inserted = false
+            if len(block.instructions) > 0 {
+                let last = block.instructions[len(block.instructions) - 1]
+                already_inserted = last.op == "call" && last.callee == "__ep_runtime_end"
+            }
+            if !already_inserted {
+                block.instructions.push(mir_call("__ep_runtime_end", "void", new MirOperand[]))
+            }
+        }
+    }
+}
+
 fun mir_runtime_address_needs_check(address: MirOperand, safe_values: i64[], checked_values: i64[]): bool {
     match address {
         MirSymbolOperand value: { ret false }
@@ -167,5 +192,6 @@ fun mir_inject_all_runtime_helpers(program: MirProgram): void {
     }
 
     mir_runtime_insert_startup(program)
+    mir_runtime_insert_shutdown(program)
     mir_runtime_insert_null_checks(program)
 }

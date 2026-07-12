@@ -339,6 +339,11 @@ entry:
   ret void
 }
 
+define void @__ep_runtime_end() {
+entry:
+  ret void
+}
+
 define ptr @__ep_slice_u8_alloc(i64 %1, i64 %2) {
 entry:
   %3: ptr = call ptr __ep_alloc(i64 24)

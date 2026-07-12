@@ -48,6 +48,45 @@ def print_gc_stw_stats(stderr, label):
         flush=True,
     )
 
+GC_ALLOC_PROFILE_RE = re.compile(
+    r"^gc alloc profile: total_count=(\d+) total_bytes=(\d+) "
+    r"le32_count=(\d+) le32_bytes=(\d+) le64_count=(\d+) le64_bytes=(\d+)$",
+    re.MULTILINE,
+)
+
+
+def print_gc_alloc_profile(stderr, label):
+    matches = list(GC_ALLOC_PROFILE_RE.finditer(stderr))
+    if not matches:
+        return
+    if len(matches) != 1:
+        raise RuntimeError(f"{label} emitted {len(matches)} GC allocation profiles")
+    total_count, total_bytes, le32_count, le32_bytes, le64_count, le64_bytes = (
+        int(value) for value in matches[0].groups()
+    )
+    mid_count = le64_count - le32_count
+    large_count = total_count - le64_count
+    mid_bytes = le64_bytes - le32_bytes
+    large_bytes = total_bytes - le64_bytes
+
+    def percent(value, total):
+        return 0.0 if total == 0 else value * 100.0 / total
+
+    print(
+        f"  {label} gc alloc count: total={total_count:,} "
+        + f"<=32B={le32_count:,} ({percent(le32_count, total_count):.2f}%) "
+        + f"33-64B={mid_count:,} ({percent(mid_count, total_count):.2f}%) "
+        + f">64B={large_count:,} ({percent(large_count, total_count):.2f}%)",
+        flush=True,
+    )
+    print(
+        f"  {label} gc alloc bytes: total={format_size(total_bytes)} "
+        + f"<=32B={format_size(le32_bytes)} ({percent(le32_bytes, total_bytes):.2f}%) "
+        + f"33-64B={format_size(mid_bytes)} ({percent(mid_bytes, total_bytes):.2f}%) "
+        + f">64B={format_size(large_bytes)} ({percent(large_bytes, total_bytes):.2f}%)",
+        flush=True,
+    )
+
 
 def remove_tree_with_retry(path, attempts=5):
     for attempt in range(attempts):
@@ -134,6 +173,7 @@ def run_checked(cmd, label):
         if line.startswith("  timing: ") or line.startswith("  stats: "):
             print(f"  {label} {line.strip()}", flush=True)
     print_gc_stw_stats(result.stderr, label)
+    print_gc_alloc_profile(result.stderr, label)
     if peak_memory is not None:
         peak_working_set, peak_commit = peak_memory
         print(

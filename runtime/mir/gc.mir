@@ -30,9 +30,35 @@ global @gc_work_count: i64
 
 global @gc_collection_count: i64
 
+global @gc_alloc_count: i64
+
+global @gc_alloc_bytes: i64
+
+global @gc_alloc_le32_count: i64
+
+global @gc_alloc_le32_bytes: i64
+
+global @gc_alloc_le64_count: i64
+
+global @gc_alloc_le64_bytes: i64
+
 global @str.gc.stw.prefix: ptr = bytes "gc stw: "
 
 global @str.gc.stw.suffix: ptr = bytes " ms\n"
+
+global @str.gc.alloc.total_count: ptr = bytes "gc alloc profile: total_count="
+
+global @str.gc.alloc.total_bytes: ptr = bytes " total_bytes="
+
+global @str.gc.alloc.le32_count: ptr = bytes " le32_count="
+
+global @str.gc.alloc.le32_bytes: ptr = bytes " le32_bytes="
+
+global @str.gc.alloc.le64_count: ptr = bytes " le64_count="
+
+global @str.gc.alloc.le64_bytes: ptr = bytes " le64_bytes="
+
+global @str.gc.alloc.newline: ptr = bytes "\n"
 
 define ptr @__ep_gc_raw_try_alloc(i64 %1) {
 entry:
@@ -504,16 +530,14 @@ entry:
   ret void
 }
 
-define void @__ep_gc_print_stw(i64 %1) {
+define void @__ep_gc_write_u64(i64 %1, i64 %2) {
 entry:
-  %2: i64 = call i64 GetStdHandle(i64 -12)
-  call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.prefix)
   %3: ptr = call ptr __ep_gc_raw_alloc(i64 32)
   %4: ptr = alloca i64
   %5: ptr = alloca i64
   store i64 32, ptr %4
-  store i64 %1, ptr %5
-  %6: bool = icmp.eq i64 %1, i64 0
+  store i64 %2, ptr %5
+  %6: bool = icmp.eq i64 %2, i64 0
   condbr bool %6, label %zero, label %digit
 
 zero:
@@ -543,9 +567,50 @@ write:
   %18: i64 = load i64, ptr %4
   %19: ptr = gep i8, ptr %3, i64 %18
   %20: i64 = sub i64 32, i64 %18
-  call void __ep_gc_write_stderr(i64 %2, ptr %19, i64 %20)
+  call void __ep_gc_write_stderr(i64 %1, ptr %19, i64 %20)
   call void __ep_gc_raw_free(ptr %3)
+  ret void
+}
+
+define void @__ep_gc_print_stw(i64 %1) {
+entry:
+  %2: i64 = call i64 GetStdHandle(i64 -12)
+  call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.prefix)
+  call void __ep_gc_write_u64(i64 %2, i64 %1)
   call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.suffix)
+  ret void
+}
+
+define void @__ep_gc_print_alloc_profile() {
+entry:
+  %1: i64 = load i64, ptr gc_collection_count
+  %2: bool = icmp.eq i64 %1, i64 0
+  condbr bool %2, label %done, label %print
+
+print:
+  %3: i64 = call i64 GetStdHandle(i64 -12)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.total_count)
+  %4: i64 = load i64, ptr gc_alloc_count
+  call void __ep_gc_write_u64(i64 %3, i64 %4)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.total_bytes)
+  %5: i64 = load i64, ptr gc_alloc_bytes
+  call void __ep_gc_write_u64(i64 %3, i64 %5)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_count)
+  %6: i64 = load i64, ptr gc_alloc_le32_count
+  call void __ep_gc_write_u64(i64 %3, i64 %6)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_bytes)
+  %7: i64 = load i64, ptr gc_alloc_le32_bytes
+  call void __ep_gc_write_u64(i64 %3, i64 %7)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_count)
+  %8: i64 = load i64, ptr gc_alloc_le64_count
+  call void __ep_gc_write_u64(i64 %3, i64 %8)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_bytes)
+  %9: i64 = load i64, ptr gc_alloc_le64_bytes
+  call void __ep_gc_write_u64(i64 %3, i64 %9)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.newline)
+  ret void
+
+done:
   ret void
 }
 
@@ -587,8 +652,52 @@ entry:
   ret void
 }
 
+define void @__ep_runtime_end() {
+entry:
+  call void __ep_gc_print_alloc_profile()
+  ret void
+}
+
+define void @__ep_gc_record_alloc_profile(i64 %1) {
+entry:
+  %2: i64 = load i64, ptr gc_alloc_count
+  %3: i64 = add i64 %2, i64 1
+  store i64 %3, ptr gc_alloc_count
+  %4: i64 = load i64, ptr gc_alloc_bytes
+  %5: i64 = add i64 %4, i64 %1
+  store i64 %5, ptr gc_alloc_bytes
+  %6: bool = icmp.ule i64 %1, i64 32
+  condbr bool %6, label %le32, label %check64
+
+le32:
+  %7: i64 = load i64, ptr gc_alloc_le32_count
+  %8: i64 = add i64 %7, i64 1
+  store i64 %8, ptr gc_alloc_le32_count
+  %9: i64 = load i64, ptr gc_alloc_le32_bytes
+  %10: i64 = add i64 %9, i64 %1
+  store i64 %10, ptr gc_alloc_le32_bytes
+  br label %le64
+
+check64:
+  %11: bool = icmp.ule i64 %1, i64 64
+  condbr bool %11, label %le64, label %done
+
+le64:
+  %12: i64 = load i64, ptr gc_alloc_le64_count
+  %13: i64 = add i64 %12, i64 1
+  store i64 %13, ptr gc_alloc_le64_count
+  %14: i64 = load i64, ptr gc_alloc_le64_bytes
+  %15: i64 = add i64 %14, i64 %1
+  store i64 %15, ptr gc_alloc_le64_bytes
+  ret void
+
+done:
+  ret void
+}
+
 define void @__ep_gc_record_object(ptr %1, i64 %2) {
 entry:
+  call void __ep_gc_record_alloc_profile(i64 %2)
   %3: ptr = load ptr, ptr gc_objects
   %4: ptr = load ptr, ptr gc_sizes
   %5: i64 = load i64, ptr gc_object_count

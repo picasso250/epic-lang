@@ -43,10 +43,27 @@ def run_case(name, expected, limit_mib):
     process = subprocess.Popen([str(exe)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate(timeout=60)
     peak = peak_working_set(process)
-    timing_lines = [line for line in stderr.splitlines() if line]
-    timings_ok = timing_lines and all(re.fullmatch(rb"gc stw: \d+ ms", line) for line in timing_lines)
-    if process.returncode != 0 or stdout.strip() != expected or not timings_ok:
-        print(f"  FAIL  GC {name} behavior or STW timing")
+    stderr_lines = [line for line in stderr.splitlines() if line]
+    timing_lines = [line for line in stderr_lines if re.fullmatch(rb"gc stw: \d+ ms", line)]
+    profile_pattern = re.compile(
+        rb"gc alloc profile: total_count=(\d+) total_bytes=(\d+) "
+        rb"le32_count=(\d+) le32_bytes=(\d+) le64_count=(\d+) le64_bytes=(\d+)"
+    )
+    profile_matches = [profile_pattern.fullmatch(line) for line in stderr_lines]
+    profile_matches = [match for match in profile_matches if match]
+    known_lines = len(timing_lines) + len(profile_matches) == len(stderr_lines)
+    profile_ok = False
+    if len(profile_matches) == 1:
+        total_count, total_bytes, le32_count, le32_bytes, le64_count, le64_bytes = (
+            int(value) for value in profile_matches[0].groups()
+        )
+        profile_ok = (
+            0 <= le32_count <= le64_count <= total_count
+            and 0 <= le32_bytes <= le64_bytes <= total_bytes
+        )
+    timings_ok = bool(timing_lines)
+    if process.returncode != 0 or stdout.strip() != expected or not timings_ok or not profile_ok or not known_lines:
+        print(f"  FAIL  GC {name} behavior, STW timing, or allocation profile")
         print((stdout + stderr).decode("utf-8", errors="replace")[-2000:])
         return False
     limit = limit_mib * 1024 * 1024
