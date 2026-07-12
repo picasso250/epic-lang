@@ -601,6 +601,10 @@ fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirInst): void {
     mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
+fun mir_to_x64_is_icmp_op(op: str): bool {
+    ret op == "icmp.eq" || op == "icmp.ne" || op == "icmp.slt" || op == "icmp.sgt" || op == "icmp.sle" || op == "icmp.sge" || op == "icmp.ult" || op == "icmp.ugt" || op == "icmp.ule" || op == "icmp.uge"
+}
+
 fun mir_to_x64_icmp_cc(op: str): str {
     if op == "icmp.eq" { ret "sete" }
     if op == "icmp.ne" { ret "setne" }
@@ -616,7 +620,7 @@ fun mir_to_x64_icmp_cc(op: str): str {
     ret "sete"
 }
 
-fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
+fun mir_to_x64_emit_icmp_compare(lower: MirToX64Lower, inst: MirInst): void {
     mir_to_x64_load_operand(lower, "rax", inst.operands[0])
     let immediate = false
     match inst.operands[1] {
@@ -632,9 +636,57 @@ fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
         mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
         x64_add_inst2(lower.x64, "cmp", x64_reg("rax"), x64_reg("rcx"))
     }
+}
+
+fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
+    mir_to_x64_emit_icmp_compare(lower, inst)
     x64_add_inst1(lower.x64, mir_to_x64_icmp_cc(inst.op), x64_reg("al"))
     x64_add_inst2(lower.x64, "movzx", x64_reg("eax"), x64_reg("al"))
     mir_to_x64_store_result(lower, inst.result_id, "rax")
+}
+
+fun mir_to_x64_fused_icmp_jcc(op: str): str {
+    if op == "icmp.eq" { ret "jz" }
+    if op == "icmp.ne" { ret "jnz" }
+    if op == "icmp.slt" { ret "jl" }
+    if op == "icmp.sle" { ret "jle" }
+    if op == "icmp.sge" { ret "jge" }
+    ret ""
+}
+
+fun mir_to_x64_can_fuse_block_icmp(lower: MirToX64Lower, block: MirBlock): bool {
+    if len(block.instructions) == 0 { ret false }
+    let inst = block.instructions[len(block.instructions) - 1]
+    let jcc = mir_to_x64_fused_icmp_jcc(inst.op)
+    if len(jcc) == 0 && inst.op != "icmp.sgt" { ret false }
+    if lower.reusable_values[inst.result_id] == 0 { ret false }
+    match block.terminator {
+        MirCondBrTerminator cond: {
+            match cond.cond {
+                MirValueOperand value: { ret value.value_id == inst.result_id }
+                _: {}
+            }
+        }
+        _: {}
+    }
+    ret false
+}
+
+fun mir_to_x64_emit_fused_icmp_term(lower: MirToX64Lower, inst: MirInst, term: MirTerminator): void {
+    match term {
+        MirCondBrTerminator cond: {
+            mir_to_x64_emit_icmp_compare(lower, inst)
+            if inst.op == "icmp.sgt" {
+                x64_add_inst1(lower.x64, "jle", x64_label_ref(mir_to_x64_block_label(lower, cond.else_target)))
+                x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
+            } else {
+                x64_add_inst1(lower.x64, mir_to_x64_fused_icmp_jcc(inst.op), x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
+                x64_add_inst1(lower.x64, "jmp", x64_label_ref(mir_to_x64_block_label(lower, cond.else_target)))
+            }
+            ret
+        }
+        _: { mir_to_x64_die("fused icmp requires condbr") }
+    }
 }
 
 fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
@@ -743,7 +795,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         mir_to_x64_store_result(lower, inst.result_id, "rax")
         ret
     }
-    if inst.op == "icmp.eq" || inst.op == "icmp.ne" || inst.op == "icmp.slt" || inst.op == "icmp.sgt" || inst.op == "icmp.sle" || inst.op == "icmp.sge" || inst.op == "icmp.ult" || inst.op == "icmp.ugt" || inst.op == "icmp.ule" || inst.op == "icmp.uge" {
+    if mir_to_x64_is_icmp_op(inst.op) {
         mir_to_x64_emit_icmp(lower, inst)
         ret
     }
@@ -879,15 +931,23 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
         lower.timing_blocks += 1
         x64_bind_label(lower.x64, mir_to_x64_block_label(lower, fn.blocks[b].name))
         let inst_start = mir_to_x64_now_ms()
-        for j: 0:len(fn.blocks[b].instructions) {
+        let fused_icmp = mir_to_x64_can_fuse_block_icmp(lower, fn.blocks[b])
+        let instruction_limit = len(fn.blocks[b].instructions)
+        if fused_icmp { instruction_limit -= 1 }
+        for j: 0:instruction_limit {
             lower.timing_instructions += 1
             mir_to_x64_lower_inst(lower, fn.blocks[b].instructions[j])
         }
+        if fused_icmp { lower.timing_instructions += 1 }
         let inst_stop = mir_to_x64_now_ms()
         lower.timing_insts += (inst_stop - inst_start)
 
         let term_start = mir_to_x64_now_ms()
-        mir_to_x64_lower_term(lower, fn, fn.blocks[b].terminator)
+        if fused_icmp {
+            mir_to_x64_emit_fused_icmp_term(lower, fn.blocks[b].instructions[len(fn.blocks[b].instructions) - 1], fn.blocks[b].terminator)
+        } else {
+            mir_to_x64_lower_term(lower, fn, fn.blocks[b].terminator)
+        }
         let term_stop = mir_to_x64_now_ms()
         lower.timing_terms += (term_stop - term_start)
     }

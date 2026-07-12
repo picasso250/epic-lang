@@ -1,5 +1,61 @@
 # X64IR pretty-print fixture for the self-hosted x64 DTO.
 
+fun check_local_peephole(): void {
+    let program = x64_program_empty()
+    x64_add_inst2(program, "mov", x64_mem_base("rbp", -8, 8), x64_reg("rax"))
+    x64_add_inst2(program, "mov", x64_reg("rax"), x64_mem_base("rbp", -8, 8))
+    if len(program.items) != 1 { panic "same-register stack reload must be removed" }
+
+    x64_add_inst2(program, "mov", x64_reg("rcx"), x64_mem_base("rbp", -8, 8))
+    if len(program.items) != 2 { panic "different-register reload must remain" }
+
+    let label = x64_new_label(program)
+    x64_bind_label(program, label)
+    x64_add_inst2(program, "mov", x64_reg("rax"), x64_mem_base("rbp", -8, 8))
+    if len(program.items) != 4 { panic "label must block reload peephole" }
+
+    let branches = x64_program_empty()
+    let fallthrough = x64_new_label(branches)
+    x64_add_inst1(branches, "jmp", x64_label_ref(fallthrough))
+    x64_bind_label(branches, fallthrough)
+    if len(branches.items) != 1 { panic "jump to immediately bound label must be removed" }
+
+    let retained = x64_program_empty()
+    let other = x64_new_label(retained)
+    let bound = x64_new_label(retained)
+    x64_add_inst1(retained, "jmp", x64_label_ref(other))
+    x64_bind_label(retained, bound)
+    if len(retained.items) != 2 { panic "jump to another label must remain" }
+
+    let inverted = x64_program_empty()
+    let next = x64_new_label(inverted)
+    let away = x64_new_label(inverted)
+    x64_add_inst1(inverted, "jnz", x64_label_ref(next))
+    x64_add_inst1(inverted, "jmp", x64_label_ref(away))
+    x64_bind_label(inverted, next)
+    if len(inverted.items) != 2 { panic "conditional fallthrough must remove trailing jump" }
+    match inverted.items[0] {
+        X64InstItem branch: {
+            if branch.op != "jz" { panic "conditional fallthrough must invert branch" }
+            match branch.operands[0] {
+                X64LabelRefOperand target: {
+                    if target.label.id != away.id { panic "inverted branch must target former jump destination" }
+                }
+                _: { panic "inverted branch target must remain a label" }
+            }
+        }
+        _: { panic "inverted branch must remain an instruction" }
+    }
+
+    let unsupported = x64_program_empty()
+    let unsupported_next = x64_new_label(unsupported)
+    let unsupported_away = x64_new_label(unsupported)
+    x64_add_inst1(unsupported, "jle", x64_label_ref(unsupported_next))
+    x64_add_inst1(unsupported, "jmp", x64_label_ref(unsupported_away))
+    x64_bind_label(unsupported, unsupported_next)
+    if len(unsupported.items) != 3 { panic "branch without supported inverse must remain" }
+}
+
 fun build_x64_fixture(): X64Program {
     let program = x64_program_empty()
     x64_add_global(program, "_start")
@@ -29,5 +85,6 @@ fun build_x64_fixture(): X64Program {
 }
 
 fun main(): void {
+    check_local_peephole()
     print(x64_program_text(build_x64_fixture()))
 }

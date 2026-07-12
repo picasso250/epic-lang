@@ -136,7 +136,66 @@ fun x64_add_section(program: X64Program, name: str): void {
     program.items.push(new X64Item(new X64SectionItem { name: name }))
 }
 
+fun x64_invert_jcc(op: str): str {
+    if op == "jz" { ret "jnz" }
+    if op == "jnz" { ret "jz" }
+    if op == "jl" { ret "jge" }
+    if op == "jge" { ret "jl" }
+    ret ""
+}
+
+fun x64_invert_fallthrough_branch(program: X64Program, label: X64Label): void {
+    if len(program.items) < 2 { ret }
+    match program.items[len(program.items) - 1] {
+        X64InstItem tail: {
+            if tail.op != "jmp" || len(tail.operands) != 1 { ret }
+            match tail.operands[0] {
+                X64LabelRefOperand other: {
+                    match program.items[len(program.items) - 2] {
+                        X64InstItem branch: {
+                            let inverse = x64_invert_jcc(branch.op)
+                            if len(inverse) == 0 || len(branch.operands) != 1 { ret }
+                            match branch.operands[0] {
+                                X64LabelRefOperand fallthrough: {
+                                    if fallthrough.label.id != label.id { ret }
+                                    branch.op = inverse
+                                    branch.operands[0] = x64_label_ref(other.label)
+                                    let removed = program.items.pop()
+                                }
+                                _: {}
+                            }
+                        }
+                        _: {}
+                    }
+                }
+                _: {}
+            }
+        }
+        _: {}
+    }
+}
+
+fun x64_drop_fallthrough_jump(program: X64Program, label: X64Label): void {
+    if len(program.items) == 0 { ret }
+    match program.items[len(program.items) - 1] {
+        X64InstItem inst: {
+            if inst.op != "jmp" || len(inst.operands) != 1 { ret }
+            match inst.operands[0] {
+                X64LabelRefOperand target: {
+                    if target.label.id == label.id {
+                        let removed = program.items.pop()
+                    }
+                }
+                _: {}
+            }
+        }
+        _: {}
+    }
+}
+
 fun x64_bind_label(program: X64Program, label: X64Label): void {
+    x64_invert_fallthrough_branch(program, label)
+    x64_drop_fallthrough_jump(program, label)
     program.items.push(new X64Item(new X64LabelItem { label: label }))
 }
 
@@ -154,7 +213,43 @@ fun x64_add_inst1(program: X64Program, op: str, a: X64Operand): void {
     x64_add_inst(program, op, operands)
 }
 
+fun x64_is_redundant_same_reg_reload(program: X64Program, op: str, a: X64Operand, b: X64Operand): bool {
+    if op != "mov" || len(program.items) == 0 { ret false }
+    match a {
+        X64RegOperand load_reg: {
+            match b {
+                X64MemBaseOperand load_mem: {
+                    match program.items[len(program.items) - 1] {
+                        X64InstItem previous: {
+                            if previous.op != "mov" || len(previous.operands) != 2 { ret false }
+                            match previous.operands[0] {
+                                X64MemBaseOperand store_mem: {
+                                    match previous.operands[1] {
+                                        X64RegOperand store_reg: {
+                                            if load_reg.name != store_reg.name { ret false }
+                                            if load_mem.base != store_mem.base { ret false }
+                                            if load_mem.disp != store_mem.disp { ret false }
+                                            ret load_mem.size == store_mem.size
+                                        }
+                                        _: {}
+                                    }
+                                }
+                                _: {}
+                            }
+                        }
+                        _: {}
+                    }
+                }
+                _: {}
+            }
+        }
+        _: {}
+    }
+    ret false
+}
+
 fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): void {
+    if x64_is_redundant_same_reg_reload(program, op, a, b) { ret }
     let operands = new X64Operand[]
     operands.push(a)
     operands.push(b)

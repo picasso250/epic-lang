@@ -1,0 +1,60 @@
+fun comparison(op: str, result_id: i64, left: MirOperand, right: MirOperand): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = op
+    inst.result_id = result_id
+    inst.result_type = "bool"
+    inst.has_result = true
+    inst.operands.push(left)
+    inst.operands.push(right)
+    ret inst
+}
+
+fun has_op(program: X64Program, op: str): bool {
+    for i: 0:len(program.items) {
+        match program.items[i] {
+            X64InstItem inst: { if inst.op == op { ret true } }
+            _: {}
+        }
+    }
+    ret false
+}
+
+fun main(): void {
+    let program = mir_program_empty()
+    let fused = mir_function_empty("fused", "i64")
+    fused.params.push(new MirParam { typ: "i64", value_id: 1 })
+    fused.params.push(new MirParam { typ: "i64", value_id: 2 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(comparison("icmp.slt", 3, mir_value_operand("i64", 1), mir_value_operand("i64", 2)))
+    entry.terminator = mir_condbr(mir_value_operand("bool", 3), "yes", "no")
+    entry.has_terminator = true
+    let yes = mir_block_empty("yes")
+    yes.terminator = mir_ret_value(mir_const_int("i64", 1))
+    yes.has_terminator = true
+    let no = mir_block_empty("no")
+    no.terminator = mir_ret_value(mir_const_int("i64", 0))
+    no.has_terminator = true
+    fused.blocks.push(entry)
+    fused.blocks.push(yes)
+    fused.blocks.push(no)
+    let fused_x64 = mir_to_x64_lower_function_with_program(program, fused)
+    if !has_op(fused_x64, "cmp") || (!has_op(fused_x64, "jl") && !has_op(fused_x64, "jge")) {
+        panic "single-use terminal icmp must branch directly"
+    }
+    if has_op(fused_x64, "setl") || has_op(fused_x64, "movzx") || has_op(fused_x64, "test") {
+        panic "fused icmp must not materialize a boolean"
+    }
+
+    let materialized = mir_function_empty("materialized", "bool")
+    materialized.params.push(new MirParam { typ: "i64", value_id: 1 })
+    materialized.params.push(new MirParam { typ: "i64", value_id: 2 })
+    let value_entry = mir_block_empty("entry")
+    value_entry.instructions.push(comparison("icmp.slt", 3, mir_value_operand("i64", 1), mir_value_operand("i64", 2)))
+    value_entry.terminator = mir_ret_value(mir_value_operand("bool", 3))
+    value_entry.has_terminator = true
+    materialized.blocks.push(value_entry)
+    let value_x64 = mir_to_x64_lower_function_with_program(program, materialized)
+    if !has_op(value_x64, "setl") || !has_op(value_x64, "movzx") {
+        panic "icmp used as a value must remain materialized"
+    }
+}
