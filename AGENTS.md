@@ -20,6 +20,14 @@
 - 负向测试放 `tests/<module>/fail/`。
 - `test_*.py` 是可直接运行的脚本测试，不是 pytest 测试；不要把 `python -m pytest` 当作支持入口。
 
+## 性能测量
+
+- `test_bootstrap_fixed_point.py` 的三代编译由不同代编译器执行，不能直接当作三次等价性能样本。先运行一次 fixed point 验证收敛，再复用收敛编译器测量同一 workload。
+- wall time 使用外部高精度计时（例如 Python `time.perf_counter_ns()`）；编译器内部的 `GetTickCount64()` 适合阶段诊断，不适合判断约 1% 以内的差异。
+- 默认先测 3 次并报告 median；这足以发现明显变化，但不足以证明很小的变化。
+- 当差异小于 1%、三次结果方向不一致、或差异接近计时粒度时，改为 A/B 交错顺序并增加到 9 次；仍不能区分时最多增加到 15 次，然后将结论标为“未确认有变化”，不要继续堆样本。
+- A/B 必须使用相同源码、相同 seed、相同参数和相同输出位置条件；同时报告 wall time、X64 items、`.text` bytes 和最终 exe size。
+
 ## 现状
 
 - 自举完成
