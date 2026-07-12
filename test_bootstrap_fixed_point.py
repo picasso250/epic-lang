@@ -4,6 +4,7 @@
 import argparse
 import filecmp
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,6 +33,20 @@ def format_size(num_bytes):
 
 def print_exe_size(path, label):
     print(f"  {label} exe size: {format_size(os.path.getsize(path))}", flush=True)
+
+
+def print_gc_stw_stats(stderr, label):
+    pauses = [int(match.group(1)) for match in re.finditer(r"^gc stw: (\d+) ms$", stderr, re.MULTILINE)]
+    if not pauses:
+        return
+    ordered = sorted(pauses)
+    p50 = ordered[(len(ordered) - 1) // 2]
+    p95 = ordered[((len(ordered) * 95 + 99) // 100) - 1]
+    print(
+        f"  {label} gc stw: count={len(pauses)} total={sum(pauses)} ms "
+        + f"min={ordered[0]} ms p50={p50} ms p95={p95} ms max={ordered[-1]} ms",
+        flush=True,
+    )
 
 
 def remove_tree_with_retry(path, attempts=5):
@@ -118,6 +133,7 @@ def run_checked(cmd, label):
     for line in result.stdout.splitlines():
         if line.startswith("  timing: ") or line.startswith("  stats: "):
             print(f"  {label} {line.strip()}", flush=True)
+    print_gc_stw_stats(result.stderr, label)
     if peak_memory is not None:
         peak_working_set, peak_commit = peak_memory
         print(

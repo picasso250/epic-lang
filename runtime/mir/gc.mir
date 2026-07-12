@@ -24,6 +24,10 @@ global @gc_work_count: i64
 
 global @gc_collection_count: i64
 
+global @str.gc.stw.prefix: ptr = bytes "gc stw: "
+
+global @str.gc.stw.suffix: ptr = bytes " ms\n"
+
 define ptr @__ep_gc_raw_try_alloc(i64 %1) {
 entry:
   %2: i64 = load i64, ptr heap
@@ -448,16 +452,85 @@ bytes_adaptive:
   ret void
 }
 
+define void @__ep_gc_write_stderr(i64 %1, ptr %2, i64 %3) {
+entry:
+  %4: i64 = ptrtoint ptr %2 to i64
+  %5: ptr = alloca i64
+  store i64 0, ptr %5
+  %6: i64 = ptrtoint ptr %5 to i64
+  %7: i64 = call i64 WriteFile(i64 %1, i64 %4, i64 %3, i64 %6, i64 0)
+  ret void
+}
+
+define void @__ep_gc_write_stderr_str(i64 %1, ptr %2) {
+entry:
+  %3: ptr = gep struct str, ptr %2, i64 0, i64 0
+  %4: ptr = load ptr, ptr %3
+  %5: ptr = gep struct str, ptr %2, i64 0, i64 1
+  %6: i64 = load i64, ptr %5
+  call void __ep_gc_write_stderr(i64 %1, ptr %4, i64 %6)
+  ret void
+}
+
+define void @__ep_gc_print_stw(i64 %1) {
+entry:
+  %2: i64 = call i64 GetStdHandle(i64 -12)
+  call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.prefix)
+  %3: ptr = call ptr __ep_gc_raw_alloc(i64 32)
+  %4: ptr = alloca i64
+  %5: ptr = alloca i64
+  store i64 32, ptr %4
+  store i64 %1, ptr %5
+  %6: bool = icmp.eq i64 %1, i64 0
+  condbr bool %6, label %zero, label %digit
+
+zero:
+  store i64 31, ptr %4
+  %7: ptr = gep i8, ptr %3, i64 31
+  store i8 48, ptr %7
+  br label %write
+
+digit:
+  %8: i64 = load i64, ptr %5
+  %9: i64 = urem i64 %8, i64 10
+  %10: i64 = add i64 %9, i64 48
+  %11: ptr = alloca i64
+  store i64 %10, ptr %11
+  %12: i8 = load i8, ptr %11
+  %13: i64 = load i64, ptr %4
+  %14: i64 = sub i64 %13, i64 1
+  store i64 %14, ptr %4
+  %15: ptr = gep i8, ptr %3, i64 %14
+  store i8 %12, ptr %15
+  %16: i64 = udiv i64 %8, i64 10
+  store i64 %16, ptr %5
+  %17: bool = icmp.ne i64 %16, i64 0
+  condbr bool %17, label %digit, label %write
+
+write:
+  %18: i64 = load i64, ptr %4
+  %19: ptr = gep i8, ptr %3, i64 %18
+  %20: i64 = sub i64 32, i64 %18
+  call void __ep_gc_write_stderr(i64 %2, ptr %19, i64 %20)
+  call void __ep_gc_raw_free(ptr %3)
+  call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.suffix)
+  ret void
+}
+
 define void @__ep_gc_collect() {
 entry:
+  %1: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
   call void __ep_gc_prepare_collection()
   call void __ep_gc_mark_roots()
   call void __ep_gc_drain_marks()
   call void __ep_gc_sweep()
   call void __ep_gc_release_collection()
-  %1: i64 = load i64, ptr gc_collection_count
-  %2: i64 = add i64 %1, i64 1
-  store i64 %2, ptr gc_collection_count
+  %2: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
+  %3: i64 = sub i64 %2, i64 %1
+  call void __ep_gc_print_stw(i64 %3)
+  %4: i64 = load i64, ptr gc_collection_count
+  %5: i64 = add i64 %4, i64 1
+  store i64 %5, ptr gc_collection_count
   ret void
 }
 

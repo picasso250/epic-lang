@@ -26,6 +26,7 @@ heap 分配，地址在生命周期内不移动。runtime 维护一个紧凑的 
   reference 字段仍按 8 字节对齐；窄 scalar 字段和清零 padding 只可能造成 conservative
   false retention，不会隐藏活引用。
 - sweep 释放未标记 payload，并原地压紧 tracked-object array。
+- 每次 stop-the-world collection 完成后向 stderr 输出 `gc stw: <ms> ms`；计时不包含日志写出本身。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
 reference 或精确 stack map。公开 WinAPI 调用是同步的；runtime 不承诺管理由

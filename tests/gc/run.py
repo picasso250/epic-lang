@@ -2,6 +2,7 @@
 """Automatic GC retention and bounded-memory stress test."""
 
 import ctypes
+import re
 import subprocess
 import sys
 from ctypes import wintypes
@@ -42,8 +43,10 @@ def run_case(name, expected, limit_mib):
     process = subprocess.Popen([str(exe)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate(timeout=60)
     peak = peak_working_set(process)
-    if process.returncode != 0 or stdout.strip() != expected:
-        print(f"  FAIL  GC {name} behavior")
+    timing_lines = [line for line in stderr.splitlines() if line]
+    timings_ok = timing_lines and all(re.fullmatch(rb"gc stw: \d+ ms", line) for line in timing_lines)
+    if process.returncode != 0 or stdout.strip() != expected or not timings_ok:
+        print(f"  FAIL  GC {name} behavior or STW timing")
         print((stdout + stderr).decode("utf-8", errors="replace")[-2000:])
         return False
     limit = limit_mib * 1024 * 1024
