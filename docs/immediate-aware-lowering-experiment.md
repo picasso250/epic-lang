@@ -90,5 +90,8 @@ E1 is a stable machine-layer capability and belongs on `dev`.
 E2 has a deterministic code-size benefit and no confirmed wall-time regression.
 The compact right-hand-only implementation is preferable to broader versions:
 it captures most constant opportunities without making the self-hosted lowering
-code disproportionately large. The result is suitable for `dev` and can serve
-as the base for a separate power-of-two strength reduction experiment.
+code disproportionately large. The result is suitable for `dev` and served as
+the base for the follow-up
+[`power-of-two strength-reduction experiment`](power-of-two-strength-reduction-experiment.md).
+That experiment found that the generic optimization cost outweighed its current
+self-host benefit, so its code changes were not retained.
