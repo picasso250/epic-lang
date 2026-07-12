@@ -342,20 +342,6 @@ fun machine_emit_mov_reg_reg(b: MachineBuilder, dst: str, src: str): void {
     machine_modrm(b, 3, s, d)
 }
 
-fun machine_emit_cmp_reg_imm(b: MachineBuilder, reg_name: str, imm: i64): void {
-    let r = machine_reg64(reg_name)
-    machine_rex(b, true, 0, r / 8)
-    if imm >= -128 && imm <= 127 {
-        machine_append_byte(b.text, 131)
-        machine_modrm(b, 3, 7, r)
-        machine_append_byte(b.text, imm)
-    } else {
-        machine_append_byte(b.text, 129)
-        machine_modrm(b, 3, 7, r)
-        machine_append_i32(b.text, imm)
-    }
-}
-
 fun machine_emit_jump(b: MachineBuilder, op: str, label: X64Label): void {
     if op == "jmp" {
         machine_append_byte(b.text, 233)
@@ -606,20 +592,44 @@ fun machine_emit_setcc(b: MachineBuilder, op: str): void {
     machine_append_byte(b.text, 192)
 }
 
-fun machine_emit_add_reg_imm(b: MachineBuilder, reg_name: str, imm: i64): void {
+fun machine_group1_ext(op: str): i64 {
+    if op == "add" { ret 0 }
+    if op == "or" { ret 1 }
+    if op == "and" { ret 4 }
+    if op == "sub" { ret 5 }
+    if op == "xor" { ret 6 }
+    if op == "cmp" { ret 7 }
+    machine_die(("unsupported immediate alu op: " + op))
+    ret 0
+}
+
+fun machine_emit_reg_imm_alu(b: MachineBuilder, op: str, reg_name: str, imm: i64): void {
+    let ext = machine_group1_ext(op)
     if machine_is_reg8_name(reg_name) {
+        if imm < -128 || imm > 255 {
+            machine_die(("8-bit immediate out of range: " + str(imm)))
+        }
         let r8 = machine_reg8(reg_name)
         machine_rex(b, false, 0, r8 / 8)
         machine_append_byte(b.text, 128)
-        machine_modrm(b, 3, 0, r8)
+        machine_modrm(b, 3, ext, r8)
         machine_append_byte(b.text, imm)
         ret
     }
+    if imm < -2147483648 || imm > 2147483647 {
+        machine_die(("64-bit alu immediate out of signed 32-bit range: " + str(imm)))
+    }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r / 8)
-    machine_append_byte(b.text, 131)
-    machine_modrm(b, 3, 0, r)
-    machine_append_byte(b.text, imm)
+    if imm >= -128 && imm <= 127 {
+        machine_append_byte(b.text, 131)
+        machine_modrm(b, 3, ext, r)
+        machine_append_byte(b.text, imm)
+    } else {
+        machine_append_byte(b.text, 129)
+        machine_modrm(b, 3, ext, r)
+        machine_append_i32(b.text, imm)
+    }
 }
 
 fun machine_emit_inc_dec(b: MachineBuilder, op: str, reg_name: str): void {
@@ -638,6 +648,24 @@ fun machine_emit_imul_reg_reg(b: MachineBuilder, dst: str, src: str): void {
     machine_modrm(b, 3, d, s)
 }
 
+fun machine_emit_imul_reg_reg_imm(b: MachineBuilder, dst: str, src: str, imm: i64): void {
+    if imm < -2147483648 || imm > 2147483647 {
+        machine_die(("imul immediate out of signed 32-bit range: " + str(imm)))
+    }
+    let d = machine_reg64(dst)
+    let s = machine_reg64(src)
+    machine_rex(b, true, d / 8, s / 8)
+    if imm >= -128 && imm <= 127 {
+        machine_append_byte(b.text, 107)
+        machine_modrm(b, 3, d, s)
+        machine_append_byte(b.text, imm)
+    } else {
+        machine_append_byte(b.text, 105)
+        machine_modrm(b, 3, d, s)
+        machine_append_i32(b.text, imm)
+    }
+}
+
 fun machine_emit_group3_reg(b: MachineBuilder, op: str, reg_name: str): void {
     let ext = 0
     if op == "neg" { ext = 3 }
@@ -650,16 +678,30 @@ fun machine_emit_group3_reg(b: MachineBuilder, op: str, reg_name: str): void {
     machine_modrm(b, 3, ext, r)
 }
 
+fun machine_shift_ext(op: str): i64 {
+    if op == "shl" { ret 4 }
+    if op == "shr" { ret 5 }
+    if op == "sar" { ret 7 }
+    machine_die(("unsupported shift: " + op))
+    ret 0
+}
+
 fun machine_emit_shift_reg_cl(b: MachineBuilder, op: str, reg_name: str): void {
-    let ext = 0
-    if op == "shl" { ext = 4 }
-    else if op == "shr" { ext = 5 }
-    else if op == "sar" { ext = 7 }
-    else { machine_die(("unsupported shift: " + op)) }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r / 8)
     machine_append_byte(b.text, 211)
-    machine_modrm(b, 3, ext, r)
+    machine_modrm(b, 3, machine_shift_ext(op), r)
+}
+
+fun machine_emit_shift_reg_imm(b: MachineBuilder, op: str, reg_name: str, imm: i64): void {
+    if imm < 0 || imm > 255 {
+        machine_die(("shift immediate out of byte range: " + str(imm)))
+    }
+    let r = machine_reg64(reg_name)
+    machine_rex(b, true, 0, r / 8)
+    machine_append_byte(b.text, 193)
+    machine_modrm(b, 3, machine_shift_ext(op), r)
+    machine_append_byte(b.text, imm)
 }
 
 fun machine_emit_movx_reg_mem(b: MachineBuilder, op: str, dst: str, base: str, disp: i64, size: i64): void {
@@ -761,7 +803,7 @@ fun machine_emit_cmp_inst(b: MachineBuilder, ops: X64Operand[]): bool {
         X64RegOperand left: {
             match ops[1] {
                 X64ImmOperand right: {
-                    machine_emit_cmp_reg_imm(b, left.name, right.value)
+                    machine_emit_reg_imm_alu(b, "cmp", left.name, right.value)
                     ret true
                 }
                 X64RegOperand right: {
@@ -904,6 +946,25 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
+    if op == "imul" && len(ops) == 3 {
+        match ops[0] {
+            X64RegOperand dst: {
+                match ops[1] {
+                    X64RegOperand src: {
+                        match ops[2] {
+                            X64ImmOperand imm: {
+                                machine_emit_imul_reg_reg_imm(b, dst.name, src.name, imm.value)
+                                ret
+                            }
+                            _: {}
+                        }
+                    }
+                    _: {}
+                }
+            }
+            _: {}
+        }
+    }
     if (op == "add" || op == "sub" || op == "and" || op == "or" || op == "xor") && len(ops) == 2 {
         match ops[0] {
             X64RegOperand dst: {
@@ -913,10 +974,8 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
                         ret
                     }
                     X64ImmOperand imm: {
-                        if op == "add" {
-                            machine_emit_add_reg_imm(b, dst.name, imm.value)
-                            ret
-                        }
+                        machine_emit_reg_imm_alu(b, op, dst.name, imm.value)
+                        ret
                     }
                     _: {}
                 }
@@ -952,11 +1011,22 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
     }
     if (op == "movzx" || op == "movsx") && machine_emit_movx_inst(b, op, ops) { ret }
     if op == "movsxd" && machine_emit_movsxd_inst(b, ops) { ret }
-    if (op == "shl" || op == "sar" || op == "shr") && len(ops) == 2 && machine_is_reg(ops[1], "cl") {
+    if (op == "shl" || op == "sar" || op == "shr") && len(ops) == 2 {
         match ops[0] {
             X64RegOperand target: {
-                machine_emit_shift_reg_cl(b, op, target.name)
-                ret
+                match ops[1] {
+                    X64RegOperand count: {
+                        if count.name == "cl" {
+                            machine_emit_shift_reg_cl(b, op, target.name)
+                            ret
+                        }
+                    }
+                    X64ImmOperand count: {
+                        machine_emit_shift_reg_imm(b, op, target.name, count.value)
+                        ret
+                    }
+                    _: {}
+                }
             }
             _: {}
         }

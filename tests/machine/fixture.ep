@@ -78,8 +78,105 @@ fun assert_machine_generic_register_bytes(): void {
     }
 }
 
+fun build_machine_immediate_fixture(): X64Program {
+    let program = x64_program_empty()
+    x64_add_section(program, ".text")
+    x64_add_inst2(program, "add", x64_reg("r10"), x64_imm(-1))
+    x64_add_inst2(program, "or", x64_reg("r9"), x64_imm(4660))
+    x64_add_inst2(program, "and", x64_reg("rsi"), x64_imm(255))
+    x64_add_inst2(program, "sub", x64_reg("r10"), x64_imm(127))
+    x64_add_inst2(program, "xor", x64_reg("r9"), x64_imm(-129))
+    x64_add_inst2(program, "cmp", x64_reg("rsi"), x64_imm(5))
+    x64_add_inst2(program, "shl", x64_reg("r10"), x64_imm(3))
+    x64_add_inst2(program, "shr", x64_reg("rsi"), x64_imm(8))
+    x64_add_inst2(program, "sar", x64_reg("r9"), x64_imm(63))
+    let small_mul = new X64Operand[]
+    small_mul.push(x64_reg("r10"))
+    small_mul.push(x64_reg("r9"))
+    small_mul.push(x64_imm(7))
+    x64_add_inst(program, "imul", small_mul)
+    let wide_mul = new X64Operand[]
+    wide_mul.push(x64_reg("rsi"))
+    wide_mul.push(x64_reg("r10"))
+    wide_mul.push(x64_imm(1000))
+    x64_add_inst(program, "imul", wide_mul)
+    ret program
+}
+
+fun assert_machine_immediate_bytes(): void {
+    let obj = machine_build_object(build_machine_immediate_fixture())
+    let expected = new i64[]
+    expected.push(73)
+    expected.push(131)
+    expected.push(194)
+    expected.push(255)
+    expected.push(73)
+    expected.push(129)
+    expected.push(201)
+    expected.push(52)
+    expected.push(18)
+    expected.push(0)
+    expected.push(0)
+    expected.push(72)
+    expected.push(129)
+    expected.push(230)
+    expected.push(255)
+    expected.push(0)
+    expected.push(0)
+    expected.push(0)
+    expected.push(73)
+    expected.push(131)
+    expected.push(234)
+    expected.push(127)
+    expected.push(73)
+    expected.push(129)
+    expected.push(241)
+    expected.push(127)
+    expected.push(255)
+    expected.push(255)
+    expected.push(255)
+    expected.push(72)
+    expected.push(131)
+    expected.push(254)
+    expected.push(5)
+    expected.push(73)
+    expected.push(193)
+    expected.push(226)
+    expected.push(3)
+    expected.push(72)
+    expected.push(193)
+    expected.push(238)
+    expected.push(8)
+    expected.push(73)
+    expected.push(193)
+    expected.push(249)
+    expected.push(63)
+    expected.push(77)
+    expected.push(107)
+    expected.push(209)
+    expected.push(7)
+    expected.push(73)
+    expected.push(105)
+    expected.push(242)
+    expected.push(232)
+    expected.push(3)
+    expected.push(0)
+    expected.push(0)
+    if len(obj.text) != len(expected) {
+        panic "machine immediate byte length mismatch"
+    }
+    let i = 0
+    for i < len(expected) {
+        if obj.text[i] != expected[i] {
+            panic "machine immediate bytes mismatch"
+        }
+        i = i + 1
+    }
+}
+
 fun main(): void {
     assert_machine_generic_register_bytes()
+    assert_machine_immediate_bytes()
     let index = machine_name_index_new(2)
     machine_name_index_insert(index, "symbol_0", 7)
     machine_name_index_insert(index, "symbol_8", 11)

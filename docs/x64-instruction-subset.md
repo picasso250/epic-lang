@@ -176,9 +176,9 @@ ret
 | `jo/jz/jnz/jl/jge/jle/jg/jns` | `jcc LabelRef` |
 | `cqo` | no operands |
 | `idiv/div` | `idiv r64`, `div r64`; dividend/result still use implicit `RDX:RAX` |
-| `imul` | `imul r64, r64` |
+| `imul` | `imul r64, r64`, `imul r64, r64, imm8/imm32` |
 | `neg` | `neg r64` |
-| `cmp` | `cmp r64, r64`, `cmp r64, imm32/imm8` |
+| `cmp` | `cmp r64, r64`, `cmp r64, imm8/imm32` |
 | `sete/setne/setg/setl/setge/setle` | target `al` |
 | `movzx` | `movzx eax, al` |
 | `movsx` | `movsx r64, byte/word [r64+disp]` |
@@ -186,10 +186,11 @@ ret
 | `movsxd` | `movsxd r64, dword [r64+disp]` |
 | `test` | intended contract: `test r64, same r64` |
 | `xor` | `xor r64, r64` |
-| `shl/sar/shr` | `op r64, cl`; variable count remains fixed to `cl` |
+| `shl/sar/shr` | `op r64, cl`, `op r64, imm8` |
 | `inc/dec` | `inc r64`, `dec r64` |
 | `add/sub/and/or/xor` | `op r64, r64` |
-| `add` | `add r64, imm8`, `add r8, imm8` |
+| `add/or/and/sub/xor` | `op r64, imm8/imm32`; immediate is sign-extended |
+| `add` | `add r8, imm8` |
 | `mov` | forms listed below |
 | `lea` | `lea r64, [symbol]`, `lea r64, [base+disp]` |
 
@@ -251,15 +252,17 @@ ret
 | 形式 | 状态 | 说明 |
 |------|------|------|
 | `add/sub/and/or/xor r64, r64` | ✅ | 二地址运算 |
-| `add/sub r64, imm8` | ✅ | 仅有 `add` 支持 imm8；`sub` 当前未直接使用此形式 |
+| `add/or/and/sub/xor r64, imm8/imm32` | ✅ | Group 1 immediate encoding; imm32 is sign-extended |
 | `add r8, imm8` | ✅ | byte arithmetic |
 | `cmp r64, r64` | ✅ | |
 | `cmp r64, imm32/imm8` | ✅ | imm32 和 imm8 均支持 |
 | `test r64, r64` | ✅ | 当前合约只允许两个 operand 相同寄存器 |
 | `test r64, imm` | ❌ 不支持 | |
 | `neg r64` | ✅ | Group 3 `/3` encoding |
-| `shl/sar/shr r64, cl` | ✅ | target is generic; count register is architecturally fixed |
+| `shl/sar/shr r64, cl` | ✅ | target is generic; variable count register is architecturally fixed |
+| `shl/sar/shr r64, imm8` | ✅ | constant shift count |
 | `imul r64, r64` | ✅ | two-operand low-64-bit multiply |
+| `imul r64, r64, imm8/imm32` | ✅ | three-operand signed immediate multiply |
 | `cqo; idiv r64` | ✅ | dividend and quotient/remainder use implicit `RDX:RAX` |
 | `div r64` | ✅ | dividend and quotient/remainder use implicit `RDX:RAX` |
 
@@ -389,7 +392,7 @@ imports.
 `MachineObjectBuilder.__init__()`. The two previously risky forms are covered:
 
 - `test a, b` is rejected unless both operands are the same register.
-- `add r64, imm` rejects immediates outside signed imm8 for the current encoder path.
+- 64-bit Group 1 ALU and `imul` immediate forms accept signed imm32 values; larger constants require a register operand.
 - `call Symbol` requires a defined or declared symbol.
 
 Recommended next step: keep validator tests next to each newly supported X64IR
