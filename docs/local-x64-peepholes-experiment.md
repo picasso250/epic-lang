@@ -182,14 +182,48 @@ jl  <-> jge
 程序仍删除对应 trailing jump。P4 三个 wall samples 为
 `2067.156 / 2053.531 / 2063.102 ms`，全部快于 P3。
 
+## P5: complete canonical Jcc support
+
+Machine originally encoded only `jz/jnz/jl/jle/jge`, even though MIR and `setcc` already represented the
+full signed and unsigned integer comparison set. P5 adds the 16 canonical near-Jcc spellings:
+
+```text
+jo  jno  jb  jae  jz  jnz  jbe  ja
+js  jns  jp  jnp  jl  jge  jle  jg
+```
+
+No aliases such as `je`, `jc`, or `jnae` are added. A single `machine_jcc_opcode` mapping is shared by
+validation and encoding. The inverse mapping now covers all eight pairs, and terminal compare fusion directly
+supports all ten integer MIR predicates:
+
+```text
+eq/ne
+slt/sle/sgt/sge
+ult/ule/ugt/uge
+```
+
+Exact opcode-byte tests cover `0F 80` through `0F 8F`; targeted MIR tests verify every predicate maps to its
+canonical Jcc, while comparison results used as ordinary values still materialize `setcc + movzx`.
+
+| 指标 | P5 | 相对 P4 |
+|---|---:|---:|
+| wall median | 2012.244 ms | -50.858 ms, -2.47% |
+| X64 items | 146,864 | +32 |
+| `.text` bytes | 669,702 | +81 B |
+| exe size | 709,120 B | +512 B |
+
+P5 wall samples 为 `2009.718 / 2012.244 / 2016.610 ms`，全部快于 P4 的三个样本。新增完整
+encoder/helper 使确定性体积略增，但幅度很小；最终 exe 仍比 frozen v0 的 711,680 B 小
+2,560 B。该结果满足“完整性收益且无明显 time/size 回退”的接受标准。
+
 ## Cumulative result
 
-| 指标 | `dev@3150ec0` | P4 final | 累计变化 |
+| 指标 | `dev@3150ec0` | P5 final | 累计变化 |
 |---|---:|---:|---:|
-| wall median | 3174.657 ms | 2063.102 ms | -1111.555 ms, -35.01% |
-| X64 items | 179,451 | 146,832 | -32,619, -18.18% |
-| `.text` bytes | 790,502 | 669,621 | -120,881 B, -15.29% |
-| exe size | 829,440 B | 708,608 B | -120,832 B, -14.57% |
+| wall median | 3174.657 ms | 2012.244 ms | -1162.413 ms, -36.62% |
+| X64 items | 179,451 | 146,864 | -32,587, -18.16% |
+| `.text` bytes | 790,502 | 669,702 | -120,800 B, -15.28% |
+| exe size | 829,440 B | 709,120 B | -120,320 B, -14.51% |
 
 代表性 final fixed-point run 的 peak working set 约 88.6 MiB，原始基线约 94 MiB。内存值仅作
 诊断，性能结论仍以 3 次等价 self-host wall samples 为准。
@@ -203,7 +237,8 @@ jl  <-> jge
 - 81 e2e；
 - 8 examples；
 - GC stress/tiny；
-- targeted direct-alloca、reload、fallthrough、branch-fusion tests；
+- targeted direct-alloca、reload、fallthrough、all-predicate branch-fusion tests；
+- exact byte tests for all 16 canonical Jcc opcodes and all eight inverse pairs；
 - `git diff --check`。
 
 ## Conclusion
@@ -216,5 +251,4 @@ jl  <-> jge
 - 同时产生显著 wall、instruction count 和 executable size 收益。
 
 后续优先级已经明显下降：不同寄存器的 store/reload 只能把 memory reload 改成 register move，
-不直接减少指令数；unsigned compare fusion 只有约几十个机会且需要扩张 machine jcc subset；完整
-register allocation 的历史实验则有明显 self-host complexity cost。
+不直接减少指令数；完整 register allocation 的历史实验则有明显 self-host complexity cost。

@@ -234,9 +234,10 @@ _store_result(inst.result, "rax")
 
 Ordered predicate 的 signedness 由 opcode 明确表达。
 
-当 block 最后一条 instruction 是 `icmp.eq/ne/slt/sgt/sle/sge`，且紧随的 `condbr` 直接消费
-该 block-local result 时，lowering 发射 `cmp + jcc`，不再物化 `setcc + movzx` bool。
-普通 value use 与 unsigned predicate 保持原有物化路径。
+当 block 最后一条 instruction 是任一整数 `icmp`，且紧随的 `condbr` 直接消费该
+block-local result 时，lowering 发射 `cmp + jcc`，不再物化 `setcc + movzx` bool。
+映射为 `jz/jnz`、signed `jl/jle/jg/jge` 或 unsigned `jb/jbe/ja/jae`。普通 value use 仍保持
+原有物化路径。
 
 ### 5.6 `ptrtoint`
 

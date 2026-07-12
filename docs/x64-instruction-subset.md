@@ -173,7 +173,7 @@ ret
 | `sub/add` | `sub rsp, imm`, `add rsp, imm` |
 | `call` | `call Symbol` |
 | `jmp` | `jmp LabelRef` |
-| `jo/jz/jnz/jl/jge/jle/jg/jns` | `jcc LabelRef` |
+| `jo/jno/jb/jae/jz/jnz/jbe/ja/js/jns/jp/jnp/jl/jge/jle/jg` | canonical near `jcc LabelRef` forms |
 | `cqo` | no operands |
 | `idiv/div` | `idiv r64`, `div r64`; dividend/result still use implicit `RDX:RAX` |
 | `imul` | `imul r64, r64`, `imul r64, r64, imm8/imm32` |
@@ -432,8 +432,8 @@ X64IR construction performs only adjacency-proven simplifications:
 
 - remove `mov reg, [mem]` immediately following `mov [mem], reg` when reg/base/disp/width all match;
 - remove `jmp label` when `label` is bound immediately afterward;
-- rewrite `jcc next; jmp other; next:` to `inverse-jcc other; next:` for the existing
-  `jz/jnz` and `jl/jge` inverse pairs.
+- rewrite `jcc next; jmp other; next:` to `inverse-jcc other; next:` for all canonical inverse pairs:
+  `jo/jno`, `jb/jae`, `jz/jnz`, `jbe/ja`, `js/jns`, `jp/jnp`, `jl/jge`, and `jle/jg`.
 
 A label or any intervening X64IR item blocks these rewrites. This is local instruction selection, not a CFG or
 register-allocation pass. Measurement and safety details are recorded in
