@@ -1614,11 +1614,8 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     st.current_block = end_flow.block
     let local_count = len(st.local_names)
     let var_addr = mir_alloc_local(st, stmt.name, "i64")
-    let end_name = (("__" + stmt.name) + (".end" + str(st.value_counter)))
-    let end_addr = mir_alloc_local(st, end_name, "i64")
 
     mir_emit_inst(st, mir_store(start_flow.value, var_addr))
-    mir_emit_inst(st, mir_store(end_flow.value, end_addr))
 
     let cond_block = mir_new_block(st, "for.cond")
     let body_block = mir_new_block(st, "for.body")
@@ -1630,11 +1627,9 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     st.current_block = cond_block
     let cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(cur_name, "i64", "i64", var_addr))
-    let end_load_name = mir_new_value(st)
-    mir_emit_inst(st, mir_load(end_load_name, "i64", "i64", end_addr))
     let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
     cond_inst.operands.push(mir_value_operand("i64", cur_name))
-    cond_inst.operands.push(mir_value_operand("i64", end_load_name))
+    cond_inst.operands.push(end_flow.value)
     mir_emit_inst(st, cond_inst)
     st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_id), body_block.name, end_block.name)
     st.current_block.has_terminator = true

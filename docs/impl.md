@@ -207,7 +207,7 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
-- **循环降级**：条件 `for` 解析为 `Loop` AST，降级为 condition/body/end blocks。`ForRange` 对 `start`、`end` 从左到右各求值一次并保存到 local slot，使用 condition/body/increment/end blocks；`continue` 指向 increment，`break` 指向 end。源码没有隐式数组迭代 AST 或 iterable 协议，数组索引必须显式写 `for i: 0:len(xs)`。
+- **循环降级**：条件 `for` 解析为 `Loop` AST，降级为 condition/body/end blocks。`ForRange` 对 `start`、`end` 从左到右各求值一次；cursor 保存到 local slot，不可变的 `end` 直接作为跨 block MIR value 复用，使用 condition/body/increment/end blocks；`continue` 指向 increment，`break` 指向 end。源码没有隐式数组迭代 AST 或 iterable 协议，数组索引必须显式写 `for i: 0:len(xs)`。
 - **复合赋值降级**：Parser 为所有 `op=` 语句生成 `AstAssignOp`；Sema 只接受类型完全相同的整数左值和右值。AST-to-MIR 对局部变量保存其 slot 地址；对字段先求值 object 并计算一次 `gep` 地址；对数组下标先求值并保存 base 与 index。随后先 `load`/调用 slice get 读取旧值，再求值 RHS，发射对应整数 MIR op，按目标窄整数类型规范化，最后写回先前捕获的地址或用同一 base/index 调用 slice set。因此左值定位表达式不会重复求值，且 RHS 对同一目标的中途修改会被最终写回覆盖。
 - **Map 删除**：内建 map 类型、语法、sema/codegen 分支和 MIR runtime helper 均已删除。需要名称查找的编译器代码使用显式数组与线性查询。
 - **字符串运算**：`str == str` / `!=` 调用 `__ep_str_eq` 做按字节内容比较；`str + str` 调用 `__ep_str_cat`，分配新的 header 和连续字节区并复制两侧内容。字符串排序比较在 sema 拒绝；`str += str` 也拒绝，避免暗示原地扩容或共享 buffer 修改。
