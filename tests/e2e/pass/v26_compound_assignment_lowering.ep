@@ -1,0 +1,73 @@
+# EXIT: 0
+
+struct Counter {
+    lhs_calls: i64
+    rhs_calls: i64
+}
+
+struct Box {
+    value: i64
+    small: u8
+    signed: i16
+}
+
+fun next_index(counter: Counter): i64 {
+    counter.lhs_calls += 1
+    ret 0
+}
+
+fun array_rhs(counter: Counter, xs: i64[]): i64 {
+    counter.rhs_calls += 1
+    xs[0] = 100
+    ret 3
+}
+
+fun field_rhs(counter: Counter, box: Box): i64 {
+    counter.rhs_calls += 1
+    box.value = 100
+    ret 4
+}
+
+fun run(): i64 {
+    let counter = new Counter {}
+
+    let xs = new i64[1]
+    xs[0] = 5
+    xs[next_index(counter)] += array_rhs(counter, xs)
+    if counter.lhs_calls != 1 { ret 10 }
+    if counter.rhs_calls != 1 { ret 11 }
+    if xs[0] != 8 { ret 12 }
+
+    let boxes = new Box[1]
+    boxes[0] = new Box { value: 7, small: u8(255), signed: i16(32767) }
+    boxes[next_index(counter)].value += field_rhs(counter, boxes[0])
+    if counter.lhs_calls != 2 { ret 20 }
+    if counter.rhs_calls != 2 { ret 21 }
+    if boxes[0].value != 11 { ret 22 }
+
+    boxes[0].small += u8(1)
+    if i64(boxes[0].small) != 0 { ret 30 }
+    boxes[0].signed += i16(1)
+    if i64(boxes[0].signed) != (0 - 32768) { ret 31 }
+    boxes[0].signed >>= i16(1)
+    if i64(boxes[0].signed) != (0 - 16384) { ret 32 }
+
+    let words = new u32[1]
+    words[0] = u32(4294967295)
+    words[0] += u32(1)
+    if u64(words[0]) != u64(0) { ret 40 }
+
+    let quotient: u32 = u32(4294967295)
+    quotient /= u32(2)
+    if u64(quotient) != u64(2147483647) { ret 50 }
+
+    let signed: i16 = i16(32767)
+    signed += i16(1)
+    if i64(signed) != (0 - 32768) { ret 60 }
+
+    ret 0
+}
+
+fun main(): void {
+    exit(run())
+}

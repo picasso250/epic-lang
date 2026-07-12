@@ -81,6 +81,7 @@ text MIR 只是 pretty printer 输出，用于：
 - 表达式结果 lowering 成不可变 numeric-ID value，例如 `%2`、`%3`。
 - 变量读取是 `load`。
 - 变量赋值是 `store`。
+- 源码复合赋值由专用 `AstAssignOp` 降级，而不是复制左侧 AST 构造普通二元表达式。lowering 先捕获一次左值位置并读取旧值，再求值 RHS、执行整数 MIR op、规范化窄整数并写回；字段复用同一 `gep` 地址，下标复用同一 base/index。
 - 结构体字段、数组元素、字符串数据等地址通过 `gep` 计算，再由 `load/store` 访问。
 - heap 分配是普通 `call`，例如 `call ptr @epic.alloc(i64 %size)`。
 - 复合类型（struct/array/string）不能在栈上分配；所有复合类型实例必须通过 heap 分配的 `ptr` 访问，不可使用 `alloca` 分配。
