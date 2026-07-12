@@ -157,7 +157,6 @@ fun use_adt(): i64 {
 }
 
 fun main(): void {
-    let point_size = sizeof(Point)
     let a = use_scalars()
     let b = use_arrays_and_strings()
     let c = use_structs()
@@ -165,7 +164,6 @@ fun main(): void {
     let e = use_adt()
     let assert = a >= 0
     check(assert)
-    check(point_size == u64(24))
     check(b >= 0)
     check(e == 42)
     println(str(a + b + c + d + e))

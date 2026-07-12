@@ -133,7 +133,7 @@ fun sema_array_elem(t: str): str {
 }
 
 fun sema_is_reserved_func(name: str): bool {
-    if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" || name == "sizeof" {
+    if name == "argv" || name == "print" || name == "println" || name == "exit" || name == "str" || name == "cstr" || name == "bytes" {
         ret true
     }
     if name == "read_file" || name == "write_file" || name == "len" {
@@ -783,12 +783,6 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         AstCall n: {
             ret sema_set_type(node, sema_call_type(st, n))
-        }
-        AstSizeOf n: {
-            if sema_struct_index(st, n.type_name) < 0 {
-                sema_die(f"sizeof expects user struct type, got {n.type_name}")
-            }
-            ret sema_set_type(node, "u64")
         }
         AstDotCall n: {
             ret sema_set_type(node, sema_dot_call_type(st, n))

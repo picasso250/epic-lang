@@ -156,17 +156,6 @@ fun mir_storage_align(storage_type: str): i64 {
     ret mir_storage_size(storage_type)
 }
 
-fun mir_registered_struct_size(st: MirCodegenState, struct_name: str): i64 {
-    for i: 0:len(st.program.struct_layouts) {
-        let layout = st.program.struct_layouts[i]
-        if layout.name == struct_name {
-            ret layout.size
-        }
-    }
-    ast_to_mir_die(f"missing struct layout: {struct_name}")
-    ret 0
-}
-
 fun mir_union_member_layout(union_name: str, member_name: str, tag: i64): MirUnionMemberLayout {
     ret new MirUnionMemberLayout { union_name: union_name, member_name: member_name, tag: tag }
 }
@@ -1250,9 +1239,6 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         }
         AstDotCall n: {
             ret mir_emit_dot_call(st, block, n)
-        }
-        AstSizeOf n: {
-            ret mir_value_flow(mir_const_int("i64", mir_registered_struct_size(st, n.type_name)), st.current_block)
         }
         AstCall n: {
             if n.name == "println" {

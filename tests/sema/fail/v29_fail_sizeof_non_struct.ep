@@ -1,5 +1,0 @@
-# COMPILE_FAIL_CONTAINS: sizeof expects user struct type, got u64
-
-fun main(): void {
-    let n = sizeof(u64)
-}

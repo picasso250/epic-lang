@@ -1,5 +1,4 @@
 # EXIT: 0
-# STDOUT: 16
 # STDOUT: true
 
 struct WinSystemTime {
@@ -18,6 +17,5 @@ extern "kernel32.dll" fun GetSystemTime(value: WinSystemTime): void
 fun main(): void {
     let now = new WinSystemTime
     GetSystemTime(now)
-    println(str(sizeof(WinSystemTime)))
     println(str(now.month >= u16(1) && now.month <= u16(12)))
 }

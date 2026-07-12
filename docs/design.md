@@ -415,7 +415,6 @@ let source = str(read_file(path))
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
 | `cstr(s: str): u64`                    | 检查并返回可传给 C API 的 NUL 结尾地址值    |
-| `sizeof(T): u64`                        | 返回用户 struct 的 natural-layout 字节大小  |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 
@@ -451,7 +450,7 @@ extern scalar 参数和返回值允许 `u8`、`i16`、`u16`、`i32`、`u32`、`i
 
 extern 参数还可使用非空的 FFI-safe 用户 struct。此时源码参数 `value: T` **固定表示同步 borrowed `T*`**，不是 C by-value `T`；lowering 直接传递 Epic heap-backed struct payload 的稳定地址。FFI-safe struct 的字段只允许整数 scalar，不允许 `bool`、`str`、array、其他 struct 或 ADT。Win32 `BOOL` 应写作 `i32`，一字节 `BOOLEAN` 才写作 `u8`。nested C struct 第一版使用字段 flatten，C union/bitfield 使用相同大小的整数 raw storage 表达。
 
-struct extern 返回值和 struct by-value 参数均不支持。只有在用户已经独立确认目标 ABI 把 1/2/4/8 字节 aggregate 放在普通整数 lane 时，才可把它手工声明成对应整数并用位运算解码；未使用高位必须由用户 mask。`sizeof(T)` 只接受用户 struct，返回该类型 natural layout 的字节大小，适合初始化 `cbSize`/`dwLength` 字段。
+struct extern 返回值和 struct by-value 参数均不支持。只有在用户已经独立确认目标 ABI 把 1/2/4/8 字节 aggregate 放在普通整数 lane 时，才可把它手工声明成对应整数并用位运算解码；未使用高位必须由用户 mask。Epic 不公开 `sizeof`；需要 `cbSize`/`dwLength` 时使用目标 ABI 文档或独立布局工具取得常量。
 
 extern struct pointer 只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。当前没有 callback/function pointer，因此 extern 调用期间不会重新进入 Epic；未来若开放 callback，需要重新审视 safepoint 和 root 契约。
 

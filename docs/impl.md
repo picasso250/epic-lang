@@ -170,7 +170,7 @@ storage size 分别为 1/2/4/8 字节；reference 始终按 8 字节对齐。后
 Epic 表达式值仍统一经过 64-bit value representation：窄字段 load 后符号扩展或零扩展，store 时仅写目标
 lane。heap allocation 使用显式 struct size；`gep struct` 的 element stride 同样使用该 size。
 
-Extern FFI 可把只含整数 scalar 字段的非空用户 struct 作为同步 borrowed pointer 参数。Sema 在 extern 声明处拒绝 `bool`、reference、nested struct 和 ADT 字段；AST-to-MIR 将该参数类型降低为 `ptr`，现有 Windows x64 call lowering 直接传 payload 地址。该规则不表示 C by-value aggregate，也不允许 struct 返回。`sizeof(T)` 是专用 AST 表达式，Sema 只接受用户 struct，AST-to-MIR 从已注册的 `MirStructLayout.size` 生成整数常量。
+Extern FFI 可把只含整数 scalar 字段的非空用户 struct 作为同步 borrowed pointer 参数。Sema 在 extern 声明处拒绝 `bool`、reference、nested struct 和 ADT 字段；AST-to-MIR 将该参数类型降低为 `ptr`，现有 Windows x64 call lowering 直接传 payload 地址。该规则不表示 C by-value aggregate，也不允许 struct 返回。
 
 ### ADT (Algebraic Data Types)
 
