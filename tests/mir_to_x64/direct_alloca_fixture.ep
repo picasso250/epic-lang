@@ -1,0 +1,61 @@
+fun main(): void {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("direct_alloca", "i64")
+    fn.params.push(new MirParam { typ: "ptr", value_id: 1 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(mir_alloca(2, "i64"))
+    entry.instructions.push(mir_store(mir_const_int("i64", 7), mir_value_operand("ptr", 2)))
+    entry.instructions.push(mir_load(3, "i64", "i64", mir_value_operand("ptr", 2)))
+    entry.instructions.push(mir_alloca(4, "i8"))
+    entry.instructions.push(mir_store_as(mir_const_int("i64", 255), "i8", mir_value_operand("ptr", 4)))
+    entry.instructions.push(mir_load(5, "i64", "i8", mir_value_operand("ptr", 4)))
+    entry.instructions.push(mir_load(6, "i64", "i64", mir_value_operand("ptr", 1)))
+    entry.terminator = mir_ret_value(mir_value_operand("i64", 3))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+
+    let lowered = mir_to_x64_lower_function_with_program(program, fn)
+    let direct_qword_store = false
+    let direct_qword_load = false
+    let direct_byte_store = false
+    let direct_byte_load = false
+    let indirect_pointer_load = false
+    let alloca_lea = false
+    for i: 0:len(lowered.items) {
+        match lowered.items[i] {
+            X64InstItem inst: {
+                if inst.op == "lea" && len(inst.operands) == 2 {
+                    match inst.operands[1] {
+                        X64MemBaseOperand mem: { if mem.base == "rbp" { alloca_lea = true } }
+                        _: {}
+                    }
+                }
+                if len(inst.operands) == 2 {
+                    match inst.operands[0] {
+                        X64MemBaseOperand dst: {
+                            if dst.base == "rbp" && dst.size == 8 { direct_qword_store = true }
+                            if dst.base == "rbp" && dst.size == 1 { direct_byte_store = true }
+                        }
+                        X64RegOperand dst: {
+                            match inst.operands[1] {
+                                X64MemBaseOperand src: {
+                                    if src.base == "rbp" && src.size == 8 && dst.name == "rax" { direct_qword_load = true }
+                                    if src.base == "rbp" && src.size == 1 && dst.name == "rax" { direct_byte_load = true }
+                                    if src.base == "rax" && src.size == 8 && dst.name == "rax" { indirect_pointer_load = true }
+                                }
+                                _: {}
+                            }
+                        }
+                        _: {}
+                    }
+                }
+            }
+            _: {}
+        }
+    }
+    if alloca_lea { panic "alloca load/store must not materialize its address" }
+    if !direct_qword_store || !direct_qword_load || !direct_byte_store || !direct_byte_load {
+        panic "alloca load/store must use direct rbp-relative memory"
+    }
+    if !indirect_pointer_load { panic "non-alloca pointer load must remain indirect" }
+}

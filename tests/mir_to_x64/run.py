@@ -15,6 +15,7 @@ def main():
     fixtures = [
         ("layout_fixture.ep", "mir_to_x64_layout.exe", "dynamic struct GEP stride"),
         ("immediate_fixture.ep", "mir_to_x64_immediate.exe", "immediate-aware lowering"),
+        ("direct_alloca_fixture.ep", "mir_to_x64_direct_alloca.exe", "direct alloca memory lowering"),
     ]
     for fixture_name, exe_name, label in fixtures:
         fixture = ROOT / "tests" / "mir_to_x64" / fixture_name
