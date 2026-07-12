@@ -101,6 +101,8 @@ python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
 
 冻结的 `v0` 标签保留历史 Python stage-0 和完整恢复入口；当前分支只维护 Epic 实现，日常 self-hosted 演进从 `epic-v0.exe` 起步。
 
+> **Bootstrap seed 限制：** 冻结 v0 会把无符号 `>>` 错误地编译为算术右移。当前源码只在随后 `& u64(255)` 的字节提取中依赖该操作，因此 stage1 仍然正确；不要在 bootstrap-sensitive 的 `src/` / `runtime/` 中新增一般无符号右移依赖。不要修改或移动 `v0` 标签；需要升级 seed 时应创建新的冻结版本。完整边界见 `docs/impl.md` 的“冻结 v0 seed 的右移限制”。
+
 ## 当前边界
 
 Epic 当前仍有以下明确边界：

@@ -56,6 +56,19 @@ src/epic.ep
 
 当前 `src/epic.ep` 是活跃 driver，能够使用 Epic 编写的 frontend、MIR lowering、X64IR lowering、machine emitter、COFF writer 和 linker 编译用户程序及自身。旧 `src/codegen_support.ep` / `src/codegen.ep` 的 NASM 文本汇编路线已经删除；不要把旧 driver 的历史状态套到当前同名的 `src/epic.ep` 上。
 
+#### 冻结 v0 seed 的右移限制
+
+冻结的 `build/bootstrap-v0/epic-v0.exe` 有一个已知历史缺陷：它把源码层所有 `>>` 都降为算术右移 `sar`，因此不能正确编译一般的无符号右移。当前 self-hosted compiler 已按左操作数类型选择 `sar` / `shr`，但 bootstrap 第一代仍由该冻结 seed 产生。
+
+当前源码之所以仍能从 v0 自举，是因为第一代实际执行的无符号 `>>` 只出现在 linker 的字节提取中，形式为 `(x >> shift) & u64(255)`；`sar` 与 `shr` 的差异只在高位填充，低 8 位经过掩码后相同。不要把这个偶然安全性推广到一般无符号右移。
+
+维护 bootstrap-sensitive 的 `src/` 或 `runtime/` 代码时：
+
+- 不要新增依赖一般无符号 `>>` 结果的控制流、比较、算术或未掩码序列化逻辑，除非明确验证冻结 v0 生成的 stage1 行为以及完整 fixed point。
+- `>>>` / `>>>=` 已从当前语言删除，不能作为兼容旧 seed 的替代写法；即使 v0 能识别，后续 self-hosted generation 也不会接受。
+- 不要回写或移动 `v0` 标签来修复该缺陷。`v0` 是可复现的历史信任起点；需要更强 seed 语义时，应冻结一个新的 seed 版本并保留 v0 不动。
+- `test_bootstrap_fixed_point.py` 必须继续从原始冻结 v0 开始运行；stage2 与 stage3 字节一致才表示当前源码已越过 seed 限制并收敛。
+
 ## 验收检查 (Acceptance)
 
 当前仓库的推荐验收入口是：
