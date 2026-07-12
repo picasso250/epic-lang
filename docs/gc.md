@@ -32,6 +32,9 @@ heap 分配，地址在生命周期内不移动。runtime 长期维护紧凑的 
 - 正常退出时，若进程至少发生过一次 collection，则向 stderr 输出一次累计 allocation profile，
   包含总请求数/字节数、`<=8/16/24/32/64B` 累计桶，以及精确 `16/24/32B` 计数。
 
+当前自举 workload 的 allocation size 分布、固定尺寸结论和 allocator 启示记录在
+[`gc-allocation-profile.md`](gc-allocation-profile.md)。
+
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
 reference 或精确 stack map。公开 WinAPI 调用是同步的；runtime 不承诺管理由
 外部线程持有且未出现在 Epic roots 中的引用。
