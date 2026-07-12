@@ -24,7 +24,7 @@ fun main(): void {
     for i: 0:len(lowered.items) {
         match lowered.items[i] {
             X64InstItem inst: {
-                if inst.op == "lea" && len(inst.operands) == 2 {
+                if inst.op == 2 && len(inst.operands) == 2 { # x64 lea
                     match inst.operands[1] {
                         X64MemBaseOperand mem: { if mem.base == "rbp" { alloca_lea = true } }
                         _: {}

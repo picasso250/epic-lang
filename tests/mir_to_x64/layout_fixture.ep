@@ -23,7 +23,7 @@ fun main(): void {
     for i: 0:len(lowered.items) {
         match lowered.items[i] {
             X64InstItem inst: {
-                if inst.op == "imul" { saw_multiply = true }
+                if inst.op == 31 { saw_multiply = true } # x64 imul
                 for j: 0:len(inst.operands) {
                     match inst.operands[j] {
                         X64ImmOperand imm: { if imm.value == 12 { saw_scale = true } }

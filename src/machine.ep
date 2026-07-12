@@ -332,32 +332,18 @@ fun machine_emit_mov_reg_reg(b: MachineBuilder, dst: str, src: str): void {
     machine_modrm(b, 3, s, d)
 }
 
-fun machine_jcc_opcode(op: str): i64 {
-    if op == "jo" { ret 128 }
-    if op == "jno" { ret 129 }
-    if op == "jb" { ret 130 }
-    if op == "jae" { ret 131 }
-    if op == "jz" { ret 132 }
-    if op == "jnz" { ret 133 }
-    if op == "jbe" { ret 134 }
-    if op == "ja" { ret 135 }
-    if op == "js" { ret 136 }
-    if op == "jns" { ret 137 }
-    if op == "jp" { ret 138 }
-    if op == "jnp" { ret 139 }
-    if op == "jl" { ret 140 }
-    if op == "jge" { ret 141 }
-    if op == "jle" { ret 142 }
-    if op == "jg" { ret 143 }
+fun machine_jcc_opcode(op: i64): i64 {
+    # X64 opcode IDs 8..23 follow near-Jcc byte order 0x80..0x8f.
+    if op >= 8 && op <= 23 { ret 128 + (op - 8) }
     ret -1
 }
 
-fun machine_emit_jump(b: MachineBuilder, op: str, label: X64Label): void {
-    if op == "jmp" {
+fun machine_emit_jump(b: MachineBuilder, op: i64, label: X64Label): void {
+    if op == 7 { # x64 jmp
         machine_append_byte(b.text, 233)
     } else {
         let opcode = machine_jcc_opcode(op)
-        if opcode < 0 { machine_die(("unsupported jump: " + op)) }
+        if opcode < 0 { machine_die(("unsupported jump: " + x64_opcode_text(op))) }
         machine_append_byte(b.text, 15)
         machine_append_byte(b.text, opcode)
     }
@@ -547,17 +533,17 @@ fun machine_emit_cmp_reg_reg(b: MachineBuilder, left: str, right: str): void {
     machine_modrm(b, 3, r, l)
 }
 
-fun machine_alu_opcode(op: str): i64 {
-    if op == "add" { ret 1 }
-    if op == "sub" { ret 41 }
-    if op == "and" { ret 33 }
-    if op == "or" { ret 9 }
-    if op == "xor" { ret 49 }
-    machine_die(("unsupported alu op: " + op))
+fun machine_alu_opcode(op: i64): i64 {
+    if op == 24 { ret 1 } # x64 add
+    if op == 25 { ret 41 } # x64 sub
+    if op == 26 { ret 33 } # x64 and
+    if op == 27 { ret 9 } # x64 or
+    if op == 28 { ret 49 } # x64 xor
+    machine_die(("unsupported alu op: " + x64_opcode_text(op)))
     ret 0
 }
 
-fun machine_emit_reg_reg_alu(b: MachineBuilder, op: str, dst: str, src: str): void {
+fun machine_emit_reg_reg_alu(b: MachineBuilder, op: i64, dst: str, src: str): void {
     let d = machine_reg64(dst)
     let s = machine_reg64(src)
     machine_rex(b, true, s / 8, d / 8)
@@ -572,36 +558,36 @@ fun machine_emit_test_reg_reg(b: MachineBuilder, reg_name: str): void {
     machine_modrm(b, 3, r, r)
 }
 
-fun machine_emit_setcc(b: MachineBuilder, op: str): void {
+fun machine_emit_setcc(b: MachineBuilder, op: i64): void {
     let code = 0
-    if op == "sete" { code = 148 }
-    else if op == "setne" { code = 149 }
-    else if op == "setg" { code = 159 }
-    else if op == "setl" { code = 156 }
-    else if op == "setge" { code = 157 }
-    else if op == "setle" { code = 158 }
-    else if op == "seta" { code = 151 }
-    else if op == "setae" { code = 147 }
-    else if op == "setb" { code = 146 }
-    else if op == "setbe" { code = 150 }
-    else { machine_die(("unsupported setcc: " + op)) }
+    if op == 44 { code = 148 } # x64 sete
+    else if op == 45 { code = 149 } # x64 setne
+    else if op == 46 { code = 159 } # x64 setg
+    else if op == 47 { code = 156 } # x64 setl
+    else if op == 48 { code = 157 } # x64 setge
+    else if op == 49 { code = 158 } # x64 setle
+    else if op == 50 { code = 151 } # x64 seta
+    else if op == 51 { code = 147 } # x64 setae
+    else if op == 52 { code = 146 } # x64 setb
+    else if op == 53 { code = 150 } # x64 setbe
+    else { machine_die(("unsupported setcc: " + x64_opcode_text(op))) }
     machine_append_byte(b.text, 15)
     machine_append_byte(b.text, code)
     machine_append_byte(b.text, 192)
 }
 
-fun machine_group1_ext(op: str): i64 {
-    if op == "add" { ret 0 }
-    if op == "or" { ret 1 }
-    if op == "and" { ret 4 }
-    if op == "sub" { ret 5 }
-    if op == "xor" { ret 6 }
-    if op == "cmp" { ret 7 }
-    machine_die(("unsupported immediate alu op: " + op))
+fun machine_group1_ext(op: i64): i64 {
+    if op == 24 { ret 0 } # x64 add
+    if op == 27 { ret 1 } # x64 or
+    if op == 26 { ret 4 } # x64 and
+    if op == 25 { ret 5 } # x64 sub
+    if op == 28 { ret 6 } # x64 xor
+    if op == 29 { ret 7 } # x64 cmp
+    machine_die(("unsupported immediate alu op: " + x64_opcode_text(op)))
     ret 0
 }
 
-fun machine_emit_reg_imm_alu(b: MachineBuilder, op: str, reg_name: str, imm: i64): void {
+fun machine_emit_reg_imm_alu(b: MachineBuilder, op: i64, reg_name: str, imm: i64): void {
     let ext = machine_group1_ext(op)
     if machine_is_reg8_name(reg_name) {
         if imm < -128 || imm > 255 {
@@ -630,11 +616,11 @@ fun machine_emit_reg_imm_alu(b: MachineBuilder, op: str, reg_name: str, imm: i64
     }
 }
 
-fun machine_emit_inc_dec(b: MachineBuilder, op: str, reg_name: str): void {
+fun machine_emit_inc_dec(b: MachineBuilder, op: i64, reg_name: str): void {
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r / 8)
     machine_append_byte(b.text, 255)
-    if op == "inc" { machine_modrm(b, 3, 0, r) } else { machine_modrm(b, 3, 1, r) }
+    if op == 39 { machine_modrm(b, 3, 0, r) } else { machine_modrm(b, 3, 1, r) } # x64 inc
 }
 
 fun machine_emit_imul_reg_reg(b: MachineBuilder, dst: str, src: str): void {
@@ -664,34 +650,34 @@ fun machine_emit_imul_reg_reg_imm(b: MachineBuilder, dst: str, src: str, imm: i6
     }
 }
 
-fun machine_emit_group3_reg(b: MachineBuilder, op: str, reg_name: str): void {
+fun machine_emit_group3_reg(b: MachineBuilder, op: i64, reg_name: str): void {
     let ext = 0
-    if op == "neg" { ext = 3 }
-    else if op == "div" { ext = 6 }
-    else if op == "idiv" { ext = 7 }
-    else { machine_die(("unsupported group 3 op: " + op)) }
+    if op == 34 { ext = 3 } # x64 neg
+    else if op == 32 { ext = 6 } # x64 div
+    else if op == 33 { ext = 7 } # x64 idiv
+    else { machine_die(("unsupported group 3 op: " + x64_opcode_text(op))) }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r / 8)
     machine_append_byte(b.text, 247)
     machine_modrm(b, 3, ext, r)
 }
 
-fun machine_shift_ext(op: str): i64 {
-    if op == "shl" { ret 4 }
-    if op == "shr" { ret 5 }
-    if op == "sar" { ret 7 }
-    machine_die(("unsupported shift: " + op))
+fun machine_shift_ext(op: i64): i64 {
+    if op == 36 { ret 4 } # x64 shl
+    if op == 37 { ret 5 } # x64 shr
+    if op == 38 { ret 7 } # x64 sar
+    machine_die(("unsupported shift: " + x64_opcode_text(op)))
     ret 0
 }
 
-fun machine_emit_shift_reg_cl(b: MachineBuilder, op: str, reg_name: str): void {
+fun machine_emit_shift_reg_cl(b: MachineBuilder, op: i64, reg_name: str): void {
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r / 8)
     machine_append_byte(b.text, 211)
     machine_modrm(b, 3, machine_shift_ext(op), r)
 }
 
-fun machine_emit_shift_reg_imm(b: MachineBuilder, op: str, reg_name: str, imm: i64): void {
+fun machine_emit_shift_reg_imm(b: MachineBuilder, op: i64, reg_name: str, imm: i64): void {
     if imm < 0 || imm > 255 {
         machine_die(("shift immediate out of byte range: " + str(imm)))
     }
@@ -702,15 +688,15 @@ fun machine_emit_shift_reg_imm(b: MachineBuilder, op: str, reg_name: str, imm: i
     machine_append_byte(b.text, imm)
 }
 
-fun machine_emit_movx_reg_mem(b: MachineBuilder, op: str, dst: str, base: str, disp: i64, size: i64): void {
+fun machine_emit_movx_reg_mem(b: MachineBuilder, op: i64, dst: str, base: str, disp: i64, size: i64): void {
     let d = machine_reg64(dst)
     let base_code = machine_reg64(base)
     machine_rex(b, true, d / 8, base_code / 8)
     machine_append_byte(b.text, 15)
-    if op == "movzx" && size == 1 { machine_append_byte(b.text, 182) }
-    else if op == "movzx" && size == 2 { machine_append_byte(b.text, 183) }
-    else if op == "movsx" && size == 1 { machine_append_byte(b.text, 190) }
-    else if op == "movsx" && size == 2 { machine_append_byte(b.text, 191) }
+    if op == 41 && size == 1 { machine_append_byte(b.text, 182) } # x64 movzx
+    else if op == 41 && size == 2 { machine_append_byte(b.text, 183) } # x64 movzx
+    else if op == 42 && size == 1 { machine_append_byte(b.text, 190) } # x64 movsx
+    else if op == 42 && size == 2 { machine_append_byte(b.text, 191) } # x64 movsx
     else { machine_die(("unsupported movx size: " + str(size))) }
     machine_mem_modrm(b, d, base, disp)
 }
@@ -723,16 +709,16 @@ fun machine_emit_movsxd_reg_mem32(b: MachineBuilder, dst: str, base: str, disp: 
     machine_mem_modrm(b, d, base, disp)
 }
 
-fun machine_emit_rsp_imm(b: MachineBuilder, op: str, imm: i64): void {
+fun machine_emit_rsp_imm(b: MachineBuilder, op: i64, imm: i64): void {
     machine_append_byte(b.text, 72)
     if imm >= 0 && imm <= 127 {
         machine_append_byte(b.text, 131)
-        if op == "sub" { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) }
+        if op == 25 { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) } # x64 sub
         machine_append_byte(b.text, imm)
         ret
     }
     machine_append_byte(b.text, 129)
-    if op == "sub" { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) }
+    if op == 25 { machine_append_byte(b.text, 236) } else { machine_append_byte(b.text, 196) } # x64 sub
     machine_append_i32(b.text, imm)
 }
 
@@ -801,7 +787,7 @@ fun machine_emit_cmp_inst(b: MachineBuilder, ops: X64Operand[]): bool {
         X64RegOperand left: {
             match ops[1] {
                 X64ImmOperand right: {
-                    machine_emit_reg_imm_alu(b, "cmp", left.name, right.value)
+                    machine_emit_reg_imm_alu(b, 29, left.name, right.value) # x64 cmp
                     ret true
                 }
                 X64RegOperand right: {
@@ -837,7 +823,7 @@ fun machine_emit_lea_inst(b: MachineBuilder, ops: X64Operand[]): bool {
     ret false
 }
 
-fun machine_emit_movx_inst(b: MachineBuilder, op: str, ops: X64Operand[]): bool {
+fun machine_emit_movx_inst(b: MachineBuilder, op: i64, ops: X64Operand[]): bool {
     if len(ops) != 2 { ret false }
     match ops[0] {
         X64RegOperand dst: {
@@ -873,20 +859,20 @@ fun machine_emit_movsxd_inst(b: MachineBuilder, ops: X64Operand[]): bool {
     ret false
 }
 
-fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
-    if op == "push" && len(ops) == 1 && machine_is_reg(ops[0], "rbp") {
+fun machine_emit_inst(b: MachineBuilder, op: i64, ops: X64Operand[]): void {
+    if op == 5 && len(ops) == 1 && machine_is_reg(ops[0], "rbp") { # x64 push
         machine_append_byte(b.text, 85)
         ret
     }
-    if op == "pop" && len(ops) == 1 && machine_is_reg(ops[0], "rbp") {
+    if op == 6 && len(ops) == 1 && machine_is_reg(ops[0], "rbp") { # x64 pop
         machine_append_byte(b.text, 93)
         ret
     }
-    if op == "ret" && len(ops) == 0 {
+    if op == 4 && len(ops) == 0 { # x64 ret
         machine_append_byte(b.text, 195)
         ret
     }
-    if (op == "sub" || op == "add") && len(ops) == 2 && machine_is_reg(ops[0], "rsp") {
+    if (op == 25 || op == 24) && len(ops) == 2 && machine_is_reg(ops[0], "rsp") { # x64 sub, add
         match ops[1] {
             X64ImmOperand imm: {
                 machine_emit_rsp_imm(b, op, imm.value)
@@ -895,9 +881,9 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if op == "mov" && machine_emit_mov_inst(b, ops) { ret }
-    if op == "cmp" && machine_emit_cmp_inst(b, ops) { ret }
-    if (op == "jmp" || machine_jcc_opcode(op) >= 0) && len(ops) == 1 {
+    if op == 1 && machine_emit_mov_inst(b, ops) { ret } # x64 mov
+    if op == 29 && machine_emit_cmp_inst(b, ops) { ret } # x64 cmp
+    if (op == 7 || machine_jcc_opcode(op) >= 0) && len(ops) == 1 { # x64 jmp
         match ops[0] {
             X64LabelRefOperand target: {
                 machine_emit_jump(b, op, target.label)
@@ -906,8 +892,8 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if op == "lea" && machine_emit_lea_inst(b, ops) { ret }
-    if op == "call" && len(ops) == 1 {
+    if op == 2 && machine_emit_lea_inst(b, ops) { ret } # x64 lea
+    if op == 3 && len(ops) == 1 { # x64 call
         match ops[0] {
             X64SymbolOperand target: {
                 machine_emit_call_symbol(b, target.name)
@@ -916,12 +902,12 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if op == "cqo" && len(ops) == 0 {
+    if op == 35 && len(ops) == 0 { # x64 cqo
         machine_append_byte(b.text, 72)
         machine_append_byte(b.text, 153)
         ret
     }
-    if (op == "idiv" || op == "div" || op == "neg") && len(ops) == 1 {
+    if (op == 33 || op == 32 || op == 34) && len(ops) == 1 { # x64 idiv, div, neg
         match ops[0] {
             X64RegOperand reg: {
                 machine_emit_group3_reg(b, op, reg.name)
@@ -930,7 +916,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if op == "imul" && len(ops) == 2 {
+    if op == 31 && len(ops) == 2 { # x64 imul
         match ops[0] {
             X64RegOperand dst: {
                 match ops[1] {
@@ -944,7 +930,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if op == "imul" && len(ops) == 3 {
+    if op == 31 && len(ops) == 3 { # x64 imul
         match ops[0] {
             X64RegOperand dst: {
                 match ops[1] {
@@ -963,7 +949,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if (op == "add" || op == "sub" || op == "and" || op == "or" || op == "xor") && len(ops) == 2 {
+    if op >= 24 && op <= 28 && len(ops) == 2 { # x64 add..xor ALU family
         match ops[0] {
             X64RegOperand dst: {
                 match ops[1] {
@@ -981,7 +967,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if op == "test" && len(ops) == 2 {
+    if op == 30 && len(ops) == 2 { # x64 test
         match ops[0] {
             X64RegOperand left: {
                 match ops[1] {
@@ -997,19 +983,19 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if (op == "sete" || op == "setne" || op == "setg" || op == "setl" || op == "setge" || op == "setle" || op == "seta" || op == "setae" || op == "setb" || op == "setbe") && len(ops) == 1 && machine_is_reg(ops[0], "al") {
+    if op >= 44 && op <= 53 && len(ops) == 1 && machine_is_reg(ops[0], "al") { # x64 setcc family
         machine_emit_setcc(b, op)
         ret
     }
-    if op == "movzx" && len(ops) == 2 && machine_is_reg(ops[0], "eax") && machine_is_reg(ops[1], "al") {
+    if op == 41 && len(ops) == 2 && machine_is_reg(ops[0], "eax") && machine_is_reg(ops[1], "al") { # x64 movzx
         machine_append_byte(b.text, 15)
         machine_append_byte(b.text, 182)
         machine_append_byte(b.text, 192)
         ret
     }
-    if (op == "movzx" || op == "movsx") && machine_emit_movx_inst(b, op, ops) { ret }
-    if op == "movsxd" && machine_emit_movsxd_inst(b, ops) { ret }
-    if (op == "shl" || op == "sar" || op == "shr") && len(ops) == 2 {
+    if (op == 41 || op == 42) && machine_emit_movx_inst(b, op, ops) { ret } # x64 movzx, movsx
+    if op == 43 && machine_emit_movsxd_inst(b, ops) { ret } # x64 movsxd
+    if op >= 36 && op <= 38 && len(ops) == 2 { # x64 shift family
         match ops[0] {
             X64RegOperand target: {
                 match ops[1] {
@@ -1029,7 +1015,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    if (op == "inc" || op == "dec") && len(ops) == 1 {
+    if (op == 39 || op == 40) && len(ops) == 1 { # x64 inc, dec
         match ops[0] {
             X64RegOperand target: {
                 machine_emit_inc_dec(b, op, target.name)
@@ -1038,7 +1024,7 @@ fun machine_emit_inst(b: MachineBuilder, op: str, ops: X64Operand[]): void {
             _: {}
         }
     }
-    machine_die(("unsupported instruction: " + op))
+    machine_die(("unsupported instruction: " + x64_opcode_text(op)))
 }
 
 fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
@@ -1073,7 +1059,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             machine_die(("label outside section: " + x64_label_text(it.label)))
         }
         X64InstItem it: {
-            if b.section != ".text" { machine_die(("instruction outside .text: " + it.op)) }
+            if b.section != ".text" { machine_die(("instruction outside .text: " + x64_opcode_text(it.op))) }
             machine_emit_inst(b, it.op, it.operands)
             ret
         }

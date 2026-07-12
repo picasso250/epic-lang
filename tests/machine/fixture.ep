@@ -16,28 +16,28 @@ fun build_machine_x64_fixture(): X64Program {
     let start = x64_new_symbol_label(program, "_start")
     let done = x64_new_label(program)
     x64_bind_label(program, start)
-    x64_add_inst2(program, "mov", x64_reg("rax"), x64_imm(1))
-    x64_add_inst2(program, "cmp", x64_reg("rax"), x64_imm(1))
-    x64_add_inst1(program, "jz", x64_label_ref(done))
-    x64_add_inst2(program, "mov", x64_reg("rax"), x64_imm(2))
+    x64_add_inst2(program, 1, x64_reg("rax"), x64_imm(1)) # x64 mov
+    x64_add_inst2(program, 29, x64_reg("rax"), x64_imm(1)) # x64 cmp
+    x64_add_inst1(program, 12, x64_label_ref(done)) # x64 jz
+    x64_add_inst2(program, 1, x64_reg("rax"), x64_imm(2)) # x64 mov
     x64_bind_label(program, done)
-    x64_add_inst2(program, "lea", x64_reg("rdx"), x64_mem_symbol("msg", 8))
-    x64_add_inst2(program, "mov", x64_reg("rcx"), x64_reg("rax"))
-    x64_add_inst1(program, "call", x64_symbol("ExitProcess"))
-    x64_add_inst0(program, "ret")
+    x64_add_inst2(program, 2, x64_reg("rdx"), x64_mem_symbol("msg", 8)) # x64 lea
+    x64_add_inst2(program, 1, x64_reg("rcx"), x64_reg("rax")) # x64 mov
+    x64_add_inst1(program, 3, x64_symbol("ExitProcess")) # x64 call
+    x64_add_inst0(program, 4) # x64 ret
     ret program
 }
 
 fun build_machine_generic_register_fixture(): X64Program {
     let program = x64_program_empty()
     x64_add_section(program, ".text")
-    x64_add_inst2(program, "imul", x64_reg("r10"), x64_reg("r9"))
-    x64_add_inst1(program, "neg", x64_reg("r10"))
-    x64_add_inst1(program, "idiv", x64_reg("r9"))
-    x64_add_inst1(program, "div", x64_reg("rsi"))
-    x64_add_inst2(program, "shl", x64_reg("r10"), x64_reg("cl"))
-    x64_add_inst2(program, "shr", x64_reg("rsi"), x64_reg("cl"))
-    x64_add_inst2(program, "sar", x64_reg("r9"), x64_reg("cl"))
+    x64_add_inst2(program, 31, x64_reg("r10"), x64_reg("r9")) # x64 imul
+    x64_add_inst1(program, 34, x64_reg("r10")) # x64 neg
+    x64_add_inst1(program, 33, x64_reg("r9")) # x64 idiv
+    x64_add_inst1(program, 32, x64_reg("rsi")) # x64 div
+    x64_add_inst2(program, 36, x64_reg("r10"), x64_reg("cl")) # x64 shl
+    x64_add_inst2(program, 37, x64_reg("rsi"), x64_reg("cl")) # x64 shr
+    x64_add_inst2(program, 38, x64_reg("r9"), x64_reg("cl")) # x64 sar
     ret program
 }
 
@@ -81,25 +81,25 @@ fun assert_machine_generic_register_bytes(): void {
 fun build_machine_immediate_fixture(): X64Program {
     let program = x64_program_empty()
     x64_add_section(program, ".text")
-    x64_add_inst2(program, "add", x64_reg("r10"), x64_imm(-1))
-    x64_add_inst2(program, "or", x64_reg("r9"), x64_imm(4660))
-    x64_add_inst2(program, "and", x64_reg("rsi"), x64_imm(255))
-    x64_add_inst2(program, "sub", x64_reg("r10"), x64_imm(127))
-    x64_add_inst2(program, "xor", x64_reg("r9"), x64_imm(-129))
-    x64_add_inst2(program, "cmp", x64_reg("rsi"), x64_imm(5))
-    x64_add_inst2(program, "shl", x64_reg("r10"), x64_imm(3))
-    x64_add_inst2(program, "shr", x64_reg("rsi"), x64_imm(8))
-    x64_add_inst2(program, "sar", x64_reg("r9"), x64_imm(63))
+    x64_add_inst2(program, 24, x64_reg("r10"), x64_imm(-1)) # x64 add
+    x64_add_inst2(program, 27, x64_reg("r9"), x64_imm(4660)) # x64 or
+    x64_add_inst2(program, 26, x64_reg("rsi"), x64_imm(255)) # x64 and
+    x64_add_inst2(program, 25, x64_reg("r10"), x64_imm(127)) # x64 sub
+    x64_add_inst2(program, 28, x64_reg("r9"), x64_imm(-129)) # x64 xor
+    x64_add_inst2(program, 29, x64_reg("rsi"), x64_imm(5)) # x64 cmp
+    x64_add_inst2(program, 36, x64_reg("r10"), x64_imm(3)) # x64 shl
+    x64_add_inst2(program, 37, x64_reg("rsi"), x64_imm(8)) # x64 shr
+    x64_add_inst2(program, 38, x64_reg("r9"), x64_imm(63)) # x64 sar
     let small_mul = new X64Operand[]
     small_mul.push(x64_reg("r10"))
     small_mul.push(x64_reg("r9"))
     small_mul.push(x64_imm(7))
-    x64_add_inst(program, "imul", small_mul)
+    x64_add_inst(program, 31, small_mul) # x64 imul
     let wide_mul = new X64Operand[]
     wide_mul.push(x64_reg("rsi"))
     wide_mul.push(x64_reg("r10"))
     wide_mul.push(x64_imm(1000))
-    x64_add_inst(program, "imul", wide_mul)
+    x64_add_inst(program, 31, wide_mul) # x64 imul
     ret program
 }
 
@@ -177,23 +177,23 @@ fun assert_machine_immediate_bytes(): void {
 fun build_machine_jcc_fixture(): X64Program {
     let program = x64_program_empty()
     x64_add_section(program, ".text")
-    let ops = new str[]
-    ops.push("jo")
-    ops.push("jno")
-    ops.push("jb")
-    ops.push("jae")
-    ops.push("jz")
-    ops.push("jnz")
-    ops.push("jbe")
-    ops.push("ja")
-    ops.push("js")
-    ops.push("jns")
-    ops.push("jp")
-    ops.push("jnp")
-    ops.push("jl")
-    ops.push("jge")
-    ops.push("jle")
-    ops.push("jg")
+    let ops = new i64[]
+    ops.push(8) # x64 jo
+    ops.push(9) # x64 jno
+    ops.push(10) # x64 jb
+    ops.push(11) # x64 jae
+    ops.push(12) # x64 jz
+    ops.push(13) # x64 jnz
+    ops.push(14) # x64 jbe
+    ops.push(15) # x64 ja
+    ops.push(16) # x64 js
+    ops.push(17) # x64 jns
+    ops.push(18) # x64 jp
+    ops.push(19) # x64 jnp
+    ops.push(20) # x64 jl
+    ops.push(21) # x64 jge
+    ops.push(22) # x64 jle
+    ops.push(23) # x64 jg
     let labels = new X64Label[]
     for i: 0:len(ops) {
         labels.push(x64_new_label(program))
@@ -201,7 +201,7 @@ fun build_machine_jcc_fixture(): X64Program {
     for i: 0:len(ops) {
         x64_add_inst1(program, ops[i], x64_label_ref(labels[i]))
     }
-    x64_add_inst0(program, "ret")
+    x64_add_inst0(program, 4) # x64 ret
     for i: 0:len(labels) {
         x64_bind_label(program, labels[i])
     }

@@ -9,7 +9,7 @@ fun comparison(op: str, result_id: i64, left: MirOperand, right: MirOperand): Mi
     ret inst
 }
 
-fun has_op(program: X64Program, op: str): bool {
+fun has_op(program: X64Program, op: i64): bool {
     for i: 0:len(program.items) {
         match program.items[i] {
             X64InstItem inst: { if inst.op == op { ret true } }
@@ -20,15 +20,15 @@ fun has_op(program: X64Program, op: str): bool {
 }
 
 fun has_materialized_bool(program: X64Program): bool {
-    if has_op(program, "sete") || has_op(program, "setne") { ret true }
-    if has_op(program, "setl") || has_op(program, "setle") { ret true }
-    if has_op(program, "setg") || has_op(program, "setge") { ret true }
-    if has_op(program, "setb") || has_op(program, "setbe") { ret true }
-    if has_op(program, "seta") || has_op(program, "setae") { ret true }
-    ret has_op(program, "movzx") || has_op(program, "test")
+    if has_op(program, 44) || has_op(program, 45) { ret true }
+    if has_op(program, 47) || has_op(program, 49) { ret true }
+    if has_op(program, 46) || has_op(program, 48) { ret true }
+    if has_op(program, 52) || has_op(program, 53) { ret true }
+    if has_op(program, 50) || has_op(program, 51) { ret true }
+    ret has_op(program, 41) || has_op(program, 30)
 }
 
-fun assert_fused(op: str, typ: str, expected_jcc: str): void {
+fun assert_fused(op: str, typ: str, expected_jcc: i64): void {
     let program = mir_program_empty()
     let fused = mir_function_empty("fused", "i64")
     fused.params.push(new MirParam { typ: typ, value_id: 1 })
@@ -47,7 +47,7 @@ fun assert_fused(op: str, typ: str, expected_jcc: str): void {
     fused.blocks.push(no)
     fused.blocks.push(yes)
     let lowered = mir_to_x64_lower_function_with_program(program, fused)
-    if !has_op(lowered, "cmp") || !has_op(lowered, expected_jcc) {
+    if !has_op(lowered, 29) || !has_op(lowered, expected_jcc) {
         panic "terminal icmp must use its canonical direct branch"
     }
     if has_materialized_bool(lowered) {
@@ -66,21 +66,21 @@ fun assert_materialized_value(): void {
     entry.has_terminator = true
     materialized.blocks.push(entry)
     let lowered = mir_to_x64_lower_function_with_program(program, materialized)
-    if !has_op(lowered, "setl") || !has_op(lowered, "movzx") {
+    if !has_op(lowered, 47) || !has_op(lowered, 41) {
         panic "icmp used as a value must remain materialized"
     }
 }
 
 fun main(): void {
-    assert_fused("icmp.eq", "i64", "jz")
-    assert_fused("icmp.ne", "i64", "jnz")
-    assert_fused("icmp.slt", "i64", "jl")
-    assert_fused("icmp.sle", "i64", "jle")
-    assert_fused("icmp.sgt", "i64", "jg")
-    assert_fused("icmp.sge", "i64", "jge")
-    assert_fused("icmp.ult", "u64", "jb")
-    assert_fused("icmp.ule", "u64", "jbe")
-    assert_fused("icmp.ugt", "u64", "ja")
-    assert_fused("icmp.uge", "u64", "jae")
+    assert_fused("icmp.eq", "i64", 12)
+    assert_fused("icmp.ne", "i64", 13)
+    assert_fused("icmp.slt", "i64", 20)
+    assert_fused("icmp.sle", "i64", 22)
+    assert_fused("icmp.sgt", "i64", 23)
+    assert_fused("icmp.sge", "i64", 21)
+    assert_fused("icmp.ult", "u64", 10)
+    assert_fused("icmp.ule", "u64", 14)
+    assert_fused("icmp.ugt", "u64", 15)
+    assert_fused("icmp.uge", "u64", 11)
     assert_materialized_value()
 }

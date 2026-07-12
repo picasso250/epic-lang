@@ -55,7 +55,7 @@ struct X64LabelItem {
 }
 
 struct X64InstItem {
-    op: str
+    op: i64
     operands: X64Operand[]
 }
 
@@ -74,6 +74,75 @@ type X64Item = X64GlobalItem | X64ExternItem | X64SectionItem | X64LabelItem | X
 struct X64Program {
     items: X64Item[]
     label_count: i64
+}
+
+# X64 opcodes use enum-like numeric IDs until Epic gains scalar enum syntax.
+#  1 mov      2 lea      3 call     4 ret      5 push     6 pop
+#  7 jmp      8 jo       9 jno     10 jb      11 jae     12 jz
+# 13 jnz     14 jbe     15 ja      16 js      17 jns     18 jp
+# 19 jnp     20 jl      21 jge     22 jle     23 jg
+# 24 add     25 sub     26 and     27 or      28 xor     29 cmp
+# 30 test    31 imul    32 div     33 idiv    34 neg     35 cqo
+# 36 shl     37 shr     38 sar     39 inc     40 dec
+# 41 movzx   42 movsx   43 movsxd
+# 44 sete    45 setne   46 setg    47 setl    48 setge
+# 49 setle   50 seta    51 setae   52 setb    53 setbe
+
+fun x64_opcode_text(op: i64): str {
+    if op == 1 { ret "mov" }
+    if op == 2 { ret "lea" }
+    if op == 3 { ret "call" }
+    if op == 4 { ret "ret" }
+    if op == 5 { ret "push" }
+    if op == 6 { ret "pop" }
+    if op == 7 { ret "jmp" }
+    if op == 8 { ret "jo" }
+    if op == 9 { ret "jno" }
+    if op == 10 { ret "jb" }
+    if op == 11 { ret "jae" }
+    if op == 12 { ret "jz" }
+    if op == 13 { ret "jnz" }
+    if op == 14 { ret "jbe" }
+    if op == 15 { ret "ja" }
+    if op == 16 { ret "js" }
+    if op == 17 { ret "jns" }
+    if op == 18 { ret "jp" }
+    if op == 19 { ret "jnp" }
+    if op == 20 { ret "jl" }
+    if op == 21 { ret "jge" }
+    if op == 22 { ret "jle" }
+    if op == 23 { ret "jg" }
+    if op == 24 { ret "add" }
+    if op == 25 { ret "sub" }
+    if op == 26 { ret "and" }
+    if op == 27 { ret "or" }
+    if op == 28 { ret "xor" }
+    if op == 29 { ret "cmp" }
+    if op == 30 { ret "test" }
+    if op == 31 { ret "imul" }
+    if op == 32 { ret "div" }
+    if op == 33 { ret "idiv" }
+    if op == 34 { ret "neg" }
+    if op == 35 { ret "cqo" }
+    if op == 36 { ret "shl" }
+    if op == 37 { ret "shr" }
+    if op == 38 { ret "sar" }
+    if op == 39 { ret "inc" }
+    if op == 40 { ret "dec" }
+    if op == 41 { ret "movzx" }
+    if op == 42 { ret "movsx" }
+    if op == 43 { ret "movsxd" }
+    if op == 44 { ret "sete" }
+    if op == 45 { ret "setne" }
+    if op == 46 { ret "setg" }
+    if op == 47 { ret "setl" }
+    if op == 48 { ret "setge" }
+    if op == 49 { ret "setle" }
+    if op == 50 { ret "seta" }
+    if op == 51 { ret "setae" }
+    if op == 52 { ret "setb" }
+    if op == 53 { ret "setbe" }
+    ret "<bad x64 opcode>"
 }
 
 fun x64_reg(name: str): X64Operand {
@@ -136,37 +205,23 @@ fun x64_add_section(program: X64Program, name: str): void {
     program.items.push(new X64Item(new X64SectionItem { name: name }))
 }
 
-fun x64_invert_jcc(op: str): str {
-    if op == "jo" { ret "jno" }
-    if op == "jno" { ret "jo" }
-    if op == "jb" { ret "jae" }
-    if op == "jae" { ret "jb" }
-    if op == "jz" { ret "jnz" }
-    if op == "jnz" { ret "jz" }
-    if op == "jbe" { ret "ja" }
-    if op == "ja" { ret "jbe" }
-    if op == "js" { ret "jns" }
-    if op == "jns" { ret "js" }
-    if op == "jp" { ret "jnp" }
-    if op == "jnp" { ret "jp" }
-    if op == "jl" { ret "jge" }
-    if op == "jge" { ret "jl" }
-    if op == "jle" { ret "jg" }
-    if op == "jg" { ret "jle" }
-    ret ""
+fun x64_invert_jcc(op: i64): i64 {
+    # IDs 8..23 are ordered inverse pairs: jo/jno, jb/jae, ..., jle/jg.
+    if op >= 8 && op <= 23 { ret op ^ 1 }
+    ret 0
 }
 
 fun x64_invert_fallthrough_branch(program: X64Program, label: X64Label): void {
     if len(program.items) < 2 { ret }
     match program.items[len(program.items) - 1] {
         X64InstItem tail: {
-            if tail.op != "jmp" || len(tail.operands) != 1 { ret }
+            if tail.op != 7 || len(tail.operands) != 1 { ret } # x64 jmp
             match tail.operands[0] {
                 X64LabelRefOperand other: {
                     match program.items[len(program.items) - 2] {
                         X64InstItem branch: {
                             let inverse = x64_invert_jcc(branch.op)
-                            if len(inverse) == 0 || len(branch.operands) != 1 { ret }
+                            if inverse == 0 || len(branch.operands) != 1 { ret }
                             match branch.operands[0] {
                                 X64LabelRefOperand fallthrough: {
                                     if fallthrough.label.id != label.id { ret }
@@ -191,7 +246,7 @@ fun x64_drop_fallthrough_jump(program: X64Program, label: X64Label): void {
     if len(program.items) == 0 { ret }
     match program.items[len(program.items) - 1] {
         X64InstItem inst: {
-            if inst.op != "jmp" || len(inst.operands) != 1 { ret }
+            if inst.op != 7 || len(inst.operands) != 1 { ret } # x64 jmp
             match inst.operands[0] {
                 X64LabelRefOperand target: {
                     if target.label.id == label.id {
@@ -211,29 +266,29 @@ fun x64_bind_label(program: X64Program, label: X64Label): void {
     program.items.push(new X64Item(new X64LabelItem { label: label }))
 }
 
-fun x64_add_inst(program: X64Program, op: str, operands: X64Operand[]): void {
+fun x64_add_inst(program: X64Program, op: i64, operands: X64Operand[]): void {
     program.items.push(new X64Item(new X64InstItem { op: op, operands: operands }))
 }
 
-fun x64_add_inst0(program: X64Program, op: str): void {
+fun x64_add_inst0(program: X64Program, op: i64): void {
     x64_add_inst(program, op, new X64Operand[])
 }
 
-fun x64_add_inst1(program: X64Program, op: str, a: X64Operand): void {
+fun x64_add_inst1(program: X64Program, op: i64, a: X64Operand): void {
     let operands = new X64Operand[]
     operands.push(a)
     x64_add_inst(program, op, operands)
 }
 
-fun x64_is_redundant_same_reg_reload(program: X64Program, op: str, a: X64Operand, b: X64Operand): bool {
-    if op != "mov" || len(program.items) == 0 { ret false }
+fun x64_is_redundant_same_reg_reload(program: X64Program, op: i64, a: X64Operand, b: X64Operand): bool {
+    if op != 1 || len(program.items) == 0 { ret false } # x64 mov
     match a {
         X64RegOperand load_reg: {
             match b {
                 X64MemBaseOperand load_mem: {
                     match program.items[len(program.items) - 1] {
                         X64InstItem previous: {
-                            if previous.op != "mov" || len(previous.operands) != 2 { ret false }
+                            if previous.op != 1 || len(previous.operands) != 2 { ret false } # x64 mov
                             match previous.operands[0] {
                                 X64MemBaseOperand store_mem: {
                                     match previous.operands[1] {
@@ -260,7 +315,7 @@ fun x64_is_redundant_same_reg_reload(program: X64Program, op: str, a: X64Operand
     ret false
 }
 
-fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): void {
+fun x64_add_inst2(program: X64Program, op: i64, a: X64Operand, b: X64Operand): void {
     if x64_is_redundant_same_reg_reload(program, op, a, b) { ret }
     let operands = new X64Operand[]
     operands.push(a)
@@ -268,7 +323,7 @@ fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): v
     x64_add_inst(program, op, operands)
 }
 
-fun x64_add_inst3(program: X64Program, op: str, a: X64Operand, b: X64Operand, c: X64Operand): void {
+fun x64_add_inst3(program: X64Program, op: i64, a: X64Operand, b: X64Operand, c: X64Operand): void {
     let operands = new X64Operand[]
     operands.push(a)
     operands.push(b)
@@ -361,9 +416,9 @@ fun x64_item_text(item: X64Item): str {
         }
         X64InstItem it: {
             if len(it.operands) == 0 {
-                ret (("    " + it.op) + "\n")
+                ret (("    " + x64_opcode_text(it.op)) + "\n")
             }
-            ret (((("    " + it.op) + " ") + x64_operands_text(it.operands)) + "\n")
+            ret (((("    " + x64_opcode_text(it.op)) + " ") + x64_operands_text(it.operands)) + "\n")
         }
         X64DataBytesItem it: {
             ret (((it.name + ": db ") + x64_values_text(it.values)) + "\n")

@@ -83,9 +83,14 @@ linker 可见的 text symbol。创建、绑定和引用分别使用
 | `X64Extern(name)` | 声明外部符号；当前 machine layer 收集但不验证引用必须先声明。 |
 | `X64Section(name)` | 切换当前 section；当前支持 `.text`、`.data`。 |
 | `X64Label(id, symbol_name)` | 在当前 section 绑定已分配的 label handle。 |
-| `X64Inst(op, operands)` | `.text` 指令。 |
+| `X64Inst(op, operands)` | `.text` 指令；`op` 内部使用 enum-like `i64` ID，文本 mnemonic 只在 MIR->X64IR、pretty-print 和诊断边界转换。 |
 | `X64DataBytes(label, values)` | `.data` 内定义字节序列。 |
 | `X64DataZero(label, count)` | `.data` 内定义零初始化字节。 |
+
+Opcode ID 的完整表集中在 `src/x64.ep`。在语言获得 scalar enum 之前，生产代码中的数字
+opcode 必须带随行 mnemonic 注释，或处于有明确范围说明的 opcode-family 判断中；不要在其他
+文件建立第二份无注释编号表。Jcc `8..23` 按 canonical near-Jcc byte 顺序排列，相邻 ID 是
+inverse condition。实验与性能数据见 [`x64-opcode-id-experiment.md`](x64-opcode-id-experiment.md)。
 
 操作数：
 

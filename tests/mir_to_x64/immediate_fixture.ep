@@ -43,12 +43,12 @@ fun main(): void {
                 if len(inst.operands) >= 2 {
                     match inst.operands[1] {
                         X64ImmOperand imm: {
-                            if inst.op == "add" && imm.value == 7 { saw_add_7 = true }
-                            if inst.op == "sub" && imm.value == 255 { saw_sub_255 = true }
-                            if inst.op == "and" && imm.value == 255 { saw_and_255 = true }
-                            if inst.op == "shr" && imm.value == 3 { saw_shr_3 = true }
-                            if inst.op == "cmp" && imm.value == 0 { saw_cmp_0 = true }
-                            if inst.op == "mov" {
+                            if inst.op == 24 && imm.value == 7 { saw_add_7 = true } # x64 add
+                            if inst.op == 25 && imm.value == 255 { saw_sub_255 = true } # x64 sub
+                            if inst.op == 26 && imm.value == 255 { saw_and_255 = true } # x64 and
+                            if inst.op == 37 && imm.value == 3 { saw_shr_3 = true } # x64 shr
+                            if inst.op == 29 && imm.value == 0 { saw_cmp_0 = true } # x64 cmp
+                            if inst.op == 1 { # x64 mov
                                 match inst.operands[0] {
                                     X64RegOperand dst: {
                                         if dst.name == "rcx" {
@@ -63,12 +63,12 @@ fun main(): void {
                             }
                         }
                         X64RegOperand right: {
-                            if inst.op == "and" && right.name == "rcx" { saw_large_and_reg = true }
+                            if inst.op == 26 && right.name == "rcx" { saw_large_and_reg = true } # x64 and
                         }
                         _: {}
                     }
                 }
-                if inst.op == "imul" && len(inst.operands) == 3 {
+                if inst.op == 31 && len(inst.operands) == 3 { # x64 imul
                     match inst.operands[2] {
                         X64ImmOperand imm: { if imm.value == 10 { saw_imul_10 = true } }
                         _: {}
