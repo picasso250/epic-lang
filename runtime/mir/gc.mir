@@ -36,7 +36,6 @@ global @gc_small_page_count: i64
 
 global @gc_threshold: i64 = 8388608
 
-global @gc_object_threshold: i64 = 262144
 
 global @gc_stack_high: ptr
 
@@ -1034,36 +1033,20 @@ done:
 
 define void @__ep_gc_update_thresholds() {
 entry:
-  %1: i64 = load i64, ptr gc_object_count
-  %2: i64 = load i64, ptr gc_small_object_count
+  %1: i64 = load i64, ptr gc_large_live_bytes
+  %2: i64 = load i64, ptr gc_small_live_bytes
   %3: i64 = add i64 %1, i64 %2
-  %4: i64 = load i64, ptr gc_large_live_bytes
-  %5: i64 = load i64, ptr gc_small_live_bytes
-  %6: i64 = add i64 %4, i64 %5
-  store i64 %6, ptr gc_live_bytes
-  %26: i64 = mul i64 %3, i64 2
-  %27: bool = icmp.ult i64 %26, i64 262144
-  condbr bool %27, label %object_minimum, label %object_adaptive
-
-object_minimum:
-  store i64 262144, ptr gc_object_threshold
-  br label %bytes_threshold
-
-object_adaptive:
-  store i64 %26, ptr gc_object_threshold
-  br label %bytes_threshold
-
-bytes_threshold:
-  %28: i64 = mul i64 %6, i64 2
-  %29: bool = icmp.ult i64 %28, i64 8388608
-  condbr bool %29, label %bytes_minimum, label %bytes_adaptive
+  store i64 %3, ptr gc_live_bytes
+  %4: i64 = mul i64 %3, i64 2
+  %5: bool = icmp.ult i64 %4, i64 8388608
+  condbr bool %5, label %bytes_minimum, label %bytes_adaptive
 
 bytes_minimum:
   store i64 8388608, ptr gc_threshold
   ret void
 
 bytes_adaptive:
-  store i64 %28, ptr gc_threshold
+  store i64 %4, ptr gc_threshold
   ret void
 }
 
@@ -1400,14 +1383,7 @@ threshold:
   %4: i64 = add i64 %3, i64 %1
   %5: i64 = load i64, ptr gc_threshold
   %6: bool = icmp.uge i64 %4, i64 %5
-  %7: i64 = load i64, ptr gc_object_count
-  %16: i64 = load i64, ptr gc_small_object_count
-  %17: i64 = add i64 %7, i64 %16
-  %8: i64 = add i64 %17, i64 1
-  %9: i64 = load i64, ptr gc_object_threshold
-  %10: bool = icmp.uge i64 %8, i64 %9
-  %11: bool = or bool %6, bool %10
-  condbr bool %11, label %collect, label %allocate
+  condbr bool %6, label %collect, label %allocate
 
 collect:
   call void __ep_gc_collect()

@@ -20,9 +20,10 @@ small allocator reserve 1 GiB 连续虚拟地址 arena，并将它划分为 64 K
 
 ## Collection
 
-- 初始 payload 阈值为 8 MiB，对象数量阈值为 262,144；任一达到即触发
-  collection。每轮 collection 后分别使用 `max(8 MiB, 2 * live_bytes)` 和
-  `max(262,144, 2 * live_objects)`。
+- 初始 heap-pressure 阈值为 8 MiB；达到即触发 collection。每轮 collection 后使用
+  `max(8 MiB, 2 * live_bytes)`。small object 按实际 slab class 的 8/16/24/32B slot
+  大小计入 `live_bytes`，因此该阈值同时反映 small arena 的实际 committed payload
+  压力；不再维护独立对象数量阈值。
 - collection 只为 large objects 临时建立 payload-address hash table 和 mark byte table；
   small candidate 通过 arena range、slab class、slot alignment 和 allocation bitmap
   直接识别。两条路径共用 tagged integer work stack，结束后释放临时 metadata。
@@ -44,6 +45,8 @@ slab 实验的具体实现边界和性能结果记录在
 [`gc-slab-experiment.md`](gc-slab-experiment.md)。
 byte-map 到 bitmap 的后续实验记录在
 [`gc-bitmap-experiment.md`](gc-bitmap-experiment.md)。
+对象数量触发器在 slab allocator 上的删除实验记录在
+[`gc-object-threshold-experiment.md`](gc-object-threshold-experiment.md)。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
 reference 或精确 stack map。公开 WinAPI 调用是同步的；runtime 不承诺管理由
