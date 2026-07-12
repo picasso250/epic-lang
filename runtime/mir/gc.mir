@@ -34,9 +34,27 @@ global @gc_alloc_count: i64
 
 global @gc_alloc_bytes: i64
 
+global @gc_alloc_le8_count: i64
+
+global @gc_alloc_le8_bytes: i64
+
+global @gc_alloc_le16_count: i64
+
+global @gc_alloc_le16_bytes: i64
+
+global @gc_alloc_le24_count: i64
+
+global @gc_alloc_le24_bytes: i64
+
 global @gc_alloc_le32_count: i64
 
 global @gc_alloc_le32_bytes: i64
+
+global @gc_alloc_exact16_count: i64
+
+global @gc_alloc_exact24_count: i64
+
+global @gc_alloc_exact32_count: i64
 
 global @gc_alloc_le64_count: i64
 
@@ -50,9 +68,27 @@ global @str.gc.alloc.total_count: ptr = bytes "gc alloc profile: total_count="
 
 global @str.gc.alloc.total_bytes: ptr = bytes " total_bytes="
 
+global @str.gc.alloc.le8_count: ptr = bytes " le8_count="
+
+global @str.gc.alloc.le8_bytes: ptr = bytes " le8_bytes="
+
+global @str.gc.alloc.le16_count: ptr = bytes " le16_count="
+
+global @str.gc.alloc.le16_bytes: ptr = bytes " le16_bytes="
+
+global @str.gc.alloc.le24_count: ptr = bytes " le24_count="
+
+global @str.gc.alloc.le24_bytes: ptr = bytes " le24_bytes="
+
 global @str.gc.alloc.le32_count: ptr = bytes " le32_count="
 
 global @str.gc.alloc.le32_bytes: ptr = bytes " le32_bytes="
+
+global @str.gc.alloc.exact16_count: ptr = bytes " exact16_count="
+
+global @str.gc.alloc.exact24_count: ptr = bytes " exact24_count="
+
+global @str.gc.alloc.exact32_count: ptr = bytes " exact32_count="
 
 global @str.gc.alloc.le64_count: ptr = bytes " le64_count="
 
@@ -595,18 +631,45 @@ print:
   call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.total_bytes)
   %5: i64 = load i64, ptr gc_alloc_bytes
   call void __ep_gc_write_u64(i64 %3, i64 %5)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_count)
-  %6: i64 = load i64, ptr gc_alloc_le32_count
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le8_count)
+  %6: i64 = load i64, ptr gc_alloc_le8_count
   call void __ep_gc_write_u64(i64 %3, i64 %6)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_bytes)
-  %7: i64 = load i64, ptr gc_alloc_le32_bytes
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le8_bytes)
+  %7: i64 = load i64, ptr gc_alloc_le8_bytes
   call void __ep_gc_write_u64(i64 %3, i64 %7)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_count)
-  %8: i64 = load i64, ptr gc_alloc_le64_count
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le16_count)
+  %8: i64 = load i64, ptr gc_alloc_le16_count
   call void __ep_gc_write_u64(i64 %3, i64 %8)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_bytes)
-  %9: i64 = load i64, ptr gc_alloc_le64_bytes
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le16_bytes)
+  %9: i64 = load i64, ptr gc_alloc_le16_bytes
   call void __ep_gc_write_u64(i64 %3, i64 %9)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le24_count)
+  %10: i64 = load i64, ptr gc_alloc_le24_count
+  call void __ep_gc_write_u64(i64 %3, i64 %10)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le24_bytes)
+  %11: i64 = load i64, ptr gc_alloc_le24_bytes
+  call void __ep_gc_write_u64(i64 %3, i64 %11)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_count)
+  %12: i64 = load i64, ptr gc_alloc_le32_count
+  call void __ep_gc_write_u64(i64 %3, i64 %12)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_bytes)
+  %13: i64 = load i64, ptr gc_alloc_le32_bytes
+  call void __ep_gc_write_u64(i64 %3, i64 %13)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_count)
+  %14: i64 = load i64, ptr gc_alloc_le64_count
+  call void __ep_gc_write_u64(i64 %3, i64 %14)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_bytes)
+  %15: i64 = load i64, ptr gc_alloc_le64_bytes
+  call void __ep_gc_write_u64(i64 %3, i64 %15)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.exact16_count)
+  %16: i64 = load i64, ptr gc_alloc_exact16_count
+  call void __ep_gc_write_u64(i64 %3, i64 %16)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.exact24_count)
+  %17: i64 = load i64, ptr gc_alloc_exact24_count
+  call void __ep_gc_write_u64(i64 %3, i64 %17)
+  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.exact32_count)
+  %18: i64 = load i64, ptr gc_alloc_exact32_count
+  call void __ep_gc_write_u64(i64 %3, i64 %18)
   call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.newline)
   ret void
 
@@ -666,29 +729,89 @@ entry:
   %4: i64 = load i64, ptr gc_alloc_bytes
   %5: i64 = add i64 %4, i64 %1
   store i64 %5, ptr gc_alloc_bytes
-  %6: bool = icmp.ule i64 %1, i64 32
-  condbr bool %6, label %le32, label %check64
+  %6: bool = icmp.ule i64 %1, i64 8
+  condbr bool %6, label %le8, label %check16
+
+le8:
+  %7: i64 = load i64, ptr gc_alloc_le8_count
+  %8: i64 = add i64 %7, i64 1
+  store i64 %8, ptr gc_alloc_le8_count
+  %9: i64 = load i64, ptr gc_alloc_le8_bytes
+  %10: i64 = add i64 %9, i64 %1
+  store i64 %10, ptr gc_alloc_le8_bytes
+  br label %le16
+
+check16:
+  %11: bool = icmp.ule i64 %1, i64 16
+  condbr bool %11, label %le16, label %check24
+
+le16:
+  %12: i64 = load i64, ptr gc_alloc_le16_count
+  %13: i64 = add i64 %12, i64 1
+  store i64 %13, ptr gc_alloc_le16_count
+  %14: i64 = load i64, ptr gc_alloc_le16_bytes
+  %15: i64 = add i64 %14, i64 %1
+  store i64 %15, ptr gc_alloc_le16_bytes
+  %16: bool = icmp.eq i64 %1, i64 16
+  condbr bool %16, label %exact16, label %le24
+
+exact16:
+  %17: i64 = load i64, ptr gc_alloc_exact16_count
+  %18: i64 = add i64 %17, i64 1
+  store i64 %18, ptr gc_alloc_exact16_count
+  br label %le24
+
+check24:
+  %19: bool = icmp.ule i64 %1, i64 24
+  condbr bool %19, label %le24, label %check32
+
+le24:
+  %20: i64 = load i64, ptr gc_alloc_le24_count
+  %21: i64 = add i64 %20, i64 1
+  store i64 %21, ptr gc_alloc_le24_count
+  %22: i64 = load i64, ptr gc_alloc_le24_bytes
+  %23: i64 = add i64 %22, i64 %1
+  store i64 %23, ptr gc_alloc_le24_bytes
+  %24: bool = icmp.eq i64 %1, i64 24
+  condbr bool %24, label %exact24, label %le32
+
+exact24:
+  %25: i64 = load i64, ptr gc_alloc_exact24_count
+  %26: i64 = add i64 %25, i64 1
+  store i64 %26, ptr gc_alloc_exact24_count
+  br label %le32
+
+check32:
+  %27: bool = icmp.ule i64 %1, i64 32
+  condbr bool %27, label %le32, label %check64
 
 le32:
-  %7: i64 = load i64, ptr gc_alloc_le32_count
-  %8: i64 = add i64 %7, i64 1
-  store i64 %8, ptr gc_alloc_le32_count
-  %9: i64 = load i64, ptr gc_alloc_le32_bytes
-  %10: i64 = add i64 %9, i64 %1
-  store i64 %10, ptr gc_alloc_le32_bytes
+  %28: i64 = load i64, ptr gc_alloc_le32_count
+  %29: i64 = add i64 %28, i64 1
+  store i64 %29, ptr gc_alloc_le32_count
+  %30: i64 = load i64, ptr gc_alloc_le32_bytes
+  %31: i64 = add i64 %30, i64 %1
+  store i64 %31, ptr gc_alloc_le32_bytes
+  %32: bool = icmp.eq i64 %1, i64 32
+  condbr bool %32, label %exact32, label %le64
+
+exact32:
+  %33: i64 = load i64, ptr gc_alloc_exact32_count
+  %34: i64 = add i64 %33, i64 1
+  store i64 %34, ptr gc_alloc_exact32_count
   br label %le64
 
 check64:
-  %11: bool = icmp.ule i64 %1, i64 64
-  condbr bool %11, label %le64, label %done
+  %35: bool = icmp.ule i64 %1, i64 64
+  condbr bool %35, label %le64, label %done
 
 le64:
-  %12: i64 = load i64, ptr gc_alloc_le64_count
-  %13: i64 = add i64 %12, i64 1
-  store i64 %13, ptr gc_alloc_le64_count
-  %14: i64 = load i64, ptr gc_alloc_le64_bytes
-  %15: i64 = add i64 %14, i64 %1
-  store i64 %15, ptr gc_alloc_le64_bytes
+  %36: i64 = load i64, ptr gc_alloc_le64_count
+  %37: i64 = add i64 %36, i64 1
+  store i64 %37, ptr gc_alloc_le64_count
+  %38: i64 = load i64, ptr gc_alloc_le64_bytes
+  %39: i64 = add i64 %38, i64 %1
+  store i64 %39, ptr gc_alloc_le64_bytes
   ret void
 
 done:

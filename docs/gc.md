@@ -30,7 +30,7 @@ heap 分配，地址在生命周期内不移动。runtime 长期维护紧凑的 
   side metadata，不调用 `HeapSize`。
 - 每次 stop-the-world collection 完成后向 stderr 输出 `gc stw: <ms> ms`；计时不包含日志写出本身。
 - 正常退出时，若进程至少发生过一次 collection，则向 stderr 输出一次累计 allocation profile，
-  包含总请求数/字节数以及 `<=32B`、`<=64B` 两个累计桶。
+  包含总请求数/字节数、`<=8/16/24/32/64B` 累计桶，以及精确 `16/24/32B` 计数。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
 reference 或精确 stack map。公开 WinAPI 调用是同步的；runtime 不承诺管理由

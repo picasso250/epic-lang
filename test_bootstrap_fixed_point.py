@@ -50,7 +50,10 @@ def print_gc_stw_stats(stderr, label):
 
 GC_ALLOC_PROFILE_RE = re.compile(
     r"^gc alloc profile: total_count=(\d+) total_bytes=(\d+) "
-    r"le32_count=(\d+) le32_bytes=(\d+) le64_count=(\d+) le64_bytes=(\d+)$",
+    r"le8_count=(\d+) le8_bytes=(\d+) le16_count=(\d+) le16_bytes=(\d+) "
+    r"le24_count=(\d+) le24_bytes=(\d+) le32_count=(\d+) le32_bytes=(\d+) "
+    r"le64_count=(\d+) le64_bytes=(\d+) exact16_count=(\d+) "
+    r"exact24_count=(\d+) exact32_count=(\d+)$",
     re.MULTILINE,
 )
 
@@ -61,29 +64,27 @@ def print_gc_alloc_profile(stderr, label):
         return
     if len(matches) != 1:
         raise RuntimeError(f"{label} emitted {len(matches)} GC allocation profiles")
-    total_count, total_bytes, le32_count, le32_bytes, le64_count, le64_bytes = (
-        int(value) for value in matches[0].groups()
-    )
-    mid_count = le64_count - le32_count
-    large_count = total_count - le64_count
-    mid_bytes = le64_bytes - le32_bytes
-    large_bytes = total_bytes - le64_bytes
+    values = [int(value) for value in matches[0].groups()]
+    total_count, total_bytes = values[0], values[1]
+    counts = [values[2], values[4]-values[2], values[6]-values[4], values[8]-values[6], values[10]-values[8], total_count-values[10]]
+    sizes = [values[3], values[5]-values[3], values[7]-values[5], values[9]-values[7], values[11]-values[9], total_bytes-values[11]]
+    names = ["<=8B", "9-16B", "17-24B", "25-32B", "33-64B", ">64B"]
 
     def percent(value, total):
         return 0.0 if total == 0 else value * 100.0 / total
 
     print(
         f"  {label} gc alloc count: total={total_count:,} "
-        + f"<=32B={le32_count:,} ({percent(le32_count, total_count):.2f}%) "
-        + f"33-64B={mid_count:,} ({percent(mid_count, total_count):.2f}%) "
-        + f">64B={large_count:,} ({percent(large_count, total_count):.2f}%)",
+        + " ".join(f"{name}={value:,} ({percent(value, total_count):.2f}%)" for name, value in zip(names, counts)),
         flush=True,
     )
     print(
         f"  {label} gc alloc bytes: total={format_size(total_bytes)} "
-        + f"<=32B={format_size(le32_bytes)} ({percent(le32_bytes, total_bytes):.2f}%) "
-        + f"33-64B={format_size(mid_bytes)} ({percent(mid_bytes, total_bytes):.2f}%) "
-        + f">64B={format_size(large_bytes)} ({percent(large_bytes, total_bytes):.2f}%)",
+        + " ".join(f"{name}={format_size(value)} ({percent(value, total_bytes):.2f}%)" for name, value in zip(names, sizes)),
+        flush=True,
+    )
+    print(
+        f"  {label} gc alloc exact: 16B={values[12]:,} 24B={values[13]:,} 32B={values[14]:,}",
         flush=True,
     )
 
