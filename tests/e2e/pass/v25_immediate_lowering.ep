@@ -1,0 +1,31 @@
+# EXIT: 0
+
+fun run(): i64 {
+    let x: i64 = 5
+    if x + 7 != 12 { ret 1 }
+    if 7 + x != 12 { ret 2 }
+    if x - 200 != (0 - 195) { ret 3 }
+    if (x & 255) != 5 { ret 4 }
+    if (255 & x) != 5 { ret 5 }
+    if (x | 8) != 13 { ret 6 }
+    if (8 | x) != 13 { ret 7 }
+    if (x ^ 255) != 250 { ret 8 }
+    if x * 10 != 50 { ret 9 }
+    if 10 * x != 50 { ret 10 }
+    if (x << 3) != 40 { ret 11 }
+    if (40 >> 3) != 5 { ret 12 }
+    if (u64(40) >>> 3) != u64(5) { ret 13 }
+    if !(3 < x) { ret 14 }
+    if !(8 > x) { ret 15 }
+    if !(5 <= x) { ret 16 }
+    if !(5 >= x) { ret 17 }
+    let mask: u64 = u64(4294967295)
+    let wide: u64 = u64(4294967296)
+    if (wide | mask) != u64(8589934591) { ret 18 }
+    if (wide & mask) != u64(0) { ret 19 }
+    ret 0
+}
+
+fun main(): void {
+    exit(run())
+}

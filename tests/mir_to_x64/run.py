@@ -11,14 +11,19 @@ from compiler_runner import compile_tool
 
 
 def main():
-    fixture = ROOT / "tests" / "mir_to_x64" / "layout_fixture.ep"
     sources = [ROOT / "src" / name for name in ("util.ep", "mir.ep", "x64.ep", "mir_to_x64.ep")]
-    tool = compile_tool(fixture, [*sources, fixture], ROOT / "build" / "tests" / "mir_to_x64_layout.exe")
-    result = subprocess.run([str(tool)], cwd=ROOT, capture_output=True)
-    if result.returncode != 0:
-        print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
-        return 1
-    print("  PASS  dynamic struct GEP stride")
+    fixtures = [
+        ("layout_fixture.ep", "mir_to_x64_layout.exe", "dynamic struct GEP stride"),
+        ("immediate_fixture.ep", "mir_to_x64_immediate.exe", "immediate-aware lowering"),
+    ]
+    for fixture_name, exe_name, label in fixtures:
+        fixture = ROOT / "tests" / "mir_to_x64" / fixture_name
+        tool = compile_tool(fixture, [*sources, fixture], ROOT / "build" / "tests" / exe_name)
+        result = subprocess.run([str(tool)], cwd=ROOT, capture_output=True)
+        if result.returncode != 0:
+            print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
+            return 1
+        print(f"  PASS  {label}")
     return 0
 
 

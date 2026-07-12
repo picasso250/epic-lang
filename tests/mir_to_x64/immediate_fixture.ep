@@ -1,0 +1,90 @@
+fun immediate_binary(op: str, result_id: i64, result_type: str, left: MirOperand, right: MirOperand): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = op
+    inst.result_id = result_id
+    inst.result_type = result_type
+    inst.has_result = true
+    inst.operands.push(left)
+    inst.operands.push(right)
+    ret inst
+}
+
+fun main(): void {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("immediates", "i64")
+    fn.params.push(new MirParam { typ: "i64", value_id: 1 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(immediate_binary("add", 2, "i64", mir_value_operand("i64", 1), mir_const_int("i64", 7)))
+    entry.instructions.push(immediate_binary("sub", 3, "i64", mir_value_operand("i64", 2), mir_const_int("i64", 255)))
+    entry.instructions.push(immediate_binary("and", 4, "i64", mir_value_operand("i64", 3), mir_const_int("i64", 255)))
+    entry.instructions.push(immediate_binary("mul", 5, "i64", mir_value_operand("i64", 4), mir_const_int("i64", 10)))
+    entry.instructions.push(immediate_binary("shr", 6, "i64", mir_value_operand("i64", 5), mir_const_int("i64", 3)))
+    entry.instructions.push(immediate_binary("icmp.slt", 7, "bool", mir_value_operand("i64", 6), mir_const_int("i64", 0)))
+    entry.instructions.push(immediate_binary("add", 8, "i64", mir_const_int("i64", 9), mir_value_operand("i64", 1)))
+    entry.instructions.push(immediate_binary("icmp.slt", 9, "bool", mir_const_int("i64", 8), mir_value_operand("i64", 8)))
+    entry.instructions.push(immediate_binary("and", 10, "i64", mir_value_operand("i64", 8), mir_const_int("i64", 4294967295)))
+    entry.terminator = mir_ret_value(mir_value_operand("i64", 10))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+
+    let lowered = mir_to_x64_lower_function_with_program(program, fn)
+    let saw_add_7 = false
+    let saw_sub_255 = false
+    let saw_and_255 = false
+    let saw_imul_10 = false
+    let saw_shr_3 = false
+    let saw_cmp_0 = false
+    let saw_large_move = false
+    let saw_large_and_reg = false
+    let bad_small_move = false
+    for i: 0:len(lowered.items) {
+        match lowered.items[i] {
+            X64InstItem inst: {
+                if len(inst.operands) >= 2 {
+                    match inst.operands[1] {
+                        X64ImmOperand imm: {
+                            if inst.op == "add" && imm.value == 7 { saw_add_7 = true }
+                            if inst.op == "sub" && imm.value == 255 { saw_sub_255 = true }
+                            if inst.op == "and" && imm.value == 255 { saw_and_255 = true }
+                            if inst.op == "shr" && imm.value == 3 { saw_shr_3 = true }
+                            if inst.op == "cmp" && imm.value == 0 { saw_cmp_0 = true }
+                            if inst.op == "mov" {
+                                match inst.operands[0] {
+                                    X64RegOperand dst: {
+                                        if dst.name == "rcx" {
+                                            if imm.value == 4294967295 { saw_large_move = true }
+                                            if imm.value == 7 || imm.value == 255 || imm.value == 10 || imm.value == 3 || imm.value == 0 || imm.value == 9 {
+                                                bad_small_move = true
+                                            }
+                                        }
+                                    }
+                                    _: {}
+                                }
+                            }
+                        }
+                        X64RegOperand right: {
+                            if inst.op == "and" && right.name == "rcx" { saw_large_and_reg = true }
+                        }
+                        _: {}
+                    }
+                }
+                if inst.op == "imul" && len(inst.operands) == 3 {
+                    match inst.operands[2] {
+                        X64ImmOperand imm: { if imm.value == 10 { saw_imul_10 = true } }
+                        _: {}
+                    }
+                }
+            }
+            _: {}
+        }
+    }
+    if !saw_add_7 || !saw_sub_255 || !saw_and_255 || !saw_imul_10 || !saw_shr_3 || !saw_cmp_0 {
+        panic "right-side constants must lower as immediates"
+    }
+    if !saw_large_move || !saw_large_and_reg {
+        panic "non-encodable immediates must retain register fallback"
+    }
+    if bad_small_move {
+        panic "encodable immediate was unnecessarily loaded into rcx"
+    }
+}

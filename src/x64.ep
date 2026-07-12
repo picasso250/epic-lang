@@ -161,6 +161,14 @@ fun x64_add_inst2(program: X64Program, op: str, a: X64Operand, b: X64Operand): v
     x64_add_inst(program, op, operands)
 }
 
+fun x64_add_inst3(program: X64Program, op: str, a: X64Operand, b: X64Operand, c: X64Operand): void {
+    let operands = new X64Operand[]
+    operands.push(a)
+    operands.push(b)
+    operands.push(c)
+    x64_add_inst(program, op, operands)
+}
+
 fun x64_add_data_bytes(program: X64Program, label: str, values: i64[]): void {
     program.items.push(new X64Item(new X64DataBytesItem { name: label, values: values }))
 }

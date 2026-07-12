@@ -503,7 +503,7 @@ fun mir_to_x64_add_rax_imm(lower: MirToX64Lower, value: i64): void {
     if value == 0 {
         ret
     }
-    if value >= -128 && value <= 127 {
+    if value >= -2147483648 && value <= 2147483647 {
         x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_imm(value))
         ret
     }
@@ -512,9 +512,7 @@ fun mir_to_x64_add_rax_imm(lower: MirToX64Lower, value: i64): void {
 }
 
 fun mir_to_x64_scale_rcx_by_8(lower: MirToX64Lower): void {
-    x64_add_inst2(lower.x64, "add", x64_reg("rcx"), x64_reg("rcx"))
-    x64_add_inst2(lower.x64, "add", x64_reg("rcx"), x64_reg("rcx"))
-    x64_add_inst2(lower.x64, "add", x64_reg("rcx"), x64_reg("rcx"))
+    x64_add_inst2(lower.x64, "shl", x64_reg("rcx"), x64_imm(3))
 }
 
 fun mir_to_x64_add_scaled_index(lower: MirToX64Lower, operand: MirOperand, scale: i64): void {
@@ -533,8 +531,12 @@ fun mir_to_x64_add_scaled_index(lower: MirToX64Lower, operand: MirOperand, scale
     }
     x64_add_inst2(lower.x64, "mov", x64_reg("r11"), x64_reg("rax"))
     mir_to_x64_load_operand(lower, "rax", operand)
-    x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_imm(scale))
-    x64_add_inst2(lower.x64, "imul", x64_reg("rax"), x64_reg("rcx"))
+    if scale >= -2147483648 && scale <= 2147483647 {
+        x64_add_inst3(lower.x64, "imul", x64_reg("rax"), x64_reg("rax"), x64_imm(scale))
+    } else {
+        x64_add_inst2(lower.x64, "mov", x64_reg("rcx"), x64_imm(scale))
+        x64_add_inst2(lower.x64, "imul", x64_reg("rax"), x64_reg("rcx"))
+    }
     x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("r11"))
 }
 
@@ -581,32 +583,56 @@ fun mir_to_x64_is_binary_op(op: str): bool {
 
 fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirInst): void {
     mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-    mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
-    if inst.op == "add" {
-        x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
-    } else if inst.op == "sub" {
-        x64_add_inst2(lower.x64, "sub", x64_reg("rax"), x64_reg("rcx"))
-    } else if inst.op == "and" {
-        x64_add_inst2(lower.x64, "and", x64_reg("rax"), x64_reg("rcx"))
-    } else if inst.op == "or" {
-        x64_add_inst2(lower.x64, "or", x64_reg("rax"), x64_reg("rcx"))
-    } else if inst.op == "xor" {
-        x64_add_inst2(lower.x64, "xor", x64_reg("rax"), x64_reg("rcx"))
-    } else if inst.op == "mul" {
-        x64_add_inst2(lower.x64, "imul", x64_reg("rax"), x64_reg("rcx"))
-    } else if inst.op == "shl" || inst.op == "sar" || inst.op == "shr" {
-        x64_add_inst2(lower.x64, inst.op, x64_reg("rax"), x64_reg("cl"))
-    } else if inst.op == "sdiv" || inst.op == "srem" {
-        x64_add_inst0(lower.x64, "cqo")
-        x64_add_inst1(lower.x64, "idiv", x64_reg("rcx"))
-        if inst.op == "srem" {
-            x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_reg("rdx"))
+    let immediate = false
+    let immediate_value = 0
+    match inst.operands[1] {
+        MirIntOperand value: {
+            if (inst.op == "add" || inst.op == "sub" || inst.op == "and" || inst.op == "or" || inst.op == "xor" || inst.op == "mul") && value.value >= -2147483648 && value.value <= 2147483647 {
+                immediate = true
+            }
+            if (inst.op == "shl" || inst.op == "sar" || inst.op == "shr") && value.value >= 0 && value.value <= 255 {
+                immediate = true
+            }
+            if immediate {
+                immediate_value = value.value
+            }
         }
-    } else if inst.op == "udiv" || inst.op == "urem" {
-        x64_add_inst2(lower.x64, "xor", x64_reg("rdx"), x64_reg("rdx"))
-        x64_add_inst1(lower.x64, "div", x64_reg("rcx"))
-        if inst.op == "urem" {
-            x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_reg("rdx"))
+        _: {}
+    }
+    if immediate {
+        if inst.op == "mul" {
+            x64_add_inst3(lower.x64, "imul", x64_reg("rax"), x64_reg("rax"), x64_imm(immediate_value))
+        } else {
+            x64_add_inst2(lower.x64, inst.op, x64_reg("rax"), x64_imm(immediate_value))
+        }
+    } else {
+        mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
+        if inst.op == "add" {
+            x64_add_inst2(lower.x64, "add", x64_reg("rax"), x64_reg("rcx"))
+        } else if inst.op == "sub" {
+            x64_add_inst2(lower.x64, "sub", x64_reg("rax"), x64_reg("rcx"))
+        } else if inst.op == "and" {
+            x64_add_inst2(lower.x64, "and", x64_reg("rax"), x64_reg("rcx"))
+        } else if inst.op == "or" {
+            x64_add_inst2(lower.x64, "or", x64_reg("rax"), x64_reg("rcx"))
+        } else if inst.op == "xor" {
+            x64_add_inst2(lower.x64, "xor", x64_reg("rax"), x64_reg("rcx"))
+        } else if inst.op == "mul" {
+            x64_add_inst2(lower.x64, "imul", x64_reg("rax"), x64_reg("rcx"))
+        } else if inst.op == "shl" || inst.op == "sar" || inst.op == "shr" {
+            x64_add_inst2(lower.x64, inst.op, x64_reg("rax"), x64_reg("cl"))
+        } else if inst.op == "sdiv" || inst.op == "srem" {
+            x64_add_inst0(lower.x64, "cqo")
+            x64_add_inst1(lower.x64, "idiv", x64_reg("rcx"))
+            if inst.op == "srem" {
+                x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_reg("rdx"))
+            }
+        } else if inst.op == "udiv" || inst.op == "urem" {
+            x64_add_inst2(lower.x64, "xor", x64_reg("rdx"), x64_reg("rdx"))
+            x64_add_inst1(lower.x64, "div", x64_reg("rcx"))
+            if inst.op == "urem" {
+                x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_reg("rdx"))
+            }
         }
     }
     mir_to_x64_store_result(lower, inst.result_id, "rax")
@@ -629,8 +655,20 @@ fun mir_to_x64_icmp_cc(op: str): str {
 
 fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
     mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-    mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
-    x64_add_inst2(lower.x64, "cmp", x64_reg("rax"), x64_reg("rcx"))
+    let immediate = false
+    match inst.operands[1] {
+        MirIntOperand value: {
+            if value.value >= -2147483648 && value.value <= 2147483647 {
+                x64_add_inst2(lower.x64, "cmp", x64_reg("rax"), x64_imm(value.value))
+                immediate = true
+            }
+        }
+        _: {}
+    }
+    if !immediate {
+        mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
+        x64_add_inst2(lower.x64, "cmp", x64_reg("rax"), x64_reg("rcx"))
+    }
     x64_add_inst1(lower.x64, mir_to_x64_icmp_cc(inst.op), x64_reg("al"))
     x64_add_inst2(lower.x64, "movzx", x64_reg("eax"), x64_reg("al"))
     mir_to_x64_store_result(lower, inst.result_id, "rax")
