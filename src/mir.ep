@@ -439,6 +439,22 @@ fun mir_program_add_struct_field(program: MirProgram, struct_name: str, field_ty
     program.struct_fields.push(mir_struct_field(struct_name, field_type, field_index, field_offset))
 }
 
+fun mir_function_name_index(program: MirProgram): NameIndex {
+    let index = name_index_new(len(program.functions))
+    for i: 0:len(program.functions) {
+        name_index_put(index, program.functions[i].name, i)
+    }
+    ret index
+}
+
+fun mir_extern_name_index(program: MirProgram): NameIndex {
+    let index = name_index_new(len(program.externs))
+    for i: 0:len(program.externs) {
+        name_index_put(index, program.externs[i].name, i)
+    }
+    ret index
+}
+
 fun mir_name_in(names: str[], name: str): bool {
     for i: 0:len(names) {
         if names[i] == name {
@@ -504,15 +520,49 @@ fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_t
     program.externs.push(mir_extern(name, return_type, param_types))
 }
 
+fun mir_call_instruction_count(program: MirProgram): i64 {
+    let count = 0
+    for fi: 0:len(program.functions) {
+        for bi: 0:len(program.functions[fi].blocks) {
+            let block = program.functions[fi].blocks[bi]
+            for ii: 0:len(block.instructions) {
+                if block.instructions[ii].op == "call" { count += 1 }
+            }
+        }
+    }
+    ret count
+}
+
 fun mir_declare_unresolved_calls(program: MirProgram): void {
+    let functions = mir_function_name_index(program)
+    let externs = name_index_new(len(program.externs) + mir_call_instruction_count(program))
+    for i: 0:len(program.externs) {
+        name_index_put(externs, program.externs[i].name, i)
+    }
     for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
         for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "call" && mir_find_function(program, inst.callee) < 0 {
-                    mir_declare_extern(program, inst.callee, inst.typ, mir_call_param_types(inst))
+                if inst.op == "call" && name_index_lookup(functions, inst.callee) < 0 {
+                    let extern_index = name_index_lookup(externs, inst.callee)
+                    let param_types = mir_call_param_types(inst)
+                    if extern_index >= 0 {
+                        let ext = program.externs[extern_index]
+                        if ext.return_type != inst.typ || len(ext.param_types) != len(param_types) {
+                            panic ("conflicting MIR extern declaration: " + inst.callee)
+                        }
+                        for pi: 0:len(param_types) {
+                            if ext.param_types[pi] != param_types[pi] {
+                                panic ("conflicting MIR extern declaration: " + inst.callee)
+                            }
+                        }
+                    } else {
+                        let next = len(program.externs)
+                        program.externs.push(mir_extern(inst.callee, inst.typ, param_types))
+                        name_index_put(externs, inst.callee, next)
+                    }
                 }
             }
         }
@@ -520,9 +570,10 @@ fun mir_declare_unresolved_calls(program: MirProgram): void {
 }
 
 fun mir_remove_defined_externs(program: MirProgram): void {
+    let functions = mir_function_name_index(program)
     let kept = new MirExtern[]
     for i: 0:len(program.externs) {
-        if mir_find_function(program, program.externs[i].name) < 0 {
+        if name_index_lookup(functions, program.externs[i].name) < 0 {
             kept.push(program.externs[i])
         }
     }
@@ -530,6 +581,8 @@ fun mir_remove_defined_externs(program: MirProgram): void {
 }
 
 fun mir_validate_call_contracts(program: MirProgram): void {
+    let functions = mir_function_name_index(program)
+    let externs = mir_extern_name_index(program)
     for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
         for bi: 0:len(fn.blocks) {
@@ -537,7 +590,7 @@ fun mir_validate_call_contracts(program: MirProgram): void {
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
                 if inst.op == "call" {
-                    let internal_index = mir_find_function(program, inst.callee)
+                    let internal_index = name_index_lookup(functions, inst.callee)
                     if internal_index >= 0 {
                         let target = program.functions[internal_index]
                         let params = new str[]
@@ -548,7 +601,7 @@ fun mir_validate_call_contracts(program: MirProgram): void {
                             panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {inst.callee}"
                         }
                     } else {
-                        let extern_index = mir_find_extern(program, inst.callee)
+                        let extern_index = name_index_lookup(externs, inst.callee)
                         if extern_index < 0 {
                             panic f"MIR validation error: {fn.name}.{block.name}: undeclared callee: {inst.callee}"
                         }
@@ -572,37 +625,30 @@ fun mir_validate_call_contracts(program: MirProgram): void {
     }
 }
 
-fun mir_mark_reachable_function(program: MirProgram, reachable: str[], name: str): void {
-    if mir_name_in(reachable, name) {
-        ret
-    }
-    let fn_index = mir_find_function(program, name)
-    if fn_index < 0 {
-        ret
-    }
-    mir_push_unique(reachable, name)
+fun mir_mark_reachable_function(program: MirProgram, functions: NameIndex, reachable: i64[], name: str): void {
+    let fn_index = name_index_lookup(functions, name)
+    if fn_index < 0 || reachable[fn_index] != 0 { ret }
+    reachable[fn_index] = 1
     let fn = program.functions[fn_index]
     for bi: 0:len(fn.blocks) {
         let block = fn.blocks[bi]
         for ii: 0:len(block.instructions) {
             let inst = block.instructions[ii]
             if inst.op == "call" {
-                mir_mark_reachable_function(program, reachable, inst.callee)
+                mir_mark_reachable_function(program, functions, reachable, inst.callee)
             }
         }
     }
 }
 
 fun mir_prune_unreachable_functions(program: MirProgram): void {
-    let reachable = new str[]
-    mir_mark_reachable_function(program, reachable, "main")
+    let functions = mir_function_name_index(program)
+    let reachable = new i64[len(program.functions)]
+    mir_mark_reachable_function(program, functions, reachable, "main")
 
     let kept = new MirFunction[]
     for i: 0:len(program.functions) {
-        let fn = program.functions[i]
-        if mir_name_in(reachable, fn.name) {
-            kept.push(fn)
-        }
+        if reachable[i] != 0 { kept.push(program.functions[i]) }
     }
     program.functions = kept
 }
@@ -693,15 +739,18 @@ fun mir_struct_name_from_type(typ: str): str {
 }
 
 fun mir_referenced_external_names(program: MirProgram): str[] {
+    let functions = mir_function_name_index(program)
     let names = new str[]
+    let seen = name_index_new(len(program.externs))
     for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
         for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "call" && mir_find_function(program, inst.callee) < 0 {
-                    mir_push_unique(names, inst.callee)
+                if inst.op == "call" && name_index_lookup(functions, inst.callee) < 0 && name_index_lookup(seen, inst.callee) < 0 {
+                    name_index_put(seen, inst.callee, len(names))
+                    names.push(inst.callee)
                 }
             }
         }
@@ -711,9 +760,10 @@ fun mir_referenced_external_names(program: MirProgram): str[] {
 
 fun mir_retain_referenced_externs(program: MirProgram): void {
     let names = mir_referenced_external_names(program)
+    let externs = mir_extern_name_index(program)
     let kept = new MirExtern[]
     for i: 0:len(names) {
-        let index = mir_find_extern(program, names[i])
+        let index = name_index_lookup(externs, names[i])
         if index < 0 { panic ("missing MIR extern declaration: " + names[i]) }
         kept.push(program.externs[index])
     }

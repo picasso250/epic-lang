@@ -15,3 +15,57 @@ fun str_buf_extend(buf: u8[], s: str): void {
 fun str_buf_finish(buf: u8[]): str {
     ret str(buf)
 }
+
+struct NameIndex {
+    capacity: i64
+    count: i64
+    names: str[]
+    encoded_values: i64[]
+}
+
+fun name_index_new(expected_count: i64): NameIndex {
+    let capacity = 8
+    for capacity < expected_count * 2 { capacity *= 2 }
+    let index = new NameIndex
+    index.capacity = capacity
+    index.count = 0
+    index.names = new str[capacity]
+    index.encoded_values = new i64[capacity]
+    ret index
+}
+
+fun name_index_hash(name: str): i64 {
+    let value = -3750763034362895579
+    let bs = bytes(name)
+    for i: 0:len(bs) {
+        value = (value ^ i64(bs[i])) * 1099511628211
+    }
+    ret value
+}
+
+fun name_index_lookup(index: NameIndex, name: str): i64 {
+    let slot = name_index_hash(name) & (index.capacity - 1)
+    for index.encoded_values[slot] != 0 {
+        if index.names[slot] == name { ret index.encoded_values[slot] - 3 }
+        slot = (slot + 1) & (index.capacity - 1)
+    }
+    ret -1
+}
+
+fun name_index_put(index: NameIndex, name: str, value: i64): void {
+    let slot = name_index_hash(name) & (index.capacity - 1)
+    for index.encoded_values[slot] != 0 {
+        if index.names[slot] == name {
+            index.encoded_values[slot] = value + 3
+            ret
+        }
+        slot = (slot + 1) & (index.capacity - 1)
+    }
+    if index.count + 1 >= index.capacity {
+        panic "name index capacity exceeded"
+    }
+    index.names[slot] = name
+    # Zero marks an empty slot; callers store only -2 or non-negative values.
+    index.encoded_values[slot] = value + 3
+    index.count += 1
+}

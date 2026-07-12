@@ -37,13 +37,6 @@ struct MachineBuilder {
     data_reloc_names: str[]
 }
 
-struct MachineNameIndex {
-    capacity: i64
-    names: str[]
-    values: i64[]
-    occupied: i64[]
-}
-
 fun machine_builder_empty(label_count: i64): MachineBuilder {
     let b = new MachineBuilder
     b.text = new i64[]
@@ -185,60 +178,26 @@ fun machine_add_text_reloc(b: MachineBuilder, offset: i64, name: str): void {
     b.text_reloc_names.push(name)
 }
 
-fun machine_name_index_new(expected_count: i64): MachineNameIndex {
-    let capacity = 8
-    for capacity < expected_count * 2 { capacity *= 2 }
-    let index = new MachineNameIndex
-    index.capacity = capacity
-    index.names = new str[capacity]
-    index.values = new i64[capacity]
-    index.occupied = new i64[capacity]
-    ret index
+fun machine_name_index_new(expected_count: i64): NameIndex {
+    ret name_index_new(expected_count)
 }
 
-fun machine_name_hash(name: str): i64 {
-    let value = -3750763034362895579
-    let bs = bytes(name)
-    for i: 0:len(bs) {
-        value = (value ^ i64(bs[i])) * 1099511628211
+fun machine_name_index_lookup(index: NameIndex, name: str): i64 {
+    ret name_index_lookup(index, name)
+}
+
+fun machine_name_index_insert(index: NameIndex, name: str, value: i64): void {
+    if name_index_lookup(index, name) != -1 {
+        machine_die(("duplicate symbol name: " + name))
     }
-    ret value
+    name_index_put(index, name, value)
 }
 
-fun machine_name_index_slot(index: MachineNameIndex, name: str): i64 {
-    ret machine_name_hash(name) & (index.capacity - 1)
-}
-
-fun machine_name_index_lookup(index: MachineNameIndex, name: str): i64 {
-    let slot = machine_name_index_slot(index, name)
-    for index.occupied[slot] != 0 {
-        if index.names[slot] == name { ret index.values[slot] }
-        slot = (slot + 1) & (index.capacity - 1)
+fun machine_name_index_set(index: NameIndex, name: str, value: i64): void {
+    if name_index_lookup(index, name) == -1 {
+        machine_die(("unknown symbol name: " + name))
     }
-    ret -1
-}
-
-fun machine_name_index_insert(index: MachineNameIndex, name: str, value: i64): void {
-    let slot = machine_name_index_slot(index, name)
-    for index.occupied[slot] != 0 {
-        if index.names[slot] == name { machine_die(("duplicate symbol name: " + name)) }
-        slot = (slot + 1) & (index.capacity - 1)
-    }
-    index.occupied[slot] = 1
-    index.names[slot] = name
-    index.values[slot] = value
-}
-
-fun machine_name_index_set(index: MachineNameIndex, name: str, value: i64): void {
-    let slot = machine_name_index_slot(index, name)
-    for index.occupied[slot] != 0 {
-        if index.names[slot] == name {
-            index.values[slot] = value
-            ret
-        }
-        slot = (slot + 1) & (index.capacity - 1)
-    }
-    machine_die(("unknown symbol name: " + name))
+    name_index_put(index, name, value)
 }
 
 fun machine_ascii_less(a: str, b: str): bool {

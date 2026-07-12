@@ -169,17 +169,30 @@ fun mir_runtime_insert_null_checks(program: MirProgram): void {
 
 fun mir_inject_all_runtime_helpers(program: MirProgram): void {
     let helpers = mir_runtime_helper_program()
+    let functions = name_index_new(len(program.functions) + len(helpers.functions))
+    for i: 0:len(program.functions) {
+        name_index_put(functions, program.functions[i].name, i)
+    }
     for i: 0:len(helpers.functions) {
-        if mir_find_function(program, helpers.functions[i].name) < 0 {
-            program.functions.push(helpers.functions[i])
+        let fn = helpers.functions[i]
+        if name_index_lookup(functions, fn.name) < 0 {
+            let next = len(program.functions)
+            program.functions.push(fn)
+            name_index_put(functions, fn.name, next)
         }
     }
     mir_remove_defined_externs(program)
 
+    let externs = name_index_new(len(program.externs) + len(helpers.externs))
+    for i: 0:len(program.externs) {
+        name_index_put(externs, program.externs[i].name, i)
+    }
     for i: 0:len(helpers.externs) {
         let ext = helpers.externs[i]
-        if mir_find_function(program, ext.name) < 0 && mir_find_extern(program, ext.name) < 0 {
+        if name_index_lookup(functions, ext.name) < 0 && name_index_lookup(externs, ext.name) < 0 {
+            let next = len(program.externs)
             program.externs.push(ext)
+            name_index_put(externs, ext.name, next)
         }
     }
 

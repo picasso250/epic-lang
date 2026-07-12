@@ -136,6 +136,8 @@ condbr bool %c0, label %then, label %else
 
 函数、全局变量、字符串常量、import 在 object model 中使用 raw module symbol。未来 text MIR syntax 可选择用 `@` 前缀，但 `@` 不进入 `MirFunction.name` / `MirExtern.name` / `MirGlobal.name` / `SymbolOperand.name`：
 
+raw symbol spelling 不等于线性查询。Runtime helper 注入、call contract validation、reachable-function pruning 和 referenced-extern 收集为 function/extern 数组建立临时 `NameIndex`，查找命中后仍返回原数组 index；诊断、MIR text 和 COFF 输出继续读取原始字符串。
+
 ```text
 main
 foo
