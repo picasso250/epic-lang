@@ -217,7 +217,7 @@ module.exports = grammar({
       field("left", choice($.identifier, $.postfix_expression)),
       field("operator", choice(
         "=", "+=", "-=", "*=", "/=", "%=",
-        "<<=", ">>=", ">>>=", "&=", "|=", "^=",
+        "<<=", ">>=", "&=", "|=", "^=",
       )),
       field("right", $.expression),
     )),
@@ -257,7 +257,6 @@ module.exports = grammar({
         [">=", PREC.comparison],
         ["<<", PREC.shift],
         [">>", PREC.shift],
-        [">>>", PREC.shift],
         ["+", PREC.additive],
         ["-", PREC.additive],
         ["*", PREC.multiplicative],

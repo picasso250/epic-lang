@@ -377,7 +377,7 @@ fun sema_literal_int(node: AstNode): i64 {
             if n.op == "<<" {
                 ret left << right
             }
-            if n.op == ">>" || n.op == ">>>" {
+            if n.op == ">>" {
                 ret left >> right
             }
         }
@@ -755,7 +755,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             if sema_is_int(right) == false {
                 sema_die(f"operator {n.op} right expected integer, got {right}")
             }
-            if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+            if n.op == "<<" || n.op == ">>" {
                 ret sema_set_type(node, left)
             }
             if left != right {

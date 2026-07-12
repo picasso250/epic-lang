@@ -1,4 +1,4 @@
-# EXIT: 67
+# EXIT: 72
 struct Box {
     value: i64
     small: u8
@@ -16,7 +16,10 @@ fun main(): void {
     x |= 2
     x &= 14
     x ^= 3
-    x >>>= 1
+
+    let logical: u64 = u64(0) - u64(1)
+    logical >>= u64(1)
+    if logical != u64(9223372036854775807) { exit(1) }
 
     let b = new Box {}
     b.value = 4

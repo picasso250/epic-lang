@@ -948,10 +948,6 @@
                 },
                 {
                   "type": "STRING",
-                  "value": ">>>="
-                },
-                {
-                  "type": "STRING",
                   "value": "&="
                 },
                 {
@@ -1457,39 +1453,6 @@
                 "content": {
                   "type": "STRING",
                   "value": ">>"
-                }
-              },
-              {
-                "type": "FIELD",
-                "name": "right",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "expression"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "type": "PREC_LEFT",
-          "value": 9,
-          "content": {
-            "type": "SEQ",
-            "members": [
-              {
-                "type": "FIELD",
-                "name": "left",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "expression"
-                }
-              },
-              {
-                "type": "FIELD",
-                "name": "operator",
-                "content": {
-                  "type": "STRING",
-                  "value": ">>>"
                 }
               },
               {

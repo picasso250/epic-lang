@@ -19,25 +19,25 @@ fun u64_le(buf: u8[], off: i64): u64 {
 
 fun put_u16_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >>> 8) & u64(255))
+    buf[off + 1] = u8((x >> 8) & u64(255))
 }
 
 fun put_u32_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >>> 8) & u64(255))
-    buf[off + 2] = u8((x >>> 16) & u64(255))
-    buf[off + 3] = u8((x >>> 24) & u64(255))
+    buf[off + 1] = u8((x >> 8) & u64(255))
+    buf[off + 2] = u8((x >> 16) & u64(255))
+    buf[off + 3] = u8((x >> 24) & u64(255))
 }
 
 fun put_u64_le(buf: u8[], off: i64, x: u64): void {
     buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >>> 8) & u64(255))
-    buf[off + 2] = u8((x >>> 16) & u64(255))
-    buf[off + 3] = u8((x >>> 24) & u64(255))
-    buf[off + 4] = u8((x >>> 32) & u64(255))
-    buf[off + 5] = u8((x >>> 40) & u64(255))
-    buf[off + 6] = u8((x >>> 48) & u64(255))
-    buf[off + 7] = u8((x >>> 56) & u64(255))
+    buf[off + 1] = u8((x >> 8) & u64(255))
+    buf[off + 2] = u8((x >> 16) & u64(255))
+    buf[off + 3] = u8((x >> 24) & u64(255))
+    buf[off + 4] = u8((x >> 32) & u64(255))
+    buf[off + 5] = u8((x >> 40) & u64(255))
+    buf[off + 6] = u8((x >> 48) & u64(255))
+    buf[off + 7] = u8((x >> 56) & u64(255))
 }
 
 fun main(): void {

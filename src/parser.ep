@@ -975,9 +975,6 @@ fun is_assignment_op_kind(kind: str): i64 {
         "SHR_ASSIGN": {
             ret 1
         }
-        "USHR_ASSIGN": {
-            ret 1
-        }
         "AMP_ASSIGN": {
             ret 1
         }
@@ -1018,9 +1015,6 @@ fun assignment_op_from_kind(kind: str): str {
         }
         "SHR_ASSIGN": {
             ret ">>"
-        }
-        "USHR_ASSIGN": {
-            ret ">>>"
         }
         "AMP_ASSIGN": {
             ret "&"
@@ -1130,9 +1124,6 @@ fun op_text(kind: str): str {
         }
         "SHR": {
             ret ">>"
-        }
-        "USHR": {
-            ret ">>>"
         }
         "BANG": {
             ret "!"
@@ -1362,7 +1353,7 @@ fun (p: Parser) parse_term(): AstNode {
 
 fun (p: Parser) parse_shift(): AstNode {
     let left = p.parse_term()
-    for p.peek_kind("SHL") == 1 || p.peek_kind("SHR") == 1 || p.peek_kind("USHR") == 1 {
+    for p.peek_kind("SHL") == 1 || p.peek_kind("SHR") == 1 {
         let op = p.advance()
         left = bin_node(op_text(token_kind(op)), left, p.parse_term(), token_line(op))
     }
