@@ -48,8 +48,7 @@ fun mrt_strip_comment(line: str): str {
     let bs = bytes(line)
     let in_string = false
     let escaped = false
-    let i = 0
-    for i < len(bs) {
+    for i: 0:len(bs) {
         let c = bs[i]
         if in_string {
             if escaped {
@@ -70,7 +69,6 @@ fun mrt_strip_comment(line: str): str {
                 }
             }
         }
-        i += 1
     }
     ret line
 }
@@ -79,14 +77,12 @@ fun mrt_split_lines(text: str): str[] {
     let out = new str[]
     let bs = bytes(text)
     let start = 0
-    let i = 0
-    for i < len(bs) {
+    for i: 0:len(bs) {
         if bs[i] == u8(10) {
             let line = mrt_trim(mrt_strip_comment(text[start:i]))
             if len(line) > 0 { out.push(line) }
             start = i + 1
         }
-        i += 1
     }
     if start < len(text) {
         let line = mrt_trim(mrt_strip_comment(text[start:len(text)]))
@@ -99,13 +95,11 @@ fun mrt_split_commas(text: str): str[] {
     let out = new str[]
     let bs = bytes(text)
     let start = 0
-    let i = 0
-    for i < len(bs) {
+    for i: 0:len(bs) {
         if bs[i] == u8(44) {
             out.push(mrt_trim(text[start:i]))
             start = i + 1
         }
-        i += 1
     }
     let last = mrt_trim(text[start:len(text)])
     if len(last) > 0 { out.push(last) }
@@ -138,15 +132,14 @@ fun mrt_parse_i64(s: str): i64 {
     let t = mrt_trim(s)
     let bs = bytes(t)
     let sign = 1
-    let i = 0
+    let start = 0
     if len(bs) > 0 && bs[0] == u8(45) {
         sign = 0 - 1
-        i = 1
+        start = 1
     }
     let n = 0
-    for i < len(bs) {
+    for i: start:len(bs) {
         n = n * 10 + (i64(bs[i]) - 48)
-        i += 1
     }
     ret n * sign
 }
@@ -155,14 +148,13 @@ fun mrt_is_int_text(s: str): bool {
     let t = mrt_trim(s)
     let bs = bytes(t)
     if len(bs) == 0 { ret false }
-    let i = 0
+    let start = 0
     if bs[0] == u8(45) {
         if len(bs) == 1 { ret false }
-        i = 1
+        start = 1
     }
-    for i < len(bs) {
+    for i: start:len(bs) {
         if bs[i] < u8(48) || bs[i] > u8(57) { ret false }
-        i += 1
     }
     ret true
 }
@@ -200,14 +192,12 @@ fun mrt_parse_params(text: str): MirParam[] {
     let t = mrt_trim(text)
     if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
-    let i = 0
-    for i < len(parts) {
+    for i: 0:len(parts) {
         let part = parts[i]
         let p = new MirParam
         p.typ = mrt_first_word(part)
         p.value_id = mrt_parse_local_id(mrt_after_first_word(part))
         out.push(p)
-        i += 1
     }
     ret out
 }
@@ -217,10 +207,8 @@ fun mrt_parse_operands(text: str): MirOperand[] {
     let t = mrt_trim(text)
     if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
-    let i = 0
-    for i < len(parts) {
+    for i: 0:len(parts) {
         out.push(mrt_parse_typed_operand(parts[i]))
-        i += 1
     }
     ret out
 }
@@ -510,8 +498,7 @@ fun mrt_parse_function(text: str): MirFunction {
 
     let current = mir_block_empty("")
     let has_current = false
-    let i = 1
-    for i < len(lines) {
+    for i: 1:len(lines) {
         let line = lines[i]
         if line == "}" {
             if has_current { fn.blocks.push(current) }
@@ -530,7 +517,6 @@ fun mrt_parse_function(text: str): MirFunction {
                 current.instructions.push(mrt_parse_inst(line))
             }
         }
-        i += 1
     }
     mir_text_die(("missing closing brace: " + name))
     ret fn

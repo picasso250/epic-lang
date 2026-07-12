@@ -52,8 +52,7 @@ fun epic_parse_file(path: str): AstNode {
 fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
     let merged = new AstProgram { meta: ast_meta(0), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
     let found_main = false
-    let i = 0
-    for i < len(input_paths) {
+    for i: 0:len(input_paths) {
         let parsed = epic_parse_file(input_paths[i])
         let is_main = input_paths[i] == main_path
         match parsed {
@@ -61,8 +60,7 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
                 merged.externs.extend(ast.externs)
                 merged.structs.extend(ast.structs)
                 merged.unions.extend(ast.unions)
-                let fi = 0
-                for fi < len(ast.funcs) {
+                for fi: 0:len(ast.funcs) {
                     if ast.funcs[fi].name == "main" {
                         if is_main {
                             merged.funcs.push(ast.funcs[fi])
@@ -71,12 +69,10 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
                     } else {
                         merged.funcs.push(ast.funcs[fi])
                     }
-                    fi += 1
                 }
             }
             _: { epic_die("internal: expected parsed program") }
         }
-        i += 1
     }
     if !found_main {
         epic_die(("main file has no main function: " + main_path))
@@ -85,10 +81,8 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
 }
 
 fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
-    let i = 0
-    for i < len(bs) {
+    for i: 0:len(bs) {
         out.push(i64(bs[i]))
-        i += 1
     }
 }
 
@@ -145,10 +139,8 @@ fun epic_lower_program(program: MirProgram, verbose: bool): X64Program {
     epic_timing(verbose, "lower prepare globals", prepare_start, prepare_stop)
 
     let funcs_start = epic_now_ms()
-    let i = 0
-    for i < len(program.functions) {
+    for i: 0:len(program.functions) {
         mir_to_x64_lower_function_with_lower(lower, program.functions[i])
-        i += 1
     }
     let funcs_stop = epic_now_ms()
     epic_timing(verbose, "lower functions", funcs_start, funcs_stop)

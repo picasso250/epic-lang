@@ -348,8 +348,7 @@ fun import_less_casefold(a: str, b: str): bool {
     if len(bb) < n {
         n = len(bb)
     }
-    let i = 0
-    for i < n {
+    for i: 0:n {
         let ac = ascii_lower_byte(ab[i])
         let bc = ascii_lower_byte(bb[i])
         if ac < bc {
@@ -358,7 +357,6 @@ fun import_less_casefold(a: str, b: str): bool {
         if ac > bc {
             ret false
         }
-        i += 1
     }
     ret len(ab) < len(bb)
 }

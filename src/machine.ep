@@ -199,10 +199,8 @@ fun machine_name_index_new(expected_count: i64): MachineNameIndex {
 fun machine_name_hash(name: str): i64 {
     let value = -3750763034362895579
     let bs = bytes(name)
-    let i = 0
-    for i < len(bs) {
+    for i: 0:len(bs) {
         value = (value ^ i64(bs[i])) * 1099511628211
-        i += 1
     }
     ret value
 }
@@ -250,40 +248,34 @@ fun machine_ascii_less(a: str, b: str): bool {
     if len(bb) < n {
         n = len(bb)
     }
-    let i = 0
-    for i < n {
+    for i: 0:n {
         if ab[i] < bb[i] {
             ret true
         }
         if ab[i] > bb[i] {
             ret false
         }
-        i += 1
     }
     ret len(ab) < len(bb)
 }
 
 fun machine_sorted_strings(names: str[]): str[] {
     let out = new str[]
-    let i = 0
-    for i < len(names) {
+    for i: 0:len(names) {
         let key = names[i]
         let next = new str[]
         let inserted = false
-        let j = 0
-        for j < len(out) {
+        for j: 0:len(out) {
             if !inserted && machine_ascii_less(key, out[j]) {
                 next.push(key)
                 inserted = true
             }
             next.push(out[j])
-            j += 1
         }
         if !inserted {
             next.push(key)
         }
         out = next
-        i += 1
     }
     ret out
 }
@@ -297,8 +289,7 @@ fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
 }
 
 fun machine_patch_fixups(b: MachineBuilder): void {
-    let i = 0
-    for i < len(b.fixups) {
+    for i: 0:len(b.fixups) {
         let f = b.fixups[i]
         machine_require_label_id(b, f.label)
         if b.label_defined[f.label.id] != 0 {
@@ -309,7 +300,6 @@ fun machine_patch_fixups(b: MachineBuilder): void {
         } else {
             machine_die(("unbound anonymous label: " + x64_label_text(f.label)))
         }
-        i += 1
     }
 }
 
@@ -1083,10 +1073,8 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
-            let i = 0
-            for i < len(it.values) {
+            for i: 0:len(it.values) {
                 machine_append_byte(b.data, it.values[i])
-                i += 1
             }
             ret
         }
@@ -1094,10 +1082,8 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
-            let i = 0
-            for i < it.count {
+            for i: 0:it.count {
                 machine_append_byte(b.data, 0)
-                i += 1
             }
             ret
         }
@@ -1125,73 +1111,57 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.symbol_values = new i64[]
     let name_index = machine_name_index_new(len(b.text_label_names) + len(b.data_label_names) + len(b.text_reloc_names) + len(b.data_reloc_names))
 
-    let i = 0
-    for i < len(b.text_label_names) {
+    for i: 0:len(b.text_label_names) {
         machine_name_index_insert(name_index, b.text_label_names[i], len(obj.symbol_names))
         obj.symbol_names.push(b.text_label_names[i])
         obj.symbol_sections.push(1)
         obj.symbol_values.push(b.text_label_offsets[i])
-        i += 1
     }
-    i = 0
-    for i < len(b.data_label_names) {
+    for i: 0:len(b.data_label_names) {
         machine_name_index_insert(name_index, b.data_label_names[i], len(obj.symbol_names))
         obj.symbol_names.push(b.data_label_names[i])
         obj.symbol_sections.push(2)
         obj.symbol_values.push(b.data_label_offsets[i])
-        i += 1
     }
 
     let externs = new str[]
-    i = 0
-    for i < len(b.text_reloc_names) {
+    for i: 0:len(b.text_reloc_names) {
         if machine_name_index_lookup(name_index, b.text_reloc_names[i]) == -1 {
             machine_name_index_insert(name_index, b.text_reloc_names[i], -2)
             externs.push(b.text_reloc_names[i])
         }
-        i += 1
     }
-    i = 0
-    for i < len(b.data_reloc_names) {
+    for i: 0:len(b.data_reloc_names) {
         if machine_name_index_lookup(name_index, b.data_reloc_names[i]) == -1 {
             machine_name_index_insert(name_index, b.data_reloc_names[i], -2)
             externs.push(b.data_reloc_names[i])
         }
-        i += 1
     }
     let sorted_externs = machine_sorted_strings(externs)
-    i = 0
-    for i < len(sorted_externs) {
+    for i: 0:len(sorted_externs) {
         machine_name_index_set(name_index, sorted_externs[i], len(obj.symbol_names))
         obj.symbol_names.push(sorted_externs[i])
         obj.symbol_sections.push(0)
         obj.symbol_values.push(0)
-        i += 1
     }
 
-    i = 0
-    for i < len(b.text_reloc_names) {
+    for i: 0:len(b.text_reloc_names) {
         let symbol_index = machine_name_index_lookup(name_index, b.text_reloc_names[i])
         if symbol_index < 0 { machine_die(("unknown relocation symbol: " + b.text_reloc_names[i])) }
         obj.text_reloc_symbol_indexes.push(symbol_index)
-        i += 1
     }
-    i = 0
-    for i < len(b.data_reloc_names) {
+    for i: 0:len(b.data_reloc_names) {
         let symbol_index = machine_name_index_lookup(name_index, b.data_reloc_names[i])
         if symbol_index < 0 { machine_die(("unknown relocation symbol: " + b.data_reloc_names[i])) }
         obj.data_reloc_symbol_indexes.push(symbol_index)
-        i += 1
     }
     ret obj
 }
 
 fun machine_build_object(program: X64Program): MachineObject {
     let b = machine_builder_empty(program.label_count)
-    let i = 0
-    for i < len(program.items) {
+    for i: 0:len(program.items) {
         machine_emit_item(b, program.items[i])
-        i += 1
     }
     machine_patch_fixups(b)
     ret machine_object_from_builder(b)
@@ -1201,10 +1171,8 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
     let b = machine_builder_empty(program.label_count)
 
     let emit_start = machine_now_ms()
-    let i = 0
-    for i < len(program.items) {
+    for i: 0:len(program.items) {
         machine_emit_item(b, program.items[i])
-        i += 1
     }
     let emit_stop = machine_now_ms()
     machine_print_timing("emit items", emit_start, emit_stop)
@@ -1226,10 +1194,8 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
 }
 fun machine_print_bytes(label: str, values: i64[]): void {
     println(label)
-    let i = 0
-    for i < len(values) {
+    for i: 0:len(values) {
         println(str(values[i]))
-        i += 1
     }
 }
 

@@ -300,13 +300,11 @@ fun mir_inst_text(inst: MirInst): str {
         str_buf_extend(buf, "gep ")
         str_buf_extend(buf, inst.typ)
         str_buf_extend(buf, ", ")
-        let i = 0
-        for i < len(inst.operands) {
+        for i: 0:len(inst.operands) {
             if i > 0 {
                 str_buf_extend(buf, ", ")
             }
             str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
-            i += 1
         }
         ret str_buf_finish(buf)
     }
@@ -328,13 +326,11 @@ fun mir_inst_text(inst: MirInst): str {
         str_buf_extend(buf, " ")
         str_buf_extend(buf, inst.callee)
         str_buf_extend(buf, "(")
-        let i = 0
-        for i < len(inst.operands) {
+        for i: 0:len(inst.operands) {
             if i > 0 {
                 str_buf_extend(buf, ", ")
             }
             str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
-            i += 1
         }
         str_buf_extend(buf, ")")
         ret str_buf_finish(buf)
@@ -342,13 +338,11 @@ fun mir_inst_text(inst: MirInst): str {
 
     str_buf_extend(buf, inst.op)
     str_buf_extend(buf, " ")
-    let i = 0
-    for i < len(inst.operands) {
+    for i: 0:len(inst.operands) {
         if i > 0 {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
-        i += 1
     }
     ret str_buf_finish(buf)
 }
@@ -461,41 +455,33 @@ fun mir_push_unique(names: str[], name: str): void {
 }
 
 fun mir_find_function(program: MirProgram, name: str): i64 {
-    let i = 0
-    for i < len(program.functions) {
+    for i: 0:len(program.functions) {
         if program.functions[i].name == name {
             ret i
         }
-        i += 1
     }
     ret 0 - 1
 }
 
 fun mir_find_extern(program: MirProgram, name: str): i64 {
-    let i = 0
-    for i < len(program.externs) {
+    for i: 0:len(program.externs) {
         if program.externs[i].name == name { ret i }
-        i += 1
     }
     ret 0 - 1
 }
 
 fun mir_call_param_types(inst: MirInst): str[] {
     let types = new str[]
-    let i = 0
-    for i < len(inst.operands) {
+    for i: 0:len(inst.operands) {
         types.push(mir_operand_type(inst.operands[i]))
-        i += 1
     }
     ret types
 }
 
 fun mir_signature_matches_call(return_type: str, param_types: str[], inst: MirInst): bool {
     if return_type != inst.typ || len(param_types) != len(inst.operands) { ret false }
-    let i = 0
-    for i < len(param_types) {
+    for i: 0:len(param_types) {
         if param_types[i] != mir_operand_type(inst.operands[i]) { ret false }
-        i += 1
     }
     ret true
 }
@@ -508,12 +494,10 @@ fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_t
         if ext.return_type != return_type || len(ext.param_types) != len(param_types) {
             panic ("conflicting MIR extern declaration: " + name)
         }
-        let i = 0
-        for i < len(param_types) {
+        for i: 0:len(param_types) {
             if ext.param_types[i] != param_types[i] {
                 panic ("conflicting MIR extern declaration: " + name)
             }
-            i += 1
         }
         ret
     }
@@ -521,57 +505,44 @@ fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_t
 }
 
 fun mir_declare_unresolved_calls(program: MirProgram): void {
-    let fi = 0
-    for fi < len(program.functions) {
+    for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
-        let bi = 0
-        for bi < len(fn.blocks) {
+        for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
-            let ii = 0
-            for ii < len(block.instructions) {
+            for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
                 if inst.op == "call" && mir_find_function(program, inst.callee) < 0 {
                     mir_declare_extern(program, inst.callee, inst.typ, mir_call_param_types(inst))
                 }
-                ii += 1
             }
-            bi += 1
         }
-        fi += 1
     }
 }
 
 fun mir_remove_defined_externs(program: MirProgram): void {
     let kept = new MirExtern[]
-    let i = 0
-    for i < len(program.externs) {
+    for i: 0:len(program.externs) {
         if mir_find_function(program, program.externs[i].name) < 0 {
             kept.push(program.externs[i])
         }
-        i += 1
     }
     program.externs = kept
 }
 
 fun mir_validate_call_contracts(program: MirProgram): void {
-    let fi = 0
-    for fi < len(program.functions) {
+    for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
-        let bi = 0
-        for bi < len(fn.blocks) {
+        for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
-            let ii = 0
-            for ii < len(block.instructions) {
+            for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
                 if inst.op == "call" {
                     let internal_index = mir_find_function(program, inst.callee)
                     if internal_index >= 0 {
                         let target = program.functions[internal_index]
                         let params = new str[]
-                        let pi = 0
-                        for pi < len(target.params) {
+                        for pi: 0:len(target.params) {
                             params.push(target.params[pi].typ)
-                            pi += 1
                         }
                         if !mir_signature_matches_call(target.return_type, params, inst) {
                             panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {inst.callee}"
@@ -596,11 +567,8 @@ fun mir_validate_call_contracts(program: MirProgram): void {
                         }
                     }
                 }
-                ii += 1
             }
-            bi += 1
         }
-        fi += 1
     }
 }
 
@@ -614,18 +582,14 @@ fun mir_mark_reachable_function(program: MirProgram, reachable: str[], name: str
     }
     mir_push_unique(reachable, name)
     let fn = program.functions[fn_index]
-    let bi = 0
-    for bi < len(fn.blocks) {
+    for bi: 0:len(fn.blocks) {
         let block = fn.blocks[bi]
-        let ii = 0
-        for ii < len(block.instructions) {
+        for ii: 0:len(block.instructions) {
             let inst = block.instructions[ii]
             if inst.op == "call" {
                 mir_mark_reachable_function(program, reachable, inst.callee)
             }
-            ii += 1
         }
-        bi += 1
     }
 }
 
@@ -634,13 +598,11 @@ fun mir_prune_unreachable_functions(program: MirProgram): void {
     mir_mark_reachable_function(program, reachable, "main")
 
     let kept = new MirFunction[]
-    let i = 0
-    for i < len(program.functions) {
+    for i: 0:len(program.functions) {
         let fn = program.functions[i]
         if mir_name_in(reachable, fn.name) {
             kept.push(fn)
         }
-        i += 1
     }
     program.functions = kept
 }
@@ -663,8 +625,7 @@ fun mir_hex_digit(value: i64): u8 {
 fun mir_escape_bytes(text: str): str {
     let out = new u8[]
     let bs = bytes(text)
-    let i = 0
-    for i < len(bs) {
+    for i: 0:len(bs) {
         let c = bs[i]
         if c == u8(92) {
             out.push(u8(92))
@@ -689,7 +650,6 @@ fun mir_escape_bytes(text: str): str {
             out.push(mir_hex_digit(i64(c) / 16))
             out.push(mir_hex_digit(i64(c) % 16))
         }
-        i += 1
     }
     ret str(out)
 }
@@ -699,34 +659,28 @@ fun mir_ascii_less(a: str, b: str): bool {
     let bb = bytes(b)
     let n = len(ab)
     if len(bb) < n { n = len(bb) }
-    let i = 0
-    for i < n {
+    for i: 0:n {
         if ab[i] < bb[i] { ret true }
         if ab[i] > bb[i] { ret false }
-        i += 1
     }
     ret len(ab) < len(bb)
 }
 
 fun mir_sorted_strings(names: str[]): str[] {
     let out = new str[]
-    let i = 0
-    for i < len(names) {
+    for i: 0:len(names) {
         let key = names[i]
         let next = new str[]
         let inserted = false
-        let j = 0
-        for j < len(out) {
+        for j: 0:len(out) {
             if !inserted && mir_ascii_less(key, out[j]) {
                 next.push(key)
                 inserted = true
             }
             next.push(out[j])
-            j += 1
         }
         if !inserted { next.push(key) }
         out = next
-        i += 1
     }
     ret out
 }
@@ -740,23 +694,17 @@ fun mir_struct_name_from_type(typ: str): str {
 
 fun mir_referenced_external_names(program: MirProgram): str[] {
     let names = new str[]
-    let fi = 0
-    for fi < len(program.functions) {
+    for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
-        let bi = 0
-        for bi < len(fn.blocks) {
+        for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
-            let ii = 0
-            for ii < len(block.instructions) {
+            for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
                 if inst.op == "call" && mir_find_function(program, inst.callee) < 0 {
                     mir_push_unique(names, inst.callee)
                 }
-                ii += 1
             }
-            bi += 1
         }
-        fi += 1
     }
     ret mir_sorted_strings(names)
 }
@@ -764,12 +712,10 @@ fun mir_referenced_external_names(program: MirProgram): str[] {
 fun mir_retain_referenced_externs(program: MirProgram): void {
     let names = mir_referenced_external_names(program)
     let kept = new MirExtern[]
-    let i = 0
-    for i < len(names) {
+    for i: 0:len(names) {
         let index = mir_find_extern(program, names[i])
         if index < 0 { panic ("missing MIR extern declaration: " + names[i]) }
         kept.push(program.externs[index])
-        i += 1
     }
     program.externs = kept
 }
@@ -781,11 +727,9 @@ fun mir_extern_text(ext: MirExtern): str {
     str_buf_extend(buf, " @")
     str_buf_extend(buf, ext.name)
     str_buf_extend(buf, "(")
-    let i = 0
-    for i < len(ext.param_types) {
+    for i: 0:len(ext.param_types) {
         if i > 0 { str_buf_extend(buf, ", ") }
         str_buf_extend(buf, ext.param_types[i])
-        i += 1
     }
     str_buf_extend(buf, ")")
     ret str_buf_finish(buf)
@@ -793,49 +737,39 @@ fun mir_extern_text(ext: MirExtern): str {
 
 fun mir_referenced_struct_names(program: MirProgram): str[] {
     let names = new str[]
-    let fi = 0
-    for fi < len(program.functions) {
+    for fi: 0:len(program.functions) {
         let fn = program.functions[fi]
-        let bi = 0
-        for bi < len(fn.blocks) {
+        for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
-            let ii = 0
-            for ii < len(block.instructions) {
+            for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
                 if inst.op == "gep" {
                     let name = mir_struct_name_from_type(inst.typ)
                     if len(name) > 0 { mir_push_unique(names, name) }
                 }
-                ii += 1
             }
-            bi += 1
         }
-        fi += 1
     }
     ret mir_sorted_strings(names)
 }
 
 fun mir_struct_field_count(program: MirProgram, struct_name: str): i64 {
     let count = 0
-    let i = 0
-    for i < len(program.struct_fields) {
+    for i: 0:len(program.struct_fields) {
         let field = program.struct_fields[i]
         if field.struct_name == struct_name && field.field_index + 1 > count {
             count = field.field_index + 1
         }
-        i += 1
     }
     ret count
 }
 
 fun mir_struct_field_type_at(program: MirProgram, struct_name: str, field_index: i64): str {
-    let i = 0
-    for i < len(program.struct_fields) {
+    for i: 0:len(program.struct_fields) {
         let field = program.struct_fields[i]
         if field.struct_name == struct_name && field.field_index == field_index {
             ret field.field_type
         }
-        i += 1
     }
     panic ("missing MIR struct field: " + struct_name)
 }
@@ -870,13 +804,11 @@ fun mir_print_struct_type(program: MirProgram, struct_name: str): void {
     str_buf_extend(buf, str(layout.align))
     str_buf_extend(buf, " { ")
     let count = mir_struct_field_count(program, struct_name)
-    let i = 0
-    for i < count {
+    for i: 0:count {
         if i > 0 { str_buf_extend(buf, ", ") }
         str_buf_extend(buf, mir_struct_field_type_at(program, struct_name, i))
         str_buf_extend(buf, " @")
         str_buf_extend(buf, str(mir_struct_field_offset_at(program, struct_name, i)))
-        i += 1
     }
     str_buf_extend(buf, " }")
     println(str_buf_finish(buf))
@@ -916,36 +848,30 @@ fun mir_print_function(fn: MirFunction): void {
     str_buf_extend(header, " @")
     str_buf_extend(header, fn.name)
     str_buf_extend(header, "(")
-    let i = 0
-    for i < len(fn.params) {
+    for i: 0:len(fn.params) {
         if i > 0 {
             str_buf_extend(header, ", ")
         }
         str_buf_extend(header, fn.params[i].typ)
         str_buf_extend(header, " %")
         str_buf_extend(header, str(fn.params[i].value_id))
-        i += 1
     }
     str_buf_extend(header, ") {")
     println(str_buf_finish(header))
 
-    let b = 0
-    for b < len(fn.blocks) {
+    for b: 0:len(fn.blocks) {
         if b > 0 {
             println("")
         }
         println((fn.blocks[b].name + ":"))
-        let j = 0
-        for j < len(fn.blocks[b].instructions) {
+        for j: 0:len(fn.blocks[b].instructions) {
             print("  ")
             println(mir_inst_text(fn.blocks[b].instructions[j]))
-            j += 1
         }
         if fn.blocks[b].has_terminator {
             print("  ")
             println(mir_terminator_text(fn.blocks[b].terminator))
         }
-        b += 1
     }
     println("}")
 }
@@ -953,38 +879,30 @@ fun mir_print_function(fn: MirFunction): void {
 fun mir_print_program(program: MirProgram): void {
     let printed = 0
     let extern_names = mir_referenced_external_names(program)
-    let ei = 0
-    for ei < len(extern_names) {
+    for ei: 0:len(extern_names) {
         let extern_index = mir_find_extern(program, extern_names[ei])
         if extern_index < 0 { panic ("missing MIR extern declaration: " + extern_names[ei]) }
         if printed > 0 { println("") }
         println(mir_extern_text(program.externs[extern_index]))
         printed += 1
-        ei += 1
     }
 
     let struct_names = mir_referenced_struct_names(program)
-    let si = 0
-    for si < len(struct_names) {
+    for si: 0:len(struct_names) {
         if printed > 0 { println("") }
         mir_print_struct_type(program, struct_names[si])
         printed += 1
-        si += 1
     }
 
-    let gi = 0
-    for gi < len(program.globals) {
+    for gi: 0:len(program.globals) {
         if printed > 0 { println("") }
         println(mir_global_text(program.globals[gi]))
         printed += 1
-        gi += 1
     }
 
-    let fi = 0
-    for fi < len(program.functions) {
+    for fi: 0:len(program.functions) {
         if printed > 0 { println("") }
         mir_print_function(program.functions[fi])
         printed += 1
-        fi += 1
     }
 }

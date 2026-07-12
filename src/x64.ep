@@ -218,26 +218,22 @@ fun x64_operand_text(op: X64Operand): str {
 
 fun x64_operands_text(operands: X64Operand[]): str {
     let buf = make_str_buf()
-    let i = 0
-    for i < len(operands) {
+    for i: 0:len(operands) {
         if i > 0 {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, x64_operand_text(operands[i]))
-        i += 1
     }
     ret str_buf_finish(buf)
 }
 
 fun x64_values_text(values: i64[]): str {
     let buf = make_str_buf()
-    let i = 0
-    for i < len(values) {
+    for i: 0:len(values) {
         if i > 0 {
             str_buf_extend(buf, ", ")
         }
         str_buf_extend(buf, str(values[i]))
-        i += 1
     }
     ret str_buf_finish(buf)
 }
@@ -274,10 +270,8 @@ fun x64_item_text(item: X64Item): str {
 
 fun x64_program_text(program: X64Program): str {
     let buf = make_str_buf()
-    let i = 0
-    for i < len(program.items) {
+    for i: 0:len(program.items) {
         str_buf_extend(buf, x64_item_text(program.items[i]))
-        i += 1
     }
     ret str_buf_finish(buf)
 }

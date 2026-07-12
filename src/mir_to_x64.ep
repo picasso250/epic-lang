@@ -91,8 +91,7 @@ fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): 
 }
 
 fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram): void {
-    let i = 0
-    for i < len(program.globals) {
+    for i: 0:len(program.globals) {
         match program.globals[i] {
             MirStringGlobal g: {
                 mir_to_x64_add_string_global(lower, g.name, len(g.init))
@@ -104,43 +103,34 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
                 lower.global_names.push(g.name)
             }
         }
-        i += 1
     }
-    i = 0
-    for i < len(program.struct_layouts) {
+    for i: 0:len(program.struct_layouts) {
         lower.struct_layout_names.push(program.struct_layouts[i].name)
         lower.struct_layout_sizes.push(program.struct_layouts[i].size)
         lower.struct_layout_aligns.push(program.struct_layouts[i].align)
-        i += 1
     }
-    i = 0
-    for i < len(program.struct_fields) {
+    for i: 0:len(program.struct_fields) {
         lower.struct_field_names.push(program.struct_fields[i].struct_name)
         lower.struct_field_types.push(program.struct_fields[i].field_type)
         lower.struct_field_indexes.push(program.struct_fields[i].field_index)
         lower.struct_field_offsets.push(program.struct_fields[i].field_offset)
-        i += 1
     }
 }
 
 fun mir_to_x64_string_index(lower: MirToX64Lower, name: str): i64 {
-    let i = 0
-    for i < len(lower.string_names) {
+    for i: 0:len(lower.string_names) {
         if lower.string_names[i] == name {
             ret i
         }
-        i += 1
     }
     ret 0 - 1
 }
 
 fun mir_to_x64_global_index(lower: MirToX64Lower, name: str): i64 {
-    let i = 0
-    for i < len(lower.global_names) {
+    for i: 0:len(lower.global_names) {
         if lower.global_names[i] == name {
             ret i
         }
-        i += 1
     }
     ret 0 - 1
 }
@@ -190,10 +180,8 @@ fun mir_to_x64_emit_stack_alloc(lower: MirToX64Lower, size: i64): void {
 }
 
 fun mir_to_x64_block_label(lower: MirToX64Lower, block_name: str): X64Label {
-    let i = 0
-    for i < len(lower.block_label_names) {
+    for i: 0:len(lower.block_label_names) {
         if lower.block_label_names[i] == block_name { ret lower.block_labels[i] }
-        i += 1
     }
     mir_to_x64_die(("unknown MIR block: " + block_name))
     ret new X64Label
@@ -205,10 +193,8 @@ fun mir_to_x64_count_use(counts: i64[], value_id: i64): void {
 
 fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i64[] {
     let counts = new i64[len(lower.value_slots)]
-    let ii = 0
-    for ii < len(block.instructions) {
-        let oi = 0
-        for oi < len(block.instructions[ii].operands) {
+    for ii: 0:len(block.instructions) {
+        for oi: 0:len(block.instructions[ii].operands) {
             match block.instructions[ii].operands[oi] {
                 MirValueOperand value: {
                     if lower.reusable_values[value.value_id] != 0 {
@@ -217,9 +203,7 @@ fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i6
                 }
                 _: {}
             }
-            oi += 1
         }
-        ii += 1
     }
     match block.terminator {
         MirBrTerminator br: {
@@ -289,10 +273,8 @@ fun mir_to_x64_release_operand(lower: MirToX64Lower, operand: MirOperand): void 
 }
 
 fun mir_to_x64_release_operands(lower: MirToX64Lower, operands: MirOperand[]): void {
-    let i = 0
-    for i < len(operands) {
+    for i: 0:len(operands) {
         mir_to_x64_release_operand(lower, operands[i])
-        i += 1
     }
 }
 
@@ -340,10 +322,8 @@ fun mir_to_x64_mark_cross_block_terminator_use(lower: MirToX64Lower, def_blocks:
 
 fun mir_to_x64_mark_reusable_values(lower: MirToX64Lower, fn: MirFunction): void {
     let def_blocks = new i64[len(lower.value_slots)]
-    let bi = 0
-    for bi < len(fn.blocks) {
-        let ii = 0
-        for ii < len(fn.blocks[bi].instructions) {
+    for bi: 0:len(fn.blocks) {
+        for ii: 0:len(fn.blocks[bi].instructions) {
             if fn.blocks[bi].instructions[ii].op != "alloca" && fn.blocks[bi].instructions[ii].has_result {
                 let value_id = fn.blocks[bi].instructions[ii].result_id
                 def_blocks[value_id] = bi + 1
@@ -356,41 +336,28 @@ fun mir_to_x64_mark_reusable_values(lower: MirToX64Lower, fn: MirFunction): void
                     lower.reusable_values[value_id] = 1
                 }
             }
-            ii += 1
         }
-        bi += 1
     }
-    bi = 0
-    for bi < len(fn.blocks) {
-        let ii = 0
-        for ii < len(fn.blocks[bi].instructions) {
-            let oi = 0
-            for oi < len(fn.blocks[bi].instructions[ii].operands) {
+    for bi: 0:len(fn.blocks) {
+        for ii: 0:len(fn.blocks[bi].instructions) {
+            for oi: 0:len(fn.blocks[bi].instructions[ii].operands) {
                 mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, fn.blocks[bi].instructions[ii].operands[oi], bi + 1)
-                oi += 1
             }
-            ii += 1
         }
         mir_to_x64_mark_cross_block_terminator_use(lower, def_blocks, fn.blocks[bi].terminator, bi + 1)
-        bi += 1
     }
 }
 
 fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
-    let i = 0
-    for i < len(fn.params) {
+    for i: 0:len(fn.params) {
         mir_to_x64_add_value_slot(lower, fn.params[i].value_id)
-        i += 1
     }
     mir_to_x64_mark_reusable_values(lower, fn)
-    let b = 0
-    for b < len(fn.blocks) {
+    for b: 0:len(fn.blocks) {
         lower.block_local_use_counts = mir_to_x64_count_block_local_uses(lower, fn.blocks[b])
-        let j = 0
-        for j < len(fn.blocks[b].instructions) {
+        for j: 0:len(fn.blocks[b].instructions) {
             if fn.blocks[b].instructions[j].op == "alloca" {
                 mir_to_x64_add_addr_slot(lower, fn.blocks[b].instructions[j].result_id)
-                j += 1
                 continue
             }
             mir_to_x64_release_operands(lower, fn.blocks[b].instructions[j].operands)
@@ -405,15 +372,11 @@ fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
                     mir_to_x64_release_value(lower, fn.blocks[b].instructions[j].result_id)
                 }
             }
-            j += 1
         }
         mir_to_x64_release_terminator(lower, fn.blocks[b].terminator)
-        b += 1
     }
-    i = 0
-    for i < 8 {
+    for i: 0:8 {
         mir_to_x64_slot(lower)
-        i += 1
     }
 }
 
@@ -690,11 +653,9 @@ fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
     let extra = ((stack_args * 8 + 15) / 16) * 16
     let frame = 32 + extra
     x64_add_inst2(lower.x64, "sub", x64_reg("rsp"), x64_imm(frame))
-    i = 4
-    for i < len(inst.operands) {
+    for i: 4:len(inst.operands) {
         mir_to_x64_load_operand(lower, "rax", inst.operands[i])
         x64_add_inst2(lower.x64, "mov", x64_mem_base("rsp", 32 + (i - 4) * 8, 8), x64_reg("rax"))
-        i += 1
     }
     x64_add_inst1(lower.x64, "call", x64_symbol(inst.callee))
     x64_add_inst2(lower.x64, "add", x64_reg("rsp"), x64_imm(frame))
@@ -821,24 +782,18 @@ fun mir_to_x64_now_ms(): i64 {
 
 fun mir_to_x64_value_capacity(fn: MirFunction): i64 {
     let max_id = 0
-    let i = 0
-    for i < len(fn.params) {
+    for i: 0:len(fn.params) {
         if fn.params[i].value_id > max_id {
             max_id = fn.params[i].value_id
         }
-        i += 1
     }
-    let b = 0
-    for b < len(fn.blocks) {
-        let j = 0
-        for j < len(fn.blocks[b].instructions) {
+    for b: 0:len(fn.blocks) {
+        for j: 0:len(fn.blocks[b].instructions) {
             let inst = fn.blocks[b].instructions[j]
             if inst.has_result && inst.result_id > max_id {
                 max_id = inst.result_id
             }
-            j += 1
         }
-        b += 1
     }
     ret max_id + 1
 }
@@ -862,11 +817,9 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     }
     lower.block_label_names = new str[]
     lower.block_labels = new X64Label[]
-    let label_i = 0
-    for label_i < len(fn.blocks) {
+    for label_i: 0:len(fn.blocks) {
         lower.block_label_names.push(fn.blocks[label_i].name)
         lower.block_labels.push(x64_new_label(lower.x64))
-        label_i += 1
     }
     lower.return_label = x64_new_label(lower.x64)
 
@@ -893,29 +846,24 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     arg_regs.push("rdx")
     arg_regs.push("r8")
     arg_regs.push("r9")
-    let i = 0
-    for i < len(fn.params) {
+    for i: 0:len(fn.params) {
         if i < len(arg_regs) {
             x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].value_id), 8), x64_reg(arg_regs[i]))
         } else {
             x64_add_inst2(lower.x64, "mov", x64_reg("rax"), x64_mem_base("rbp", 16 + i * 8, 8))
             x64_add_inst2(lower.x64, "mov", x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].value_id), 8), x64_reg("rax"))
         }
-        i += 1
     }
     let params_stop = mir_to_x64_now_ms()
     lower.timing_params += (params_stop - params_start)
 
-    let b = 0
-    for b < len(fn.blocks) {
+    for b: 0:len(fn.blocks) {
         lower.timing_blocks += 1
         x64_bind_label(lower.x64, mir_to_x64_block_label(lower, fn.blocks[b].name))
-        let j = 0
         let inst_start = mir_to_x64_now_ms()
-        for j < len(fn.blocks[b].instructions) {
+        for j: 0:len(fn.blocks[b].instructions) {
             lower.timing_instructions += 1
             mir_to_x64_lower_inst(lower, fn.blocks[b].instructions[j])
-            j += 1
         }
         let inst_stop = mir_to_x64_now_ms()
         lower.timing_insts += (inst_stop - inst_start)
@@ -924,7 +872,6 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
         mir_to_x64_lower_term(lower, fn, fn.blocks[b].terminator)
         let term_stop = mir_to_x64_now_ms()
         lower.timing_terms += (term_stop - term_start)
-        b += 1
     }
 
     let epilogue_start = mir_to_x64_now_ms()
