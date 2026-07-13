@@ -272,8 +272,10 @@ fun mir_binary_op(expr_op: str, source_type: str): str {
     if expr_op == "|" { ret "or" }
     if expr_op == "^" { ret "xor" }
     if expr_op == "<<" { ret "shl" }
-    if expr_op == ">>" { ret "sar" }
-    if expr_op == ">>>" { ret "shr" }
+    if expr_op == ">>" {
+        if unsigned { ret "shr" }
+        ret "sar"
+    }
     if expr_op == "==" { ret "icmp.eq" }
     if expr_op == "!=" { ret "icmp.ne" }
     if expr_op == "<" {
@@ -1131,7 +1133,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             let op = mir_binary_op(n.op, left_type)
             let result_type = mir_op_result_type(op)
-            if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+            if n.op == "<<" || n.op == ">>" {
                 mir_emit_shift_count_check(st, right_flow.value, left_type, n.meta.line)
             }
             let inst = mir_make_result_inst(st, op, result_type)
@@ -1678,7 +1680,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     let target_type = ast_require_resolved_type(target.meta)
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
-                    if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                    if n.op == "<<" || n.op == ">>" {
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
@@ -1705,7 +1707,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     let target_type = ast_require_resolved_type(target.meta)
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
-                    if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                    if n.op == "<<" || n.op == ">>" {
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)
@@ -1735,7 +1737,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     let target_type = ast_require_resolved_type(target.meta)
                     let op = mir_binary_op(n.op, target_type)
                     let result_type = mir_op_result_type(op)
-                    if n.op == "<<" || n.op == ">>" || n.op == ">>>" {
+                    if n.op == "<<" || n.op == ">>" {
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
                     let inst = mir_make_result_inst(st, op, result_type)

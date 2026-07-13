@@ -921,16 +921,16 @@ class MirCodegen(MirFunctionBuilder):
         return value
 
     def _binary(self, op, left, right, lhs_type=None, line=0):
-        op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor",
-                  "<<": "shl", ">>": "sar", ">>>": "shr"}
         unsigned = self._is_unsigned_integer(lhs_type)
+        op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor",
+                  "<<": "shl", ">>": "shr" if unsigned else "sar"}
         if op == "/":
             value = ValueOperand(self.inst("udiv" if unsigned else "sdiv", [left, right], result_type=I64))
             return self._normalize_integer_value(value, lhs_type)
         if op == "%":
             value = ValueOperand(self.inst("urem" if unsigned else "srem", [left, right], result_type=I64))
             return self._normalize_integer_value(value, lhs_type)
-        if op in ("<<", ">>", ">>>"):
+        if op in ("<<", ">>"):
             self._emit_shift_count_check(right, lhs_type, line)
         if op in op_map:
             value = ValueOperand(self.inst(op_map[op], [left, right], result_type=I64))
@@ -949,9 +949,9 @@ class MirCodegen(MirFunctionBuilder):
         left = self._emit_expr_from(in_block, expr.left)
         right = self._emit_expr_from(left.block, expr.right)
         self.set_block(right.block)
-        op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "sar", ">>>": "shr"}
-        cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
         unsigned = self._is_unsigned_integer(left_type)
+        op_map = {"+": "add", "-": "sub", "*": "mul", "&": "and", "|": "or", "^": "xor", "<<": "shl", ">>": "shr" if unsigned else "sar"}
+        cmp_map = {"==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge"}
         if expr.op == "+" and left_type == et.STR and right_type == et.STR:
             result = self.inst("call", [left.value, right.value], result_type=ptr(), type=ptr(), callee="__ep_str_cat")
             return ValueFlow(ValueOperand(result), self.current_block)
@@ -968,7 +968,7 @@ class MirCodegen(MirFunctionBuilder):
             value = ValueOperand(self.inst("urem" if unsigned else "srem", [left.value, right.value], result_type=I64))
             return ValueFlow(self._normalize_integer_value(value, left_type), self.current_block)
         if expr.op in op_map:
-            if expr.op in ("<<", ">>", ">>>"):
+            if expr.op in ("<<", ">>"):
                 self._emit_shift_count_check(right.value, left_type, self._node_line(expr))
             value = ValueOperand(self.inst(op_map[expr.op], [left.value, right.value], result_type=I64))
             return ValueFlow(self._normalize_integer_value(value, left_type), self.current_block)

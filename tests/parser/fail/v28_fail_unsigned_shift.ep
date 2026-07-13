@@ -1,0 +1,4 @@
+# COMPILE_FAIL: Unexpected token
+fun main(): void {
+    let x = u64(8) >>> 1
+}

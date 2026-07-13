@@ -532,30 +532,20 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == '>' {
-            if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 62 && char_at(src, pos + 3) == 61 {
-                push_token(tokens, "USHR_ASSIGN", ">>>=", line)
-                pos += 4
+            if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 61 {
+                push_token(tokens, "SHR_ASSIGN", ">>=", line)
+                pos += 3
             } else {
-                if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 62 {
-                    push_token(tokens, "USHR", ">>>", line)
-                    pos += 3
+                if char_at(src, pos + 1) == 62 {
+                    push_token(tokens, "SHR", ">>", line)
+                    pos += 2
                 } else {
-                    if char_at(src, pos + 1) == 62 && char_at(src, pos + 2) == 61 {
-                        push_token(tokens, "SHR_ASSIGN", ">>=", line)
-                        pos += 3
+                    if char_at(src, pos + 1) == 61 {
+                        push_token(tokens, "GTE", ">=", line)
+                        pos += 2
                     } else {
-                        if char_at(src, pos + 1) == 62 {
-                            push_token(tokens, "SHR", ">>", line)
-                            pos += 2
-                        } else {
-                            if char_at(src, pos + 1) == 61 {
-                                push_token(tokens, "GTE", ">=", line)
-                                pos += 2
-                            } else {
-                                push_token(tokens, "GT", ">", line)
-                                pos += 1
-                            }
-                        }
+                        push_token(tokens, "GT", ">", line)
+                        pos += 1
                     }
                 }
             }

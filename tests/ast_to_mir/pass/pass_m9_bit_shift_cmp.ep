@@ -4,7 +4,7 @@ fun run(): i64 {
     if y >= 9 {
         ret y >> 1
     }
-    ret y >>> 1
+    ret y >> 1
 }
 
 fun main(): void {

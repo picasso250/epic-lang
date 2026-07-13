@@ -16,7 +16,11 @@ fun main(): void {
     x |= 2
     x &= 14
     x ^= 3
-    x >>>= 1
+    x >>= 1
+
+    let ux: u64 = u64(1) << 63
+    ux >>= u64(63)
+    if ux != u64(1) { exit(1) }
 
     let b = new Box {}
     b.value = 4

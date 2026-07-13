@@ -79,7 +79,7 @@ fun main(): i64 {
     # -- Operators --------------------------------------------------
     let arith = 1 + 2 - 3 * 4 / 5 % 6
     let bit = 1 & 2 | 3 ^ 4
-    let shift = 1 << 2 >> 3 >>> 4
+    let shift = 1 << 2 >> 3
     let comp = 1 == 2 != 3 < 4 <= 5 > 6 >= 7
     let logic = true && false || !true
     let neg = ~0
@@ -94,7 +94,6 @@ fun main(): i64 {
     assign ^= 1
     assign <<= 1
     assign >>= 1
-    assign >>>= 1
 
     # -- Language-ish structures ------------------------------------
     # Struct field access
@@ -126,7 +125,6 @@ fun operators(): i64 {
     let h = 1 | 2
     let i = 1 << 2
     let j = 1 >> 2
-    let k = 1 >>> 2
     let l = 1 == 2
     let m = 1 != 2
     let n = 1 < 2

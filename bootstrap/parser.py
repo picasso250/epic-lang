@@ -354,7 +354,6 @@ class Parser:
         "PERCENT_ASSIGN": "%",
         "SHL_ASSIGN": "<<",
         "SHR_ASSIGN": ">>",
-        "USHR_ASSIGN": ">>>",
         "AMP_ASSIGN": "&",
         "PIPE_ASSIGN": "|",
         "CARET_ASSIGN": "^",
@@ -482,7 +481,7 @@ class Parser:
         "EQEQ": "==", "NEQ": "!=", "LT": "<", "GT": ">",
         "LTE": "<=", "GTE": ">=", "AND": "&&", "OR": "||",
         "PIPE": "|", "CARET": "^", "AMPERSAND": "&",
-        "SHL": "<<", "SHR": ">>", "USHR": ">>>",
+        "SHL": "<<", "SHR": ">>",
     }
 
     def parse_equality(self):
@@ -518,7 +517,7 @@ class Parser:
 
     def parse_shift(self):
         left = self.parse_term()
-        while op := (self.check("SHL") or self.check("SHR") or self.check("USHR")):
+        while op := (self.check("SHL") or self.check("SHR")):
             left = BinaryNode(op=self.OP_MAP[op[0]], left=left, line=op[2], right=self.parse_term())
         return left
 

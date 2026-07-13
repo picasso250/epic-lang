@@ -14,7 +14,11 @@ fun main(): void {
     if combined == u64(90) {
         println(str(combined))
     }
-    let shifted: u64 = (u64(b) << 1) >>> 1
+    let shifted: u64 = (u64(b) << 1) >> 1
     println(str(shifted))
+    let high: u64 = u64(1) << 63
+    if high >> 63 != u64(1) { exit(1) }
+    let signed: i64 = 0 - 8
+    if signed >> 1 != (0 - 4) { exit(2) }
     exit(0)
 }
