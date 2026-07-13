@@ -787,7 +787,7 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         mir_to_x64_emit_call(lower, inst)
         ret
     }
-    if inst.op == "ptrtoint" {
+    if inst.op == "ptrtoint" || inst.op == "inttoptr" {
         mir_to_x64_load_operand(lower, "rax", inst.operands[0])
         mir_to_x64_store_result(lower, inst.result_id, "rax")
         ret

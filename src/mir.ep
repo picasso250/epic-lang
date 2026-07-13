@@ -308,8 +308,9 @@ fun mir_inst_text(inst: MirInst): str {
         }
         ret str_buf_finish(buf)
     }
-    if inst.op == "ptrtoint" {
-        str_buf_extend(buf, "ptrtoint ")
+    if inst.op == "ptrtoint" || inst.op == "inttoptr" {
+        str_buf_extend(buf, inst.op)
+        str_buf_extend(buf, " ")
         str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
         str_buf_extend(buf, " to ")
         str_buf_extend(buf, inst.typ)

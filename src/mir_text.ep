@@ -279,12 +279,14 @@ fun mrt_parse_inst(line: str): MirInst {
         let args = mrt_parse_operands(after_ret[lp + 1:rp])
         ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_id, result_type)
     }
-    if mrt_starts_with(body, "ptrtoint ") {
-        let rest = body[9:len(body)]
+    if mrt_starts_with(body, "ptrtoint ") || mrt_starts_with(body, "inttoptr ") {
+        let op = "ptrtoint"
+        if mrt_starts_with(body, "inttoptr ") { op = "inttoptr" }
+        let rest = body[len(op) + 1:len(body)]
         let to_pos = mrt_find(rest, " to ")
-        if to_pos < 0 { mir_text_die(("bad ptrtoint: " + line)) }
+        if to_pos < 0 { mir_text_die(("bad " + op + ": " + line)) }
         let inst = mir_inst_empty()
-        inst.op = "ptrtoint"
+        inst.op = op
         inst.typ = mrt_trim(rest[to_pos + 4:len(rest)])
         inst.operands.push(mrt_parse_typed_operand(rest[0:to_pos]))
         ret mrt_inst_with_result(inst, result_id, result_type)

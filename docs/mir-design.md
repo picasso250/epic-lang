@@ -370,9 +370,10 @@ MIR integer signedness is expressed by opcode (`sdiv`/`udiv`, `icmp.slt`/`icmp.u
 
 ```text
 %n: i64 = ptrtoint ptr %p to i64
+%p: ptr = inttoptr i64 %n to ptr
 ```
 
-第一版只需要 `ptr -> i64`，用于 LLVM-like `gep null, 1` 大小计算。反向 `inttoptr` 不作为当前目标需求。
+当前实现同时支持 `ptrtoint` 和 `inttoptr`。源码 opaque `ptr` 与 `i64/u64` 的显式 bit-pattern 转换 lower 到这两条 MIR 指令；x64 lowering 中两者都是 64-bit value move，不引入解引用语义。
 
 ### 11.3 比较
 
@@ -767,7 +768,7 @@ global @str.0: ptr = bytes "hello\n"
 - `load T, ptr` 的地址 operand 必须是 `ptr`，result 必须是 `T`。
 - `store T value, ptr addr` 的 value 类型必须是 `T`，addr 必须是 `ptr`。
 - `gep SourceType, ptr base, indices...` 的 base 必须是 `ptr`，result 必须是 `ptr`，indices 必须匹配 `SourceType`。
-- `ptrtoint ptr -> i64` 类型匹配。
+- `ptrtoint ptr -> i64` 与 `inttoptr i64 -> ptr` 类型匹配。
 - `add/sub/mul/sdiv/udiv/srem/urem` 两个 operand 类型一致，result 类型一致；signedness 由 opcode 表达，不由 integer bit width 表达。
 - `icmp.*` 两个 operand 类型一致，result 是 `bool`。
 - `condbr` condition 是 `bool`。
@@ -815,7 +816,7 @@ AST
 MIR lowering 负责：
 
 - 把 structured MIR 控制流降成 label + jmp/conditional jmp。
-- 把 `add/sub/icmp/load/store/gep/ptrtoint/call` 降到当前简单寄存器策略。
+- 把 `add/sub/icmp/load/store/gep/ptrtoint/inttoptr/call` 降到当前简单寄存器策略。
 - 根据 module 的显式 struct layout 把 `gep struct` 降成 offset address calculation。
 - 把局部变量和临时值分配到 stack slot 或固定寄存器约定。
 - 把 Epic call / runtime call / WinAPI call 降成 Windows x64 ABI 调用序列。

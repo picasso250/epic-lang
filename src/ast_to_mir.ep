@@ -403,6 +403,14 @@ fun mir_make_ptrtoint(st: MirCodegenState, operand: MirOperand, target_type: str
     ret mir_value_operand(target_type, inst.result_id)
 }
 
+fun mir_make_inttoptr(st: MirCodegenState, operand: MirOperand): MirOperand {
+    let inst = mir_make_result_inst(st, "inttoptr", "ptr")
+    inst.typ = "ptr"
+    inst.operands.push(operand)
+    mir_emit_inst(st, inst)
+    ret mir_value_operand("ptr", inst.result_id)
+}
+
 fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: MirOperand[]): MirOperand {
     let inst = mir_inst_empty()
     inst.op = "call"
@@ -777,7 +785,7 @@ fun mir_is_struct_name(st: MirCodegenState, name: str): bool {
 }
 
 fun mir_is_ptr_array_elem_type(st: MirCodegenState, elem_type: str): bool {
-    if elem_type == "str" {
+    if elem_type == "ptr" || elem_type == "str" {
         ret true
     }
     ret mir_is_struct_name(st, elem_type)
@@ -1279,7 +1287,23 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 args.push(mir_const_int("i64", n.meta.line))
                 ret mir_value_flow(mir_emit_call_inst(st, "__ep_cstr", "i64", args), st.current_block)
             }
-            if n.name == "i64" || n.name == "u64" || n.name == "bool" {
+            if n.name == "ptr" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                if ast_resolved_type(n.args[0]) == "ptr" {
+                    ret arg_flow
+                }
+                ret mir_value_flow(mir_make_inttoptr(st, arg_flow.value), st.current_block)
+            }
+            if n.name == "i64" || n.name == "u64" {
+                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
+                st.current_block = arg_flow.block
+                if ast_resolved_type(n.args[0]) == "ptr" {
+                    ret mir_value_flow(mir_make_ptrtoint(st, arg_flow.value, "i64"), st.current_block)
+                }
+                ret arg_flow
+            }
+            if n.name == "bool" {
                 ret mir_emit_expr(st, st.current_block, n.args[0])
             }
             if n.name == "u8" {

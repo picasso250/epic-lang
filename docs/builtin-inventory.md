@@ -27,8 +27,9 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
 | `cstr(text)` | `str -> u64` | validates/creates a NUL-terminated buffer through `__ep_cstr` |
 | `len(value)` | `str` or any array -> `i64` | reads the public logical length |
-| `i64(x)` | integer -> `i64` | integer conversion |
-| `u64(x)` | integer -> `u64` | integer conversion |
+| `i64(x)` | integer or `ptr` -> `i64` | integer conversion or pointer bit-pattern extraction |
+| `u64(x)` | integer or `ptr` -> `u64` | integer conversion or pointer bit-pattern extraction |
+| `ptr(x)` | `i64`, `u64`, or `ptr` -> `ptr` | opaque pointer bit-pattern conversion |
 | `i32(x)` | integer -> `i32` | truncates to 32 bits, then keeps canonical sign extension |
 | `u32(x)` | integer -> `u32` | truncates to 32 bits, then keeps canonical zero extension |
 | `u8(x)` | integer -> `u8` | truncates to 8 bits |

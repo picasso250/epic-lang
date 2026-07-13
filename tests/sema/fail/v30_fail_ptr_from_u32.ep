@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: ptr expected ptr, i64, or u64, got u32
+fun main(): void {
+    let p = ptr(u32(0))
+}

@@ -1,0 +1,6 @@
+# COMPILE_FAIL_CONTAINS: pointer operator only supports == and !=, got +
+extern "kernel32.dll" fun GetCommandLineA(): ptr
+fun main(): void {
+    let p = GetCommandLineA()
+    let q = p + p
+}

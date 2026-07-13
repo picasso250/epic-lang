@@ -1,0 +1,39 @@
+# EXIT: 0
+# STDOUT: true
+
+extern "kernel32.dll" fun GetCommandLineA(): ptr
+extern "kernel32.dll" fun lstrlenA(value: ptr): i32
+
+struct Holder {
+    value: ptr
+}
+
+fun check(ok: bool): void {
+    if !ok { panic "check failed" }
+}
+
+fun main(): void {
+    let p = GetCommandLineA()
+    let bits = u64(p)
+    let same = ptr(bits)
+    let signed_bits = i64(p)
+    let same_signed = ptr(signed_bits)
+    let next = ptr(bits + u64(1))
+    let restored = ptr(u64(next) - u64(1))
+    let null_ptr = ptr(u64(0))
+
+    let holder = new Holder { value: p }
+    let pointers = new ptr[] { p, same }
+    pointers.push(restored)
+
+    check(p == same)
+    check(p == same_signed)
+    check(next != p)
+    check(restored == p)
+    check(holder.value == p)
+    check(pointers[0] == pointers[1])
+    check(pointers.pop() == p)
+    check(u64(null_ptr) == u64(0))
+    check(lstrlenA(p) > i32(0))
+    println(str(true))
+}

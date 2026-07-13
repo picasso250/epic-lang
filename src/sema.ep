@@ -90,7 +90,7 @@ fun sema_is_int(t: str): bool {
 }
 
 fun sema_is_extern_scalar_abi_type(t: str): bool {
-    ret sema_is_int(t)
+    ret sema_is_int(t) || t == "ptr"
 }
 
 fun sema_validate_extern_struct_param(st: SemaState, extern_name: str, param_name: str, type_name: str): void {
@@ -139,7 +139,7 @@ fun sema_is_reserved_func(name: str): bool {
     if name == "read_file" || name == "write_file" || name == "len" {
         ret true
     }
-    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "i16" || name == "u16" || name == "u8" || name == "bool" {
+    if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "i16" || name == "u16" || name == "u8" || name == "bool" || name == "ptr" {
         ret true
     }
     ret false
@@ -152,7 +152,7 @@ fun sema_type_atom(st: SemaState, name: str): str {
     if name == "i64" || name == "u64" || name == "i32" || name == "u32" || name == "i16" || name == "u16" || name == "u8" {
         ret name
     }
-    if name == "bool" || name == "void" || name == "str" {
+    if name == "bool" || name == "void" || name == "str" || name == "ptr" {
         ret name
     }
     if sema_struct_index(st, name) >= 0 {
@@ -757,6 +757,15 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             if (n.op == "<" || n.op == ">" || n.op == "<=" || n.op == ">=") && (left == "str" || right == "str") {
                 sema_die(f"string ordering comparison {n.op} is not supported")
             }
+            if left == "ptr" || right == "ptr" {
+                if n.op != "==" && n.op != "!=" {
+                    sema_die(f"pointer operator only supports == and !=, got {n.op}")
+                }
+                if left != "ptr" || right != "ptr" {
+                    sema_die(f"pointer comparison expected ptr operands, got {left} and {right}")
+                }
+                ret sema_set_type(node, "bool")
+            }
             if n.op == "==" || n.op == "!=" || n.op == "<" || n.op == ">" || n.op == "<=" || n.op == ">=" {
                 if sema_is_int(left) && sema_is_int(right) {
                     if left != right {
@@ -934,7 +943,23 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
         sema_check_assign(st, "str", node.args[0], "cstr argument 1")
         ret "u64"
     }
-    if node.name == "i64" || node.name == "u64" || node.name == "i32" || node.name == "u32" || node.name == "i16" || node.name == "u16" || node.name == "u8" {
+    if node.name == "ptr" {
+        sema_check_arity("ptr", 1, node.args)
+        let source = sema_expr_type(st, node.args[0])
+        if source != "ptr" && source != "i64" && source != "u64" {
+            sema_die(f"ptr expected ptr, i64, or u64, got {source}")
+        }
+        ret "ptr"
+    }
+    if node.name == "i64" || node.name == "u64" {
+        sema_check_arity(node.name, 1, node.args)
+        let source = sema_expr_type(st, node.args[0])
+        if source != "ptr" && sema_is_int(source) == false {
+            sema_die(f"{node.name} expected integer or ptr, got {source}")
+        }
+        ret sema_type_atom(st, node.name)
+    }
+    if node.name == "i32" || node.name == "u32" || node.name == "i16" || node.name == "u16" || node.name == "u8" {
         sema_check_arity(node.name, 1, node.args)
         sema_expect_int(st, node.args[0], f"{node.name} argument")
         ret sema_type_atom(st, node.name)

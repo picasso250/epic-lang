@@ -443,20 +443,20 @@ let source = str(read_file(path))
 ```epic
 extern "kernel32.dll" fun Sleep(milliseconds: u32): void
 extern "kernel32.dll" fun GetTickCount64(): u64
-extern "kernel32.dll" fun lstrcmpA(left: u64, right: u64): i32
+extern "kernel32.dll" fun lstrcmpA(left: ptr, right: ptr): i32
 ```
 
-extern scalar 参数和返回值允许 `u8`、`i16`、`u16`、`i32`、`u32`、`i64`、`u64`，返回类型还可为 `void`。`DWORD`/`UINT` 使用 `u32`，C `int`/`LONG` 使用 `i32`，64 位整数使用对应的 `i64/u64`；窄整数返回值在调用边界立即规范化到 Epic 的 64-bit value representation。
+extern scalar 参数和返回值允许 `u8`、`i16`、`u16`、`i32`、`u32`、`i64`、`u64` 和 opaque `ptr`，返回类型还可为 `void`。`DWORD`/`UINT` 使用 `u32`，C `int`/`LONG` 使用 `i32`，64 位整数使用对应的 `i64/u64`，地址、handle 和可空 C pointer 使用 `ptr`；窄整数返回值在调用边界立即规范化到 Epic 的 64-bit value representation。
 
-extern 参数还可使用非空的 FFI-safe 用户 struct。此时源码参数 `value: T` **固定表示同步 borrowed `T*`**，不是 C by-value `T`；lowering 直接传递 Epic heap-backed struct payload 的稳定地址。FFI-safe struct 的字段只允许整数 scalar，不允许 `bool`、`str`、array、其他 struct 或 ADT。Win32 `BOOL` 应写作 `i32`，一字节 `BOOLEAN` 才写作 `u8`。nested C struct 第一版使用字段 flatten，C union/bitfield 使用相同大小的整数 raw storage 表达。
+extern 参数还可使用非空的 FFI-safe 用户 struct。此时源码参数 `value: T` **固定表示同步 borrowed `T*`**，不是 C by-value `T`；lowering 直接传递 Epic heap-backed struct payload 的稳定地址。FFI-safe struct 的字段只允许整数 scalar 或 opaque `ptr`，不允许 `bool`、`str`、array、其他 struct 或 ADT。Win32 `BOOL` 应写作 `i32`，一字节 `BOOLEAN` 才写作 `u8`。nested C struct 第一版使用字段 flatten，C union/bitfield 使用相同大小的整数 raw storage 表达。
 
 struct extern 返回值和 struct by-value 参数均不支持。只有在用户已经独立确认目标 ABI 把 1/2/4/8 字节 aggregate 放在普通整数 lane 时，才可把它手工声明成对应整数并用位运算解码；未使用高位必须由用户 mask。Epic 不公开 `sizeof`；需要 `cbSize`/`dwLength` 时使用目标 ABI 文档或独立布局工具取得常量。
 
 extern struct pointer 只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。当前没有 callback/function pointer，因此 extern 调用期间不会重新进入 Epic；未来若开放 callback，需要重新审视 safepoint 和 root 契约。
 
-Epic 不公开 `ptr` 类型。外部指针、C 字符串地址、Windows handle 和其他 pointer-sized opaque value 使用 `u64` bit pattern；`0` 写作 `u64(0)`，`INVALID_HANDLE_VALUE` 可写作 `u64(0) - u64(1)`。这些值不能解引用，也不使用 postfix `?`；空地址检查显式写 `value != u64(0)`。可空 C struct pointer 继续声明为 `u64`，因为 Epic struct 参数本身不可传 null。
+`ptr` 是公开的 64-bit opaque address scalar。它可用于变量、参数、返回值、struct 字段、`ptr[]` 和 extern ABI；只支持同类型的 `==` / `!=`，不支持直接算术、位运算、排序比较、解引用、字段访问、下标或 postfix `?`。地址运算必须显式经过整数：`ptr(u64(base) + offset)`。只允许 `ptr(i64/u64)` 与 `i64/u64(ptr)` 双向 bit-pattern 转换；空地址写作 `ptr(0)`，`INVALID_HANDLE_VALUE` 可写作 `ptr(u64(0) - u64(1))`。`ptr` 不拥有内存，也不延长外部资源或 managed allocation 的生命周期。
 
-`cstr(s)` 返回 `u64`，并要求字符串不含内嵌 NUL。extern 不提供隐式字符串转换。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
+`cstr(s)` 当前仍返回 `u64`，并要求字符串不含内嵌 NUL；后续由返回 `ptr` 的 `cptr` 取代。extern 不提供隐式字符串转换。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
 
 源码 extern 通过自带 PE linker 的编码导入符号传递 DLL metadata，因此 Python 驱动下要求默认的 `--linker py`；`lld-link` 仍可用于没有源码 extern 的程序。普通退出继续使用 `exit(code)`。
 
