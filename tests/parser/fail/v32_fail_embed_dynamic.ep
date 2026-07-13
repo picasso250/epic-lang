@@ -1,0 +1,5 @@
+# COMPILE_FAIL_CONTAINS: Expected STRING
+fun main(): void {
+    let path = "payload.txt"
+    let value = embed path
+}

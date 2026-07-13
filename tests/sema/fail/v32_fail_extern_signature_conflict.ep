@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: conflicting extern declaration SameName
+extern "demo.dll" fun SameName(value: u32): i64
+extern "demo.dll" fun SameName(value: u64): i64
+fun main(): void {}

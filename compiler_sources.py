@@ -1,15 +1,5 @@
 """Canonical source order for building the self-hosted Epic compiler."""
 
-SELF_HOST_RUNTIME_SOURCES = [
-    "runtime/array.ep",
-    "runtime/panic.ep",
-    "runtime/str.ep",
-]
-
-SELF_HOST_RUNTIME_HELPER_SOURCES = [
-    "runtime/file.ep",
-]
-
 SELF_HOST_COMPILER_SOURCES = [
     "src/util.ep",
     "src/lexer.ep",
@@ -17,6 +7,7 @@ SELF_HOST_COMPILER_SOURCES = [
     "src/sema.ep",
     "src/mir.ep",
     "src/mir_text.ep",
+    "src/runtime_bundle.ep",
     "src/mir_runtime.ep",
     "src/backend_abi.ep",
     "src/ast_to_mir.ep",

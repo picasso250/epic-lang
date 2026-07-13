@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_HELPER_SOURCES, SELF_HOST_RUNTIME_SOURCES
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
 
 
 ROOT = Path(__file__).resolve().parent
@@ -28,10 +28,10 @@ DEFAULT_CACHE_ROOT = ROOT / "build" / "cache" / "self-host-benchmark"
 BENCH_DIR = ROOT / "build" / "self-host-benchmark"
 BENCH_COMPILER = BENCH_DIR / "compiler.exe"
 BENCH_OUTPUT = BENCH_DIR / "epic.exe"
-RUNTIME_MIR_SOURCES = ["runtime/mir/gc.mir", "runtime/mir/helpers.mir"]
-CACHE_SCHEMA = 1
-BOOTSTRAP_CONTRACT = "fixed-point-v0-seed-v1"
-BENCHMARK_CONTRACT = "self-host-compiler-v1"
+RUNTIME_BUNDLE_SOURCE = "src/runtime_bundle.ep"
+CACHE_SCHEMA = 2
+BOOTSTRAP_CONTRACT = "fixed-point-embedded-runtime-v2"
+BENCHMARK_CONTRACT = "self-host-compiler-v2"
 
 
 def sha256_file(path: Path) -> str:
@@ -62,6 +62,25 @@ def group_record(paths: list[str]) -> dict[str, Any]:
     }
 
 
+def embedded_runtime_paths() -> list[str]:
+    bundle = ROOT / RUNTIME_BUNDLE_SOURCE
+    text = bundle.read_text(encoding="utf-8")
+    paths: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r'\bembed\s+"([^"]+)"', text):
+        resolved = (bundle.parent / match.group(1)).resolve()
+        try:
+            relative = resolved.relative_to(ROOT.resolve()).as_posix()
+        except ValueError as exc:
+            raise RuntimeError(f"embedded runtime path escapes repository: {match.group(1)}") from exc
+        if relative not in seen:
+            seen.add(relative)
+            paths.append(relative)
+    if not paths:
+        raise RuntimeError(f"no embed expressions found in {RUNTIME_BUNDLE_SOURCE}")
+    return paths
+
+
 def host_record() -> dict[str, Any]:
     return {
         "system": platform.system(),
@@ -89,15 +108,13 @@ def resolve_seed(requested: str | None) -> Path:
         errors="replace",
     )
     if completed.returncode != 0 or not seed.is_file():
-        raise RuntimeError("failed to rebuild frozen v0 seed")
+        raise RuntimeError("failed to rebuild v0 branch seed")
     return seed
 
 
 def build_inputs(seed: Path) -> dict[str, Any]:
     compiler_sources = [path.replace("\\", "/") for path in SELF_HOST_COMPILER_SOURCES]
-    runtime_sources = [path.replace("\\", "/") for path in SELF_HOST_RUNTIME_SOURCES]
-    runtime_sources.extend(path.replace("\\", "/") for path in SELF_HOST_RUNTIME_HELPER_SOURCES)
-    runtime_sources.extend(RUNTIME_MIR_SOURCES)
+    runtime_sources = embedded_runtime_paths()
     return {
         "schema": CACHE_SCHEMA,
         "bootstrap_contract": BOOTSTRAP_CONTRACT,
@@ -109,7 +126,7 @@ def build_inputs(seed: Path) -> dict[str, Any]:
         "runtime_sources": group_record(runtime_sources),
         "tools": group_record(["compiler_sources.py", "test_bootstrap_fixed_point.py"]),
         "source_order": {
-            "runtime": list(SELF_HOST_RUNTIME_SOURCES),
+            "embedded_runtime": runtime_sources,
             "compiler": list(SELF_HOST_COMPILER_SOURCES),
             "main": "src/epic.ep",
         },
@@ -129,7 +146,7 @@ def benchmark_inputs(build_key: str, runs: int) -> dict[str, Any]:
         "tool": file_record(Path(__file__).relative_to(ROOT).as_posix()),
         "host": host_record(),
         "command": {
-            "runtime": list(SELF_HOST_RUNTIME_SOURCES),
+            "embedded_runtime": embedded_runtime_paths(),
             "compiler": list(SELF_HOST_COMPILER_SOURCES),
             "main": "src/epic.ep",
             "output": BENCH_OUTPUT.relative_to(ROOT).as_posix(),
@@ -188,7 +205,6 @@ def build_fixed_point(seed: Path, compiler_output: Path, log_path: Path) -> None
 def benchmark_command() -> list[str]:
     return [
         str(BENCH_COMPILER),
-        *SELF_HOST_RUNTIME_SOURCES,
         *SELF_HOST_COMPILER_SOURCES,
         "--main",
         "src/epic.ep",
@@ -201,14 +217,16 @@ def benchmark_command() -> list[str]:
 def parse_benchmark_row(stdout: str, elapsed_ns: int) -> dict[str, Any]:
     x64_match = re.search(r"lower counts:.*x64_items=(\d+)", stdout)
     text_match = re.search(r"machine counts:.*text_bytes=(\d+)", stdout)
+    data_match = re.search(r"machine counts:.*data_bytes=(\d+)", stdout)
     total_match = re.search(r"timing: total: (\d+) ms", stdout)
-    if not x64_match or not text_match or not total_match:
+    if not x64_match or not text_match or not data_match or not total_match:
         raise RuntimeError("compiler output is missing benchmark metrics\n" + stdout[-8000:])
     return {
         "wall_ms": elapsed_ns / 1_000_000,
         "internal_ms": int(total_match.group(1)),
         "x64_items": int(x64_match.group(1)),
         "text_bytes": int(text_match.group(1)),
+        "data_bytes": int(data_match.group(1)),
         "exe_bytes": BENCH_OUTPUT.stat().st_size,
     }
 
@@ -225,7 +243,7 @@ def run_benchmark(compiler: Path, runs: int, log_dir: Path) -> list[dict[str, An
         row = parse_benchmark_row(completed.stdout, elapsed_ns)
         rows.append(row)
         print(render_run("benchmark", index + 1, row))
-    for metric in ("x64_items", "text_bytes", "exe_bytes"):
+    for metric in ("x64_items", "text_bytes", "data_bytes", "exe_bytes"):
         values = {row[metric] for row in rows}
         if len(values) != 1:
             raise RuntimeError(f"non-deterministic {metric}: {sorted(values)}")
@@ -238,6 +256,7 @@ def result_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "median_internal_ms": statistics.median(row["internal_ms"] for row in rows),
         "x64_items": rows[0]["x64_items"],
         "text_bytes": rows[0]["text_bytes"],
+        "data_bytes": rows[0]["data_bytes"],
         "exe_bytes": rows[0]["exe_bytes"],
     }
 
@@ -246,7 +265,8 @@ def render_run(label: str, index: int, row: dict[str, Any]) -> str:
     return (
         f"{label} run {index}: wall_ms={row['wall_ms']:.4f} "
         f"internal_ms={row['internal_ms']} x64_items={row['x64_items']} "
-        f"text_bytes={row['text_bytes']} exe_bytes={row['exe_bytes']}"
+        f"text_bytes={row['text_bytes']} data_bytes={row['data_bytes']} "
+        f"exe_bytes={row['exe_bytes']}"
     )
 
 
@@ -274,6 +294,7 @@ def render_result(
             f"{label} median_internal_ms={summary['median_internal_ms']:.0f}",
             f"{label} x64_items=[{summary['x64_items']}]",
             f"{label} text_bytes=[{summary['text_bytes']}]",
+            f"{label} data_bytes=[{summary['data_bytes']}]",
             f"{label} exe_bytes=[{summary['exe_bytes']}]",
         ]
     )
@@ -356,7 +377,7 @@ def ensure_build(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seed", help="seed compiler; default is the frozen v0 compiler")
+    parser.add_argument("--seed", help="seed compiler; default is the reproducible v0 branch compiler")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--label", default="self-host")
     parser.add_argument("--cache-dir", default=str(DEFAULT_CACHE_ROOT))

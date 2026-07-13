@@ -1,0 +1,5 @@
+# EXIT: 0
+extern "kernel32.dll" fun CreateFileA(name: ptr, desired_access: u32, share_mode: u32, attributes: ptr, disposition: u32, flags: u32, template: ptr): ptr
+fun main(): void {
+    exit(0)
+}

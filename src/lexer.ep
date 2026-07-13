@@ -113,6 +113,7 @@ fun keyword_kind(text: str): str {
     if text == "extern" { ret "EXTERN" }
     if text == "for" { ret "FOR" }
     if text == "new" { ret "NEW" }
+    if text == "embed" { ret "EMBED" }
     if text == "let" { ret "LET" }
     if text == "else" { ret "ELSE" }
     if text == "type" { ret "TYPE" }

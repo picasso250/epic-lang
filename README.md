@@ -2,8 +2,8 @@
 
 一个已完成自举的 **Windows x64** 原生编程语言。版本标签保存可复现里程碑；当前 `dev` 语言契约允许显式破坏性演进。
 
-- **可复现自举**：从冻结的 v0 compiler 构建当前 self-hosted compiler，并达到字节一致的不动点
-- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 15 个 Epic 模块组成
+- **可复现自举**：从 `v0` 分支导出的 seed 构建当前 self-hosted compiler，并达到字节一致的不动点
+- **纯 Epic 源码完成自举**：当前自托管编译器与内置 runtime 资源共同形成自包含工具链
 - **自动内存管理**：内置 non-moving conservative mark-sweep GC，无需额外 runtime 部署
 - **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World（含 GC）为 **10752 bytes（10.5 KiB）**
 - **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
@@ -34,7 +34,7 @@ python test_bootstrap_fixed_point.py -o build\epic.exe
 .\build\epic.exe examples\00_hello_world.ep -o build\hello.exe --verbose
 ```
 
-第一条命令使用冻结的 v0 seed 启动完整 bootstrap；本地缺少 seed 时会从 `v0` 标签的 detached worktree 自动重建。self-hosted compiler 会自动从当前工作目录的 `runtime/` 加入标准 runtime 源码；之后的 examples 可以沿用同一形式，只替换目标 `.ep` 文件。
+第一条命令使用 `v0` 分支导出的 seed 启动完整 bootstrap；本地缺少 seed 时会从该分支的 detached worktree 自动重建并校验 SHA-256。生成的 self-hosted compiler 已把标准 Epic runtime source 与 MIR bundle 嵌入自身 `.data`，运行时不依赖当前工作目录中的 `runtime/`。
 
 程序输出：
 
@@ -57,15 +57,15 @@ Epic 目前支持：
 - 堆分配结构体——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
 - 自动垃圾回收；对象地址在生命周期内保持稳定
 - 封闭的结构体-联合 ADT——`type Name = A | B` 声明、显式包装构造、公共字段访问
-- 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
+- `embed "path"` 编译期原始字节嵌入、面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
 
 主要语言特性可通过 `examples/` 渐进学习；完整语言边界由 `docs/` 和意图级测试共同定义。
 
-当前语言特性由编译器、`examples/`、`docs/` 和意图级测试共同定义。源码与 MIR 不承诺跨开发版本兼容；破坏性变更必须同步更新文档和测试。`v0`、`v1` 等标签保存对应历史快照。
+当前语言特性由编译器、`examples/`、`docs/` 和意图级测试共同定义。源码与 MIR 不承诺跨开发版本兼容；破坏性变更必须同步更新文档和测试。`v0` 分支维护可复现 bootstrap seed；其余版本标签保存对应历史快照。
 
 ## 自举不动点
 
-项目已通过完整 bootstrap fixed-point 验证：冻结的 `epic-v0.exe` 编译当前 Epic compiler，随后连续使用生成的 compiler 重新编译同一份源码。
+项目已通过完整 bootstrap fixed-point 验证：`v0` 分支导出的 `epic-v0.exe` 编译当前 Epic compiler，随后连续使用生成的 compiler 重新编译同一份源码。
 
 - **self-hosted 产物已达到字节不动点**：连续三个 self-hosted generations 字节一致
 
@@ -77,7 +77,7 @@ python test_bootstrap_fixed_point.py -o build\epic.exe
 
 ### 重建 v0 bootstrap compiler
 
-`v0` 标签包含可复现的 bootstrap 构建入口。脚本将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，校验已提交的 SHA-256，随后清理 worktree：
+`v0` 分支包含 Python stage-0、与 self-hosted `src/` 对齐的语言实现，以及可复现的 bootstrap 构建入口。脚本将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，校验已提交的 SHA-256，随后清理 worktree：
 
 这是发布与复现路径，不是日常编译路径；临时 worktree 用来隔离当前工作区的未提交改动。
 
@@ -99,9 +99,7 @@ build/bootstrap-v0/manifest.json
 python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
 ```
 
-冻结的 `v0` 标签保留历史 Python stage-0 和完整恢复入口；当前分支只维护 Epic 实现，日常 self-hosted 演进从 `epic-v0.exe` 起步。
-
-> **Bootstrap seed 限制：** 冻结 v0 会把无符号 `>>` 错误地编译为算术右移。当前源码只在随后 `& u64(255)` 的字节提取中依赖该操作，因此 stage1 仍然正确；不要在 bootstrap-sensitive 的 `src/` / `runtime/` 中新增一般无符号右移依赖。不要修改或移动 `v0` 标签；需要升级 seed 时应创建新的冻结版本。完整边界见 `docs/impl.md` 的“冻结 v0 seed 的右移限制”。
+`v0` 是可演进的 bootstrap 分支。它的 Python `bootstrap/` 与 Epic `src/` 必须保持语言语义一致；当前两边都支持 `embed "path"`，并让 `>>` / `>>=` 对有符号整数生成算术右移、对无符号整数生成逻辑右移。`>>>` / `>>>=` 不属于语言。
 
 ## 当前边界
 
@@ -109,7 +107,7 @@ Epic 当前仍有以下明确边界：
 
 - 仅面向 Windows x64；尚无跨平台 ABI 承诺
 - MIR 是 LLVM 风格，但并非 LLVM IR 兼容
-- 一等用户指针类型不纳入公开语言特性
+- `ptr` 是公开 opaque address scalar，但不提供解引用或隐式地址算术
 - 尚无完整的 SSA / phi-node 优化器流水线
 - 尚无通用汇编器或通用寄存器分配器
 - 旧的 NASM 文本汇编后端路径已归档，不再活跃
@@ -134,7 +132,7 @@ build/              忽略的本地构建输出
 ```powershell
 python tests/run.py                    # 模块级编译测试
 python tests/examples/run.py           # examples/ 正向示例
-python test_bootstrap_fixed_point.py   # 从冻结 v0 seed 开始的自举不动点检查
+python test_bootstrap_fixed_point.py   # 从 v0 分支 seed 开始的自举不动点检查
 ```
 
 模块级测试：
@@ -153,7 +151,7 @@ python tests/link/run.py
 python benchmark_self_host.py --label baseline
 ```
 
-脚本把 seed compiler、canonical compiler 源码、runtime `.ep/.mir`、测量工具版本和宿主信息纳入 key，并在 `build/cache/self-host-benchmark/` 分层保存收敛编译器、原始日志、结构化结果和文本报告。输入未变时直接复用；需要重新取得当前环境下的 wall-time 样本时加 `--refresh`，此时仍会复用相同的收敛编译器；需要连 fixed point 一起强制重建时使用 `--rebuild`。
+脚本把 seed compiler、canonical compiler 源码、嵌入的 runtime `.ep/.mir`、测量工具版本和宿主信息纳入 key，并在 `build/cache/self-host-benchmark/` 分层保存收敛编译器、原始日志、结构化结果和文本报告。输入未变时直接复用；需要重新取得当前环境下的 wall-time 样本时加 `--refresh`，此时仍会复用相同的收敛编译器；需要连 fixed point 一起强制重建时使用 `--rebuild`。
 
 `test_*.py` 是可直接运行的脚本，非 pytest。
 

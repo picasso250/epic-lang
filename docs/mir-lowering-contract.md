@@ -360,7 +360,7 @@ jmp  LabelRef(fn_name.else_target)
 
 ### 8.1 Program data
 
-`emit_program_data()` 在 `.data` section 按 MIR globals 生成：
+`emit_program_data()` 在 `.data` section 按 MIR globals 生成。普通字符串字面量和 `embed` 文件内容使用同一 global 表示：
 
 - 无初始化 global：8-byte zero slot，例如 `argv` 和 cached process `heap`
 - ptr/string global：零结尾 data bytes 与 24-byte header
@@ -379,22 +379,20 @@ Helpers such as `__ep_alloc`, `__ep_print_str`, `__ep_print_newline`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
-ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
-`src/mir_runtime.ep`. Standard composite helpers come from merged runtime Epic sources.
-`runtime/file.ep` is compiled as a separate AST/MIR program during injection; its private
-WinAPI extern declarations therefore never enter the user program's source namespace.
+ordinary `MirFunction`s loaded from the embedded `runtime/mir/helpers.mir` bundle and
+injected by `src/mir_runtime.ep`. All standard composite helpers, including `runtime/file.ep`,
+come from Epic sources embedded by `src/runtime_bundle.ep` and merged with user source before
+sema. Canonically identical repeated extern declarations are folded; conflicts are rejected.
 After injection, the compiler prunes unreachable MIR functions from the final
 program starting at `main`; startup and helper dependencies remain reachable
 through explicit MIR calls.
 `bytes(str)` and `str(u8[])` are lowered as identity casts. `cptr(str/u8[])`
 loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
 pointer unchanged; deprecated `cstr(str)` uses the same lowering. None require a MIR
-runtime function or runtime validation. Active `__ep_read_file` / `__ep_write_file`
-bodies come from `runtime/file.ep` and use `cptr(str/u8[])` plus explicit WinAPI externs.
-They retain an unused trailing source-line operand because the frozen v0 seed emits that
-call shape while bootstrapping the active self-hosted compiler; no validation uses the value.
-The same-named MIR bodies in `runtime/mir/helpers.mir` are first-generation bootstrap
-fallbacks only. Current compilers inject the Epic bodies first and skip those duplicates.
+runtime function or runtime validation. Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and
+use `cptr(str/u8[])` plus explicit pointer-typed WinAPI externs. Their MIR signatures match the
+public builtins exactly: one path operand for read, and path plus data operands for write.
+`runtime/mir/helpers.mir` contains no same-named fallback bodies.
 The x64 backend contains only generic instruction lowering in `src/mir_to_x64.ep`.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.

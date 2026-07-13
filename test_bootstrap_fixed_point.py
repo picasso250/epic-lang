@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that the compiler reaches a fixed point from the frozen v0 seed."""
+"""Check that the compiler reaches a fixed point from the reproducible v0 branch seed."""
 
 import argparse
 import filecmp
@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
 
 
 def rel(path):
@@ -21,7 +21,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
 DEFAULT_SEED = os.path.join(BUILD_DIR, "bootstrap-v0", "epic-v0.exe")
-RUNTIME_SOURCES = list(SELF_HOST_RUNTIME_SOURCES)
 COMPILER_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_COMPILER_SOURCES]
 
 TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "30"))
@@ -190,7 +189,6 @@ def build_with_epic(compiler, output_path, label):
     run_checked(
         [
             compiler,
-            *RUNTIME_SOURCES,
             *COMPILER_SOURCES,
             "--main",
             os.path.join("src", "epic.ep"),
@@ -237,7 +235,7 @@ def resolve_seed(requested):
     build_script = os.path.join(SCRIPT_DIR, "build_epic_v0.py")
     run_checked(
         [sys.executable, build_script, "--require-expected"],
-        "rebuild frozen v0 seed",
+        "rebuild v0 branch seed",
     )
     if not os.path.isfile(seed):
         raise RuntimeError(f"v0 rebuild did not produce seed compiler: {seed}")

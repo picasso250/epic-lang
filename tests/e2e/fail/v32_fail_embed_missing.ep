@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: embed file not found: ../data/missing.txt
+fun main(): void {
+    println(embed "../data/missing.txt")
+}

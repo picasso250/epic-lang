@@ -109,10 +109,10 @@ categories include:
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
 - panic and bounds/null failure paths.
 
-The self-hosted compiler loads the committed MIR bundles and merges Epic runtime helpers.
-`runtime/array.ep`, `runtime/panic.ep`, and `runtime/str.ep` are standard sources merged
-before the user program. `runtime/file.ep` is parsed, checked, and lowered separately during
-MIR runtime injection so its private WinAPI declarations cannot collide with user externs.
+`src/runtime_bundle.ep` embeds the committed MIR bundles and all standard Epic runtime
+sources (`array`, `panic`, `str`, and `file`) into the compiler image. The Epic sources are
+merged before the user program and pass through one frontend. Equivalent repeated extern
+declarations are deduplicated by canonical DLL/signature; conflicting declarations fail.
 Reachability begins at `main`; unused helpers and imports are pruned before x64 lowering.
 
 ## Name reservation

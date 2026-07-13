@@ -1,0 +1,18 @@
+# Runtime resources embedded into the compiler image as ordinary string globals.
+
+struct EmbeddedRuntimeSource {
+    path: str
+    text: str
+}
+
+fun embedded_runtime_sources(): EmbeddedRuntimeSource[] {
+    ret new EmbeddedRuntimeSource[] {
+        new EmbeddedRuntimeSource { path: "runtime/array.ep", text: embed "../runtime/array.ep" },
+        new EmbeddedRuntimeSource { path: "runtime/panic.ep", text: embed "../runtime/panic.ep" },
+        new EmbeddedRuntimeSource { path: "runtime/str.ep", text: embed "../runtime/str.ep" },
+        new EmbeddedRuntimeSource { path: "runtime/file.ep", text: embed "../runtime/file.ep" }
+    }
+}
+
+fun embedded_runtime_helpers_mir(): str { ret embed "../runtime/mir/helpers.mir" }
+fun embedded_runtime_gc_mir(): str { ret embed "../runtime/mir/gc.mir" }

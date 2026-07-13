@@ -1,3 +1,17 @@
+extern i64 @GetProcessHeap()
+
+extern ptr @HeapAlloc(i64, i64, i64)
+
+extern i64 @HeapFree(i64, i64, ptr)
+
+extern void @GetCurrentThreadStackLimits(ptr, ptr)
+
+extern i64 @__ep_import$kernel32.dll$GetTickCount64()
+
+extern ptr @__ep_import$kernel32.dll$VirtualAlloc(ptr, i64, i64, i64)
+
+global @heap: i64
+
 global @gc_objects: ptr
 
 global @gc_sizes: ptr
@@ -1050,27 +1064,25 @@ bytes_adaptive:
   ret void
 }
 
-define void @__ep_gc_write_stderr(i64 %1, ptr %2, i64 %3) {
+define void @__ep_gc_write_stderr(ptr %1, ptr %2, i64 %3) {
 entry:
-  %4: i64 = ptrtoint ptr %2 to i64
-  %5: ptr = alloca i64
-  store i64 0, ptr %5
-  %6: i64 = ptrtoint ptr %5 to i64
-  %7: i64 = call i64 __ep_import$kernel32.dll$WriteFile(i64 %1, i64 %4, i64 %3, i64 %6, i64 0)
+  %4: ptr = alloca i64
+  store i64 0, ptr %4
+  %5: i64 = call i64 __ep_import$kernel32.dll$WriteFile(ptr %1, ptr %2, i64 %3, ptr %4, ptr null)
   ret void
 }
 
-define void @__ep_gc_write_stderr_str(i64 %1, ptr %2) {
+define void @__ep_gc_write_stderr_str(ptr %1, ptr %2) {
 entry:
   %3: ptr = gep struct str, ptr %2, i64 0, i64 0
   %4: ptr = load ptr, ptr %3
   %5: ptr = gep struct str, ptr %2, i64 0, i64 1
   %6: i64 = load i64, ptr %5
-  call void __ep_gc_write_stderr(i64 %1, ptr %4, i64 %6)
+  call void __ep_gc_write_stderr(ptr %1, ptr %4, i64 %6)
   ret void
 }
 
-define void @__ep_gc_write_u64(i64 %1, i64 %2) {
+define void @__ep_gc_write_u64(ptr %1, i64 %2) {
 entry:
   %3: ptr = call ptr __ep_gc_raw_alloc(i64 32)
   %4: ptr = alloca i64
@@ -1107,17 +1119,17 @@ write:
   %18: i64 = load i64, ptr %4
   %19: ptr = gep i8, ptr %3, i64 %18
   %20: i64 = sub i64 32, i64 %18
-  call void __ep_gc_write_stderr(i64 %1, ptr %19, i64 %20)
+  call void __ep_gc_write_stderr(ptr %1, ptr %19, i64 %20)
   call void __ep_gc_raw_free(ptr %3)
   ret void
 }
 
 define void @__ep_gc_print_stw(i64 %1) {
 entry:
-  %2: i64 = call i64 __ep_import$kernel32.dll$GetStdHandle(i64 -12)
-  call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.prefix)
-  call void __ep_gc_write_u64(i64 %2, i64 %1)
-  call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.suffix)
+  %2: ptr = call ptr __ep_import$kernel32.dll$GetStdHandle(i64 -12)
+  call void __ep_gc_write_stderr_str(ptr %2, ptr str.gc.stw.prefix)
+  call void __ep_gc_write_u64(ptr %2, i64 %1)
+  call void __ep_gc_write_stderr_str(ptr %2, ptr str.gc.stw.suffix)
   ret void
 }
 
@@ -1128,53 +1140,53 @@ entry:
   condbr bool %2, label %done, label %print
 
 print:
-  %3: i64 = call i64 __ep_import$kernel32.dll$GetStdHandle(i64 -12)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.total_count)
+  %3: ptr = call ptr __ep_import$kernel32.dll$GetStdHandle(i64 -12)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.total_count)
   %4: i64 = load i64, ptr gc_alloc_count
-  call void __ep_gc_write_u64(i64 %3, i64 %4)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.total_bytes)
+  call void __ep_gc_write_u64(ptr %3, i64 %4)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.total_bytes)
   %5: i64 = load i64, ptr gc_alloc_bytes
-  call void __ep_gc_write_u64(i64 %3, i64 %5)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le8_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %5)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le8_count)
   %6: i64 = load i64, ptr gc_alloc_le8_count
-  call void __ep_gc_write_u64(i64 %3, i64 %6)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le8_bytes)
+  call void __ep_gc_write_u64(ptr %3, i64 %6)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le8_bytes)
   %7: i64 = load i64, ptr gc_alloc_le8_bytes
-  call void __ep_gc_write_u64(i64 %3, i64 %7)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le16_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %7)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le16_count)
   %8: i64 = load i64, ptr gc_alloc_le16_count
-  call void __ep_gc_write_u64(i64 %3, i64 %8)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le16_bytes)
+  call void __ep_gc_write_u64(ptr %3, i64 %8)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le16_bytes)
   %9: i64 = load i64, ptr gc_alloc_le16_bytes
-  call void __ep_gc_write_u64(i64 %3, i64 %9)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le24_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %9)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le24_count)
   %10: i64 = load i64, ptr gc_alloc_le24_count
-  call void __ep_gc_write_u64(i64 %3, i64 %10)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le24_bytes)
+  call void __ep_gc_write_u64(ptr %3, i64 %10)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le24_bytes)
   %11: i64 = load i64, ptr gc_alloc_le24_bytes
-  call void __ep_gc_write_u64(i64 %3, i64 %11)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %11)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le32_count)
   %12: i64 = load i64, ptr gc_alloc_le32_count
-  call void __ep_gc_write_u64(i64 %3, i64 %12)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le32_bytes)
+  call void __ep_gc_write_u64(ptr %3, i64 %12)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le32_bytes)
   %13: i64 = load i64, ptr gc_alloc_le32_bytes
-  call void __ep_gc_write_u64(i64 %3, i64 %13)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %13)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le64_count)
   %14: i64 = load i64, ptr gc_alloc_le64_count
-  call void __ep_gc_write_u64(i64 %3, i64 %14)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.le64_bytes)
+  call void __ep_gc_write_u64(ptr %3, i64 %14)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.le64_bytes)
   %15: i64 = load i64, ptr gc_alloc_le64_bytes
-  call void __ep_gc_write_u64(i64 %3, i64 %15)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.exact16_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %15)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.exact16_count)
   %16: i64 = load i64, ptr gc_alloc_exact16_count
-  call void __ep_gc_write_u64(i64 %3, i64 %16)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.exact24_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %16)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.exact24_count)
   %17: i64 = load i64, ptr gc_alloc_exact24_count
-  call void __ep_gc_write_u64(i64 %3, i64 %17)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.exact32_count)
+  call void __ep_gc_write_u64(ptr %3, i64 %17)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.exact32_count)
   %18: i64 = load i64, ptr gc_alloc_exact32_count
-  call void __ep_gc_write_u64(i64 %3, i64 %18)
-  call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.newline)
+  call void __ep_gc_write_u64(ptr %3, i64 %18)
+  call void __ep_gc_write_stderr_str(ptr %3, ptr str.gc.alloc.newline)
   ret void
 
 done:

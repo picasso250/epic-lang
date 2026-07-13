@@ -45,6 +45,7 @@ fun main(): i64 {
 
     # -- Strings ----------------------------------------------------
     let s0 = "hello"
+    let embedded = embed "../data/embed.txt"
     let s1 = "line1\nline2"
     let s2 = "tab\there"
     let s3 = "back\\slash"

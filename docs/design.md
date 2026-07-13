@@ -461,7 +461,20 @@ extern struct pointer 和 `cptr(...)` 结果只在同步调用期间借用。外
 
 extern 不提供隐式字符串或 buffer 转换；调用者必须显式使用 `cptr(...)`。`cstr(str)` 仅为 deprecated source alias，也返回 `ptr`，没有额外保证。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
 
+同名 extern 可以重复声明，但 DLL、参数数量、每个 canonical 参数类型和 canonical 返回类型必须完全一致；参数名不参与等价判断。等价声明在 sema 中折叠为一个导入，任一签名或 DLL 差异都会报告 conflicting extern declaration。
+
 源码 extern 通过自带 PE linker 的编码导入符号传递 DLL metadata，因此 Python 驱动下要求默认的 `--linker py`；`lld-link` 仍可用于没有源码 extern 的程序。普通退出继续使用 `exit(code)`。
+
+## 编译期文件嵌入 (Compile-time Embed)
+
+`embed "path"` 是类型为 `str` 的编译期表达式。路径必须是字符串字面量，并相对包含该表达式的 Epic 源文件目录解析；当前工作目录不参与语义。文件不存在时编译失败。文件内容按原始字节映射到 Epic 的 byte-oriented `str`，允许 NUL 和非 UTF-8 字节，并像普通字符串 global 一样进入可执行文件 `.data`。
+
+```epic
+let source = embed "../runtime/file.ep"
+let raw = bytes(embed "asset.bin")
+```
+
+`src/runtime_bundle.ep` 是编译器内置 runtime 资源的唯一清单。标准 runtime Epic source 和 MIR bundle 都由该文件嵌入，因此收敛后的 `epic.exe` 不需要磁盘上的 `runtime/` 才能编译普通程序。
 
 ## 演进与版本标签 (Evolution and Tags)
 
@@ -474,17 +487,16 @@ extern 不提供隐式字符串或 buffer 转换；调用者必须显式使用 `
 - 更新正向、负向或意图级测试；
 - 删除旧语义，而不是同时维护两套规则。
 
-Git 标签是可复现的历史里程碑，不是当前分支的兼容承诺。`v0` 保留 bootstrap seed 和历史
-Python stage-0；`v1` 记录完成自举与自动 GC 的里程碑。内部与公开设计都可在后续标签继续演进。
+Git 标签是可复现的历史里程碑，不是当前分支的兼容承诺。`v0` 是维护 bootstrap seed 与 Python stage-0 的分支；`v1` 标签记录完成自举与自动 GC 的里程碑。内部与公开设计都可继续演进。
 
 ## 自举模型 (Bootstrap Model)
 
 ```text
-frozen epic-v0.exe -> current Epic compiler -> current Epic compiler
+v0 branch epic-v0.exe -> current Epic compiler -> current Epic compiler
 ```
 
-当前活跃编译器只位于 `src/`。冻结的 `v0` 标签保留历史 Python stage-0，`build_epic_v0.py` 可在 detached worktree 中重建 seed；当前分支不维护 Python oracle 或阶段 lockstep。
+当前活跃编译器只位于 `src/`。`v0` 分支维护 Python stage-0 和同语义的 self-hosted 实现；`build_epic_v0.py` 可在 detached worktree 中重建并校验 seed。当前 `dev` 不维护 Python oracle 或阶段 lockstep。
 
 当前活跃验收入口包括 `python tests/run.py`、`python tests/examples/run.py` 和 `python test_bootstrap_fixed_point.py`。模块测试覆盖各阶段的意图与 canonical fixture，examples 和 e2e 约束公开行为，不动点测试连续使用生成的 Epic 编译器重新编译自身并检查输出稳定。
 
-分阶段的 v0/v1/v2 目录链是历史遗留。Git 标签保留了该链路；它不再是当前维护源码布局的一部分。
+分阶段的 v0/v1/v2 目录链是历史遗留；它不再是当前维护源码布局的一部分。

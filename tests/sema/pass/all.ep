@@ -9,6 +9,8 @@ fun check(ok: bool): void {
 
 extern "kernel32.dll" fun GetTickCount64(): u64
 extern "demo.dll" fun NarrowAbi(a: u8, b: i16, c: u16): u8
+extern "demo.dll" fun RepeatedExtern(value: u32, address: ptr): i64
+extern "demo.dll" fun RepeatedExtern(other: u32, pointer: ptr): i64
 
 struct Point {
     x: i64
@@ -43,6 +45,7 @@ fun make_point(x: i64, y: i64, label: str): Point {
 }
 
 fun use_scalars(): i64 {
+    let embedded: str = embed "../data/embed.txt"
     let in = 42
     let a = 1
     let b: i64 = 2

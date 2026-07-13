@@ -29,6 +29,7 @@ struct BinaryExpr {
 type Expr = LiteralExpr | BinaryExpr
 
 fun adt_parser_surface(): void {
+    let embedded = embed "../data/embed.txt"
     let in = 42
     let e: Expr = new Expr(new LiteralExpr { value: "1" })
     match e {

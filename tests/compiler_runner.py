@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import subprocess
@@ -10,13 +11,51 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
 DEFAULT_COMPILER = ROOT / "build" / "test-compiler" / "epic.exe"
+
+
+def _embedded_runtime_paths() -> list[Path]:
+    bundle = ROOT / "src" / "runtime_bundle.ep"
+    paths = []
+    for match in re.finditer(r'\bembed\s+"([^"]+)"', bundle.read_text(encoding="utf-8")):
+        paths.append((bundle.parent / match.group(1)).resolve())
+    return paths
+
+
+def _compiler_fingerprint() -> str:
+    digest = hashlib.sha256()
+    inputs = [
+        ROOT / "compiler_sources.py",
+        ROOT / "test_bootstrap_fixed_point.py",
+        ROOT / "build_epic_v0.py",
+        ROOT / "build" / "bootstrap-v0" / "epic-v0.exe",
+        *(ROOT / path for path in SELF_HOST_COMPILER_SOURCES),
+        *_embedded_runtime_paths(),
+    ]
+    for path in inputs:
+        if not path.is_file():
+            raise RuntimeError(f"test compiler input is missing: {path}")
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def compiler_path() -> Path:
     configured = os.environ.get("EPIC_TEST_COMPILER")
-    compiler = Path(configured).resolve() if configured else DEFAULT_COMPILER
-    if compiler.is_file():
+    if configured:
+        compiler = Path(configured).resolve()
+        if not compiler.is_file():
+            raise RuntimeError(f"configured test compiler does not exist: {compiler}")
+        return compiler
+
+    compiler = DEFAULT_COMPILER
+    fingerprint = _compiler_fingerprint()
+    stamp = compiler.with_suffix(".inputs.sha256")
+    if compiler.is_file() and stamp.is_file() and stamp.read_text(encoding="ascii").strip() == fingerprint:
         return compiler
     compiler.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
@@ -28,6 +67,7 @@ def compiler_path() -> Path:
     )
     if result.returncode != 0 or not compiler.is_file():
         raise RuntimeError("failed to build current self-hosted test compiler")
+    stamp.write_text(fingerprint + "\n", encoding="ascii", newline="\n")
     return compiler
 
 

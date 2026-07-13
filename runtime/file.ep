@@ -1,40 +1,38 @@
 # File I/O runtime helpers written in Epic.
-# This source is compiled separately during MIR runtime injection so its WinAPI
-# declarations do not enter or conflict with the user program's source namespace.
 
-extern "kernel32.dll" fun CreateFileA(path: u64, access: u32, share: u32, security: u64, creation: u32, flags: u32, template_file: u64): u64
-extern "kernel32.dll" fun GetFileSize(file: u64, high: u64): u32
-extern "kernel32.dll" fun ReadFile(file: u64, buffer: u64, count: u32, read_count: u64, overlapped: u64): i32
-extern "kernel32.dll" fun WriteFile(file: u64, buffer: u64, count: u32, write_count: u64, overlapped: u64): i32
-extern "kernel32.dll" fun CloseHandle(file: u64): i32
+extern "kernel32.dll" fun CreateFileA(path: ptr, access: u32, share: u32, security: ptr, creation: u32, flags: u32, template_file: ptr): ptr
+extern "kernel32.dll" fun GetFileSize(file: ptr, high: ptr): u32
+extern "kernel32.dll" fun ReadFile(file: ptr, buffer: ptr, count: u32, read_count: ptr, overlapped: ptr): i32
+extern "kernel32.dll" fun WriteFile(file: ptr, buffer: ptr, count: u32, write_count: ptr, overlapped: ptr): i32
+extern "kernel32.dll" fun CloseHandle(file: ptr): i32
 
 fun __ep_file_u32_le(buffer: u8[]): i64 {
     ret i64(buffer[0]) + i64(buffer[1]) * 256 + i64(buffer[2]) * 65536 + i64(buffer[3]) * 16777216
 }
 
-fun __ep_write_file(path: str, data: u8[], source_line: i64): i64 {
-    let file = CreateFileA(u64(cptr(path)), u32(1073741824), u32(0), u64(0), u32(2), u32(128), u64(0))
-    if file == u64(0) - u64(1) {
+fun __ep_write_file(path: str, data: u8[]): i64 {
+    let file = CreateFileA(cptr(path), u32(1073741824), u32(0), ptr(0), u32(2), u32(128), ptr(0))
+    if file == ptr(u64(0) - u64(1)) {
         ret -1
     }
 
     let written = new u8[4]
-    WriteFile(file, u64(cptr(data)), u32(len(data)), u64(cptr(written)), u64(0))
+    WriteFile(file, cptr(data), u32(len(data)), cptr(written), ptr(0))
     CloseHandle(file)
     ret __ep_file_u32_le(written)
 }
 
-fun __ep_read_file(path: str, source_line: i64): u8[] {
-    let file = CreateFileA(u64(cptr(path)), u32(2147483648), u32(1), u64(0), u32(3), u32(128), u64(0))
-    if file == u64(0) - u64(1) {
+fun __ep_read_file(path: str): u8[] {
+    let file = CreateFileA(cptr(path), u32(2147483648), u32(1), ptr(0), u32(3), u32(128), ptr(0))
+    if file == ptr(u64(0) - u64(1)) {
         ret new u8[]
     }
 
-    let size = GetFileSize(file, u64(0))
+    let size = GetFileSize(file, ptr(0))
     let data = new u8[i64(size)]
     if size != u32(0) {
         let read_count = new u8[4]
-        ReadFile(file, u64(cptr(data)), size, u64(cptr(read_count)), u64(0))
+        ReadFile(file, cptr(data), size, cptr(read_count), ptr(0))
         let actual = __ep_file_u32_le(read_count)
         for len(data) > actual {
             data.pop()

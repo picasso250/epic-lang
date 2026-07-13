@@ -14,9 +14,9 @@ small allocator reserve 1 GiB 连续虚拟地址 arena，并将它划分为 64 K
 保存在常驻 side table；slot 每次分配和复用时按 class size 清零。large allocator 继续
 长期维护紧凑的 payload 基址和请求大小并行数组。
 
-冻结的 v0 seed 只读取 `runtime/mir/helpers.mir`，因此该文件保留 legacy
-`__ep_alloc` 作为单代 bootstrap bridge。当前 compiler 先加载
-`runtime/mir/gc.mir`，同名 GC allocator 优先，legacy 定义会被去重跳过。
+`__ep_alloc`、`__ep_runtime_start` 和 `__ep_runtime_end` 只由
+`runtime/mir/gc.mir` 定义。`runtime/mir/helpers.mir` 不再保留 bootstrap fallback；
+两个 MIR bundle 都通过 `src/runtime_bundle.ep` 嵌入编译器镜像。
 
 ## Collection
 

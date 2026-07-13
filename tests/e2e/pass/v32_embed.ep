@@ -1,0 +1,10 @@
+# EXIT: 0
+# STDOUT: hello embed
+fun main(): void {
+    let raw = bytes(embed "../data/embed.bin")
+    if len(raw) != 3 { exit(1) }
+    if raw[0] != u8(255) { exit(2) }
+    if raw[1] != u8(0) { exit(3) }
+    if raw[2] != 'A' { exit(4) }
+    println(embed "../data/embed.txt")
+}
