@@ -296,6 +296,13 @@ fun mir_to_x64_inst_uses_value_from_rax(inst: MirInst, value_id: i64): bool {
     ret mir_to_x64_operand_is_value(inst.operands[0], value_id)
 }
 
+fun mir_to_x64_call_uses_immediate_operand(inst: MirInst, value_id: i64): bool {
+    if inst.immediate_operand_hint == 0 { ret false }
+    let index = inst.immediate_operand_hint - 1
+    if inst.op != "call" || index < 0 || index >= len(inst.operands) || index >= 4 { ret false }
+    ret mir_to_x64_operand_is_value(inst.operands[index], value_id)
+}
+
 fun mir_to_x64_term_uses_value(term: MirTerminator, value_id: i64): bool {
     match term {
         MirCondBrTerminator cond: { ret mir_to_x64_operand_is_value(cond.cond, value_id) }
@@ -315,6 +322,7 @@ fun mir_to_x64_should_keep_result_in_rax(lower: MirToX64Lower, block: MirBlock, 
         next += 1
     }
     if next < len(block.instructions) {
+        if mir_to_x64_call_uses_immediate_operand(block.instructions[next], inst.result_id) { ret true }
         ret mir_to_x64_inst_uses_value_from_rax(block.instructions[next], inst.result_id)
     }
     ret mir_to_x64_term_uses_value(block.terminator, inst.result_id)
@@ -817,9 +825,27 @@ fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
     arg_regs.push("rdx")
     arg_regs.push("r8")
     arg_regs.push("r9")
+    let resident_arg = -1
+    if inst.immediate_operand_hint > 0 {
+        let hinted_arg = inst.immediate_operand_hint - 1
+        if hinted_arg < len(inst.operands) && hinted_arg < 4 {
+            match inst.operands[hinted_arg] {
+                MirValueOperand value: {
+                    if lower.rax_value_id == value.value_id {
+                        resident_arg = hinted_arg
+                        x64_add_inst2(lower.x64, 1, x64_reg(arg_regs[hinted_arg]), x64_reg("rax")) # x64 mov
+                        lower.rax_value_id = 0
+                    }
+                }
+                _: {}
+            }
+        }
+    }
     let i = 0
     for i < len(inst.operands) && i < 4 {
-        mir_to_x64_load_operand(lower, arg_regs[i], inst.operands[i])
+        if i != resident_arg {
+            mir_to_x64_load_operand(lower, arg_regs[i], inst.operands[i])
+        }
         i += 1
     }
     let stack_args = len(inst.operands) - 4

@@ -32,6 +32,7 @@ type MirOperand = MirValueOperand | MirIntOperand | MirBoolOperand | MirNullOper
 struct MirInst {
     op: str
     operands: MirOperand[]
+    immediate_operand_hint: i64
     result_id: i64
     result_type: str
     typ: str
@@ -209,6 +210,7 @@ fun mir_inst_empty(): MirInst {
     let inst = new MirInst
     inst.op = ""
     inst.operands = new MirOperand[]
+    inst.immediate_operand_hint = 0
     inst.result_id = 0
     inst.result_type = ""
     inst.typ = ""

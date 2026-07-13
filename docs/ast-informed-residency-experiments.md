@@ -51,3 +51,53 @@ Bootstrap fixed point、完整 13 模块测试、10 个 examples 和 91 个 e2e 
 ### Decision
 
 接受 binary MIR shaping，继续独立验证 call immediate-use hint。
+
+## Call immediate-use hint
+
+### Hypothesis
+
+AST-to-MIR 在求值 call arguments 时已经知道当前 block 最新 result 属于哪个参数。把这个关系
+编码为 target-neutral 的 operand index，可以让后端直接决定 Windows x64 register argument，
+避免重新扫描下一 instruction、分类 consumer，或在通用 operand load 路径增加 resident 检查。
+
+当前统计的 1,534 个 call immediate-use 机会里，1,528 个属于前四个 register arguments，只有
+6 个属于 stack arguments。第一版只覆盖 register arguments。
+
+### Implementation
+
+`MirInst.immediate_operand_hint` 使用 0 表示无 hint，其他值编码 operand index + 1。AST-to-MIR
+构造 call 时，仅当最新 MIR result 是前四个 operands 之一才设置 hint。
+
+MIR-to-X64 的 single-use residency 判断先验证该固定 index 是否消费 producer result。call lowering
+命中时直接把 resident `rax` 移到 `rcx`、`rdx`、`r8` 或 `r9`，跳过 result home store 和 argument
+reload。通用 `mir_to_x64_load_operand` 没有新增分支或 union match。
+
+Hint 不参与程序语义；MIR text 未携带 hint 时继续走原 lowering。
+
+### Correctness
+
+Bootstrap fixed point、完整 13 模块测试、10 个 examples 和 91 个 e2e 测试全部通过。
+
+### A/B result
+
+基线为上一阶段接受的 binary MIR shaping。两边使用相同 v0 seed、compiler/runtime sources、参数
+和输出位置；每边三个等价样本。
+
+| metric | binary shaping | call hint | change |
+|---|---:|---:|---:|
+| wall samples | 1664.294 / 1648.861 / 1613.927 ms | 1594.980 / 1603.465 / 1590.432 ms | — |
+| wall median | 1648.861 ms | 1594.980 ms | -53.881 ms, -3.27% |
+| internal median | 1640 ms | 1578 ms | -62 ms, -3.78% |
+| X64 items | 149,764 | 149,111 | -653, -0.44% |
+| `.text` bytes | 692,736 B | 688,372 B | -4,364 B, -0.63% |
+| `.data` bytes | 81,840 B | 81,840 B | 0 |
+| compiler exe | 777,216 B | 772,608 B | -4,608 B, -0.59% |
+
+三个 call-hint samples 全部快于 binary-only 最快样本，且 time、X64 items、`.text` 和最终 exe
+同时改善。
+
+### Decision
+
+接受 call immediate-use hint。它验证了上次 resident-transfer 失败的核心复盘：producer/consumer
+关系在 AST-to-MIR 直接编码后，后端无需为所有 instruction 和 operand 支付动态扫描成本。继续
+独立验证 store-address hint。

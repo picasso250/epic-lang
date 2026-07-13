@@ -456,6 +456,23 @@ fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: Mi
     inst.callee = callee
     inst.typ = ret_type
     inst.operands = args
+    if len(st.current_block.instructions) > 0 {
+        let latest = st.current_block.instructions[len(st.current_block.instructions) - 1]
+        if latest.has_result {
+            let hint_limit = len(args)
+            if hint_limit > 4 { hint_limit = 4 }
+            for i: 0:hint_limit {
+                match args[i] {
+                    MirValueOperand value: {
+                        if value.value_id == latest.result_id {
+                            inst.immediate_operand_hint = i + 1
+                        }
+                    }
+                    _: {}
+                }
+            }
+        }
+    }
     if ret_type == "void" {
         mir_emit_inst(st, inst)
         ret mir_const_int("i64", 0)
