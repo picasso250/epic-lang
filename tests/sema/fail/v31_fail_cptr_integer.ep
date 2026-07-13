@@ -1,4 +1,4 @@
-# COMPILE_FAIL_CONTAINS: cptr expected str, u8[], or FFI-safe struct, got i64
+# COMPILE_FAIL_CONTAINS: cptr expected str, scalar/ptr array, or FFI-safe struct, got i64
 fun main(): void {
     let p = cptr(1)
 }

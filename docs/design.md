@@ -416,7 +416,7 @@ let source = str(read_file(path))
 |----------------------------------------|---------------------------------------------|
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
-| `cptr(x): ptr`                         | 返回 `str` / `u8[]` backing data 或 FFI-safe struct payload 的 borrowed 地址；不检查 |
+| `cptr(x): ptr`                         | 返回 `str` / bool、整数或 `ptr` 数组 backing data，或 FFI-safe struct payload 的 borrowed 地址；不检查 |
 | `cstr(s: str): ptr`                    | deprecated `cptr(s)` alias；不检查 NUL 或内嵌 NUL |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
@@ -437,9 +437,11 @@ let source = str(read_file(path))
 | `a.pop()`              | 删除并返回最后一个元素；空数组 panic            |
 | `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |
 
-`cptr` 第一版只接受 `str`、`u8[]` 和非空 FFI-safe 用户 struct。`cptr(str)` / `cptr(u8[])` 直接读取 `{data,len,cap}` header 的 `data`；空 `u8[]` 自然返回 `ptr(0)`。`cptr(struct)` 直接返回 non-moving heap payload 地址。三种形式都不做 null、NUL、长度、容量或内容检查，不分配、不复制，也不转移所有权。内嵌 NUL 合法；传给 C 字符串 API 时，C 只能看到第一个 NUL 之前的前缀。
+`cptr` 接受 `str`、元素为 `bool`/整数/`ptr` 的数组和非空 FFI-safe 用户 struct。`cptr(str)` / `cptr(T[])` 直接读取 `{data,len,cap}` header 的 `data`；空数组自然返回 `ptr(0)`。数组 data 按元素的自然宽度连续存放：`bool/u8=1`、`i16/u16=2`、`i32/u32=4`、`i64/u64/ptr=8`。`cptr(struct)` 直接返回 non-moving heap payload 地址。这些形式都不做 null、NUL、长度、容量或内容检查，不分配、不复制，也不转移所有权。外部代码必须按静态元素表示访问数组；Win32 `BOOL[]` 应使用 `i32[]`，一字节 `BOOLEAN[]` 才对应 `bool[]` 或 `u8[]`。内嵌 NUL 合法，传给 C 字符串 API 时，C 只能看到第一个 NUL 之前的前缀。
 
-返回地址只在 owner 仍可达且外部调用遵守同步 borrowed 契约时有效。`str` 和 struct payload 地址在当前 non-moving GC 下稳定；`u8[]` 的 backing data 可被 `push` / `extend` 等扩容操作替换，因此任何可能增长数组的操作后必须重新调用 `cptr(array)`。`new u8[n]` 可作为同步 WinAPI output buffer。`cstr(str)` 暂时保留为 deprecated alias，lowering 与 `cptr(str)` 完全相同，不再存在 `__ep_cstr` runtime helper 或运行时诊断。
+`cptr` 拒绝 `str[]`、struct/union 数组、嵌套数组等 managed-reference 元素数组。Epic 的这些数组保存连续的 8-byte managed reference，不能充当 WinAPI 所要求的 inline C struct 数组；需要显式指针数组时先构造 `ptr[]`。当前语言不提供 inline aggregate array。
+
+返回地址只在 owner 仍可达且外部调用遵守同步 borrowed 契约时有效。`str` 和 struct payload 地址在当前 non-moving GC 下稳定；任意数组的 backing data 都可能被 `push` / `extend` 等扩容操作替换，因此任何可能增长数组的操作后必须重新调用 `cptr(array)`。`new bool[n]`、`new integer[n]` 和 `new ptr[n]` 可作为同步 WinAPI output buffer；其中 `u16[]` 可承载显式构造并自行 NUL 结尾的 UTF-16 code units。`cstr(str)` 暂时保留为 deprecated alias，lowering 与 `cptr(str)` 完全相同，不再存在 `__ep_cstr` runtime helper 或运行时诊断。
 
 ### Extern FFI
 

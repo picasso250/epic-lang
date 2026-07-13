@@ -25,7 +25,7 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `exit(code)` | `i64 -> void`; terminates the process | `ExitProcess` |
 | `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity view for `str`/`u8[]`, runtime formatting for scalar values |
 | `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
-| `cptr(value)` | accepts `str`, `u8[]`, or a non-empty FFI-safe user struct; returns `ptr` | direct data/payload pointer lowering with no runtime checks |
+| `cptr(value)` | accepts `str`, a bool/integer/ptr array, or a non-empty FFI-safe user struct; returns `ptr` | direct data/payload pointer lowering with no runtime checks |
 | `cstr(text)` | `str -> ptr` | deprecated alias of `cptr(text)`; no NUL validation or helper call |
 | `len(value)` | `str` or any array -> `i64` | reads the public logical length |
 | `i64(x)` | integer or `ptr` -> `i64` | integer conversion or pointer bit-pattern extraction |

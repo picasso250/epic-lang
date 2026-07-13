@@ -1,0 +1,9 @@
+# COMPILE_FAIL_CONTAINS: cptr array element Box is a managed reference; use a scalar or ptr array
+struct Box {
+    value: i64
+}
+
+fun main(): void {
+    let boxes = new Box[] { new Box { value: 1 } }
+    let address = cptr(boxes)
+}

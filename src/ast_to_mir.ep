@@ -463,7 +463,7 @@ fun mir_emit_cptr(st: MirCodegenState, block: MirBlock, arg: AstNode): MirValueF
     if source_type == "str" {
         ret mir_value_flow(mir_load_field(st, arg_flow.value, "str", "data"), st.current_block)
     }
-    if source_type == "u8[]" {
+    if mir_is_array_type(source_type) {
         ret mir_value_flow(mir_load_field(st, arg_flow.value, "_slice", "data"), st.current_block)
     }
     if mir_is_struct_name(st, source_type) {

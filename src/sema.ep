@@ -94,10 +94,15 @@ fun sema_is_extern_scalar_abi_type(t: str): bool {
 }
 
 fun sema_validate_cptr_type(st: SemaState, type_name: str): void {
-    if type_name == "str" || type_name == "u8[]" { ret }
+    if type_name == "str" { ret }
+    if sema_is_array(type_name) {
+        let elem_type = sema_array_elem(type_name)
+        if elem_type == "bool" || sema_is_extern_scalar_abi_type(elem_type) { ret }
+        sema_die(f"cptr array element {elem_type} is a managed reference; use a scalar or ptr array")
+    }
     let struct_index = sema_struct_index(st, type_name)
     if struct_index < 0 {
-        sema_die(f"cptr expected str, u8[], or FFI-safe struct, got {type_name}")
+        sema_die(f"cptr expected str, scalar/ptr array, or FFI-safe struct, got {type_name}")
     }
     let def = st.structs[struct_index]
     if len(def.fields) == 0 {

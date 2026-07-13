@@ -391,7 +391,8 @@ All array headers use the single `_slice { data, len, cap }` MIR layout. Helpers
 return raw slot addresses where scalar semantics matter; AST-to-MIR emits the
 static `i8`/`i16`/`u16`/`i32`/`u32`/`i64`/`ptr` load or store so narrow signedness
 and truncation remain compile-time properties rather than runtime dispatch.
-`bytes(str)` and `str(u8[])` are lowered as identity casts. `cptr(str/u8[])`
+`bytes(str)` and `str(u8[])` are lowered as identity casts. `cptr(str/T[])`, where
+`T` is `bool`, an integer, or `ptr`,
 loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
 pointer unchanged; deprecated `cstr(str)` uses the same lowering. None require a MIR
 runtime function or runtime validation. Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and

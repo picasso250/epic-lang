@@ -2,6 +2,7 @@
 # STDOUT: true
 
 extern "kernel32.dll" fun lstrlenA(text: ptr): i32
+extern "kernel32.dll" fun lstrlenW(text: ptr): i32
 
 struct RawPair {
     left: i32
@@ -24,6 +25,24 @@ fun main(): void {
     buffer[2] = 'i'
     buffer[3] = u8(0)
     check(lstrlenA(cptr(buffer)) == i32(3))
+
+    let wide = new u16[] { u16(65), u16(0), u16(66) }
+    check(lstrlenW(cptr(wide)) == i32(1))
+
+    let flags = new bool[] { true }
+    let signed_words = new i16[] { i16(1) }
+    let signed_dwords = new i32[] { i32(1) }
+    let words = new u32[] { u32(1) }
+    let signed_qwords = new i64[] { 1 }
+    let wide_words = new u64[] { u64(1) }
+    let pointers = new ptr[] { ptr(0) }
+    check(cptr(flags) != ptr(0))
+    check(cptr(signed_words) != ptr(0))
+    check(cptr(signed_dwords) != ptr(0))
+    check(cptr(words) != ptr(0))
+    check(cptr(signed_qwords) != ptr(0))
+    check(cptr(wide_words) != ptr(0))
+    check(cptr(pointers) != ptr(0))
 
     let pair = new RawPair { left: i32(1), right: u32(2), next: ptr(0) }
     check(cptr(pair) != ptr(0))
