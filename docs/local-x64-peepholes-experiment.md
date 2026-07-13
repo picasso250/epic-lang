@@ -252,3 +252,6 @@ encoder/helper 使确定性体积略增，但幅度很小；最终 exe 仍比 fr
 
 后续优先级已经明显下降：不同寄存器的 store/reload 只能把 memory reload 改成 register move，
 不直接减少指令数；完整 register allocation 的历史实验则有明显 self-host complexity cost。
+
+后续 direct alloca `load + ALU + store` 融合实验未能偿还 matcher 与 encoder 的 self-host 成本，
+详见 [`direct-local-update-experiment.md`](direct-local-update-experiment.md)。
