@@ -167,7 +167,6 @@ def build_with_epic(compiler, output_path, label):
     run_checked(
         [
             compiler,
-            *RUNTIME_SOURCES,
             *COMPILER_SOURCES,
             "--main",
             os.path.join("src", "epic.ep"),

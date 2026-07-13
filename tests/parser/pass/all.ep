@@ -171,6 +171,7 @@ fun expressions(): i64 {
 }
 
 fun main(): void {
+    let embedded = embed "../data/embed.txt"
     statements_and_control(true)
     expressions()
     ret

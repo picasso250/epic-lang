@@ -22,13 +22,8 @@ fun mir_runtime_global_name(global: MirGlobal): str {
     ret ""
 }
 
-fun mir_runtime_helper_bundle_path(): str {
-    ret cstr_ready_path("runtime/mir/helpers.mir")
-}
-
 fun mir_runtime_helper_program(): MirProgram {
-    let text = str(read_file(mir_runtime_helper_bundle_path()))
-    ret mrt_parse_program(text)
+    ret mrt_parse_program(runtime_helpers_mir_source())
 }
 
 fun mir_runtime_i64_in(values: i64[], value: i64): bool {

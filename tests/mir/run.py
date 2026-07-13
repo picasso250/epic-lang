@@ -93,6 +93,30 @@ entry:
 
     print("  PASS  MIR canonical text round-trip")
 
+    dump_mir = subprocess.run(
+        [
+            sys.executable,
+            str(root / "bootstrap" / "epic.py"),
+            "tests/e2e/pass/v1_bool_int_ops.ep",
+            "--dump-mir",
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if dump_mir.returncode != 0:
+        print("  FAIL  epic.py --dump-mir")
+        print(dump_mir.stdout)
+        print(dump_mir.stderr)
+        sys.exit(dump_mir.returncode)
+    if " = sar " not in dump_mir.stdout or " = shr " not in dump_mir.stdout:
+        print("  FAIL  epic.py --dump-mir omitted signed/unsigned right shifts")
+        print(dump_mir.stdout)
+        sys.exit(1)
+    print("  PASS  epic.py --dump-mir")
+
     fail_compile = subprocess.run(
         [
             sys.executable,

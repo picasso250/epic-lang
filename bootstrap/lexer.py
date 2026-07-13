@@ -21,6 +21,7 @@ TOKEN_SPEC = [
     ("CONTINUE",  r'\bcontinue\b'),
     ("STRUCT",    r'\bstruct\b'),
     ("NEW",       r'\bnew\b'),
+    ("EMBED",     r'\bembed\b'),
     ("LET",       r'\blet\b'),
     ("ID",        r'[a-zA-Z_][a-zA-Z0-9_]*'),
     ("NUMBER",    r'[0-9]+'),

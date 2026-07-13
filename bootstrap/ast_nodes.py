@@ -208,6 +208,13 @@ class StringNode(ASTNode):
     resolved_type: Optional[EpicType] = None
 
 
+@dataclass
+class EmbedNode(ASTNode):
+    path: str
+    source_path: str
+    resolved_type: Optional[EpicType] = None
+
+
 class FStringPart:
     pass
 

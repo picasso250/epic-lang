@@ -129,7 +129,7 @@ def _parse_file(input_path, verbose=True):
     with open(input_path, "r", encoding="utf-8") as f:
         source = f.read()
     tokens = lex(source)
-    parser = Parser(tokens)
+    parser = Parser(tokens, os.path.abspath(input_path))
     return parser.parse_program()
 
 
@@ -293,6 +293,12 @@ def dump_typed_ast_files(input_paths, main_path):
     print(dump_typed_ast_text(ast), end="")
 
 
+def dump_mir_files(input_paths, main_path):
+    ast = _merge_programs(input_paths, main_path, verbose=False, include_runtime=False)
+    ast = analyze_program(ast)
+    print(ast_to_mir(ast).text())
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  CLI
 # ═══════════════════════════════════════════════════════════════════════════
@@ -316,6 +322,8 @@ def parse_args(argv):
                         help="print parsed AST and exit")
     parser.add_argument("--dump-typed-ast", action="store_true",
                         help="print semantically analyzed typed AST and exit")
+    parser.add_argument("--dump-mir", action="store_true",
+                        help="print MIR for the requested input program and exit")
     return parser.parse_args(argv)
 
 
@@ -337,7 +345,7 @@ def main(argv=None):
         return 1
 
     try:
-        dump_modes = [args.dump_tokens, args.dump_ast, args.dump_typed_ast]
+        dump_modes = [args.dump_tokens, args.dump_ast, args.dump_typed_ast, args.dump_mir]
         if sum(1 for mode in dump_modes if mode) > 1:
             print("Error: choose only one dump mode", file=sys.stderr)
             return 1
@@ -347,6 +355,8 @@ def main(argv=None):
             dump_ast_files(args.inputs)
         elif args.dump_typed_ast:
             dump_typed_ast_files(args.inputs, args.main or args.inputs[0])
+        elif args.dump_mir:
+            dump_mir_files(args.inputs, args.main or args.inputs[0])
         else:
             compile_files(
                 args.inputs,

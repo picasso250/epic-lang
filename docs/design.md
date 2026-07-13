@@ -155,6 +155,14 @@ Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并
 当前 Python reference compiler 的 `i32/u32/u8` 布局仍使用 8 字节槽。
 算术、位运算、除余和移位会按结果类型规范化 `u8/u32/i32`；比较按左操作数类型选择 signed/unsigned 语义。
 
+### 编译期文件嵌入 (Embed)
+
+`embed "path"` 是类型为 `str` 的编译期表达式。路径必须是字符串字面量，并相对包含该表达式的源文件目录解析。文件必须存在；内容按原始字节映射为 Epic `str`，与普通字符串字面量一样进入可执行文件的 `.data`。 编译器自身用该机制嵌入标准 Epic runtime source 与 MIR helper bundle，因此生成的编译器不依赖工作目录中的 `runtime/`。
+
+```epic
+let runtime_source = embed "../runtime/file.ep"
+```
+
 ### 复合赋值 (Compound Assignment)
 
 支持：`+=`、`-=`、`*=`、`/=`、`%=`、`<<=`、`>>=`、`&=`、`|=`、`^=`。左侧表达式只求值一次。复合赋值只用于整数；`str += str` 不支持，需要显式写 `s = s + rhs`。

@@ -348,6 +348,8 @@ class SemanticAnalyzer:
             return ExprInfo(BOOL, expr.value)
         if isinstance(expr, StringNode):
             return ExprInfo(STR)
+        if isinstance(expr, EmbedNode):
+            return ExprInfo(STR)
         if isinstance(expr, FStringNode):
             for part in expr.parts:
                 if isinstance(part, FStringExprPart):
@@ -789,7 +791,7 @@ def assert_typed_program(program):
 
     def expr(node, path):
         require(node, path)
-        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode, VarNode)):
+        if isinstance(node, (LiteralNode, CharNode, BoolNode, StringNode, EmbedNode, VarNode)):
             return
         if isinstance(node, FStringNode):
             for idx, part in enumerate(node.parts):

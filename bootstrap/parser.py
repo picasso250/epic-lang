@@ -14,9 +14,10 @@ class ParseError(Exception):
 
 
 class Parser:
-    def __init__(self, tokens):
+    def __init__(self, tokens, source_path=""):
         self.tokens = tokens
         self.pos = 0
+        self.source_path = source_path
 
     def peek(self):
         if self.pos < len(self.tokens):
@@ -605,6 +606,10 @@ class Parser:
         if self.peek_kind("CHAR"):
             t = self.advance()
             return CharNode(value=t[1], line=t[2])
+        if self.peek_kind("EMBED"):
+            t = self.advance()
+            path = self.expect("STRING")
+            return EmbedNode(path=path[1], source_path=self.source_path, line=t[2])
         if self.peek_kind("STRING"):
             t = self.advance()
             return StringNode(value=t[1], line=t[2])
@@ -645,7 +650,7 @@ class Parser:
                 continue
             if kind == "expr":
                 from lexer import lex
-                p = Parser(lex(value))
+                p = Parser(lex(value), self.source_path)
                 expr = p.parse_expr()
                 if p.peek()[0] != "EOF":
                     t = p.peek()
@@ -833,6 +838,8 @@ def dump_ast_lines(node, depth=0):
         emit(f"Bool {node.value}{_type_suffix(node)}")
     elif isinstance(node, StringNode):
         emit(f"String {node.value}{_type_suffix(node)}")
+    elif isinstance(node, EmbedNode):
+        emit(f"Embed {node.path}{_type_suffix(node)}")
     elif isinstance(node, FStringNode):
         emit(f"FString{_type_suffix(node)}")
         for part in node.parts:

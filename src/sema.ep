@@ -677,6 +677,9 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         AstString n: {
             ret sema_set_type(node, "str")
         }
+        AstEmbed n: {
+            ret sema_set_type(node, "str")
+        }
         AstFString n: {
             for i: 0:len(n.fields) {
                 let part = n.fields[i]
@@ -1281,7 +1284,7 @@ fun main(): void {
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
-    let p = make_parser(tokens)
+    let p = make_parser_at(tokens, argv[1])
     let ast = p.parse_program()
     let st = make_sema_state()
     sema_program(st, ast)

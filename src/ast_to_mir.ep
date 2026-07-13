@@ -1,3 +1,5 @@
+extern "kernel32.dll" fun GetFileAttributesA(path: u64): u32
+
 #
 # Minimal self-hosted typed AST -> AST-to-MIR.
 # First milestone path: user-function MIR text oracle comparison against Python.
@@ -1054,6 +1056,43 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
     ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
 }
 
+fun mir_embed_is_absolute(path: str): bool {
+    if len(path) == 0 { ret false }
+    let view = bytes(path)
+    if view[0] == '/' || view[0] == '\\' { ret true }
+    ret len(path) >= 2 && view[1] == ':'
+}
+
+fun mir_embed_resolve(source_path: str, path: str): str {
+    if mir_embed_is_absolute(path) || len(source_path) == 0 { ret path }
+    let view = bytes(source_path)
+    let i = len(source_path)
+    for i > 0 {
+        i -= 1
+        if view[i] == '/' || view[i] == '\\' {
+            if i == 0 { ret path }
+            ret source_path[0:i] + "/" + path
+        }
+    }
+    ret path
+}
+
+fun mir_embed_cstr(path: str): str {
+    let out = new u8[]
+    out.extend(bytes(path))
+    out.push(u8(0))
+    ret str(out)
+}
+
+fun mir_embed_read(source_path: str, path: str): str {
+    let resolved = mir_embed_resolve(source_path, path)
+    let ready = mir_embed_cstr(resolved)
+    if GetFileAttributesA(cstr(ready)) == u32(4294967295) {
+        ast_to_mir_die("embed file not found: " + path)
+    }
+    ret str(read_file(ready))
+}
+
 fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
     st.current_block = block
     match expr {
@@ -1068,6 +1107,10 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         }
         AstString n: {
             ret mir_value_flow(mir_symbol_operand("ptr", mir_string_label(st, n.value)), st.current_block)
+        }
+        AstEmbed n: {
+            let value = mir_embed_read(n.source_path, n.path)
+            ret mir_value_flow(mir_symbol_operand("ptr", mir_string_label(st, value)), st.current_block)
         }
         AstFString n: {
             ret mir_emit_fstring(st, st.current_block, n)
@@ -2025,7 +2068,7 @@ fun main(): void {
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
-    let p = make_parser(tokens)
+    let p = make_parser_at(tokens, argv[1])
     let ast = p.parse_program()
     let st = make_sema_state()
     sema_program(st, ast)

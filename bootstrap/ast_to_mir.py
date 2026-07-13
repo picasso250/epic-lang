@@ -1,3 +1,4 @@
+from pathlib import Path
 """AST -> Epic AST-to-MIR for the initial machine-backend path."""
 
 from dataclasses import dataclass
@@ -856,6 +857,15 @@ class MirCodegen(MirFunctionBuilder):
             return ValueFlow(ConstBoolOperand(bool(expr.value)), self.current_block)
         if isinstance(expr, StringNode):
             return ValueFlow(SymbolOperand(ptr(), self._string_label(expr.value)), self.current_block)
+        if isinstance(expr, EmbedNode):
+            path = Path(expr.path)
+            if not path.is_absolute():
+                base = Path(expr.source_path).resolve().parent if expr.source_path else Path.cwd()
+                path = base / path
+            if not path.is_file():
+                raise MirCodegenError(f"embed file not found: {expr.path}")
+            value = path.read_bytes().decode("latin-1")
+            return ValueFlow(SymbolOperand(ptr(), self._string_label(value)), self.current_block)
         if isinstance(expr, FStringNode):
             return self._emit_fstring_from(self.current_block, expr)
         if isinstance(expr, VarNode):

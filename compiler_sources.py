@@ -13,6 +13,7 @@ SELF_HOST_COMPILER_SOURCES = [
     "src/sema.ep",
     "src/mir.ep",
     "src/mir_text.ep",
+    "src/runtime_bundle.ep",
     "src/mir_runtime.ep",
     "src/backend_abi.ep",
     "src/ast_to_mir.ep",

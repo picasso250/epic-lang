@@ -156,6 +156,7 @@ fun use_adt(): i64 {
 }
 
 fun main(): void {
+    let embedded: str = embed "../data/embed.txt"
     let a = use_scalars()
     let b = use_arrays_and_strings()
     let c = use_structs()

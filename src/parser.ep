@@ -257,6 +257,12 @@ struct AstString {
     value: str
 }
 
+struct AstEmbed {
+    meta: AstMeta
+    path: str
+    source_path: str
+}
+
 struct AstFString {
     meta: AstMeta
     fields: AstNode[]
@@ -352,7 +358,7 @@ struct AstUnionInit {
     expr: AstNode
 }
 
-type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstEmbed | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
 
 fun ast_empty(): AstNode {
     ret new AstNode(new AstEmpty { meta: ast_meta(0) })
@@ -400,16 +406,22 @@ struct Parser {
     for_counter: i64
     loop_depth: i64
     eof: Token
+    source_path: str
 }
 
-fun make_parser(tokens: Token[]): Parser {
+fun make_parser_at(tokens: Token[], source_path: str): Parser {
     let p = new Parser
     p.tokens = tokens
     p.pos = 0
     p.for_counter = 0
     p.loop_depth = 0
     p.eof = make_token("EOF", "", "", 0)
+    p.source_path = source_path
     ret p
+}
+
+fun make_parser(tokens: Token[]): Parser {
+    ret make_parser_at(tokens, "")
 }
 
 fun (p: Parser) peek(): Token {
@@ -1193,7 +1205,7 @@ fun (p: Parser) parse_array_literal(name: Token): AstNode {
     ret new AstNode(node)
 }
 
-fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
+fun parse_fstring_parts(parts: FStringPart[], line: i64, source_path: str): AstNode[] {
     let out = new AstNode[]
     for i: 0:len(parts) {
         match parts[i] {
@@ -1204,7 +1216,7 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64): AstNode[] {
             }
             FStringExprPart part: {
                 let tokens = lex(part.text)
-                let p = make_parser(tokens)
+                let p = make_parser_at(tokens, source_path)
                 let expr = p.parse_expr()
                 if p.peek_kind("EOF") == 0 {
                     parse_error(line, "Unexpected token in f-string expression")
@@ -1278,6 +1290,11 @@ fun (p: Parser) parse_primary(): AstNode {
         let t = p.advance()
         ret p.parse_postfix(new AstNode(new AstChar { meta: ast_meta(token_line(t)), value: token_text(t) }))
     }
+    if p.peek_kind("EMBED") == 1 {
+        let t = p.advance()
+        let path = p.expect("STRING")
+        ret p.parse_postfix(new AstNode(new AstEmbed { meta: ast_meta(token_line(t)), path: token_text(path), source_path: p.source_path }))
+    }
     if p.peek_kind("STRING") == 1 {
         let t = p.advance()
         ret p.parse_postfix(new AstNode(new AstString { meta: ast_meta(token_line(t)), value: token_text(t) }))
@@ -1286,7 +1303,7 @@ fun (p: Parser) parse_primary(): AstNode {
         let t = p.advance()
         match t {
             FStringToken ft: {
-                ret p.parse_postfix(new AstNode(new AstFString { meta: ast_meta(ft.line), fields: parse_fstring_parts(ft.parts, ft.line) }))
+                ret p.parse_postfix(new AstNode(new AstFString { meta: ast_meta(ft.line), fields: parse_fstring_parts(ft.parts, ft.line, p.source_path) }))
             }
             PlainToken pt: {
                 parse_error(pt.line, "Expected f-string parts")
@@ -1666,6 +1683,10 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             dump_node_line(node, depth, "String", "", "", false, "", n.value, true)
             ret 0
         }
+        AstEmbed n: {
+            dump_node_line(node, depth, "Embed", "", "", false, "", n.path, false)
+            ret 0
+        }
         AstFString n: {
             dump_node_line(node, depth, "FString", "", "", false, "", "", false)
             dump_list(n.fields, depth + 1)
@@ -1756,7 +1777,7 @@ fun main(): void {
     }
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
-    let p = make_parser(tokens)
+    let p = make_parser_at(tokens, argv[1])
     let ast = p.parse_program()
     dump_node(ast, 0)
     ret
