@@ -48,6 +48,8 @@ byte-map 到 bitmap 的后续实验记录在
 [`gc-object-threshold-experiment.md`](gc-object-threshold-experiment.md)。
 将 small sweep 限制到 page bump 范围的负结果记录在
 [`gc-sweep-bump-experiment.md`](gc-sweep-bump-experiment.md)。
+按 allocation bitmap 空 byte 跳过 slots 的负结果记录在
+[`gc-sweep-empty-byte-experiment.md`](gc-sweep-empty-byte-experiment.md)。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
 reference 或精确 stack map。公开 WinAPI 调用是同步的；`cptr` 可以借用 `str` / `u8[]`
