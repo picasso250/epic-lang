@@ -214,15 +214,6 @@ fun mrt_parse_operands(text: str): MirOperand[] {
     ret out
 }
 
-fun mrt_inst_with_result(inst: MirInst, result_id: i64, result_type: str): MirInst {
-    if result_id > 0 {
-        inst.has_result = true
-        inst.result_id = result_id
-        inst.result_type = result_type
-    }
-    ret inst
-}
-
 fun mrt_parse_inst(line: str): MirInst {
     let body = line
     let result_id = 0
@@ -263,11 +254,7 @@ fun mrt_parse_inst(line: str): MirInst {
         let rest = body[4:len(body)]
         let comma = mrt_find(rest, ",")
         if comma < 0 { mir_text_die(("bad gep: " + line)) }
-        let inst = mir_inst_empty()
-        inst.op = "gep"
-        inst.typ = mrt_trim(rest[0:comma])
-        inst.operands = mrt_parse_operands(rest[comma + 1:len(rest)])
-        ret mrt_inst_with_result(inst, result_id, result_type)
+        ret mir_gep(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_operands(rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "call ") {
         let rest = body[5:len(body)]
@@ -278,7 +265,15 @@ fun mrt_parse_inst(line: str): MirInst {
         if lp < 0 || rp < lp { mir_text_die(("bad call: " + line)) }
         let callee = after_ret[0:lp]
         let args = mrt_parse_operands(after_ret[lp + 1:rp])
-        ret mrt_inst_with_result(mir_call(callee, ret_type, args), result_id, result_type)
+        ret new MirInst(new MirCallInst {
+            callee: callee,
+            return_type: ret_type,
+            args: args,
+            immediate_arg: 0,
+            result_id: result_id,
+            result_type: result_type,
+            has_result: result_id > 0
+        })
     }
     if mrt_starts_with(body, "ptrtoint ") || mrt_starts_with(body, "inttoptr ") {
         let op = "ptrtoint"
@@ -286,24 +281,22 @@ fun mrt_parse_inst(line: str): MirInst {
         let rest = body[len(op) + 1:len(body)]
         let to_pos = mrt_find(rest, " to ")
         if to_pos < 0 { mir_text_die(("bad " + op + ": " + line)) }
-        let inst = mir_inst_empty()
-        inst.op = op
-        inst.typ = mrt_trim(rest[to_pos + 4:len(rest)])
-        inst.operands.push(mrt_parse_typed_operand(rest[0:to_pos]))
-        ret mrt_inst_with_result(inst, result_id, result_type)
+        let target_type = mrt_trim(rest[to_pos + 4:len(rest)])
+        let operand = mrt_parse_typed_operand(rest[0:to_pos])
+        if op == "inttoptr" { ret mir_inttoptr(result_id, result_type, operand, target_type) }
+        ret mir_ptrtoint(result_id, result_type, operand, target_type)
     }
     if mrt_starts_with(body, "not ") {
-        let inst = mir_inst_empty()
-        inst.op = "not"
-        inst.operands.push(mrt_parse_typed_operand(body[4:len(body)]))
-        ret mrt_inst_with_result(inst, result_id, result_type)
+        ret mir_not(result_id, mrt_parse_typed_operand(body[4:len(body)]))
     }
 
     let op = mrt_first_word(body)
-    let inst = mir_inst_empty()
-    inst.op = op
-    inst.operands = mrt_parse_operands(mrt_after_first_word(body))
-    ret mrt_inst_with_result(inst, result_id, result_type)
+    let operands = mrt_parse_operands(mrt_after_first_word(body))
+    if len(operands) != 2 { mir_text_die(("bad binary instruction: " + line)) }
+    if mrt_starts_with(op, "icmp.") {
+        ret mir_compare(mir_compare_kind(op), result_id, operands[0], operands[1])
+    }
+    ret mir_binary(mir_binary_kind(op), result_id, result_type, operands[0], operands[1])
 }
 
 fun mrt_is_terminator(line: str): bool {

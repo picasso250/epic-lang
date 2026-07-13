@@ -11,11 +11,7 @@ fun main(): void {
     let program = mir_program_empty()
     let root = mir_function_empty("main", "ptr")
     let entry = mir_block_empty("entry")
-    let keep = mir_inst_empty()
-    keep.op = "store"
-    keep.typ = "ptr"
-    keep.operands.push(mir_symbol_operand("ptr", "from_instruction"))
-    keep.operands.push(mir_operand_null())
+    let keep = mir_store(mir_symbol_operand("ptr", "from_instruction"), mir_operand_null())
     entry.instructions.push(keep)
     entry.terminator = mir_ret_value(mir_symbol_operand("ptr", "from_terminator"))
     entry.has_terminator = true

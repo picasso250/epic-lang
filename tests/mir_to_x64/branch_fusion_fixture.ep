@@ -1,12 +1,5 @@
 fun comparison(op: str, result_id: i64, left: MirOperand, right: MirOperand): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = op
-    inst.result_id = result_id
-    inst.result_type = "bool"
-    inst.has_result = true
-    inst.operands.push(left)
-    inst.operands.push(right)
-    ret inst
+    ret mir_compare(mir_compare_kind(op), result_id, left, right)
 }
 
 fun has_op(program: X64Program, op: i64): bool {

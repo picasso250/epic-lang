@@ -379,9 +379,9 @@ fun mir_swapped_binary_op(op: str): str {
 fun mir_operand_is_latest_result(st: MirCodegenState, operand: MirOperand): bool {
     if len(st.current_block.instructions) == 0 { ret false }
     let latest = st.current_block.instructions[len(st.current_block.instructions) - 1]
-    if !latest.has_result { ret false }
+    if !mir_inst_has_result(latest) { ret false }
     match operand {
-        MirValueOperand value: { ret value.value_id == latest.result_id }
+        MirValueOperand value: { ret value.value_id == mir_inst_result_id(latest) }
         _: {}
     }
     ret false
@@ -399,18 +399,16 @@ fun mir_emit_shift_count_check(st: MirCodegenState, count: MirOperand, source_ty
     let high_block = mir_new_block(st, "shift.high")
     let ok_block = mir_new_block(st, "shift.ok")
     let fail_block = mir_new_block(st, "shift.fail")
-    let nonneg = mir_make_result_inst(st, "icmp.sge", "bool")
-    nonneg.operands.push(count)
-    nonneg.operands.push(mir_const_int("i64", 0))
+    let nonneg_id = mir_new_value(st)
+    let nonneg = mir_compare(mir_compare_kind("icmp.sge"), nonneg_id, count, mir_const_int("i64", 0))
     mir_emit_inst(st, nonneg)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", nonneg.result_id), high_block.name, fail_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", nonneg_id), high_block.name, fail_block.name)
     st.current_block.has_terminator = true
     st.current_block = high_block
-    let in_range = mir_make_result_inst(st, "icmp.slt", "bool")
-    in_range.operands.push(count)
-    in_range.operands.push(mir_const_int("i64", width))
+    let in_range_id = mir_new_value(st)
+    let in_range = mir_compare(mir_compare_kind("icmp.slt"), in_range_id, count, mir_const_int("i64", width))
     mir_emit_inst(st, in_range)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", in_range.result_id), ok_block.name, fail_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", in_range_id), ok_block.name, fail_block.name)
     st.current_block.has_terminator = true
     st.current_block = fail_block
     let print_args = new MirOperand[]
@@ -427,45 +425,35 @@ fun mir_emit_shift_count_check(st: MirCodegenState, count: MirOperand, source_ty
 }
 
 fun mir_make_gep(st: MirCodegenState, source_type: str, operands: MirOperand[]): MirOperand {
-    let inst = mir_make_result_inst(st, "gep", "ptr")
-    inst.typ = source_type
-    inst.operands = operands
-    mir_emit_inst(st, inst)
-    ret mir_value_operand("ptr", inst.result_id)
+    let result_id = mir_new_value(st)
+    mir_emit_inst(st, mir_gep(result_id, "ptr", source_type, operands))
+    ret mir_value_operand("ptr", result_id)
 }
 
 fun mir_make_ptrtoint(st: MirCodegenState, operand: MirOperand, target_type: str): MirOperand {
-    let inst = mir_make_result_inst(st, "ptrtoint", target_type)
-    inst.typ = target_type
-    inst.operands.push(operand)
-    mir_emit_inst(st, inst)
-    ret mir_value_operand(target_type, inst.result_id)
+    let result_id = mir_new_value(st)
+    mir_emit_inst(st, mir_ptrtoint(result_id, target_type, operand, target_type))
+    ret mir_value_operand(target_type, result_id)
 }
 
 fun mir_make_inttoptr(st: MirCodegenState, operand: MirOperand): MirOperand {
-    let inst = mir_make_result_inst(st, "inttoptr", "ptr")
-    inst.typ = "ptr"
-    inst.operands.push(operand)
-    mir_emit_inst(st, inst)
-    ret mir_value_operand("ptr", inst.result_id)
+    let result_id = mir_new_value(st)
+    mir_emit_inst(st, mir_inttoptr(result_id, "ptr", operand, "ptr"))
+    ret mir_value_operand("ptr", result_id)
 }
 
 fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: MirOperand[]): MirOperand {
-    let inst = mir_inst_empty()
-    inst.op = "call"
-    inst.callee = callee
-    inst.typ = ret_type
-    inst.operands = args
+    let immediate_arg = 0
     if len(st.current_block.instructions) > 0 {
         let latest = st.current_block.instructions[len(st.current_block.instructions) - 1]
-        if latest.has_result {
+        if mir_inst_has_result(latest) {
             let hint_limit = len(args)
             if hint_limit > 4 { hint_limit = 4 }
             for i: 0:hint_limit {
                 match args[i] {
                     MirValueOperand value: {
-                        if value.value_id == latest.result_id {
-                            inst.immediate_operand_hint = i + 1
+                        if value.value_id == mir_inst_result_id(latest) {
+                            immediate_arg = i + 1
                         }
                     }
                     _: {}
@@ -473,24 +461,36 @@ fun mir_emit_call_inst(st: MirCodegenState, callee: str, ret_type: str, args: Mi
             }
         }
     }
+    let result_id = 0
+    let result_type = ""
+    let has_result = ret_type != "void"
+    if has_result {
+        result_id = mir_new_value(st)
+        result_type = ret_type
+    }
+    let inst = new MirInst(new MirCallInst {
+        callee: callee,
+        return_type: ret_type,
+        args: args,
+        immediate_arg: immediate_arg,
+        result_id: result_id,
+        result_type: result_type,
+        has_result: has_result
+    })
     if ret_type == "void" {
         mir_emit_inst(st, inst)
         ret mir_const_int("i64", 0)
     }
-    inst.result_id = mir_new_value(st)
-    inst.result_type = ret_type
-    inst.has_result = true
     mir_emit_inst(st, inst)
-    ret mir_value_operand(ret_type, inst.result_id)
+    ret mir_value_operand(ret_type, result_id)
 }
 
-fun mir_make_result_inst(st: MirCodegenState, op: str, result_type: str): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = op
-    inst.result_id = mir_new_value(st)
-    inst.result_type = result_type
-    inst.has_result = true
-    ret inst
+fun mir_make_binary_result_inst(st: MirCodegenState, op: str, result_type: str, left: MirOperand, right: MirOperand): MirInst {
+    let result_id = mir_new_value(st)
+    if len(op) >= 5 && op[0:5] == "icmp." {
+        ret mir_compare(mir_compare_kind(op), result_id, left, right)
+    }
+    ret mir_binary(mir_binary_kind(op), result_id, result_type, left, right)
 }
 
 fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
@@ -627,11 +627,10 @@ fun mir_load_union_common_field(st: MirCodegenState, union_value: MirOperand, un
         let wrapper_name = mir_new_value(st)
         mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", wrapper_addr))
         let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
-        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(tag)
-        cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, members[ci])))
+        let cond_id = mir_new_value(st)
+        let cond = mir_compare(mir_compare_kind("icmp.eq"), cond_id, tag, mir_const_int("i64", mir_union_tag(st, union_name, members[ci])))
         mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_id), case_blocks[ci].name, next_block.name)
         st.current_block.has_terminator = true
         if ci < len(members) - 1 {
             check_block = next_blocks[ci]
@@ -666,12 +665,7 @@ fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
     let size_i64 = mir_make_ptrtoint(st, size_ptr, "i64")
     let args = new MirOperand[]
     args.push(size_i64)
-    let call = mir_make_result_inst(st, "call", "ptr")
-    call.typ = "ptr"
-    call.callee = "__ep_alloc"
-    call.operands = args
-    mir_emit_inst(st, call)
-    ret mir_value_operand("ptr", call.result_id)
+    ret mir_emit_call_inst(st, "__ep_alloc", "ptr", args)
 }
 
 fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstStructInit): MirValueFlow {
@@ -700,23 +694,17 @@ fun mir_emit_union_init(st: MirCodegenState, block: MirBlock, expr: AstUnionInit
 }
 
 fun mir_trunc_uint_value(st: MirCodegenState, value: MirOperand, mask: i64): MirOperand {
-    let inst = mir_make_result_inst(st, "and", "i64")
-    inst.operands.push(value)
-    inst.operands.push(mir_const_int("i64", mask))
+    let inst = mir_make_binary_result_inst(st, "and", "i64", value, mir_const_int("i64", mask))
     mir_emit_inst(st, inst)
-    ret mir_value_operand("i64", inst.result_id)
+    ret mir_value_operand("i64", mir_inst_result_id(inst))
 }
 
 fun mir_trunc_signed_value(st: MirCodegenState, value: MirOperand, shift: i64): MirOperand {
-    let shl_inst = mir_make_result_inst(st, "shl", "i64")
-    shl_inst.operands.push(value)
-    shl_inst.operands.push(mir_const_int("i64", shift))
+    let shl_inst = mir_make_binary_result_inst(st, "shl", "i64", value, mir_const_int("i64", shift))
     mir_emit_inst(st, shl_inst)
-    let sar_inst = mir_make_result_inst(st, "sar", "i64")
-    sar_inst.operands.push(mir_value_operand("i64", shl_inst.result_id))
-    sar_inst.operands.push(mir_const_int("i64", shift))
+    let sar_inst = mir_make_binary_result_inst(st, "sar", "i64", mir_value_operand("i64", mir_inst_result_id(shl_inst)), mir_const_int("i64", shift))
     mir_emit_inst(st, sar_inst)
-    ret mir_value_operand("i64", sar_inst.result_id)
+    ret mir_value_operand("i64", mir_inst_result_id(sar_inst))
 }
 
 fun mir_trunc_i16_value(st: MirCodegenState, value: MirOperand): MirOperand {
@@ -1210,17 +1198,15 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             let inner_flow = mir_emit_expr(st, st.current_block, n.expr)
             st.current_block = inner_flow.block
             if n.op == "-" {
-                let inst = mir_make_result_inst(st, "sub", "i64")
-                inst.operands.push(mir_const_int("i64", 0))
-                inst.operands.push(inner_flow.value)
+                let inst = mir_make_binary_result_inst(st, "sub", "i64", mir_const_int("i64", 0), inner_flow.value)
                 mir_emit_inst(st, inst)
-                ret mir_value_flow(mir_value_operand("i64", inst.result_id), st.current_block)
+                ret mir_value_flow(mir_value_operand("i64", mir_inst_result_id(inst)), st.current_block)
             }
             if n.op == "!" {
-                let inst = mir_make_result_inst(st, "not", "bool")
-                inst.operands.push(inner_flow.value)
+                let result_id = mir_new_value(st)
+                let inst = mir_not(result_id, inner_flow.value)
                 mir_emit_inst(st, inst)
-                ret mir_value_flow(mir_value_operand("bool", inst.result_id), st.current_block)
+                ret mir_value_flow(mir_value_operand("bool", result_id), st.current_block)
             }
             ast_to_mir_die(f"unsupported unary op {n.op}")
         }
@@ -1246,10 +1232,10 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 args.push(right_flow.value)
                 let eq = mir_emit_call_inst(st, "__ep_str_eq", "bool", args)
                 if n.op == "!=" {
-                    let not_inst = mir_make_result_inst(st, "not", "bool")
-                    not_inst.operands.push(eq)
+                    let result_id = mir_new_value(st)
+                    let not_inst = mir_not(result_id, eq)
                     mir_emit_inst(st, not_inst)
-                    ret mir_value_flow(mir_value_operand("bool", not_inst.result_id), st.current_block)
+                    ret mir_value_flow(mir_value_operand("bool", result_id), st.current_block)
                 }
                 ret mir_value_flow(eq, st.current_block)
             }
@@ -1260,17 +1246,17 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             }
             let swapped_op = mir_swapped_binary_op(op)
             let swap_operands = swapped_op != "" && mir_operand_is_latest_result(st, right_flow.value)
-            let inst = mir_make_result_inst(st, op, result_type)
+            let selected_op = op
+            let left = left_flow.value
+            let right = right_flow.value
             if swap_operands {
-                inst.op = swapped_op
-                inst.operands.push(right_flow.value)
-                inst.operands.push(left_flow.value)
-            } else {
-                inst.operands.push(left_flow.value)
-                inst.operands.push(right_flow.value)
+                selected_op = swapped_op
+                left = right_flow.value
+                right = left_flow.value
             }
+            let inst = mir_make_binary_result_inst(st, selected_op, result_type, left, right)
             mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), ast_require_resolved_type(n.meta)), st.current_block)
+            ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, mir_inst_result_id(inst)), ast_require_resolved_type(n.meta)), st.current_block)
         }
         AstNewArray n: {
             ret mir_emit_new_array(st, st.current_block, n)
@@ -1293,11 +1279,9 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
         AstNullCheck n: {
             let value_flow = mir_emit_expr(st, st.current_block, n.expr)
             st.current_block = value_flow.block
-            let inst = mir_make_result_inst(st, "icmp.ne", "bool")
-            inst.operands.push(value_flow.value)
-            inst.operands.push(mir_operand_null())
+            let inst = mir_make_binary_result_inst(st, "icmp.ne", "bool", value_flow.value, mir_operand_null())
             mir_emit_inst(st, inst)
-            ret mir_value_flow(mir_value_operand("bool", inst.result_id), st.current_block)
+            ret mir_value_flow(mir_value_operand("bool", mir_inst_result_id(inst)), st.current_block)
         }
         AstFieldAccess n: {
             let base_type = ast_resolved_type(n.object)
@@ -1512,11 +1496,10 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
         if ci < len(stmt.fields) - 1 {
             next_block = next_blocks[ci]
         }
-        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(tag)
-        cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, stmt.fields[ci].variant_name)))
+        let cond_id = mir_new_value(st)
+        let cond = mir_compare(mir_compare_kind("icmp.eq"), cond_id, tag, mir_const_int("i64", mir_union_tag(st, union_name, stmt.fields[ci].variant_name)))
         mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_id), case_blocks[ci].name, next_block.name)
         st.current_block.has_terminator = true
         if ci < len(stmt.fields) - 1 {
             check_block = next_blocks[ci]
@@ -1583,11 +1566,10 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
         }
         let pat_flow = mir_emit_expr(st, st.current_block, stmt.fields[ci].expr)
         st.current_block = pat_flow.block
-        let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(scrutinee_flow.value)
-        cond.operands.push(pat_flow.value)
+        let cond_id = mir_new_value(st)
+        let cond = mir_compare(mir_compare_kind("icmp.eq"), cond_id, scrutinee_flow.value, pat_flow.value)
         mir_emit_inst(st, cond)
-        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
+        st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_id), case_blocks[ci].name, next_block.name)
         st.current_block.has_terminator = true
         if ci < len(stmt.fields) - 1 {
             check_block = next_blocks[ci]
@@ -1689,11 +1671,10 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     st.current_block = cond_block
     let cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(cur_name, "i64", "i64", var_addr))
-    let cond_inst = mir_make_result_inst(st, "icmp.slt", "bool")
-    cond_inst.operands.push(mir_value_operand("i64", cur_name))
-    cond_inst.operands.push(end_flow.value)
+    let cond_id = mir_new_value(st)
+    let cond_inst = mir_compare(mir_compare_kind("icmp.slt"), cond_id, mir_value_operand("i64", cur_name), end_flow.value)
     mir_emit_inst(st, cond_inst)
-    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_inst.result_id), body_block.name, end_block.name)
+    st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond_id), body_block.name, end_block.name)
     st.current_block.has_terminator = true
 
     mir_push_loop(st, inc_block.name, end_block.name)
@@ -1707,11 +1688,9 @@ fun mir_emit_for_range(st: MirCodegenState, block: MirBlock, stmt: AstForRange):
     st.current_block = inc_block
     let inc_cur_name = mir_new_value(st)
     mir_emit_inst(st, mir_load(inc_cur_name, "i64", "i64", var_addr))
-    let add_inst = mir_make_result_inst(st, "add", "i64")
-    add_inst.operands.push(mir_value_operand("i64", inc_cur_name))
-    add_inst.operands.push(mir_const_int("i64", 1))
+    let add_inst = mir_make_binary_result_inst(st, "add", "i64", mir_value_operand("i64", inc_cur_name), mir_const_int("i64", 1))
     mir_emit_inst(st, add_inst)
-    mir_emit_inst(st, mir_store(mir_value_operand("i64", add_inst.result_id), var_addr))
+    mir_emit_inst(st, mir_store(mir_value_operand("i64", mir_inst_result_id(add_inst)), var_addr))
     st.current_block.terminator = mir_br(cond_block.name)
     st.current_block.has_terminator = true
     mir_truncate_locals(st, local_count)
@@ -1806,11 +1785,9 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     if n.op == "<<" || n.op == ">>" {
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
-                    let inst = mir_make_result_inst(st, op, result_type)
-                    inst.operands.push(mir_value_operand(st.local_types[idx], result_id))
-                    inst.operands.push(rhs_flow.value)
+                    let inst = mir_make_binary_result_inst(st, op, result_type, mir_value_operand(st.local_types[idx], result_id), rhs_flow.value)
                     mir_emit_inst(st, inst)
-                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), addr))
+                    mir_emit_inst(st, mir_store(mir_normalize_int_value(st, mir_value_operand(result_type, mir_inst_result_id(inst)), target_type), addr))
                     ret mir_reachable_flow(st.current_block)
                 }
                 AstFieldAccess target: {
@@ -1833,11 +1810,9 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     if n.op == "<<" || n.op == ">>" {
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
-                    let inst = mir_make_result_inst(st, op, result_type)
-                    inst.operands.push(mir_value_operand(field_typ, result_id))
-                    inst.operands.push(rhs_flow.value)
+                    let inst = mir_make_binary_result_inst(st, op, result_type, mir_value_operand(field_typ, result_id), rhs_flow.value)
                     mir_emit_inst(st, inst)
-                    mir_emit_inst(st, mir_store_as(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), mir_field_access_type(st, struct_name, target.name), addr))
+                    mir_emit_inst(st, mir_store_as(mir_normalize_int_value(st, mir_value_operand(result_type, mir_inst_result_id(inst)), target_type), mir_field_access_type(st, struct_name, target.name), addr))
                     ret mir_reachable_flow(st.current_block)
                 }
                 AstSubscript target: {
@@ -1855,11 +1830,9 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                     if n.op == "<<" || n.op == ">>" {
                         mir_emit_shift_count_check(st, rhs_flow.value, target_type, n.meta.line)
                     }
-                    let inst = mir_make_result_inst(st, op, result_type)
-                    inst.operands.push(current)
-                    inst.operands.push(rhs_flow.value)
+                    let inst = mir_make_binary_result_inst(st, op, result_type, current, rhs_flow.value)
                     mir_emit_inst(st, inst)
-                    mir_emit_array_store(st, dst_flow.value, index_flow.value, mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), target_type), base_type)
+                    mir_emit_array_store(st, dst_flow.value, index_flow.value, mir_normalize_int_value(st, mir_value_operand(result_type, mir_inst_result_id(inst)), target_type), base_type)
                     ret mir_reachable_flow(st.current_block)
                 }
                 _: {

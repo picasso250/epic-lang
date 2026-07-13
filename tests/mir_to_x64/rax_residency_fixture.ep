@@ -1,24 +1,10 @@
-fun residency_result(op: str, result_id: i64, result_type: str, operands: MirOperand[]): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = op
-    inst.result_id = result_id
-    inst.result_type = result_type
-    inst.has_result = true
-    inst.operands = operands
-    ret inst
-}
-
 fun residency_binary(op: str, result_id: i64, left: MirOperand, right: MirOperand): MirInst {
-    let operands = new MirOperand[]
-    operands.push(left)
-    operands.push(right)
-    ret residency_result(op, result_id, "i64", operands)
+    ret mir_binary(mir_binary_kind(op), result_id, "i64", left, right)
 }
 
 fun residency_unary(op: str, result_id: i64, result_type: str, operand: MirOperand): MirInst {
-    let operands = new MirOperand[]
-    operands.push(operand)
-    ret residency_result(op, result_id, result_type, operands)
+    if op == "inttoptr" { ret mir_inttoptr(result_id, result_type, operand, result_type) }
+    ret mir_ptrtoint(result_id, result_type, operand, result_type)
 }
 
 fun residency_rbp_rax_store_count(program: X64Program): i64 {

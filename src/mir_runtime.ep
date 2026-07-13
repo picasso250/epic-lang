@@ -50,7 +50,10 @@ fun mir_runtime_insert_startup(program: MirProgram): void {
     let entry = main_fn.blocks[0]
     if len(entry.instructions) > 0 {
         let first = entry.instructions[0]
-        if first.op == "call" && first.callee == "__ep_runtime_start" { ret }
+        match first {
+            MirCallInst call: { if call.callee == "__ep_runtime_start" { ret } }
+            _: {}
+        }
     }
     let instructions = new MirInst[]
     instructions.push(mir_call("__ep_runtime_start", "void", new MirOperand[]))
@@ -74,7 +77,10 @@ fun mir_runtime_insert_shutdown(program: MirProgram): void {
             let already_inserted = false
             if len(block.instructions) > 0 {
                 let last = block.instructions[len(block.instructions) - 1]
-                already_inserted = last.op == "call" && last.callee == "__ep_runtime_end"
+                match last {
+                    MirCallInst call: { already_inserted = call.callee == "__ep_runtime_end" }
+                    _: {}
+                }
             }
             if !already_inserted {
                 block.instructions.push(mir_call("__ep_runtime_end", "void", new MirOperand[]))
@@ -103,14 +109,17 @@ fun mir_runtime_insert_null_checks(program: MirProgram): void {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "alloca" && inst.has_result {
-                    mir_runtime_push_unique_i64(safe_values, inst.result_id)
-                }
-                if inst.op == "gep" && inst.has_result && len(inst.operands) > 0 {
-                    match inst.operands[0] {
-                        MirNullOperand value: {}
-                        _: { mir_runtime_push_unique_i64(safe_values, inst.result_id) }
+                match inst {
+                    MirAllocaInst alloca: { mir_runtime_push_unique_i64(safe_values, alloca.result_id) }
+                    MirGepInst gep: {
+                        if len(gep.operands) > 0 {
+                            match gep.operands[0] {
+                                MirNullOperand value: {}
+                                _: { mir_runtime_push_unique_i64(safe_values, gep.result_id) }
+                            }
+                        }
                     }
+                    _: {}
                 }
             }
         }
@@ -123,20 +132,27 @@ fun mir_runtime_insert_null_checks(program: MirProgram): void {
                 let inst = block.instructions[ii]
                 let has_address = false
                 let address = mir_operand_null()
-                if inst.op == "gep" && len(inst.operands) > 0 {
-                    match inst.operands[0] {
-                        MirNullOperand value: {}
-                        _: {
-                            has_address = true
-                            address = inst.operands[0]
+                match inst {
+                    MirGepInst gep: {
+                        if len(gep.operands) > 0 {
+                            match gep.operands[0] {
+                                MirNullOperand value: {}
+                                _: {
+                                    has_address = true
+                                    address = gep.operands[0]
+                                }
+                            }
                         }
                     }
-                } else if inst.op == "load" && len(inst.operands) > 0 {
-                    has_address = true
-                    address = inst.operands[0]
-                } else if inst.op == "store" && len(inst.operands) == 2 {
-                    has_address = true
-                    address = inst.operands[1]
+                    MirLoadInst load: {
+                        has_address = true
+                        address = load.address
+                    }
+                    MirStoreInst store: {
+                        has_address = true
+                        address = store.address
+                    }
+                    _: {}
                 }
                 if has_address && mir_runtime_address_needs_check(address, safe_values, checked_values) {
                     let args = new MirOperand[]

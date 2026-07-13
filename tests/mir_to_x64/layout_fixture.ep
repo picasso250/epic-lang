@@ -5,13 +5,7 @@ fun main(): void {
     fn.params.push(new MirParam { typ: "ptr", value_id: 1 })
     fn.params.push(new MirParam { typ: "i64", value_id: 2 })
     let entry = mir_block_empty("entry")
-    let gep = mir_inst_empty()
-    gep.op = "gep"
-    gep.result_id = 3
-    gep.result_type = "ptr"
-    gep.typ = "struct Twelve"
-    gep.has_result = true
-    gep.operands = new MirOperand[] { mir_value_operand("ptr", 1), mir_value_operand("i64", 2) }
+    let gep = mir_gep(3, "ptr", "struct Twelve", new MirOperand[] { mir_value_operand("ptr", 1), mir_value_operand("i64", 2) })
     entry.instructions.push(gep)
     entry.terminator = mir_ret_value(mir_value_operand("ptr", 3))
     entry.has_terminator = true

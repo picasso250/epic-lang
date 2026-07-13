@@ -133,8 +133,9 @@ fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram
         for bi: 0:len(fn.blocks) {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
-                for oi: 0:len(block.instructions[ii].operands) {
-                    mir_to_x64_record_address_taken_operand(lower, block.instructions[ii].operands[oi])
+                let inst = block.instructions[ii]
+                for oi: 0:mir_inst_operand_count(inst) {
+                    mir_to_x64_record_address_taken_operand(lower, mir_inst_operand(inst, oi))
                 }
             }
             mir_to_x64_record_address_taken_term(lower, block.terminator)
@@ -243,8 +244,9 @@ fun mir_to_x64_count_use(counts: i64[], value_id: i64): void {
 fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i64[] {
     let counts = new i64[len(lower.value_slots)]
     for ii: 0:len(block.instructions) {
-        for oi: 0:len(block.instructions[ii].operands) {
-            match block.instructions[ii].operands[oi] {
+        let inst = block.instructions[ii]
+        for oi: 0:mir_inst_operand_count(inst) {
+            match mir_inst_operand(inst, oi) {
                 MirValueOperand value: {
                     if lower.reusable_values[value.value_id] != 0 {
                         mir_to_x64_count_use(counts, value.value_id)
@@ -292,17 +294,34 @@ fun mir_to_x64_operand_is_value(operand: MirOperand, value_id: i64): bool {
 }
 
 fun mir_to_x64_inst_uses_value_from_rax(inst: MirInst, value_id: i64): bool {
-    if inst.op == "alloca" || inst.op == "call" || len(inst.operands) == 0 { ret false }
-    ret mir_to_x64_operand_is_value(inst.operands[0], value_id)
+    match inst {
+        MirLoadInst load: { ret mir_to_x64_operand_is_value(load.address, value_id) }
+        MirStoreInst store: { ret mir_to_x64_operand_is_value(store.value, value_id) }
+        MirBinaryInst binary: { ret mir_to_x64_operand_is_value(binary.left, value_id) }
+        MirCompareInst compare: { ret mir_to_x64_operand_is_value(compare.left, value_id) }
+        MirGepInst gep: {
+            if len(gep.operands) > 0 { ret mir_to_x64_operand_is_value(gep.operands[0], value_id) }
+        }
+        MirCastInst cast: { ret mir_to_x64_operand_is_value(cast.operand, value_id) }
+        MirNotInst not_inst: { ret mir_to_x64_operand_is_value(not_inst.operand, value_id) }
+        _: {}
+    }
+    ret false
 }
 
 fun mir_to_x64_inst_uses_immediate_operand(inst: MirInst, value_id: i64): bool {
-    if inst.immediate_operand_hint == 0 { ret false }
-    let index = inst.immediate_operand_hint - 1
-    if index < 0 || index >= len(inst.operands) { ret false }
-    if inst.op == "call" && index >= 4 { ret false }
-    if inst.op != "call" && (inst.op != "store" || index != 1) { ret false }
-    ret mir_to_x64_operand_is_value(inst.operands[index], value_id)
+    match inst {
+        MirCallInst call: {
+            if call.immediate_arg > 0 && call.immediate_arg <= len(call.args) && call.immediate_arg <= 4 {
+                ret mir_to_x64_operand_is_value(call.args[call.immediate_arg - 1], value_id)
+            }
+        }
+        MirStoreInst store: {
+            if store.immediate_address { ret mir_to_x64_operand_is_value(store.address, value_id) }
+        }
+        _: {}
+    }
+    ret false
 }
 
 fun mir_to_x64_term_uses_value(term: MirTerminator, value_id: i64): bool {
@@ -316,18 +335,24 @@ fun mir_to_x64_term_uses_value(term: MirTerminator, value_id: i64): bool {
 
 fun mir_to_x64_should_keep_result_in_rax(lower: MirToX64Lower, block: MirBlock, inst_index: i64, counts: i64[], fused_icmp: bool): bool {
     let inst = block.instructions[inst_index]
-    if inst.op == "alloca" || !inst.has_result || lower.reusable_values[inst.result_id] == 0 { ret false }
-    if counts[inst.result_id] != 1 { ret false }
+    match inst { MirAllocaInst alloca: { ret false } _: {} }
+    if !mir_inst_has_result(inst) { ret false }
+    let result_id = mir_inst_result_id(inst)
+    if lower.reusable_values[result_id] == 0 { ret false }
+    if counts[result_id] != 1 { ret false }
     if fused_icmp && inst_index == len(block.instructions) - 1 { ret false }
     let next = inst_index + 1
-    for next < len(block.instructions) && block.instructions[next].op == "alloca" {
+    for next < len(block.instructions) {
+        let is_alloca = false
+        match block.instructions[next] { MirAllocaInst alloca: { is_alloca = true } _: {} }
+        if !is_alloca { break }
         next += 1
     }
     if next < len(block.instructions) {
-        if mir_to_x64_inst_uses_immediate_operand(block.instructions[next], inst.result_id) { ret true }
-        ret mir_to_x64_inst_uses_value_from_rax(block.instructions[next], inst.result_id)
+        if mir_to_x64_inst_uses_immediate_operand(block.instructions[next], result_id) { ret true }
+        ret mir_to_x64_inst_uses_value_from_rax(block.instructions[next], result_id)
     }
-    ret mir_to_x64_term_uses_value(block.terminator, inst.result_id)
+    ret mir_to_x64_term_uses_value(block.terminator, result_id)
 }
 
 fun mir_to_x64_reuse_or_alloc_slot(lower: MirToX64Lower): i64 {
@@ -365,12 +390,6 @@ fun mir_to_x64_release_operand(lower: MirToX64Lower, operand: MirOperand): void 
             }
         }
         _: {}
-    }
-}
-
-fun mir_to_x64_release_operands(lower: MirToX64Lower, operands: MirOperand[]): void {
-    for i: 0:len(operands) {
-        mir_to_x64_release_operand(lower, operands[i])
     }
 }
 
@@ -420,13 +439,21 @@ fun mir_to_x64_mark_reusable_values(lower: MirToX64Lower, fn: MirFunction): void
     let def_blocks = new i64[len(lower.value_slots)]
     for bi: 0:len(fn.blocks) {
         for ii: 0:len(fn.blocks[bi].instructions) {
-            if fn.blocks[bi].instructions[ii].op != "alloca" && fn.blocks[bi].instructions[ii].has_result {
-                let value_id = fn.blocks[bi].instructions[ii].result_id
+            let inst = fn.blocks[bi].instructions[ii]
+            let is_alloca = false
+            let is_gep = false
+            match inst {
+                MirAllocaInst alloca: { is_alloca = true }
+                MirGepInst gep: { is_gep = true }
+                _: {}
+            }
+            if !is_alloca && mir_inst_has_result(inst) {
+                let value_id = mir_inst_result_id(inst)
                 def_blocks[value_id] = bi + 1
                 # Conservative GC recognizes managed object base addresses.
                 # Keep every non-GEP pointer result in a stable stack slot so
                 # an interior address is never its only trace at a safepoint.
-                if fn.blocks[bi].instructions[ii].result_type == "ptr" && fn.blocks[bi].instructions[ii].op != "gep" {
+                if mir_inst_result_type(inst) == "ptr" && !is_gep {
                     lower.reusable_values[value_id] = 0
                 } else {
                     lower.reusable_values[value_id] = 1
@@ -436,8 +463,9 @@ fun mir_to_x64_mark_reusable_values(lower: MirToX64Lower, fn: MirFunction): void
     }
     for bi: 0:len(fn.blocks) {
         for ii: 0:len(fn.blocks[bi].instructions) {
-            for oi: 0:len(fn.blocks[bi].instructions[ii].operands) {
-                mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, fn.blocks[bi].instructions[ii].operands[oi], bi + 1)
+            let inst = fn.blocks[bi].instructions[ii]
+            for oi: 0:mir_inst_operand_count(inst) {
+                mir_to_x64_mark_cross_block_operand_use(lower, def_blocks, mir_inst_operand(inst, oi), bi + 1)
             }
         }
         mir_to_x64_mark_cross_block_terminator_use(lower, def_blocks, fn.blocks[bi].terminator, bi + 1)
@@ -452,20 +480,31 @@ fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
     for b: 0:len(fn.blocks) {
         lower.block_local_use_counts = mir_to_x64_count_block_local_uses(lower, fn.blocks[b])
         for j: 0:len(fn.blocks[b].instructions) {
-            if fn.blocks[b].instructions[j].op == "alloca" {
-                mir_to_x64_add_addr_slot(lower, fn.blocks[b].instructions[j].result_id)
+            let inst = fn.blocks[b].instructions[j]
+            let is_alloca = false
+            match inst {
+                MirAllocaInst alloca: {
+                    mir_to_x64_add_addr_slot(lower, alloca.result_id)
+                    is_alloca = true
+                }
+                _: {}
+            }
+            if is_alloca {
                 continue
             }
-            mir_to_x64_release_operands(lower, fn.blocks[b].instructions[j].operands)
-            if fn.blocks[b].instructions[j].has_result {
-                if lower.reusable_values[fn.blocks[b].instructions[j].result_id] != 0 {
-                    lower.temp_value_slots[fn.blocks[b].instructions[j].result_id] = 1
-                    lower.value_slots[fn.blocks[b].instructions[j].result_id] = mir_to_x64_reuse_or_alloc_slot(lower)
+            for oi: 0:mir_inst_operand_count(inst) {
+                mir_to_x64_release_operand(lower, mir_inst_operand(inst, oi))
+            }
+            if mir_inst_has_result(inst) {
+                let result_id = mir_inst_result_id(inst)
+                if lower.reusable_values[result_id] != 0 {
+                    lower.temp_value_slots[result_id] = 1
+                    lower.value_slots[result_id] = mir_to_x64_reuse_or_alloc_slot(lower)
                 } else {
-                    lower.value_slots[fn.blocks[b].instructions[j].result_id] = mir_to_x64_slot(lower)
+                    lower.value_slots[result_id] = mir_to_x64_slot(lower)
                 }
-                if lower.block_local_use_counts[fn.blocks[b].instructions[j].result_id] == 0 {
-                    mir_to_x64_release_value(lower, fn.blocks[b].instructions[j].result_id)
+                if lower.block_local_use_counts[result_id] == 0 {
+                    mir_to_x64_release_value(lower, result_id)
                 }
             }
         }
@@ -633,9 +672,9 @@ fun mir_to_x64_gep_scale(lower: MirToX64Lower, source_type: str): i64 {
     ret 8
 }
 
-fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
+fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirGepInst): void {
     mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-    let struct_name = mir_to_x64_source_struct_name(inst.typ)
+    let struct_name = mir_to_x64_source_struct_name(inst.source_type)
     if struct_name != "" {
         if len(inst.operands) == 2 {
             mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_struct_size(lower, struct_name))
@@ -654,38 +693,34 @@ fun mir_to_x64_emit_gep(lower: MirToX64Lower, inst: MirInst): void {
         if len(inst.operands) < 2 {
             mir_to_x64_die("gep needs an index")
         }
-        mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_gep_scale(lower, inst.typ))
+        mir_to_x64_add_scaled_index(lower, inst.operands[1], mir_to_x64_gep_scale(lower, inst.source_type))
     }
     mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
-fun mir_to_x64_binary_opcode(op: str): i64 {
-    if op == "add" { ret 24 } # x64 add
-    if op == "sub" { ret 25 } # x64 sub
-    if op == "and" { ret 26 } # x64 and
-    if op == "or" { ret 27 } # x64 or
-    if op == "xor" { ret 28 } # x64 xor
-    if op == "shl" { ret 36 } # x64 shl
-    if op == "shr" { ret 37 } # x64 shr
-    if op == "sar" { ret 38 } # x64 sar
-    mir_to_x64_die(("unsupported direct x64 binary op: " + op))
+fun mir_to_x64_binary_opcode(kind: i64): i64 {
+    if kind == 1 { ret 24 } # x64 add
+    if kind == 2 { ret 25 } # x64 sub
+    if kind == 8 { ret 26 } # x64 and
+    if kind == 9 { ret 27 } # x64 or
+    if kind == 10 { ret 28 } # x64 xor
+    if kind == 11 { ret 36 } # x64 shl
+    if kind == 13 { ret 37 } # x64 shr
+    if kind == 12 { ret 38 } # x64 sar
+    mir_to_x64_die("unsupported direct x64 binary op")
     ret 0
 }
 
-fun mir_to_x64_is_binary_op(op: str): bool {
-    ret op == "add" || op == "sub" || op == "mul" || op == "and" || op == "or" || op == "xor" || op == "shl" || op == "sar" || op == "shr" || op == "sdiv" || op == "srem" || op == "udiv" || op == "urem"
-}
-
-fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirInst): void {
-    mir_to_x64_load_operand(lower, "rax", inst.operands[0])
+fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirBinaryInst): void {
+    mir_to_x64_load_operand(lower, "rax", inst.left)
     let immediate = false
     let immediate_value = 0
-    match inst.operands[1] {
+    match inst.right {
         MirIntOperand value: {
-            if (inst.op == "add" || inst.op == "sub" || inst.op == "and" || inst.op == "or" || inst.op == "xor" || inst.op == "mul") && value.value >= -2147483648 && value.value <= 2147483647 {
+            if (inst.kind == 1 || inst.kind == 2 || inst.kind == 3 || inst.kind == 8 || inst.kind == 9 || inst.kind == 10) && value.value >= -2147483648 && value.value <= 2147483647 {
                 immediate = true
             }
-            if (inst.op == "shl" || inst.op == "sar" || inst.op == "shr") && value.value >= 0 && value.value <= 255 {
+            if (inst.kind == 11 || inst.kind == 12 || inst.kind == 13) && value.value >= 0 && value.value <= 255 {
                 immediate = true
             }
             if immediate {
@@ -695,37 +730,37 @@ fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirInst): void {
         _: {}
     }
     if immediate {
-        if inst.op == "mul" {
+        if inst.kind == 3 {
             x64_add_inst3(lower.x64, 31, x64_reg("rax"), x64_reg("rax"), x64_imm(immediate_value)) # x64 imul
         } else {
-            x64_add_inst2(lower.x64, mir_to_x64_binary_opcode(inst.op), x64_reg("rax"), x64_imm(immediate_value))
+            x64_add_inst2(lower.x64, mir_to_x64_binary_opcode(inst.kind), x64_reg("rax"), x64_imm(immediate_value))
         }
     } else {
-        mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
-        if inst.op == "add" {
+        mir_to_x64_load_operand(lower, "rcx", inst.right)
+        if inst.kind == 1 {
             x64_add_inst2(lower.x64, 24, x64_reg("rax"), x64_reg("rcx")) # x64 add
-        } else if inst.op == "sub" {
+        } else if inst.kind == 2 {
             x64_add_inst2(lower.x64, 25, x64_reg("rax"), x64_reg("rcx")) # x64 sub
-        } else if inst.op == "and" {
+        } else if inst.kind == 8 {
             x64_add_inst2(lower.x64, 26, x64_reg("rax"), x64_reg("rcx")) # x64 and
-        } else if inst.op == "or" {
+        } else if inst.kind == 9 {
             x64_add_inst2(lower.x64, 27, x64_reg("rax"), x64_reg("rcx")) # x64 or
-        } else if inst.op == "xor" {
+        } else if inst.kind == 10 {
             x64_add_inst2(lower.x64, 28, x64_reg("rax"), x64_reg("rcx")) # x64 xor
-        } else if inst.op == "mul" {
+        } else if inst.kind == 3 {
             x64_add_inst2(lower.x64, 31, x64_reg("rax"), x64_reg("rcx")) # x64 imul
-        } else if inst.op == "shl" || inst.op == "sar" || inst.op == "shr" {
-            x64_add_inst2(lower.x64, mir_to_x64_binary_opcode(inst.op), x64_reg("rax"), x64_reg("cl"))
-        } else if inst.op == "sdiv" || inst.op == "srem" {
+        } else if inst.kind == 11 || inst.kind == 12 || inst.kind == 13 {
+            x64_add_inst2(lower.x64, mir_to_x64_binary_opcode(inst.kind), x64_reg("rax"), x64_reg("cl"))
+        } else if inst.kind == 4 || inst.kind == 5 {
             x64_add_inst0(lower.x64, 35) # x64 cqo
             x64_add_inst1(lower.x64, 33, x64_reg("rcx")) # x64 idiv
-            if inst.op == "srem" {
+            if inst.kind == 5 {
                 x64_add_inst2(lower.x64, 1, x64_reg("rax"), x64_reg("rdx")) # x64 mov
             }
-        } else if inst.op == "udiv" || inst.op == "urem" {
+        } else if inst.kind == 6 || inst.kind == 7 {
             x64_add_inst2(lower.x64, 28, x64_reg("rdx"), x64_reg("rdx")) # x64 xor
             x64_add_inst1(lower.x64, 32, x64_reg("rcx")) # x64 div
-            if inst.op == "urem" {
+            if inst.kind == 7 {
                 x64_add_inst2(lower.x64, 1, x64_reg("rax"), x64_reg("rdx")) # x64 mov
             }
         }
@@ -733,29 +768,25 @@ fun mir_to_x64_emit_binary_op(lower: MirToX64Lower, inst: MirInst): void {
     mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
-fun mir_to_x64_is_icmp_op(op: str): bool {
-    ret op == "icmp.eq" || op == "icmp.ne" || op == "icmp.slt" || op == "icmp.sgt" || op == "icmp.sle" || op == "icmp.sge" || op == "icmp.ult" || op == "icmp.ugt" || op == "icmp.ule" || op == "icmp.uge"
-}
-
-fun mir_to_x64_icmp_cc(op: str): i64 {
-    if op == "icmp.eq" { ret 44 } # x64 sete
-    if op == "icmp.ne" { ret 45 } # x64 setne
-    if op == "icmp.slt" { ret 47 } # x64 setl
-    if op == "icmp.sgt" { ret 46 } # x64 setg
-    if op == "icmp.sle" { ret 49 } # x64 setle
-    if op == "icmp.sge" { ret 48 } # x64 setge
-    if op == "icmp.ult" { ret 52 } # x64 setb
-    if op == "icmp.ugt" { ret 50 } # x64 seta
-    if op == "icmp.ule" { ret 53 } # x64 setbe
-    if op == "icmp.uge" { ret 51 } # x64 setae
-    mir_to_x64_die(("unsupported icmp op: " + op))
+fun mir_to_x64_icmp_cc(kind: i64): i64 {
+    if kind == 1 { ret 44 } # x64 sete
+    if kind == 2 { ret 45 } # x64 setne
+    if kind == 3 { ret 47 } # x64 setl
+    if kind == 4 { ret 46 } # x64 setg
+    if kind == 5 { ret 49 } # x64 setle
+    if kind == 6 { ret 48 } # x64 setge
+    if kind == 7 { ret 52 } # x64 setb
+    if kind == 8 { ret 50 } # x64 seta
+    if kind == 9 { ret 53 } # x64 setbe
+    if kind == 10 { ret 51 } # x64 setae
+    mir_to_x64_die("unsupported icmp op")
     ret 44 # x64 sete
 }
 
-fun mir_to_x64_emit_icmp_compare(lower: MirToX64Lower, inst: MirInst): void {
-    mir_to_x64_load_operand(lower, "rax", inst.operands[0])
+fun mir_to_x64_emit_icmp_compare(lower: MirToX64Lower, inst: MirCompareInst): void {
+    mir_to_x64_load_operand(lower, "rax", inst.left)
     let immediate = false
-    match inst.operands[1] {
+    match inst.right {
         MirIntOperand value: {
             if value.value >= -2147483648 && value.value <= 2147483647 {
                 x64_add_inst2(lower.x64, 29, x64_reg("rax"), x64_imm(value.value)) # x64 cmp
@@ -765,42 +796,46 @@ fun mir_to_x64_emit_icmp_compare(lower: MirToX64Lower, inst: MirInst): void {
         _: {}
     }
     if !immediate {
-        mir_to_x64_load_operand(lower, "rcx", inst.operands[1])
+        mir_to_x64_load_operand(lower, "rcx", inst.right)
         x64_add_inst2(lower.x64, 29, x64_reg("rax"), x64_reg("rcx")) # x64 cmp
     }
 }
 
-fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirInst): void {
+fun mir_to_x64_emit_icmp(lower: MirToX64Lower, inst: MirCompareInst): void {
     mir_to_x64_emit_icmp_compare(lower, inst)
-    x64_add_inst1(lower.x64, mir_to_x64_icmp_cc(inst.op), x64_reg("al"))
+    x64_add_inst1(lower.x64, mir_to_x64_icmp_cc(inst.kind), x64_reg("al"))
     x64_add_inst2(lower.x64, 41, x64_reg("eax"), x64_reg("al")) # x64 movzx
     mir_to_x64_store_result(lower, inst.result_id, "rax")
 }
 
-fun mir_to_x64_fused_icmp_jcc(op: str): i64 {
-    if op == "icmp.eq" { ret 12 } # x64 jz
-    if op == "icmp.ne" { ret 13 } # x64 jnz
-    if op == "icmp.slt" { ret 20 } # x64 jl
-    if op == "icmp.sle" { ret 22 } # x64 jle
-    if op == "icmp.sgt" { ret 23 } # x64 jg
-    if op == "icmp.sge" { ret 21 } # x64 jge
-    if op == "icmp.ult" { ret 10 } # x64 jb
-    if op == "icmp.ule" { ret 14 } # x64 jbe
-    if op == "icmp.ugt" { ret 15 } # x64 ja
-    if op == "icmp.uge" { ret 11 } # x64 jae
+fun mir_to_x64_fused_icmp_jcc(kind: i64): i64 {
+    if kind == 1 { ret 12 } # x64 jz
+    if kind == 2 { ret 13 } # x64 jnz
+    if kind == 3 { ret 20 } # x64 jl
+    if kind == 5 { ret 22 } # x64 jle
+    if kind == 4 { ret 23 } # x64 jg
+    if kind == 6 { ret 21 } # x64 jge
+    if kind == 7 { ret 10 } # x64 jb
+    if kind == 9 { ret 14 } # x64 jbe
+    if kind == 8 { ret 15 } # x64 ja
+    if kind == 10 { ret 11 } # x64 jae
     ret 0
 }
 
 fun mir_to_x64_can_fuse_block_icmp(lower: MirToX64Lower, block: MirBlock): bool {
     if len(block.instructions) == 0 { ret false }
     let inst = block.instructions[len(block.instructions) - 1]
-    let jcc = mir_to_x64_fused_icmp_jcc(inst.op)
-    if jcc == 0 { ret false }
-    if lower.reusable_values[inst.result_id] == 0 { ret false }
-    match block.terminator {
-        MirCondBrTerminator cond: {
-            match cond.cond {
-                MirValueOperand value: { ret value.value_id == inst.result_id }
+    match inst {
+        MirCompareInst compare: {
+            if mir_to_x64_fused_icmp_jcc(compare.kind) == 0 { ret false }
+            if lower.reusable_values[compare.result_id] == 0 { ret false }
+            match block.terminator {
+                MirCondBrTerminator cond: {
+                    match cond.cond {
+                        MirValueOperand value: { ret value.value_id == compare.result_id }
+                        _: {}
+                    }
+                }
                 _: {}
             }
         }
@@ -809,11 +844,11 @@ fun mir_to_x64_can_fuse_block_icmp(lower: MirToX64Lower, block: MirBlock): bool 
     ret false
 }
 
-fun mir_to_x64_emit_fused_icmp_term(lower: MirToX64Lower, inst: MirInst, term: MirTerminator): void {
+fun mir_to_x64_emit_fused_icmp_term(lower: MirToX64Lower, inst: MirCompareInst, term: MirTerminator): void {
     match term {
         MirCondBrTerminator cond: {
             mir_to_x64_emit_icmp_compare(lower, inst)
-            x64_add_inst1(lower.x64, mir_to_x64_fused_icmp_jcc(inst.op), x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
+            x64_add_inst1(lower.x64, mir_to_x64_fused_icmp_jcc(inst.kind), x64_label_ref(mir_to_x64_block_label(lower, cond.then_target)))
             x64_add_inst1(lower.x64, 7, x64_label_ref(mir_to_x64_block_label(lower, cond.else_target))) # x64 jmp
             ret
         }
@@ -821,17 +856,17 @@ fun mir_to_x64_emit_fused_icmp_term(lower: MirToX64Lower, inst: MirInst, term: M
     }
 }
 
-fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
+fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirCallInst): void {
     let arg_regs = new str[]
     arg_regs.push("rcx")
     arg_regs.push("rdx")
     arg_regs.push("r8")
     arg_regs.push("r9")
     let resident_arg = -1
-    if inst.immediate_operand_hint > 0 {
-        let hinted_arg = inst.immediate_operand_hint - 1
-        if hinted_arg < len(inst.operands) && hinted_arg < 4 {
-            match inst.operands[hinted_arg] {
+    if inst.immediate_arg > 0 {
+        let hinted_arg = inst.immediate_arg - 1
+        if hinted_arg < len(inst.args) && hinted_arg < 4 {
+            match inst.args[hinted_arg] {
                 MirValueOperand value: {
                     if lower.rax_value_id == value.value_id {
                         resident_arg = hinted_arg
@@ -844,19 +879,19 @@ fun mir_to_x64_emit_call(lower: MirToX64Lower, inst: MirInst): void {
         }
     }
     let i = 0
-    for i < len(inst.operands) && i < 4 {
+    for i < len(inst.args) && i < 4 {
         if i != resident_arg {
-            mir_to_x64_load_operand(lower, arg_regs[i], inst.operands[i])
+            mir_to_x64_load_operand(lower, arg_regs[i], inst.args[i])
         }
         i += 1
     }
-    let stack_args = len(inst.operands) - 4
+    let stack_args = len(inst.args) - 4
     if stack_args < 0 { stack_args = 0 }
     let extra = ((stack_args * 8 + 15) / 16) * 16
     let frame = 32 + extra
     x64_add_inst2(lower.x64, 25, x64_reg("rsp"), x64_imm(frame)) # x64 sub
-    for i: 4:len(inst.operands) {
-        mir_to_x64_load_operand(lower, "rax", inst.operands[i])
+    for i: 4:len(inst.args) {
+        mir_to_x64_load_operand(lower, "rax", inst.args[i])
         x64_add_inst2(lower.x64, 1, x64_mem_base("rsp", 32 + (i - 4) * 8, 8), x64_reg("rax")) # x64 mov
     }
     x64_add_inst1(lower.x64, 3, x64_symbol(inst.callee)) # x64 call
@@ -875,96 +910,77 @@ fun mir_to_x64_alloca_offset(lower: MirToX64Lower, operand: MirOperand): i64 {
 }
 
 fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
-    if inst.op == "alloca" {
-        ret
-    }
-    if inst.op == "store" {
-        let resident_address = false
-        if inst.immediate_operand_hint == 2 {
-            match inst.operands[1] {
-                MirValueOperand value: {
-                    if lower.rax_value_id == value.value_id {
-                        resident_address = true
-                        x64_add_inst2(lower.x64, 1, x64_reg("rcx"), x64_reg("rax")) # x64 mov
-                        lower.rax_value_id = 0
+    match inst {
+        MirAllocaInst alloca: {}
+        MirStoreInst store: {
+            let resident_address = false
+            if store.immediate_address {
+                match store.address {
+                    MirValueOperand value: {
+                        if lower.rax_value_id == value.value_id {
+                            resident_address = true
+                            x64_add_inst2(lower.x64, 1, x64_reg("rcx"), x64_reg("rax")) # x64 mov
+                            lower.rax_value_id = 0
+                        }
                     }
+                    _: {}
                 }
-                _: {}
+            }
+            mir_to_x64_load_operand(lower, "rax", store.value)
+            let base = "rbp"
+            let disp = mir_to_x64_alloca_offset(lower, store.address)
+            if disp == 0 {
+                base = "rcx"
+                if !resident_address { mir_to_x64_load_operand(lower, base, store.address) }
+            }
+            if store.access_type == "i8" {
+                x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 1), x64_reg("al")) # x64 mov
+            } else if store.access_type == "i16" || store.access_type == "u16" {
+                x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 2), x64_reg("ax")) # x64 mov
+            } else if store.access_type == "i32" || store.access_type == "u32" {
+                x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 4), x64_reg("eax")) # x64 mov
+            } else {
+                x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 8), x64_reg("rax")) # x64 mov
             }
         }
-        mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-        let base = "rbp"
-        let disp = mir_to_x64_alloca_offset(lower, inst.operands[1])
-        if disp == 0 {
-            base = "rcx"
-            if !resident_address {
-                mir_to_x64_load_operand(lower, base, inst.operands[1])
+        MirLoadInst load: {
+            let base = "rbp"
+            let disp = mir_to_x64_alloca_offset(lower, load.address)
+            if disp == 0 {
+                base = "rax"
+                mir_to_x64_load_operand(lower, base, load.address)
             }
+            if load.access_type == "i8" {
+                x64_add_inst2(lower.x64, 41, x64_reg("rax"), x64_mem_base(base, disp, 1)) # x64 movzx
+            } else if load.access_type == "i16" {
+                x64_add_inst2(lower.x64, 42, x64_reg("rax"), x64_mem_base(base, disp, 2)) # x64 movsx
+            } else if load.access_type == "u16" {
+                x64_add_inst2(lower.x64, 41, x64_reg("rax"), x64_mem_base(base, disp, 2)) # x64 movzx
+            } else if load.access_type == "i32" {
+                x64_add_inst2(lower.x64, 43, x64_reg("rax"), x64_mem_base(base, disp, 4)) # x64 movsxd
+            } else if load.access_type == "u32" {
+                x64_add_inst2(lower.x64, 1, x64_reg("eax"), x64_mem_base(base, disp, 4)) # x64 mov
+            } else {
+                x64_add_inst2(lower.x64, 1, x64_reg("rax"), x64_mem_base(base, disp, 8)) # x64 mov
+            }
+            mir_to_x64_store_result(lower, load.result_id, "rax")
         }
-        if inst.typ == "i8" {
-            x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 1), x64_reg("al")) # x64 mov
-        } else if inst.typ == "i16" || inst.typ == "u16" {
-            x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 2), x64_reg("ax")) # x64 mov
-        } else if inst.typ == "i32" || inst.typ == "u32" {
-            x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 4), x64_reg("eax")) # x64 mov
-        } else {
-            x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 8), x64_reg("rax")) # x64 mov
+        MirCallInst call: { mir_to_x64_emit_call(lower, call) }
+        MirCastInst cast: {
+            mir_to_x64_load_operand(lower, "rax", cast.operand)
+            mir_to_x64_store_result(lower, cast.result_id, "rax")
         }
-        ret
-    }
-    if inst.op == "load" {
-        let base = "rbp"
-        let disp = mir_to_x64_alloca_offset(lower, inst.operands[0])
-        if disp == 0 {
-            base = "rax"
-            mir_to_x64_load_operand(lower, base, inst.operands[0])
+        MirGepInst gep: { mir_to_x64_emit_gep(lower, gep) }
+        MirBinaryInst binary: { mir_to_x64_emit_binary_op(lower, binary) }
+        MirNotInst not_inst: {
+            mir_to_x64_load_operand(lower, "rax", not_inst.operand)
+            x64_add_inst2(lower.x64, 30, x64_reg("rax"), x64_reg("rax")) # x64 test
+            x64_add_inst1(lower.x64, 44, x64_reg("al")) # x64 sete
+            x64_add_inst2(lower.x64, 41, x64_reg("eax"), x64_reg("al")) # x64 movzx
+            mir_to_x64_store_result(lower, not_inst.result_id, "rax")
         }
-        if inst.typ == "i8" {
-            x64_add_inst2(lower.x64, 41, x64_reg("rax"), x64_mem_base(base, disp, 1)) # x64 movzx
-        } else if inst.typ == "i16" {
-            x64_add_inst2(lower.x64, 42, x64_reg("rax"), x64_mem_base(base, disp, 2)) # x64 movsx
-        } else if inst.typ == "u16" {
-            x64_add_inst2(lower.x64, 41, x64_reg("rax"), x64_mem_base(base, disp, 2)) # x64 movzx
-        } else if inst.typ == "i32" {
-            x64_add_inst2(lower.x64, 43, x64_reg("rax"), x64_mem_base(base, disp, 4)) # x64 movsxd
-        } else if inst.typ == "u32" {
-            x64_add_inst2(lower.x64, 1, x64_reg("eax"), x64_mem_base(base, disp, 4)) # x64 mov
-        } else {
-            x64_add_inst2(lower.x64, 1, x64_reg("rax"), x64_mem_base(base, disp, 8)) # x64 mov
-        }
-        mir_to_x64_store_result(lower, inst.result_id, "rax")
-        ret
+        MirCompareInst compare: { mir_to_x64_emit_icmp(lower, compare) }
     }
-    if inst.op == "call" {
-        mir_to_x64_emit_call(lower, inst)
-        ret
-    }
-    if inst.op == "ptrtoint" || inst.op == "inttoptr" {
-        mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-        mir_to_x64_store_result(lower, inst.result_id, "rax")
-        ret
-    }
-    if inst.op == "gep" {
-        mir_to_x64_emit_gep(lower, inst)
-        ret
-    }
-    if mir_to_x64_is_binary_op(inst.op) {
-        mir_to_x64_emit_binary_op(lower, inst)
-        ret
-    }
-    if inst.op == "not" {
-        mir_to_x64_load_operand(lower, "rax", inst.operands[0])
-        x64_add_inst2(lower.x64, 30, x64_reg("rax"), x64_reg("rax")) # x64 test
-        x64_add_inst1(lower.x64, 44, x64_reg("al")) # x64 sete
-        x64_add_inst2(lower.x64, 41, x64_reg("eax"), x64_reg("al")) # x64 movzx
-        mir_to_x64_store_result(lower, inst.result_id, "rax")
-        ret
-    }
-    if mir_to_x64_is_icmp_op(inst.op) {
-        mir_to_x64_emit_icmp(lower, inst)
-        ret
-    }
-    mir_to_x64_die(("unsupported MIR instruction: " + inst.op))
 }
 
 
@@ -1025,8 +1041,8 @@ fun mir_to_x64_value_capacity(fn: MirFunction): i64 {
     for b: 0:len(fn.blocks) {
         for j: 0:len(fn.blocks[b].instructions) {
             let inst = fn.blocks[b].instructions[j]
-            if inst.has_result && inst.result_id > max_id {
-                max_id = inst.result_id
+            if mir_inst_has_result(inst) && mir_inst_result_id(inst) > max_id {
+                max_id = mir_inst_result_id(inst)
             }
         }
     }
@@ -1142,7 +1158,10 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
 
         let term_start = mir_to_x64_now_ms()
         if fused_icmp {
-            mir_to_x64_emit_fused_icmp_term(lower, fn.blocks[b].instructions[len(fn.blocks[b].instructions) - 1], fn.blocks[b].terminator)
+            match fn.blocks[b].instructions[len(fn.blocks[b].instructions) - 1] {
+                MirCompareInst compare: { mir_to_x64_emit_fused_icmp_term(lower, compare, fn.blocks[b].terminator) }
+                _: { mir_to_x64_die("fused comparison has wrong instruction shape") }
+            }
         } else {
             mir_to_x64_lower_term(lower, fn, fn.blocks[b].terminator)
         }

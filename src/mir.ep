@@ -29,16 +29,71 @@ struct MirSymbolOperand {
 
 type MirOperand = MirValueOperand | MirIntOperand | MirBoolOperand | MirNullOperand | MirSymbolOperand
 
-struct MirInst {
-    op: str
-    operands: MirOperand[]
-    immediate_operand_hint: i64
+struct MirLoadInst {
     result_id: i64
     result_type: str
-    typ: str
+    access_type: str
+    address: MirOperand
+}
+
+struct MirStoreInst {
+    value: MirOperand
+    access_type: str
+    address: MirOperand
+    immediate_address: bool
+}
+
+struct MirBinaryInst {
+    kind: i64
+    result_id: i64
+    result_type: str
+    left: MirOperand
+    right: MirOperand
+}
+
+struct MirCompareInst {
+    kind: i64
+    result_id: i64
+    left: MirOperand
+    right: MirOperand
+}
+
+struct MirGepInst {
+    result_id: i64
+    result_type: str
+    source_type: str
+    operands: MirOperand[]
+}
+
+struct MirCallInst {
     callee: str
+    return_type: str
+    args: MirOperand[]
+    immediate_arg: i64
+    result_id: i64
+    result_type: str
     has_result: bool
 }
+
+struct MirAllocaInst {
+    result_id: i64
+    elem_type: str
+}
+
+struct MirCastInst {
+    kind: i64
+    result_id: i64
+    result_type: str
+    operand: MirOperand
+    target_type: str
+}
+
+struct MirNotInst {
+    result_id: i64
+    operand: MirOperand
+}
+
+type MirInst = MirLoadInst | MirStoreInst | MirBinaryInst | MirCompareInst | MirGepInst | MirCallInst | MirAllocaInst | MirCastInst | MirNotInst
 
 struct MirBrTerminator {
     target: str
@@ -206,53 +261,20 @@ fun mir_operand_typed_text(op: MirOperand): str {
     ret str_buf_finish(buf)
 }
 
-fun mir_inst_empty(): MirInst {
-    let inst = new MirInst
-    inst.op = ""
-    inst.operands = new MirOperand[]
-    inst.immediate_operand_hint = 0
-    inst.result_id = 0
-    inst.result_type = ""
-    inst.typ = ""
-    inst.callee = ""
-    inst.has_result = false
-    ret inst
-}
-
 fun mir_alloca(result_id: i64, elem_type: str): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = "alloca"
-    inst.result_id = result_id
-    inst.result_type = "ptr"
-    inst.typ = elem_type
-    inst.has_result = true
-    ret inst
+    ret new MirInst(new MirAllocaInst { result_id: result_id, elem_type: elem_type })
 }
 
 fun mir_load(result_id: i64, result_type: str, access_type: str, addr: MirOperand): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = "load"
-    inst.result_id = result_id
-    inst.result_type = result_type
-    inst.typ = access_type
-    inst.has_result = true
-    inst.operands.push(addr)
-    ret inst
+    ret new MirInst(new MirLoadInst { result_id: result_id, result_type: result_type, access_type: access_type, address: addr })
 }
 
 fun mir_store_as(value: MirOperand, access_type: str, addr: MirOperand): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = "store"
-    inst.typ = access_type
-    inst.operands.push(value)
-    inst.operands.push(addr)
-    ret inst
+    ret new MirInst(new MirStoreInst { value: value, access_type: access_type, address: addr, immediate_address: false })
 }
 
 fun mir_store_as_with_immediate_addr(value: MirOperand, access_type: str, addr: MirOperand): MirInst {
-    let inst = mir_store_as(value, access_type, addr)
-    inst.immediate_operand_hint = 2
-    ret inst
+    ret new MirInst(new MirStoreInst { value: value, access_type: access_type, address: addr, immediate_address: true })
 }
 
 fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
@@ -260,20 +282,191 @@ fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
 }
 
 fun mir_call(callee: str, ret_type: str, args: MirOperand[]): MirInst {
-    let inst = mir_inst_empty()
-    inst.op = "call"
-    inst.callee = callee
-    inst.typ = ret_type
-    inst.operands = args
-    ret inst
+    ret new MirInst(new MirCallInst {
+        callee: callee,
+        return_type: ret_type,
+        args: args,
+        immediate_arg: 0,
+        result_id: 0,
+        result_type: "",
+        has_result: false
+    })
+}
+
+fun mir_binary_kind(op: str): i64 {
+    if op == "add" { ret 1 }
+    if op == "sub" { ret 2 }
+    if op == "mul" { ret 3 }
+    if op == "sdiv" { ret 4 }
+    if op == "srem" { ret 5 }
+    if op == "udiv" { ret 6 }
+    if op == "urem" { ret 7 }
+    if op == "and" { ret 8 }
+    if op == "or" { ret 9 }
+    if op == "xor" { ret 10 }
+    if op == "shl" { ret 11 }
+    if op == "sar" { ret 12 }
+    if op == "shr" { ret 13 }
+    panic ("unknown MIR binary op: " + op)
+}
+
+fun mir_binary_op_text(kind: i64): str {
+    if kind == 1 { ret "add" }
+    if kind == 2 { ret "sub" }
+    if kind == 3 { ret "mul" }
+    if kind == 4 { ret "sdiv" }
+    if kind == 5 { ret "srem" }
+    if kind == 6 { ret "udiv" }
+    if kind == 7 { ret "urem" }
+    if kind == 8 { ret "and" }
+    if kind == 9 { ret "or" }
+    if kind == 10 { ret "xor" }
+    if kind == 11 { ret "shl" }
+    if kind == 12 { ret "sar" }
+    if kind == 13 { ret "shr" }
+    panic "unknown MIR binary kind"
+}
+
+fun mir_compare_kind(op: str): i64 {
+    if op == "icmp.eq" { ret 1 }
+    if op == "icmp.ne" { ret 2 }
+    if op == "icmp.slt" { ret 3 }
+    if op == "icmp.sgt" { ret 4 }
+    if op == "icmp.sle" { ret 5 }
+    if op == "icmp.sge" { ret 6 }
+    if op == "icmp.ult" { ret 7 }
+    if op == "icmp.ugt" { ret 8 }
+    if op == "icmp.ule" { ret 9 }
+    if op == "icmp.uge" { ret 10 }
+    panic ("unknown MIR compare op: " + op)
+}
+
+fun mir_compare_op_text(kind: i64): str {
+    if kind == 1 { ret "icmp.eq" }
+    if kind == 2 { ret "icmp.ne" }
+    if kind == 3 { ret "icmp.slt" }
+    if kind == 4 { ret "icmp.sgt" }
+    if kind == 5 { ret "icmp.sle" }
+    if kind == 6 { ret "icmp.sge" }
+    if kind == 7 { ret "icmp.ult" }
+    if kind == 8 { ret "icmp.ugt" }
+    if kind == 9 { ret "icmp.ule" }
+    if kind == 10 { ret "icmp.uge" }
+    panic "unknown MIR compare kind"
+}
+
+fun mir_binary(kind: i64, result_id: i64, result_type: str, left: MirOperand, right: MirOperand): MirInst {
+    ret new MirInst(new MirBinaryInst { kind: kind, result_id: result_id, result_type: result_type, left: left, right: right })
+}
+
+fun mir_compare(kind: i64, result_id: i64, left: MirOperand, right: MirOperand): MirInst {
+    ret new MirInst(new MirCompareInst { kind: kind, result_id: result_id, left: left, right: right })
+}
+
+fun mir_gep(result_id: i64, result_type: str, source_type: str, operands: MirOperand[]): MirInst {
+    ret new MirInst(new MirGepInst { result_id: result_id, result_type: result_type, source_type: source_type, operands: operands })
+}
+
+fun mir_cast(kind: i64, result_id: i64, result_type: str, operand: MirOperand, target_type: str): MirInst {
+    ret new MirInst(new MirCastInst { kind: kind, result_id: result_id, result_type: result_type, operand: operand, target_type: target_type })
+}
+
+fun mir_ptrtoint(result_id: i64, result_type: str, operand: MirOperand, target_type: str): MirInst {
+    ret mir_cast(1, result_id, result_type, operand, target_type)
+}
+
+fun mir_inttoptr(result_id: i64, result_type: str, operand: MirOperand, target_type: str): MirInst {
+    ret mir_cast(2, result_id, result_type, operand, target_type)
+}
+
+fun mir_not(result_id: i64, operand: MirOperand): MirInst {
+    ret new MirInst(new MirNotInst { result_id: result_id, operand: operand })
+}
+
+fun mir_inst_has_result(inst: MirInst): bool {
+    match inst {
+        MirStoreInst i: { ret false }
+        MirCallInst i: { ret i.has_result }
+        _: { ret true }
+    }
+    ret false
+}
+
+fun mir_inst_result_id(inst: MirInst): i64 {
+    match inst {
+        MirLoadInst i: { ret i.result_id }
+        MirBinaryInst i: { ret i.result_id }
+        MirCompareInst i: { ret i.result_id }
+        MirGepInst i: { ret i.result_id }
+        MirCallInst i: { ret i.result_id }
+        MirAllocaInst i: { ret i.result_id }
+        MirCastInst i: { ret i.result_id }
+        MirNotInst i: { ret i.result_id }
+        MirStoreInst i: { ret 0 }
+    }
+    ret 0
+}
+
+fun mir_inst_result_type(inst: MirInst): str {
+    match inst {
+        MirLoadInst i: { ret i.result_type }
+        MirBinaryInst i: { ret i.result_type }
+        MirCompareInst i: { ret "bool" }
+        MirGepInst i: { ret i.result_type }
+        MirCallInst i: { ret i.result_type }
+        MirAllocaInst i: { ret "ptr" }
+        MirCastInst i: { ret i.result_type }
+        MirNotInst i: { ret "bool" }
+        MirStoreInst i: { ret "" }
+    }
+    ret ""
+}
+
+fun mir_inst_operand_count(inst: MirInst): i64 {
+    match inst {
+        MirLoadInst i: { ret 1 }
+        MirStoreInst i: { ret 2 }
+        MirBinaryInst i: { ret 2 }
+        MirCompareInst i: { ret 2 }
+        MirGepInst i: { ret len(i.operands) }
+        MirCallInst i: { ret len(i.args) }
+        MirAllocaInst i: { ret 0 }
+        MirCastInst i: { ret 1 }
+        MirNotInst i: { ret 1 }
+    }
+    ret 0
+}
+
+fun mir_inst_operand(inst: MirInst, index: i64): MirOperand {
+    match inst {
+        MirLoadInst i: { if index == 0 { ret i.address } }
+        MirStoreInst i: {
+            if index == 0 { ret i.value }
+            if index == 1 { ret i.address }
+        }
+        MirBinaryInst i: {
+            if index == 0 { ret i.left }
+            if index == 1 { ret i.right }
+        }
+        MirCompareInst i: {
+            if index == 0 { ret i.left }
+            if index == 1 { ret i.right }
+        }
+        MirGepInst i: { if index >= 0 && index < len(i.operands) { ret i.operands[index] } }
+        MirCallInst i: { if index >= 0 && index < len(i.args) { ret i.args[index] } }
+        MirCastInst i: { if index == 0 { ret i.operand } }
+        MirNotInst i: { if index == 0 { ret i.operand } }
+        MirAllocaInst i: {}
+    }
+    panic "MIR operand index out of bounds"
 }
 
 fun mir_inst_result_prefix(inst: MirInst, buf: u8[]): void {
-    if inst.has_result {
+    if mir_inst_has_result(inst) {
         str_buf_extend(buf, "%")
-        str_buf_extend(buf, str(inst.result_id))
+        str_buf_extend(buf, str(mir_inst_result_id(inst)))
         str_buf_extend(buf, ": ")
-        str_buf_extend(buf, inst.result_type)
+        str_buf_extend(buf, mir_inst_result_type(inst))
         str_buf_extend(buf, " = ")
     }
 }
@@ -281,78 +474,73 @@ fun mir_inst_result_prefix(inst: MirInst, buf: u8[]): void {
 fun mir_inst_text(inst: MirInst): str {
     let buf = make_str_buf()
     mir_inst_result_prefix(inst, buf)
-
-    if inst.op == "alloca" {
-        str_buf_extend(buf, "alloca ")
-        str_buf_extend(buf, inst.typ)
-        ret str_buf_finish(buf)
-    }
-    if inst.op == "load" {
-        str_buf_extend(buf, "load ")
-        str_buf_extend(buf, inst.typ)
-        str_buf_extend(buf, ", ")
-        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
-        ret str_buf_finish(buf)
-    }
-    if inst.op == "store" {
-        str_buf_extend(buf, "store ")
-        if inst.typ != mir_operand_type(inst.operands[0]) {
-            str_buf_extend(buf, inst.typ)
-            str_buf_extend(buf, " from ")
+    match inst {
+        MirAllocaInst i: {
+            str_buf_extend(buf, "alloca ")
+            str_buf_extend(buf, i.elem_type)
         }
-        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
-        str_buf_extend(buf, ", ")
-        str_buf_extend(buf, mir_operand_typed_text(inst.operands[1]))
-        ret str_buf_finish(buf)
-    }
-    if inst.op == "gep" {
-        str_buf_extend(buf, "gep ")
-        str_buf_extend(buf, inst.typ)
-        str_buf_extend(buf, ", ")
-        for i: 0:len(inst.operands) {
-            if i > 0 {
-                str_buf_extend(buf, ", ")
-            }
-            str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
-        }
-        ret str_buf_finish(buf)
-    }
-    if inst.op == "ptrtoint" || inst.op == "inttoptr" {
-        str_buf_extend(buf, inst.op)
-        str_buf_extend(buf, " ")
-        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
-        str_buf_extend(buf, " to ")
-        str_buf_extend(buf, inst.typ)
-        ret str_buf_finish(buf)
-    }
-    if inst.op == "not" {
-        str_buf_extend(buf, "not ")
-        str_buf_extend(buf, mir_operand_typed_text(inst.operands[0]))
-        ret str_buf_finish(buf)
-    }
-    if inst.op == "call" {
-        str_buf_extend(buf, "call ")
-        str_buf_extend(buf, inst.typ)
-        str_buf_extend(buf, " ")
-        str_buf_extend(buf, inst.callee)
-        str_buf_extend(buf, "(")
-        for i: 0:len(inst.operands) {
-            if i > 0 {
-                str_buf_extend(buf, ", ")
-            }
-            str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
-        }
-        str_buf_extend(buf, ")")
-        ret str_buf_finish(buf)
-    }
-
-    str_buf_extend(buf, inst.op)
-    str_buf_extend(buf, " ")
-    for i: 0:len(inst.operands) {
-        if i > 0 {
+        MirLoadInst i: {
+            str_buf_extend(buf, "load ")
+            str_buf_extend(buf, i.access_type)
             str_buf_extend(buf, ", ")
+            str_buf_extend(buf, mir_operand_typed_text(i.address))
         }
-        str_buf_extend(buf, mir_operand_typed_text(inst.operands[i]))
+        MirStoreInst i: {
+            str_buf_extend(buf, "store ")
+            if i.access_type != mir_operand_type(i.value) {
+                str_buf_extend(buf, i.access_type)
+                str_buf_extend(buf, " from ")
+            }
+            str_buf_extend(buf, mir_operand_typed_text(i.value))
+            str_buf_extend(buf, ", ")
+            str_buf_extend(buf, mir_operand_typed_text(i.address))
+        }
+        MirGepInst i: {
+            str_buf_extend(buf, "gep ")
+            str_buf_extend(buf, i.source_type)
+            str_buf_extend(buf, ", ")
+            for oi: 0:len(i.operands) {
+                if oi > 0 { str_buf_extend(buf, ", ") }
+                str_buf_extend(buf, mir_operand_typed_text(i.operands[oi]))
+            }
+        }
+        MirCastInst i: {
+            if i.kind == 1 { str_buf_extend(buf, "ptrtoint") } else { str_buf_extend(buf, "inttoptr") }
+            str_buf_extend(buf, " ")
+            str_buf_extend(buf, mir_operand_typed_text(i.operand))
+            str_buf_extend(buf, " to ")
+            str_buf_extend(buf, i.target_type)
+        }
+        MirNotInst i: {
+            str_buf_extend(buf, "not ")
+            str_buf_extend(buf, mir_operand_typed_text(i.operand))
+        }
+        MirCallInst i: {
+            str_buf_extend(buf, "call ")
+            str_buf_extend(buf, i.return_type)
+            str_buf_extend(buf, " ")
+            str_buf_extend(buf, i.callee)
+            str_buf_extend(buf, "(")
+            for ai: 0:len(i.args) {
+                if ai > 0 { str_buf_extend(buf, ", ") }
+                str_buf_extend(buf, mir_operand_typed_text(i.args[ai]))
+            }
+            str_buf_extend(buf, ")")
+        }
+        MirBinaryInst i: {
+            str_buf_extend(buf, mir_binary_op_text(i.kind))
+            str_buf_extend(buf, " ")
+            str_buf_extend(buf, mir_operand_typed_text(i.left))
+            str_buf_extend(buf, ", ")
+            str_buf_extend(buf, mir_operand_typed_text(i.right))
+        }
+        MirCompareInst i: {
+            str_buf_extend(buf, mir_compare_op_text(i.kind))
+            str_buf_extend(buf, " ")
+            str_buf_extend(buf, mir_operand_typed_text(i.left))
+            str_buf_extend(buf, ", ")
+            str_buf_extend(buf, mir_operand_typed_text(i.right))
+        }
     }
     ret str_buf_finish(buf)
 }
@@ -496,18 +684,18 @@ fun mir_find_extern(program: MirProgram, name: str): i64 {
     ret 0 - 1
 }
 
-fun mir_call_param_types(inst: MirInst): str[] {
+fun mir_call_param_types(inst: MirCallInst): str[] {
     let types = new str[]
-    for i: 0:len(inst.operands) {
-        types.push(mir_operand_type(inst.operands[i]))
+    for i: 0:len(inst.args) {
+        types.push(mir_operand_type(inst.args[i]))
     }
     ret types
 }
 
-fun mir_signature_matches_call(return_type: str, param_types: str[], inst: MirInst): bool {
-    if return_type != inst.typ || len(param_types) != len(inst.operands) { ret false }
+fun mir_signature_matches_call(return_type: str, param_types: str[], inst: MirCallInst): bool {
+    if return_type != inst.return_type || len(param_types) != len(inst.args) { ret false }
     for i: 0:len(param_types) {
-        if param_types[i] != mir_operand_type(inst.operands[i]) { ret false }
+        if param_types[i] != mir_operand_type(inst.args[i]) { ret false }
     }
     ret true
 }
@@ -536,7 +724,10 @@ fun mir_call_instruction_count(program: MirProgram): i64 {
         for bi: 0:len(program.functions[fi].blocks) {
             let block = program.functions[fi].blocks[bi]
             for ii: 0:len(block.instructions) {
-                if block.instructions[ii].op == "call" { count += 1 }
+                match block.instructions[ii] {
+                    MirCallInst call: { count += 1 }
+                    _: {}
+                }
             }
         }
     }
@@ -555,24 +746,29 @@ fun mir_declare_unresolved_calls(program: MirProgram): void {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "call" && name_index_lookup(functions, inst.callee) < 0 {
-                    let extern_index = name_index_lookup(externs, inst.callee)
-                    let param_types = mir_call_param_types(inst)
-                    if extern_index >= 0 {
-                        let ext = program.externs[extern_index]
-                        if ext.return_type != inst.typ || len(ext.param_types) != len(param_types) {
-                            panic ("conflicting MIR declaration: " + inst.callee)
-                        }
-                        for pi: 0:len(param_types) {
-                            if ext.param_types[pi] != param_types[pi] {
-                                panic ("conflicting MIR declaration: " + inst.callee)
+                match inst {
+                    MirCallInst call: {
+                        if name_index_lookup(functions, call.callee) < 0 {
+                            let extern_index = name_index_lookup(externs, call.callee)
+                            let param_types = mir_call_param_types(call)
+                            if extern_index >= 0 {
+                                let ext = program.externs[extern_index]
+                                if ext.return_type != call.return_type || len(ext.param_types) != len(param_types) {
+                                    panic ("conflicting MIR declaration: " + call.callee)
+                                }
+                                for pi: 0:len(param_types) {
+                                    if ext.param_types[pi] != param_types[pi] {
+                                        panic ("conflicting MIR declaration: " + call.callee)
+                                    }
+                                }
+                            } else {
+                                let next = len(program.externs)
+                                program.externs.push(mir_extern(call.callee, call.return_type, param_types))
+                                name_index_put(externs, call.callee, next)
                             }
                         }
-                    } else {
-                        let next = len(program.externs)
-                        program.externs.push(mir_extern(inst.callee, inst.typ, param_types))
-                        name_index_put(externs, inst.callee, next)
                     }
+                    _: {}
                 }
             }
         }
@@ -599,39 +795,49 @@ fun mir_validate_call_contracts(program: MirProgram): void {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "call" {
-                    let internal_index = name_index_lookup(functions, inst.callee)
-                    if internal_index >= 0 {
-                        let target = program.functions[internal_index]
-                        let params = new str[]
-                        for pi: 0:len(target.params) {
-                            params.push(target.params[pi].typ)
+                match inst {
+                    MirCallInst call: {
+                        let internal_index = name_index_lookup(functions, call.callee)
+                        if internal_index >= 0 {
+                            let target = program.functions[internal_index]
+                            let params = new str[]
+                            for pi: 0:len(target.params) {
+                                params.push(target.params[pi].typ)
+                            }
+                            if !mir_signature_matches_call(target.return_type, params, call) {
+                                panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {call.callee}"
+                            }
+                        } else {
+                            let extern_index = name_index_lookup(externs, call.callee)
+                            if extern_index < 0 {
+                                panic f"MIR validation error: {fn.name}.{block.name}: undeclared callee: {call.callee}"
+                            }
+                            let ext = program.externs[extern_index]
+                            if !mir_signature_matches_call(ext.return_type, ext.param_types, call) {
+                                panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {call.callee}"
+                            }
                         }
-                        if !mir_signature_matches_call(target.return_type, params, inst) {
-                            panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {inst.callee}"
-                        }
-                    } else {
-                        let extern_index = name_index_lookup(externs, inst.callee)
-                        if extern_index < 0 {
-                            panic f"MIR validation error: {fn.name}.{block.name}: undeclared callee: {inst.callee}"
-                        }
-                        let ext = program.externs[extern_index]
-                        if !mir_signature_matches_call(ext.return_type, ext.param_types, inst) {
-                            panic f"MIR validation error: {fn.name}.{block.name}: call signature mismatch: {inst.callee}"
+                        if call.return_type == "void" {
+                            if call.has_result {
+                                panic f"MIR validation error: {fn.name}.{block.name}: void call has result: {call.callee}"
+                            }
+                        } else {
+                            if !call.has_result || call.result_type != call.return_type {
+                                panic f"MIR validation error: {fn.name}.{block.name}: non-void call result mismatch: {call.callee}"
+                            }
                         }
                     }
-                    if inst.typ == "void" {
-                        if inst.has_result {
-                            panic f"MIR validation error: {fn.name}.{block.name}: void call has result: {inst.callee}"
-                        }
-                    } else {
-                        if !inst.has_result || inst.result_type != inst.typ {
-                            panic f"MIR validation error: {fn.name}.{block.name}: non-void call result mismatch: {inst.callee}"
-                        }
-                    }
+                    _: {}
                 }
             }
         }
+    }
+}
+
+fun mir_mark_reachable_operand(program: MirProgram, functions: NameIndex, reachable: i64[], operand: MirOperand): void {
+    match operand {
+        MirSymbolOperand symbol: { mir_mark_reachable_function(program, functions, reachable, symbol.name) }
+        _: {}
     }
 }
 
@@ -644,16 +850,40 @@ fun mir_mark_reachable_function(program: MirProgram, functions: NameIndex, reach
         let block = fn.blocks[bi]
         for ii: 0:len(block.instructions) {
             let inst = block.instructions[ii]
-            if inst.op == "call" {
-                mir_mark_reachable_function(program, functions, reachable, inst.callee)
-            }
-            for oi: 0:len(inst.operands) {
-                match inst.operands[oi] {
-                    MirSymbolOperand symbol: {
-                        mir_mark_reachable_function(program, functions, reachable, symbol.name)
+            match inst {
+                MirCallInst call: {
+                    mir_mark_reachable_function(program, functions, reachable, call.callee)
+                    for oi: 0:len(call.args) {
+                        mir_mark_reachable_operand(program, functions, reachable, call.args[oi])
                     }
-                    _: {}
                 }
+                MirLoadInst load: {
+                    mir_mark_reachable_operand(program, functions, reachable, load.address)
+                }
+                MirStoreInst store: {
+                    mir_mark_reachable_operand(program, functions, reachable, store.value)
+                    mir_mark_reachable_operand(program, functions, reachable, store.address)
+                }
+                MirBinaryInst binary: {
+                    mir_mark_reachable_operand(program, functions, reachable, binary.left)
+                    mir_mark_reachable_operand(program, functions, reachable, binary.right)
+                }
+                MirCompareInst compare: {
+                    mir_mark_reachable_operand(program, functions, reachable, compare.left)
+                    mir_mark_reachable_operand(program, functions, reachable, compare.right)
+                }
+                MirGepInst gep: {
+                    for oi: 0:len(gep.operands) {
+                        mir_mark_reachable_operand(program, functions, reachable, gep.operands[oi])
+                    }
+                }
+                MirCastInst cast: {
+                    mir_mark_reachable_operand(program, functions, reachable, cast.operand)
+                }
+                MirNotInst not_inst: {
+                    mir_mark_reachable_operand(program, functions, reachable, not_inst.operand)
+                }
+                MirAllocaInst alloca: {}
             }
         }
         match block.terminator {
@@ -781,9 +1011,14 @@ fun mir_referenced_external_names(program: MirProgram): str[] {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "call" && name_index_lookup(functions, inst.callee) < 0 && name_index_lookup(seen, inst.callee) < 0 {
-                    name_index_put(seen, inst.callee, len(names))
-                    names.push(inst.callee)
+                match inst {
+                    MirCallInst call: {
+                        if name_index_lookup(functions, call.callee) < 0 && name_index_lookup(seen, call.callee) < 0 {
+                            name_index_put(seen, call.callee, len(names))
+                            names.push(call.callee)
+                        }
+                    }
+                    _: {}
                 }
             }
         }
@@ -826,9 +1061,12 @@ fun mir_referenced_struct_names(program: MirProgram): str[] {
             let block = fn.blocks[bi]
             for ii: 0:len(block.instructions) {
                 let inst = block.instructions[ii]
-                if inst.op == "gep" {
-                    let name = mir_struct_name_from_type(inst.typ)
-                    if len(name) > 0 { mir_push_unique(names, name) }
+                match inst {
+                    MirGepInst gep: {
+                        let name = mir_struct_name_from_type(gep.source_type)
+                        if len(name) > 0 { mir_push_unique(names, name) }
+                    }
+                    _: {}
                 }
             }
         }
