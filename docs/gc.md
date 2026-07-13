@@ -36,8 +36,7 @@ small allocator reserve 1 GiB 连续虚拟地址 arena，并将它划分为 64 K
   清理 allocation/mark bitmap、重建 dead-slot free list，并选择各 class 的 active slab。
   对象大小均来自 side metadata，不调用 `HeapSize`。
 - 每次 stop-the-world collection 完成后向 stderr 输出 `gc stw: <ms> ms`；计时不包含日志写出本身。
-- 正常退出时，若进程至少发生过一次 collection，则向 stderr 输出一次累计 allocation profile，
-  包含总请求数/字节数、`<=8/16/24/32/64B` 累计桶，以及精确 `16/24/32B` 计数。
+- 正常运行只保留每轮 `gc stw` 诊断；历史 allocation-size profile 已完成 allocator 决策并从生产热路径删除。
 
 当前自举 workload 的 allocation size 分布、固定尺寸结论和 allocator 启示记录在
 [`gc-allocation-profile.md`](gc-allocation-profile.md)。
