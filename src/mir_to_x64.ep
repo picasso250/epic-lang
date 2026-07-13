@@ -296,10 +296,12 @@ fun mir_to_x64_inst_uses_value_from_rax(inst: MirInst, value_id: i64): bool {
     ret mir_to_x64_operand_is_value(inst.operands[0], value_id)
 }
 
-fun mir_to_x64_call_uses_immediate_operand(inst: MirInst, value_id: i64): bool {
+fun mir_to_x64_inst_uses_immediate_operand(inst: MirInst, value_id: i64): bool {
     if inst.immediate_operand_hint == 0 { ret false }
     let index = inst.immediate_operand_hint - 1
-    if inst.op != "call" || index < 0 || index >= len(inst.operands) || index >= 4 { ret false }
+    if index < 0 || index >= len(inst.operands) { ret false }
+    if inst.op == "call" && index >= 4 { ret false }
+    if inst.op != "call" && (inst.op != "store" || index != 1) { ret false }
     ret mir_to_x64_operand_is_value(inst.operands[index], value_id)
 }
 
@@ -322,7 +324,7 @@ fun mir_to_x64_should_keep_result_in_rax(lower: MirToX64Lower, block: MirBlock, 
         next += 1
     }
     if next < len(block.instructions) {
-        if mir_to_x64_call_uses_immediate_operand(block.instructions[next], inst.result_id) { ret true }
+        if mir_to_x64_inst_uses_immediate_operand(block.instructions[next], inst.result_id) { ret true }
         ret mir_to_x64_inst_uses_value_from_rax(block.instructions[next], inst.result_id)
     }
     ret mir_to_x64_term_uses_value(block.terminator, inst.result_id)
@@ -877,12 +879,27 @@ fun mir_to_x64_lower_inst(lower: MirToX64Lower, inst: MirInst): void {
         ret
     }
     if inst.op == "store" {
+        let resident_address = false
+        if inst.immediate_operand_hint == 2 {
+            match inst.operands[1] {
+                MirValueOperand value: {
+                    if lower.rax_value_id == value.value_id {
+                        resident_address = true
+                        x64_add_inst2(lower.x64, 1, x64_reg("rcx"), x64_reg("rax")) # x64 mov
+                        lower.rax_value_id = 0
+                    }
+                }
+                _: {}
+            }
+        }
         mir_to_x64_load_operand(lower, "rax", inst.operands[0])
         let base = "rbp"
         let disp = mir_to_x64_alloca_offset(lower, inst.operands[1])
         if disp == 0 {
             base = "rcx"
-            mir_to_x64_load_operand(lower, base, inst.operands[1])
+            if !resident_address {
+                mir_to_x64_load_operand(lower, base, inst.operands[1])
+            }
         }
         if inst.typ == "i8" {
             x64_add_inst2(lower.x64, 1, x64_mem_base(base, disp, 1), x64_reg("al")) # x64 mov

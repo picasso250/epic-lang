@@ -249,6 +249,12 @@ fun mir_store_as(value: MirOperand, access_type: str, addr: MirOperand): MirInst
     ret inst
 }
 
+fun mir_store_as_with_immediate_addr(value: MirOperand, access_type: str, addr: MirOperand): MirInst {
+    let inst = mir_store_as(value, access_type, addr)
+    inst.immediate_operand_hint = 2
+    ret inst
+}
+
 fun mir_store(value: MirOperand, addr: MirOperand): MirInst {
     ret mir_store_as(value, mir_operand_type(value), addr)
 }

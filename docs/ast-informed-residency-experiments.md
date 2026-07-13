@@ -101,3 +101,68 @@ Bootstrap fixed point、完整 13 模块测试、10 个 examples 和 91 个 e2e 
 接受 call immediate-use hint。它验证了上次 resident-transfer 失败的核心复盘：producer/consumer
 关系在 AST-to-MIR 直接编码后，后端无需为所有 instruction 和 operand 支付动态扫描成本。继续
 独立验证 store-address hint。
+
+## Store-address hint
+
+### Hypothesis
+
+Store-address 候选集中在 typed AST 已知的字段写入和聚合初始化。对紧邻 store 产生的 field
+`gep`，把 address operand index 编码到同一个 `immediate_operand_hint`，可以让 store lowering
+先把 resident `rax` 转移到 `rcx`，再把 value 加载到 `rax`，从而省去 address result home 和
+reload。
+
+### Implementation
+
+AST-to-MIR 只在四个静态明确的位置使用 immediate-address store constructor：
+
+- field assignment；
+- struct field initialization；
+- union tag initialization；
+- union payload initialization。
+
+这些位置覆盖统计中约 97% 的 store-address 候选。数组 store、compound field assignment 和 MIR
+text runtime 保持原路径。后端只在 store hint 非零且 resident value ID 匹配时转移寄存器；hint
+失效时自动回退到原有 address load。
+
+### Correctness
+
+Bootstrap fixed point、完整 13 模块测试、10 个 examples 和 91 个 e2e 测试全部通过。
+
+### A/B result
+
+基线为上一阶段接受的 call hint。两边使用相同 v0 seed、compiler/runtime sources、参数和输出
+位置；每边三个等价样本。
+
+| metric | call hint | store-address hint | change |
+|---|---:|---:|---:|
+| wall samples | 1594.980 / 1603.465 / 1590.432 ms | 1592.260 / 1573.192 / 1608.256 ms | — |
+| wall median | 1594.980 ms | 1592.260 ms | -2.720 ms, -0.17% |
+| internal median | 1578 ms | 1578 ms | 0 |
+| X64 items | 149,111 | 148,461 | -650, -0.44% |
+| `.text` bytes | 688,372 B | 684,786 B | -3,586 B, -0.52% |
+| `.data` bytes | 81,840 B | 81,840 B | 0 |
+| compiler exe | 772,608 B | 769,024 B | -3,584 B, -0.46% |
+
+三个 wall samples 的区间重叠，按性能测量规则判定 time 变化不显著，不增加样本追逐噪声。
+X64 items、`.text` 和最终 exe 的确定性下降明确。
+
+### Decision
+
+接受 store-address hint：没有可确认的 time 收益或回退，size 收益稳定。
+
+## Cumulative result
+
+最终实现相对原始 `a38841c` baseline：
+
+| metric | original baseline | final | change |
+|---|---:|---:|---:|
+| wall median | 1731.198 ms | 1592.260 ms | -138.938 ms, -8.03% |
+| internal median | 1719 ms | 1578 ms | -141 ms, -8.20% |
+| X64 items | 149,675 | 148,461 | -1,214, -0.81% |
+| `.text` bytes | 692,903 B | 684,786 B | -8,117 B, -1.17% |
+| `.data` bytes | 81,840 B | 81,840 B | 0 |
+| compiler exe | 777,216 B | 769,024 B | -8,192 B, -1.05% |
+
+本组实验保留 binary MIR shaping、call operand hint 和 store-address hint。核心结论是：typed AST
+和 AST-to-MIR 已知的 immediate-use 关系值得显式保留；target-neutral operand index 足以让后端
+做局部寄存器决策，同时避免通用热路径扫描。

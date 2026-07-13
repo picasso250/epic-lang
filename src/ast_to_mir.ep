@@ -682,7 +682,7 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstStructIn
         let value_flow = mir_emit_expr(st, st.current_block, field.value_expr)
         st.current_block = value_flow.block
         let addr = mir_field_addr(st, obj, expr.name, field.name)
-        mir_emit_inst(st, mir_store_as(value_flow.value, mir_field_access_type(st, expr.name, field.name), addr))
+        mir_emit_inst(st, mir_store_as_with_immediate_addr(value_flow.value, mir_field_access_type(st, expr.name, field.name), addr))
     }
     ret mir_value_flow(obj, st.current_block)
 }
@@ -693,9 +693,9 @@ fun mir_emit_union_init(st: MirCodegenState, block: MirBlock, expr: AstUnionInit
     st.current_block = payload_flow.block
     let obj = mir_alloc_struct(st, expr.type_name)
     let tag_addr = mir_field_addr(st, obj, expr.type_name, "tag")
-    mir_emit_inst(st, mir_store_as(mir_const_int("i64", mir_union_tag(st, expr.type_name, ast_resolved_type(expr.expr))), mir_field_access_type(st, expr.type_name, "tag"), tag_addr))
+    mir_emit_inst(st, mir_store_as_with_immediate_addr(mir_const_int("i64", mir_union_tag(st, expr.type_name, ast_resolved_type(expr.expr))), mir_field_access_type(st, expr.type_name, "tag"), tag_addr))
     let payload_addr = mir_field_addr(st, obj, expr.type_name, "payload")
-    mir_emit_inst(st, mir_store_as(payload_flow.value, mir_field_access_type(st, expr.type_name, "payload"), payload_addr))
+    mir_emit_inst(st, mir_store_as_with_immediate_addr(payload_flow.value, mir_field_access_type(st, expr.type_name, "payload"), payload_addr))
     ret mir_value_flow(obj, st.current_block)
 }
 
@@ -1788,7 +1788,7 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
                 ast_to_mir_die("field assignment base must be struct")
             }
             let addr = mir_field_addr(st, base_flow.value, struct_name, n.name)
-            mir_emit_inst(st, mir_store_as(value_flow.value, mir_field_access_type(st, struct_name, n.name), addr))
+            mir_emit_inst(st, mir_store_as_with_immediate_addr(value_flow.value, mir_field_access_type(st, struct_name, n.name), addr))
             ret mir_reachable_flow(st.current_block)
         }
         AstAssign n: {
