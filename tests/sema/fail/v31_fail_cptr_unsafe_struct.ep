@@ -1,0 +1,9 @@
+# COMPILE_FAIL_CONTAINS: cptr struct Unsafe field text has unsupported FFI type str
+struct Unsafe {
+    text: str
+}
+
+fun main(): void {
+    let value = new Unsafe { text: "bad" }
+    let p = cptr(value)
+}

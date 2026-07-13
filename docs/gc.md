@@ -49,8 +49,9 @@ byte-map 到 bitmap 的后续实验记录在
 [`gc-object-threshold-experiment.md`](gc-object-threshold-experiment.md)。
 
 当前不支持多线程 roots、moving/compaction、generation、finalizer、weak
-reference 或精确 stack map。公开 WinAPI 调用是同步的；FFI-safe Epic struct 可以把
-non-moving managed payload 地址作为 borrowed C struct pointer 传入，调用期间对应引用仍在
-Epic 栈槽中。外部函数不得保存、释放或把该地址交给异步操作/外部线程；runtime 不承诺管理由
-外部线程持有且未出现在 Epic roots 中的引用。WinAPI 写入的 handle/opaque pointer bit pattern
+reference 或精确 stack map。公开 WinAPI 调用是同步的；`cptr` 可以借用 `str` / `u8[]`
+backing data 或 FFI-safe Epic struct 的 non-moving payload 地址，调用期间 owner 必须仍在 Epic
+栈槽中。外部函数不得保存、释放或把该地址交给异步操作/外部线程；数组扩容后旧 backing
+pointer 立即失效。runtime 不承诺管理由外部线程持有且未出现在 Epic roots 中的引用。WinAPI
+写入的 handle/opaque pointer bit pattern
 可能因 conservative scanning 造成 false retention，但不会隐藏活 managed reference。

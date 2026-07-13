@@ -1,0 +1,34 @@
+# EXIT: 0
+# STDOUT: true
+
+extern "kernel32.dll" fun lstrlenA(text: ptr): i32
+
+struct RawPair {
+    left: i32
+    right: u32
+    next: ptr
+}
+
+fun check(ok: bool): void {
+    if !ok { panic "cptr check failed" }
+}
+
+fun main(): void {
+    let embedded = str(new u8[] { 'A', u8(0), 'B' })
+    check(lstrlenA(cptr(embedded)) == i32(1))
+    check(cstr(embedded) == cptr(embedded))
+
+    let buffer = new u8[4]
+    buffer[0] = 'E'
+    buffer[1] = 'p'
+    buffer[2] = 'i'
+    buffer[3] = u8(0)
+    check(lstrlenA(cptr(buffer)) == i32(3))
+
+    let pair = new RawPair { left: i32(1), right: u32(2), next: ptr(0) }
+    check(cptr(pair) != ptr(0))
+
+    let empty = new u8[]
+    check(cptr(empty) == ptr(0))
+    println(str(true))
+}

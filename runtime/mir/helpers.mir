@@ -30,8 +30,6 @@ extern ptr @__ep_import$kernel32.dll$VirtualAlloc(ptr, i64, i64, i64)
 
 extern void @__ep_runtime_panic(ptr)
 
-extern ptr @__ep_str_from_i64(i64)
-
 global @argv: ptr
 
 global @heap: i64
@@ -41,10 +39,6 @@ global @str.runtime.newline: ptr = bytes "\n"
 global @str.runtime.slice.oob: ptr = bytes "slice index out of bounds"
 
 global @str.runtime.null.deref: ptr = bytes "runtime trap: null deref"
-
-global @str.runtime.cstr.prefix: ptr = bytes "panic line "
-
-global @str.runtime.cstr.suffix: ptr = bytes ": invalid cstr"
 
 define ptr @__ep_alloc(i64 %1) {
 entry:
@@ -89,104 +83,28 @@ ok:
   ret void
 }
 
-define i64 @__ep_cstr(ptr %1, i64 %2) {
-entry:
-  %3: ptr = gep struct str, ptr %1, i64 0, i64 0
-  %4: ptr = load ptr, ptr %3
-  %5: ptr = gep struct str, ptr %1, i64 0, i64 1
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.eq ptr %4, ptr null
-  condbr bool %7, label %fail, label %check_len
-
-check_len:
-  %8: bool = icmp.slt i64 %6, i64 0
-  condbr bool %8, label %fail, label %prepare
-
-prepare:
-  %9: ptr = alloca i64
-  %10: ptr = alloca i64
-  %11: ptr = alloca i64
-  store i64 %6, ptr %9
-  store i64 0, ptr %10
-  store i64 0, ptr %11
-  %12: bool = icmp.sgt i64 %6, i64 0
-  condbr bool %12, label %inspect_last, label %scan_check
-
-inspect_last:
-  %13: i64 = sub i64 %6, i64 1
-  %14: ptr = gep i8, ptr %4, i64 %13
-  %15: i64 = load i8, ptr %14
-  %16: bool = icmp.eq i64 %15, i64 0
-  condbr bool %16, label %mark_terminated, label %scan_check
-
-mark_terminated:
-  store i64 %13, ptr %9
-  store i64 1, ptr %10
-  br label %scan_check
-
-scan_check:
-  %17: i64 = load i64, ptr %11
-  %18: i64 = load i64, ptr %9
-  %19: bool = icmp.slt i64 %17, i64 %18
-  condbr bool %19, label %scan_body, label %scan_done
-
-scan_body:
-  %20: ptr = gep i8, ptr %4, i64 %17
-  %21: i64 = load i8, ptr %20
-  %22: bool = icmp.eq i64 %21, i64 0
-  condbr bool %22, label %fail, label %scan_next
-
-scan_next:
-  %23: i64 = add i64 %17, i64 1
-  store i64 %23, ptr %11
-  br label %scan_check
-
-scan_done:
-  %24: i64 = load i64, ptr %10
-  %25: bool = icmp.eq i64 %24, i64 1
-  condbr bool %25, label %ok, label %check_tail
-
-check_tail:
-  %26: i64 = load i64, ptr %9
-  %27: ptr = gep i8, ptr %4, i64 %26
-  %28: i64 = load i8, ptr %27
-  %29: bool = icmp.eq i64 %28, i64 0
-  condbr bool %29, label %ok, label %fail
-
-ok:
-  %30: i64 = ptrtoint ptr %4 to i64
-  ret i64 %30
-
-fail:
-  call void __ep_print_str(ptr str.runtime.cstr.prefix)
-  %31: ptr = call ptr __ep_str_from_i64(i64 %2)
-  call void __ep_print_str(ptr %31)
-  call void __ep_print_str(ptr str.runtime.cstr.suffix)
-  call void __ep_print_newline()
-  call void ExitProcess(i64 1)
-  ret i64 0
-}
-
 define i64 @__ep_write_file(ptr %1, ptr %2, i64 %3) {
 entry:
-  %4: i64 = call i64 __ep_cstr(ptr %1, i64 %3)
-  %5: i64 = call i64 CreateFileA(i64 %4, i64 1073741824, i64 0, i64 0, i64 2, i64 128, i64 0)
-  %6: bool = icmp.eq i64 %5, i64 -1
-  condbr bool %6, label %fail, label %write
+  %4: ptr = gep struct str, ptr %1, i64 0, i64 0
+  %5: ptr = load ptr, ptr %4
+  %6: i64 = ptrtoint ptr %5 to i64
+  %7: i64 = call i64 CreateFileA(i64 %6, i64 1073741824, i64 0, i64 0, i64 2, i64 128, i64 0)
+  %8: bool = icmp.eq i64 %7, i64 -1
+  condbr bool %8, label %fail, label %write
 
 write:
-  %7: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 0
-  %8: ptr = load ptr, ptr %7
-  %9: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 1
-  %10: i64 = load i64, ptr %9
-  %11: i64 = ptrtoint ptr %8 to i64
-  %12: ptr = alloca i64
-  store i64 0, ptr %12
-  %13: i64 = ptrtoint ptr %12 to i64
-  %14: i64 = call i64 WriteFile(i64 %5, i64 %11, i64 %10, i64 %13, i64 0)
-  %15: i64 = call i64 CloseHandle(i64 %5)
-  %16: i64 = load i64, ptr %12
-  ret i64 %16
+  %9: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 0
+  %10: ptr = load ptr, ptr %9
+  %11: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 1
+  %12: i64 = load i64, ptr %11
+  %13: i64 = ptrtoint ptr %10 to i64
+  %14: ptr = alloca i64
+  store i64 0, ptr %14
+  %15: i64 = ptrtoint ptr %14 to i64
+  %16: i64 = call i64 WriteFile(i64 %7, i64 %13, i64 %12, i64 %15, i64 0)
+  %17: i64 = call i64 CloseHandle(i64 %7)
+  %18: i64 = load i64, ptr %14
+  ret i64 %18
 
 fail:
   ret i64 -1
@@ -194,38 +112,40 @@ fail:
 
 define ptr @__ep_read_file(ptr %1, i64 %2) {
 entry:
-  %3: i64 = call i64 __ep_cstr(ptr %1, i64 %2)
-  %4: i64 = call i64 CreateFileA(i64 %3, i64 2147483648, i64 1, i64 0, i64 3, i64 128, i64 0)
-  %5: bool = icmp.eq i64 %4, i64 -1
-  condbr bool %5, label %empty, label %size
+  %3: ptr = gep struct str, ptr %1, i64 0, i64 0
+  %4: ptr = load ptr, ptr %3
+  %5: i64 = ptrtoint ptr %4 to i64
+  %6: i64 = call i64 CreateFileA(i64 %5, i64 2147483648, i64 1, i64 0, i64 3, i64 128, i64 0)
+  %7: bool = icmp.eq i64 %6, i64 -1
+  condbr bool %7, label %empty, label %size
 
 size:
-  %6: i64 = call i64 GetFileSize(i64 %4, i64 0)
-  %7: ptr = call ptr __ep_slice_u8_alloc(i64 %6, i64 %6)
-  %8: bool = icmp.eq i64 %6, i64 0
-  condbr bool %8, label %close_empty, label %read
+  %8: i64 = call i64 GetFileSize(i64 %6, i64 0)
+  %9: ptr = call ptr __ep_slice_u8_alloc(i64 %8, i64 %8)
+  %10: bool = icmp.eq i64 %8, i64 0
+  condbr bool %10, label %close_empty, label %read
 
 read:
-  %9: ptr = gep struct _slice_u8, ptr %7, i64 0, i64 0
-  %10: ptr = load ptr, ptr %9
-  %11: i64 = ptrtoint ptr %10 to i64
-  %12: ptr = alloca i64
-  store i64 0, ptr %12
+  %11: ptr = gep struct _slice_u8, ptr %9, i64 0, i64 0
+  %12: ptr = load ptr, ptr %11
   %13: i64 = ptrtoint ptr %12 to i64
-  %14: i64 = call i64 ReadFile(i64 %4, i64 %11, i64 %6, i64 %13, i64 0)
-  %15: i64 = call i64 CloseHandle(i64 %4)
-  %16: i64 = load i64, ptr %12
-  %17: ptr = gep struct _slice_u8, ptr %7, i64 0, i64 1
-  store i64 %16, ptr %17
-  ret ptr %7
+  %14: ptr = alloca i64
+  store i64 0, ptr %14
+  %15: i64 = ptrtoint ptr %14 to i64
+  %16: i64 = call i64 ReadFile(i64 %6, i64 %13, i64 %8, i64 %15, i64 0)
+  %17: i64 = call i64 CloseHandle(i64 %6)
+  %18: i64 = load i64, ptr %14
+  %19: ptr = gep struct _slice_u8, ptr %9, i64 0, i64 1
+  store i64 %18, ptr %19
+  ret ptr %9
 
 close_empty:
-  %18: i64 = call i64 CloseHandle(i64 %4)
-  ret ptr %7
+  %20: i64 = call i64 CloseHandle(i64 %6)
+  ret ptr %9
 
 empty:
-  %19: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
-  ret ptr %19
+  %21: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  ret ptr %21
 }
 
 define bool @__ep_is_space(i64 %1) {

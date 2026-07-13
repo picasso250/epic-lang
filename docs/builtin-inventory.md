@@ -25,7 +25,8 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `exit(code)` | `i64 -> void`; terminates the process | `ExitProcess` |
 | `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity view for `str`/`u8[]`, runtime formatting for scalar values |
 | `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
-| `cstr(text)` | `str -> u64` | validates/creates a NUL-terminated buffer through `__ep_cstr` |
+| `cptr(value)` | accepts `str`, `u8[]`, or a non-empty FFI-safe user struct; returns `ptr` | direct data/payload pointer lowering with no runtime checks |
+| `cstr(text)` | `str -> ptr` | deprecated alias of `cptr(text)`; no NUL validation or helper call |
 | `len(value)` | `str` or any array -> `i64` | reads the public logical length |
 | `i64(x)` | integer or `ptr` -> `i64` | integer conversion or pointer bit-pattern extraction |
 | `u64(x)` | integer or `ptr` -> `u64` | integer conversion or pointer bit-pattern extraction |
@@ -87,9 +88,10 @@ Syntax:
 extern "kernel32.dll" fun Sleep(milliseconds: u32): void
 ```
 
-The public extern ABI accepts `i32`, `u32`, `i64`, and `u64` parameters, plus those
-integer types or `void` as returns. Foreign pointers and handles are represented as
-opaque `u64` values; `cstr(str)` supplies a NUL-terminated address for C APIs.
+The public extern ABI accepts the public integer scalar types and opaque `ptr`, plus
+those types or `void` as returns. Foreign pointers, nullable addresses, and handles use
+`ptr`. Strings, byte buffers, and FFI-safe struct payloads cross the boundary only through
+explicit borrowed pointers from `cptr(...)`; no implicit conversion or NUL guarantee exists.
 
 The compiler lowers source imports to self-describing symbols of the form
 `__ep_import$<dll>$<symbol>`. The linker groups them by DLL and does not use a function
@@ -101,7 +103,7 @@ Backend-private helpers are ordinary MIR functions, not language builtins. Curre
 categories include:
 
 - allocation, GC, and startup: `__ep_alloc`, collector helpers, `__ep_runtime_start`;
-- string output/conversion: `__ep_print_str`, `__ep_print_newline`, `__ep_cstr`, scalar-to-string helpers;
+- string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers; `cptr`/`cstr` require no runtime helper;
 - string operations used by syntax: equality, concatenation, and slicing;
 - file operations: `__ep_read_file`, `__ep_write_file`;
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
@@ -115,8 +117,8 @@ this MIR and imports only the WinAPI symbols that remain reachable.
 ## Name reservation
 
 Sema reserves names whose call syntax is always interpreted as a
-builtin or pseudo-builtin, including `print`, `println`, `exit`, conversions such as
-`i64`/`u8`/`bool`, file I/O, `len`, and `argv`.
+builtin or pseudo-builtin, including `print`, `println`, `exit`, `cptr`, deprecated
+`cstr`, conversions such as `i64`/`u8`/`bool`, file I/O, `len`, and `argv`.
 
 Array operations are different: their builtin meaning is selected by receiver syntax.
 Therefore `push`, `pop`, `extend`, and the removed builtin name `cap` are intentionally

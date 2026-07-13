@@ -1,0 +1,6 @@
+# COMPILE_FAIL_CONTAINS: lstrlenA argument 1 expected ptr, got str
+extern "kernel32.dll" fun lstrlenA(text: ptr): i32
+
+fun main(): void {
+    let n = lstrlenA("abc")
+}

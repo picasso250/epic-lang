@@ -414,7 +414,8 @@ let source = str(read_file(path))
 |----------------------------------------|---------------------------------------------|
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
-| `cstr(s: str): u64`                    | 检查并返回可传给 C API 的 NUL 结尾地址值    |
+| `cptr(x): ptr`                         | 返回 `str` / `u8[]` backing data 或 FFI-safe struct payload 的 borrowed 地址；不检查 |
+| `cstr(s: str): ptr`                    | deprecated `cptr(s)` alias；不检查 NUL 或内嵌 NUL |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 
@@ -434,7 +435,9 @@ let source = str(read_file(path))
 | `a.pop()`              | 删除并返回最后一个元素；空数组 panic            |
 | `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |
 
-`cstr` 要求字符串内部数据指针非空、`len(s) >= 0`、`s[0:len(s)]` 不含 `0`，并且内部数据在 `len(s)` 位置以 `0` 结尾。检查失败时打印 `panic line N: invalid cstr` 并以状态 `1` 退出。
+`cptr` 第一版只接受 `str`、`u8[]` 和非空 FFI-safe 用户 struct。`cptr(str)` / `cptr(u8[])` 直接读取 `{data,len,cap}` header 的 `data`；空 `u8[]` 自然返回 `ptr(0)`。`cptr(struct)` 直接返回 non-moving heap payload 地址。三种形式都不做 null、NUL、长度、容量或内容检查，不分配、不复制，也不转移所有权。内嵌 NUL 合法；传给 C 字符串 API 时，C 只能看到第一个 NUL 之前的前缀。
+
+返回地址只在 owner 仍可达且外部调用遵守同步 borrowed 契约时有效。`str` 和 struct payload 地址在当前 non-moving GC 下稳定；`u8[]` 的 backing data 可被 `push` / `extend` 等扩容操作替换，因此任何可能增长数组的操作后必须重新调用 `cptr(array)`。`new u8[n]` 可作为同步 WinAPI output buffer。`cstr(str)` 暂时保留为 deprecated alias，lowering 与 `cptr(str)` 完全相同，不再存在 `__ep_cstr` runtime helper 或运行时诊断。
 
 ### Extern FFI
 
@@ -452,11 +455,11 @@ extern 参数还可使用非空的 FFI-safe 用户 struct。此时源码参数 `
 
 struct extern 返回值和 struct by-value 参数均不支持。只有在用户已经独立确认目标 ABI 把 1/2/4/8 字节 aggregate 放在普通整数 lane 时，才可把它手工声明成对应整数并用位运算解码；未使用高位必须由用户 mask。Epic 不公开 `sizeof`；需要 `cbSize`/`dwLength` 时使用目标 ABI 文档或独立布局工具取得常量。
 
-extern struct pointer 只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。当前没有 callback/function pointer，因此 extern 调用期间不会重新进入 Epic；未来若开放 callback，需要重新审视 safepoint 和 root 契约。
+extern struct pointer 和 `cptr(...)` 结果只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。当前没有 callback/function pointer，因此 extern 调用期间不会重新进入 Epic；未来若开放 callback，需要重新审视 safepoint 和 root 契约。
 
 `ptr` 是公开的 64-bit opaque address scalar。它可用于变量、参数、返回值、struct 字段、`ptr[]` 和 extern ABI；只支持同类型的 `==` / `!=`，不支持直接算术、位运算、排序比较、解引用、字段访问、下标或 postfix `?`。地址运算必须显式经过整数：`ptr(u64(base) + offset)`。只允许 `ptr(i64/u64)` 与 `i64/u64(ptr)` 双向 bit-pattern 转换；空地址写作 `ptr(0)`，`INVALID_HANDLE_VALUE` 可写作 `ptr(u64(0) - u64(1))`。`ptr` 不拥有内存，也不延长外部资源或 managed allocation 的生命周期。
 
-`cstr(s)` 当前仍返回 `u64`，并要求字符串不含内嵌 NUL；后续由返回 `ptr` 的 `cptr` 取代。extern 不提供隐式字符串转换。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
+extern 不提供隐式字符串或 buffer 转换；调用者必须显式使用 `cptr(...)`。`cstr(str)` 仅为 deprecated source alias，也返回 `ptr`，没有额外保证。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
 
 源码 extern 通过自带 PE linker 的编码导入符号传递 DLL metadata，因此 Python 驱动下要求默认的 `--linker py`；`lld-link` 仍可用于没有源码 extern 的程序。普通退出继续使用 `exit(code)`。
 

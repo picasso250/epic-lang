@@ -453,6 +453,24 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     ret mir_value_operand(field_typ, result_id)
 }
 
+fun mir_emit_cptr(st: MirCodegenState, block: MirBlock, arg: AstNode): MirValueFlow {
+    st.current_block = block
+    let source_type = ast_resolved_type(arg)
+    let arg_flow = mir_emit_expr(st, st.current_block, arg)
+    st.current_block = arg_flow.block
+    if source_type == "str" {
+        ret mir_value_flow(mir_load_field(st, arg_flow.value, "str", "data"), st.current_block)
+    }
+    if source_type == "u8[]" {
+        ret mir_value_flow(mir_load_field(st, arg_flow.value, "_slice_u8", "data"), st.current_block)
+    }
+    if mir_is_struct_name(st, source_type) {
+        ret arg_flow
+    }
+    ast_to_mir_die(f"cptr unsupported source type {source_type}")
+    ret mir_value_flow(mir_operand_null(), st.current_block)
+}
+
 fun mir_union_member_names(st: MirCodegenState, union_name: str): str[] {
     let out = new str[]
     for i: 0:len(st.union_members) {
@@ -1279,13 +1297,8 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 }
                 ret mir_value_flow(mir_load_field(st, base_flow.value, struct_name, n.name), st.current_block)
             }
-            if n.name == "cstr" {
-                let args = new MirOperand[]
-                let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
-                st.current_block = arg_flow.block
-                args.push(arg_flow.value)
-                args.push(mir_const_int("i64", n.meta.line))
-                ret mir_value_flow(mir_emit_call_inst(st, "__ep_cstr", "i64", args), st.current_block)
+            if n.name == "cptr" || n.name == "cstr" {
+                ret mir_emit_cptr(st, st.current_block, n.args[0])
             }
             if n.name == "ptr" {
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])

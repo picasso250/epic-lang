@@ -1,6 +1,0 @@
-# EXIT: 1
-# STDOUT: panic line 4: invalid cstr
-fun main(): void {
-    let p = cstr(str(new u8[] { u8(65), u8(0), u8(66) }))
-    exit(0)
-}

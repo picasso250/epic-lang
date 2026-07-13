@@ -244,6 +244,7 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 | `write_file`       | `__ep_write_file` helper                    | 公开 |
 | `str` / `u8[]` view | 显式 zero-copy layout reinterpret；源码类型保持不同 | 公开 |
 | `bytes`            | zero-copy layout reinterpret                | 公开 |
+| `cptr` / `cstr`    | inline aggregate data/payload pointer lowering；`cstr` 是 deprecated alias；无 runtime helper 或检查 | 公开 |
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
 | `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |

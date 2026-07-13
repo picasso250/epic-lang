@@ -374,8 +374,8 @@ global；`__ep_alloc` 直接读取 cached heap，随后与普通函数一样 low
 
 ### 8.3 Runtime helper emission
 
-Helpers such as `__ep_alloc`, `__ep_cstr`, `__ep_read_file`,
-`__ep_write_file`, `__ep_print_str`, `__ep_print_newline`, `__ep_str_from_bool`,
+Helpers such as `__ep_alloc`, `__ep_read_file`, `__ep_write_file`,
+`__ep_print_str`, `__ep_print_newline`, `__ep_str_from_bool`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
@@ -384,8 +384,12 @@ ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
 After injection, the compiler prunes unreachable MIR functions from the final
 program starting at `main`; startup and helper dependencies remain reachable
 through explicit MIR calls.
-`bytes(str)` and `str(u8[])` are lowered as identity casts, so they do not
-require MIR runtime functions.
+`bytes(str)` and `str(u8[])` are lowered as identity casts. `cptr(str/u8[])`
+loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
+pointer unchanged; deprecated `cstr(str)` uses the same lowering. None require a MIR
+runtime function or runtime validation. `__ep_read_file` / `__ep_write_file` retain an
+unused trailing source-line operand because the frozen v0 seed emits that call shape while
+bootstrapping the active self-hosted compiler; no validation uses the value.
 The x64 backend contains only generic instruction lowering in `src/mir_to_x64.ep`.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.

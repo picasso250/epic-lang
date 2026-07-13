@@ -1,6 +1,0 @@
-# COMPILE_FAIL_CONTAINS: lstrlenA argument 1 expected u64, got str
-extern "kernel32.dll" fun lstrlenA(text: u64): i32
-
-fun main(): void {
-    let n = lstrlenA("abc")
-}

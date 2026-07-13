@@ -1,0 +1,7 @@
+# COMPILE_FAIL_CONTAINS: cptr struct Empty must not be empty
+struct Empty {}
+
+fun main(): void {
+    let value = new Empty
+    let p = cptr(value)
+}
