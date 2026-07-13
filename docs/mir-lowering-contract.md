@@ -379,9 +379,10 @@ Helpers such as `__ep_alloc`, `__ep_print_str`, `__ep_print_newline`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s loaded from the embedded `runtime/mir/helpers.ir` bundle and
-injected by `src/mir_runtime.ep`. All standard composite helpers, including `runtime/file.ep`,
-come from Epic sources embedded by `src/runtime_bundle.ep` and merged with user source before
-sema. Canonically identical repeated extern declarations are folded; conflicts are rejected.
+injected by `src/mir_runtime.ep`. Array slicing/extension and panic helpers are part of the
+same bundle. The remaining string and file helpers come from Epic sources embedded by
+`src/runtime_bundle.ep` and merged with user source before sema. Canonically identical
+repeated extern declarations are folded; conflicts are rejected.
 After injection, the compiler prunes unreachable MIR functions from the final
 program starting at `main`; startup and helper dependencies remain reachable
 through explicit MIR calls.
