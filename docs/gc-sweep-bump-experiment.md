@@ -18,7 +18,7 @@ slot 都位于 `[0, bump)`，复用的 slot 也来自这个范围，因此尾部
 ## Three-sample benchmark
 
 基线为 `dev@f1b7e6c`。两组使用相同 seed、compiler source、参数和输出位置；variant
-只改变 embedded `runtime/mir/gc.mir`。结果均来自收敛编译器对相同 self-host workload
+只改变 embedded `runtime/mir/gc.ir`。结果均来自收敛编译器对相同 self-host workload
 的三次等价测量。
 
 | Metric | Baseline | Sweep to bump | Delta |

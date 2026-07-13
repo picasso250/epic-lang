@@ -1,12 +1,12 @@
-extern void @ExitProcess(i64)
+declare void @__ep_import$kernel32.dll$ExitProcess(i64)
 
-extern ptr @__ep_import$kernel32.dll$GetStdHandle(i64)
+declare ptr @__ep_import$kernel32.dll$GetStdHandle(i64)
 
-extern i64 @__ep_import$kernel32.dll$WriteFile(ptr, ptr, i64, ptr, ptr)
+declare i64 @__ep_import$kernel32.dll$WriteFile(ptr, ptr, i64, ptr, ptr)
 
-extern ptr @GetCommandLineA()
+declare ptr @__ep_import$kernel32.dll$GetCommandLineA()
 
-extern void @__ep_runtime_panic(ptr)
+declare void @__ep_runtime_panic(ptr)
 
 global @argv: ptr
 
@@ -43,7 +43,7 @@ entry:
 fail:
   call void __ep_print_str(ptr str.runtime.null.deref)
   call void __ep_print_newline()
-  call void ExitProcess(i64 1)
+  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
   ret void
 
 ok:
@@ -64,7 +64,7 @@ entry:
 
 define ptr @__ep_argv_init() {
 entry:
-  %1: ptr = call ptr GetCommandLineA()
+  %1: ptr = call ptr __ep_import$kernel32.dll$GetCommandLineA()
   %2: ptr = alloca ptr
   %3: ptr = alloca ptr
   %4: ptr = alloca i64
@@ -599,7 +599,7 @@ ok:
   ret void
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
   ret void
 }
 

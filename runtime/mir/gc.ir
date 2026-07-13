@@ -1,14 +1,14 @@
-extern i64 @GetProcessHeap()
+declare i64 @__ep_import$kernel32.dll$GetProcessHeap()
 
-extern ptr @HeapAlloc(i64, i64, i64)
+declare ptr @__ep_import$kernel32.dll$HeapAlloc(i64, i64, i64)
 
-extern i64 @HeapFree(i64, i64, ptr)
+declare i64 @__ep_import$kernel32.dll$HeapFree(i64, i64, ptr)
 
-extern void @GetCurrentThreadStackLimits(ptr, ptr)
+declare void @__ep_import$kernel32.dll$GetCurrentThreadStackLimits(ptr, ptr)
 
-extern i64 @__ep_import$kernel32.dll$GetTickCount64()
+declare i64 @__ep_import$kernel32.dll$GetTickCount64()
 
-extern ptr @__ep_import$kernel32.dll$VirtualAlloc(ptr, i64, i64, i64)
+declare ptr @__ep_import$kernel32.dll$VirtualAlloc(ptr, i64, i64, i64)
 
 global @heap: i64
 
@@ -76,7 +76,7 @@ global @str.gc.stw.suffix: ptr = bytes " ms\n"
 define ptr @__ep_gc_raw_try_alloc(i64 %1) {
 entry:
   %2: i64 = load i64, ptr heap
-  %3: ptr = call ptr HeapAlloc(i64 %2, i64 8, i64 %1)
+  %3: ptr = call ptr __ep_import$kernel32.dll$HeapAlloc(i64 %2, i64 8, i64 %1)
   ret ptr %3
 }
 
@@ -87,7 +87,7 @@ entry:
   condbr bool %3, label %fail, label %ok
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
   ret ptr null
 
 ok:
@@ -97,7 +97,7 @@ ok:
 define void @__ep_gc_raw_free(ptr %1) {
 entry:
   %2: i64 = load i64, ptr heap
-  %3: i64 = call i64 HeapFree(i64 %2, i64 0, ptr %1)
+  %3: i64 = call i64 __ep_import$kernel32.dll$HeapFree(i64 %2, i64 0, ptr %1)
   ret void
 }
 
@@ -128,7 +128,7 @@ metadata:
   ret void
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
   ret void
 }
 
@@ -1093,7 +1093,7 @@ define void @__ep_gc_init() {
 entry:
   %1: ptr = alloca ptr
   %2: ptr = alloca ptr
-  call void GetCurrentThreadStackLimits(ptr %1, ptr %2)
+  call void __ep_import$kernel32.dll$GetCurrentThreadStackLimits(ptr %1, ptr %2)
   %3: ptr = load ptr, ptr %2
   store ptr %3, ptr gc_stack_high
   call void __ep_gc_grow_objects(i64 1024)
@@ -1103,7 +1103,7 @@ entry:
 
 define void @__ep_runtime_start() {
 entry:
-  %1: i64 = call i64 GetProcessHeap()
+  %1: i64 = call i64 __ep_import$kernel32.dll$GetProcessHeap()
   store i64 %1, ptr heap
   call void __ep_gc_init()
   %2: ptr = call ptr __ep_argv_init()
@@ -1221,7 +1221,7 @@ record:
   ret ptr %12
 
 fail:
-  call void ExitProcess(i64 1)
+  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
   ret ptr null
 }
 

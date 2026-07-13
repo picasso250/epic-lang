@@ -15,7 +15,7 @@ small allocator reserve 1 GiB 连续虚拟地址 arena，并将它划分为 64 K
 长期维护紧凑的 payload 基址和请求大小并行数组。
 
 `__ep_alloc`、`__ep_runtime_start` 和 `__ep_runtime_end` 只由
-`runtime/mir/gc.mir` 定义。`runtime/mir/helpers.mir` 不再保留 bootstrap fallback；
+`runtime/mir/gc.ir` 定义。`runtime/mir/helpers.ir` 不再保留 bootstrap fallback；
 两个 MIR bundle 都通过 `src/runtime_bundle.ep` 嵌入编译器镜像。
 
 ## Collection

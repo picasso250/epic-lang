@@ -116,7 +116,7 @@ MIR lowering 当前固定面向 Windows x64：
 - 返回值在 `rax`。
 - `main` 降成 PE entry symbol `_start`。
 - `main` starts with an injected MIR call to `__ep_runtime_start` to cache the process heap and initialize `argv`。
-- `main` 的 `ret value` 降成 `ExitProcess(value)`，不走普通 `ret`。
+- `main` 的 `ret value` 降成编码导入 `__ep_import$kernel32.dll$ExitProcess(value)`，不走普通 `ret`。
 - Win32 `LPDWORD` output 参数只写 32 位。当前 helper 如果复用 8 字节栈槽
   存放这类输出，必须在 call 前清零整个 qword，或者后续改成显式 32-bit
   zero-extend load。
@@ -158,7 +158,7 @@ ret
 | `call` | Windows x64 call sequence。 |
 | `br` | `jmp label`。 |
 | `condbr` | `test rax, rax; jnz then; jmp else`。 |
-| `ret` | `ExitProcess` for `main`，普通函数跳转到 shared return label。 |
+| `ret` | 编码 `ExitProcess` import for `main`，普通函数跳转到 shared return label。 |
 
 ## 5. 当前 machine instruction subset
 
@@ -387,7 +387,7 @@ prunes unreachable functions.
 `bytes(str)` and `str(u8[])` are identity casts in lowering, not runtime helper
 calls.
 
-Base helper bodies are bundled in `runtime/mir/helpers.mir`; composite helpers
+Base helper bodies are bundled in `runtime/mir/helpers.ir`; composite helpers
 are written in Epic. `src/runtime_bundle.ep` embeds both MIR bundles and all Epic runtime
 sources. The Epic sources are merged with user input; equivalent extern declarations are
 canonicalized before MIR lowering.
@@ -423,7 +423,7 @@ byte offset stay part of the MIR contract.
 ### 8.5 Symbol spelling contract
 
 MIR object model stores raw module symbols such as `main`, `__ep_str_eq`,
-`ExitProcess`, and `str.1`. The `@` sigil is reserved for a future text MIR
+`__ep_import$kernel32.dll$ExitProcess`, and `str.1`. The `@` sigil is reserved for a future text MIR
 syntax/parser and must not be stored in `MirFunction.name`, `MirExtern.name`,
 `MirGlobal.name`, or `SymbolOperand.name`. Local SSA values also use raw names in `MirValue.name` / `MirParam.name`; the `%` sigil belongs to text MIR printing/parsing only.
 

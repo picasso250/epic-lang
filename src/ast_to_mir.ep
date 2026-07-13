@@ -383,7 +383,7 @@ fun mir_emit_shift_count_check(st: MirCodegenState, count: MirOperand, source_ty
     mir_emit_call_inst(st, "__ep_print_newline", "void", nl_args)
     let exit_args = new MirOperand[]
     exit_args.push(mir_const_int("i64", 1))
-    mir_emit_inst(st, mir_call("ExitProcess", "void", exit_args))
+    mir_emit_inst(st, mir_call("__ep_import$kernel32.dll$ExitProcess", "void", exit_args))
     if st.current_fn.return_type == "void" { st.current_block.terminator = mir_ret_void() } else { st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0)) }
     st.current_block.has_terminator = true
     st.current_block = ok_block
@@ -898,7 +898,7 @@ fun mir_emit_print_newline(st: MirCodegenState): void {
 fun mir_emit_exit_current_block(st: MirCodegenState, code: i64): void {
     let args = new MirOperand[]
     args.push(mir_const_int("i64", code))
-    mir_emit_inst(st, mir_call("ExitProcess", "void", args))
+    mir_emit_inst(st, mir_call("__ep_import$kernel32.dll$ExitProcess", "void", args))
 }
 
 fun mir_emit_slice(st: MirCodegenState, block: MirBlock, expr: AstSlice): MirValueFlow {
@@ -1416,7 +1416,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 let code_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = code_flow.block
                 args.push(code_flow.value)
-                mir_emit_inst(st, mir_call("ExitProcess", "void", args))
+                mir_emit_inst(st, mir_call("__ep_import$kernel32.dll$ExitProcess", "void", args))
                 ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
             }
             let ret_type = mir_func_return_type(st, n.name)

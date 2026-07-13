@@ -75,7 +75,7 @@ pop  rbp
 ret
 ```
 
-`main` 不走此路径——它直接 `call ExitProcess`。
+`main` 不走此路径——它直接调用编码导入 `__ep_import$kernel32.dll$ExitProcess`。
 
 ## 3. Stack model
 
@@ -320,8 +320,7 @@ if inst.result is not None:
 `Symbol(callee)` 的 `callee` 直接取 `inst.callee` 字符串。可以是：
 
 - 用户函数名（如 `main`、`foo`）
-- backend-owned WinAPI import 名（如 `ExitProcess`、`HeapAlloc`）
-- source extern 编码名（`__ep_import$<dll>$<symbol>`）
+- Windows API / source extern 编码名（`__ep_import$<dll>$<symbol>`）
 - Runtime helper 名（如 `__ep_print_str`、`__ep_alloc`）
 
 ### 6.2 Frame alignment
@@ -351,8 +350,8 @@ jmp  LabelRef(fn_name.else_target)
 
 | 函数 | 行为 |
 |------|------|
-| `main` (有值) | `mov rcx, rax; sub rsp, 32; call ExitProcess` |
-| `main` (无值) | `mov rcx, 0; sub rsp, 32; call ExitProcess` |
+| `main` (有值) | `mov rcx, rax; sub rsp, 32; call __ep_import$kernel32.dll$ExitProcess` |
+| `main` (无值) | `mov rcx, 0; sub rsp, 32; call __ep_import$kernel32.dll$ExitProcess` |
 | 非 main (有值) | `_load_operand("rax", value); jmp return_label` |
 | 非 main (无值) | `jmp return_label` |
 
@@ -379,7 +378,7 @@ Helpers such as `__ep_alloc`, `__ep_print_str`, `__ep_print_newline`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
 `__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
 and `__ep_slice_u8_extend` are
-ordinary `MirFunction`s loaded from the embedded `runtime/mir/helpers.mir` bundle and
+ordinary `MirFunction`s loaded from the embedded `runtime/mir/helpers.ir` bundle and
 injected by `src/mir_runtime.ep`. All standard composite helpers, including `runtime/file.ep`,
 come from Epic sources embedded by `src/runtime_bundle.ep` and merged with user source before
 sema. Canonically identical repeated extern declarations are folded; conflicts are rejected.
@@ -392,7 +391,7 @@ pointer unchanged; deprecated `cstr(str)` uses the same lowering. None require a
 runtime function or runtime validation. Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and
 use `cptr(str/u8[])` plus explicit pointer-typed WinAPI externs. Their MIR signatures match the
 public builtins exactly: one path operand for read, and path plus data operands for write.
-`runtime/mir/helpers.mir` contains no same-named fallback bodies.
+`runtime/mir/helpers.ir` contains no same-named fallback bodies.
 The x64 backend contains only generic instruction lowering in `src/mir_to_x64.ep`.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.

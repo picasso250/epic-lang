@@ -2,7 +2,7 @@
 
 本文记录 `experiment/pow2-strength-reduction` 分支对常量二次幂乘除法的审计与实验。目标是判断：
 既然 GC bitmap 热路径曾将 `udiv 8` / `urem 8` 手写为 `shr 3` / `and 7`，是否应在
-MIR-to-X64 中普遍执行 strength reduction，或者至少把 `runtime/mir/gc.mir` 中同类操作
+MIR-to-X64 中普遍执行 strength reduction，或者至少把 `runtime/mir/gc.ir` 中同类操作
 全部改写。
 
 ## 机会审计
@@ -122,7 +122,7 @@ exe:        829440 -> 829440
 
 ### T1: 全部 31 个机会
 
-直接在 `gc.mir` 中改写 21 `mul`、7 `udiv`、3 `urem`，不增加 compiler 识别逻辑。
+直接在 `gc.ir` 中改写 21 `mul`、7 `udiv`、3 `urem`，不增加 compiler 识别逻辑。
 
 | 指标 | T1 | 相对基线 |
 |---|---:|---:|

@@ -151,7 +151,7 @@ python tests/link/run.py
 python benchmark_self_host.py --label baseline
 ```
 
-脚本把 seed compiler、canonical compiler 源码、嵌入的 runtime `.ep/.mir`、测量工具版本和宿主信息纳入 key，并在 `build/cache/self-host-benchmark/` 分层保存收敛编译器、原始日志、结构化结果和文本报告。输入未变时直接复用；需要重新取得当前环境下的 wall-time 样本时加 `--refresh`，此时仍会复用相同的收敛编译器；需要连 fixed point 一起强制重建时使用 `--rebuild`。
+脚本把 seed compiler、canonical compiler 源码、嵌入的 runtime `.ep/.ir`、测量工具版本和宿主信息纳入 key，并在 `build/cache/self-host-benchmark/` 分层保存收敛编译器、原始日志、结构化结果和文本报告。输入未变时直接复用；需要重新取得当前环境下的 wall-time 样本时加 `--refresh`，此时仍会复用相同的收敛编译器；需要连 fixed point 一起强制重建时使用 `--rebuild`。
 
 `test_*.py` 是可直接运行的脚本，非 pytest。
 

@@ -833,7 +833,7 @@ fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTermin
             if fn.name == "main" {
                 x64_add_inst2(lower.x64, 1, x64_reg("rcx"), x64_imm(0)) # x64 mov
                 x64_add_inst2(lower.x64, 25, x64_reg("rsp"), x64_imm(32)) # x64 sub
-                x64_add_inst1(lower.x64, 3, x64_symbol("ExitProcess")) # x64 call
+                x64_add_inst1(lower.x64, 3, x64_symbol("__ep_import$kernel32.dll$ExitProcess")) # x64 call
             } else {
                 x64_add_inst1(lower.x64, 7, x64_label_ref(lower.return_label)) # x64 jmp
             }
@@ -844,7 +844,7 @@ fun mir_to_x64_lower_term(lower: MirToX64Lower, fn: MirFunction, term: MirTermin
             if fn.name == "main" {
                 x64_add_inst2(lower.x64, 1, x64_reg("rcx"), x64_reg("rax")) # x64 mov
                 x64_add_inst2(lower.x64, 25, x64_reg("rsp"), x64_imm(32)) # x64 sub
-                x64_add_inst1(lower.x64, 3, x64_symbol("ExitProcess")) # x64 call
+                x64_add_inst1(lower.x64, 3, x64_symbol("__ep_import$kernel32.dll$ExitProcess")) # x64 call
             } else {
                 x64_add_inst1(lower.x64, 7, x64_label_ref(lower.return_label)) # x64 jmp
             }

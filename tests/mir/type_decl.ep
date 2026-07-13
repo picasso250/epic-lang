@@ -6,7 +6,7 @@ fun check(ok: bool): void {
 
 fun main(): void {
     let text = make_str_buf()
-    str_buf_extend(text, "extern void @ExitProcess(i64)\n\ntype Zed = struct size 8 align 8 { ptr @0 }\n\ntype Unused = struct size 8 align 8 { i64 @0 }\n\ntype Data = struct size 16 align 8 { i8 @0, i16 @2, i32 @4, i64 @8 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
+    str_buf_extend(text, "declare void @__ep_import$kernel32.dll$ExitProcess(i64)\n\ntype Zed = struct size 8 align 8 { ptr @0 }\n\ntype Unused = struct size 8 align 8 { i64 @0 }\n\ntype Data = struct size 16 align 8 { i8 @0, i16 @2, i32 @4, i64 @8 }\n\nglobal @argv: ptr\n\nglobal @counter: i64 = 42\n\nglobal @str.0: ptr = bytes \"A")
     text.push(u8(92))
     text.push(u8(110))
     text.push(u8(92))
@@ -16,10 +16,10 @@ fun main(): void {
     text.push(u8(92))
     str_buf_extend(text, "x00")
     text.push(u8(92))
-    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %1: ptr = gep struct Zed, ptr null, i64 1\n  %2: ptr = gep struct Data, ptr null, i64 1\n  call void ExitProcess(i64 0)\n  ret i64 0\n}\n")
+    str_buf_extend(text, "xFF//tail\"\n\ndefine i64 @main() {\nentry:\n  %1: ptr = gep struct Zed, ptr null, i64 1\n  %2: ptr = gep struct Data, ptr null, i64 1\n  call void __ep_import$kernel32.dll$ExitProcess(i64 0)\n  ret i64 0\n}\n")
 
     let program = mrt_parse_program(str_buf_finish(text))
-    backend_validate_program_abi(program)
+    mir_validate_call_contracts(program)
     check(len(program.struct_layouts) == 3)
     check(program.struct_layouts[2].name == "Data")
     check(program.struct_layouts[2].size == 16)

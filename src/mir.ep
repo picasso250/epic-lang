@@ -509,11 +509,11 @@ fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_t
     if index >= 0 {
         let ext = program.externs[index]
         if ext.return_type != return_type || len(ext.param_types) != len(param_types) {
-            panic ("conflicting MIR extern declaration: " + name)
+            panic ("conflicting MIR declaration: " + name)
         }
         for i: 0:len(param_types) {
             if ext.param_types[i] != param_types[i] {
-                panic ("conflicting MIR extern declaration: " + name)
+                panic ("conflicting MIR declaration: " + name)
             }
         }
         ret
@@ -552,11 +552,11 @@ fun mir_declare_unresolved_calls(program: MirProgram): void {
                     if extern_index >= 0 {
                         let ext = program.externs[extern_index]
                         if ext.return_type != inst.typ || len(ext.param_types) != len(param_types) {
-                            panic ("conflicting MIR extern declaration: " + inst.callee)
+                            panic ("conflicting MIR declaration: " + inst.callee)
                         }
                         for pi: 0:len(param_types) {
                             if ext.param_types[pi] != param_types[pi] {
-                                panic ("conflicting MIR extern declaration: " + inst.callee)
+                                panic ("conflicting MIR declaration: " + inst.callee)
                             }
                         }
                     } else {
@@ -765,7 +765,7 @@ fun mir_retain_referenced_externs(program: MirProgram): void {
     let kept = new MirExtern[]
     for i: 0:len(names) {
         let index = name_index_lookup(externs, names[i])
-        if index < 0 { panic ("missing MIR extern declaration: " + names[i]) }
+        if index < 0 { panic ("missing MIR declaration: " + names[i]) }
         kept.push(program.externs[index])
     }
     program.externs = kept
@@ -773,7 +773,7 @@ fun mir_retain_referenced_externs(program: MirProgram): void {
 
 fun mir_extern_text(ext: MirExtern): str {
     let buf = make_str_buf()
-    str_buf_extend(buf, "extern ")
+    str_buf_extend(buf, "declare ")
     str_buf_extend(buf, ext.return_type)
     str_buf_extend(buf, " @")
     str_buf_extend(buf, ext.name)
@@ -932,7 +932,7 @@ fun mir_print_program(program: MirProgram): void {
     let extern_names = mir_referenced_external_names(program)
     for ei: 0:len(extern_names) {
         let extern_index = mir_find_extern(program, extern_names[ei])
-        if extern_index < 0 { panic ("missing MIR extern declaration: " + extern_names[ei]) }
+        if extern_index < 0 { panic ("missing MIR declaration: " + extern_names[ei]) }
         if printed > 0 { println("") }
         println(mir_extern_text(program.externs[extern_index]))
         printed += 1

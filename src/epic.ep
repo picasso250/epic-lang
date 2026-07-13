@@ -113,10 +113,15 @@ fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
 fun epic_lower_program(program: MirProgram, verbose: bool): X64Program {
     let lower = mir_to_x64_lower_empty()
     let start = epic_now_ms()
+    let exit_import = "__ep_import$kernel32.dll$ExitProcess"
     x64_add_global(lower.x64, "_start")
+    x64_add_extern(lower.x64, exit_import)
     for ei: 0:len(program.externs) {
         let ext = program.externs[ei]
-        if backend_abi_is_winapi(ext.name) || (len(ext.name) >= 12 && ext.name[0:12] == "__ep_import$") {
+        if len(ext.name) < 12 || ext.name[0:12] != "__ep_import$" {
+            panic ("backend import error: unencoded declaration: " + ext.name)
+        }
+        if ext.name != exit_import {
             x64_add_extern(lower.x64, ext.name)
         }
     }
@@ -187,7 +192,7 @@ fun epic_backend(mir: MirProgram, exe_path: str, verbose: bool): void {
     mir_inject_all_runtime_helpers(mir)
     mir_prune_unreachable_functions(mir)
     mir_retain_referenced_externs(mir)
-    backend_validate_program_abi(mir)
+    mir_validate_call_contracts(mir)
     let prepare_stop = epic_now_ms()
     epic_timing(verbose, "prepare mir", prepare_start, prepare_stop)
 

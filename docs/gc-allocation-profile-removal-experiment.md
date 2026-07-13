@@ -13,7 +13,7 @@ not required for allocation, marking, sweeping, or threshold selection.
 - two calls from the small and large allocation paths;
 - the runtime-end profile print call.
 
-The patch deletes 222 physical lines from `runtime/mir/gc.mir` and adds no replacement code.
+The patch deletes 222 physical lines from `runtime/mir/gc.ir` and adds no replacement code.
 Per-collection `gc stw` diagnostics remain.
 
 ## Validation
@@ -39,7 +39,7 @@ larger than their spread.
 
 ## Conclusion
 
-This change should replace the permanent profiler. It removes roughly 15% of `gc.mir`,
+This change should replace the permanent profiler. It removes roughly 15% of `gc.ir`,
 shrinks the self-hosted compiler, and improves total compile time despite a small
 layout-sensitive increase in measured GC STW. Future allocation-shape studies
 should use a temporary experiment branch or an explicitly enabled diagnostic build rather
