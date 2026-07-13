@@ -56,3 +56,38 @@ Bootstrap fixed point、完整 13 模块测试、10 个 examples 和 91 个 e2e 
 ### Decision
 
 接受 match hoist，继续独立验证完整且至少四个 variants 的平衡 ADT tag tree。
+
+## Balanced full ADT tag dispatch
+
+### Hypothesis
+
+对至少四个 cases 且显式覆盖 union 全部 variants 的 match，先按实际 tag 排序，再用
+`icmp.ule` 生成平衡决策树。完整 match 不需要失败出口，因此 N 个 cases 只需 N-1 次比较；
+最坏路径由线性的 O(N) 降为 O(log N)。小 match 和部分 match 仍保留线性 dispatch。
+
+### Correctness
+
+候选实现通过 bootstrap fixed point、完整 13 模块测试、10 个 examples 和 91 个 e2e 测试。
+
+### A/B result
+
+基线为上一阶段已接受的 match hoist。两边使用相同 v0 seed、compiler/runtime sources、参数和
+输出位置，每边三个等价样本。
+
+| metric | match hoist | balanced tags | change |
+|---|---:|---:|---:|
+| wall samples | 1565.912 / 1538.281 / 1548.795 ms | 1569.979 / 1539.210 / 1557.428 ms | — |
+| wall median | 1548.795 ms | 1557.428 ms | +8.633 ms, +0.56% |
+| internal median | 1516 ms | 1547 ms | +31 ms, +2.04% |
+| X64 items | 145,208 | 146,185 | +977, +0.67% |
+| `.text` bytes | 666,821 B | 671,774 B | +4,953 B, +0.74% |
+| `.data` bytes | 81,808 B | 81,842 B | +34 B, +0.04% |
+| compiler exe | 751,104 B | 756,224 B | +5,120 B, +0.68% |
+
+wall samples 重叠，无法证明时间收益；median 反而略慢。候选实现的排序和建树逻辑也进入
+self-host compiler，本身的代码成本超过了少数大型完整 match 减少的比较。
+
+### Decision
+
+拒绝并撤回平衡 tag tree。它没有显著时间收益，同时所有 size 指标均回退。按串行实验约束，
+停止后续 integer binary search / jump-table 实验；保留已成功的 match hoist。
