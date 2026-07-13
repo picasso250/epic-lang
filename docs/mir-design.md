@@ -17,7 +17,7 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | 方面 | 目标 MIR | 当前 Python prototype |
 |------|----------|----------------------|
 | Runtime helper call in MIR | 降到 MIR `call` + MIR helper function | ✅ runtime 调用均为普通 MIR `call` |
-| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ✅ 基础 helper 从 `runtime/mir/helpers.mir` 加载，复合 helper 由 `runtime/*.ep` 编译后一起注入 |
+| Runtime helper impl | `MirFunction` 注入，走正常 MIR→X64 lowering | ✅ MIR bundles 直接加载；标准 Epic runtime source 合并；`runtime/file.ep` 独立编译后注入 |
 | 注入策略 | 按需注入（`required_helpers` tracking） | ⚠️ 当前先加载 helper bundle，再按 MIR call reachability prune function；尚无显式 required_helpers 表 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ✅ `MirProgram.structs` 使用 `dict[str, MirStruct]`，字段为 `MirField` 列表 |
 | symbol contract | object model 使用 raw module symbol；`@` 只保留给未来 text MIR syntax | ✅ 当前 `MirFunction` / `MirExtern` / `MirGlobal` / `SymbolOperand` 都应存 raw name |

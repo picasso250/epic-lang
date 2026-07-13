@@ -391,7 +391,7 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` 在失败时返回空的 `u8[]`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 显式视为 `str`，不分配不复制。`bytes(str)` 同理。
+`read_file` 在失败时返回空的 `u8[]`。当前实现写在 `runtime/file.ep`，通过 `cptr(str/u8[])` 调用同步 WinAPI；`write_file` 返回 WinAPI 报告的写入字节数，打开失败返回 `-1`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 显式视为 `str`，不分配不复制。`bytes(str)` 同理。
 
 `str(bytes)` 与 `bytes(str)` 是显式的零拷贝 view 转换。它们连接文本与可变字节缓冲边界，但不会消除 `str` 这个独立源码类型。
 

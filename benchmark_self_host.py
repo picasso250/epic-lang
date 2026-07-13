@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES
+from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_HELPER_SOURCES, SELF_HOST_RUNTIME_SOURCES
 
 
 ROOT = Path(__file__).resolve().parent
@@ -96,6 +96,7 @@ def resolve_seed(requested: str | None) -> Path:
 def build_inputs(seed: Path) -> dict[str, Any]:
     compiler_sources = [path.replace("\\", "/") for path in SELF_HOST_COMPILER_SOURCES]
     runtime_sources = [path.replace("\\", "/") for path in SELF_HOST_RUNTIME_SOURCES]
+    runtime_sources.extend(path.replace("\\", "/") for path in SELF_HOST_RUNTIME_HELPER_SOURCES)
     runtime_sources.extend(RUNTIME_MIR_SOURCES)
     return {
         "schema": CACHE_SCHEMA,

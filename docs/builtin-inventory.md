@@ -10,7 +10,7 @@ This document describes the current compiler, not removed NASM-era code.
 | Reserved public names | `sema_is_reserved_func` in `src/sema.ep` |
 | Type checking | `src/sema.ep` |
 | MIR lowering | `src/ast_to_mir.ep` |
-| Runtime definitions | `runtime/mir/helpers.mir`, `runtime/*.ep`, injected through `src/mir_runtime.ep` |
+| Runtime definitions | MIR bundles plus Epic runtime sources, injected through `src/mir_runtime.ep` |
 
 The parser does not own builtin semantics or builtin-name reservation. Calls are parsed
 normally and builtin behavior is resolved during sema and MIR lowering.
@@ -105,14 +105,15 @@ categories include:
 - allocation, GC, and startup: `__ep_alloc`, collector helpers, `__ep_runtime_start`;
 - string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers; `cptr`/`cstr` require no runtime helper;
 - string operations used by syntax: equality, concatenation, and slicing;
-- file operations: `__ep_read_file`, `__ep_write_file`;
+- file operations: Epic implementations of `__ep_read_file` and `__ep_write_file` from `runtime/file.ep`;
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
 - panic and bounds/null failure paths.
 
-The self-hosted compiler loads the committed MIR helper bundle, merges helpers compiled
-from `runtime/*.ep`, and prunes unreachable functions. Reachability begins at
-`main`; startup and runtime dependencies are normal MIR calls. The x64 backend lowers
-this MIR and imports only the WinAPI symbols that remain reachable.
+The self-hosted compiler loads the committed MIR bundles and merges Epic runtime helpers.
+`runtime/array.ep`, `runtime/panic.ep`, and `runtime/str.ep` are standard sources merged
+before the user program. `runtime/file.ep` is parsed, checked, and lowered separately during
+MIR runtime injection so its private WinAPI declarations cannot collide with user externs.
+Reachability begins at `main`; unused helpers and imports are pruned before x64 lowering.
 
 ## Name reservation
 

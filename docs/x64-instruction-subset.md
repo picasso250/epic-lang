@@ -388,7 +388,9 @@ prunes unreachable functions.
 calls.
 
 Base helper bodies are bundled in `runtime/mir/helpers.mir`; composite helpers
-are written in `runtime/*.ep`. The self-hosted compiler consumes these sources.
+are written in Epic. Standard runtime sources are merged with user input, while
+`runtime/file.ep` is compiled separately during MIR injection to isolate its WinAPI
+extern declarations. The self-hosted compiler consumes all of these sources.
 The x64 layer owns only ABI lowering, program data emission, and WinAPI
 imports.
 

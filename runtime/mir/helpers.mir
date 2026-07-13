@@ -1,6 +1,6 @@
 extern void @ExitProcess(i64)
 
-extern i64 @GetStdHandle(i64)
+extern i64 @__ep_import$kernel32.dll$GetStdHandle(i64)
 
 extern i64 @GetProcessHeap()
 
@@ -12,15 +12,15 @@ extern i64 @HeapSize(i64, i64, ptr)
 
 extern void @GetCurrentThreadStackLimits(ptr, ptr)
 
-extern i64 @CreateFileA(i64, i64, i64, i64, i64, i64, i64)
+extern i64 @__ep_import$kernel32.dll$CreateFileA(i64, i64, i64, i64, i64, i64, i64)
 
-extern i64 @GetFileSize(i64, i64)
+extern i64 @__ep_import$kernel32.dll$GetFileSize(i64, i64)
 
-extern i64 @ReadFile(i64, i64, i64, i64, i64)
+extern i64 @__ep_import$kernel32.dll$ReadFile(i64, i64, i64, i64, i64)
 
-extern i64 @WriteFile(i64, i64, i64, i64, i64)
+extern i64 @__ep_import$kernel32.dll$WriteFile(i64, i64, i64, i64, i64)
 
-extern i64 @CloseHandle(i64)
+extern i64 @__ep_import$kernel32.dll$CloseHandle(i64)
 
 extern ptr @GetCommandLineA()
 
@@ -49,7 +49,7 @@ entry:
 
 define void @__ep_print_str(ptr %1) {
 entry:
-  %2: i64 = call i64 GetStdHandle(i64 -11)
+  %2: i64 = call i64 __ep_import$kernel32.dll$GetStdHandle(i64 -11)
   %3: ptr = gep struct str, ptr %1, i64 0, i64 0
   %4: ptr = load ptr, ptr %3
   %5: ptr = gep struct str, ptr %1, i64 0, i64 1
@@ -58,7 +58,7 @@ entry:
   %8: ptr = alloca i64
   store i64 0, ptr %8
   %9: i64 = ptrtoint ptr %8 to i64
-  %10: i64 = call i64 WriteFile(i64 %2, i64 %7, i64 %6, i64 %9, i64 0)
+  %10: i64 = call i64 __ep_import$kernel32.dll$WriteFile(i64 %2, i64 %7, i64 %6, i64 %9, i64 0)
   ret void
 }
 
@@ -88,7 +88,7 @@ entry:
   %4: ptr = gep struct str, ptr %1, i64 0, i64 0
   %5: ptr = load ptr, ptr %4
   %6: i64 = ptrtoint ptr %5 to i64
-  %7: i64 = call i64 CreateFileA(i64 %6, i64 1073741824, i64 0, i64 0, i64 2, i64 128, i64 0)
+  %7: i64 = call i64 __ep_import$kernel32.dll$CreateFileA(i64 %6, i64 1073741824, i64 0, i64 0, i64 2, i64 128, i64 0)
   %8: bool = icmp.eq i64 %7, i64 -1
   condbr bool %8, label %fail, label %write
 
@@ -101,8 +101,8 @@ write:
   %14: ptr = alloca i64
   store i64 0, ptr %14
   %15: i64 = ptrtoint ptr %14 to i64
-  %16: i64 = call i64 WriteFile(i64 %7, i64 %13, i64 %12, i64 %15, i64 0)
-  %17: i64 = call i64 CloseHandle(i64 %7)
+  %16: i64 = call i64 __ep_import$kernel32.dll$WriteFile(i64 %7, i64 %13, i64 %12, i64 %15, i64 0)
+  %17: i64 = call i64 __ep_import$kernel32.dll$CloseHandle(i64 %7)
   %18: i64 = load i64, ptr %14
   ret i64 %18
 
@@ -115,12 +115,12 @@ entry:
   %3: ptr = gep struct str, ptr %1, i64 0, i64 0
   %4: ptr = load ptr, ptr %3
   %5: i64 = ptrtoint ptr %4 to i64
-  %6: i64 = call i64 CreateFileA(i64 %5, i64 2147483648, i64 1, i64 0, i64 3, i64 128, i64 0)
+  %6: i64 = call i64 __ep_import$kernel32.dll$CreateFileA(i64 %5, i64 2147483648, i64 1, i64 0, i64 3, i64 128, i64 0)
   %7: bool = icmp.eq i64 %6, i64 -1
   condbr bool %7, label %empty, label %size
 
 size:
-  %8: i64 = call i64 GetFileSize(i64 %6, i64 0)
+  %8: i64 = call i64 __ep_import$kernel32.dll$GetFileSize(i64 %6, i64 0)
   %9: ptr = call ptr __ep_slice_u8_alloc(i64 %8, i64 %8)
   %10: bool = icmp.eq i64 %8, i64 0
   condbr bool %10, label %close_empty, label %read
@@ -132,15 +132,15 @@ read:
   %14: ptr = alloca i64
   store i64 0, ptr %14
   %15: i64 = ptrtoint ptr %14 to i64
-  %16: i64 = call i64 ReadFile(i64 %6, i64 %13, i64 %8, i64 %15, i64 0)
-  %17: i64 = call i64 CloseHandle(i64 %6)
+  %16: i64 = call i64 __ep_import$kernel32.dll$ReadFile(i64 %6, i64 %13, i64 %8, i64 %15, i64 0)
+  %17: i64 = call i64 __ep_import$kernel32.dll$CloseHandle(i64 %6)
   %18: i64 = load i64, ptr %14
   %19: ptr = gep struct _slice_u8, ptr %9, i64 0, i64 1
   store i64 %18, ptr %19
   ret ptr %9
 
 close_empty:
-  %20: i64 = call i64 CloseHandle(i64 %6)
+  %20: i64 = call i64 __ep_import$kernel32.dll$CloseHandle(i64 %6)
   ret ptr %9
 
 empty:

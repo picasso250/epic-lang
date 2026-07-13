@@ -6,6 +6,10 @@ SELF_HOST_RUNTIME_SOURCES = [
     "runtime/str.ep",
 ]
 
+SELF_HOST_RUNTIME_HELPER_SOURCES = [
+    "runtime/file.ep",
+]
+
 SELF_HOST_COMPILER_SOURCES = [
     "src/util.ep",
     "src/lexer.ep",

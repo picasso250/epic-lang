@@ -1056,7 +1056,7 @@ entry:
   %5: ptr = alloca i64
   store i64 0, ptr %5
   %6: i64 = ptrtoint ptr %5 to i64
-  %7: i64 = call i64 WriteFile(i64 %1, i64 %4, i64 %3, i64 %6, i64 0)
+  %7: i64 = call i64 __ep_import$kernel32.dll$WriteFile(i64 %1, i64 %4, i64 %3, i64 %6, i64 0)
   ret void
 }
 
@@ -1114,7 +1114,7 @@ write:
 
 define void @__ep_gc_print_stw(i64 %1) {
 entry:
-  %2: i64 = call i64 GetStdHandle(i64 -12)
+  %2: i64 = call i64 __ep_import$kernel32.dll$GetStdHandle(i64 -12)
   call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.prefix)
   call void __ep_gc_write_u64(i64 %2, i64 %1)
   call void __ep_gc_write_stderr_str(i64 %2, ptr str.gc.stw.suffix)
@@ -1128,7 +1128,7 @@ entry:
   condbr bool %2, label %done, label %print
 
 print:
-  %3: i64 = call i64 GetStdHandle(i64 -12)
+  %3: i64 = call i64 __ep_import$kernel32.dll$GetStdHandle(i64 -12)
   call void __ep_gc_write_stderr_str(i64 %3, ptr str.gc.alloc.total_count)
   %4: i64 = load i64, ptr gc_alloc_count
   call void __ep_gc_write_u64(i64 %3, i64 %4)

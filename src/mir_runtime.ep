@@ -30,16 +30,35 @@ fun mir_runtime_gc_bundle_path(): str {
     ret cstr_ready_path("runtime/mir/gc.mir")
 }
 
+fun mir_runtime_file_source_path(): str {
+    ret cstr_ready_path("runtime/file.ep")
+}
+
+fun mir_runtime_epic_helper_program(path: str): MirProgram {
+    let text = str(read_file(path))
+    let tokens = lex(text)
+    let parser = make_parser(tokens)
+    let ast = parser.parse_program()
+    let sema = make_sema_state()
+    sema_program(sema, ast)
+    ret mir_ast_to_mir(ast)
+}
+
 fun mir_runtime_helper_program(): MirProgram {
     let text = str(read_file(mir_runtime_helper_bundle_path()))
     let helpers = mrt_parse_program(text)
     let gc_text = str(read_file(mir_runtime_gc_bundle_path()))
     let gc = mrt_parse_program(gc_text)
+    let file = mir_runtime_epic_helper_program(mir_runtime_file_source_path())
     # GC definitions come first. The frozen v0 seed only knows helpers.mir,
-    # whose legacy allocator lets it build the first current generation. A
-    # current compiler sees gc.mir first and skips that duplicate allocator.
+    # whose legacy allocator and file helpers let it build the first current
+    # generation. A current compiler sees Epic helpers first and skips those
+    # duplicate MIR fallbacks.
+    gc.externs.extend(file.externs)
     gc.externs.extend(helpers.externs)
+    gc.globals.extend(file.globals)
     gc.globals.extend(helpers.globals)
+    gc.functions.extend(file.functions)
     gc.functions.extend(helpers.functions)
     ret gc
 }

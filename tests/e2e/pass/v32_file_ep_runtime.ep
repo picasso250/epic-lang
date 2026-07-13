@@ -1,0 +1,21 @@
+# EXIT: 0
+# STDOUT: true
+# CLEAN: test_file_ep_empty.bin
+# CLEAN: test_file_ep_binary.bin
+
+fun check(ok: bool): void {
+    if !ok { panic "Epic file runtime check failed" }
+}
+
+fun main(): void {
+    let empty = new u8[]
+    check(write_file("test_file_ep_empty.bin", empty) == 0)
+    check(len(read_file("test_file_ep_empty.bin")) == 0)
+
+    let binary = new u8[] { u8(0), u8(1), u8(255), u8(2) }
+    check(write_file("test_file_ep_binary.bin", binary) == 4)
+    let loaded = read_file("test_file_ep_binary.bin")
+    check(len(loaded) == 4)
+    check(loaded[0] == u8(0) && loaded[1] == u8(1) && loaded[2] == u8(255) && loaded[3] == u8(2))
+    println(str(true))
+}

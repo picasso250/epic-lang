@@ -5,17 +5,11 @@
 
 fun backend_abi_is_winapi(name: str): bool {
     if name == "ExitProcess" { ret true }
-    if name == "GetStdHandle" { ret true }
     if name == "GetProcessHeap" { ret true }
     if name == "HeapAlloc" { ret true }
     if name == "HeapFree" { ret true }
     if name == "HeapSize" { ret true }
     if name == "GetCurrentThreadStackLimits" { ret true }
-    if name == "CreateFileA" { ret true }
-    if name == "GetFileSize" { ret true }
-    if name == "ReadFile" { ret true }
-    if name == "WriteFile" { ret true }
-    if name == "CloseHandle" { ret true }
     if name == "GetCommandLineA" { ret true }
     ret false
 }
@@ -30,14 +24,10 @@ fun backend_abi_return_type(name: str): str {
 fun backend_abi_param_count(name: str): i64 {
     if name == "ExitProcess" { ret 1 }
     if name == "GetProcessHeap" || name == "GetCommandLineA" { ret 0 }
-    if name == "GetStdHandle" || name == "CloseHandle" { ret 1 }
-    if name == "GetFileSize" { ret 2 }
     if name == "HeapAlloc" { ret 3 }
     if name == "HeapFree" { ret 3 }
     if name == "HeapSize" { ret 3 }
     if name == "GetCurrentThreadStackLimits" { ret 2 }
-    if name == "CreateFileA" { ret 7 }
-    if name == "ReadFile" || name == "WriteFile" { ret 5 }
     ret 0 - 1
 }
 
