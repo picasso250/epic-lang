@@ -16,6 +16,7 @@ def main():
         ("layout_fixture.ep", "mir_to_x64_layout.exe", "dynamic struct GEP stride"),
         ("immediate_fixture.ep", "mir_to_x64_immediate.exe", "immediate-aware lowering"),
         ("direct_alloca_fixture.ep", "mir_to_x64_direct_alloca.exe", "direct alloca memory lowering"),
+        ("rax_residency_fixture.ep", "mir_to_x64_rax_residency.exe", "single-use rax result residency"),
         ("branch_fusion_fixture.ep", "mir_to_x64_branch_fusion.exe", "terminal compare branch fusion"),
         ("function_address_fixture.ep", "mir_to_x64_function_address.exe", "function address and callback ABI lowering"),
     ]

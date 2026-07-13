@@ -37,6 +37,8 @@ struct MirToX64Lower {
     timing_functions: i64
     timing_blocks: i64
     timing_instructions: i64
+    rax_value_id: i64
+    keep_result_in_rax: bool
 }
 
 fun mir_to_x64_lower_empty(): MirToX64Lower {
@@ -74,6 +76,8 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.timing_functions = 0
     lower.timing_blocks = 0
     lower.timing_instructions = 0
+    lower.rax_value_id = 0
+    lower.keep_result_in_rax = false
     ret lower
 }
 
@@ -279,6 +283,43 @@ fun mir_to_x64_count_block_local_uses(lower: MirToX64Lower, block: MirBlock): i6
     ret counts
 }
 
+fun mir_to_x64_operand_is_value(operand: MirOperand, value_id: i64): bool {
+    match operand {
+        MirValueOperand value: { ret value.value_id == value_id }
+        _: {}
+    }
+    ret false
+}
+
+fun mir_to_x64_inst_uses_value_from_rax(inst: MirInst, value_id: i64): bool {
+    if inst.op == "alloca" || inst.op == "call" || len(inst.operands) == 0 { ret false }
+    ret mir_to_x64_operand_is_value(inst.operands[0], value_id)
+}
+
+fun mir_to_x64_term_uses_value(term: MirTerminator, value_id: i64): bool {
+    match term {
+        MirCondBrTerminator cond: { ret mir_to_x64_operand_is_value(cond.cond, value_id) }
+        MirRetValueTerminator rv: { ret mir_to_x64_operand_is_value(rv.value, value_id) }
+        _: {}
+    }
+    ret false
+}
+
+fun mir_to_x64_should_keep_result_in_rax(lower: MirToX64Lower, block: MirBlock, inst_index: i64, counts: i64[], fused_icmp: bool): bool {
+    let inst = block.instructions[inst_index]
+    if inst.op == "alloca" || !inst.has_result || lower.reusable_values[inst.result_id] == 0 { ret false }
+    if counts[inst.result_id] != 1 { ret false }
+    if fused_icmp && inst_index == len(block.instructions) - 1 { ret false }
+    let next = inst_index + 1
+    for next < len(block.instructions) && block.instructions[next].op == "alloca" {
+        next += 1
+    }
+    if next < len(block.instructions) {
+        ret mir_to_x64_inst_uses_value_from_rax(block.instructions[next], inst.result_id)
+    }
+    ret mir_to_x64_term_uses_value(block.terminator, inst.result_id)
+}
+
 fun mir_to_x64_reuse_or_alloc_slot(lower: MirToX64Lower): i64 {
     if lower.free_value_slot_count > 0 {
         lower.free_value_slot_count -= 1
@@ -426,6 +467,18 @@ fun mir_to_x64_plan_slots(lower: MirToX64Lower, fn: MirFunction): void {
 }
 
 fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand): void {
+    if reg == "rax" {
+        match operand {
+            MirValueOperand value: {
+                if lower.rax_value_id == value.value_id {
+                    lower.rax_value_id = 0
+                    ret
+                }
+            }
+            _: {}
+        }
+        lower.rax_value_id = 0
+    }
     match operand {
         MirIntOperand value: {
             x64_add_inst2(lower.x64, 1, x64_reg(reg), x64_imm(value.value)) # x64 mov
@@ -480,6 +533,13 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
 }
 
 fun mir_to_x64_store_result(lower: MirToX64Lower, result_id: i64, reg: str): void {
+    if lower.keep_result_in_rax && reg == "rax" {
+        lower.rax_value_id = result_id
+        lower.keep_result_in_rax = false
+        ret
+    }
+    lower.rax_value_id = 0
+    lower.keep_result_in_rax = false
     x64_add_inst2(lower.x64, 1, x64_mem_base("rbp", mir_to_x64_value_slot(lower, result_id), 8), x64_reg(reg)) # x64 mov
 }
 
@@ -957,6 +1017,8 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     lower.free_value_slots = new i64[]
     lower.free_value_slot_count = 0
     lower.next_slot = 0
+    lower.rax_value_id = 0
+    lower.keep_result_in_rax = false
     let entry_label = new X64Label
     if fn.name == "main" {
         entry_label = x64_new_symbol_label(lower.x64, "_start")
@@ -1018,13 +1080,17 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
 
     for b: 0:len(fn.blocks) {
         lower.timing_blocks += 1
+        lower.rax_value_id = 0
+        lower.keep_result_in_rax = false
         x64_bind_label(lower.x64, mir_to_x64_block_label(lower, fn.blocks[b].name))
         let inst_start = mir_to_x64_now_ms()
         let fused_icmp = mir_to_x64_can_fuse_block_icmp(lower, fn.blocks[b])
+        let residency_use_counts = mir_to_x64_count_block_local_uses(lower, fn.blocks[b])
         let instruction_limit = len(fn.blocks[b].instructions)
         if fused_icmp { instruction_limit -= 1 }
         for j: 0:instruction_limit {
             lower.timing_instructions += 1
+            lower.keep_result_in_rax = mir_to_x64_should_keep_result_in_rax(lower, fn.blocks[b], j, residency_use_counts, fused_icmp)
             mir_to_x64_lower_inst(lower, fn.blocks[b].instructions[j])
         }
         if fused_icmp { lower.timing_instructions += 1 }

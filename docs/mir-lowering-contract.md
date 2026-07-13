@@ -112,6 +112,11 @@ aligned_frame = ((next_slot + 15) // 16) * 16
 
 函数局部 MIR value 使用正整数 ID。`value_slots`、`addr_slots`、临时槽标志、block-local use counts、可复用标志和 definition block 都是由最大 ID 定长后直接索引的数组；MIR→x64 不再维护 string-keyed map。
 
+`value_slot` 目前仍为每个 result 规划，但不保证一定物化。已证明 block-local、单次使用，且由
+下一条 instruction 的 operand 0 或 terminator 从 `rax` 消费的 result 会短暂驻留在 `rax`；
+对应 slot 不执行 store/load。跨 block value、多次使用 value、call 参数和需要稳定 GC home 的
+pointer result 继续物化。
+
 ## 4. Operand loading
 
 `_load_operand(reg, operand)` 将 MIR operand 的值加载到指定 x64 寄存器中。
@@ -126,6 +131,9 @@ aligned_frame = ((next_slot + 15) // 16) * 16
 | `ValueOperand(value_id)` — address slot | `lea reg, [rbp+slot]` |
 | `SymbolOperand("argv")` | `mov reg, [_argv]` |
 | `SymbolOperand(string_global)` | 构造 string header 到 reg（见下文） |
+
+当目标寄存器是 `rax`，且 lowering 记录的 resident value ID 与 operand 相同，加载不发射任何
+X64IR item，并消费该 residency 状态。
 
 ### 4.1 String global materialization
 
@@ -186,7 +194,7 @@ memory access type carries lane width and signed load behavior. MIR result value
 _load_operand("rax", operands[0])   # 左值
 _load_operand("rcx", operands[1])   # 右值
 ALU_op(rax, rcx)                    # 运算
-_store_result(inst.result, "rax")   # 结果存入 value_slot
+_store_result(inst.result, "rax")   # 通常存入 value_slot；满足 residency 条件时留在 rax
 ```
 
 | MIR op | x64 指令 | 说明 |

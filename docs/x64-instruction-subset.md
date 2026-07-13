@@ -137,7 +137,8 @@ ret
 - 每个 MIR 参数、临时 value、`alloca` address 都占 8 字节栈槽。
 - lowering 额外保留 8 个 scratch slots。
 - frame 大小按 `((next_slot + 15) // 16) * 16` 对齐。
-- 第一版不做寄存器分配。
+- block-local、单次使用且由下一条 instruction/terminator 从 `rax` 消费的 result 会短暂驻留
+  `rax`；其他 value 继续使用栈槽。
 
 ## 4. 当前 MIR lowering 覆盖
 
@@ -147,7 +148,7 @@ ret
 | --- | --- |
 | `alloca` | 只分配栈槽，不发指令。 |
 | `store` | operand -> `rax`，再 `mov [rbp+slot], rax`。 |
-| `load` | `mov rax, [rbp+slot]`，再存入结果栈槽。 |
+| `load` | `mov rax, [rbp+slot]`；结果通常存入栈槽，满足 residency 条件时保留在 `rax`。 |
 | `add/sub/and/or/xor` | 左值 -> `rax`，右值 -> `rcx`，二地址 ALU。 |
 | `mul` | `imul rax, rcx`。 |
 | `sdiv/srem` | `cqo; idiv rcx`，`srem` 取 `rdx`。 |

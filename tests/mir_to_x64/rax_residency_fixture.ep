@@ -1,0 +1,133 @@
+fun residency_result(op: str, result_id: i64, result_type: str, operands: MirOperand[]): MirInst {
+    let inst = mir_inst_empty()
+    inst.op = op
+    inst.result_id = result_id
+    inst.result_type = result_type
+    inst.has_result = true
+    inst.operands = operands
+    ret inst
+}
+
+fun residency_binary(op: str, result_id: i64, left: MirOperand, right: MirOperand): MirInst {
+    let operands = new MirOperand[]
+    operands.push(left)
+    operands.push(right)
+    ret residency_result(op, result_id, "i64", operands)
+}
+
+fun residency_unary(op: str, result_id: i64, result_type: str, operand: MirOperand): MirInst {
+    let operands = new MirOperand[]
+    operands.push(operand)
+    ret residency_result(op, result_id, result_type, operands)
+}
+
+fun residency_rbp_rax_store_count(program: X64Program): i64 {
+    let count = 0
+    for i: 0:len(program.items) {
+        match program.items[i] {
+            X64InstItem inst: {
+                if inst.op != 1 || len(inst.operands) != 2 { continue } # x64 mov
+                match inst.operands[0] {
+                    X64MemBaseOperand dst: {
+                        if dst.base != "rbp" || dst.size != 8 { continue }
+                        match inst.operands[1] {
+                            X64RegOperand src: { if src.name == "rax" { count += 1 } }
+                            _: {}
+                        }
+                    }
+                    _: {}
+                }
+            }
+            _: {}
+        }
+    }
+    ret count
+}
+
+fun residency_single_chain(): X64Program {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("single_chain", "i64")
+    fn.params.push(new MirParam { typ: "i64", value_id: 1 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(residency_binary("add", 2, mir_value_operand("i64", 1), mir_const_int("i64", 7)))
+    entry.instructions.push(residency_binary("sub", 3, mir_value_operand("i64", 2), mir_const_int("i64", 3)))
+    entry.terminator = mir_ret_value(mir_value_operand("i64", 3))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+    ret mir_to_x64_lower_function_with_program(program, fn)
+}
+
+fun residency_right_operand(): X64Program {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("right_operand", "i64")
+    fn.params.push(new MirParam { typ: "i64", value_id: 1 })
+    fn.params.push(new MirParam { typ: "i64", value_id: 2 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(residency_binary("add", 3, mir_value_operand("i64", 1), mir_const_int("i64", 7)))
+    entry.instructions.push(residency_binary("add", 4, mir_value_operand("i64", 2), mir_value_operand("i64", 3)))
+    entry.terminator = mir_ret_value(mir_value_operand("i64", 4))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+    ret mir_to_x64_lower_function_with_program(program, fn)
+}
+
+fun residency_multiple_uses(): X64Program {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("multiple_uses", "i64")
+    fn.params.push(new MirParam { typ: "i64", value_id: 1 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(residency_binary("add", 2, mir_value_operand("i64", 1), mir_const_int("i64", 1)))
+    entry.instructions.push(residency_binary("add", 3, mir_value_operand("i64", 2), mir_const_int("i64", 2)))
+    entry.instructions.push(residency_binary("add", 4, mir_value_operand("i64", 2), mir_value_operand("i64", 3)))
+    entry.terminator = mir_ret_value(mir_value_operand("i64", 4))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+    ret mir_to_x64_lower_function_with_program(program, fn)
+}
+
+fun residency_pointer_result(): X64Program {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("pointer_result", "i64")
+    fn.params.push(new MirParam { typ: "i64", value_id: 1 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(residency_unary("inttoptr", 2, "ptr", mir_value_operand("i64", 1)))
+    entry.instructions.push(residency_unary("ptrtoint", 3, "i64", mir_value_operand("ptr", 2)))
+    entry.terminator = mir_ret_value(mir_value_operand("i64", 3))
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+    ret mir_to_x64_lower_function_with_program(program, fn)
+}
+
+fun residency_cross_block(): X64Program {
+    let program = mir_program_empty()
+    let fn = mir_function_empty("cross_block", "i64")
+    fn.params.push(new MirParam { typ: "i64", value_id: 1 })
+    let entry = mir_block_empty("entry")
+    entry.instructions.push(residency_binary("add", 2, mir_value_operand("i64", 1), mir_const_int("i64", 1)))
+    entry.terminator = mir_br("next")
+    entry.has_terminator = true
+    let next = mir_block_empty("next")
+    next.terminator = mir_ret_value(mir_value_operand("i64", 2))
+    next.has_terminator = true
+    fn.blocks.push(entry)
+    fn.blocks.push(next)
+    ret mir_to_x64_lower_function_with_program(program, fn)
+}
+
+fun main(): void {
+    if residency_rbp_rax_store_count(residency_single_chain()) != 0 {
+        panic "single-use immediate rax consumers must keep results in rax"
+    }
+    if residency_rbp_rax_store_count(residency_right_operand()) != 1 {
+        panic "right-operand consumers must retain the result home"
+    }
+    if residency_rbp_rax_store_count(residency_multiple_uses()) != 2 {
+        panic "multiple-use values must retain their result homes"
+    }
+    if residency_rbp_rax_store_count(residency_pointer_result()) != 1 {
+        panic "managed pointer results must retain stable stack homes"
+    }
+    if residency_rbp_rax_store_count(residency_cross_block()) != 1 {
+        panic "cross-block values must retain their result homes"
+    }
+}
