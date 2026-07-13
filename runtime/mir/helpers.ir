@@ -6,6 +6,8 @@ declare i64 @__ep_import$kernel32.dll$WriteFile(ptr, ptr, i64, ptr, ptr)
 
 declare ptr @__ep_import$kernel32.dll$GetCommandLineA()
 
+declare void @__ep_import$kernel32.dll$RtlMoveMemory(ptr, ptr, i64)
+
 global @argv: ptr
 
 global @str.runtime.newline: ptr = bytes "\n"
@@ -15,8 +17,6 @@ global @str.runtime.slice.oob: ptr = bytes "slice index out of bounds"
 global @str.runtime.null.deref: ptr = bytes "runtime trap: null deref"
 
 global @str.runtime.panic.prefix: ptr = bytes "runtime panic: "
-
-global @str.runtime.array.slice.panic.prefix: ptr = bytes "panic line 5: "
 
 define void @__ep_print_str(ptr %1) {
 entry:
@@ -71,7 +71,7 @@ entry:
   %3: ptr = alloca ptr
   %4: ptr = alloca i64
   %5: ptr = alloca i64
-  %6: ptr = call ptr __ep_slice_ptr_new(i64 0)
+  %6: ptr = call ptr __ep_slice_new(i64 0, i64 8)
   store ptr %1, ptr %2
   br label %skip_check
 
@@ -149,136 +149,98 @@ store_arg:
   store i64 %26, ptr %29
   %30: ptr = gep ptr, ptr %27, i64 2
   store i64 %26, ptr %30
-  call void __ep_slice_ptr_push(ptr %6, ptr %27)
+  %31: ptr = call ptr __ep_slice_push_slot(ptr %6, i64 8)
+  store ptr %27, ptr %31
   br label %skip_check
 
 done:
   ret ptr %6
 }
 
-define ptr @__ep_slice_u8_alloc(i64 %1, i64 %2) {
+define ptr @__ep_slice_new(i64 %1, i64 %2) {
 entry:
   %3: ptr = call ptr __ep_alloc(i64 24)
-  %4: bool = icmp.eq i64 %2, i64 0
-  condbr bool %4, label %data_zero, label %data_alloc
+  %4: i64 = mul i64 %1, i64 %2
+  %5: bool = icmp.eq i64 %4, i64 0
+  condbr bool %5, label %data_zero, label %data_alloc
 
 data_zero:
-  %5: ptr = gep struct _slice_u8, ptr %3, i64 0, i64 0
-  store ptr null, ptr %5
+  %6: ptr = gep struct _slice, ptr %3, i64 0, i64 0
+  store ptr null, ptr %6
   br label %init
 
 data_alloc:
-  %6: ptr = call ptr __ep_alloc(i64 %2)
-  %7: ptr = gep struct _slice_u8, ptr %3, i64 0, i64 0
-  store ptr %6, ptr %7
+  %7: ptr = call ptr __ep_alloc(i64 %4)
+  %8: ptr = gep struct _slice, ptr %3, i64 0, i64 0
+  store ptr %7, ptr %8
   br label %init
 
 init:
-  %8: ptr = gep struct _slice_u8, ptr %3, i64 0, i64 1
-  store i64 %1, ptr %8
-  %9: ptr = gep struct _slice_u8, ptr %3, i64 0, i64 2
-  store i64 %2, ptr %9
+  %9: ptr = gep struct _slice, ptr %3, i64 0, i64 1
+  store i64 %1, ptr %9
+  %10: ptr = gep struct _slice, ptr %3, i64 0, i64 2
+  store i64 %1, ptr %10
   ret ptr %3
 }
 
-define i64 @__ep_slice_u8_get(ptr %1, i64 %2) {
+define void @__ep_slice_reserve(ptr %1, i64 %2, i64 %3) {
 entry:
-  %3: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: bool = icmp.sge i64 %2, i64 0
-  condbr bool %5, label %check_high, label %fail
+  %4: ptr = gep struct _slice, ptr %1, i64 0, i64 2
+  %5: i64 = load i64, ptr %4
+  %6: bool = icmp.sge i64 %5, i64 %2
+  condbr bool %6, label %done, label %grow_init
 
-check_high:
-  %6: bool = icmp.slt i64 %2, i64 %4
-  condbr bool %6, label %ok, label %fail
+grow_init:
+  %7: ptr = alloca i64
+  %8: bool = icmp.eq i64 %5, i64 0
+  condbr bool %8, label %grow_zero, label %grow_current
 
-ok:
-  %7: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 0
-  %8: ptr = load ptr, ptr %7
-  %9: ptr = gep i8, ptr %8, i64 %2
-  %10: i64 = load i8, ptr %9
-  ret i64 %10
+grow_zero:
+  store i64 4, ptr %7
+  br label %grow_check
 
-fail:
-  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret i64 0
+grow_current:
+  store i64 %5, ptr %7
+  br label %grow_check
+
+grow_check:
+  %9: i64 = load i64, ptr %7
+  %10: bool = icmp.slt i64 %9, i64 %2
+  condbr bool %10, label %grow_double, label %grow_alloc
+
+grow_double:
+  %11: i64 = add i64 %9, i64 %9
+  store i64 %11, ptr %7
+  br label %grow_check
+
+grow_alloc:
+  %12: i64 = mul i64 %9, i64 %3
+  %13: ptr = call ptr __ep_alloc(i64 %12)
+  %14: ptr = gep struct _slice, ptr %1, i64 0, i64 1
+  %15: i64 = load i64, ptr %14
+  %16: bool = icmp.eq i64 %15, i64 0
+  condbr bool %16, label %swap, label %copy
+
+copy:
+  %17: ptr = gep struct _slice, ptr %1, i64 0, i64 0
+  %18: ptr = load ptr, ptr %17
+  %19: i64 = mul i64 %15, i64 %3
+  call void __ep_import$kernel32.dll$RtlMoveMemory(ptr %13, ptr %18, i64 %19)
+  br label %swap
+
+swap:
+  %20: ptr = gep struct _slice, ptr %1, i64 0, i64 0
+  store ptr %13, ptr %20
+  store i64 %9, ptr %4
+  br label %done
+
+done:
+  ret void
 }
 
-define i64 @__ep_slice_u8_pop(ptr %1) {
+define ptr @__ep_slice_at(ptr %1, i64 %2, i64 %3) {
 entry:
-  %2: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
-  %3: i64 = load i64, ptr %2
-  %4: bool = icmp.sgt i64 %3, i64 0
-  condbr bool %4, label %ok, label %fail
-
-ok:
-  %5: i64 = sub i64 %3, i64 1
-  %6: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 0
-  %7: ptr = load ptr, ptr %6
-  %8: ptr = gep i8, ptr %7, i64 %5
-  %9: i64 = load i8, ptr %8
-  store i64 %5, ptr %2
-  ret i64 %9
-
-fail:
-  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret i64 0
-}
-
-define ptr @__ep_slice_i64_new(i64 %1) {
-entry:
-  %2: ptr = call ptr __ep_alloc(i64 24)
-  %3: bool = icmp.eq i64 %1, i64 0
-  condbr bool %3, label %data_zero, label %data_alloc
-
-data_zero:
-  %4: ptr = gep ptr, ptr %2, i64 0
-  store ptr null, ptr %4
-  br label %init
-
-data_alloc:
-  %5: i64 = add i64 %1, i64 %1
-  %6: i64 = add i64 %5, i64 %5
-  %7: i64 = add i64 %6, i64 %6
-  %8: ptr = call ptr __ep_alloc(i64 %7)
-  %9: ptr = gep ptr, ptr %2, i64 0
-  store ptr %8, ptr %9
-  br label %init
-
-init:
-  %10: ptr = gep ptr, ptr %2, i64 1
-  store i64 %1, ptr %10
-  %11: ptr = gep ptr, ptr %2, i64 2
-  store i64 %1, ptr %11
-  ret ptr %2
-}
-
-define i64 @__ep_slice_i64_get(ptr %1, i64 %2) {
-entry:
-  %3: ptr = gep ptr, ptr %1, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: bool = icmp.sge i64 %2, i64 0
-  condbr bool %5, label %check_high, label %fail
-
-check_high:
-  %6: bool = icmp.slt i64 %2, i64 %4
-  condbr bool %6, label %ok, label %fail
-
-ok:
-  %7: ptr = gep ptr, ptr %1, i64 0
-  %8: ptr = load ptr, ptr %7
-  %9: ptr = gep ptr, ptr %8, i64 %2
-  %10: i64 = load i64, ptr %9
-  ret i64 %10
-
-fail:
-  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret i64 0
-}
-
-define void @__ep_slice_i64_set(ptr %1, i64 %2, i64 %3) {
-entry:
-  %4: ptr = gep ptr, ptr %1, i64 1
+  %4: ptr = gep struct _slice, ptr %1, i64 0, i64 1
   %5: i64 = load i64, ptr %4
   %6: bool = icmp.sge i64 %2, i64 0
   condbr bool %6, label %check_high, label %fail
@@ -288,152 +250,45 @@ check_high:
   condbr bool %7, label %ok, label %fail
 
 ok:
-  %8: ptr = gep ptr, ptr %1, i64 0
+  %8: ptr = gep struct _slice, ptr %1, i64 0, i64 0
   %9: ptr = load ptr, ptr %8
-  %10: ptr = gep ptr, ptr %9, i64 %2
-  store i64 %3, ptr %10
-  ret void
+  %10: i64 = mul i64 %2, i64 %3
+  %11: ptr = gep i8, ptr %9, i64 %10
+  ret ptr %11
 
 fail:
   call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret void
+  ret ptr null
 }
 
-define void @__ep_slice_i64_push(ptr %1, i64 %2) {
+define ptr @__ep_slice_push_slot(ptr %1, i64 %2) {
 entry:
-  %3: ptr = gep ptr, ptr %1, i64 1
+  %3: ptr = gep struct _slice, ptr %1, i64 0, i64 1
   %4: i64 = load i64, ptr %3
-  %5: ptr = gep ptr, ptr %1, i64 2
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.sge i64 %4, i64 %6
-  condbr bool %7, label %grow, label %store
-
-grow:
-  %8: ptr = alloca i64
-  %9: ptr = alloca ptr
-  %10: ptr = alloca i64
-  %11: bool = icmp.eq i64 %6, i64 0
-  condbr bool %11, label %grow_zero, label %grow_double
-
-store:
-  %12: ptr = gep ptr, ptr %1, i64 0
-  %13: ptr = load ptr, ptr %12
-  %14: ptr = gep ptr, ptr %13, i64 %4
-  store i64 %2, ptr %14
-  %15: i64 = add i64 %4, i64 1
-  store i64 %15, ptr %3
-  ret void
-
-grow_zero:
-  store i64 4, ptr %8
-  %16: ptr = call ptr __ep_alloc(i64 32)
-  store ptr %16, ptr %9
-  br label %copy_entry
-
-grow_double:
-  %17: i64 = add i64 %6, i64 %6
-  store i64 %17, ptr %8
-  %18: i64 = add i64 %17, i64 %17
-  %19: i64 = add i64 %18, i64 %18
-  %20: i64 = add i64 %19, i64 %19
-  %21: ptr = call ptr __ep_alloc(i64 %20)
-  store ptr %21, ptr %9
-  br label %copy_entry
-
-copy_entry:
-  %22: ptr = gep ptr, ptr %1, i64 0
-  %23: ptr = load ptr, ptr %22
-  %24: ptr = load ptr, ptr %9
-  store i64 0, ptr %10
-  br label %copy_check
-
-copy_check:
-  %25: i64 = load i64, ptr %10
-  %26: bool = icmp.slt i64 %25, i64 %4
-  condbr bool %26, label %copy_body, label %swap
-
-copy_body:
-  %27: ptr = gep ptr, ptr %23, i64 %25
-  %28: i64 = load i64, ptr %27
-  %29: ptr = gep ptr, ptr %24, i64 %25
-  store i64 %28, ptr %29
-  %30: i64 = add i64 %25, i64 1
-  store i64 %30, ptr %10
-  br label %copy_check
-
-swap:
-  %31: ptr = gep ptr, ptr %1, i64 0
-  store ptr %24, ptr %31
-  %32: i64 = load i64, ptr %8
-  store i64 %32, ptr %5
-  br label %store
-}
-
-define i64 @__ep_slice_i64_pop(ptr %1) {
-entry:
-  %2: ptr = gep ptr, ptr %1, i64 1
-  %3: i64 = load i64, ptr %2
-  %4: bool = icmp.sgt i64 %3, i64 0
-  condbr bool %4, label %ok, label %fail
-
-ok:
-  %5: i64 = sub i64 %3, i64 1
-  %6: ptr = gep ptr, ptr %1, i64 0
+  %5: i64 = add i64 %4, i64 1
+  call void __ep_slice_reserve(ptr %1, i64 %5, i64 %2)
+  %6: ptr = gep struct _slice, ptr %1, i64 0, i64 0
   %7: ptr = load ptr, ptr %6
-  %8: ptr = gep ptr, ptr %7, i64 %5
-  %9: i64 = load i64, ptr %8
-  store i64 %5, ptr %2
-  ret i64 %9
-
-fail:
-  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret i64 0
+  %8: i64 = mul i64 %4, i64 %2
+  %9: ptr = gep i8, ptr %7, i64 %8
+  store i64 %5, ptr %3
+  ret ptr %9
 }
 
-define ptr @__ep_slice_ptr_new(i64 %1) {
+define ptr @__ep_slice_pop_slot(ptr %1, i64 %2) {
 entry:
-  %2: ptr = call ptr __ep_alloc(i64 24)
-  %3: bool = icmp.eq i64 %1, i64 0
-  condbr bool %3, label %data_zero, label %data_alloc
-
-data_zero:
-  %4: ptr = gep ptr, ptr %2, i64 0
-  store ptr null, ptr %4
-  br label %init
-
-data_alloc:
-  %5: i64 = add i64 %1, i64 %1
-  %6: i64 = add i64 %5, i64 %5
-  %7: i64 = add i64 %6, i64 %6
-  %8: ptr = call ptr __ep_alloc(i64 %7)
-  %9: ptr = gep ptr, ptr %2, i64 0
-  store ptr %8, ptr %9
-  br label %init
-
-init:
-  %10: ptr = gep ptr, ptr %2, i64 1
-  store i64 %1, ptr %10
-  %11: ptr = gep ptr, ptr %2, i64 2
-  store i64 %1, ptr %11
-  ret ptr %2
-}
-
-define ptr @__ep_slice_ptr_get(ptr %1, i64 %2) {
-entry:
-  %3: ptr = gep ptr, ptr %1, i64 1
+  %3: ptr = gep struct _slice, ptr %1, i64 0, i64 1
   %4: i64 = load i64, ptr %3
-  %5: bool = icmp.sge i64 %2, i64 0
-  condbr bool %5, label %check_high, label %fail
-
-check_high:
-  %6: bool = icmp.slt i64 %2, i64 %4
-  condbr bool %6, label %ok, label %fail
+  %5: bool = icmp.sgt i64 %4, i64 0
+  condbr bool %5, label %ok, label %fail
 
 ok:
-  %7: ptr = gep ptr, ptr %1, i64 0
+  %6: i64 = sub i64 %4, i64 1
+  %7: ptr = gep struct _slice, ptr %1, i64 0, i64 0
   %8: ptr = load ptr, ptr %7
-  %9: ptr = gep ptr, ptr %8, i64 %2
-  %10: ptr = load ptr, ptr %9
+  %9: i64 = mul i64 %6, i64 %2
+  %10: ptr = gep i8, ptr %8, i64 %9
+  store i64 %6, ptr %3
   ret ptr %10
 
 fail:
@@ -441,240 +296,71 @@ fail:
   ret ptr null
 }
 
-define void @__ep_slice_ptr_set(ptr %1, i64 %2, ptr %3) {
+define void @__ep_slice_extend(ptr %1, ptr %2, i64 %3) {
 entry:
-  %4: ptr = gep ptr, ptr %1, i64 1
+  %4: ptr = gep struct _slice, ptr %2, i64 0, i64 1
   %5: i64 = load i64, ptr %4
-  %6: bool = icmp.sge i64 %2, i64 0
-  condbr bool %6, label %check_high, label %fail
+  %6: bool = icmp.eq i64 %5, i64 0
+  condbr bool %6, label %done, label %prepare
 
-check_high:
-  %7: bool = icmp.slt i64 %2, i64 %5
-  condbr bool %7, label %ok, label %fail
-
-ok:
-  %8: ptr = gep ptr, ptr %1, i64 0
-  %9: ptr = load ptr, ptr %8
-  %10: ptr = gep ptr, ptr %9, i64 %2
-  store ptr %3, ptr %10
-  ret void
-
-fail:
-  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret void
-}
-
-define void @__ep_slice_ptr_push(ptr %1, ptr %2) {
-entry:
-  %3: ptr = gep ptr, ptr %1, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: ptr = gep ptr, ptr %1, i64 2
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.sge i64 %4, i64 %6
-  condbr bool %7, label %grow, label %store
-
-grow:
-  %8: ptr = alloca i64
-  %9: ptr = alloca ptr
-  %10: ptr = alloca i64
-  %11: bool = icmp.eq i64 %6, i64 0
-  condbr bool %11, label %grow_zero, label %grow_double
-
-store:
-  %12: ptr = gep ptr, ptr %1, i64 0
+prepare:
+  %7: ptr = gep struct _slice, ptr %2, i64 0, i64 0
+  %8: ptr = load ptr, ptr %7
+  %9: ptr = gep struct _slice, ptr %1, i64 0, i64 1
+  %10: i64 = load i64, ptr %9
+  %11: i64 = add i64 %10, i64 %5
+  call void __ep_slice_reserve(ptr %1, i64 %11, i64 %3)
+  %12: ptr = gep struct _slice, ptr %1, i64 0, i64 0
   %13: ptr = load ptr, ptr %12
-  %14: ptr = gep ptr, ptr %13, i64 %4
-  store ptr %2, ptr %14
-  %15: i64 = add i64 %4, i64 1
-  store i64 %15, ptr %3
-  ret void
-
-grow_zero:
-  store i64 4, ptr %8
-  %16: ptr = call ptr __ep_alloc(i64 32)
-  store ptr %16, ptr %9
-  br label %copy_entry
-
-grow_double:
-  %17: i64 = add i64 %6, i64 %6
-  store i64 %17, ptr %8
-  %18: i64 = add i64 %17, i64 %17
-  %19: i64 = add i64 %18, i64 %18
-  %20: i64 = add i64 %19, i64 %19
-  %21: ptr = call ptr __ep_alloc(i64 %20)
-  store ptr %21, ptr %9
-  br label %copy_entry
-
-copy_entry:
-  %22: ptr = gep ptr, ptr %1, i64 0
-  %23: ptr = load ptr, ptr %22
-  %24: ptr = load ptr, ptr %9
-  store i64 0, ptr %10
-  br label %copy_check
-
-copy_check:
-  %25: i64 = load i64, ptr %10
-  %26: bool = icmp.slt i64 %25, i64 %4
-  condbr bool %26, label %copy_body, label %swap
-
-copy_body:
-  %27: ptr = gep ptr, ptr %23, i64 %25
-  %28: ptr = load ptr, ptr %27
-  %29: ptr = gep ptr, ptr %24, i64 %25
-  store ptr %28, ptr %29
-  %30: i64 = add i64 %25, i64 1
-  store i64 %30, ptr %10
-  br label %copy_check
-
-swap:
-  %31: ptr = gep ptr, ptr %1, i64 0
-  store ptr %24, ptr %31
-  %32: i64 = load i64, ptr %8
-  store i64 %32, ptr %5
-  br label %store
-}
-
-define ptr @__ep_slice_ptr_pop(ptr %1) {
-entry:
-  %2: ptr = gep ptr, ptr %1, i64 1
-  %3: i64 = load i64, ptr %2
-  %4: bool = icmp.sgt i64 %3, i64 0
-  condbr bool %4, label %ok, label %fail
-
-ok:
-  %5: i64 = sub i64 %3, i64 1
-  %6: ptr = gep ptr, ptr %1, i64 0
-  %7: ptr = load ptr, ptr %6
-  %8: ptr = gep ptr, ptr %7, i64 %5
-  %9: ptr = load ptr, ptr %8
-  store i64 %5, ptr %2
-  ret ptr %9
-
-fail:
-  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
-  ret ptr null
-}
-
-define void @__ep_slice_ptr_extend(ptr %1, ptr %2) {
-entry:
-  %3: ptr = gep ptr, ptr %2, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: ptr = alloca i64
-  store i64 0, ptr %5
-  br label %loop_check
-
-loop_check:
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.slt i64 %6, i64 %4
-  condbr bool %7, label %loop_body, label %done
-
-loop_body:
-  %8: ptr = call ptr __ep_slice_ptr_get(ptr %2, i64 %6)
-  call void __ep_slice_ptr_push(ptr %1, ptr %8)
-  %9: i64 = add i64 %6, i64 1
-  store i64 %9, ptr %5
-  br label %loop_check
+  %14: i64 = mul i64 %10, i64 %3
+  %15: ptr = gep i8, ptr %13, i64 %14
+  %16: i64 = mul i64 %5, i64 %3
+  call void __ep_import$kernel32.dll$RtlMoveMemory(ptr %15, ptr %8, i64 %16)
+  store i64 %11, ptr %9
+  br label %done
 
 done:
   ret void
 }
 
-define void @__ep_slice_u8_set(ptr %1, i64 %2, i64 %3) {
+define ptr @__ep_slice_copy_range(ptr %1, i64 %2, i64 %3, i64 %4) {
 entry:
-  %4: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
-  %5: i64 = load i64, ptr %4
-  %6: bool = icmp.sge i64 %2, i64 0
-  condbr bool %6, label %check_high, label %fail
+  %5: bool = icmp.slt i64 %2, i64 0
+  condbr bool %5, label %fail, label %check_order
+
+check_order:
+  %6: bool = icmp.slt i64 %3, i64 %2
+  condbr bool %6, label %fail, label %check_high
 
 check_high:
-  %7: bool = icmp.slt i64 %2, i64 %5
-  condbr bool %7, label %ok, label %fail
-
-ok:
-  %8: ptr = alloca i64
-  store i64 %3, ptr %8
-  %9: i8 = load i8, ptr %8
-  %10: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 0
-  %11: ptr = load ptr, ptr %10
-  %12: ptr = gep i8, ptr %11, i64 %2
-  store i8 %9, ptr %12
-  ret void
+  %7: ptr = gep struct _slice, ptr %1, i64 0, i64 1
+  %8: i64 = load i64, ptr %7
+  %9: bool = icmp.sgt i64 %3, i64 %8
+  condbr bool %9, label %fail, label %init
 
 fail:
-  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
-  ret void
-}
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
+  ret ptr null
 
-define void @__ep_slice_u8_push(ptr %1, i64 %2) {
-entry:
-  %3: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 2
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.sge i64 %4, i64 %6
-  condbr bool %7, label %grow, label %store
+init:
+  %10: i64 = sub i64 %3, i64 %2
+  %11: ptr = call ptr __ep_slice_new(i64 %10, i64 %4)
+  %12: bool = icmp.eq i64 %10, i64 0
+  condbr bool %12, label %done, label %copy
 
-grow:
-  %8: ptr = alloca i64
-  %9: ptr = alloca ptr
-  %10: ptr = alloca i64
-  %11: bool = icmp.eq i64 %6, i64 0
-  condbr bool %11, label %grow_zero, label %grow_double
+copy:
+  %13: ptr = gep struct _slice, ptr %1, i64 0, i64 0
+  %14: ptr = load ptr, ptr %13
+  %15: i64 = mul i64 %2, i64 %4
+  %16: ptr = gep i8, ptr %14, i64 %15
+  %17: ptr = gep struct _slice, ptr %11, i64 0, i64 0
+  %18: ptr = load ptr, ptr %17
+  %19: i64 = mul i64 %10, i64 %4
+  call void __ep_import$kernel32.dll$RtlMoveMemory(ptr %18, ptr %16, i64 %19)
+  br label %done
 
-store:
-  %12: ptr = alloca i64
-  store i64 %2, ptr %12
-  %13: i8 = load i8, ptr %12
-  %14: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 0
-  %15: ptr = load ptr, ptr %14
-  %16: ptr = gep i8, ptr %15, i64 %4
-  store i8 %13, ptr %16
-  %17: i64 = add i64 %4, i64 1
-  %18: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
-  store i64 %17, ptr %18
-  ret void
-
-grow_zero:
-  store i64 4, ptr %8
-  %19: ptr = call ptr __ep_alloc(i64 4)
-  store ptr %19, ptr %9
-  condbr bool %11, label %copy_entry, label %copy_entry
-
-grow_double:
-  %20: i64 = add i64 %6, i64 %6
-  store i64 %20, ptr %8
-  %21: ptr = call ptr __ep_alloc(i64 %20)
-  store ptr %21, ptr %9
-  condbr bool %11, label %copy_entry, label %copy_entry
-
-copy_entry:
-  %22: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 0
-  %23: ptr = load ptr, ptr %22
-  %24: ptr = load ptr, ptr %9
-  store i64 0, ptr %10
-  condbr bool %11, label %copy_check, label %copy_check
-
-copy_check:
-  %25: i64 = load i64, ptr %10
-  %26: bool = icmp.slt i64 %25, i64 %4
-  condbr bool %26, label %copy_body, label %swap
-
-copy_body:
-  %27: ptr = gep i8, ptr %23, i64 %25
-  %28: i8 = load i8, ptr %27
-  %29: ptr = gep i8, ptr %24, i64 %25
-  store i8 %28, ptr %29
-  %30: i64 = add i64 %25, i64 1
-  store i64 %30, ptr %10
-  condbr bool %11, label %copy_check, label %copy_check
-
-swap:
-  %31: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 0
-  store ptr %24, ptr %31
-  %32: i64 = load i64, ptr %8
-  %33: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 2
-  store i64 %32, ptr %33
-  condbr bool %11, label %store, label %store
+done:
+  ret ptr %11
 }
 
 define void @__ep_runtime_panic(ptr %1) {
@@ -683,97 +369,5 @@ entry:
   call void __ep_print_str(ptr %1)
   call void __ep_print_newline()
   call void __ep_import$kernel32.dll$ExitProcess(i64 1)
-  ret void
-}
-
-define ptr @__ep_slice_u8_slice(ptr %1, i64 %2, i64 %3) {
-entry:
-  %4: bool = icmp.slt i64 %2, i64 0
-  condbr bool %4, label %fail, label %check_order
-
-check_order:
-  %5: bool = icmp.slt i64 %3, i64 %2
-  condbr bool %5, label %fail, label %check_high
-
-check_high:
-  %6: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
-  %7: i64 = load i64, ptr %6
-  %8: bool = icmp.sgt i64 %3, i64 %7
-  condbr bool %8, label %fail, label %init
-
-fail:
-  call void __ep_print_str(ptr str.runtime.array.slice.panic.prefix)
-  call void __ep_print_str(ptr str.runtime.slice.oob)
-  call void __ep_print_newline()
-  call void __ep_import$kernel32.dll$ExitProcess(i64 1)
-  ret ptr null
-
-init:
-  %9: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
-  %10: ptr = alloca i64
-  store i64 %2, ptr %10
-  br label %loop
-
-loop:
-  %11: i64 = load i64, ptr %10
-  %12: bool = icmp.slt i64 %11, i64 %3
-  condbr bool %12, label %copy, label %done
-
-copy:
-  %13: i64 = call i64 __ep_slice_u8_get(ptr %1, i64 %11)
-  call void __ep_slice_u8_push(ptr %9, i64 %13)
-  %14: i64 = add i64 %11, i64 1
-  store i64 %14, ptr %10
-  br label %loop
-
-done:
-  ret ptr %9
-}
-
-define void @__ep_slice_u8_extend(ptr %1, ptr %2) {
-entry:
-  %3: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: ptr = alloca i64
-  store i64 0, ptr %5
-  br label %loop
-
-loop:
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.slt i64 %6, i64 %4
-  condbr bool %7, label %copy, label %done
-
-copy:
-  %8: i64 = call i64 __ep_slice_u8_get(ptr %2, i64 %6)
-  call void __ep_slice_u8_push(ptr %1, i64 %8)
-  %9: i64 = add i64 %6, i64 1
-  store i64 %9, ptr %5
-  br label %loop
-
-done:
-  ret void
-}
-
-define void @__ep_slice_i64_extend(ptr %1, ptr %2) {
-entry:
-  %3: ptr = gep struct _slice_i64, ptr %2, i64 0, i64 1
-  %4: i64 = load i64, ptr %3
-  %5: ptr = alloca i64
-  store i64 0, ptr %5
-  br label %loop
-
-loop:
-  %6: i64 = load i64, ptr %5
-  %7: bool = icmp.slt i64 %6, i64 %4
-  condbr bool %7, label %copy, label %done
-
-copy:
-  %8: i64 = call i64 __ep_slice_i64_get(ptr %2, i64 %6)
-  call void __ep_slice_i64_push(ptr %1, i64 %8)
-  %9: i64 = add i64 %6, i64 1
-  store i64 %9, ptr %5
-  br label %loop
-
-done:
   ret void
 }

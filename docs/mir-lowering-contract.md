@@ -376,8 +376,9 @@ global；`__ep_alloc` 直接读取 cached heap，随后与普通函数一样 low
 Helpers such as `__ep_alloc`, `__ep_print_str`, `__ep_print_newline`,
 `__ep_str_from_bool`,
 `__ep_str_cat`, `__ep_str_eq`, `__ep_str_slice`,
-`__ep_slice_u8_*`, `__ep_slice_i64_*`, `__ep_slice_ptr_*`,
-and `__ep_slice_u8_extend` are
+and the element-size-parameterized `__ep_slice_new`, `__ep_slice_reserve`,
+`__ep_slice_at`, `__ep_slice_push_slot`, `__ep_slice_pop_slot`,
+`__ep_slice_extend`, and `__ep_slice_copy_range` are
 ordinary `MirFunction`s loaded from the embedded `runtime/mir/helpers.ir` bundle and
 injected by `src/mir_runtime.ep`. Array slicing/extension and panic helpers are part of the
 same bundle. The remaining string and file helpers come from Epic sources embedded by
@@ -386,6 +387,10 @@ repeated extern declarations are folded; conflicts are rejected.
 After injection, the compiler prunes unreachable MIR functions from the final
 program starting at `main`; startup and helper dependencies remain reachable
 through explicit MIR calls.
+All array headers use the single `_slice { data, len, cap }` MIR layout. Helpers
+return raw slot addresses where scalar semantics matter; AST-to-MIR emits the
+static `i8`/`i16`/`u16`/`i32`/`u32`/`i64`/`ptr` load or store so narrow signedness
+and truncation remain compile-time properties rather than runtime dispatch.
 `bytes(str)` and `str(u8[])` are lowered as identity casts. `cptr(str/u8[])`
 loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
 pointer unchanged; deprecated `cstr(str)` uses the same lowering. None require a MIR

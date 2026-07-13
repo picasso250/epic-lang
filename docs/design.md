@@ -341,7 +341,8 @@ match n {
 
 > 注意：`s[i]` 已删除；按字节读取字符串必须显式写 `bytes(s)[i]`。`s[start:end]`、`==` / `!=` 仍是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
 >
-> 切片当前仅支持 str 和 u8[]；其他数组需要复制部分元素时使用 for + `.push(...)`。
+> `str` 和所有数组类型都支持复制式切片。数组切片返回相同的 `T[]` 类型；
+> `str` 继续使用独立的字符串复制路径并维护末尾 NUL。
 
 ```epic
 let a = s[start:end]
@@ -354,6 +355,7 @@ let d = s[0:len(s)]
 - `start < 0` 或 `end < 0` 会退出
 - `start > end` 或 `end > len` 会退出
 - 成功的切片会分配并复制
+- 结构体、ADT wrapper 和 `str` 数组复制的是 8-byte 引用，因此切片是浅复制
 
 ### 长度 (Length，内置函数)
 
@@ -372,7 +374,7 @@ let d = s[0:len(s)]
 | 字符串字节索引 | `bytes(s)[i]` | `s[i]` 和 `s.data[i]`（已从 public surface 删除） |
 | 长度 | `len(x)` | `x.len`（已从 public surface 删除） |
 | 内部容量 | 无 public API | `a.cap`（已从 public surface 删除） |
-| 切片 | `s[start:end]` / `bytes[start:end]`（必须显式写出 start 和 end；仅支持 str 和 u8[]） | 无 public 替代（`str_slice` 已从 public surface 删除） |
+| 切片 | `s[start:end]` / `array[start:end]`（必须显式写出 start 和 end） | 无 public 替代（`str_slice` 已从 public surface 删除） |
 | 从 `u8[]` 构造字符串 | `str(bytes)` | `str_new(bytes.data, bytes.len)`（已从 public surface 删除） |
 | 字符串相等 | `s1 == s2` / `s1 != s2` | 按字节内容比较；`str_eq` 已从 public surface 删除 |
 

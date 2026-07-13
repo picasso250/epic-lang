@@ -2,6 +2,7 @@
 # STDOUT: 6
 # STDOUT: abab
 # STDOUT: 5
+# STDOUT: 24
 struct Box {
     value: i64
 }
@@ -30,5 +31,10 @@ fun main(): void {
     more_boxes.push(new Box { value: 3 })
     boxes.extend(more_boxes)
     println(str(boxes[0].value + boxes[1].value))
+
+    let narrow = new i32[] { i32(7) }
+    let more_narrow = new i32[] { i32(8), i32(9) }
+    narrow.extend(more_narrow)
+    println(str(i64(narrow[0]) + i64(narrow[1]) + i64(narrow[2])))
     exit(0)
 }

@@ -846,8 +846,8 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         AstSlice n: {
             let base = sema_expr_type(st, n.base)
-            if base != "str" && (sema_is_array(base) == false || sema_array_elem(base) != "u8") {
-                sema_die("slice only supports str and u8[]")
+            if base != "str" && sema_is_array(base) == false {
+                sema_die("slice expects str or array")
             }
             sema_expect_int(st, n.start, "slice start")
             sema_expect_int(st, n.end, "slice end")

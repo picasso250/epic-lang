@@ -1,0 +1,185 @@
+# EXIT: 0
+
+struct Box {
+    value: i64
+}
+
+struct Left {
+    value: i64
+}
+
+struct Right {
+    value: i64
+}
+
+type Choice = Left | Right
+
+fun grow_i32_rhs(xs: i32[]): i32 {
+    xs.push(i32(11))
+    xs.push(i32(13))
+    ret i32(2)
+}
+
+fun check_bool(): i64 {
+    let zeros = new bool[3]
+    if zeros[0] || zeros[1] || zeros[2] { ret 1 }
+    let xs = new bool[] { true, false }
+    xs[1] = true
+    xs.push(false)
+    if xs.pop() { ret 2 }
+    let part = xs[0:2]
+    if len(part) != 2 || !part[0] || !part[1] { ret 3 }
+    ret 0
+}
+
+fun check_u8(): i64 {
+    let zeros = new u8[2]
+    if i64(zeros[0]) != 0 || i64(zeros[1]) != 0 { ret 1 }
+    let xs = new u8[] { u8(0), u8(255) }
+    xs[1] += u8(1)
+    xs.push(u8(255))
+    if i64(xs.pop()) != 255 || i64(xs[1]) != 0 { ret 2 }
+    let part = xs[0:2]
+    if len(part) != 2 || i64(part[0]) != 0 || i64(part[1]) != 0 { ret 3 }
+    ret 0
+}
+
+fun check_i16(): i64 {
+    let zeros = new i16[2]
+    if i64(zeros[0]) != 0 || i64(zeros[1]) != 0 { ret 1 }
+    let xs = new i16[] { i16(32767), i16(0 - 32768) }
+    xs[0] += i16(1)
+    xs.push(i16(1234))
+    if i64(xs.pop()) != 1234 || i64(xs[0]) != (0 - 32768) { ret 2 }
+    let part = xs[0:2]
+    if i64(part[0]) != (0 - 32768) || i64(part[1]) != (0 - 32768) { ret 3 }
+    ret 0
+}
+
+fun check_u16(): i64 {
+    let zeros = new u16[2]
+    if i64(zeros[0]) != 0 || i64(zeros[1]) != 0 { ret 1 }
+    let xs = new u16[] { u16(65535), u16(1) }
+    xs[0] += u16(1)
+    xs.push(u16(65535))
+    if i64(xs.pop()) != 65535 || i64(xs[0]) != 0 { ret 2 }
+    let part = xs[1:2]
+    if len(part) != 1 || i64(part[0]) != 1 { ret 3 }
+    ret 0
+}
+
+fun check_i32(): i64 {
+    let zeros = new i32[2]
+    if i64(zeros[0]) != 0 || i64(zeros[1]) != 0 { ret 1 }
+    let xs = new i32[] { i32(2147483647) }
+    xs[0] += i32(1)
+    if i64(xs[0]) != (0 - 2147483648) { ret 2 }
+    let rhs = new i32[] { i32(7), i32(9) }
+    xs.extend(rhs)
+    if len(xs) != 3 || i64(xs[1]) != 7 || i64(xs[2]) != 9 { ret 3 }
+    let empty = xs[1:1]
+    let full = xs[0:len(xs)]
+    if len(empty) != 0 || len(full) != 3 || i64(full[0]) != (0 - 2147483648) { ret 4 }
+    ret 0
+}
+
+fun check_u32(): i64 {
+    let zeros = new u32[2]
+    if u64(zeros[0]) != u64(0) || u64(zeros[1]) != u64(0) { ret 1 }
+    let xs = new u32[] { u32(4294967295), u32(1) }
+    xs[0] += u32(1)
+    xs.push(u32(4294967295))
+    if u64(xs.pop()) != u64(4294967295) || u64(xs[0]) != u64(0) { ret 2 }
+    let part = xs[0:2]
+    if u64(part[1]) != u64(1) { ret 3 }
+    ret 0
+}
+
+fun check_i64(): i64 {
+    let zeros = new i64[2]
+    if zeros[0] != 0 || zeros[1] != 0 { ret 1 }
+    let xs = new i64[] { 9223372036854775807, (0 - 9223372036854775807 - 1) }
+    xs.push(42)
+    if xs.pop() != 42 { ret 2 }
+    xs.extend(xs)
+    if len(xs) != 4 || xs[0] != xs[2] || xs[1] != xs[3] { ret 3 }
+    let empty = new i64[]
+    xs.extend(empty)
+    empty.extend(xs)
+    if len(xs) != 4 || len(empty) != 4 || empty[3] != xs[3] { ret 4 }
+    ret 0
+}
+
+fun check_u64(): i64 {
+    let zeros = new u64[2]
+    if zeros[0] != u64(0) || zeros[1] != u64(0) { ret 1 }
+    let max = u64(0) - u64(1)
+    let xs = new u64[] { max, u64(1) }
+    xs[0] += u64(1)
+    xs.push(max)
+    if xs.pop() != max || xs[0] != u64(0) { ret 2 }
+    let part = xs[1:2]
+    if part[0] != u64(1) { ret 3 }
+    ret 0
+}
+
+fun check_references(): i64 {
+    let text = new str[] { "a", "b", "c" }
+    let text_part = text[1:3]
+    if len(text_part) != 2 || text_part[0] != "b" || text_part[1] != "c" { ret 1 }
+
+    let box = new Box { value: 10 }
+    let boxes = new Box[] { box }
+    let boxes_copy = boxes[0:1]
+    box.value = 42
+    if boxes_copy[0].value != 42 { ret 2 }
+
+    let left = new Left { value: 7 }
+    let choice: Choice = new Choice(left)
+    let choices = new Choice[] { choice }
+    let choices_copy = choices[0:1]
+    left.value = 9
+    if choices_copy[0].value != 9 { ret 3 }
+
+    for i: 0:20000 {
+        let garbage = new Box { value: i }
+    }
+    if text_part[1] != "c" || boxes_copy[0].value != 42 || choices_copy[0].value != 9 { ret 4 }
+    ret 0
+}
+
+fun check_relocated_compound_store(): i64 {
+    let xs = new i32[] { i32(5) }
+    xs[0] += grow_i32_rhs(xs)
+    if len(xs) != 3 { ret 1 }
+    if i64(xs[0]) != 7 || i64(xs[1]) != 11 || i64(xs[2]) != 13 { ret 2 }
+    ret 0
+}
+
+fun run(): i64 {
+    let result = check_bool()
+    if result != 0 { ret 10 + result }
+    result = check_u8()
+    if result != 0 { ret 20 + result }
+    result = check_i16()
+    if result != 0 { ret 30 + result }
+    result = check_u16()
+    if result != 0 { ret 40 + result }
+    result = check_i32()
+    if result != 0 { ret 50 + result }
+    result = check_u32()
+    if result != 0 { ret 60 + result }
+    result = check_i64()
+    if result != 0 { ret 70 + result }
+    result = check_u64()
+    if result != 0 { ret 80 + result }
+    result = check_references()
+    if result != 0 { ret 90 + result }
+    result = check_relocated_compound_store()
+    if result != 0 { ret 100 + result }
+    ret 0
+}
+
+fun main(): void {
+    exit(run())
+}

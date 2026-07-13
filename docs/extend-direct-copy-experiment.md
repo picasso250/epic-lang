@@ -1,4 +1,4 @@
-# Direct-copy `extend` experiment
+# `extend` copy experiments
 
 Date: 2026-07-13
 
@@ -59,3 +59,43 @@ copy removes per-element calls locally, but this self-host workload did not show
 a stable end-to-end speedup that pays for the additional MIR and executable
 size. Revisit only with a workload that demonstrates large-array `extend` as a
 measured bottleneck, or after adding a compact shared reserve/copy primitive.
+
+## Shared `RtlMoveMemory` follow-up
+
+A second experiment implemented the compact shared primitive suggested above.
+All supported arrays use the same three-word `{ data, len, capacity }` header, so
+the three helpers were replaced by one:
+
+```text
+__ep_slice_extend(dst, src, slot_size)
+```
+
+This follow-up initially passed `slot_size = 1` for `u8[]` and `8` for all other
+supported arrays. The later natural-width slice experiment generalized this ABI
+to 1/2/4/8-byte slots and reused the same block-copy strategy for every array
+operation; see [`natural-width-slices-experiment.md`](natural-width-slices-experiment.md).
+The helper snapshots the source, grows at most once with the existing capacity
+policy, then copies the old destination and appended source with at most two
+calls to `Kernel32.dll!RtlMoveMemory`. Empty-source and empty-destination paths
+avoid zero-length calls. `RtlMoveMemory` also gives the helper overlap-safe block
+copy semantics, while the source snapshot preserves `xs.extend(xs)` across an
+allocation.
+
+The same complete module suite and bootstrap fixed point passed. The self-host
+A/B was:
+
+| Metric | Existing `get` + `push` | Shared `RtlMoveMemory` | Delta |
+| --- | ---: | ---: | ---: |
+| wall time median | 1572.279 ms | 1576.316 ms | +4.037 ms (+0.26%) |
+| internal time median | 1547 ms | 1547 ms | 0 ms |
+| X64 items | 147699 | 147780 | +81 (+0.05%) |
+| `.text` | 673939 B | 674386 B | +447 B (+0.07%) |
+| `.data` | 91357 B | 91582 B | +225 B (+0.25%) |
+| executable | 768000 B | 768512 B | +512 B (+0.07%) |
+
+The new wall samples were 1576.3430, 1565.2218, and 1576.3161 ms. Their range
+overlaps the existing samples, so performance remains unchanged under the
+project's three-run rule. Unlike the first experiment, this version reduces the
+runtime from three helpers to one and removes the per-element checked calls with
+only a 512-byte executable increase. Retain the shared helper for the structural
+simplification and better large-copy behavior.

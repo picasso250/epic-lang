@@ -1,0 +1,7 @@
+# EXIT: 1
+# STDOUT_CONTAINS: runtime panic: slice index out of bounds
+fun main(): void {
+    let xs = new i64[] { 1, 2 }
+    let ys = xs[0:3]
+    exit(len(ys))
+}

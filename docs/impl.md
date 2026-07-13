@@ -103,10 +103,10 @@ mark-sweep。managed payload 由 `__ep_alloc` 统一登记；collector 扫描活
 | `u32`      | 64-bit value；struct/storage lane 为 4 bytes，读取时零扩展 |
 | `i64`      | `i64`             |
 | `u64`      | `u64`             |
-| `str`      | `&str` today; migration target is the same representation as `&_slice_u8` |
+| `str`      | `&str`；header representation 与 `&_slice` 相同 |
 | `Token`    | `&Token`          |
-| `u8[]`     | `&_slice_u8`        |
-| `Token[]`  | `&_slice_Token`     |
+| `u8[]`     | `&_slice`         |
+| `Token[]`  | `&_slice`         |
 
 用户程序不编写指针类型。`&T` 和 `&&T` 仅属于 codegen 内部类型。
 
@@ -121,7 +121,7 @@ str = {
     cap: i64,
 }
 
-_slice_u8 = {
+_slice = {
     data: &u8,
     len: i64,
     cap: i64,
@@ -138,19 +138,22 @@ _slice_u8 = {
 
 ### 动态数组 / Slice Header (Dynamic Array)
 
-Epic 用户层的 dynamic array（`T[]`）和实现层的 slice header（`_slice_T`）是同一个容器概念：header 持有 `data`、`len`、`cap`，并拥有可增长的 backing storage。这里的 “slice header” 是运行时布局命名，不表示只有 view 语义。
+Epic 用户层的 dynamic array（`T[]`）和实现层唯一的 `_slice` header 是同一个容器概念：header 持有 `data`、`len`、`cap`，并拥有可增长的 backing storage。所有数组类型共享这一份 24-byte layout metadata；这里的 “slice header” 是运行时布局命名，不表示只有 view 语义。
 
 `cap` 字段及数组增长策略完全属于 runtime 私有实现。源码层不提供 `cap()`，用户程序只能观察逻辑长度和元素行为。
 
 ```
-_slice_T = {
+_slice = {
     data,
     len: i64,
     cap: i64,
 }
 ```
 
-基本类型 dynamic array 存储基本类型的值。结构体和 `str` dynamic array 存储引用。
+基本类型 dynamic array 使用自然宽度槽：`u8/bool=1`、`i16/u16=2`、
+`i32/u32=4`、`i64/u64=8` bytes。结构体、union、`str` 和其他引用数组使用
+8-byte 引用槽；aggregate payload 不 inline 到 backing storage。`len` / `cap`
+始终按元素计数，lowering 在每次 runtime 调用中显式传入 `slot_size`。
 
 `str` 和 `T[]` 的存储槽可以为 `0`，表示 null reference。local variable 不允许省略初始化器，因此正常用户代码必须通过字面量、`new` 或函数返回值显式获得非 null 容器。编译器不再在容器使用点插入 materialize/ensure；对 null reference 执行 `len`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误。slice header 的 backing storage 仍然懒分配：非 null 空 header 的 `data` 可在首次写入时再分配。
 
@@ -216,7 +219,7 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
 - **循环降级**：条件 `for` 解析为 `Loop` AST，降级为 condition/body/end blocks。`ForRange` 对 `start`、`end` 从左到右各求值一次；cursor 保存到 local slot，不可变的 `end` 直接作为跨 block MIR value 复用，使用 condition/body/increment/end blocks；`continue` 指向 increment，`break` 指向 end。源码没有隐式数组迭代 AST 或 iterable 协议，数组索引必须显式写 `for i: 0:len(xs)`。
-- **复合赋值降级**：Parser 为所有 `op=` 语句生成 `AstAssignOp`；Sema 只接受类型完全相同的整数左值和右值。AST-to-MIR 对局部变量保存其 slot 地址；对字段先求值 object 并计算一次 `gep` 地址；对数组下标先求值并保存 base 与 index。随后先 `load`/调用 slice get 读取旧值，再求值 RHS，发射对应整数 MIR op，按目标窄整数类型规范化，最后写回先前捕获的地址或用同一 base/index 调用 slice set。因此左值定位表达式不会重复求值，且 RHS 对同一目标的中途修改会被最终写回覆盖。
+- **复合赋值降级**：Parser 为所有 `op=` 语句生成 `AstAssignOp`；Sema 只接受类型完全相同的整数左值和右值。AST-to-MIR 对局部变量保存其 slot 地址；对字段先求值 object 并计算一次 `gep` 地址；对数组下标先求值并保存 base 与 index。随后读取旧值，再求值 RHS，发射对应整数 MIR op并按目标窄整数类型规范化。数组写回会用保存的 base/index 重新调用 `__ep_slice_at`，避免 RHS 扩容同一数组后使用失效的 backing 地址；base 和 index 表达式本身不会重复求值。
 - **Map 删除**：内建 map 类型、语法、sema/codegen 分支和 MIR runtime helper 均已删除。普通小集合仍使用显式数组；MIR 函数/extern 与 machine symbol 的热查找使用 `src/util.ep` 中固定容量、开放寻址的 `NameIndex`，名称本身继续保存为 `str`。
 - **字符串运算**：`str == str` / `!=` 调用 `__ep_str_eq` 做按字节内容比较；`str + str` 调用 `__ep_str_cat`，分配新的 header 和连续字节区并复制两侧内容。字符串排序比较在 sema 拒绝；`str += str` 也拒绝，避免暗示原地扩容或共享 buffer 修改。
 
@@ -243,10 +246,10 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 | `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
 | `str_replace_char` | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
-| `xs.push(x)`      | 由 codegen 为动态数组发射                   | 公开容器点调用 |
-| `xs.pop()`        | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_pop`、`__ep_slice_i64_pop`、`__ep_slice_ptr_pop`；空数组 panic | 公开容器点调用 |
-| `dst.extend(src)`  | `u8[]`、word arrays 和 pointer arrays 分别用 `__ep_slice_u8_extend`、`__ep_slice_i64_extend`、`__ep_slice_ptr_extend` | 公开容器点调用 |
+| `xs.push(x)`      | `__ep_slice_push_slot(slice, slot_size)` 返回槽地址；lowering 发出静态宽度 store | 公开容器点调用 |
+| `xs.pop()`        | `__ep_slice_pop_slot(slice, slot_size)` 返回槽地址；lowering 发出静态宽度 load；空数组 panic | 公开容器点调用 |
+| `dst.extend(src)`  | `__ep_slice_extend(dst, src, slot_size)`；一次性扩容并通过 `RtlMoveMemory` 块复制 | 公开容器点调用 |
 | `len`              | 直接内联发射                                | 公开 |
-| 切片语法           | 字符串用 `__ep_str_slice`（internal）；数组用复制循环 | 语法公开，helper internal |
+| 切片语法           | 字符串用 `__ep_str_slice`；所有数组用 `__ep_slice_copy_range` 块复制 | 语法公开，helper internal |
 
 小端加载/存储辅助函数不属于内置函数。`link.ep` 和示例使用 `u8[]`、`u64`、带检查的索引和位运算将其实现为普通的 Epic 函数。

@@ -1,9 +1,0 @@
-# COMPILE_FAIL_CONTAINS: slice only supports str and u8[]
-struct Token {
-    kind: i64
-}
-
-fun main(): void {
-    let xs = new Token[1]
-    let ys = xs[0:1]
-}

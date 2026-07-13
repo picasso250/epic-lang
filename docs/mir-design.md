@@ -638,7 +638,7 @@ MirGlobal
   init: MirGlobalInit
 
 MirStruct
-  name: str                  # Pair / str / _slice_i64
+  name: str                  # Pair / str / _slice
   fields: list[MirField]
   size: int?                 # 可选缓存；可以由 layout pass 计算
 
