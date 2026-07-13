@@ -361,6 +361,32 @@ fun mir_op_result_type(op: str): str {
     ret "i64"
 }
 
+fun mir_swapped_binary_op(op: str): str {
+    if op == "add" || op == "mul" || op == "and" || op == "or" || op == "xor" || op == "icmp.eq" || op == "icmp.ne" {
+        ret op
+    }
+    if op == "icmp.slt" { ret "icmp.sgt" }
+    if op == "icmp.sgt" { ret "icmp.slt" }
+    if op == "icmp.sle" { ret "icmp.sge" }
+    if op == "icmp.sge" { ret "icmp.sle" }
+    if op == "icmp.ult" { ret "icmp.ugt" }
+    if op == "icmp.ugt" { ret "icmp.ult" }
+    if op == "icmp.ule" { ret "icmp.uge" }
+    if op == "icmp.uge" { ret "icmp.ule" }
+    ret ""
+}
+
+fun mir_operand_is_latest_result(st: MirCodegenState, operand: MirOperand): bool {
+    if len(st.current_block.instructions) == 0 { ret false }
+    let latest = st.current_block.instructions[len(st.current_block.instructions) - 1]
+    if !latest.has_result { ret false }
+    match operand {
+        MirValueOperand value: { ret value.value_id == latest.result_id }
+        _: {}
+    }
+    ret false
+}
+
 fun mir_shift_width(source_type: str): i64 {
     if source_type == "u8" { ret 8 }
     if source_type == "i16" || source_type == "u16" { ret 16 }
@@ -1215,9 +1241,17 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
             if n.op == "<<" || n.op == ">>" {
                 mir_emit_shift_count_check(st, right_flow.value, left_type, n.meta.line)
             }
+            let swapped_op = mir_swapped_binary_op(op)
+            let swap_operands = swapped_op != "" && mir_operand_is_latest_result(st, right_flow.value)
             let inst = mir_make_result_inst(st, op, result_type)
-            inst.operands.push(left_flow.value)
-            inst.operands.push(right_flow.value)
+            if swap_operands {
+                inst.op = swapped_op
+                inst.operands.push(right_flow.value)
+                inst.operands.push(left_flow.value)
+            } else {
+                inst.operands.push(left_flow.value)
+                inst.operands.push(right_flow.value)
+            }
             mir_emit_inst(st, inst)
             ret mir_value_flow(mir_normalize_int_value(st, mir_value_operand(result_type, inst.result_id), ast_require_resolved_type(n.meta)), st.current_block)
         }
