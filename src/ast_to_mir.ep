@@ -1483,9 +1483,12 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
     let union_name = ast_resolved_type(stmt.expr)
     let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = scrutinee_flow.block
-    let match_name = ("__match" + str(st.value_counter))
-    let match_addr = mir_alloc_local(st, match_name, "ptr")
-    mir_emit_inst(st, mir_store(scrutinee_flow.value, match_addr))
+    let tag = mir_const_int("i64", 0)
+    let payload = mir_operand_null()
+    if len(stmt.fields) > 0 {
+        tag = mir_load_field(st, scrutinee_flow.value, union_name, "tag")
+        payload = mir_load_field(st, scrutinee_flow.value, union_name, "payload")
+    }
 
     let end_block = mir_new_block(st, "match.end")
     let case_blocks = new MirBlock[]
@@ -1509,9 +1512,6 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
         if ci < len(stmt.fields) - 1 {
             next_block = next_blocks[ci]
         }
-        let wrapper_name = mir_new_value(st)
-        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", match_addr))
-        let tag = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "tag")
         let cond = mir_make_result_inst(st, "icmp.eq", "bool")
         cond.operands.push(tag)
         cond.operands.push(mir_const_int("i64", mir_union_tag(st, union_name, stmt.fields[ci].variant_name)))
@@ -1531,9 +1531,6 @@ fun mir_emit_union_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): 
     for bi: 0:len(stmt.fields) {
         st.current_block = case_blocks[bi]
         let local_count = len(st.local_names)
-        let wrapper_name = mir_new_value(st)
-        mir_emit_inst(st, mir_load(wrapper_name, "ptr", "ptr", match_addr))
-        let payload = mir_load_field(st, mir_value_operand("ptr", wrapper_name), union_name, "payload")
         let bind_addr = mir_alloc_local(st, stmt.fields[bi].binding_name, "ptr")
         mir_emit_inst(st, mir_store(payload, bind_addr))
         let case_flow = mir_emit_block(st, st.current_block, stmt.fields[bi].body)
@@ -1561,9 +1558,6 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
     }
     let scrutinee_flow = mir_emit_expr(st, st.current_block, stmt.expr)
     st.current_block = scrutinee_flow.block
-    let match_name = ("__match" + str(st.value_counter))
-    let match_addr = mir_alloc_local(st, match_name, mir_operand_type(scrutinee_flow.value))
-    mir_emit_inst(st, mir_store(scrutinee_flow.value, match_addr))
 
     let end_block = mir_new_block(st, "match.end")
     let case_blocks = new MirBlock[]
@@ -1587,12 +1581,10 @@ fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlo
         if ci < len(stmt.fields) - 1 {
             next_block = next_blocks[ci]
         }
-        let scrut_name = mir_new_value(st)
-        mir_emit_inst(st, mir_load(scrut_name, mir_operand_type(scrutinee_flow.value), mir_operand_type(scrutinee_flow.value), match_addr))
         let pat_flow = mir_emit_expr(st, st.current_block, stmt.fields[ci].expr)
         st.current_block = pat_flow.block
         let cond = mir_make_result_inst(st, "icmp.eq", "bool")
-        cond.operands.push(mir_value_operand(mir_operand_type(scrutinee_flow.value), scrut_name))
+        cond.operands.push(scrutinee_flow.value)
         cond.operands.push(pat_flow.value)
         mir_emit_inst(st, cond)
         st.current_block.terminator = mir_condbr(mir_value_operand("bool", cond.result_id), case_blocks[ci].name, next_block.name)
