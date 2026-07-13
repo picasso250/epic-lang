@@ -129,6 +129,17 @@ fun mir_local_index(st: MirCodegenState, name: str): i64 {
     ret 0
 }
 
+fun mir_local_index_or_negative(st: MirCodegenState, name: str): i64 {
+    let i = len(st.local_names) - 1
+    for i >= 0 {
+        if st.local_names[i] == name {
+            ret i
+        }
+        i -= 1
+    }
+    ret -1
+}
+
 fun mir_struct_field_layout(struct_name: str, field_name: str, field_type: str, access_type: str, field_index: i64, field_offset: i64): MirStructFieldLayout {
     ret new MirStructFieldLayout { struct_name: struct_name, field_name: field_name, field_type: field_type, access_type: access_type, field_index: field_index, field_offset: field_offset }
 }
@@ -1291,6 +1302,14 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
                 ret mir_emit_cptr(st, st.current_block, n.args[0])
             }
             if n.name == "ptr" {
+                match n.args[0] {
+                    AstVar value: {
+                        if mir_local_index_or_negative(st, value.name) < 0 {
+                            ret mir_value_flow(mir_symbol_operand("ptr", value.name), st.current_block)
+                        }
+                    }
+                    _: {}
+                }
                 let arg_flow = mir_emit_expr(st, st.current_block, n.args[0])
                 st.current_block = arg_flow.block
                 if ast_resolved_type(n.args[0]) == "ptr" {
@@ -1889,10 +1908,11 @@ fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): M
     ret flow
 }
 
-fun mir_param(value_id: i64, typ: str): MirParam {
+fun mir_param(value_id: i64, typ: str, source_type: str): MirParam {
     let p = new MirParam
     p.value_id = value_id
     p.typ = typ
+    p.source_type = source_type
     ret p
 }
 
@@ -1908,7 +1928,8 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
 
     for pi: 0:len(fn_ast.params) {
         let param = fn_ast.params[pi]
-        st.current_fn.params.push(mir_param(mir_new_value(st), mir_epic_type(ast_require_resolved_type(param.meta))))
+        let source_type = ast_require_resolved_type(param.meta)
+        st.current_fn.params.push(mir_param(mir_new_value(st), mir_epic_type(source_type), source_type))
     }
 
     st.current_block = mir_new_block(st, "entry")

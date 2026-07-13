@@ -20,6 +20,13 @@ def main():
         print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
         return 1
     print("  PASS  natural struct layout metadata")
+
+    case = ROOT / "tests" / "ast_to_mir" / "pass" / "function_address.ep"
+    result = subprocess.run([str(tool), str(case)], cwd=ROOT, capture_output=True)
+    if result.returncode != 0 or b"call void __ep_import$kernel32.dll$ConsumeCallback(ptr callback)" not in result.stdout:
+        print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
+        return 1
+    print("  PASS  function address symbol operand")
     return 0
 
 

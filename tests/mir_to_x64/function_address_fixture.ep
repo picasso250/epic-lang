@@ -1,0 +1,98 @@
+fun fixture_function(name: str, source_types: str[]): MirFunction {
+    let fn = mir_function_empty(name, "ptr")
+    for i: 0:len(source_types) {
+        fn.params.push(new MirParam { typ: "i64", source_type: source_types[i], value_id: i + 1 })
+    }
+    let entry = mir_block_empty("entry")
+    entry.terminator = mir_ret_value(mir_operand_null())
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+    ret fn
+}
+
+fun count_opcode(program: X64Program, start: i64, op: i64): i64 {
+    let count = 0
+    for i: start:len(program.items) {
+        match program.items[i] {
+            X64InstItem inst: { if inst.op == op { count += 1 } }
+            _: {}
+        }
+    }
+    ret count
+}
+
+fun main(): void {
+    let program = mir_program_empty()
+    let narrow_types = new str[] { "bool", "u8", "i16", "u16", "i32", "u32" }
+    let callback = fixture_function("callback", narrow_types)
+    let direct = fixture_function("direct", new str[] { "i32" })
+    let holder = mir_function_empty("holder", "ptr")
+    let holder_entry = mir_block_empty("entry")
+    holder_entry.terminator = mir_ret_value(mir_symbol_operand("ptr", "callback"))
+    holder_entry.has_terminator = true
+    holder.blocks.push(holder_entry)
+    program.functions.push(callback)
+    program.functions.push(direct)
+    program.functions.push(holder)
+
+    let lower = mir_to_x64_lower_empty()
+    mir_to_x64_prepare_program_globals(lower, program)
+    mir_to_x64_lower_function_with_lower(lower, callback)
+    if count_opcode(lower.x64, 0, 41) < 3 || count_opcode(lower.x64, 0, 42) < 1 || count_opcode(lower.x64, 0, 43) < 1 {
+        panic "address-taken narrow parameters were not normalized"
+    }
+    let saw_stack_parameter = false
+    for i: 0:len(lower.x64.items) {
+        match lower.x64.items[i] {
+            X64InstItem inst: {
+                for oi: 0:len(inst.operands) {
+                    match inst.operands[oi] {
+                        X64MemBaseOperand mem: {
+                            if mem.base == "rbp" && mem.disp == 56 { saw_stack_parameter = true }
+                        }
+                        _: {}
+                    }
+                }
+            }
+            _: {}
+        }
+    }
+    if !saw_stack_parameter { panic "sixth callback parameter did not use the incoming stack slot" }
+
+    let direct_start = len(lower.x64.items)
+    mir_to_x64_lower_function_with_lower(lower, direct)
+    if count_opcode(lower.x64, direct_start, 43) != 0 {
+        panic "non-address-taken function parameters must not be entry-normalized"
+    }
+
+    mir_to_x64_lower_function_with_lower(lower, holder)
+    let saw_function_lea = false
+    for i: 0:len(lower.x64.items) {
+        match lower.x64.items[i] {
+            X64InstItem inst: {
+                if inst.op == 2 {
+                    for oi: 0:len(inst.operands) {
+                        match inst.operands[oi] {
+                            X64MemSymbolOperand mem: { if mem.symbol == "callback" { saw_function_lea = true } }
+                            _: {}
+                        }
+                    }
+                }
+            }
+            _: {}
+        }
+    }
+    if !saw_function_lea { panic "function address must lower to lea [function_symbol]" }
+
+    let object = machine_build_object(lower.x64)
+    let callback_symbol = -1
+    for i: 0:len(object.symbol_names) {
+        if object.symbol_names[i] == "callback" && object.symbol_sections[i] == 1 { callback_symbol = i }
+    }
+    if callback_symbol < 0 { panic "callback text symbol missing" }
+    let saw_callback_relocation = false
+    for i: 0:len(object.text_reloc_symbol_indexes) {
+        if object.text_reloc_symbol_indexes[i] == callback_symbol { saw_callback_relocation = true }
+    }
+    if !saw_callback_relocation { panic "function lea text relocation missing" }
+}

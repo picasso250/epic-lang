@@ -1,0 +1,32 @@
+# EXIT: 0
+# STDOUT: true
+
+struct CallbackAllocation {
+    flags: u32
+}
+
+extern "kernel32.dll" fun CreateEventW(attributes: ptr, manual_reset: i32, initial_state: i32, name: ptr): ptr
+extern "kernel32.dll" fun SetEvent(event: ptr): i32
+extern "kernel32.dll" fun WaitForSingleObject(handle: ptr, milliseconds: u32): u32
+extern "kernel32.dll" fun CloseHandle(handle: ptr): i32
+extern "kernel32.dll" fun EnumSystemLocalesEx(callback: ptr, flags: u32, context: ptr, reserved: ptr): i32
+
+fun visit_locale(locale: ptr, flags: u32, context: ptr): i32 {
+    let allocation = new CallbackAllocation { flags: flags }
+    let raw_flags = u64(flags)
+    if raw_flags != u64(u32(raw_flags)) || allocation.flags != flags {
+        ret i32(0)
+    }
+    SetEvent(context)
+    ret i32(0)
+}
+
+fun main(): void {
+    let event = CreateEventW(ptr(0), i32(0), i32(0), ptr(0))
+    if event == ptr(0) { panic "CreateEventW failed" }
+    EnumSystemLocalesEx(ptr(visit_locale), u32(0), event, ptr(0))
+    let signaled = WaitForSingleObject(event, u32(1000)) == u32(0)
+    CloseHandle(event)
+    println(str(signaled))
+    if !signaled { exit(1) }
+}

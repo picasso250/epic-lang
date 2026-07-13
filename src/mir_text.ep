@@ -196,6 +196,7 @@ fun mrt_parse_params(text: str): MirParam[] {
         let part = parts[i]
         let p = new MirParam
         p.typ = mrt_first_word(part)
+        p.source_type = p.typ
         p.value_id = mrt_parse_local_id(mrt_after_first_word(part))
         out.push(p)
     }

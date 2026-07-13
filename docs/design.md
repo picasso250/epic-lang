@@ -459,7 +459,31 @@ extern 参数还可使用非空的 FFI-safe 用户 struct。此时源码参数 `
 
 struct extern 返回值和 struct by-value 参数均不支持。只有在用户已经独立确认目标 ABI 把 1/2/4/8 字节 aggregate 放在普通整数 lane 时，才可把它手工声明成对应整数并用位运算解码；未使用高位必须由用户 mask。Epic 不公开 `sizeof`；需要 `cbSize`/`dwLength` 时使用目标 ABI 文档或独立布局工具取得常量。
 
-extern struct pointer 和 `cptr(...)` 结果只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。当前没有 callback/function pointer，因此 extern 调用期间不会重新进入 Epic；未来若开放 callback，需要重新审视 safepoint 和 root 契约。
+extern struct pointer 和 `cptr(...)` 结果只在同步调用期间借用。外部函数不得在返回后保存该地址，不得释放或取得所有权，也不得交给外部线程或异步操作继续访问。
+
+### Raw Function Address 与 WinAPI Callback
+
+`ptr(function_name)` 返回源码定义的顶层普通函数的真实 `.text` 入口地址。lexical local 优先：如果当前作用域已有同名 local，`ptr(name)` 仍执行原有的 `i64` / `u64` / `ptr` 到 `ptr` 转换。`main`、extern、builtin、方法和未知名称不能取地址；函数名在 `ptr(...)` 之外也不是普通表达式。
+
+函数地址擦除全部签名信息，可以赋给 local、比较、存入 `ptr` struct 字段或 `ptr[]`，也可以传给 extern。Epic 不支持 `p(args)` 形式的间接调用，不生成 callback thunk，也不检查参数数量、参数类型或返回类型是否匹配外部 API 的 callback ABI。该匹配责任完全属于调用者。
+
+Windows x64 使用统一调用约定。address-taken 函数在真实入口把 `bool` / `u8` / `i16` / `u16` / `i32` / `u32` 参数规范化为 Epic 的 64-bit value representation，前四个寄存器参数和后续 8-byte 栈参数都遵循同一规则；`i64` / `u64` / `ptr` / managed reference 保留传入值。函数地址和直接调用共享同一入口，在进程生命周期内稳定。
+
+第一版只支持在 Epic owner OS thread 上同步重入的 callback，例如 `WndProc`、消息循环 dispatch 和同步枚举。此类 callback 可以调用普通 Epic 函数和分配对象。thread-pool callback、异步 WinHTTP completion 等 foreign-thread callback 不受支持，runtime 不提供 thread guard；用户必须保证外部 API 不会从其他线程进入 Epic。
+
+raw `ptr` 不拥有 callback context，也不会替 managed 对象保活。需要 context 时应由用户保持 owner 可达，并遵守同步 borrowed 契约。managed root handle、`ptr -> reference` 恢复、closure、callback 类型和动态间接调用均不属于当前语言。
+
+```epic
+extern "kernel32.dll" fun EnumSystemLocalesEx(callback: ptr, flags: u32, context: ptr, reserved: ptr): i32
+
+fun visit(locale: ptr, flags: u32, context: ptr): i32 {
+    ret i32(0)
+}
+
+fun main(): void {
+    EnumSystemLocalesEx(ptr(visit), u32(0), ptr(0), ptr(0))
+}
+```
 
 `ptr` 是公开的 64-bit opaque address scalar。它可用于变量、参数、返回值、struct 字段、`ptr[]` 和 extern ABI；只支持同类型的 `==` / `!=`，不支持直接算术、位运算、排序比较、解引用、字段访问、下标或 postfix `?`。地址运算必须显式经过整数：`ptr(u64(base) + offset)`。只允许 `ptr(i64/u64)` 与 `i64/u64(ptr)` 双向 bit-pattern 转换；空地址写作 `ptr(0)`，`INVALID_HANDLE_VALUE` 可写作 `ptr(u64(0) - u64(1))`。`ptr` 不拥有内存，也不延长外部资源或 managed allocation 的生命周期。
 

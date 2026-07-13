@@ -54,6 +54,18 @@ def main():
         print(output)
         return 1
     print("  PASS  legacy MIR extern rejected")
+
+    reachability = compile_tool(
+        ROOT / "tests" / "mir" / "function_address_reachability.ep",
+        [ROOT / "src" / "util.ep", ROOT / "src" / "mir.ep", ROOT / "tests" / "mir" / "function_address_reachability.ep"],
+        BUILD / "function_address_reachability.exe",
+    )
+    result = subprocess.run([str(reachability)], cwd=ROOT, capture_output=True, text=True, encoding="ascii", errors="replace")
+    if result.returncode != 0:
+        print("  FAIL  MIR function-address reachability")
+        print(result.stdout + result.stderr)
+        return 1
+    print("  PASS  MIR function-address reachability")
     return 0
 
 

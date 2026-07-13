@@ -1,0 +1,21 @@
+struct CallbackSlot {
+    callback: ptr
+}
+
+fun target(value: u32): i32 {
+    ret i32(value)
+}
+
+fun shadow(): ptr {
+    let target = ptr(7)
+    ret ptr(target)
+}
+
+fun main(): void {
+    let callback = ptr(target)
+    let slot = new CallbackSlot { callback: callback }
+    let callbacks = new ptr[] { ptr(target), slot.callback, shadow() }
+    if callbacks[0] == ptr(0) {
+        panic "function address must be non-null"
+    }
+}

@@ -17,10 +17,14 @@ def main():
         ("immediate_fixture.ep", "mir_to_x64_immediate.exe", "immediate-aware lowering"),
         ("direct_alloca_fixture.ep", "mir_to_x64_direct_alloca.exe", "direct alloca memory lowering"),
         ("branch_fusion_fixture.ep", "mir_to_x64_branch_fusion.exe", "terminal compare branch fusion"),
+        ("function_address_fixture.ep", "mir_to_x64_function_address.exe", "function address and callback ABI lowering"),
     ]
     for fixture_name, exe_name, label in fixtures:
         fixture = ROOT / "tests" / "mir_to_x64" / fixture_name
-        tool = compile_tool(fixture, [*sources, fixture], ROOT / "build" / "tests" / exe_name)
+        fixture_sources = [*sources]
+        if fixture_name == "function_address_fixture.ep":
+            fixture_sources.append(ROOT / "src" / "machine.ep")
+        tool = compile_tool(fixture, [*fixture_sources, fixture], ROOT / "build" / "tests" / exe_name)
         result = subprocess.run([str(tool)], cwd=ROOT, capture_output=True)
         if result.returncode != 0:
             print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])

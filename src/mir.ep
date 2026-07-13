@@ -69,6 +69,7 @@ struct MirBlock {
 struct MirParam {
     value_id: i64
     typ: str
+    source_type: str
 }
 
 struct MirFunction {
@@ -638,6 +639,29 @@ fun mir_mark_reachable_function(program: MirProgram, functions: NameIndex, reach
             if inst.op == "call" {
                 mir_mark_reachable_function(program, functions, reachable, inst.callee)
             }
+            for oi: 0:len(inst.operands) {
+                match inst.operands[oi] {
+                    MirSymbolOperand symbol: {
+                        mir_mark_reachable_function(program, functions, reachable, symbol.name)
+                    }
+                    _: {}
+                }
+            }
+        }
+        match block.terminator {
+            MirCondBrTerminator term: {
+                match term.cond {
+                    MirSymbolOperand symbol: { mir_mark_reachable_function(program, functions, reachable, symbol.name) }
+                    _: {}
+                }
+            }
+            MirRetValueTerminator term: {
+                match term.value {
+                    MirSymbolOperand symbol: { mir_mark_reachable_function(program, functions, reachable, symbol.name) }
+                    _: {}
+                }
+            }
+            _: {}
         }
     }
 }

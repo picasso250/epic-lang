@@ -1,0 +1,96 @@
+# COMPILE_ONLY
+
+struct WndClassW {
+    style: u32
+    wnd_proc: ptr
+    class_extra: i32
+    window_extra: i32
+    instance: ptr
+    icon: ptr
+    cursor: ptr
+    background: ptr
+    menu_name: ptr
+    class_name: ptr
+}
+
+struct Msg {
+    hwnd: ptr
+    message: u32
+    wparam: u64
+    lparam: i64
+    time: u32
+    point_x: i32
+    point_y: i32
+    private: u32
+}
+
+extern "kernel32.dll" fun GetModuleHandleW(name: ptr): ptr
+extern "user32.dll" fun LoadCursorW(instance: ptr, cursor: ptr): ptr
+extern "user32.dll" fun RegisterClassW(class: WndClassW): u16
+extern "user32.dll" fun CreateWindowExW(ex_style: u32, class_name: ptr, window_name: ptr, style: u32, x: i32, y: i32, width: i32, height: i32, parent: ptr, menu: ptr, instance: ptr, param: ptr): ptr
+extern "user32.dll" fun ShowWindow(hwnd: ptr, command: i32): i32
+extern "user32.dll" fun UpdateWindow(hwnd: ptr): i32
+extern "user32.dll" fun MessageBoxW(hwnd: ptr, text: ptr, caption: ptr, kind: u32): i32
+extern "user32.dll" fun DefWindowProcW(hwnd: ptr, message: u32, wparam: u64, lparam: i64): i64
+extern "user32.dll" fun PostQuitMessage(exit_code: i32): void
+extern "user32.dll" fun GetMessageW(message: Msg, hwnd: ptr, min_filter: u32, max_filter: u32): i32
+extern "user32.dll" fun TranslateMessage(message: Msg): i32
+extern "user32.dll" fun DispatchMessageW(message: Msg): i64
+
+fun wide(text: str): u16[] {
+    let out = new u16[len(text) + 1]
+    let source = bytes(text)
+    for i: 0:len(source) {
+        out[i] = u16(source[i])
+    }
+    out[len(source)] = u16(0)
+    ret out
+}
+
+fun wnd_proc(hwnd: ptr, message: u32, wparam: u64, lparam: i64): i64 {
+    if message == u32(273) && (wparam & u64(65535)) == u64(1001) {
+        let text = wide("Hello from an Epic WndProc callback.")
+        let caption = wide("Epic Win32 callback")
+        MessageBoxW(hwnd, cptr(text), cptr(caption), u32(64))
+        ret 0
+    }
+    if message == u32(2) {
+        PostQuitMessage(i32(0))
+        ret 0
+    }
+    ret DefWindowProcW(hwnd, message, wparam, lparam)
+}
+
+fun main(): void {
+    let instance = GetModuleHandleW(ptr(0))
+    let class_name = wide("EpicCallbackWindow")
+    let title = wide("Epic raw WinAPI callback")
+    let button_class = wide("BUTTON")
+    let button_text = wide("Show message")
+    let window_class = new WndClassW {
+        wnd_proc: ptr(wnd_proc)
+        instance: instance
+        cursor: LoadCursorW(ptr(0), ptr(32512))
+        background: ptr(6)
+        class_name: cptr(class_name)
+    }
+    if RegisterClassW(window_class) == u16(0) {
+        panic "RegisterClassW failed"
+    }
+
+    let hwnd = CreateWindowExW(u32(0), cptr(class_name), cptr(title), u32(13565952), i32(2147483648), i32(2147483648), i32(640), i32(360), ptr(0), ptr(0), instance, ptr(0))
+    if hwnd == ptr(0) { panic "CreateWindowExW failed" }
+    let button = CreateWindowExW(u32(0), cptr(button_class), cptr(button_text), u32(1342177280), i32(24), i32(24), i32(180), i32(40), hwnd, ptr(1001), instance, ptr(0))
+    if button == ptr(0) { panic "button creation failed" }
+    ShowWindow(hwnd, i32(5))
+    UpdateWindow(hwnd)
+
+    let message = new Msg
+    let result = GetMessageW(message, ptr(0), u32(0), u32(0))
+    for result > i32(0) {
+        TranslateMessage(message)
+        DispatchMessageW(message)
+        result = GetMessageW(message, ptr(0), u32(0), u32(0))
+    }
+    if result < i32(0) { exit(1) }
+}

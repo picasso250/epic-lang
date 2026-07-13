@@ -15,6 +15,8 @@ struct MirToX64Lower {
     string_names: str[]
     string_lengths: i64[]
     global_names: str[]
+    function_names: str[]
+    address_taken_function_names: str[]
     struct_layout_names: str[]
     struct_layout_sizes: i64[]
     struct_layout_aligns: i64[]
@@ -50,6 +52,8 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
     lower.string_names = new str[]
     lower.string_lengths = new i64[]
     lower.global_names = new str[]
+    lower.function_names = new str[]
+    lower.address_taken_function_names = new str[]
     lower.struct_layout_names = new str[]
     lower.struct_layout_sizes = new i64[]
     lower.struct_layout_aligns = new i64[]
@@ -90,7 +94,48 @@ fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): 
     lower.string_lengths.push(length)
 }
 
+fun mir_to_x64_name_in(values: str[], name: str): bool {
+    for i: 0:len(values) {
+        if values[i] == name { ret true }
+    }
+    ret false
+}
+
+fun mir_to_x64_record_address_taken_operand(lower: MirToX64Lower, operand: MirOperand): void {
+    match operand {
+        MirSymbolOperand symbol: {
+            if mir_to_x64_name_in(lower.function_names, symbol.name) && !mir_to_x64_name_in(lower.address_taken_function_names, symbol.name) {
+                lower.address_taken_function_names.push(symbol.name)
+            }
+        }
+        _: {}
+    }
+}
+
+fun mir_to_x64_record_address_taken_term(lower: MirToX64Lower, term: MirTerminator): void {
+    match term {
+        MirCondBrTerminator value: { mir_to_x64_record_address_taken_operand(lower, value.cond) }
+        MirRetValueTerminator value: { mir_to_x64_record_address_taken_operand(lower, value.value) }
+        _: {}
+    }
+}
+
 fun mir_to_x64_prepare_program_globals(lower: MirToX64Lower, program: MirProgram): void {
+    for fi: 0:len(program.functions) {
+        lower.function_names.push(program.functions[fi].name)
+    }
+    for fi: 0:len(program.functions) {
+        let fn = program.functions[fi]
+        for bi: 0:len(fn.blocks) {
+            let block = fn.blocks[bi]
+            for ii: 0:len(block.instructions) {
+                for oi: 0:len(block.instructions[ii].operands) {
+                    mir_to_x64_record_address_taken_operand(lower, block.instructions[ii].operands[oi])
+                }
+            }
+            mir_to_x64_record_address_taken_term(lower, block.terminator)
+        }
+    }
     for i: 0:len(program.globals) {
         match program.globals[i] {
             MirStringGlobal g: {
@@ -422,6 +467,10 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
             }
             let global_index = mir_to_x64_global_index(lower, value.name)
             if global_index >= 0 {
+                x64_add_inst2(lower.x64, 2, x64_reg(reg), x64_mem_symbol(value.name, 8)) # x64 lea
+                ret
+            }
+            if mir_to_x64_name_in(lower.function_names, value.name) {
                 x64_add_inst2(lower.x64, 2, x64_reg(reg), x64_mem_symbol(value.name, 8)) # x64 lea
                 ret
             }
@@ -881,6 +930,22 @@ fun mir_to_x64_value_capacity(fn: MirFunction): i64 {
     ret max_id + 1
 }
 
+fun mir_to_x64_load_callback_param(lower: MirToX64Lower, source_type: str, base: str, disp: i64): void {
+    if source_type == "bool" || source_type == "u8" {
+        x64_add_inst2(lower.x64, 41, x64_reg("rax"), x64_mem_base(base, disp, 1)) # x64 movzx
+    } else if source_type == "i16" {
+        x64_add_inst2(lower.x64, 42, x64_reg("rax"), x64_mem_base(base, disp, 2)) # x64 movsx
+    } else if source_type == "u16" {
+        x64_add_inst2(lower.x64, 41, x64_reg("rax"), x64_mem_base(base, disp, 2)) # x64 movzx
+    } else if source_type == "i32" {
+        x64_add_inst2(lower.x64, 43, x64_reg("rax"), x64_mem_base(base, disp, 4)) # x64 movsxd
+    } else if source_type == "u32" {
+        x64_add_inst2(lower.x64, 1, x64_reg("eax"), x64_mem_base(base, disp, 4)) # x64 mov
+    } else {
+        x64_add_inst2(lower.x64, 1, x64_reg("rax"), x64_mem_base(base, disp, 8)) # x64 mov
+    }
+}
+
 fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction): X64Program {
     lower.timing_functions += 1
     let value_capacity = mir_to_x64_value_capacity(fn)
@@ -929,8 +994,19 @@ fun mir_to_x64_lower_function_with_lower(lower: MirToX64Lower, fn: MirFunction):
     arg_regs.push("rdx")
     arg_regs.push("r8")
     arg_regs.push("r9")
+    let normalize_params = mir_to_x64_name_in(lower.address_taken_function_names, fn.name)
     for i: 0:len(fn.params) {
-        if i < len(arg_regs) {
+        if normalize_params {
+            let source_disp = 16 + i * 8
+            if i < len(arg_regs) {
+                source_disp = mir_to_x64_value_slot(lower, fn.params[i].value_id)
+                x64_add_inst2(lower.x64, 1, x64_mem_base("rbp", source_disp, 8), x64_reg(arg_regs[i])) # x64 mov
+            }
+            let source_type = fn.params[i].source_type
+            if source_type == "" { source_type = fn.params[i].typ }
+            mir_to_x64_load_callback_param(lower, source_type, "rbp", source_disp)
+            x64_add_inst2(lower.x64, 1, x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].value_id), 8), x64_reg("rax")) # x64 mov
+        } else if i < len(arg_regs) {
             x64_add_inst2(lower.x64, 1, x64_mem_base("rbp", mir_to_x64_value_slot(lower, fn.params[i].value_id), 8), x64_reg(arg_regs[i])) # x64 mov
         } else {
             x64_add_inst2(lower.x64, 1, x64_reg("rax"), x64_mem_base("rbp", 16 + i * 8, 8)) # x64 mov

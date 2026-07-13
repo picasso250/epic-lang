@@ -1,0 +1,12 @@
+# COMPILE_FAIL_CONTAINS: ptr cannot take the address of method Box__touch
+
+struct Box {
+    value: i64
+}
+
+fun (box: Box) touch(): void {
+}
+
+fun main(): void {
+    let callback = ptr(Box__touch)
+}

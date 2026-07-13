@@ -216,6 +216,17 @@ fun sema_lookup(st: SemaState, name: str): str {
     ret ""
 }
 
+fun sema_lookup_or_empty(st: SemaState, name: str): str {
+    let i = len(st.local_names) - 1
+    for i >= 0 {
+        if st.local_names[i] == name {
+            ret st.local_types[i]
+        }
+        i -= 1
+    }
+    ret ""
+}
+
 fun sema_define_local(st: SemaState, name: str, typ: str): void {
     st.local_names.push(name)
     st.local_types.push(typ)
@@ -995,6 +1006,32 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     }
     if node.name == "ptr" {
         sema_check_arity("ptr", 1, node.args)
+        match node.args[0] {
+            AstVar value: {
+                let local_type = sema_lookup_or_empty(st, value.name)
+                if local_type == "" {
+                    if value.name == "main" {
+                        sema_die("ptr cannot take the address of main")
+                    }
+                    let func_index = sema_func_index(st, value.name)
+                    if func_index >= 0 {
+                        if st.funcs[func_index].method_name? {
+                            sema_die(f"ptr cannot take the address of method {value.name}")
+                        }
+                        sema_set_type(node.args[0], "ptr")
+                        ret "ptr"
+                    }
+                    if sema_extern_index(st, value.name) >= 0 {
+                        sema_die(f"ptr cannot take the address of extern {value.name}")
+                    }
+                    if sema_is_reserved_func(value.name) {
+                        sema_die(f"ptr cannot take the address of builtin {value.name}")
+                    }
+                    sema_die(f"ptr cannot take the address of unknown function {value.name}")
+                }
+            }
+            _: {}
+        }
         let source = sema_expr_type(st, node.args[0])
         if source != "ptr" && source != "i64" && source != "u64" {
             sema_die(f"ptr expected ptr, i64, or u64, got {source}")

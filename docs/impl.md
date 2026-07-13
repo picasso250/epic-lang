@@ -168,6 +168,10 @@ lane。heap allocation 使用显式 struct size；`gep struct` 的 element strid
 
 Extern FFI 可把只含整数 scalar 字段的非空用户 struct 作为同步 borrowed pointer 参数。Sema 在 extern 声明处拒绝 `bool`、reference、nested struct 和 ADT 字段；AST-to-MIR 将该参数类型降低为 `ptr`，现有 Windows x64 call lowering 直接传 payload 地址。该规则不表示 C by-value aggregate，也不允许 struct 返回。
 
+源码 `ptr(function_name)` 由 Sema 在 lexical local 未命中时解析为普通顶层函数地址；main、extern、builtin 和 method symbol 被拒绝。AST-to-MIR 直接产生 `ptr` 类型的 function symbol operand。MIR DCE 在 call edge 之外也扫描 instruction 与 terminator operand 中的内部 function symbol，保留只通过地址引用的函数。x64 lowering 将该 operand 发射为 `lea reg, [symbol]`，沿用现有 RIP-relative text relocation。
+
+`MirParam.source_type` 保存被统一 64-bit MIR value lane 擦除前的源码参数类型。lowering 先建立 address-taken function 索引；只有这些函数在共享真实入口把 `bool/u8/i16/u16/i32/u32` 的寄存器和栈参数按自然宽度 load 并扩展到 64 bit。直接调用专用函数不额外生成入口规范化，`i64/u64/ptr/reference` 也不改写。callback 没有 thunk、closure 或 runtime helper。
+
 ### ADT (Algebraic Data Types)
 
 ADT v1 使用 struct union lowering：

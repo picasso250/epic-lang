@@ -1,0 +1,9 @@
+extern "kernel32.dll" fun ConsumeCallback(callback: ptr): void
+
+fun callback(value: u32): i32 {
+    ret i32(value)
+}
+
+fun main(): void {
+    ConsumeCallback(ptr(callback))
+}

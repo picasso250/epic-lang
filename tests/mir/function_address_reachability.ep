@@ -1,0 +1,38 @@
+fun empty_function(name: str): MirFunction {
+    let fn = mir_function_empty(name, "ptr")
+    let entry = mir_block_empty("entry")
+    entry.terminator = mir_ret_value(mir_operand_null())
+    entry.has_terminator = true
+    fn.blocks.push(entry)
+    ret fn
+}
+
+fun main(): void {
+    let program = mir_program_empty()
+    let root = mir_function_empty("main", "ptr")
+    let entry = mir_block_empty("entry")
+    let keep = mir_inst_empty()
+    keep.op = "store"
+    keep.typ = "ptr"
+    keep.operands.push(mir_symbol_operand("ptr", "from_instruction"))
+    keep.operands.push(mir_operand_null())
+    entry.instructions.push(keep)
+    entry.terminator = mir_ret_value(mir_symbol_operand("ptr", "from_terminator"))
+    entry.has_terminator = true
+    root.blocks.push(entry)
+    program.functions.push(root)
+    program.functions.push(empty_function("from_instruction"))
+    program.functions.push(empty_function("from_terminator"))
+    program.functions.push(empty_function("unused"))
+
+    mir_prune_unreachable_functions(program)
+    if len(program.functions) != 3 {
+        panic "function symbol reachability count mismatch"
+    }
+    if mir_find_function(program, "from_instruction") < 0 || mir_find_function(program, "from_terminator") < 0 {
+        panic "function symbol reachability target missing"
+    }
+    if mir_find_function(program, "unused") >= 0 {
+        panic "unused function was not pruned"
+    }
+}

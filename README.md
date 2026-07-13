@@ -107,7 +107,7 @@ Epic 当前仍有以下明确边界：
 
 - 仅面向 Windows x64；尚无跨平台 ABI 承诺
 - MIR 是 LLVM 风格，但并非 LLVM IR 兼容
-- `ptr` 是公开 opaque address scalar，但不提供解引用或隐式地址算术
+- `ptr` 是公开 opaque address scalar；`ptr(top_level_function)` 可用于 owner-thread 同步 WinAPI callback，但不提供解引用、间接调用或隐式地址算术
 - 尚无完整的 SSA / phi-node 优化器流水线
 - 尚无通用汇编器或通用寄存器分配器
 - 旧的 NASM 文本汇编后端路径已归档，不再活跃
