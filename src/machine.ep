@@ -104,6 +104,10 @@ fun machine_reg64(name: str): i64 {
     if name == "r9" { ret 9 }
     if name == "r10" { ret 10 }
     if name == "r11" { ret 11 }
+    if name == "r12" { ret 12 }
+    if name == "r13" { ret 13 }
+    if name == "r14" { ret 14 }
+    if name == "r15" { ret 15 }
     machine_die(("unsupported reg64: " + name))
     ret 0
 }
@@ -334,12 +338,16 @@ fun machine_reg8(name: str): i64 {
     if name == "r9b" { ret 9 }
     if name == "r10b" { ret 10 }
     if name == "r11b" { ret 11 }
+    if name == "r12b" { ret 12 }
+    if name == "r13b" { ret 13 }
+    if name == "r14b" { ret 14 }
+    if name == "r15b" { ret 15 }
     machine_die(("unsupported reg8: " + name))
     ret 0
 }
 
 fun machine_is_reg8_name(name: str): bool {
-    if name == "al" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" {
+    if name == "al" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" || name == "r12b" || name == "r13b" || name == "r14b" || name == "r15b" {
         ret true
     }
     ret false
@@ -358,12 +366,16 @@ fun machine_reg16(name: str): i64 {
     if name == "r9w" { ret 9 }
     if name == "r10w" { ret 10 }
     if name == "r11w" { ret 11 }
+    if name == "r12w" { ret 12 }
+    if name == "r13w" { ret 13 }
+    if name == "r14w" { ret 14 }
+    if name == "r15w" { ret 15 }
     machine_die(("unsupported reg16: " + name))
     ret 0
 }
 
 fun machine_is_reg16_name(name: str): bool {
-    ret name == "ax" || name == "cx" || name == "dx" || name == "bx" || name == "sp" || name == "bp" || name == "si" || name == "di" || name == "r8w" || name == "r9w" || name == "r10w" || name == "r11w"
+    ret name == "ax" || name == "cx" || name == "dx" || name == "bx" || name == "sp" || name == "bp" || name == "si" || name == "di" || name == "r8w" || name == "r9w" || name == "r10w" || name == "r11w" || name == "r12w" || name == "r13w" || name == "r14w" || name == "r15w"
 }
 
 fun machine_reg32(name: str): i64 {
@@ -379,12 +391,16 @@ fun machine_reg32(name: str): i64 {
     if name == "r9d" { ret 9 }
     if name == "r10d" { ret 10 }
     if name == "r11d" { ret 11 }
+    if name == "r12d" { ret 12 }
+    if name == "r13d" { ret 13 }
+    if name == "r14d" { ret 14 }
+    if name == "r15d" { ret 15 }
     machine_die(("unsupported reg32: " + name))
     ret 0
 }
 
 fun machine_is_reg32_name(name: str): bool {
-    ret name == "eax" || name == "ecx" || name == "edx" || name == "ebx" || name == "esp" || name == "ebp" || name == "esi" || name == "edi" || name == "r8d" || name == "r9d" || name == "r10d" || name == "r11d"
+    ret name == "eax" || name == "ecx" || name == "edx" || name == "ebx" || name == "esp" || name == "ebp" || name == "esi" || name == "edi" || name == "r8d" || name == "r9d" || name == "r10d" || name == "r11d" || name == "r12d" || name == "r13d" || name == "r14d" || name == "r15d"
 }
 
 fun machine_emit_mov_reg_mem(b: MachineBuilder, dst: str, base: str, disp: i64): void {

@@ -162,18 +162,19 @@ ret
 
 ## 5. 当前 machine instruction subset
 
-支持的寄存器：
+当前指令形态可识别的寄存器名：
 
-- 64-bit: `rax rcx rdx rbx rsp rbp rsi rdi r8 r9 r10 r11`
-- 32-bit immediate move target: `eax ecx edx`
-- 8-bit: `al cl dl r8b r9b r10b r11b`
+- 64-bit: `rax rcx rdx rbx rsp rbp rsi rdi r8 r9 r10 r11 r12 r13 r14 r15`
+- 32-bit memory load/store: `eax ecx edx ebx esp ebp esi edi r8d r9d r10d r11d r12d r13d r14d r15d`
+- 16-bit memory store: `ax cx dx bx sp bp si di r8w r9w r10w r11w r12w r13w r14w r15w`
+- 8-bit store and immediate ALU: `al cl dl r8b r9b r10b r11b r12b r13b r14b r15b`
 
 当前 encoder 支持的指令形态：
 
 | Instruction | Supported forms |
 | --- | --- |
-| `push` | `push rbp`, `push r8` |
-| `pop` | `pop rdx`, `pop rbp` |
+| `push` | `push rbp` |
+| `pop` | `pop rbp` |
 | `ret` | no operands |
 | `sub/add` | `sub rsp, imm`, `add rsp, imm` |
 | `call` | `call Symbol` |
@@ -204,7 +205,6 @@ ret
 | Form | Notes |
 | --- | --- |
 | `mov r64, imm32/imm64` | imm64 only when outside signed 32-bit range. |
-| `mov eax/ecx/edx, imm32` | 32-bit target subset only. |
 | `mov r64, r64` | register move. |
 | `mov r64, qword [base+disp]` | base memory load. |
 | `mov r64, qword [symbol]` | RIP-relative symbol load relocation. |
@@ -216,15 +216,16 @@ ret
 
 ### 5.1 Instruction form contract
 
-以下规则是 `machine.py` 当前 encoder 的实际限制。**超出此合约的指令形式通常会被 `X64Validator` 拒绝或抛出 `MachineBackendError`**；但 validator 不是完整 x64 verifier，新增指令形态必须同时补 validator 和 encoder 测试。
+以下规则是 `src/machine.ep` 当前 encoder 的实际限制。超出此合约的指令形式会在 machine encoding 时 panic；新增指令形态必须补 encoder 测试。
 
 #### Register contract
 
 | 类别 | 支持 | 不支持 |
 |------|------|--------|
-| 64-bit | `rax rcx rdx rbx rsp rbp rsi rdi r8 r9 r10 r11` | `r12 r13 r14 r15` — encoder 未实现 REX.B 编码 |
-| 32-bit | `eax ecx edx` | `ebx esi edi r8d`… — 仅用于 `mov` 的 imm32 形式 |
-| 8-bit | `al cl dl r8b r9b r10b r11b` | `bl sil dil r12b`… — encoder 未实现低 8-bit 编码 |
+| 64-bit | `rax rcx rdx rbx rsp rbp rsi rdi r8`–`r15` | 无整数 GPR 缺口；具体指令形态仍受下表限制 |
+| 32-bit | `eax ecx edx ebx esp ebp esi edi r8d`–`r15d` | 当前只作为 `mov` memory load/store operand |
+| 16-bit | `ax cx dx bx sp bp si di r8w`–`r15w` | 当前只作为 `mov` memory store source |
+| 8-bit | `al cl dl r8b`–`r15b` | `bl spl bpl sil dil` 及 high-byte `ah ch dh bh` |
 
 #### `mov` contract
 
@@ -248,7 +249,7 @@ ret
 | 操作 | 支持形式 |
 |------|----------|
 | byte load (zero-extend) | `movzx r64, byte [mem]` |
-| byte store (8-bit reg) | `mov byte [mem], al/dl/r8b/r9b/r10b/r11b` |
+| byte store (8-bit reg) | `mov byte [mem], al/cl/dl/r8b`–`r15b` |
 | byte store (immediate) | `mov byte [mem], imm8` |
 | byte load (sign-extend) | `movsx r64, byte [mem]` (internal helpers only) |
 
@@ -275,7 +276,7 @@ ret
 
 | 形式 | 状态 | 说明 |
 |------|------|------|
-| `[base+disp]` | ✅ | base 需属于当前 REG64 集合（`rax`–`r11`）；lowering 中 `rsp`/`rbp` 最常见，但 runtime helper 也使用 `rcx`、`rsi`、`rdi`、`r8`–`r11` 等 |
+| `[base+disp]` | ✅ | base 可使用全部 16 个 64-bit GPR；lowering 中 `rsp`/`rbp` 最常见 |
 | `[symbol]` | ✅ | RIP-relative symbol load/store |
 | `[base+index*scale+disp]` | ❌ | SIB 未实现 |
 | `[base]` | ✅ | disp=0 的 `Mem(base, 0)` |

@@ -103,6 +103,70 @@ fun build_machine_immediate_fixture(): X64Program {
     ret program
 }
 
+fun build_machine_high_register_fixture(): X64Program {
+    let program = x64_program_empty()
+    x64_add_section(program, ".text")
+    x64_add_inst2(program, 1, x64_reg("r12"), x64_imm(305419896)) # x64 mov
+    x64_add_inst2(program, 1, x64_reg("r13"), x64_reg("r14")) # x64 mov
+    x64_add_inst2(program, 2, x64_reg("r15"), x64_mem_base("r12", 16, 8)) # x64 lea
+    x64_add_inst2(program, 1, x64_mem_base("r13", 0, 8), x64_reg("r14")) # x64 mov
+    x64_add_inst2(program, 1, x64_reg("r12d"), x64_mem_base("r15", 8, 4)) # x64 mov
+    x64_add_inst2(program, 1, x64_mem_base("r14", 32, 2), x64_reg("r13w")) # x64 mov
+    x64_add_inst2(program, 1, x64_mem_base("r15", 0, 1), x64_reg("r12b")) # x64 mov
+    x64_add_inst2(program, 24, x64_reg("r15b"), x64_imm(1)) # x64 add
+    ret program
+}
+
+fun assert_machine_high_register_bytes(): void {
+    let obj = machine_build_object(build_machine_high_register_fixture())
+    let expected = new i64[]
+    expected.push(73)
+    expected.push(199)
+    expected.push(196)
+    expected.push(120)
+    expected.push(86)
+    expected.push(52)
+    expected.push(18)
+    expected.push(77)
+    expected.push(137)
+    expected.push(245)
+    expected.push(77)
+    expected.push(141)
+    expected.push(124)
+    expected.push(36)
+    expected.push(16)
+    expected.push(77)
+    expected.push(137)
+    expected.push(117)
+    expected.push(0)
+    expected.push(69)
+    expected.push(139)
+    expected.push(103)
+    expected.push(8)
+    expected.push(102)
+    expected.push(69)
+    expected.push(137)
+    expected.push(110)
+    expected.push(32)
+    expected.push(69)
+    expected.push(136)
+    expected.push(39)
+    expected.push(65)
+    expected.push(128)
+    expected.push(199)
+    expected.push(1)
+    if len(obj.text) != len(expected) {
+        panic "machine high register byte length mismatch"
+    }
+    let i = 0
+    for i < len(expected) {
+        if obj.text[i] != expected[i] {
+            panic "machine high register bytes mismatch"
+        }
+        i = i + 1
+    }
+}
+
 fun assert_machine_immediate_bytes(): void {
     let obj = machine_build_object(build_machine_immediate_fixture())
     let expected = new i64[]
@@ -222,6 +286,7 @@ fun assert_machine_jcc_bytes(): void {
 
 fun main(): void {
     assert_machine_generic_register_bytes()
+    assert_machine_high_register_bytes()
     assert_machine_immediate_bytes()
     assert_machine_jcc_bytes()
     let index = machine_name_index_new(2)
