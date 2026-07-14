@@ -1,5 +1,31 @@
 # Machine byte emission fixture for self-hosted machine.ep.
 
+
+fun assert_machine_integer_bytes(): void {
+    let appended = new u8[]
+    machine_append_u32(appended, u32(4294967295))
+    machine_append_i32(appended, -2147483648)
+    let expected = new i64[] { 255, 255, 255, 255, 0, 0, 0, 128 }
+    if len(appended) != len(expected) {
+        panic "machine integer append byte length mismatch"
+    }
+    for i: 0:len(expected) {
+        if i64(appended[i]) != expected[i] {
+            panic "machine integer append bytes mismatch"
+        }
+    }
+
+    let patched = new u8[8]
+    machine_patch_u32(patched, 0, u32(305419896))
+    machine_patch_i32(patched, 4, -1)
+    let patched_expected = new i64[] { 120, 86, 52, 18, 255, 255, 255, 255 }
+    for i: 0:len(patched_expected) {
+        if i64(patched[i]) != patched_expected[i] {
+            panic "machine integer patch bytes mismatch"
+        }
+    }
+}
+
 fun build_machine_x64_fixture(): X64Program {
     let program = x64_program_empty()
     x64_add_global(program, "_start")
@@ -296,6 +322,7 @@ fun assert_machine_jcc_bytes(): void {
 }
 
 fun main(): void {
+    assert_machine_integer_bytes()
     assert_machine_generic_register_bytes()
     assert_machine_high_register_bytes()
     assert_machine_immediate_bytes()

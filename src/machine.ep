@@ -64,19 +64,18 @@ fun machine_append_byte(out: u8[], value: u8): void {
     out.push(value)
 }
 
-fun machine_u32_value(value: i64): i64 {
-    if value < 0 {
-        ret value + 4294967296
-    }
-    ret value
+fun machine_append_u32(out: u8[], value: u32): void {
+    machine_append_byte(out, u8(value))
+    machine_append_byte(out, u8(value >> 8))
+    machine_append_byte(out, u8(value >> 16))
+    machine_append_byte(out, u8(value >> 24))
 }
 
 fun machine_append_i32(out: u8[], value: i64): void {
-    let v = machine_u32_value(value)
-    machine_append_byte(out, u8(v))
-    machine_append_byte(out, u8(v >> 8))
-    machine_append_byte(out, u8(v >> 16))
-    machine_append_byte(out, u8(v >> 24))
+    if value < -2147483648 || value > 2147483647 {
+        machine_die(("i32 value out of range: " + str(value)))
+    }
+    machine_append_u32(out, u32(value))
 }
 
 fun machine_append_u64(out: u8[], value: u64): void {
@@ -242,12 +241,18 @@ fun machine_sorted_strings(names: str[]): str[] {
     ret out
 }
 
+fun machine_patch_u32(out: u8[], offset: i64, value: u32): void {
+    out[offset] = u8(value)
+    out[offset + 1] = u8(value >> 8)
+    out[offset + 2] = u8(value >> 16)
+    out[offset + 3] = u8(value >> 24)
+}
+
 fun machine_patch_i32(out: u8[], offset: i64, value: i64): void {
-    let v = machine_u32_value(value)
-    out[offset] = u8(v)
-    out[offset + 1] = u8(v >> 8)
-    out[offset + 2] = u8(v >> 16)
-    out[offset + 3] = u8(v >> 24)
+    if value < -2147483648 || value > 2147483647 {
+        machine_die(("i32 patch value out of range: " + str(value)))
+    }
+    machine_patch_u32(out, offset, u32(value))
 }
 
 fun machine_patch_fixups(b: MachineBuilder): void {

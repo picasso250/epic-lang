@@ -1,0 +1,4 @@
+fun main(): void {
+    let out = new u8[4]
+    machine_patch_i32(out, 0, -2147483649)
+}
