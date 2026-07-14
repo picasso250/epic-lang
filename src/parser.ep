@@ -14,7 +14,7 @@ fun epic_type_ends_with(s: str, suffix: str): bool {
 }
 
 fun epic_type_array_of(elem: str): str {
-    ret (elem + "[]")
+    ret f"{elem}[]"
 }
 
 fun epic_type_is_array(t: str): bool {
@@ -23,7 +23,7 @@ fun epic_type_is_array(t: str): bool {
 
 fun epic_type_array_elem(t: str): str {
     if epic_type_is_array(t) == false {
-        panic ("internal type error: expected array type, got " + t)
+        panic f"internal type error: expected array type, got {t}"
     }
     ret t[0:len(t) - 2]
 }
@@ -447,7 +447,7 @@ fun (p: Parser) advance(): Token {
 }
 
 fun parse_error(line: i64, msg: str): i64 {
-    panic (("Parse error line " + str(line)) + (": " + msg))
+    panic f"Parse error line {line}: {msg}"
     ret 1
 }
 
@@ -567,7 +567,7 @@ fun (p: Parser) parse_fn_def(): AstFunDef {
         let name = p.expect("ID")
         receiver_name = token_text(receiver)
         method_name = token_text(name)
-        symbol_name = ((receiver_type + "__") + method_name)
+        symbol_name = f"{receiver_type}__{method_name}"
         line = token_line(name)
         params.push(new AstParam { meta: ast_meta(token_line(receiver)), name: receiver_name, source_type: receiver_type_expr })
     } else {
@@ -1558,7 +1558,7 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         }
         AstFunDef n: {
             if n.method_name? {
-                dump_node_line(node, depth, "Method", ((n.receiver_type + ".") + n.method_name), type_expr_text(n.source_type), true, "", "", false)
+                dump_node_line(node, depth, "Method", f"{n.receiver_type}.{n.method_name}", type_expr_text(n.source_type), true, "", "", false)
             } else {
                 dump_node_line(node, depth, "FunDef", n.name, type_expr_text(n.source_type), true, "", "", false)
             }

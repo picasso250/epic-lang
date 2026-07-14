@@ -82,15 +82,15 @@ fun mir_to_x64_lower_empty(): MirToX64Lower {
 }
 
 fun mir_to_x64_die(msg: str): void {
-    panic ("MIR-to-X64 error: " + msg)
+    panic f"MIR-to-X64 error: {msg}"
 }
 
 fun mir_to_x64_data_label(name: str): str {
-    ret (name + "_data")
+    ret f"{name}_data"
 }
 
 fun mir_to_x64_header_label(name: str): str {
-    ret (name + "_header")
+    ret f"{name}_header"
 }
 
 fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): void {
@@ -203,7 +203,7 @@ fun mir_to_x64_value_slot(lower: MirToX64Lower, value_id: i64): i64 {
     if offset != 0 {
         ret offset
     }
-    mir_to_x64_die(("unknown MIR value: " + str(value_id)))
+    mir_to_x64_die(f"unknown MIR value: {value_id}")
     ret 0
 }
 
@@ -233,7 +233,7 @@ fun mir_to_x64_block_label(lower: MirToX64Lower, block_name: str): X64Label {
     for i: 0:len(lower.block_label_names) {
         if lower.block_label_names[i] == block_name { ret lower.block_labels[i] }
     }
-    mir_to_x64_die(("unknown MIR block: " + block_name))
+    mir_to_x64_die(f"unknown MIR block: {block_name}")
     ret new X64Label
 }
 
@@ -553,7 +553,7 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
                 x64_add_inst2(lower.x64, 2, x64_reg(reg), x64_mem_base("rbp", addr_offset, 8)) # x64 lea
                 ret
             }
-            mir_to_x64_die(("unknown MIR value: " + str(value.value_id)))
+            mir_to_x64_die(f"unknown MIR value: {value.value_id}")
         }
         MirSymbolOperand value: {
             let string_index = mir_to_x64_string_index(lower, value.name)
@@ -576,7 +576,7 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
                 x64_add_inst2(lower.x64, 2, x64_reg(reg), x64_mem_symbol(value.name, 8)) # x64 lea
                 ret
             }
-            mir_to_x64_die(("unsupported symbol operand: " + value.name))
+            mir_to_x64_die(f"unsupported symbol operand: {value.name}")
         }
     }
 }
@@ -598,7 +598,7 @@ fun mir_to_x64_struct_field_offset(lower: MirToX64Lower, struct_name: str, field
             ret lower.struct_field_offsets[i]
         }
     }
-    mir_to_x64_die(("unknown struct field index: " + struct_name))
+    mir_to_x64_die(f"unknown struct field index: {struct_name}")
     ret 0
 }
 
@@ -606,7 +606,7 @@ fun mir_to_x64_struct_size(lower: MirToX64Lower, struct_name: str): i64 {
     for i: 0:len(lower.struct_layout_names) {
         if lower.struct_layout_names[i] == struct_name { ret lower.struct_layout_sizes[i] }
     }
-    mir_to_x64_die(("unknown struct layout: " + struct_name))
+    mir_to_x64_die(f"unknown struct layout: {struct_name}")
     ret 0
 }
 

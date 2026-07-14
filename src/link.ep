@@ -735,9 +735,9 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
 fun default_out_path(obj_path: str): str {
     let dot = find_text(obj_path, ".obj")
     if dot >= 0 {
-        ret (obj_path[0:dot] + ".exe")
+        ret f"{obj_path[0:dot]}.exe"
     }
-    ret (obj_path + ".exe")
+    ret f"{obj_path}.exe"
 }
 
 fun main(): void {

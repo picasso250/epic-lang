@@ -190,7 +190,7 @@ fun x64_new_symbol_label(program: X64Program, symbol_name: str): X64Label {
 
 fun x64_label_text(label: X64Label): str {
     if len(label.symbol_name) != 0 { ret label.symbol_name }
-    ret (".L" + str(label.id))
+    ret f".L{label.id}"
 }
 
 fun x64_add_global(program: X64Program, name: str): void {
@@ -403,28 +403,28 @@ fun x64_values_text(values: u8[]): str {
 fun x64_item_text(item: X64Item): str {
     match item {
         X64GlobalItem it: {
-            ret (("global " + it.name) + "\n")
+            ret f"global {it.name}\n"
         }
         X64ExternItem it: {
-            ret (("extern " + it.name) + "\n")
+            ret f"extern {it.name}\n"
         }
         X64SectionItem it: {
-            ret (("section " + it.name) + "\n")
+            ret f"section {it.name}\n"
         }
         X64LabelItem it: {
-            ret ((x64_label_text(it.label) + ":") + "\n")
+            ret f"{x64_label_text(it.label)}:\n"
         }
         X64InstItem it: {
             if len(it.operands) == 0 {
-                ret (("    " + x64_opcode_text(it.op)) + "\n")
+                ret f"    {x64_opcode_text(it.op)}\n"
             }
-            ret (((("    " + x64_opcode_text(it.op)) + " ") + x64_operands_text(it.operands)) + "\n")
+            ret f"    {x64_opcode_text(it.op)} {x64_operands_text(it.operands)}\n"
         }
         X64DataBytesItem it: {
-            ret (((it.name + ": db ") + x64_values_text(it.values)) + "\n")
+            ret f"{it.name}: db {x64_values_text(it.values)}\n"
         }
         X64DataZeroItem it: {
-            ret ((((it.name + ": times ") + str(it.count)) + " db 0") + "\n")
+            ret f"{it.name}: times {it.count} db 0\n"
         }
     }
     ret "<bad x64 item>\n"

@@ -76,7 +76,7 @@ fun mir_unreachable_flow(): MirBlockFlow {
 }
 
 fun ast_to_mir_die(msg: str): void {
-    panic ("AST-to-MIR error: " + msg)
+    panic f"AST-to-MIR error: {msg}"
 }
 
 fun mir_epic_type(type_name: str): str {
@@ -99,7 +99,7 @@ fun mir_new_value(st: MirCodegenState): i64 {
 
 fun mir_new_block(st: MirCodegenState, prefix: str): MirBlock {
     st.block_counter += 1
-    let block = mir_block_empty((prefix + str(st.block_counter)))
+    let block = mir_block_empty(f"{prefix}{st.block_counter}")
     st.current_fn.blocks.push(block)
     ret block
 }
@@ -416,7 +416,7 @@ fun mir_emit_shift_count_check(st: MirCodegenState, count: MirOperand, source_ty
     st.current_block.has_terminator = true
     st.current_block = fail_block
     let print_args = new MirOperand[]
-    print_args.push(mir_symbol_operand("ptr", mir_string_label(st, ("panic line " + str(line) + ": invalid shift count"))))
+    print_args.push(mir_symbol_operand("ptr", mir_string_label(st, f"panic line {line}: invalid shift count")))
     mir_emit_call_inst(st, "__ep_print_str", "void", print_args)
     let nl_args = new MirOperand[]
     mir_emit_call_inst(st, "__ep_print_newline", "void", nl_args)
@@ -502,7 +502,7 @@ fun mir_field_addr(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     ops.push(base)
     ops.push(mir_const_int("i64", 0))
     ops.push(mir_const_int("i64", mir_field_index(st, struct_name, field_name)))
-    ret mir_make_gep(st, ("struct " + struct_name), ops)
+    ret mir_make_gep(st, f"struct {struct_name}", ops)
 }
 
 fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, field_name: str): MirOperand {
@@ -665,7 +665,7 @@ fun mir_alloc_struct(st: MirCodegenState, struct_name: str): MirOperand {
     let size_ops = new MirOperand[]
     size_ops.push(mir_operand_null())
     size_ops.push(mir_const_int("i64", 1))
-    let size_ptr = mir_make_gep(st, ("struct " + struct_name), size_ops)
+    let size_ptr = mir_make_gep(st, f"struct {struct_name}", size_ops)
     let size_i64 = mir_make_ptrtoint(st, size_ptr, "i64")
     let args = new MirOperand[]
     args.push(size_i64)
@@ -745,7 +745,7 @@ fun mir_string_label(st: MirCodegenState, value: str): str {
         }
     }
     st.string_counter += 1
-    let label = ("str." + str(st.string_counter))
+    let label = f"str.{st.string_counter}"
     st.string_values.push(value)
     st.string_labels.push(label)
     st.program.globals.push(mir_global_string(label, value))
@@ -1108,7 +1108,7 @@ fun mir_emit_dot_call(st: MirCodegenState, block: MirBlock, expr: AstDotCall): M
             ret mir_value_flow(mir_const_int("i64", 0), st.current_block)
         }
     }
-    let method_symbol = ((receiver_type + "__") + expr.name)
+    let method_symbol = f"{receiver_type}__{expr.name}"
     for mi: 0:len(st.func_names) {
         if st.func_names[mi] == method_symbol {
             let args = new MirOperand[]
@@ -1142,7 +1142,7 @@ fun mir_embed_resolve(source_path: str, path: str): str {
         i -= 1
         if view[i] == '/' || view[i] == '\\' {
             if i == 0 { ret source_path[0:1] + path }
-            ret source_path[0:i] + "/" + path
+            ret f"{source_path[0:i]}/{path}"
         }
     }
     ret path
@@ -1159,7 +1159,7 @@ fun mir_embed_read(source_path: str, path: str): str {
     let resolved = mir_embed_resolve(source_path, path)
     let ready = mir_embed_cstr(resolved)
     if GetFileAttributesA(u64(cstr(ready))) == u32(4294967295) {
-        ast_to_mir_die("embed file not found: " + path)
+        ast_to_mir_die(f"embed file not found: {path}")
     }
     ret str(read_file(ready))
 }
@@ -1449,7 +1449,7 @@ fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValue
 
 fun mir_emit_panic(st: MirCodegenState, block: MirBlock, stmt: AstPanic): MirBlockFlow {
     st.current_block = block
-    mir_emit_print_text(st, (("panic line " + str(stmt.meta.line)) + ": "))
+    mir_emit_print_text(st, f"panic line {stmt.meta.line}: ")
     mir_emit_print_expr(st, stmt.expr)
     mir_emit_print_newline(st)
     mir_emit_exit_current_block(st, 1)

@@ -57,7 +57,7 @@ fun machine_builder_empty(label_count: i64): MachineBuilder {
 }
 
 fun machine_die(msg: str): void {
-    panic ("machine error: " + msg)
+    panic f"machine error: {msg}"
 }
 
 fun machine_append_byte(out: u8[], value: u8): void {
@@ -66,7 +66,7 @@ fun machine_append_byte(out: u8[], value: u8): void {
 
 fun machine_append_i32(out: u8[], value: i64): void {
     if value < -2147483648 || value > 2147483647 {
-        machine_die(("i32 value out of range: " + str(value)))
+        machine_die(f"i32 value out of range: {value}")
     }
     bytes_append_u32_bits_le(out, u32(value))
 }
@@ -88,7 +88,7 @@ fun machine_reg64(name: str): i64 {
     if name == "r13" { ret 13 }
     if name == "r14" { ret 14 }
     if name == "r15" { ret 15 }
-    machine_die(("unsupported reg64: " + name))
+    machine_die(f"unsupported reg64: {name}")
     ret 0
 }
 
@@ -140,14 +140,14 @@ fun machine_mem_modrm(b: MachineBuilder, reg_field: i64, base: str, disp: i64): 
 
 fun machine_require_label_id(b: MachineBuilder, label: X64Label): void {
     if label.id < 0 || label.id >= len(b.label_offsets) {
-        machine_die(("label id out of range: " + str(label.id)))
+        machine_die(f"label id out of range: {label.id}")
     }
 }
 
 fun machine_bind_label(b: MachineBuilder, label: X64Label, offset: i64): void {
     machine_require_label_id(b, label)
     if b.label_defined[label.id] != 0 {
-        machine_die(("duplicate label binding: " + x64_label_text(label)))
+        machine_die(f"duplicate label binding: {x64_label_text(label)}")
     }
     b.label_offsets[label.id] = offset
     b.label_defined[label.id] = 1
@@ -172,14 +172,14 @@ fun machine_name_index_lookup(index: NameIndex, name: str): i64 {
 
 fun machine_name_index_insert(index: NameIndex, name: str, value: i64): void {
     if name_index_lookup(index, name) != -1 {
-        machine_die(("duplicate symbol name: " + name))
+        machine_die(f"duplicate symbol name: {name}")
     }
     name_index_put(index, name, value)
 }
 
 fun machine_name_index_set(index: NameIndex, name: str, value: i64): void {
     if name_index_lookup(index, name) == -1 {
-        machine_die(("unknown symbol name: " + name))
+        machine_die(f"unknown symbol name: {name}")
     }
     name_index_put(index, name, value)
 }
@@ -225,7 +225,7 @@ fun machine_sorted_strings(names: str[]): str[] {
 
 fun machine_patch_i32(out: u8[], offset: i64, value: i64): void {
     if value < -2147483648 || value > 2147483647 {
-        machine_die(("i32 patch value out of range: " + str(value)))
+        machine_die(f"i32 patch value out of range: {value}")
     }
     bytes_patch_u32_bits_le(out, offset, u32(value))
 }
@@ -240,7 +240,7 @@ fun machine_patch_fixups(b: MachineBuilder): void {
         } else if len(f.label.symbol_name) != 0 {
             machine_add_text_reloc(b, f.offset, f.label.symbol_name)
         } else {
-            machine_die(("unbound anonymous label: " + x64_label_text(f.label)))
+            machine_die(f"unbound anonymous label: {x64_label_text(f.label)}")
         }
     }
 }
@@ -285,7 +285,7 @@ fun machine_emit_jump(b: MachineBuilder, op: i64, label: X64Label): void {
         machine_append_byte(b.text, u8(233))
     } else {
         let opcode = machine_jcc_opcode(op)
-        if opcode < 0 { machine_die(("unsupported jump: " + x64_opcode_text(op))) }
+        if opcode < 0 { machine_die(f"unsupported jump: {x64_opcode_text(op)}") }
         machine_append_byte(b.text, u8(15))
         machine_append_byte(b.text, u8(opcode))
     }
@@ -321,7 +321,7 @@ fun machine_reg8(name: str): i64 {
     if name == "r13b" { ret 13 }
     if name == "r14b" { ret 14 }
     if name == "r15b" { ret 15 }
-    machine_die(("unsupported reg8: " + name))
+    machine_die(f"unsupported reg8: {name}")
     ret 0
 }
 
@@ -349,7 +349,7 @@ fun machine_reg16(name: str): i64 {
     if name == "r13w" { ret 13 }
     if name == "r14w" { ret 14 }
     if name == "r15w" { ret 15 }
-    machine_die(("unsupported reg16: " + name))
+    machine_die(f"unsupported reg16: {name}")
     ret 0
 }
 
@@ -374,7 +374,7 @@ fun machine_reg32(name: str): i64 {
     if name == "r13d" { ret 13 }
     if name == "r14d" { ret 14 }
     if name == "r15d" { ret 15 }
-    machine_die(("unsupported reg32: " + name))
+    machine_die(f"unsupported reg32: {name}")
     ret 0
 }
 
@@ -463,7 +463,7 @@ fun machine_emit_mov_symbol_reg(b: MachineBuilder, symbol: str, src: str): void 
 
 fun machine_emit_mov_symbol_reg8(b: MachineBuilder, symbol: str, src: str): void {
     if src != "al" {
-        machine_die(("unsupported symbol byte store register: " + src))
+        machine_die(f"unsupported symbol byte store register: {src}")
     }
     machine_append_byte(b.text, u8(136))
     machine_append_byte(b.text, u8(5))
@@ -493,7 +493,7 @@ fun machine_alu_opcode(op: i64): i64 {
     if op == 26 { ret 33 } # x64 and
     if op == 27 { ret 9 } # x64 or
     if op == 28 { ret 49 } # x64 xor
-    machine_die(("unsupported alu op: " + x64_opcode_text(op)))
+    machine_die(f"unsupported alu op: {x64_opcode_text(op)}")
     ret 0
 }
 
@@ -524,7 +524,7 @@ fun machine_emit_setcc(b: MachineBuilder, op: i64): void {
     else if op == 51 { code = 147 } # x64 setae
     else if op == 52 { code = 146 } # x64 setb
     else if op == 53 { code = 150 } # x64 setbe
-    else { machine_die(("unsupported setcc: " + x64_opcode_text(op))) }
+    else { machine_die(f"unsupported setcc: {x64_opcode_text(op)}") }
     machine_append_byte(b.text, u8(15))
     machine_append_byte(b.text, u8(code))
     machine_append_byte(b.text, u8(192))
@@ -537,7 +537,7 @@ fun machine_group1_ext(op: i64): i64 {
     if op == 25 { ret 5 } # x64 sub
     if op == 28 { ret 6 } # x64 xor
     if op == 29 { ret 7 } # x64 cmp
-    machine_die(("unsupported immediate alu op: " + x64_opcode_text(op)))
+    machine_die(f"unsupported immediate alu op: {x64_opcode_text(op)}")
     ret 0
 }
 
@@ -545,7 +545,7 @@ fun machine_emit_reg_imm_alu(b: MachineBuilder, op: i64, reg_name: str, imm: i64
     let ext = machine_group1_ext(op)
     if machine_is_reg8_name(reg_name) {
         if imm < -128 || imm > 255 {
-            machine_die(("8-bit immediate out of range: " + str(imm)))
+            machine_die(f"8-bit immediate out of range: {imm}")
         }
         let r8 = machine_reg8(reg_name)
         machine_rex(b, false, 0, r8 >> 3)
@@ -555,7 +555,7 @@ fun machine_emit_reg_imm_alu(b: MachineBuilder, op: i64, reg_name: str, imm: i64
         ret
     }
     if imm < -2147483648 || imm > 2147483647 {
-        machine_die(("64-bit alu immediate out of signed 32-bit range: " + str(imm)))
+        machine_die(f"64-bit alu immediate out of signed 32-bit range: {imm}")
     }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r >> 3)
@@ -588,7 +588,7 @@ fun machine_emit_imul_reg_reg(b: MachineBuilder, dst: str, src: str): void {
 
 fun machine_emit_imul_reg_reg_imm(b: MachineBuilder, dst: str, src: str, imm: i64): void {
     if imm < -2147483648 || imm > 2147483647 {
-        machine_die(("imul immediate out of signed 32-bit range: " + str(imm)))
+        machine_die(f"imul immediate out of signed 32-bit range: {imm}")
     }
     let d = machine_reg64(dst)
     let s = machine_reg64(src)
@@ -609,7 +609,7 @@ fun machine_emit_group3_reg(b: MachineBuilder, op: i64, reg_name: str): void {
     if op == 34 { ext = 3 } # x64 neg
     else if op == 32 { ext = 6 } # x64 div
     else if op == 33 { ext = 7 } # x64 idiv
-    else { machine_die(("unsupported group 3 op: " + x64_opcode_text(op))) }
+    else { machine_die(f"unsupported group 3 op: {x64_opcode_text(op)}") }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r >> 3)
     machine_append_byte(b.text, u8(247))
@@ -620,7 +620,7 @@ fun machine_shift_ext(op: i64): i64 {
     if op == 36 { ret 4 } # x64 shl
     if op == 37 { ret 5 } # x64 shr
     if op == 38 { ret 7 } # x64 sar
-    machine_die(("unsupported shift: " + x64_opcode_text(op)))
+    machine_die(f"unsupported shift: {x64_opcode_text(op)}")
     ret 0
 }
 
@@ -633,7 +633,7 @@ fun machine_emit_shift_reg_cl(b: MachineBuilder, op: i64, reg_name: str): void {
 
 fun machine_emit_shift_reg_imm(b: MachineBuilder, op: i64, reg_name: str, imm: i64): void {
     if imm < 0 || imm > 255 {
-        machine_die(("shift immediate out of byte range: " + str(imm)))
+        machine_die(f"shift immediate out of byte range: {imm}")
     }
     let r = machine_reg64(reg_name)
     machine_rex(b, true, 0, r >> 3)
@@ -651,7 +651,7 @@ fun machine_emit_movx_reg_mem(b: MachineBuilder, op: i64, dst: str, base: str, d
     else if op == 41 && size == 2 { machine_append_byte(b.text, u8(183)) } # x64 movzx
     else if op == 42 && size == 1 { machine_append_byte(b.text, u8(190)) } # x64 movsx
     else if op == 42 && size == 2 { machine_append_byte(b.text, u8(191)) } # x64 movsx
-    else { machine_die(("unsupported movx size: " + str(size))) }
+    else { machine_die(f"unsupported movx size: {size}") }
     machine_mem_modrm(b, d, base, disp)
 }
 
@@ -978,7 +978,7 @@ fun machine_emit_inst(b: MachineBuilder, op: i64, ops: X64Operand[]): void {
             _: {}
         }
     }
-    machine_die(("unsupported instruction: " + x64_opcode_text(op)))
+    machine_die(f"unsupported instruction: {x64_opcode_text(op)}")
 }
 
 fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
@@ -1010,15 +1010,15 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
                 }
                 ret
             }
-            machine_die(("label outside section: " + x64_label_text(it.label)))
+            machine_die(f"label outside section: {x64_label_text(it.label)}")
         }
         X64InstItem it: {
-            if b.section != ".text" { machine_die(("instruction outside .text: " + x64_opcode_text(it.op))) }
+            if b.section != ".text" { machine_die(f"instruction outside .text: {x64_opcode_text(it.op)}") }
             machine_emit_inst(b, it.op, it.operands)
             ret
         }
         X64DataBytesItem it: {
-            if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
+            if b.section != ".data" { machine_die(f"data outside .data: {it.name}") }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
             for i: 0:len(it.values) {
@@ -1027,7 +1027,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             ret
         }
         X64DataZeroItem it: {
-            if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
+            if b.section != ".data" { machine_die(f"data outside .data: {it.name}") }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
             bytes_append_zero(b.data, it.count)
@@ -1093,12 +1093,12 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
 
     for i: 0:len(b.text_reloc_names) {
         let symbol_index = machine_name_index_lookup(name_index, b.text_reloc_names[i])
-        if symbol_index < 0 { machine_die(("unknown relocation symbol: " + b.text_reloc_names[i])) }
+        if symbol_index < 0 { machine_die(f"unknown relocation symbol: {b.text_reloc_names[i]}") }
         obj.text_reloc_symbol_indexes.push(symbol_index)
     }
     for i: 0:len(b.data_reloc_names) {
         let symbol_index = machine_name_index_lookup(name_index, b.data_reloc_names[i])
-        if symbol_index < 0 { machine_die(("unknown relocation symbol: " + b.data_reloc_names[i])) }
+        if symbol_index < 0 { machine_die(f"unknown relocation symbol: {b.data_reloc_names[i]}") }
         obj.data_reloc_symbol_indexes.push(symbol_index)
     }
     ret obj

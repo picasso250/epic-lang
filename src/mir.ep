@@ -232,7 +232,7 @@ fun mir_operand_type(op: MirOperand): str {
 fun mir_operand_text(op: MirOperand): str {
     match op {
         MirValueOperand v: {
-            ret ("%" + str(v.value_id))
+            ret f"%{v.value_id}"
         }
         MirIntOperand i: {
             ret str(i.value)
@@ -307,7 +307,7 @@ fun mir_binary_kind(op: str): i64 {
     if op == "shl" { ret 11 }
     if op == "sar" { ret 12 }
     if op == "shr" { ret 13 }
-    panic ("unknown MIR binary op: " + op)
+    panic f"unknown MIR binary op: {op}"
 }
 
 fun mir_binary_op_text(kind: i64): str {
@@ -338,7 +338,7 @@ fun mir_compare_kind(op: str): i64 {
     if op == "icmp.ugt" { ret 8 }
     if op == "icmp.ule" { ret 9 }
     if op == "icmp.uge" { ret 10 }
-    panic ("unknown MIR compare op: " + op)
+    panic f"unknown MIR compare op: {op}"
 }
 
 fun mir_compare_op_text(kind: i64): str {
@@ -564,7 +564,7 @@ fun mir_ret_value(value: MirOperand): MirTerminator {
 fun mir_terminator_text(term: MirTerminator): str {
     match term {
         MirBrTerminator br: {
-            ret ("br label %" + br.target)
+            ret f"br label %{br.target}"
         }
         MirCondBrTerminator cond: {
             let buf = make_str_buf()
@@ -580,7 +580,7 @@ fun mir_terminator_text(term: MirTerminator): str {
             ret "ret void"
         }
         MirRetValueTerminator rv: {
-            ret ("ret " + mir_operand_typed_text(rv.value))
+            ret f"ret {mir_operand_typed_text(rv.value)}"
         }
     }
     ret "<bad terminator>"
@@ -706,11 +706,11 @@ fun mir_declare_extern(program: MirProgram, name: str, return_type: str, param_t
     if index >= 0 {
         let ext = program.externs[index]
         if ext.return_type != return_type || len(ext.param_types) != len(param_types) {
-            panic ("conflicting MIR declaration: " + name)
+            panic f"conflicting MIR declaration: {name}"
         }
         for i: 0:len(param_types) {
             if ext.param_types[i] != param_types[i] {
-                panic ("conflicting MIR declaration: " + name)
+                panic f"conflicting MIR declaration: {name}"
             }
         }
         ret
@@ -754,11 +754,11 @@ fun mir_declare_unresolved_calls(program: MirProgram): void {
                             if extern_index >= 0 {
                                 let ext = program.externs[extern_index]
                                 if ext.return_type != call.return_type || len(ext.param_types) != len(param_types) {
-                                    panic ("conflicting MIR declaration: " + call.callee)
+                                    panic f"conflicting MIR declaration: {call.callee}"
                                 }
                                 for pi: 0:len(param_types) {
                                     if ext.param_types[pi] != param_types[pi] {
-                                        panic ("conflicting MIR declaration: " + call.callee)
+                                        panic f"conflicting MIR declaration: {call.callee}"
                                     }
                                 }
                             } else {
@@ -1032,7 +1032,7 @@ fun mir_retain_referenced_externs(program: MirProgram): void {
     let kept = new MirExtern[]
     for i: 0:len(names) {
         let index = name_index_lookup(externs, names[i])
-        if index < 0 { panic ("missing MIR declaration: " + names[i]) }
+        if index < 0 { panic f"missing MIR declaration: {names[i]}" }
         kept.push(program.externs[index])
     }
     program.externs = kept
@@ -1092,7 +1092,7 @@ fun mir_struct_field_type_at(program: MirProgram, struct_name: str, field_index:
             ret field.field_type
         }
     }
-    panic ("missing MIR struct field: " + struct_name)
+    panic f"missing MIR struct field: {struct_name}"
 }
 
 fun mir_struct_field_offset_at(program: MirProgram, struct_name: str, field_index: i64): i64 {
@@ -1102,7 +1102,7 @@ fun mir_struct_field_offset_at(program: MirProgram, struct_name: str, field_inde
             ret field.field_offset
         }
     }
-    panic ("missing MIR struct field offset: " + struct_name)
+    panic f"missing MIR struct field offset: {struct_name}"
 }
 
 fun mir_struct_layout_index(program: MirProgram, struct_name: str): i64 {
@@ -1114,7 +1114,7 @@ fun mir_struct_layout_index(program: MirProgram, struct_name: str): i64 {
 
 fun mir_print_struct_type(program: MirProgram, struct_name: str): void {
     let layout_index = mir_struct_layout_index(program, struct_name)
-    if layout_index < 0 { panic ("missing MIR struct layout: " + struct_name) }
+    if layout_index < 0 { panic f"missing MIR struct layout: {struct_name}" }
     let layout = program.struct_layouts[layout_index]
     let buf = make_str_buf()
     str_buf_extend(buf, "type ")
@@ -1184,7 +1184,7 @@ fun mir_print_function(fn: MirFunction): void {
         if b > 0 {
             println("")
         }
-        println((fn.blocks[b].name + ":"))
+        println(f"{fn.blocks[b].name}:")
         for j: 0:len(fn.blocks[b].instructions) {
             print("  ")
             println(mir_inst_text(fn.blocks[b].instructions[j]))
@@ -1202,7 +1202,7 @@ fun mir_print_program(program: MirProgram): void {
     let extern_names = mir_referenced_external_names(program)
     for ei: 0:len(extern_names) {
         let extern_index = mir_find_extern(program, extern_names[ei])
-        if extern_index < 0 { panic ("missing MIR declaration: " + extern_names[ei]) }
+        if extern_index < 0 { panic f"missing MIR declaration: {extern_names[ei]}" }
         if printed > 0 { println("") }
         println(mir_extern_text(program.externs[extern_index]))
         printed += 1
