@@ -357,9 +357,9 @@ fun x64_mem_addr_text(op: X64Operand): str {
                 ret m.base
             }
             if m.disp > 0 {
-                ret ((m.base + "+") + str(m.disp))
+                ret f"{m.base}+{m.disp}"
             }
-            ret (m.base + str(m.disp))
+            ret f"{m.base}{m.disp}"
         }
         X64MemSymbolOperand m: { ret m.symbol }
     }
@@ -372,8 +372,8 @@ fun x64_operand_text(op: X64Operand): str {
         X64ImmOperand i: { ret str(i.value) }
         X64SymbolOperand s: { ret s.name }
         X64LabelRefOperand l: { ret x64_label_text(l.label) }
-        X64MemBaseOperand m: { ret ((x64_size_prefix(m.size) + "[") + (x64_mem_addr_text(op) + "]")) }
-        X64MemSymbolOperand m: { ret ((x64_size_prefix(m.size) + "[") + (x64_mem_addr_text(op) + "]")) }
+        X64MemBaseOperand m: { ret f"{x64_size_prefix(m.size)}[{x64_mem_addr_text(op)}]" }
+        X64MemSymbolOperand m: { ret f"{x64_size_prefix(m.size)}[{x64_mem_addr_text(op)}]" }
     }
     ret "<bad operand>"
 }
