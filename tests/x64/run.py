@@ -16,7 +16,7 @@ EXE = ROOT / "build" / "tests" / "x64.exe"
 EXPECTED = """global _start
 extern ExitProcess
 section .data
-msg: db 65, 0
+msg: db 65, 255, 0
 scratch: times 8 db 0
 section .text
 _start:

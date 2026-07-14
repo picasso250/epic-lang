@@ -1047,7 +1047,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
             for i: 0:len(it.values) {
-                machine_append_byte(b.data, u8(it.values[i]))
+                machine_append_byte(b.data, it.values[i])
             }
             ret
         }

@@ -78,9 +78,10 @@ fun build_x64_fixture(): X64Program {
     x64_add_extern(program, "ExitProcess")
     x64_add_section(program, ".data")
 
-    let msg = new i64[]
-    msg.push(65)
-    msg.push(0)
+    let msg = new u8[]
+    msg.push(u8(65))
+    msg.push(u8(255))
+    msg.push(u8(0))
     x64_add_data_bytes(program, "msg", msg)
     x64_add_data_zero(program, "scratch", 8)
 

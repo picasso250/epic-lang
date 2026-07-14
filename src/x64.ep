@@ -61,7 +61,7 @@ struct X64InstItem {
 
 struct X64DataBytesItem {
     name: str
-    values: i64[]
+    values: u8[]
 }
 
 struct X64DataZeroItem {
@@ -331,7 +331,7 @@ fun x64_add_inst3(program: X64Program, op: i64, a: X64Operand, b: X64Operand, c:
     x64_add_inst(program, op, operands)
 }
 
-fun x64_add_data_bytes(program: X64Program, label: str, values: i64[]): void {
+fun x64_add_data_bytes(program: X64Program, label: str, values: u8[]): void {
     program.items.push(new X64Item(new X64DataBytesItem { name: label, values: values }))
 }
 
@@ -389,7 +389,7 @@ fun x64_operands_text(operands: X64Operand[]): str {
     ret str_buf_finish(buf)
 }
 
-fun x64_values_text(values: i64[]): str {
+fun x64_values_text(values: u8[]): str {
     let buf = make_str_buf()
     for i: 0:len(values) {
         if i > 0 {

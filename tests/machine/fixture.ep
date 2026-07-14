@@ -32,9 +32,10 @@ fun build_machine_x64_fixture(): X64Program {
     x64_add_extern(program, "ExitProcess")
     x64_add_section(program, ".data")
 
-    let msg = new i64[]
-    msg.push(65)
-    msg.push(0)
+    let msg = new u8[]
+    msg.push(u8(65))
+    msg.push(u8(255))
+    msg.push(u8(0))
     x64_add_data_bytes(program, "msg", msg)
     x64_add_data_zero(program, "scratch", 8)
 
@@ -337,7 +338,7 @@ fun main(): void {
     if len(obj.symbol_names) != 4 || obj.symbol_names[0] != "_start" || obj.symbol_names[1] != "msg" || obj.symbol_names[2] != "scratch" || obj.symbol_names[3] != "ExitProcess" {
         panic "machine symbol order mismatch"
     }
-    if len(obj.text) != 40 || i64(obj.text[0]) != 72 || i64(obj.text[39]) != 195 || len(obj.data) != 10 || i64(obj.data[0]) != 65 {
+    if len(obj.text) != 40 || i64(obj.text[0]) != 72 || i64(obj.text[39]) != 195 || len(obj.data) != 11 || i64(obj.data[0]) != 65 || i64(obj.data[1]) != 255 {
         panic "machine bytes mismatch"
     }
     if len(obj.text_reloc_offsets) != 2 || len(obj.data_reloc_offsets) != 0 {

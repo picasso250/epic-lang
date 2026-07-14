@@ -74,16 +74,10 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
     ret new AstNode(merged)
 }
 
-fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
-    for i: 0:len(bs) {
-        out.push(i64(bs[i]))
-    }
-}
-
-fun epic_push_u64_le(out: i64[], value: u64): void {
+fun epic_push_u64_le(out: u8[], value: u64): void {
     let v = value
     for i: 0:8 {
-        out.push(i64(v & u64(255)))
+        out.push(u8(v))
         v >>= 8
     }
 }
@@ -92,14 +86,14 @@ fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
     for i: 0:len(program.globals) {
         match program.globals[i] {
             MirStringGlobal g: {
-                let values = new i64[]
-                epic_push_bytes_i64(values, bytes(g.init))
-                values.push(0)
+                let values = new u8[]
+                values.extend(bytes(g.init))
+                values.push(u8(0))
                 x64_add_data_bytes(x64, mir_to_x64_data_label(g.name), values)
                 x64_add_data_zero(x64, mir_to_x64_header_label(g.name), 24)
             }
             MirScalarGlobal g: {
-                let values = new i64[]
+                let values = new u8[]
                 epic_push_u64_le(values, u64(sema_parse_i64(g.init)))
                 x64_add_data_bytes(x64, g.name, values)
             }
