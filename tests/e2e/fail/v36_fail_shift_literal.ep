@@ -1,0 +1,6 @@
+# EXIT: 1
+# STDOUT: panic line 4: invalid shift count
+fun main(): void {
+    let value = u8(1) << 8
+    exit(i64(value))
+}

@@ -112,12 +112,24 @@ def main():
             print(f"  FAIL  {rel}")
             print(f"        {exc}")
             continue
-        if actual == expected:
-            print(f"  PASS  {rel}")
-        else:
+        if actual != expected:
             failed += 1
             print(f"  FAIL  {rel}")
             print_diff(expected, actual)
+            continue
+        if os.path.basename(path) == "pass_m36_shift_count_checks.ep":
+            literal_start = expected.index("define i64 @literal_shift(")
+            converted_start = expected.index("define i64 @converted_shift(")
+            dynamic_start = expected.index("define i64 @dynamic_shift(")
+            main_start = expected.index("define void @main(")
+            literal_body = expected[literal_start:converted_start]
+            converted_body = expected[converted_start:dynamic_start]
+            dynamic_body = expected[dynamic_start:main_start]
+            if "shift.fail" not in literal_body or "shift.fail" not in converted_body or "shift.fail" not in dynamic_body:
+                failed += 1
+                print(f"  FAIL  {rel} v0 shift runtime guards")
+                continue
+        print(f"  PASS  {rel}")
     return 1 if failed else 0
 
 

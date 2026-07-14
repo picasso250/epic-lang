@@ -1,0 +1,4 @@
+# COMPILE_FAIL: operator >> shift count expected i64, got u64
+fun main(): void {
+    let value = u64(8) >> u64(1)
+}

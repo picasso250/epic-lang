@@ -386,6 +386,12 @@ fun sema_literal_int(node: AstNode): i64 {
     ret 0
 }
 
+fun sema_check_shift_count(right_type: str, context: str): void {
+    if right_type != "i64" {
+        sema_die(f"{context} expected i64, got {right_type}")
+    }
+}
+
 fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
     if target == "u8" {
         if value < 0 || value > 255 {
@@ -745,11 +751,12 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             if sema_is_int(left) == false {
                 sema_die(f"operator {n.op} left expected integer, got {left}")
             }
+            if n.op == "<<" || n.op == ">>" {
+                sema_check_shift_count(right, f"operator {n.op} shift count")
+                ret sema_set_type(node, left)
+            }
             if sema_is_int(right) == false {
                 sema_die(f"operator {n.op} right expected integer, got {right}")
-            }
-            if n.op == "<<" || n.op == ">>" {
-                ret sema_set_type(node, left)
             }
             if left != right {
                 sema_die(f"operator {n.op} expected matching integer types, got {left} and {right}; use an explicit conversion")
@@ -1020,6 +1027,10 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             }
             if sema_is_int(target) == false {
                 sema_die(f"compound assignment expected integer target, got {target}")
+            }
+            if n.op == "<<" || n.op == ">>" {
+                sema_check_shift_count(rhs, f"compound assignment {n.op} shift count")
+                ret
             }
             if sema_is_int(rhs) == false {
                 sema_die(f"compound assignment value expected integer, got {rhs}")

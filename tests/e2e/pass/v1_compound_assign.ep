@@ -19,7 +19,7 @@ fun main(): void {
     x >>= 1
 
     let ux: u64 = u64(1) << 63
-    ux >>= u64(63)
+    ux >>= 63
     if ux != u64(1) { exit(1) }
 
     let b = new Box {}

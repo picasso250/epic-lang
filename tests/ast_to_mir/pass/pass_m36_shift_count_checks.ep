@@ -1,0 +1,15 @@
+fun literal_shift(value: u64): u64 {
+    ret value >> 8
+}
+
+fun converted_shift(value: u64): u64 {
+    ret value >> i64(8)
+}
+
+fun dynamic_shift(value: u64, count: i64): u64 {
+    ret value >> count
+}
+
+fun main(): void {
+    exit(i64(literal_shift(converted_shift(dynamic_shift(u64(65536), 1)))))
+}

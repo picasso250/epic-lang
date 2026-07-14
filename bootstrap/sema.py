@@ -260,6 +260,9 @@ class SemanticAnalyzer:
             return
         if not self._is_integer(target_type):
             self._fail(f"compound assignment expected integer target, got {target_type}")
+        if stmt.op in ("<<", ">>"):
+            self._check_shift_count(rhs, f"compound assignment {stmt.op} shift count")
+            return
         self._expect_integer(rhs, "compound assignment value")
         if target_type != rhs.type:
             self._fail(f"compound assignment expected matching integer types, got {target_type} and {rhs.type}; use an explicit conversion")
@@ -434,7 +437,7 @@ class SemanticAnalyzer:
             return ExprInfo(BOOL)
         if expr.op in ("<<", ">>"):
             self._expect_integer(left, f"operator {expr.op} left")
-            self._expect_integer(right, f"operator {expr.op} count")
+            self._check_shift_count(right, f"operator {expr.op} shift count")
             literal = self._fold_binary_literal(expr.op, left.literal_int, right.literal_int)
             return ExprInfo(left.type, literal)
         if expr.op in ("+", "-", "*", "/", "%", "&", "|", "^"):
@@ -684,6 +687,11 @@ class SemanticAnalyzer:
         lo, hi = self.INT_RANGES[target.kind]
         if not lo <= value <= hi:
             self._fail(f"{context} literal {value} out of range for {target}")
+
+    def _check_shift_count(self, right, context):
+        if right.type != I64:
+            self._fail(f"{context} expected i64, got {right.type}")
+
 
     def _expect_bool(self, info, context):
         if info.type != BOOL:
