@@ -4,8 +4,8 @@
 #
 
 struct MachineObject {
-    text: i64[]
-    data: i64[]
+    text: u8[]
+    data: u8[]
     text_reloc_offsets: i64[]
     text_reloc_symbol_indexes: i64[]
     data_reloc_offsets: i64[]
@@ -21,8 +21,8 @@ struct MachineLabelFixup {
 }
 
 struct MachineBuilder {
-    text: i64[]
-    data: i64[]
+    text: u8[]
+    data: u8[]
     section: str
     label_offsets: i64[]
     label_defined: i64[]
@@ -39,8 +39,8 @@ struct MachineBuilder {
 
 fun machine_builder_empty(label_count: i64): MachineBuilder {
     let b = new MachineBuilder
-    b.text = new i64[]
-    b.data = new i64[]
+    b.text = new u8[]
+    b.data = new u8[]
     b.section = ""
     b.label_offsets = new i64[label_count]
     b.label_defined = new i64[label_count]
@@ -60,8 +60,8 @@ fun machine_die(msg: str): void {
     panic ("machine error: " + msg)
 }
 
-fun machine_append_byte(out: i64[], value: i64): void {
-    out.push(value & 255)
+fun machine_append_byte(out: u8[], value: i64): void {
+    out.push(u8(value))
 }
 
 fun machine_u32_value(value: i64): i64 {
@@ -71,7 +71,7 @@ fun machine_u32_value(value: i64): i64 {
     ret value
 }
 
-fun machine_append_i32(out: i64[], value: i64): void {
+fun machine_append_i32(out: u8[], value: i64): void {
     let v = machine_u32_value(value)
     machine_append_byte(out, v)
     machine_append_byte(out, v >> 8)
@@ -79,7 +79,7 @@ fun machine_append_i32(out: i64[], value: i64): void {
     machine_append_byte(out, v >> 24)
 }
 
-fun machine_append_u64(out: i64[], value: u64): void {
+fun machine_append_u64(out: u8[], value: u64): void {
     machine_append_byte(out, i64(value))
     machine_append_byte(out, i64(value >> 8))
     machine_append_byte(out, i64(value >> 16))
@@ -242,12 +242,12 @@ fun machine_sorted_strings(names: str[]): str[] {
     ret out
 }
 
-fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
+fun machine_patch_i32(out: u8[], offset: i64, value: i64): void {
     let v = machine_u32_value(value)
-    out[offset] = v & 255
-    out[offset + 1] = (v >> 8) & 255
-    out[offset + 2] = (v >> 16) & 255
-    out[offset + 3] = (v >> 24) & 255
+    out[offset] = u8(v)
+    out[offset + 1] = u8(v >> 8)
+    out[offset + 2] = u8(v >> 16)
+    out[offset + 3] = u8(v >> 24)
 }
 
 fun machine_patch_fixups(b: MachineBuilder): void {
@@ -1160,10 +1160,10 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
     println(f"  timing: machine output counts: symbols={len(obj.symbol_names)} text_relocs={len(obj.text_reloc_symbol_indexes)} data_relocs={len(obj.data_reloc_symbol_indexes)}")
     ret obj
 }
-fun machine_print_bytes(label: str, values: i64[]): void {
+fun machine_print_bytes(label: str, values: u8[]): void {
     println(label)
     for i: 0:len(values) {
-        println(str(values[i]))
+        println(str(i64(values[i])))
     }
 }
 

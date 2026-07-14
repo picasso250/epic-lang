@@ -4,8 +4,8 @@ fun expect_byte(data: u8[], index: i64, expected: i64): void {
 
 fun main(): void {
     let obj = new MachineObject
-    obj.text = new i64[] { 195 }
-    obj.data = new i64[] { 1, 2 }
+    obj.text = new u8[] { u8(195) }
+    obj.data = new u8[] { u8(1), u8(2) }
     obj.text_reloc_offsets = new i64[] { 0 }
     obj.text_reloc_symbol_indexes = new i64[] { 1 }
     obj.data_reloc_offsets = new i64[]

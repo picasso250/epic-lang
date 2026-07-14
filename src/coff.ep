@@ -27,12 +27,6 @@ fun coff_append_byte(buf: u8[], value: i64): void {
     buf.push(u8(value & 255))
 }
 
-fun coff_append_i64_bytes(buf: u8[], values: i64[]): void {
-    for i: 0:len(values) {
-        coff_append_byte(buf, values[i])
-    }
-}
-
 fun coff_u32_value(value: i64): i64 {
     if value < 0 {
         ret value + 4294967296
@@ -156,8 +150,8 @@ fun coff_build_obj(obj: MachineObject): u8[] {
     data_spec.chars = 3221225536
     coff_append_section_header(buf, data_spec)
 
-    coff_append_i64_bytes(buf, obj.text)
-    coff_append_i64_bytes(buf, obj.data)
+    buf.extend(obj.text)
+    buf.extend(obj.data)
 
     for i: 0:len(obj.text_reloc_offsets) {
         coff_append_reloc(buf, obj.text_reloc_offsets[i], obj.text_reloc_symbol_indexes[i])
@@ -212,8 +206,8 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     coff_print_timing("headers", header_start, header_stop)
 
     let raw_start = coff_now_ms()
-    coff_append_i64_bytes(buf, obj.text)
-    coff_append_i64_bytes(buf, obj.data)
+    buf.extend(obj.text)
+    buf.extend(obj.data)
     let raw_stop = coff_now_ms()
     coff_print_timing("raw sections", raw_start, raw_stop)
 

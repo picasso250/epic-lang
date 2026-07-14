@@ -71,7 +71,7 @@ fun assert_machine_generic_register_bytes(): void {
     }
     let i = 0
     for i < len(expected) {
-        if obj.text[i] != expected[i] {
+        if i64(obj.text[i]) != expected[i] {
             panic "machine generic register bytes mismatch"
         }
         i = i + 1
@@ -161,7 +161,7 @@ fun assert_machine_high_register_bytes(): void {
     }
     let i = 0
     for i < len(expected) {
-        if obj.text[i] != expected[i] {
+        if i64(obj.text[i]) != expected[i] {
             panic "machine high register bytes mismatch"
         }
         i = i + 1
@@ -242,7 +242,7 @@ fun assert_machine_immediate_bytes(): void {
     }
     let i = 0
     for i < len(expected) {
-        if obj.text[i] != expected[i] {
+        if i64(obj.text[i]) != expected[i] {
             panic "machine immediate bytes mismatch"
         }
         i = i + 1
@@ -288,11 +288,11 @@ fun assert_machine_jcc_bytes(): void {
     if len(obj.text) != 97 { panic "machine jcc byte length mismatch" }
     for i: 0:16 {
         let offset = i * 6
-        if obj.text[offset] != 15 || obj.text[offset + 1] != 128 + i {
+        if i64(obj.text[offset]) != 15 || i64(obj.text[offset + 1]) != 128 + i {
             panic "machine jcc opcode mismatch"
         }
     }
-    if obj.text[96] != 195 { panic "machine jcc fixture must end in ret" }
+    if i64(obj.text[96]) != 195 { panic "machine jcc fixture must end in ret" }
 }
 
 fun main(): void {
@@ -310,7 +310,7 @@ fun main(): void {
     if len(obj.symbol_names) != 4 || obj.symbol_names[0] != "_start" || obj.symbol_names[1] != "msg" || obj.symbol_names[2] != "scratch" || obj.symbol_names[3] != "ExitProcess" {
         panic "machine symbol order mismatch"
     }
-    if len(obj.text) != 40 || obj.text[0] != 72 || obj.text[39] != 195 || len(obj.data) != 10 || obj.data[0] != 65 {
+    if len(obj.text) != 40 || i64(obj.text[0]) != 72 || i64(obj.text[39]) != 195 || len(obj.data) != 10 || i64(obj.data[0]) != 65 {
         panic "machine bytes mismatch"
     }
     if len(obj.text_reloc_offsets) != 2 || len(obj.data_reloc_offsets) != 0 {
