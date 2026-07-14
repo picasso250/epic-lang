@@ -61,6 +61,9 @@ fun use_scalars(): i64 {
     let converted_bool = bool(a)
     let sum = a + b * 3 - 4 / 2 + 5 % 2
     let shifted = (sum << 1) >> 2
+    let shift_count: i64 = 1
+    let shifted_u64: u64 = u64(8) >> shift_count
+    shifted_u64 >>= 1
     let bits = ~shifted & 255 | 16 ^ 3
     let cmp = sum == shifted || sum != bits && sum < bits || sum <= bits && bits > 0 || bits >= 0
     let logic = ok && !no || converted_bool

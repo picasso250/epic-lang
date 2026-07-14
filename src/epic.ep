@@ -84,7 +84,7 @@ fun epic_push_u64_le(out: i64[], value: u64): void {
     let v = value
     for i: 0:8 {
         out.push(i64(v & u64(255)))
-        v >>= u64(8)
+        v >>= 8
     }
 }
 

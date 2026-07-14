@@ -49,7 +49,7 @@ fun run(): i64 {
     if i64(boxes[0].small) != 0 { ret 30 }
     boxes[0].signed += i16(1)
     if i64(boxes[0].signed) != (0 - 32768) { ret 31 }
-    boxes[0].signed >>= i16(1)
+    boxes[0].signed >>= 1
     if i64(boxes[0].signed) != (0 - 16384) { ret 32 }
 
     let words = new u32[1]

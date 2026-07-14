@@ -58,7 +58,7 @@ src/epic.ep
 
 #### v0 bootstrap branch
 
-`v0` 是可演进的 bootstrap 分支。其 Python `bootstrap/` 与 Epic `src/` 对公开语言语义保持一致：`>>` / `>>=` 按左值 signedness 选择 `sar` / `shr`，`>>>` / `>>>=` 已删除，`embed "path"` 在两条实现中都按包含源文件解析并嵌入原始字节。
+`v0` 是可演进的 bootstrap 分支。其 Python `bootstrap/` 与 Epic `src/` 对公开语言语义保持一致：`>>` / `>>=` 按左值 signedness 选择 `sar` / `shr`，所有 shift count 都必须是 `i64`。当前 `dev` 对裸整数字面量由 sema 按左侧位宽静态检查，非字面量由 MIR lowering 生成运行时检查；`v0` 为保持 bootstrap 简单，对所有 count 一律生成运行时检查。`>>>` / `>>>=` 已删除，`embed "path"` 在两条实现中都按包含源文件解析并嵌入原始字节。
 
 `build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，运行该 revision 自己的 fixed-point 构建，并校验 revision 中提交的 SHA-256。当前 seed 本身已嵌入其 runtime 资源，不依赖调用目录中的 `runtime/`。
 

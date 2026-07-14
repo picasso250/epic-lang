@@ -27,6 +27,33 @@ def main():
         print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
         return 1
     print("  PASS  function address symbol operand")
+
+    case = ROOT / "tests" / "ast_to_mir" / "pass" / "shift_count_checks.ep"
+    result = subprocess.run([str(tool), str(case)], cwd=ROOT, capture_output=True)
+    output = result.stdout.decode("utf-8", errors="replace")
+    if result.returncode != 0:
+        print((result.stdout + result.stderr).decode("utf-8", errors="replace")[-2000:])
+        return 1
+    try:
+        literal_start = output.index("define i64 @literal_shift(")
+        converted_start = output.index("define i64 @converted_shift(")
+        dynamic_start = output.index("define i64 @dynamic_shift(")
+        main_start = output.index("define void @main(")
+    except ValueError:
+        print(output[-3000:])
+        return 1
+    literal_body = output[literal_start:converted_start]
+    converted_body = output[converted_start:dynamic_start]
+    dynamic_body = output[dynamic_start:main_start]
+    if (
+        " = shr " not in literal_body
+        or "shift.fail" in literal_body
+        or "shift.fail" not in converted_body
+        or "shift.fail" not in dynamic_body
+    ):
+        print(output[-3000:])
+        return 1
+    print("  PASS  shift count static/dynamic checks")
     return 0
 
 

@@ -1,0 +1,5 @@
+# COMPILE_FAIL_CONTAINS: compound assignment >> shift count literal 64 out of range for u64; expected 0 <= count < 64
+fun main(): void {
+    let value: u64 = u64(8)
+    value >>= 64
+}

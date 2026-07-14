@@ -18,7 +18,7 @@ fun main(): void {
     x ^= 3
 
     let logical: u64 = u64(0) - u64(1)
-    logical >>= u64(1)
+    logical >>= 1
     if logical != u64(9223372036854775807) { exit(1) }
 
     let b = new Box {}

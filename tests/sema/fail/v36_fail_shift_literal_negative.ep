@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: operator >> shift count literal -1 out of range for u64; expected 0 <= count < 64
+fun main(): void {
+    let value = u64(1) >> -1
+}
