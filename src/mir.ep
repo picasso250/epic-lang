@@ -956,8 +956,8 @@ fun mir_escape_bytes(text: str): str {
         } else {
             out.push(u8(92))
             out.push(u8(120))
-            out.push(mir_hex_digit(i64(c) / 16))
-            out.push(mir_hex_digit(i64(c) % 16))
+            out.push(mir_hex_digit(i64(c) >> 4))
+            out.push(mir_hex_digit(i64(c) & 15))
         }
     }
     ret str(out)

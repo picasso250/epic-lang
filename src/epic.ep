@@ -80,11 +80,11 @@ fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
     }
 }
 
-fun epic_push_u64_le(out: i64[], value: i64): void {
+fun epic_push_u64_le(out: i64[], value: u64): void {
     let v = value
     for i: 0:8 {
-        out.push(v & 255)
-        v /= 256
+        out.push(i64(v & u64(255)))
+        v >>= u64(8)
     }
 }
 
@@ -100,7 +100,7 @@ fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
             }
             MirScalarGlobal g: {
                 let values = new i64[]
-                epic_push_u64_le(values, sema_parse_i64(g.init))
+                epic_push_u64_le(values, u64(sema_parse_i64(g.init)))
                 x64_add_data_bytes(x64, g.name, values)
             }
             MirDeclGlobal g: {

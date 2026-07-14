@@ -41,17 +41,16 @@ fun coff_u32_value(value: i64): i64 {
 }
 
 fun coff_append_u16(buf: u8[], value: i64): void {
-    let v = value
-    coff_append_byte(buf, v)
-    coff_append_byte(buf, v / 256)
+    coff_append_byte(buf, value)
+    coff_append_byte(buf, value >> 8)
 }
 
 fun coff_append_u32(buf: u8[], value: i64): void {
     let v = coff_u32_value(value)
     coff_append_byte(buf, v)
-    coff_append_byte(buf, v / 256)
-    coff_append_byte(buf, v / 65536)
-    coff_append_byte(buf, v / 16777216)
+    coff_append_byte(buf, v >> 8)
+    coff_append_byte(buf, v >> 16)
+    coff_append_byte(buf, v >> 24)
 }
 
 fun coff_append_name8(buf: u8[], name: str): void {

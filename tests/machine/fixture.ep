@@ -100,6 +100,7 @@ fun build_machine_immediate_fixture(): X64Program {
     wide_mul.push(x64_reg("r10"))
     wide_mul.push(x64_imm(1000))
     x64_add_inst(program, 31, wide_mul) # x64 imul
+    x64_add_inst2(program, 1, x64_reg("rax"), x64_imm(-4294967296)) # x64 mov
     ret program
 }
 
@@ -226,6 +227,16 @@ fun assert_machine_immediate_bytes(): void {
     expected.push(3)
     expected.push(0)
     expected.push(0)
+    expected.push(72)
+    expected.push(184)
+    expected.push(0)
+    expected.push(0)
+    expected.push(0)
+    expected.push(0)
+    expected.push(255)
+    expected.push(255)
+    expected.push(255)
+    expected.push(255)
     if len(obj.text) != len(expected) {
         panic "machine immediate byte length mismatch"
     }

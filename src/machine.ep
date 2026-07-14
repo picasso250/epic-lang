@@ -74,21 +74,20 @@ fun machine_u32_value(value: i64): i64 {
 fun machine_append_i32(out: i64[], value: i64): void {
     let v = machine_u32_value(value)
     machine_append_byte(out, v)
-    machine_append_byte(out, v / 256)
-    machine_append_byte(out, v / 65536)
-    machine_append_byte(out, v / 16777216)
+    machine_append_byte(out, v >> 8)
+    machine_append_byte(out, v >> 16)
+    machine_append_byte(out, v >> 24)
 }
 
-fun machine_append_u64(out: i64[], value: i64): void {
-    let v = value
-    machine_append_byte(out, v)
-    machine_append_byte(out, v / 256)
-    machine_append_byte(out, v / 65536)
-    machine_append_byte(out, v / 16777216)
-    machine_append_byte(out, v / 4294967296)
-    machine_append_byte(out, v / 1099511627776)
-    machine_append_byte(out, v / 281474976710656)
-    machine_append_byte(out, v / 72057594037927936)
+fun machine_append_u64(out: i64[], value: u64): void {
+    machine_append_byte(out, i64(value))
+    machine_append_byte(out, i64(value >> 8))
+    machine_append_byte(out, i64(value >> 16))
+    machine_append_byte(out, i64(value >> 24))
+    machine_append_byte(out, i64(value >> 32))
+    machine_append_byte(out, i64(value >> 40))
+    machine_append_byte(out, i64(value >> 48))
+    machine_append_byte(out, i64(value >> 56))
 }
 
 fun machine_reg64(name: str): i64 {
@@ -123,7 +122,7 @@ fun machine_is_reg(op: X64Operand, name: str): bool {
 fun machine_rex(b: MachineBuilder, w: bool, r: i64, rb: i64): void {
     let value = 64
     if w { value |= 8 }
-    value |= ((r & 1) * 4)
+    value |= ((r & 1) << 2)
     value |= (rb & 1)
     if value != 64 {
         machine_append_byte(b.text, value)
@@ -131,7 +130,7 @@ fun machine_rex(b: MachineBuilder, w: bool, r: i64, rb: i64): void {
 }
 
 fun machine_modrm(b: MachineBuilder, mod: i64, reg: i64, rm: i64): void {
-    machine_append_byte(b.text, ((mod & 3) * 64) | ((reg & 7) * 8) | (rm & 7))
+    machine_append_byte(b.text, ((mod & 3) << 6) | ((reg & 7) << 3) | (rm & 7))
 }
 
 fun machine_mem_modrm(b: MachineBuilder, reg_field: i64, base: str, disp: i64): void {
@@ -246,9 +245,9 @@ fun machine_sorted_strings(names: str[]): str[] {
 fun machine_patch_i32(out: i64[], offset: i64, value: i64): void {
     let v = machine_u32_value(value)
     out[offset] = v & 255
-    out[offset + 1] = (v / 256) & 255
-    out[offset + 2] = (v / 65536) & 255
-    out[offset + 3] = (v / 16777216) & 255
+    out[offset + 1] = (v >> 8) & 255
+    out[offset + 2] = (v >> 16) & 255
+    out[offset + 3] = (v >> 24) & 255
 }
 
 fun machine_patch_fixups(b: MachineBuilder): void {
@@ -269,9 +268,9 @@ fun machine_patch_fixups(b: MachineBuilder): void {
 fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
     let reg = machine_reg64(dst)
     if imm < -2147483648 || imm > 2147483647 {
-        machine_rex(b, true, 0, reg / 8)
+        machine_rex(b, true, 0, reg >> 3)
         machine_append_byte(b.text, 184 + (reg & 7))
-        machine_append_u64(b.text, imm)
+        machine_append_u64(b.text, u64(imm))
         ret
     }
     if dst == "rax" {
@@ -281,7 +280,7 @@ fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
         machine_append_i32(b.text, imm)
         ret
     }
-    machine_rex(b, true, 0, reg / 8)
+    machine_rex(b, true, 0, reg >> 3)
     machine_append_byte(b.text, 199)
     machine_modrm(b, 3, 0, reg)
     machine_append_i32(b.text, imm)
@@ -290,7 +289,7 @@ fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
 fun machine_emit_mov_reg_reg(b: MachineBuilder, dst: str, src: str): void {
     let d = machine_reg64(dst)
     let s = machine_reg64(src)
-    machine_rex(b, true, s / 8, d / 8)
+    machine_rex(b, true, s >> 3, d >> 3)
     machine_append_byte(b.text, 137)
     machine_modrm(b, 3, s, d)
 }
@@ -317,9 +316,9 @@ fun machine_emit_jump(b: MachineBuilder, op: i64, label: X64Label): void {
 
 fun machine_emit_lea_symbol(b: MachineBuilder, dst: str, symbol: str): void {
     let d = machine_reg64(dst)
-    machine_rex(b, true, d / 8, 0)
+    machine_rex(b, true, d >> 3, 0)
     machine_append_byte(b.text, 141)
-    machine_append_byte(b.text, 5 | ((d & 7) * 8))
+    machine_append_byte(b.text, 5 | ((d & 7) << 3))
     machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
@@ -407,13 +406,13 @@ fun machine_emit_mov_reg_mem(b: MachineBuilder, dst: str, base: str, disp: i64):
     let base_code = machine_reg64(base)
     if machine_is_reg32_name(dst) {
         let d32 = machine_reg32(dst)
-        machine_rex(b, false, d32 / 8, base_code / 8)
+        machine_rex(b, false, d32 >> 3, base_code >> 3)
         machine_append_byte(b.text, 139)
         machine_mem_modrm(b, d32, base, disp)
         ret
     }
     let d = machine_reg64(dst)
-    machine_rex(b, true, d / 8, base_code / 8)
+    machine_rex(b, true, d >> 3, base_code >> 3)
     machine_append_byte(b.text, 139)
     machine_mem_modrm(b, d, base, disp)
 }
@@ -422,7 +421,7 @@ fun machine_emit_mov_mem_reg(b: MachineBuilder, base: str, disp: i64, src: str):
     let base_code = machine_reg64(base)
     if machine_is_reg8_name(src) {
         let s8 = machine_reg8(src)
-        machine_rex(b, false, s8 / 8, base_code / 8)
+        machine_rex(b, false, s8 >> 3, base_code >> 3)
         machine_append_byte(b.text, 136)
         machine_mem_modrm(b, s8, base, disp)
         ret
@@ -430,27 +429,27 @@ fun machine_emit_mov_mem_reg(b: MachineBuilder, base: str, disp: i64, src: str):
     if machine_is_reg16_name(src) {
         let s16 = machine_reg16(src)
         machine_append_byte(b.text, 102)
-        machine_rex(b, false, s16 / 8, base_code / 8)
+        machine_rex(b, false, s16 >> 3, base_code >> 3)
         machine_append_byte(b.text, 137)
         machine_mem_modrm(b, s16, base, disp)
         ret
     }
     if machine_is_reg32_name(src) {
         let s32 = machine_reg32(src)
-        machine_rex(b, false, s32 / 8, base_code / 8)
+        machine_rex(b, false, s32 >> 3, base_code >> 3)
         machine_append_byte(b.text, 137)
         machine_mem_modrm(b, s32, base, disp)
         ret
     }
     let src64 = machine_reg64(src)
-    machine_rex(b, true, src64 / 8, base_code / 8)
+    machine_rex(b, true, src64 >> 3, base_code >> 3)
     machine_append_byte(b.text, 137)
     machine_mem_modrm(b, src64, base, disp)
 }
 
 fun machine_emit_mov_mem_imm8(b: MachineBuilder, base: str, disp: i64, imm: i64): void {
     let base_code = machine_reg64(base)
-    machine_rex(b, false, 0, base_code / 8)
+    machine_rex(b, false, 0, base_code >> 3)
     machine_append_byte(b.text, 198)
     machine_mem_modrm(b, 0, base, disp)
     machine_append_byte(b.text, imm)
@@ -458,7 +457,7 @@ fun machine_emit_mov_mem_imm8(b: MachineBuilder, base: str, disp: i64, imm: i64)
 
 fun machine_emit_mov_mem_imm64(b: MachineBuilder, base: str, disp: i64, imm: i64): void {
     let base_code = machine_reg64(base)
-    machine_rex(b, true, 0, base_code / 8)
+    machine_rex(b, true, 0, base_code >> 3)
     machine_append_byte(b.text, 199)
     machine_mem_modrm(b, 0, base, disp)
     machine_append_i32(b.text, imm)
@@ -466,18 +465,18 @@ fun machine_emit_mov_mem_imm64(b: MachineBuilder, base: str, disp: i64, imm: i64
 
 fun machine_emit_mov_reg_symbol(b: MachineBuilder, dst: str, symbol: str): void {
     let d = machine_reg64(dst)
-    machine_rex(b, true, d / 8, 0)
+    machine_rex(b, true, d >> 3, 0)
     machine_append_byte(b.text, 139)
-    machine_append_byte(b.text, 5 | ((d & 7) * 8))
+    machine_append_byte(b.text, 5 | ((d & 7) << 3))
     machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
 
 fun machine_emit_mov_symbol_reg(b: MachineBuilder, symbol: str, src: str): void {
     let s = machine_reg64(src)
-    machine_rex(b, true, s / 8, 0)
+    machine_rex(b, true, s >> 3, 0)
     machine_append_byte(b.text, 137)
-    machine_append_byte(b.text, 5 | ((s & 7) * 8))
+    machine_append_byte(b.text, 5 | ((s & 7) << 3))
     machine_add_text_reloc(b, len(b.text), symbol)
     machine_append_i32(b.text, 0)
 }
@@ -495,7 +494,7 @@ fun machine_emit_mov_symbol_reg8(b: MachineBuilder, symbol: str, src: str): void
 fun machine_emit_lea_base_disp(b: MachineBuilder, dst: str, base: str, disp: i64): void {
     let d = machine_reg64(dst)
     let base_code = machine_reg64(base)
-    machine_rex(b, true, d / 8, base_code / 8)
+    machine_rex(b, true, d >> 3, base_code >> 3)
     machine_append_byte(b.text, 141)
     machine_mem_modrm(b, d, base, disp)
 }
@@ -503,7 +502,7 @@ fun machine_emit_lea_base_disp(b: MachineBuilder, dst: str, base: str, disp: i64
 fun machine_emit_cmp_reg_reg(b: MachineBuilder, left: str, right: str): void {
     let l = machine_reg64(left)
     let r = machine_reg64(right)
-    machine_rex(b, true, r / 8, l / 8)
+    machine_rex(b, true, r >> 3, l >> 3)
     machine_append_byte(b.text, 57)
     machine_modrm(b, 3, r, l)
 }
@@ -521,14 +520,14 @@ fun machine_alu_opcode(op: i64): i64 {
 fun machine_emit_reg_reg_alu(b: MachineBuilder, op: i64, dst: str, src: str): void {
     let d = machine_reg64(dst)
     let s = machine_reg64(src)
-    machine_rex(b, true, s / 8, d / 8)
+    machine_rex(b, true, s >> 3, d >> 3)
     machine_append_byte(b.text, machine_alu_opcode(op))
     machine_modrm(b, 3, s, d)
 }
 
 fun machine_emit_test_reg_reg(b: MachineBuilder, reg_name: str): void {
     let r = machine_reg64(reg_name)
-    machine_rex(b, true, r / 8, r / 8)
+    machine_rex(b, true, r >> 3, r >> 3)
     machine_append_byte(b.text, 133)
     machine_modrm(b, 3, r, r)
 }
@@ -569,7 +568,7 @@ fun machine_emit_reg_imm_alu(b: MachineBuilder, op: i64, reg_name: str, imm: i64
             machine_die(("8-bit immediate out of range: " + str(imm)))
         }
         let r8 = machine_reg8(reg_name)
-        machine_rex(b, false, 0, r8 / 8)
+        machine_rex(b, false, 0, r8 >> 3)
         machine_append_byte(b.text, 128)
         machine_modrm(b, 3, ext, r8)
         machine_append_byte(b.text, imm)
@@ -579,7 +578,7 @@ fun machine_emit_reg_imm_alu(b: MachineBuilder, op: i64, reg_name: str, imm: i64
         machine_die(("64-bit alu immediate out of signed 32-bit range: " + str(imm)))
     }
     let r = machine_reg64(reg_name)
-    machine_rex(b, true, 0, r / 8)
+    machine_rex(b, true, 0, r >> 3)
     if imm >= -128 && imm <= 127 {
         machine_append_byte(b.text, 131)
         machine_modrm(b, 3, ext, r)
@@ -593,7 +592,7 @@ fun machine_emit_reg_imm_alu(b: MachineBuilder, op: i64, reg_name: str, imm: i64
 
 fun machine_emit_inc_dec(b: MachineBuilder, op: i64, reg_name: str): void {
     let r = machine_reg64(reg_name)
-    machine_rex(b, true, 0, r / 8)
+    machine_rex(b, true, 0, r >> 3)
     machine_append_byte(b.text, 255)
     if op == 39 { machine_modrm(b, 3, 0, r) } else { machine_modrm(b, 3, 1, r) } # x64 inc
 }
@@ -601,7 +600,7 @@ fun machine_emit_inc_dec(b: MachineBuilder, op: i64, reg_name: str): void {
 fun machine_emit_imul_reg_reg(b: MachineBuilder, dst: str, src: str): void {
     let d = machine_reg64(dst)
     let s = machine_reg64(src)
-    machine_rex(b, true, d / 8, s / 8)
+    machine_rex(b, true, d >> 3, s >> 3)
     machine_append_byte(b.text, 15)
     machine_append_byte(b.text, 175)
     machine_modrm(b, 3, d, s)
@@ -613,7 +612,7 @@ fun machine_emit_imul_reg_reg_imm(b: MachineBuilder, dst: str, src: str, imm: i6
     }
     let d = machine_reg64(dst)
     let s = machine_reg64(src)
-    machine_rex(b, true, d / 8, s / 8)
+    machine_rex(b, true, d >> 3, s >> 3)
     if imm >= -128 && imm <= 127 {
         machine_append_byte(b.text, 107)
         machine_modrm(b, 3, d, s)
@@ -632,7 +631,7 @@ fun machine_emit_group3_reg(b: MachineBuilder, op: i64, reg_name: str): void {
     else if op == 33 { ext = 7 } # x64 idiv
     else { machine_die(("unsupported group 3 op: " + x64_opcode_text(op))) }
     let r = machine_reg64(reg_name)
-    machine_rex(b, true, 0, r / 8)
+    machine_rex(b, true, 0, r >> 3)
     machine_append_byte(b.text, 247)
     machine_modrm(b, 3, ext, r)
 }
@@ -647,7 +646,7 @@ fun machine_shift_ext(op: i64): i64 {
 
 fun machine_emit_shift_reg_cl(b: MachineBuilder, op: i64, reg_name: str): void {
     let r = machine_reg64(reg_name)
-    machine_rex(b, true, 0, r / 8)
+    machine_rex(b, true, 0, r >> 3)
     machine_append_byte(b.text, 211)
     machine_modrm(b, 3, machine_shift_ext(op), r)
 }
@@ -657,7 +656,7 @@ fun machine_emit_shift_reg_imm(b: MachineBuilder, op: i64, reg_name: str, imm: i
         machine_die(("shift immediate out of byte range: " + str(imm)))
     }
     let r = machine_reg64(reg_name)
-    machine_rex(b, true, 0, r / 8)
+    machine_rex(b, true, 0, r >> 3)
     machine_append_byte(b.text, 193)
     machine_modrm(b, 3, machine_shift_ext(op), r)
     machine_append_byte(b.text, imm)
@@ -666,7 +665,7 @@ fun machine_emit_shift_reg_imm(b: MachineBuilder, op: i64, reg_name: str, imm: i
 fun machine_emit_movx_reg_mem(b: MachineBuilder, op: i64, dst: str, base: str, disp: i64, size: i64): void {
     let d = machine_reg64(dst)
     let base_code = machine_reg64(base)
-    machine_rex(b, true, d / 8, base_code / 8)
+    machine_rex(b, true, d >> 3, base_code >> 3)
     machine_append_byte(b.text, 15)
     if op == 41 && size == 1 { machine_append_byte(b.text, 182) } # x64 movzx
     else if op == 41 && size == 2 { machine_append_byte(b.text, 183) } # x64 movzx
@@ -679,7 +678,7 @@ fun machine_emit_movx_reg_mem(b: MachineBuilder, op: i64, dst: str, base: str, d
 fun machine_emit_movsxd_reg_mem32(b: MachineBuilder, dst: str, base: str, disp: i64): void {
     let d = machine_reg64(dst)
     let base_code = machine_reg64(base)
-    machine_rex(b, true, d / 8, base_code / 8)
+    machine_rex(b, true, d >> 3, base_code >> 3)
     machine_append_byte(b.text, 99)
     machine_mem_modrm(b, d, base, disp)
 }
