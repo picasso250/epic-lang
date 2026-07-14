@@ -128,13 +128,13 @@ _slice = {
 }
 ```
 
-当前实现保留独立的源码级 `str` 类型，但让它与 `u8[]` 共享运行时 header 布局。字符串字面量被深拷贝到堆存储中，末尾附加一个 NUL 字节。`len` 不包含 NUL；`cap` 至少覆盖 `len + 1` 的 NUL 结尾存储。空字符串在 `len = 0` 时可能 `data = 0`。
+当前实现保留独立的源码级 `str` 类型，但让它与 `u8[]` 共享运行时 header 布局。字符串字面量在 `.data` 中发射 `len + 1` 字节并显式附加 NUL；动态字符串通过 `__ep_str_from_bytes` 保证 `data[len] == 0`。`len` 不包含 NUL。动态字符串的 backing capacity 至少覆盖 `len + 1`，静态字符串 header 可保留 `cap = 0` 作为静态/需迁移标记。
 
 > 当前 `str` 是 byte-oriented string，不定义 UTF-8/Unicode 字符语义。
 > 语言不承诺 string literal 物理不可变：相同内容的字面量可能共享同一 buffer，
 > 修改 `bytes(s)` 的结果对所有共享 view 可见。
-> `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节），
-> 所以 `str(bytes)` 和 `bytes(str)` 都是 identity cast。
+> `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节）。
+> `bytes(str)` 是 identity view；`str(bytes)` 复用同一 header，但会确保尾部 NUL，必要时扩容并替换 backing data。
 
 ### 动态数组 / Slice Header (Dynamic Array)
 
@@ -237,13 +237,13 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(x)`           | formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、非 `u8[]` array 不支持 | 公开 |
+| `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 复用 header 并通过 `__ep_str_from_bytes` 保证尾部 NUL，必要时扩容。struct、非 `u8[]` array 不支持 | 公开 |
 | `str + str`         | `__ep_str_cat`，分配新字符串并复制两侧内容 | 公开语法 |
 | `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
 | `read_file`        | `runtime/file.ep` 中的 `__ep_read_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
 | `write_file`       | `runtime/file.ep` 中的 `__ep_write_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
-| `str` / `u8[]` view | 显式 zero-copy layout reinterpret；源码类型保持不同 | 公开 |
-| `bytes`            | zero-copy layout reinterpret                | 公开 |
+| `str(u8[])`        | 复用 header，保持逻辑字节不变，必要时扩容并写入尾部 NUL | 公开 |
+| `bytes(str)`       | zero-copy layout view                       | 公开 |
 | `cptr` / `cstr`    | inline aggregate data/payload pointer lowering；`cstr` 是 deprecated alias；无 runtime helper 或检查 | 公开 |
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |

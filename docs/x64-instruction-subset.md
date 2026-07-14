@@ -386,8 +386,9 @@ and safety checks are represented as ordinary MIR definitions and calls.
 `src/mir_runtime.ep` injects the shared runtime, inserts preparation calls, and
 prunes unreachable functions.
 
-`bytes(str)` and `str(u8[])` are identity casts in lowering, not runtime helper
-calls.
+`bytes(str)` is an identity cast in lowering. `str(u8[])` calls the MIR runtime helper
+`__ep_str_from_bytes` to preserve the shared header while ensuring `data[len] == 0`;
+capacity growth may replace the backing allocation.
 
 Base helper bodies, array helpers, and panic are bundled in `runtime/mir/helpers.ir`;
 string and file helpers are written in Epic. `src/runtime_bundle.ep` embeds both MIR bundles

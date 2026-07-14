@@ -1,0 +1,26 @@
+# EXIT: 0
+# STDOUT: true
+
+extern "kernel32.dll" fun lstrlenA(text: ptr): i32
+
+fun c_len(value: str): i64 {
+    ret i64(lstrlenA(cptr(value)))
+}
+
+fun check_text(value: str, expected: i64): void {
+    if len(value) != expected || c_len(value) != expected {
+        panic "string NUL termination check failed"
+    }
+}
+
+fun main(): void {
+    check_text("abcd", 4)
+    check_text("ab" + "cd", 4)
+    check_text(f"a{12}b", 4)
+    check_text(str(u64(1234)), 4)
+    check_text(str(0 - 123), 4)
+    check_text("abcdef"[1:5], 4)
+    check_text(str(new u8[] { 'a', 'b', 'c', 'd' }), 4)
+    check_text(str(new u8[]), 0)
+    println(str(true))
+}

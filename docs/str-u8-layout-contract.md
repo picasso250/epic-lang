@@ -41,20 +41,30 @@ formatting.
 { data, len, cap }
 ```
 
-Therefore these explicit conversions are representation-level identity views:
+The shared header makes `bytes(str_value)` a representation-level identity view.
+`str(bytes_value)` reuses the same header, but first normalizes the backing storage
+through `__ep_str_from_bytes`: it reserves space for one trailing byte when needed
+and writes `data[len] = 0`. The logical length is unchanged, but reserve may replace
+and copy the backing allocation.
 
 ```epic
-str(bytes_value)   # u8[] -> str view
-bytes(str_value)   # str -> u8[] view
+str(bytes_value)   # same header; ensure trailing NUL, may grow backing storage
+bytes(str_value)   # zero-copy identity view
 ```
 
-They do not allocate, copy, validate UTF-8, or make data immutable. Mutating the
-`u8[]` returned by `bytes(s)` mutates the shared backing storage visible through
-`s` and any other aliases.
+Neither conversion validates UTF-8 or makes data immutable. Mutating the `u8[]`
+returned by `bytes(s)` mutates the shared backing storage visible through `s` and
+any other aliases. A mutation that fills or extends the buffer can overwrite the
+terminator; converting the byte view back with `str(bytes(s))` re-establishes it.
 
 The shared layout is an implementation contract, not a statement that the two
 source types are interchangeable. There is no implicit assignment conversion
 between `str` and `u8[]`.
+
+A well-formed compiler/runtime-produced `str` has a zero byte at `data[len]`;
+`len(s)` never includes that terminator. Static string globals emit `len + 1` bytes
+in `.data` and may keep `cap = 0` as non-growable/static metadata. Dynamically
+normalized strings have capacity for at least `len + 1` bytes.
 
 ## Text model
 
@@ -75,12 +85,12 @@ but that is not a plan to delete the `str` source type.
 Use `str` for text values, diagnostics, labels, paths, command-line arguments,
 and formatting results. Use `u8[]` for mutable buffers and arbitrary binary data.
 
-Current zero-copy casts are useful at explicit boundaries:
+The explicit boundaries are:
 
 - `read_file(path: str) -> u8[]`
 - `write_file(path: str, data: u8[]) -> i64`
-- `str(bytes) -> str`
-- `bytes(str) -> u8[]`
+- `str(bytes) -> str` — same header, terminator normalization may grow storage
+- `bytes(str) -> u8[]` — zero-copy view
 
 Public APIs should preserve this semantic distinction even while the layouts are
 identical.

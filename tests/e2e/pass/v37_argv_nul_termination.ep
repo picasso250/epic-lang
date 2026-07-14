@@ -1,0 +1,22 @@
+# ARGV: hello "wide world" "" tail
+# EXIT: 0
+# STDOUT: true
+
+extern "kernel32.dll" fun lstrlenA(text: ptr): i32
+
+fun check_arg(index: i64, expected: i64): void {
+    if len(argv[index]) != expected || lstrlenA(cptr(argv[index])) != i32(expected) {
+        exit(index + 1)
+    }
+}
+
+fun main(): void {
+    if len(argv) != 5 {
+        exit(1)
+    }
+    check_arg(1, 5)
+    check_arg(2, 10)
+    check_arg(3, 0)
+    check_arg(4, 4)
+    println(str(true))
+}

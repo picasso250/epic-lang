@@ -313,10 +313,10 @@ match n {
 
 `str` 是保留的源码级字节字符串/文本类型；`u8[]` 是可变字节缓冲。字符串字面量产生 `str`，`==` / `!=` 做内容比较，`+` 分配并返回新的 `str`。`u8[]` 使用数组索引和 `push` / `pop` / `extend`，不获得隐式文本语义。
 
-当前两者运行时 header 相同，均为 `{data, len, cap}`，因此显式 `str(bytes)` / `bytes(str)` 是零拷贝 view。共享布局不代表源码类型相同，也不引入隐式赋值转换。`len(s)` 计数字节数，不包含尾部 NUL；当前不做 UTF-8 校验、不提供 Unicode 字符索引，也不承诺不可变。详见 [`str-u8-layout-contract.md`](str-u8-layout-contract.md)。
+当前两者运行时 header 相同，均为 `{data, len, cap}`。`bytes(str)` 是零拷贝 view；`str(bytes)` 复用同一 header，但会保证 `data[len] == 0`，必要时扩容并替换 backing data。共享布局不代表源码类型相同，也不引入隐式赋值转换。`len(s)` 计数字节数，不包含尾部 NUL；当前不做 UTF-8 校验、不提供 Unicode 字符索引，也不承诺不可变。详见 [`str-u8-layout-contract.md`](str-u8-layout-contract.md)。
 
-> 当前 Epic compiler 依赖 `str` layout 与 `u8[]` 完全一致（{data, len, cap} 均为 24 字节），
-> 使得 `str(bytes)` 和 `bytes(str)` 都是 identity cast，零分配零复制。
+> 当前 Epic compiler 依赖 `str` layout 与 `u8[]` 完全一致（{data, len, cap} 均为 24 字节）。
+> `bytes(str)` 是 identity cast；`str(bytes)` 是同-header 的 NUL-normalizing conversion。
 > 按字节读取或修改必须显式转成 byte view：`let b = bytes(s); b[i] = v`。
 
 ### 动态数组 (Dynamic Arrays)
@@ -393,14 +393,14 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` 在失败时返回空的 `u8[]`。当前实现写在 `runtime/file.ep`，通过 `cptr(str/u8[])` 调用同步 WinAPI；`write_file` 返回 WinAPI 报告的写入字节数，打开失败返回 `-1`。`str(u8[])` 是 zero-copy layout 重解释：把同 layout 的 `u8[]` 显式视为 `str`，不分配不复制。`bytes(str)` 同理。
+`read_file` 在失败时返回空的 `u8[]`。当前实现写在 `runtime/file.ep`，通过 `cptr(str/u8[])` 调用同步 WinAPI；`write_file` 返回 WinAPI 报告的写入字节数，打开失败返回 `-1`。`str(u8[])` 复用原 header，并通过 `__ep_str_from_bytes` 保证尾部 NUL；如果原容量没有 `len + 1` 空间，会扩容并复制 backing bytes。`bytes(str)` 仍是零拷贝 view。
 
-`str(bytes)` 与 `bytes(str)` 是显式的零拷贝 view 转换。它们连接文本与可变字节缓冲边界，但不会消除 `str` 这个独立源码类型。
+这两个显式转换连接文本与可变字节缓冲边界，但不会消除 `str` 这个独立源码类型。
 
-`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是 bytes view/cast；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])` 和 `str(bool[])` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
+`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是同-header 的 NUL-normalizing conversion；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])` 和 `str(bool[])` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
 
 
-> ⚠ 修改 `bytes(str)` 返回的 `u8[]` 会修改原 `str` 的底层 buffer。如果多个 `str` 共享同一 buffer（例如相同内容的字面量），修改对所有 view 可见。语言不承诺 string literal 物理不可变。
+> ⚠ 修改 `bytes(str)` 返回的 `u8[]` 会修改原 `str` 的底层 buffer。如果多个 `str` 共享同一 buffer（例如相同内容的字面量），修改对所有 view 可见。增长或填满 buffer 还可能覆盖尾部 NUL；在传给 C 字符串 API 前可用 `str(bytes(s))` 重新规范化。语言不承诺 string literal 物理不可变。
 
 常规源码加载方式：
 
@@ -437,7 +437,7 @@ let source = str(read_file(path))
 | `a.pop()`              | 删除并返回最后一个元素；空数组 panic            |
 | `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |
 
-`cptr` 接受 `str`、元素为 `bool`/整数/`ptr` 的数组和非空 FFI-safe 用户 struct。`cptr(str)` / `cptr(T[])` 直接读取 `{data,len,cap}` header 的 `data`；空数组自然返回 `ptr(0)`。数组 data 按元素的自然宽度连续存放：`bool/u8=1`、`i16/u16=2`、`i32/u32=4`、`i64/u64/ptr=8`。`cptr(struct)` 直接返回 non-moving heap payload 地址。这些形式都不做 null、NUL、长度、容量或内容检查，不分配、不复制，也不转移所有权。外部代码必须按静态元素表示访问数组；Win32 `BOOL[]` 应使用 `i32[]`，一字节 `BOOLEAN[]` 才对应 `bool[]` 或 `u8[]`。内嵌 NUL 合法，传给 C 字符串 API 时，C 只能看到第一个 NUL 之前的前缀。
+`cptr` 接受 `str`、元素为 `bool`/整数/`ptr` 的数组和非空 FFI-safe 用户 struct。`cptr(str)` / `cptr(T[])` 直接读取 `{data,len,cap}` header 的 `data`；空数组自然返回 `ptr(0)`。数组 data 按元素的自然宽度连续存放：`bool/u8=1`、`i16/u16=2`、`i32/u32=4`、`i64/u64/ptr=8`。`cptr(struct)` 直接返回 non-moving heap payload 地址。`cptr` 本身不做 null、NUL、长度、容量或内容检查，不分配、不复制，也不转移所有权；正常字符串构造路径会维护 `data[len] == 0`，但显式 byte-view 修改可能破坏该条件。外部代码必须按静态元素表示访问数组；Win32 `BOOL[]` 应使用 `i32[]`，一字节 `BOOLEAN[]` 才对应 `bool[]` 或 `u8[]`。内嵌 NUL 合法，传给 C 字符串 API 时，C 只能看到第一个 NUL 之前的前缀。
 
 `cptr` 拒绝 `str[]`、struct/union 数组、嵌套数组等 managed-reference 元素数组。Epic 的这些数组保存连续的 8-byte managed reference，不能充当 WinAPI 所要求的 inline C struct 数组；需要显式指针数组时先构造 `ptr[]`。当前语言不提供 inline aggregate array。
 

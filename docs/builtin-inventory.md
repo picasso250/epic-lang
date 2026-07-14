@@ -23,7 +23,7 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `println()` | `() -> void`; writes one newline | `__ep_print_newline` |
 | `println(text)` | `str -> void`; writes text and one newline | `__ep_print_str`, then `__ep_print_newline` |
 | `exit(code)` | `i64 -> void`; terminates the process | `ExitProcess` |
-| `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity view for `str`/`u8[]`, runtime formatting for scalar values |
+| `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity for `str`, NUL-normalizing same-header conversion for `u8[]`, runtime formatting for scalar values |
 | `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
 | `cptr(value)` | accepts `str`, a bool/integer/ptr array, or a non-empty FFI-safe user struct; returns `ptr` | direct data/payload pointer lowering with no runtime checks |
 | `cstr(text)` | `str -> ptr` | deprecated alias of `cptr(text)`; no NUL validation or helper call |
@@ -38,8 +38,10 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `read_file(path)` | `str -> u8[]` | `__ep_read_file` |
 | `write_file(path, data)` | `(str, u8[]) -> i64` | `__ep_write_file` |
 
-`str(u8[])` and `bytes(str)` are representation-preserving views. They do not perform
-UTF-8 validation and do not allocate merely to change the static source type.
+`bytes(str)` is a representation-preserving zero-copy view. `str(u8[])` keeps the same
+header and logical bytes, but invokes `__ep_str_from_bytes` to reserve a trailing slot and
+write NUL; it may therefore replace and copy the backing allocation. Neither conversion
+performs UTF-8 validation.
 
 ## Public array methods
 
@@ -91,7 +93,7 @@ extern "kernel32.dll" fun Sleep(milliseconds: u32): void
 The public extern ABI accepts the public integer scalar types and opaque `ptr`, plus
 those types or `void` as returns. Foreign pointers, nullable addresses, and handles use
 `ptr`. Strings, byte buffers, and FFI-safe struct payloads cross the boundary only through
-explicit borrowed pointers from `cptr(...)`; no implicit conversion or NUL guarantee exists.
+explicit borrowed pointers from `cptr(...)`; `cptr` itself performs no conversion or NUL validation.
 
 The compiler lowers source imports to self-describing symbols of the form
 `__ep_import$<dll>$<symbol>`. The linker groups them by DLL and does not use a function
@@ -103,7 +105,7 @@ Backend-private helpers are ordinary MIR functions, not language builtins. Curre
 categories include:
 
 - allocation, GC, and startup: `__ep_alloc`, collector helpers, `__ep_runtime_start`;
-- string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers; `cptr`/`cstr` require no runtime helper;
+- string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers, `__ep_str_from_bytes`, and `__ep_str_copy`; `cptr`/`cstr` themselves require no runtime helper;
 - string operations used by syntax: equality, concatenation, and slicing;
 - file operations: Epic implementations of `__ep_read_file` and `__ep_write_file` from `runtime/file.ep`;
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;

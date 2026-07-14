@@ -377,7 +377,8 @@ jmp  LabelRef(fn_name.else_target)
 
 MIR preparation 在 `main` entry 插入 `__ep_runtime_start`。该 MIR helper 缓存
 `GetProcessHeap()` 的结果，再调用 `__ep_argv_init` 并把结果存入 `argv`
-global；`__ep_alloc` 直接读取 cached heap，随后与普通函数一样 lowering。
+global。`__ep_argv_init` 为每个参数复制 `len + 1` 字节并写入尾部 NUL；`__ep_alloc`
+直接读取 cached heap，随后与普通函数一样 lowering。
 
 ### 8.3 Runtime helper emission
 
@@ -399,11 +400,12 @@ All array headers use the single `_slice { data, len, cap }` MIR layout. Helpers
 return raw slot addresses where scalar semantics matter; AST-to-MIR emits the
 static `i8`/`i16`/`u16`/`i32`/`u32`/`i64`/`ptr` load or store so narrow signedness
 and truncation remain compile-time properties rather than runtime dispatch.
-`bytes(str)` and `str(u8[])` are lowered as identity casts. `cptr(str/T[])`, where
-`T` is `bool`, an integer, or `ptr`,
-loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
-pointer unchanged; deprecated `cstr(str)` uses the same lowering. None require a MIR
-runtime function or runtime validation. Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and
+`bytes(str)` is lowered as an identity cast. `str(u8[])` calls `__ep_str_from_bytes`,
+which preserves the header and logical length while reserving `len + 1` capacity when
+needed and writing `data[len] = 0`. `cptr(str/T[])`, where `T` is `bool`, an integer, or
+`ptr`, loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
+pointer unchanged; deprecated `cstr(str)` uses the same lowering and performs no validation.
+Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and
 use `cptr(str/u8[])` plus explicit pointer-typed WinAPI externs. Their MIR signatures match the
 public builtins exactly: one path operand for read, and path plus data operands for write.
 `runtime/mir/helpers.ir` contains no same-named fallback bodies.
