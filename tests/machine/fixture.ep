@@ -1,9 +1,41 @@
 # Machine byte emission fixture for self-hosted machine.ep.
 
 
+fun assert_byte_endian_helpers(): void {
+    let values = new u8[]
+    bytes_append_u16_le(values, 4660)
+    bytes_append_u32_le(values, 305419896)
+    bytes_append_u64_le(values, u64(72623859790382856))
+    if len(values) != 14 {
+        panic "byte endian append length mismatch"
+    }
+    if bytes_read_u16_le(values, 0) != u64(4660) {
+        panic "byte endian u16 read mismatch"
+    }
+    if bytes_read_u32_le(values, 2) != u64(305419896) {
+        panic "byte endian u32 read mismatch"
+    }
+    let expected = new i64[] { 52, 18, 120, 86, 52, 18, 8, 7, 6, 5, 4, 3, 2, 1 }
+    for i: 0:len(expected) {
+        if i64(values[i]) != expected[i] {
+            panic "byte endian append bytes mismatch"
+        }
+    }
+
+    let patched = new u8[12]
+    bytes_patch_u32_le(patched, 0, 4294967295)
+    bytes_patch_u64_le(patched, 4, u64(72623859790382856))
+    let patched_expected = new i64[] { 255, 255, 255, 255, 8, 7, 6, 5, 4, 3, 2, 1 }
+    for i: 0:len(patched_expected) {
+        if i64(patched[i]) != patched_expected[i] {
+            panic "byte endian patch bytes mismatch"
+        }
+    }
+}
+
 fun assert_machine_integer_bytes(): void {
     let appended = new u8[]
-    machine_append_u32(appended, u32(4294967295))
+    bytes_append_u32_bits_le(appended, u32(4294967295))
     machine_append_i32(appended, -2147483648)
     let expected = new i64[] { 255, 255, 255, 255, 0, 0, 0, 128 }
     if len(appended) != len(expected) {
@@ -16,7 +48,7 @@ fun assert_machine_integer_bytes(): void {
     }
 
     let patched = new u8[8]
-    machine_patch_u32(patched, 0, u32(305419896))
+    bytes_patch_u32_bits_le(patched, 0, u32(305419896))
     machine_patch_i32(patched, 4, -1)
     let patched_expected = new i64[] { 120, 86, 52, 18, 255, 255, 255, 255 }
     for i: 0:len(patched_expected) {
@@ -323,6 +355,7 @@ fun assert_machine_jcc_bytes(): void {
 }
 
 fun main(): void {
+    assert_byte_endian_helpers()
     assert_machine_integer_bytes()
     assert_machine_generic_register_bytes()
     assert_machine_high_register_bytes()

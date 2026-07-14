@@ -16,6 +16,89 @@ fun str_buf_finish(buf: u8[]): str {
     ret str(buf)
 }
 
+fun bytes_append_zero(buf: u8[], count: i64): void {
+    for i: 0:count {
+        buf.push(u8(0))
+    }
+}
+
+fun bytes_read_u16_le(buf: u8[], offset: i64): u64 {
+    ret u64(buf[offset]) | (u64(buf[offset + 1]) << 8)
+}
+
+fun bytes_read_u32_le(buf: u8[], offset: i64): u64 {
+    ret u64(buf[offset]) | (u64(buf[offset + 1]) << 8) | (u64(buf[offset + 2]) << 16) | (u64(buf[offset + 3]) << 24)
+}
+
+fun bytes_patch_u32_bits_le(buf: u8[], offset: i64, value: u32): void {
+    buf[offset] = u8(value)
+    buf[offset + 1] = u8(value >> 8)
+    buf[offset + 2] = u8(value >> 16)
+    buf[offset + 3] = u8(value >> 24)
+}
+
+fun bytes_patch_u32_le(buf: u8[], offset: i64, value: i64): void {
+    if value < 0 || value > 4294967295 {
+        panic f"u32 little-endian value out of range: {value}"
+    }
+    bytes_patch_u32_bits_le(buf, offset, u32(value))
+}
+
+fun bytes_patch_u64_le(buf: u8[], offset: i64, value: u64): void {
+    buf[offset] = u8(value)
+    buf[offset + 1] = u8(value >> 8)
+    buf[offset + 2] = u8(value >> 16)
+    buf[offset + 3] = u8(value >> 24)
+    buf[offset + 4] = u8(value >> 32)
+    buf[offset + 5] = u8(value >> 40)
+    buf[offset + 6] = u8(value >> 48)
+    buf[offset + 7] = u8(value >> 56)
+}
+
+fun bytes_append_u16_le(buf: u8[], value: i64): void {
+    if value < 0 || value > 65535 {
+        panic f"u16 little-endian value out of range: {value}"
+    }
+    buf.push(u8(value))
+    buf.push(u8(value >> 8))
+}
+
+fun bytes_append_u32_bits_le(buf: u8[], value: u32): void {
+    buf.push(u8(value))
+    buf.push(u8(value >> 8))
+    buf.push(u8(value >> 16))
+    buf.push(u8(value >> 24))
+}
+
+fun bytes_append_u32_le(buf: u8[], value: i64): void {
+    if value < 0 || value > 4294967295 {
+        panic f"u32 little-endian value out of range: {value}"
+    }
+    bytes_append_u32_bits_le(buf, u32(value))
+}
+
+fun bytes_append_u64_le(buf: u8[], value: u64): void {
+    buf.push(u8(value))
+    buf.push(u8(value >> 8))
+    buf.push(u8(value >> 16))
+    buf.push(u8(value >> 24))
+    buf.push(u8(value >> 32))
+    buf.push(u8(value >> 40))
+    buf.push(u8(value >> 48))
+    buf.push(u8(value >> 56))
+}
+
+fun bytes_append_name8(buf: u8[], name: str): void {
+    let value = bytes(name)
+    for i: 0:8 {
+        if i < len(value) {
+            buf.push(value[i])
+        } else {
+            buf.push(u8(0))
+        }
+    }
+}
+
 struct NameIndex {
     capacity: i64
     count: i64

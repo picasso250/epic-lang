@@ -64,29 +64,11 @@ fun machine_append_byte(out: u8[], value: u8): void {
     out.push(value)
 }
 
-fun machine_append_u32(out: u8[], value: u32): void {
-    machine_append_byte(out, u8(value))
-    machine_append_byte(out, u8(value >> 8))
-    machine_append_byte(out, u8(value >> 16))
-    machine_append_byte(out, u8(value >> 24))
-}
-
 fun machine_append_i32(out: u8[], value: i64): void {
     if value < -2147483648 || value > 2147483647 {
         machine_die(("i32 value out of range: " + str(value)))
     }
-    machine_append_u32(out, u32(value))
-}
-
-fun machine_append_u64(out: u8[], value: u64): void {
-    machine_append_byte(out, u8(value))
-    machine_append_byte(out, u8(value >> 8))
-    machine_append_byte(out, u8(value >> 16))
-    machine_append_byte(out, u8(value >> 24))
-    machine_append_byte(out, u8(value >> 32))
-    machine_append_byte(out, u8(value >> 40))
-    machine_append_byte(out, u8(value >> 48))
-    machine_append_byte(out, u8(value >> 56))
+    bytes_append_u32_bits_le(out, u32(value))
 }
 
 fun machine_reg64(name: str): i64 {
@@ -241,18 +223,11 @@ fun machine_sorted_strings(names: str[]): str[] {
     ret out
 }
 
-fun machine_patch_u32(out: u8[], offset: i64, value: u32): void {
-    out[offset] = u8(value)
-    out[offset + 1] = u8(value >> 8)
-    out[offset + 2] = u8(value >> 16)
-    out[offset + 3] = u8(value >> 24)
-}
-
 fun machine_patch_i32(out: u8[], offset: i64, value: i64): void {
     if value < -2147483648 || value > 2147483647 {
         machine_die(("i32 patch value out of range: " + str(value)))
     }
-    machine_patch_u32(out, offset, u32(value))
+    bytes_patch_u32_bits_le(out, offset, u32(value))
 }
 
 fun machine_patch_fixups(b: MachineBuilder): void {
@@ -275,7 +250,7 @@ fun machine_emit_mov_reg_imm(b: MachineBuilder, dst: str, imm: i64): void {
     if imm < -2147483648 || imm > 2147483647 {
         machine_rex(b, true, 0, reg >> 3)
         machine_append_byte(b.text, u8(184 + (reg & 7)))
-        machine_append_u64(b.text, u64(imm))
+        bytes_append_u64_le(b.text, u64(imm))
         ret
     }
     if dst == "rax" {
@@ -1055,9 +1030,7 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             if b.section != ".data" { machine_die(("data outside .data: " + it.name)) }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
-            for i: 0:it.count {
-                machine_append_byte(b.data, u8(0))
-            }
+            bytes_append_zero(b.data, it.count)
             ret
         }
     }

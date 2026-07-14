@@ -23,52 +23,17 @@ fun coff_section_spec(name: str, size: i64, raw: i64, rel_off: i64): CoffSection
     ret spec
 }
 
-fun coff_append_byte(buf: u8[], value: i64): void {
-    buf.push(u8(value & 255))
-}
-
-fun coff_u32_value(value: i64): i64 {
-    if value < 0 {
-        ret value + 4294967296
-    }
-    ret value
-}
-
-fun coff_append_u16(buf: u8[], value: i64): void {
-    coff_append_byte(buf, value)
-    coff_append_byte(buf, value >> 8)
-}
-
-fun coff_append_u32(buf: u8[], value: i64): void {
-    let v = coff_u32_value(value)
-    coff_append_byte(buf, v)
-    coff_append_byte(buf, v >> 8)
-    coff_append_byte(buf, v >> 16)
-    coff_append_byte(buf, v >> 24)
-}
-
-fun coff_append_name8(buf: u8[], name: str): void {
-    let bs = bytes(name)
-    for i: 0:8 {
-        if i < len(bs) {
-            buf.push(bs[i])
-        } else {
-            coff_append_byte(buf, 0)
-        }
-    }
-}
-
 fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
     let bs = bytes(name)
     if len(bs) <= 8 {
-        coff_append_name8(buf, name)
+        bytes_append_name8(buf, name)
         ret
     }
     let off = 4 + len(strings)
-    coff_append_u32(buf, 0)
-    coff_append_u32(buf, off)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, off)
     strings.extend(bs)
-    coff_append_byte(strings, 0)
+    strings.push(u8(0))
 }
 
 fun coff_now_ms(): i64 {
@@ -80,41 +45,41 @@ fun coff_print_timing(label: str, start: i64, stop: i64): void {
 }
 
 fun coff_append_section_header(buf: u8[], spec: CoffSectionSpec): void {
-    coff_append_name8(buf, spec.name)
-    coff_append_u32(buf, 0)
-    coff_append_u32(buf, 0)
-    coff_append_u32(buf, spec.size)
+    bytes_append_name8(buf, spec.name)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, spec.size)
     if spec.size != 0 {
-        coff_append_u32(buf, spec.raw)
+        bytes_append_u32_le(buf, spec.raw)
     } else {
-        coff_append_u32(buf, 0)
+        bytes_append_u32_le(buf, 0)
     }
     if spec.rel_count != 0 {
-        coff_append_u32(buf, spec.rel_off)
+        bytes_append_u32_le(buf, spec.rel_off)
     } else {
-        coff_append_u32(buf, 0)
+        bytes_append_u32_le(buf, 0)
     }
-    coff_append_u32(buf, 0)
-    coff_append_u16(buf, spec.rel_count)
-    coff_append_u16(buf, 0)
-    coff_append_u32(buf, spec.chars)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u16_le(buf, spec.rel_count)
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u32_le(buf, spec.chars)
 }
 
 fun coff_append_symbols(symtab: u8[], obj: MachineObject, strings: u8[]): void {
     for i: 0:len(obj.symbol_names) {
         coff_append_coff_name(symtab, obj.symbol_names[i], strings)
-        coff_append_u32(symtab, obj.symbol_values[i])
-        coff_append_u16(symtab, obj.symbol_sections[i])
-        coff_append_u16(symtab, 0)
-        coff_append_byte(symtab, 2)
-        coff_append_byte(symtab, 0)
+        bytes_append_u32_le(symtab, obj.symbol_values[i])
+        bytes_append_u16_le(symtab, obj.symbol_sections[i])
+        bytes_append_u16_le(symtab, 0)
+        symtab.push(u8(2))
+        symtab.push(u8(0))
     }
 }
 
 fun coff_append_reloc(buf: u8[], off: i64, symbol_index: i64): void {
-    coff_append_u32(buf, off)
-    coff_append_u32(buf, symbol_index)
-    coff_append_u16(buf, 4)
+    bytes_append_u32_le(buf, off)
+    bytes_append_u32_le(buf, symbol_index)
+    bytes_append_u16_le(buf, 4)
 }
 
 fun coff_build_obj(obj: MachineObject): u8[] {
@@ -133,13 +98,13 @@ fun coff_build_obj(obj: MachineObject): u8[] {
     coff_append_symbols(symtab, obj, strings)
 
     let buf = new u8[]
-    coff_append_u16(buf, 34404)
-    coff_append_u16(buf, section_count)
-    coff_append_u32(buf, 0)
-    coff_append_u32(buf, symtab_off)
-    coff_append_u32(buf, len(obj.symbol_names))
-    coff_append_u16(buf, 0)
-    coff_append_u16(buf, 0)
+    bytes_append_u16_le(buf, 34404)
+    bytes_append_u16_le(buf, section_count)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, symtab_off)
+    bytes_append_u32_le(buf, len(obj.symbol_names))
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u16_le(buf, 0)
 
     let text_spec = coff_section_spec(".text", len(obj.text), text_raw, text_rel_off)
     text_spec.rel_count = len(obj.text_reloc_offsets)
@@ -161,7 +126,7 @@ fun coff_build_obj(obj: MachineObject): u8[] {
     }
 
     buf.extend(symtab)
-    coff_append_u32(buf, 4 + len(strings))
+    bytes_append_u32_le(buf, 4 + len(strings))
     buf.extend(strings)
     ret buf
 }
@@ -186,13 +151,13 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
 
     let header_start = coff_now_ms()
     let buf = new u8[]
-    coff_append_u16(buf, 34404)
-    coff_append_u16(buf, section_count)
-    coff_append_u32(buf, 0)
-    coff_append_u32(buf, symtab_off)
-    coff_append_u32(buf, len(obj.symbol_names))
-    coff_append_u16(buf, 0)
-    coff_append_u16(buf, 0)
+    bytes_append_u16_le(buf, 34404)
+    bytes_append_u16_le(buf, section_count)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, symtab_off)
+    bytes_append_u32_le(buf, len(obj.symbol_names))
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u16_le(buf, 0)
 
     let text_spec = coff_section_spec(".text", len(obj.text), text_raw, text_rel_off)
     text_spec.rel_count = len(obj.text_reloc_offsets)
@@ -223,7 +188,7 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
 
     let final_start = coff_now_ms()
     buf.extend(symtab)
-    coff_append_u32(buf, 4 + len(strings))
+    bytes_append_u32_le(buf, 4 + len(strings))
     buf.extend(strings)
     let final_stop = coff_now_ms()
     coff_print_timing("final append", final_start, final_stop)

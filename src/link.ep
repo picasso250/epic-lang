@@ -53,80 +53,12 @@ fun align_to(n: i64, a: i64): i64 {
     ret ((n + a - 1) / a) * a
 }
 
-fun append_zero(buf: u8[], n: i64): void {
-    for i: 0:n {
-        buf.push(u8(0))
-    }
+fun le16_as_i64(buf: u8[], offset: i64): i64 {
+    ret i64(bytes_read_u16_le(buf, offset))
 }
 
-fun u16_le(buf: u8[], off: i64): u64 {
-    ret u64(buf[off]) | (u64(buf[off + 1]) << 8)
-}
-
-fun u32_le(buf: u8[], off: i64): u64 {
-    ret u64(buf[off]) | (u64(buf[off + 1]) << 8) | (u64(buf[off + 2]) << 16) | (u64(buf[off + 3]) << 24)
-}
-
-fun le16_as_i64(buf: u8[], off: i64): i64 {
-    ret i64(u16_le(buf, off))
-}
-
-fun le32_as_i64(buf: u8[], off: i64): i64 {
-    ret i64(u32_le(buf, off))
-}
-
-fun put_u16_le(buf: u8[], off: i64, x: u64): void {
-    if x > u64(65535) {
-        panic ("put_u16_le overflow: " + str(x))
-    }
-    buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >> 8) & u64(255))
-}
-
-fun put_u32_le(buf: u8[], off: i64, x: u64): void {
-    if x > u64(4294967295) {
-        panic ("put_u32_le overflow: " + str(x))
-    }
-    buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >> 8) & u64(255))
-    buf[off + 2] = u8((x >> 16) & u64(255))
-    buf[off + 3] = u8((x >> 24) & u64(255))
-}
-
-fun put_u64_le(buf: u8[], off: i64, x: u64): void {
-    buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >> 8) & u64(255))
-    buf[off + 2] = u8((x >> 16) & u64(255))
-    buf[off + 3] = u8((x >> 24) & u64(255))
-    buf[off + 4] = u8((x >> 32) & u64(255))
-    buf[off + 5] = u8((x >> 40) & u64(255))
-    buf[off + 6] = u8((x >> 48) & u64(255))
-    buf[off + 7] = u8((x >> 56) & u64(255))
-}
-
-fun append_u16(buf: u8[], x: i64): void {
-    let off = len(buf)
-    append_zero(buf, 2)
-    put_u16_le(buf, off, u64(x))
-}
-
-fun put_u32_bits_le(buf: u8[], off: i64, x: u64): void {
-    buf[off] = u8(x & u64(255))
-    buf[off + 1] = u8((x >> 8) & u64(255))
-    buf[off + 2] = u8((x >> 16) & u64(255))
-    buf[off + 3] = u8((x >> 24) & u64(255))
-}
-
-fun append_u32(buf: u8[], x: i64): void {
-    let off = len(buf)
-    append_zero(buf, 4)
-    put_u32_le(buf, off, u64(x))
-}
-
-fun append_u64(buf: u8[], x: i64): void {
-    let off = len(buf)
-    append_zero(buf, 8)
-    put_u64_le(buf, off, u64(x))
+fun le32_as_i64(buf: u8[], offset: i64): i64 {
+    ret i64(bytes_read_u32_le(buf, offset))
 }
 
 fun append_str(buf: u8[], s: str): void {
@@ -140,21 +72,6 @@ fun cstr_ready_path(s: str): str {
     ret str(out)
 }
 
-fun append_name8(buf: u8[], name: str): void {
-    let bs = bytes(name)
-    for i: 0:8 {
-        if i < len(bs) {
-            buf.push(bs[i])
-        } else {
-            buf.push(u8(0))
-        }
-    }
-}
-
-fun set_u32(buf: u8[], off: i64, x: i64): void {
-    put_u32_le(buf, off, u64(x))
-}
-
 fun append_dos_stub(buf: u8[]): void {
     buf.push(u8(77))
     buf.push(u8(90))
@@ -165,9 +82,9 @@ fun append_dos_stub(buf: u8[]): void {
     buf.push(u8(0))
     buf.push(u8(0))
     buf.push(u8(4))
-    append_zero(buf, 15)
+    bytes_append_zero(buf, 15)
     buf.push(u8(64))
-    append_zero(buf, 35)
+    bytes_append_zero(buf, 35)
     buf.push(u8(120))
     buf.push(u8(0))
     buf.push(u8(0))
@@ -307,7 +224,7 @@ fun parse_symbols(st: LinkState, symtab_off: i64, nsyms: i64): void {
         let sym = new Symbol
         sym.raw_off = pos
         sym.name_off = 0 - 1
-        if u32_le(st.data, pos) == u64(0) {
+        if bytes_read_u32_le(st.data, pos) == u64(0) {
             sym.name_off = le32_as_i64(st.data, pos + 4)
         }
         sym.value = le32_as_i64(st.data, pos + 8)
@@ -508,8 +425,8 @@ fun append_import_thunks(st: LinkState, text_sec: Section, text_rva: i64): void 
         put_name_value(st.thunk_rvas, name, rva)
         text_sec.data.push(u8(255))
         text_sec.data.push(u8(37))
-        append_zero(text_sec.data, 4)
-        append_zero(text_sec.data, 10)
+        bytes_append_zero(text_sec.data, 4)
+        bytes_append_zero(text_sec.data, 10)
         for j: 0:10 {
             text_sec.data[len(text_sec.data) - 1 - j] = u8(204)
         }
@@ -522,7 +439,7 @@ fun build_idata(st: LinkState): void {
     if len(st.imports) == 0 { ret }
 
     let dlls = import_dlls(st)
-    append_zero(st.idata, (len(dlls) + 1) * 20)
+    bytes_append_zero(st.idata, (len(dlls) + 1) * 20)
 
     let ilt_offsets = new NameValue[]
     let iat_group_offsets = new NameValue[]
@@ -532,7 +449,7 @@ fun build_idata(st: LinkState): void {
         let dll = dlls[di]
         for len(st.idata) % 8 != 0 { st.idata.push(u8(0)) }
         put_name_value(ilt_offsets, dll, len(st.idata))
-        append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
+        bytes_append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
     for di: 0:len(dlls) {
@@ -540,7 +457,7 @@ fun build_idata(st: LinkState): void {
         for len(st.idata) % 8 != 0 { st.idata.push(u8(0)) }
         put_name_value(iat_group_offsets, dll, len(st.idata))
         put_name_value(next_indexes, dll, 0)
-        append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
+        bytes_append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
     for i: 0:len(st.imports) {
@@ -549,14 +466,14 @@ fun build_idata(st: LinkState): void {
         let symbol = import_symbol_name(encoded)
         let index = get_name_value(next_indexes, dll)
         let hint_rva = st.idata_rva + len(st.idata)
-        append_u16(st.idata, 0)
+        bytes_append_u16_le(st.idata, 0)
         append_str(st.idata, symbol)
         st.idata.push(u8(0))
         if len(st.idata) % 2 != 0 { st.idata.push(u8(0)) }
         let ilt = get_name_value(ilt_offsets, dll)
         let iat = get_name_value(iat_group_offsets, dll)
-        put_u64_le(st.idata, ilt + index * 8, u64(hint_rva))
-        put_u64_le(st.idata, iat + index * 8, u64(hint_rva))
+        bytes_patch_u64_le(st.idata, ilt + index * 8, u64(hint_rva))
+        bytes_patch_u64_le(st.idata, iat + index * 8, u64(hint_rva))
         put_name_value(st.iat_offsets, encoded, iat + index * 8)
         set_name_value(next_indexes, dll, index + 1)
     }
@@ -566,9 +483,9 @@ fun build_idata(st: LinkState): void {
         let dll_off = len(st.idata)
         append_str(st.idata, dll)
         st.idata.push(u8(0))
-        put_u32_le(st.idata, di * 20, u64(st.idata_rva + get_name_value(ilt_offsets, dll)))
-        put_u32_le(st.idata, di * 20 + 12, u64(st.idata_rva + dll_off))
-        put_u32_le(st.idata, di * 20 + 16, u64(st.idata_rva + get_name_value(iat_group_offsets, dll)))
+        bytes_patch_u32_le(st.idata, di * 20, st.idata_rva + get_name_value(ilt_offsets, dll))
+        bytes_patch_u32_le(st.idata, di * 20 + 12, st.idata_rva + dll_off)
+        bytes_patch_u32_le(st.idata, di * 20 + 16, st.idata_rva + get_name_value(iat_group_offsets, dll))
     }
 }
 
@@ -604,7 +521,7 @@ fun patch_thunks(st: LinkState, text_sec: Section): void {
         let iat = get_name_value(st.iat_offsets, name)
         let off = thunk - 4096 + 2
         let disp = st.idata_rva + iat - (thunk + 6)
-        put_u32_bits_le(text_sec.data, off, u64(disp))
+        bytes_patch_u32_bits_le(text_sec.data, off, u32(disp))
     }
 }
 
@@ -621,35 +538,35 @@ fun patch_relocs(st: LinkState, text_sec: Section): void {
         if target != 0 {
             let old = le32_as_i64(text_sec.data, rel.rva)
             let disp = old + target - (4096 + rel.rva + 4)
-            put_u32_bits_le(text_sec.data, rel.rva, u64(disp))
+            bytes_patch_u32_bits_le(text_sec.data, rel.rva, u32(disp))
         }
     }
 }
 
 fun append_section_header(buf: u8[], name: str, rva: i64, raw_sz: i64): void {
-    append_name8(buf, name)
-    append_u32(buf, raw_sz)
-    append_u32(buf, rva)
-    append_u32(buf, align_to(raw_sz, 512))
-    append_u32(buf, 0)
-    append_u32(buf, 0)
-    append_u32(buf, 0)
-    append_u16(buf, 0)
-    append_u16(buf, 0)
+    bytes_append_name8(buf, name)
+    bytes_append_u32_le(buf, raw_sz)
+    bytes_append_u32_le(buf, rva)
+    bytes_append_u32_le(buf, align_to(raw_sz, 512))
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u16_le(buf, 0)
     if name == ".text" {
-        append_u32(buf, 1610612768)
+        bytes_append_u32_le(buf, 1610612768)
     } else if name == ".rdata" {
-        append_u32(buf, 1073741888)
+        bytes_append_u32_le(buf, 1073741888)
     } else {
-        append_u32(buf, 3221225536)
+        bytes_append_u32_le(buf, 3221225536)
     }
 }
 
 fun patch_section_raw(buf: u8[], index: i64, raw_pos: i64, raw_sz: i64): void {
     let opt_start = 120 + 4 + 20
     let hdr_pos = opt_start + 240 + index * 40
-    set_u32(buf, hdr_pos + 20, raw_pos)
-    set_u32(buf, hdr_pos + 16, align_to(raw_sz, 512))
+    bytes_patch_u32_le(buf, hdr_pos + 20, raw_pos)
+    bytes_patch_u32_le(buf, hdr_pos + 16, align_to(raw_sz, 512))
 }
 
 fun append_padded_section(buf: u8[], name: str, data: u8[]): void {
@@ -679,63 +596,63 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, data_sec: Section)
 
     append_dos_stub(buf)
     append_str(buf, "PE")
-    append_zero(buf, 2)
-    append_u16(buf, 34404)
-    append_u16(buf, num_sec)
-    append_u32(buf, 0)
-    append_u32(buf, 0)
-    append_u32(buf, 0)
-    append_u16(buf, 240)
-    append_u16(buf, 34)
+    bytes_append_zero(buf, 2)
+    bytes_append_u16_le(buf, 34404)
+    bytes_append_u16_le(buf, num_sec)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u16_le(buf, 240)
+    bytes_append_u16_le(buf, 34)
 
-    append_u16(buf, 523)
+    bytes_append_u16_le(buf, 523)
     buf.push(u8(14))
     buf.push(u8(0))
-    append_u32(buf, text_raw)
-    append_u32(buf, data_raw + idata_raw)
-    append_u32(buf, 0)
-    append_u32(buf, st.entry_rva)
-    append_u32(buf, 4096)
-    append_u64(buf, 5368709120)
-    append_u32(buf, 4096)
-    append_u32(buf, 512)
-    append_u16(buf, 6)
-    append_u16(buf, 0)
-    append_u16(buf, 0)
-    append_u16(buf, 0)
-    append_u16(buf, 6)
-    append_u16(buf, 0)
-    append_u32(buf, 0)
-    append_u32(buf, image_size)
-    append_u32(buf, headers_sz)
-    append_u32(buf, 0)
-    append_u16(buf, 3)
-    append_u16(buf, 33120)
-    append_u64(buf, 1048576)
-    append_u64(buf, 4096)
-    append_u64(buf, 1048576)
-    append_u64(buf, 4096)
-    append_u32(buf, 0)
-    append_u32(buf, 16)
+    bytes_append_u32_le(buf, text_raw)
+    bytes_append_u32_le(buf, data_raw + idata_raw)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, st.entry_rva)
+    bytes_append_u32_le(buf, 4096)
+    bytes_append_u64_le(buf, u64(5368709120))
+    bytes_append_u32_le(buf, 4096)
+    bytes_append_u32_le(buf, 512)
+    bytes_append_u16_le(buf, 6)
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u16_le(buf, 6)
+    bytes_append_u16_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, image_size)
+    bytes_append_u32_le(buf, headers_sz)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u16_le(buf, 3)
+    bytes_append_u16_le(buf, 33120)
+    bytes_append_u64_le(buf, u64(1048576))
+    bytes_append_u64_le(buf, u64(4096))
+    bytes_append_u64_le(buf, u64(1048576))
+    bytes_append_u64_le(buf, u64(4096))
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 16)
 
-    append_u32(buf, 0)
-    append_u32(buf, 0)
+    bytes_append_u32_le(buf, 0)
+    bytes_append_u32_le(buf, 0)
     if len(st.idata) > 0 {
-        append_u32(buf, st.idata_rva)
-        append_u32(buf, len(st.idata))
+        bytes_append_u32_le(buf, st.idata_rva)
+        bytes_append_u32_le(buf, len(st.idata))
     } else {
-        append_u32(buf, 0)
-        append_u32(buf, 0)
+        bytes_append_u32_le(buf, 0)
+        bytes_append_u32_le(buf, 0)
     }
-    append_zero(buf, 80)
+    bytes_append_zero(buf, 80)
     if len(st.idata) > 0 {
-        append_u32(buf, st.idata_rva + import_iat_dir_offset(st))
-        append_u32(buf, import_iat_dir_size(st))
+        bytes_append_u32_le(buf, st.idata_rva + import_iat_dir_offset(st))
+        bytes_append_u32_le(buf, import_iat_dir_size(st))
     } else {
-        append_u32(buf, 0)
-        append_u32(buf, 0)
+        bytes_append_u32_le(buf, 0)
+        bytes_append_u32_le(buf, 0)
     }
-    append_zero(buf, 24)
+    bytes_append_zero(buf, 24)
 
     append_section_header(buf, ".text", 4096, len(text_sec.data))
     if len(st.idata) > 0 {
