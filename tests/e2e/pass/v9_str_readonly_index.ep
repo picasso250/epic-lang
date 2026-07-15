@@ -1,0 +1,8 @@
+# EXIT: 0
+# STDOUT: Epic
+
+fun main(): void {
+    let s = "Epic"
+    let out = new u8[] { s[0], s[1], s[2], s[3] }
+    println(str(out))
+}

@@ -189,6 +189,8 @@ class SemanticAnalyzer:
             self._check_assign(target, self._expr(stmt.value), f"assignment to field {stmt.field}")
             return
         if isinstance(stmt, SubscriptAssignNode):
+            if self._expr(stmt.base).type == STR:
+                self._fail("str is read-only; subscript assignment is not allowed")
             target = self._subscript_type(stmt.base, stmt.index)
             self._check_assign(target, self._expr(stmt.value), "subscript assignment")
             return
@@ -253,6 +255,8 @@ class SemanticAnalyzer:
         self._define_local(stmt.name, target)
 
     def _analyze_assign_op(self, stmt):
+        if isinstance(stmt.target, SubscriptNode) and self._expr(stmt.target.base).type == STR:
+            self._fail("str is read-only; compound subscript assignment is not allowed")
         target_type = self._lvalue_type(stmt.target)
         rhs = self._expr(stmt.value)
         if stmt.op == "+" and target_type == STR:
@@ -576,7 +580,7 @@ class SemanticAnalyzer:
         base = self._expr(base_expr)
         self._expect_integer(self._expr(index_expr), "subscript index")
         if base.type == STR:
-            self._fail("str subscript is removed; use bytes(s)[i]")
+            return U8
         if base.type.kind == "array":
             return base.type.elem
         if base.type.kind == "ptr":

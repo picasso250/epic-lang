@@ -974,7 +974,7 @@ fun mir_emit_subscript(st: MirCodegenState, block: MirBlock, expr: AstSubscript)
     let args = new MirOperand[]
     args.push(base_flow.value)
     args.push(index_flow.value)
-    if mir_is_u8_array_type(base_type) {
+    if base_type == "str" || mir_is_u8_array_type(base_type) {
         ret mir_value_flow(mir_emit_call_inst(st, "__ep_slice_u8_get", "i64", args), st.current_block)
     }
     if mir_is_i64_array_type(base_type) {

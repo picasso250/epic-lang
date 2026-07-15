@@ -62,7 +62,8 @@ The current `str` model is byte-oriented:
 
 - `len(s)` counts bytes.
 - String literals currently accept the documented ASCII escapes.
-- Direct string byte indexing is not public; use `bytes(s)[i]` explicitly.
+- `s[i]` performs checked read-only byte indexing and returns `u8`.
+- String subscript assignment and compound assignment are rejected.
 - `s[start:end]` returns a copied `str` slice.
 - No UTF-8 validation, Unicode scalar indexing, grapheme semantics, or collation
   is defined.
@@ -95,3 +96,7 @@ The current contract does not introduce:
 - Copy-on-write aliasing.
 - Automatic formatting for structs or arbitrary arrays.
 - Implicit `str`/`u8[]` coercions.
+
+This v0 branch is a bootstrap implementation. Its shared zero-copy representation
+is retained so it can build the current compiler; it is not the runtime contract
+of the current `dev` language implementation.

@@ -659,7 +659,7 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     let base = sema_expr_type(st, base_expr)
     sema_expect_int(st, index_expr, "subscript index")
     if base == "str" {
-        sema_die("str subscript is removed; use bytes(s)[i]")
+        ret "u8"
     }
     if sema_is_array(base) {
         ret sema_array_elem(base)
@@ -1016,10 +1016,21 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             ret
         }
         AstSubscriptAssign n: {
+            if sema_expr_type(st, n.base) == "str" {
+                sema_die("str is read-only; subscript assignment is not allowed")
+            }
             sema_check_assign(st, sema_subscript_type(st, n.base, n.index), n.value_expr, "subscript assignment")
             ret
         }
         AstAssignOp n: {
+            match n.expr {
+                AstSubscript sub: {
+                    if sema_expr_type(st, sub.base) == "str" {
+                        sema_die("str is read-only; compound subscript assignment is not allowed")
+                    }
+                }
+                _: {}
+            }
             let target = sema_lvalue_type(st, n.expr)
             let rhs = sema_expr_type(st, n.value_expr)
             if n.op == "+" && target == "str" {
