@@ -63,6 +63,17 @@ def test_number_dump_uses_source_digits():
     )
 
 
+def test_hex_number_dump_preserves_source_spelling():
+    tokens = lex("0x2a 0X2A\n")
+    assert tokens[0][1] == 42
+    assert tokens[1][1] == 42
+    assert dump_tokens(tokens) == (
+        "1\tNUMBER\t4\t0x2a\n"
+        "1\tNUMBER\t4\t0X2A\n"
+        "1\tNEWLINE\t2\t\\n\n"
+    )
+
+
 def main():
     test_basic_dump_format()
     test_string_value_is_decoded_but_dump_uses_source_spelling()
@@ -70,6 +81,7 @@ def main():
     test_fstring_dump_linearized_from_source_spelling()
     test_char_dump_uses_decimal_byte_value()
     test_number_dump_uses_source_digits()
+    test_hex_number_dump_preserves_source_spelling()
     print("  PASS  lexer dump format")
 
 

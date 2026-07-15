@@ -1,0 +1,9 @@
+# COMPILE_FAIL: out of range for i64
+
+fun run(): i64 {
+    ret 0x8000000000000000
+}
+
+fun main(): void {
+    exit(run())
+}

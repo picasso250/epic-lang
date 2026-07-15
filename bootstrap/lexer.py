@@ -24,7 +24,7 @@ TOKEN_SPEC = [
     ("EMBED",     r'\bembed\b'),
     ("LET",       r'\blet\b'),
     ("ID",        r'[a-zA-Z_][a-zA-Z0-9_]*'),
-    ("NUMBER",    r'[0-9]+'),
+    ("NUMBER",    r'0[xX][0-9a-fA-F]+|[0-9]+'),
     ("SHL_ASSIGN", r'<<='),
     ("SHR_ASSIGN", r'>>='),
     ("PLUS_ASSIGN", r'\+='),
@@ -227,7 +227,10 @@ def lex(source_text):
             continue
         line = line_numbers[m.start()] if m.start() < len(line_numbers) else 1
         if kind == "NUMBER":
-            value = int(source_spelling)
+            if source_spelling.startswith(("0x", "0X")):
+                value = int(source_spelling[2:], 16)
+            else:
+                value = int(source_spelling, 10)
         elif kind == "STRING":
             dump_value = source_spelling[1:-1]
             value = decode_escaped(dump_value, line)

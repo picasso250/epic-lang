@@ -107,6 +107,10 @@ fun is_digit(c: u8): bool {
     ret c >= '0' && c <= '9'
 }
 
+fun is_hex_digit(c: u8): bool {
+    ret is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
 fun keyword_kind(text: str): str {
     if text == "if" { ret "IF" }
     if text == "fun" { ret "FUN" }
@@ -445,8 +449,18 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_digit(ch) {
             let start_line = line
             let start = pos
-            for pos < n && is_digit(src_bytes[pos]) {
-                pos += 1
+            if ch == '0' && (char_at(src, pos + 1) == 120 || char_at(src, pos + 1) == 88) {
+                pos += 2
+                if pos >= n || !is_hex_digit(src_bytes[pos]) {
+                    panic "hexadecimal literal requires at least one digit"
+                }
+                for pos < n && is_hex_digit(src_bytes[pos]) {
+                    pos += 1
+                }
+            } else {
+                for pos < n && is_digit(src_bytes[pos]) {
+                    pos += 1
+                }
             }
             let text = src[start:pos]
             push_token(tokens, "NUMBER", text, start_line)
