@@ -113,7 +113,7 @@ aligned_frame = ((next_slot + 15) // 16) * 16
 | `value_slots[value_id]` | 计算出的值 | `mov reg, [rbp+slot]` |
 | `addr_slots[value_id]` | 指向 `alloca` 的指针 | `lea reg, [rbp+slot]` |
 
-函数局部 MIR value 使用正整数 ID。`value_slots`、`addr_slots`、临时槽标志、block-local use counts、可复用标志和 definition block 都是由最大 ID 定长后直接索引的数组；MIR→x64 不再维护 string-keyed map。
+函数局部 MIR value 在 object model 中使用正整数 ID。Text parser 可接受 `%name`，但在进入 MIR object model 前已按函数解析为 numeric ID。`value_slots`、`addr_slots`、临时槽标志、block-local use counts、可复用标志和 definition block 都是由最大 ID 定长后直接索引的数组；MIR→x64 不维护 string-keyed map。
 
 `value_slot` 目前仍为每个 result 规划，但不保证一定物化。已证明 block-local、单次使用，且由
 下一条 instruction 的 operand 0 或 terminator 从 `rax` 消费的 result 会短暂驻留在 `rax`；

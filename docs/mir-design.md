@@ -21,13 +21,13 @@ MIR 的目标是：让编译链路从“直接生成巨大文本 ASM”改为“
 | 注入策略 | 按需注入（`required_helpers` tracking） | ⚠️ 当前先加载 helper bundle，再按 MIR call reachability prune function；尚无显式 required_helpers 表 |
 | struct layout | 显式 typed `MirStruct` dataclass 字段 | ✅ `MirProgram.structs` 使用 `dict[str, MirStruct]`，字段为 `MirField` 列表 |
 | symbol contract | object model 使用 raw module symbol；`@` 只保留给未来 text MIR syntax | ✅ 当前 `MirFunction` / `MirExtern` / `MirGlobal` / `SymbolOperand` 都应存 raw name |
-| local value identity | function-local positive numeric ID；text MIR 写成 `%1`、`%2` | ✅ 参数、指令结果和 value operand 均存 `i64`/`int` ID；named local value text 不再接受 |
+| local value identity | function-local positive numeric ID；canonical text 写成 `%1`、`%2` | ✅ 参数、指令结果和 value operand 均存 `i64`/`int` ID；parser 也接受命名 local 并在函数内解析为 numeric ID |
 | 命名 | 语义名：`i64_to_str`, `bool_to_str`, `bytes_to_str`, `str_to_bytes` | ⚠️ 当前内部 helper 仍使用 `__ep_*` 前缀 |
 | 前缀分层 | runtime helper 不泄漏 backend 私有实现 | ✅ 当前 runtime 统一使用 `__ep_*`，无 x64 专属 helper 层 |
 | `alloca` 复合类型 | 只允许标量 `alloca`；struct/array/string 必须 heap 分配 | ✅ 当前实现已遵守此规则 |
 
 > **使用本文档时请注意**：所有 code block 中的 MIR 示例是 target 格式，不代表当前 `ast_to_mir.py` 的实际输出。当前实现的实际 MIR 行为通过 `docs/x64-instruction-subset.md`（lowering 后的 X64IR 合约）和 `docs/mir-lowering-contract.md`（lowering 规则）描述。
-> 后续章节保留的 `%x` / `%sum` 等写法只作为数据流讲解中的助记别名；canonical text MIR 与 parser 只接受 `%1` 这类正整数 local ID。
+> 后续章节的 `%x` / `%sum` 也是合法的手写 text MIR。Parser 将函数内命名 local 解析成 numeric ID；canonical printer 与生成 MIR 仍输出 `%1` 这类正整数 ID。
 
 当前实现债的跟踪见 `docs/x64-instruction-subset.md §8 Design audit`。
 
@@ -104,7 +104,7 @@ text MIR 只是 pretty printer 输出，用于：
 %3
 ```
 
-named local value（如 `%sum`）不属于 canonical MIR，也不由 parser 接受。这些 value 是不可变的；一个 ID 一旦定义，后面不能被重新赋值。
+named local value（如 `%sum`）属于手写 text MIR surface，但不进入 MIR object model。Parser 在每个函数内分配 numeric ID；同名定义和未定义引用报错。value 不可变，一个名字或 ID 一旦定义，后面不能重新赋值。
 
 ### 4.2 Local variable address
 

@@ -27,6 +27,11 @@ global @counter: i64 = 42
 
 global @str.0: ptr = bytes "A\\n\\\"\\\\\\x00\\xFF//tail"
 
+define i64 @identity(i64 %1) {
+entry:
+  ret i64 %1
+}
+
 define i64 @main() {
 entry:
   %1: ptr = gep struct Zed, ptr null, i64 1

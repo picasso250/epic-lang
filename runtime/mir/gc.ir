@@ -73,58 +73,58 @@ global @str.gc.stw.prefix: ptr = bytes "gc stw: "
 
 global @str.gc.stw.suffix: ptr = bytes " ms\n"
 
-define ptr @__ep_gc_raw_try_alloc(i64 %1) {
+define ptr @__ep_gc_raw_try_alloc(i64 %size) {
 entry:
-  %2: i64 = load i64, ptr heap
-  %3: ptr = call ptr __ep_import$kernel32.dll$HeapAlloc(i64 %2, i64 8, i64 %1)
-  ret ptr %3
+  %loaded_2: i64 = load i64, ptr heap
+  %call_result_3: ptr = call ptr __ep_import$kernel32.dll$HeapAlloc(i64 %loaded_2, i64 8, i64 %size)
+  ret ptr %call_result_3
 }
 
-define ptr @__ep_gc_raw_alloc(i64 %1) {
+define ptr @__ep_gc_raw_alloc(i64 %size) {
 entry:
-  %2: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
-  %3: bool = icmp.eq ptr %2, ptr null
-  condbr bool %3, label %fail, label %ok
+  %call_result_2: ptr = call ptr __ep_gc_raw_try_alloc(i64 %size)
+  %condition_3: bool = icmp.eq ptr %call_result_2, ptr null
+  condbr bool %condition_3, label %fail, label %ok
 
 fail:
   call void __ep_import$kernel32.dll$ExitProcess(i64 1)
   ret ptr null
 
 ok:
-  ret ptr %2
+  ret ptr %call_result_2
 }
 
-define void @__ep_gc_raw_free(ptr %1) {
+define void @__ep_gc_raw_free(ptr %address) {
 entry:
-  %2: i64 = load i64, ptr heap
-  %3: i64 = call i64 __ep_import$kernel32.dll$HeapFree(i64 %2, i64 0, ptr %1)
+  %loaded_2: i64 = load i64, ptr heap
+  %call_result_3: i64 = call i64 __ep_import$kernel32.dll$HeapFree(i64 %loaded_2, i64 0, ptr %address)
   ret void
 }
 
 define void @__ep_gc_small_init() {
 entry:
-  %1: ptr = call ptr __ep_import$kernel32.dll$VirtualAlloc(ptr null, i64 1073741824, i64 8192, i64 4)
-  %2: bool = icmp.eq ptr %1, ptr null
-  condbr bool %2, label %fail, label %metadata
+  %call_result_1: ptr = call ptr __ep_import$kernel32.dll$VirtualAlloc(ptr null, i64 1073741824, i64 8192, i64 4)
+  %condition_2: bool = icmp.eq ptr %call_result_1, ptr null
+  condbr bool %condition_2, label %fail, label %metadata
 
 metadata:
-  %3: ptr = gep i8, ptr %1, i64 1073741824
-  store ptr %1, ptr gc_small_arena
-  store ptr %3, ptr gc_small_arena_end
-  %4: ptr = call ptr __ep_gc_raw_alloc(i64 16384)
-  %5: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
-  %6: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
-  %7: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
-  %8: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
-  %9: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
-  %10: ptr = call ptr __ep_gc_raw_alloc(i64 32)
-  store ptr %4, ptr gc_small_page_states
-  store ptr %5, ptr gc_small_page_bumps
-  store ptr %6, ptr gc_small_page_free_heads
-  store ptr %7, ptr gc_small_page_alloc_counts
-  store ptr %8, ptr gc_small_page_alloc_maps
-  store ptr %9, ptr gc_small_page_mark_maps
-  store ptr %10, ptr gc_small_active_pages
+  %address_3: ptr = gep i8, ptr %call_result_1, i64 1073741824
+  store ptr %call_result_1, ptr gc_small_arena
+  store ptr %address_3, ptr gc_small_arena_end
+  %call_result_4: ptr = call ptr __ep_gc_raw_alloc(i64 16384)
+  %call_result_5: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %call_result_6: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %call_result_7: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %call_result_8: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %call_result_9: ptr = call ptr __ep_gc_raw_alloc(i64 131072)
+  %call_result_10: ptr = call ptr __ep_gc_raw_alloc(i64 32)
+  store ptr %call_result_4, ptr gc_small_page_states
+  store ptr %call_result_5, ptr gc_small_page_bumps
+  store ptr %call_result_6, ptr gc_small_page_free_heads
+  store ptr %call_result_7, ptr gc_small_page_alloc_counts
+  store ptr %call_result_8, ptr gc_small_page_alloc_maps
+  store ptr %call_result_9, ptr gc_small_page_mark_maps
+  store ptr %call_result_10, ptr gc_small_active_pages
   ret void
 
 fail:
@@ -132,354 +132,354 @@ fail:
   ret void
 }
 
-define i64 @__ep_gc_small_acquire_page(i64 %1) {
+define i64 @__ep_gc_small_acquire_page(i64 %class_index) {
 entry:
-  %2: i64 = load i64, ptr gc_small_page_count
-  %3: bool = icmp.uge i64 %2, i64 16384
-  condbr bool %3, label %fail, label %commit
+  %loaded_2: i64 = load i64, ptr gc_small_page_count
+  %condition_3: bool = icmp.uge i64 %loaded_2, i64 16384
+  condbr bool %condition_3, label %fail, label %commit
 
 commit:
-  %4: i64 = mul i64 %2, i64 65536
-  %5: ptr = load ptr, ptr gc_small_arena
-  %6: ptr = gep i8, ptr %5, i64 %4
-  %7: ptr = call ptr __ep_import$kernel32.dll$VirtualAlloc(ptr %6, i64 65536, i64 4096, i64 4)
-  %8: bool = icmp.eq ptr %7, ptr null
-  condbr bool %8, label %fail, label %maps
+  %product_4: i64 = mul i64 %loaded_2, i64 65536
+  %loaded_5: ptr = load ptr, ptr gc_small_arena
+  %address_6: ptr = gep i8, ptr %loaded_5, i64 %product_4
+  %call_result_7: ptr = call ptr __ep_import$kernel32.dll$VirtualAlloc(ptr %address_6, i64 65536, i64 4096, i64 4)
+  %condition_8: bool = icmp.eq ptr %call_result_7, ptr null
+  condbr bool %condition_8, label %fail, label %maps
 
 maps:
-  %9: i64 = mul i64 %1, i64 8
-  %10: i64 = udiv i64 65536, i64 %9
-  %25: i64 = add i64 %10, i64 7
-  %26: i64 = shr i64 %25, i64 3
-  %11: ptr = call ptr __ep_gc_raw_alloc(i64 %26)
-  %12: ptr = call ptr __ep_gc_raw_alloc(i64 %26)
-  %13: ptr = load ptr, ptr gc_small_page_states
-  %14: ptr = gep i8, ptr %13, i64 %2
-  %15: ptr = alloca i64
-  store i64 %1, ptr %15
-  %16: i8 = load i8, ptr %15
-  store i8 %16, ptr %14
-  %17: ptr = load ptr, ptr gc_small_page_alloc_maps
-  %18: ptr = gep ptr, ptr %17, i64 %2
-  store ptr %11, ptr %18
-  %19: ptr = load ptr, ptr gc_small_page_mark_maps
-  %20: ptr = gep ptr, ptr %19, i64 %2
-  store ptr %12, ptr %20
-  %21: i64 = add i64 %2, i64 1
-  store i64 %21, ptr gc_small_page_count
-  %22: ptr = load ptr, ptr gc_small_active_pages
-  %23: i64 = sub i64 %1, i64 1
-  %24: ptr = gep i64, ptr %22, i64 %23
-  store i64 %21, ptr %24
-  ret i64 %21
+  %product_9: i64 = mul i64 %class_index, i64 8
+  %quotient_10: i64 = udiv i64 65536, i64 %product_9
+  %sum_25: i64 = add i64 %quotient_10, i64 7
+  %result_26: i64 = shr i64 %sum_25, i64 3
+  %call_result_11: ptr = call ptr __ep_gc_raw_alloc(i64 %result_26)
+  %call_result_12: ptr = call ptr __ep_gc_raw_alloc(i64 %result_26)
+  %loaded_13: ptr = load ptr, ptr gc_small_page_states
+  %address_14: ptr = gep i8, ptr %loaded_13, i64 %loaded_2
+  %slot_15: ptr = alloca i64
+  store i64 %class_index, ptr %slot_15
+  %loaded_16: i8 = load i8, ptr %slot_15
+  store i8 %loaded_16, ptr %address_14
+  %loaded_17: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %address_18: ptr = gep ptr, ptr %loaded_17, i64 %loaded_2
+  store ptr %call_result_11, ptr %address_18
+  %loaded_19: ptr = load ptr, ptr gc_small_page_mark_maps
+  %address_20: ptr = gep ptr, ptr %loaded_19, i64 %loaded_2
+  store ptr %call_result_12, ptr %address_20
+  %sum_21: i64 = add i64 %loaded_2, i64 1
+  store i64 %sum_21, ptr gc_small_page_count
+  %loaded_22: ptr = load ptr, ptr gc_small_active_pages
+  %difference_23: i64 = sub i64 %class_index, i64 1
+  %address_24: ptr = gep i64, ptr %loaded_22, i64 %difference_23
+  store i64 %sum_21, ptr %address_24
+  ret i64 %sum_21
 
 fail:
   ret i64 0
 }
 
-define ptr @__ep_gc_small_alloc(i64 %1) {
+define ptr @__ep_gc_small_alloc(i64 %size) {
 entry:
-  %67: ptr = alloca i64
-  %68: ptr = alloca i64
-  %2: i64 = add i64 %1, i64 7
-  %3: i64 = udiv i64 %2, i64 8
-  %69: bool = icmp.eq i64 %3, i64 0
-  condbr bool %69, label %zero_class, label %store_class
+  %slot_67: ptr = alloca i64
+  %slot_68: ptr = alloca i64
+  %sum_2: i64 = add i64 %size, i64 7
+  %quotient_3: i64 = udiv i64 %sum_2, i64 8
+  %condition_69: bool = icmp.eq i64 %quotient_3, i64 0
+  condbr bool %condition_69, label %zero_class, label %store_class
 
 zero_class:
-  store i64 1, ptr %68
+  store i64 1, ptr %slot_68
   br label %setup
 
 store_class:
-  store i64 %3, ptr %68
+  store i64 %quotient_3, ptr %slot_68
   br label %setup
 
 setup:
-  %70: i64 = load i64, ptr %68
-  %4: ptr = load ptr, ptr gc_small_active_pages
-  %5: i64 = sub i64 %70, i64 1
-  %6: ptr = gep i64, ptr %4, i64 %5
-  %7: i64 = load i64, ptr %6
-  %8: bool = icmp.eq i64 %7, i64 0
-  condbr bool %8, label %acquire, label %select
+  %loaded_70: i64 = load i64, ptr %slot_68
+  %loaded_4: ptr = load ptr, ptr gc_small_active_pages
+  %difference_5: i64 = sub i64 %loaded_70, i64 1
+  %address_6: ptr = gep i64, ptr %loaded_4, i64 %difference_5
+  %loaded_7: i64 = load i64, ptr %address_6
+  %condition_8: bool = icmp.eq i64 %loaded_7, i64 0
+  condbr bool %condition_8, label %acquire, label %select
 
 acquire:
-  %9: i64 = call i64 __ep_gc_small_acquire_page(i64 %70)
-  %10: bool = icmp.eq i64 %9, i64 0
-  condbr bool %10, label %fail, label %select_acquired
+  %call_result_9: i64 = call i64 __ep_gc_small_acquire_page(i64 %loaded_70)
+  %condition_10: bool = icmp.eq i64 %call_result_9, i64 0
+  condbr bool %condition_10, label %fail, label %select_acquired
 
 select_acquired:
-  store i64 %9, ptr %6
+  store i64 %call_result_9, ptr %address_6
   br label %select
 
 select:
-  %11: i64 = load i64, ptr %6
-  %12: i64 = sub i64 %11, i64 1
-  %13: i64 = mul i64 %70, i64 8
-  %14: i64 = udiv i64 65536, i64 %13
-  %15: ptr = load ptr, ptr gc_small_page_free_heads
-  %16: ptr = gep i64, ptr %15, i64 %12
-  %17: i64 = load i64, ptr %16
-  %18: bool = icmp.ne i64 %17, i64 0
-  condbr bool %18, label %pop_free, label %bump
+  %loaded_11: i64 = load i64, ptr %address_6
+  %difference_12: i64 = sub i64 %loaded_11, i64 1
+  %product_13: i64 = mul i64 %loaded_70, i64 8
+  %quotient_14: i64 = udiv i64 65536, i64 %product_13
+  %loaded_15: ptr = load ptr, ptr gc_small_page_free_heads
+  %address_16: ptr = gep i64, ptr %loaded_15, i64 %difference_12
+  %loaded_17: i64 = load i64, ptr %address_16
+  %condition_18: bool = icmp.ne i64 %loaded_17, i64 0
+  condbr bool %condition_18, label %pop_free, label %bump
 
 pop_free:
-  %19: i64 = sub i64 %17, i64 1
-  %20: i64 = mul i64 %12, i64 65536
-  %21: i64 = mul i64 %19, i64 %13
-  %22: i64 = add i64 %20, i64 %21
-  %23: ptr = load ptr, ptr gc_small_arena
-  %24: ptr = gep i8, ptr %23, i64 %22
-  %25: i64 = load i64, ptr %24
-  store i64 %25, ptr %16
+  %difference_19: i64 = sub i64 %loaded_17, i64 1
+  %product_20: i64 = mul i64 %difference_12, i64 65536
+  %product_21: i64 = mul i64 %difference_19, i64 %product_13
+  %sum_22: i64 = add i64 %product_20, i64 %product_21
+  %loaded_23: ptr = load ptr, ptr gc_small_arena
+  %address_24: ptr = gep i8, ptr %loaded_23, i64 %sum_22
+  %loaded_25: i64 = load i64, ptr %address_24
+  store i64 %loaded_25, ptr %address_16
   br label %record_free
 
 record_free:
-  store i64 %19, ptr %67
+  store i64 %difference_19, ptr %slot_67
   br label %record
 
 bump:
-  %27: ptr = load ptr, ptr gc_small_page_bumps
-  %28: ptr = gep i64, ptr %27, i64 %12
-  %29: i64 = load i64, ptr %28
-  %30: bool = icmp.uge i64 %29, i64 %14
-  condbr bool %30, label %page_full, label %use_bump
+  %loaded_27: ptr = load ptr, ptr gc_small_page_bumps
+  %address_28: ptr = gep i64, ptr %loaded_27, i64 %difference_12
+  %loaded_29: i64 = load i64, ptr %address_28
+  %condition_30: bool = icmp.uge i64 %loaded_29, i64 %quotient_14
+  condbr bool %condition_30, label %page_full, label %use_bump
 
 page_full:
-  store i64 0, ptr %6
-  %31: i64 = call i64 __ep_gc_small_acquire_page(i64 %70)
-  %32: bool = icmp.eq i64 %31, i64 0
-  condbr bool %32, label %fail, label %select
+  store i64 0, ptr %address_6
+  %call_result_31: i64 = call i64 __ep_gc_small_acquire_page(i64 %loaded_70)
+  %condition_32: bool = icmp.eq i64 %call_result_31, i64 0
+  condbr bool %condition_32, label %fail, label %select
 
 use_bump:
-  %33: i64 = add i64 %29, i64 1
-  store i64 %33, ptr %28
-  %34: i64 = mul i64 %12, i64 65536
-  %35: i64 = mul i64 %29, i64 %13
-  %36: i64 = add i64 %34, i64 %35
-  %37: ptr = load ptr, ptr gc_small_arena
-  %38: ptr = gep i8, ptr %37, i64 %36
-  store i64 %29, ptr %67
+  %sum_33: i64 = add i64 %loaded_29, i64 1
+  store i64 %sum_33, ptr %address_28
+  %product_34: i64 = mul i64 %difference_12, i64 65536
+  %product_35: i64 = mul i64 %loaded_29, i64 %product_13
+  %sum_36: i64 = add i64 %product_34, i64 %product_35
+  %loaded_37: ptr = load ptr, ptr gc_small_arena
+  %address_38: ptr = gep i8, ptr %loaded_37, i64 %sum_36
+  store i64 %loaded_29, ptr %slot_67
   br label %record
 
 record:
-  %41: i64 = load i64, ptr %67
-  %42: ptr = load ptr, ptr gc_small_page_alloc_maps
-  %43: ptr = gep ptr, ptr %42, i64 %12
-  %44: ptr = load ptr, ptr %43
-  %71: i64 = shr i64 %41, i64 3
-  %72: i64 = and i64 %41, i64 7
-  %73: i64 = shl i64 1, i64 %72
-  %45: ptr = gep i8, ptr %44, i64 %71
-  %74: i64 = load i8, ptr %45
-  %75: i64 = or i64 %74, i64 %73
-  store i8 %75, ptr %45
-  %46: ptr = load ptr, ptr gc_small_page_alloc_counts
-  %47: ptr = gep i64, ptr %46, i64 %12
-  %48: i64 = load i64, ptr %47
-  %49: i64 = add i64 %48, i64 1
-  store i64 %49, ptr %47
-  %50: i64 = load i64, ptr gc_small_object_count
-  %51: i64 = add i64 %50, i64 1
-  store i64 %51, ptr gc_small_object_count
-  %52: i64 = load i64, ptr gc_small_live_bytes
-  %53: i64 = add i64 %52, i64 %13
-  store i64 %53, ptr gc_small_live_bytes
-  %54: i64 = load i64, ptr gc_live_bytes
-  %55: i64 = add i64 %54, i64 %13
-  store i64 %55, ptr gc_live_bytes
-  %56: i64 = mul i64 %12, i64 65536
-  %57: i64 = mul i64 %41, i64 %13
-  %58: i64 = add i64 %56, i64 %57
-  %59: ptr = load ptr, ptr gc_small_arena
-  %60: ptr = gep i8, ptr %59, i64 %58
-  store i64 0, ptr %60
-  %61: bool = icmp.ugt i64 %13, i64 8
-  condbr bool %61, label %zero16, label %done
+  %loaded_41: i64 = load i64, ptr %slot_67
+  %loaded_42: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %address_43: ptr = gep ptr, ptr %loaded_42, i64 %difference_12
+  %loaded_44: ptr = load ptr, ptr %address_43
+  %result_71: i64 = shr i64 %loaded_41, i64 3
+  %bitwise_72: i64 = and i64 %loaded_41, i64 7
+  %shifted_73: i64 = shl i64 1, i64 %bitwise_72
+  %address_45: ptr = gep i8, ptr %loaded_44, i64 %result_71
+  %loaded_74: i64 = load i8, ptr %address_45
+  %bitwise_75: i64 = or i64 %loaded_74, i64 %shifted_73
+  store i8 %bitwise_75, ptr %address_45
+  %loaded_46: ptr = load ptr, ptr gc_small_page_alloc_counts
+  %address_47: ptr = gep i64, ptr %loaded_46, i64 %difference_12
+  %loaded_48: i64 = load i64, ptr %address_47
+  %sum_49: i64 = add i64 %loaded_48, i64 1
+  store i64 %sum_49, ptr %address_47
+  %loaded_50: i64 = load i64, ptr gc_small_object_count
+  %sum_51: i64 = add i64 %loaded_50, i64 1
+  store i64 %sum_51, ptr gc_small_object_count
+  %loaded_52: i64 = load i64, ptr gc_small_live_bytes
+  %sum_53: i64 = add i64 %loaded_52, i64 %product_13
+  store i64 %sum_53, ptr gc_small_live_bytes
+  %loaded_54: i64 = load i64, ptr gc_live_bytes
+  %sum_55: i64 = add i64 %loaded_54, i64 %product_13
+  store i64 %sum_55, ptr gc_live_bytes
+  %product_56: i64 = mul i64 %difference_12, i64 65536
+  %product_57: i64 = mul i64 %loaded_41, i64 %product_13
+  %sum_58: i64 = add i64 %product_56, i64 %product_57
+  %loaded_59: ptr = load ptr, ptr gc_small_arena
+  %address_60: ptr = gep i8, ptr %loaded_59, i64 %sum_58
+  store i64 0, ptr %address_60
+  %condition_61: bool = icmp.ugt i64 %product_13, i64 8
+  condbr bool %condition_61, label %zero16, label %done
 
 zero16:
-  %62: ptr = gep i8, ptr %60, i64 8
-  store i64 0, ptr %62
-  %63: bool = icmp.ugt i64 %13, i64 16
-  condbr bool %63, label %zero24, label %done
+  %address_62: ptr = gep i8, ptr %address_60, i64 8
+  store i64 0, ptr %address_62
+  %condition_63: bool = icmp.ugt i64 %product_13, i64 16
+  condbr bool %condition_63, label %zero24, label %done
 
 zero24:
-  %64: ptr = gep i8, ptr %60, i64 16
-  store i64 0, ptr %64
-  %65: bool = icmp.ugt i64 %13, i64 24
-  condbr bool %65, label %zero32, label %done
+  %address_64: ptr = gep i8, ptr %address_60, i64 16
+  store i64 0, ptr %address_64
+  %condition_65: bool = icmp.ugt i64 %product_13, i64 24
+  condbr bool %condition_65, label %zero32, label %done
 
 zero32:
-  %66: ptr = gep i8, ptr %60, i64 24
-  store i64 0, ptr %66
+  %address_66: ptr = gep i8, ptr %address_60, i64 24
+  store i64 0, ptr %address_66
   br label %done
 
 done:
-  ret ptr %60
+  ret ptr %address_60
 
 fail:
   ret ptr null
 }
 
-define void @__ep_gc_grow_objects(i64 %1) {
+define void @__ep_gc_grow_objects(i64 %required) {
 entry:
-  %2: i64 = mul i64 %1, i64 8
-  %3: ptr = call ptr __ep_gc_raw_alloc(i64 %2)
-  %4: ptr = call ptr __ep_gc_raw_alloc(i64 %2)
-  %5: ptr = load ptr, ptr gc_objects
-  %6: ptr = load ptr, ptr gc_sizes
-  %7: i64 = load i64, ptr gc_object_count
-  %8: ptr = alloca i64
-  store i64 0, ptr %8
+  %product_2: i64 = mul i64 %required, i64 8
+  %call_result_3: ptr = call ptr __ep_gc_raw_alloc(i64 %product_2)
+  %call_result_4: ptr = call ptr __ep_gc_raw_alloc(i64 %product_2)
+  %loaded_5: ptr = load ptr, ptr gc_objects
+  %loaded_6: ptr = load ptr, ptr gc_sizes
+  %loaded_7: i64 = load i64, ptr gc_object_count
+  %slot_8: ptr = alloca i64
+  store i64 0, ptr %slot_8
   br label %copy
 
 copy:
-  %9: i64 = load i64, ptr %8
-  %10: bool = icmp.ult i64 %9, i64 %7
-  condbr bool %10, label %copy_one, label %replace
+  %loaded_9: i64 = load i64, ptr %slot_8
+  %condition_10: bool = icmp.ult i64 %loaded_9, i64 %loaded_7
+  condbr bool %condition_10, label %copy_one, label %replace
 
 copy_one:
-  %11: ptr = gep ptr, ptr %5, i64 %9
-  %12: ptr = load ptr, ptr %11
-  %13: ptr = gep ptr, ptr %3, i64 %9
-  store ptr %12, ptr %13
-  %14: ptr = gep i64, ptr %6, i64 %9
-  %15: i64 = load i64, ptr %14
-  %16: ptr = gep i64, ptr %4, i64 %9
-  store i64 %15, ptr %16
-  %17: i64 = add i64 %9, i64 1
-  store i64 %17, ptr %8
+  %address_11: ptr = gep ptr, ptr %loaded_5, i64 %loaded_9
+  %loaded_12: ptr = load ptr, ptr %address_11
+  %address_13: ptr = gep ptr, ptr %call_result_3, i64 %loaded_9
+  store ptr %loaded_12, ptr %address_13
+  %address_14: ptr = gep i64, ptr %loaded_6, i64 %loaded_9
+  %loaded_15: i64 = load i64, ptr %address_14
+  %address_16: ptr = gep i64, ptr %call_result_4, i64 %loaded_9
+  store i64 %loaded_15, ptr %address_16
+  %sum_17: i64 = add i64 %loaded_9, i64 1
+  store i64 %sum_17, ptr %slot_8
   br label %copy
 
 replace:
-  %18: bool = icmp.eq ptr %5, ptr null
-  condbr bool %18, label %store, label %free_old
+  %condition_18: bool = icmp.eq ptr %loaded_5, ptr null
+  condbr bool %condition_18, label %store, label %free_old
 
 free_old:
-  call void __ep_gc_raw_free(ptr %5)
-  call void __ep_gc_raw_free(ptr %6)
+  call void __ep_gc_raw_free(ptr %loaded_5)
+  call void __ep_gc_raw_free(ptr %loaded_6)
   br label %store
 
 store:
-  store ptr %3, ptr gc_objects
-  store ptr %4, ptr gc_sizes
-  store i64 %1, ptr gc_object_cap
+  store ptr %call_result_3, ptr gc_objects
+  store ptr %call_result_4, ptr gc_sizes
+  store i64 %required, ptr gc_object_cap
   ret void
 }
 
 define void @__ep_gc_ensure_object_capacity() {
 entry:
-  %1: i64 = load i64, ptr gc_object_count
-  %2: i64 = load i64, ptr gc_object_cap
-  %3: bool = icmp.ult i64 %1, i64 %2
-  condbr bool %3, label %done, label %grow
+  %loaded_1: i64 = load i64, ptr gc_object_count
+  %loaded_2: i64 = load i64, ptr gc_object_cap
+  %condition_3: bool = icmp.ult i64 %loaded_1, i64 %loaded_2
+  condbr bool %condition_3, label %done, label %grow
 
 grow:
-  %4: bool = icmp.eq i64 %2, i64 0
-  condbr bool %4, label %initial, label %double
+  %condition_4: bool = icmp.eq i64 %loaded_2, i64 0
+  condbr bool %condition_4, label %initial, label %double
 
 initial:
   call void __ep_gc_grow_objects(i64 1024)
   ret void
 
 double:
-  %5: i64 = mul i64 %2, i64 2
-  call void __ep_gc_grow_objects(i64 %5)
+  %product_5: i64 = mul i64 %loaded_2, i64 2
+  call void __ep_gc_grow_objects(i64 %product_5)
   ret void
 
 done:
   ret void
 }
 
-define void @__ep_gc_table_insert(ptr %1, i64 %2) {
+define void @__ep_gc_table_insert(ptr %address, i64 %object_index) {
 entry:
-  %3: ptr = load ptr, ptr gc_table
-  %4: i64 = load i64, ptr gc_table_cap
-  %5: i64 = ptrtoint ptr %1 to i64
-  %6: i64 = udiv i64 %5, i64 8
-  %7: i64 = mul i64 %6, i64 6364136223846793005
-  %8: i64 = urem i64 %7, i64 %4
-  %9: ptr = alloca i64
-  store i64 %8, ptr %9
+  %loaded_3: ptr = load ptr, ptr gc_table
+  %loaded_4: i64 = load i64, ptr gc_table_cap
+  %converted_5: i64 = ptrtoint ptr %address to i64
+  %quotient_6: i64 = udiv i64 %converted_5, i64 8
+  %product_7: i64 = mul i64 %quotient_6, i64 6364136223846793005
+  %remainder_8: i64 = urem i64 %product_7, i64 %loaded_4
+  %slot_9: ptr = alloca i64
+  store i64 %remainder_8, ptr %slot_9
   br label %probe
 
 probe:
-  %10: i64 = load i64, ptr %9
-  %11: ptr = gep i64, ptr %3, i64 %10
-  %12: i64 = load i64, ptr %11
-  %13: bool = icmp.eq i64 %12, i64 0
-  condbr bool %13, label %insert, label %next
+  %loaded_10: i64 = load i64, ptr %slot_9
+  %address_11: ptr = gep i64, ptr %loaded_3, i64 %loaded_10
+  %loaded_12: i64 = load i64, ptr %address_11
+  %condition_13: bool = icmp.eq i64 %loaded_12, i64 0
+  condbr bool %condition_13, label %insert, label %next
 
 next:
-  %14: i64 = add i64 %10, i64 1
-  %15: i64 = urem i64 %14, i64 %4
-  store i64 %15, ptr %9
+  %sum_14: i64 = add i64 %loaded_10, i64 1
+  %remainder_15: i64 = urem i64 %sum_14, i64 %loaded_4
+  store i64 %remainder_15, ptr %slot_9
   br label %probe
 
 insert:
-  %16: i64 = add i64 %2, i64 1
-  store i64 %16, ptr %11
+  %sum_16: i64 = add i64 %object_index, i64 1
+  store i64 %sum_16, ptr %address_11
   ret void
 }
 
-define i64 @__ep_gc_lookup(ptr %1) {
+define i64 @__ep_gc_lookup(ptr %address) {
 entry:
-  %2: bool = icmp.eq ptr %1, ptr null
-  condbr bool %2, label %none, label %range_low
+  %condition_2: bool = icmp.eq ptr %address, ptr null
+  condbr bool %condition_2, label %none, label %range_low
 
 range_low:
-  %3: ptr = load ptr, ptr gc_low_addr
-  %4: bool = icmp.ult ptr %1, ptr %3
-  condbr bool %4, label %none, label %range_high
+  %loaded_3: ptr = load ptr, ptr gc_low_addr
+  %condition_4: bool = icmp.ult ptr %address, ptr %loaded_3
+  condbr bool %condition_4, label %none, label %range_high
 
 range_high:
-  %5: ptr = load ptr, ptr gc_high_addr
-  %6: bool = icmp.ugt ptr %1, ptr %5
-  condbr bool %6, label %none, label %hash
+  %loaded_5: ptr = load ptr, ptr gc_high_addr
+  %condition_6: bool = icmp.ugt ptr %address, ptr %loaded_5
+  condbr bool %condition_6, label %none, label %hash
 
 hash:
-  %7: ptr = load ptr, ptr gc_table
-  %8: i64 = load i64, ptr gc_table_cap
-  %9: ptr = load ptr, ptr gc_objects
-  %10: i64 = ptrtoint ptr %1 to i64
-  %11: i64 = udiv i64 %10, i64 8
-  %12: i64 = mul i64 %11, i64 6364136223846793005
-  %13: i64 = urem i64 %12, i64 %8
-  %14: ptr = alloca i64
-  %15: ptr = alloca i64
-  store i64 %13, ptr %14
-  store i64 0, ptr %15
+  %loaded_7: ptr = load ptr, ptr gc_table
+  %loaded_8: i64 = load i64, ptr gc_table_cap
+  %loaded_9: ptr = load ptr, ptr gc_objects
+  %converted_10: i64 = ptrtoint ptr %address to i64
+  %quotient_11: i64 = udiv i64 %converted_10, i64 8
+  %product_12: i64 = mul i64 %quotient_11, i64 6364136223846793005
+  %remainder_13: i64 = urem i64 %product_12, i64 %loaded_8
+  %slot_14: ptr = alloca i64
+  %slot_15: ptr = alloca i64
+  store i64 %remainder_13, ptr %slot_14
+  store i64 0, ptr %slot_15
   br label %probe
 
 probe:
-  %16: i64 = load i64, ptr %15
-  %17: bool = icmp.uge i64 %16, i64 %8
-  condbr bool %17, label %none, label %read
+  %loaded_16: i64 = load i64, ptr %slot_15
+  %condition_17: bool = icmp.uge i64 %loaded_16, i64 %loaded_8
+  condbr bool %condition_17, label %none, label %read
 
 read:
-  %18: i64 = load i64, ptr %14
-  %19: ptr = gep i64, ptr %7, i64 %18
-  %20: i64 = load i64, ptr %19
-  %21: bool = icmp.eq i64 %20, i64 0
-  condbr bool %21, label %none, label %compare
+  %loaded_18: i64 = load i64, ptr %slot_14
+  %address_19: ptr = gep i64, ptr %loaded_7, i64 %loaded_18
+  %loaded_20: i64 = load i64, ptr %address_19
+  %condition_21: bool = icmp.eq i64 %loaded_20, i64 0
+  condbr bool %condition_21, label %none, label %compare
 
 compare:
-  %22: i64 = sub i64 %20, i64 1
-  %23: ptr = gep ptr, ptr %9, i64 %22
-  %24: ptr = load ptr, ptr %23
-  %25: bool = icmp.eq ptr %24, ptr %1
-  condbr bool %25, label %found, label %next
+  %difference_22: i64 = sub i64 %loaded_20, i64 1
+  %address_23: ptr = gep ptr, ptr %loaded_9, i64 %difference_22
+  %loaded_24: ptr = load ptr, ptr %address_23
+  %condition_25: bool = icmp.eq ptr %loaded_24, ptr %address
+  condbr bool %condition_25, label %found, label %next
 
 next:
-  %26: i64 = add i64 %18, i64 1
-  %27: i64 = urem i64 %26, i64 %8
-  store i64 %27, ptr %14
-  %28: i64 = add i64 %16, i64 1
-  store i64 %28, ptr %15
+  %sum_26: i64 = add i64 %loaded_18, i64 1
+  %remainder_27: i64 = urem i64 %sum_26, i64 %loaded_8
+  store i64 %remainder_27, ptr %slot_14
+  %sum_28: i64 = add i64 %loaded_16, i64 1
+  store i64 %sum_28, ptr %slot_15
   br label %probe
 
 found:
-  ret i64 %20
+  ret i64 %loaded_20
 
 none:
   ret i64 0
@@ -487,64 +487,64 @@ none:
 
 define void @__ep_gc_prepare_collection() {
 entry:
-  %1: i64 = load i64, ptr gc_object_count
-  %2: i64 = mul i64 %1, i64 2
-  %3: ptr = alloca i64
-  store i64 1024, ptr %3
+  %loaded_1: i64 = load i64, ptr gc_object_count
+  %product_2: i64 = mul i64 %loaded_1, i64 2
+  %slot_3: ptr = alloca i64
+  store i64 1024, ptr %slot_3
   br label %choose
 
 choose:
-  %4: i64 = load i64, ptr %3
-  %5: bool = icmp.ult i64 %4, i64 %2
-  condbr bool %5, label %double, label %allocate
+  %loaded_4: i64 = load i64, ptr %slot_3
+  %condition_5: bool = icmp.ult i64 %loaded_4, i64 %product_2
+  condbr bool %condition_5, label %double, label %allocate
 
 double:
-  %6: i64 = mul i64 %4, i64 2
-  store i64 %6, ptr %3
+  %product_6: i64 = mul i64 %loaded_4, i64 2
+  store i64 %product_6, ptr %slot_3
   br label %choose
 
 allocate:
-  %7: i64 = mul i64 %4, i64 8
-  %8: ptr = call ptr __ep_gc_raw_alloc(i64 %7)
-  %22: i64 = load i64, ptr gc_small_object_count
-  %23: i64 = add i64 %1, i64 %22
-  %24: i64 = add i64 %23, i64 1
-  %25: i64 = mul i64 %24, i64 8
-  %26: ptr = call ptr __ep_gc_raw_alloc(i64 %25)
-  store ptr %26, ptr gc_work
-  %9: bool = icmp.eq i64 %1, i64 0
-  condbr bool %9, label %empty, label %full
+  %product_7: i64 = mul i64 %loaded_4, i64 8
+  %call_result_8: ptr = call ptr __ep_gc_raw_alloc(i64 %product_7)
+  %loaded_22: i64 = load i64, ptr gc_small_object_count
+  %sum_23: i64 = add i64 %loaded_1, i64 %loaded_22
+  %sum_24: i64 = add i64 %sum_23, i64 1
+  %product_25: i64 = mul i64 %sum_24, i64 8
+  %call_result_26: ptr = call ptr __ep_gc_raw_alloc(i64 %product_25)
+  store ptr %call_result_26, ptr gc_work
+  %condition_9: bool = icmp.eq i64 %loaded_1, i64 0
+  condbr bool %condition_9, label %empty, label %full
 
 empty:
-  %10: ptr = call ptr __ep_gc_raw_alloc(i64 1)
-  store ptr %10, ptr gc_marks
+  %call_result_10: ptr = call ptr __ep_gc_raw_alloc(i64 1)
+  store ptr %call_result_10, ptr gc_marks
   br label %store
 
 full:
-  %12: ptr = call ptr __ep_gc_raw_alloc(i64 %1)
-  store ptr %12, ptr gc_marks
+  %call_result_12: ptr = call ptr __ep_gc_raw_alloc(i64 %loaded_1)
+  store ptr %call_result_12, ptr gc_marks
   br label %store
 
 store:
-  store ptr %8, ptr gc_table
-  store i64 %4, ptr gc_table_cap
+  store ptr %call_result_8, ptr gc_table
+  store i64 %loaded_4, ptr gc_table_cap
   store i64 0, ptr gc_work_count
-  %15: ptr = load ptr, ptr gc_objects
-  %16: ptr = alloca i64
-  store i64 0, ptr %16
+  %loaded_15: ptr = load ptr, ptr gc_objects
+  %slot_16: ptr = alloca i64
+  store i64 0, ptr %slot_16
   br label %build
 
 build:
-  %17: i64 = load i64, ptr %16
-  %18: bool = icmp.ult i64 %17, i64 %1
-  condbr bool %18, label %insert, label %done
+  %loaded_17: i64 = load i64, ptr %slot_16
+  %condition_18: bool = icmp.ult i64 %loaded_17, i64 %loaded_1
+  condbr bool %condition_18, label %insert, label %done
 
 insert:
-  %19: ptr = gep ptr, ptr %15, i64 %17
-  %20: ptr = load ptr, ptr %19
-  call void __ep_gc_table_insert(ptr %20, i64 %17)
-  %21: i64 = add i64 %17, i64 1
-  store i64 %21, ptr %16
+  %address_19: ptr = gep ptr, ptr %loaded_15, i64 %loaded_17
+  %loaded_20: ptr = load ptr, ptr %address_19
+  call void __ep_gc_table_insert(ptr %loaded_20, i64 %loaded_17)
+  %sum_21: i64 = add i64 %loaded_17, i64 1
+  store i64 %sum_21, ptr %slot_16
   br label %build
 
 done:
@@ -553,12 +553,12 @@ done:
 
 define void @__ep_gc_release_collection() {
 entry:
-  %1: ptr = load ptr, ptr gc_table
-  %2: ptr = load ptr, ptr gc_marks
-  %3: ptr = load ptr, ptr gc_work
-  call void __ep_gc_raw_free(ptr %1)
-  call void __ep_gc_raw_free(ptr %2)
-  call void __ep_gc_raw_free(ptr %3)
+  %loaded_1: ptr = load ptr, ptr gc_table
+  %loaded_2: ptr = load ptr, ptr gc_marks
+  %loaded_3: ptr = load ptr, ptr gc_work
+  call void __ep_gc_raw_free(ptr %loaded_1)
+  call void __ep_gc_raw_free(ptr %loaded_2)
+  call void __ep_gc_raw_free(ptr %loaded_3)
   store ptr null, ptr gc_table
   store ptr null, ptr gc_marks
   store ptr null, ptr gc_work
@@ -566,111 +566,111 @@ entry:
   ret void
 }
 
-define void @__ep_gc_mark_large_ptr(ptr %1) {
+define void @__ep_gc_mark_large_ptr(ptr %candidate) {
 entry:
-  %2: i64 = call i64 __ep_gc_lookup(ptr %1)
-  %3: bool = icmp.eq i64 %2, i64 0
-  condbr bool %3, label %done, label %check
+  %call_result_2: i64 = call i64 __ep_gc_lookup(ptr %candidate)
+  %condition_3: bool = icmp.eq i64 %call_result_2, i64 0
+  condbr bool %condition_3, label %done, label %check
 
 check:
-  %4: i64 = sub i64 %2, i64 1
-  %5: ptr = load ptr, ptr gc_marks
-  %6: ptr = gep i8, ptr %5, i64 %4
-  %7: i8 = load i8, ptr %6
-  %8: bool = icmp.ne i8 %7, i8 0
-  condbr bool %8, label %done, label %mark
+  %difference_4: i64 = sub i64 %call_result_2, i64 1
+  %loaded_5: ptr = load ptr, ptr gc_marks
+  %address_6: ptr = gep i8, ptr %loaded_5, i64 %difference_4
+  %loaded_7: i8 = load i8, ptr %address_6
+  %condition_8: bool = icmp.ne i8 %loaded_7, i8 0
+  condbr bool %condition_8, label %done, label %mark
 
 mark:
-  store i8 1, ptr %6
-  %9: ptr = load ptr, ptr gc_work
-  %10: i64 = load i64, ptr gc_work_count
-  %11: ptr = gep i64, ptr %9, i64 %10
-  %13: i64 = mul i64 %4, i64 2
-  store i64 %13, ptr %11
-  %12: i64 = add i64 %10, i64 1
-  store i64 %12, ptr gc_work_count
+  store i8 1, ptr %address_6
+  %loaded_9: ptr = load ptr, ptr gc_work
+  %loaded_10: i64 = load i64, ptr gc_work_count
+  %address_11: ptr = gep i64, ptr %loaded_9, i64 %loaded_10
+  %product_13: i64 = mul i64 %difference_4, i64 2
+  store i64 %product_13, ptr %address_11
+  %sum_12: i64 = add i64 %loaded_10, i64 1
+  store i64 %sum_12, ptr gc_work_count
   ret void
 
 done:
   ret void
 }
 
-define bool @__ep_gc_mark_small_ptr(ptr %1) {
+define bool @__ep_gc_mark_small_ptr(ptr %candidate) {
 entry:
-  %2: ptr = load ptr, ptr gc_small_arena
-  %3: bool = icmp.ult ptr %1, ptr %2
-  condbr bool %3, label %miss, label %range_high
+  %loaded_2: ptr = load ptr, ptr gc_small_arena
+  %condition_3: bool = icmp.ult ptr %candidate, ptr %loaded_2
+  condbr bool %condition_3, label %miss, label %range_high
 
 range_high:
-  %4: ptr = load ptr, ptr gc_small_arena_end
-  %5: bool = icmp.uge ptr %1, ptr %4
-  condbr bool %5, label %miss, label %locate
+  %loaded_4: ptr = load ptr, ptr gc_small_arena_end
+  %condition_5: bool = icmp.uge ptr %candidate, ptr %loaded_4
+  condbr bool %condition_5, label %miss, label %locate
 
 locate:
-  %6: i64 = ptrtoint ptr %1 to i64
-  %7: i64 = ptrtoint ptr %2 to i64
-  %8: i64 = sub i64 %6, i64 %7
-  %9: i64 = udiv i64 %8, i64 65536
-  %10: i64 = load i64, ptr gc_small_page_count
-  %11: bool = icmp.uge i64 %9, i64 %10
-  condbr bool %11, label %owned_dead, label %class
+  %converted_6: i64 = ptrtoint ptr %candidate to i64
+  %converted_7: i64 = ptrtoint ptr %loaded_2 to i64
+  %difference_8: i64 = sub i64 %converted_6, i64 %converted_7
+  %quotient_9: i64 = udiv i64 %difference_8, i64 65536
+  %loaded_10: i64 = load i64, ptr gc_small_page_count
+  %condition_11: bool = icmp.uge i64 %quotient_9, i64 %loaded_10
+  condbr bool %condition_11, label %owned_dead, label %class
 
 class:
-  %12: ptr = load ptr, ptr gc_small_page_states
-  %13: ptr = gep i8, ptr %12, i64 %9
-  %16: i64 = load i8, ptr %13
-  %17: bool = icmp.eq i64 %16, i64 0
-  condbr bool %17, label %owned_dead, label %slot
+  %loaded_12: ptr = load ptr, ptr gc_small_page_states
+  %address_13: ptr = gep i8, ptr %loaded_12, i64 %quotient_9
+  %loaded_16: i64 = load i8, ptr %address_13
+  %condition_17: bool = icmp.eq i64 %loaded_16, i64 0
+  condbr bool %condition_17, label %owned_dead, label %slot
 
 slot:
-  %18: i64 = mul i64 %16, i64 8
-  %19: i64 = urem i64 %8, i64 65536
-  %20: i64 = urem i64 %19, i64 %18
-  %21: bool = icmp.ne i64 %20, i64 0
-  condbr bool %21, label %owned_dead, label %allocated
+  %product_18: i64 = mul i64 %loaded_16, i64 8
+  %remainder_19: i64 = urem i64 %difference_8, i64 65536
+  %remainder_20: i64 = urem i64 %remainder_19, i64 %product_18
+  %condition_21: bool = icmp.ne i64 %remainder_20, i64 0
+  condbr bool %condition_21, label %owned_dead, label %allocated
 
 allocated:
-  %22: i64 = udiv i64 %19, i64 %18
-  %23: i64 = udiv i64 65536, i64 %18
-  %24: bool = icmp.uge i64 %22, i64 %23
-  condbr bool %24, label %owned_dead, label %allocation_bit
+  %quotient_22: i64 = udiv i64 %remainder_19, i64 %product_18
+  %quotient_23: i64 = udiv i64 65536, i64 %product_18
+  %condition_24: bool = icmp.uge i64 %quotient_22, i64 %quotient_23
+  condbr bool %condition_24, label %owned_dead, label %allocation_bit
 
 allocation_bit:
-  %45: i64 = shr i64 %22, i64 3
-  %46: i64 = and i64 %22, i64 7
-  %47: i64 = shl i64 1, i64 %46
-  %25: ptr = load ptr, ptr gc_small_page_alloc_maps
-  %26: ptr = gep ptr, ptr %25, i64 %9
-  %27: ptr = load ptr, ptr %26
-  %28: ptr = gep i8, ptr %27, i64 %45
-  %29: i64 = load i8, ptr %28
-  %48: i64 = and i64 %29, i64 %47
-  %30: bool = icmp.eq i64 %48, i64 0
-  condbr bool %30, label %owned_dead, label %mark_bit
+  %result_45: i64 = shr i64 %quotient_22, i64 3
+  %bitwise_46: i64 = and i64 %quotient_22, i64 7
+  %shifted_47: i64 = shl i64 1, i64 %bitwise_46
+  %loaded_25: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %address_26: ptr = gep ptr, ptr %loaded_25, i64 %quotient_9
+  %loaded_27: ptr = load ptr, ptr %address_26
+  %address_28: ptr = gep i8, ptr %loaded_27, i64 %result_45
+  %loaded_29: i64 = load i8, ptr %address_28
+  %bitwise_48: i64 = and i64 %loaded_29, i64 %shifted_47
+  %condition_30: bool = icmp.eq i64 %bitwise_48, i64 0
+  condbr bool %condition_30, label %owned_dead, label %mark_bit
 
 mark_bit:
-  %31: ptr = load ptr, ptr gc_small_page_mark_maps
-  %32: ptr = gep ptr, ptr %31, i64 %9
-  %33: ptr = load ptr, ptr %32
-  %34: ptr = gep i8, ptr %33, i64 %45
-  %35: i64 = load i8, ptr %34
-  %49: i64 = and i64 %35, i64 %47
-  %36: bool = icmp.ne i64 %49, i64 0
-  condbr bool %36, label %owned_live, label %mark
+  %loaded_31: ptr = load ptr, ptr gc_small_page_mark_maps
+  %address_32: ptr = gep ptr, ptr %loaded_31, i64 %quotient_9
+  %loaded_33: ptr = load ptr, ptr %address_32
+  %address_34: ptr = gep i8, ptr %loaded_33, i64 %result_45
+  %loaded_35: i64 = load i8, ptr %address_34
+  %bitwise_49: i64 = and i64 %loaded_35, i64 %shifted_47
+  %condition_36: bool = icmp.ne i64 %bitwise_49, i64 0
+  condbr bool %condition_36, label %owned_live, label %mark
 
 mark:
-  %50: i64 = or i64 %35, i64 %47
-  store i8 %50, ptr %34
-  %37: i64 = mul i64 %9, i64 8192
-  %38: i64 = add i64 %37, i64 %22
-  %39: i64 = mul i64 %38, i64 2
-  %40: i64 = add i64 %39, i64 1
-  %41: ptr = load ptr, ptr gc_work
-  %42: i64 = load i64, ptr gc_work_count
-  %43: ptr = gep i64, ptr %41, i64 %42
-  store i64 %40, ptr %43
-  %44: i64 = add i64 %42, i64 1
-  store i64 %44, ptr gc_work_count
+  %bitwise_50: i64 = or i64 %loaded_35, i64 %shifted_47
+  store i8 %bitwise_50, ptr %address_34
+  %product_37: i64 = mul i64 %quotient_9, i64 8192
+  %sum_38: i64 = add i64 %product_37, i64 %quotient_22
+  %product_39: i64 = mul i64 %sum_38, i64 2
+  %sum_40: i64 = add i64 %product_39, i64 1
+  %loaded_41: ptr = load ptr, ptr gc_work
+  %loaded_42: i64 = load i64, ptr gc_work_count
+  %address_43: ptr = gep i64, ptr %loaded_41, i64 %loaded_42
+  store i64 %sum_40, ptr %address_43
+  %sum_44: i64 = add i64 %loaded_42, i64 1
+  store i64 %sum_44, ptr gc_work_count
   ret bool true
 
 owned_live:
@@ -683,13 +683,13 @@ miss:
   ret bool false
 }
 
-define void @__ep_gc_mark_ptr(ptr %1) {
+define void @__ep_gc_mark_ptr(ptr %candidate) {
 entry:
-  %2: bool = call bool __ep_gc_mark_small_ptr(ptr %1)
-  condbr bool %2, label %done, label %large
+  %call_result_2: bool = call bool __ep_gc_mark_small_ptr(ptr %candidate)
+  condbr bool %call_result_2, label %done, label %large
 
 large:
-  call void __ep_gc_mark_large_ptr(ptr %1)
+  call void __ep_gc_mark_large_ptr(ptr %candidate)
   ret void
 
 done:
@@ -698,24 +698,24 @@ done:
 
 define void @__ep_gc_mark_roots() {
 entry:
-  %1: ptr = load ptr, ptr argv
-  call void __ep_gc_mark_ptr(ptr %1)
-  %2: ptr = alloca i64
-  %3: ptr = alloca ptr
-  store ptr %2, ptr %3
-  %4: ptr = load ptr, ptr gc_stack_high
+  %loaded_1: ptr = load ptr, ptr argv
+  call void __ep_gc_mark_ptr(ptr %loaded_1)
+  %slot_2: ptr = alloca i64
+  %slot_3: ptr = alloca ptr
+  store ptr %slot_2, ptr %slot_3
+  %loaded_4: ptr = load ptr, ptr gc_stack_high
   br label %scan
 
 scan:
-  %5: ptr = load ptr, ptr %3
-  %6: bool = icmp.ult ptr %5, ptr %4
-  condbr bool %6, label %word, label %done
+  %loaded_5: ptr = load ptr, ptr %slot_3
+  %condition_6: bool = icmp.ult ptr %loaded_5, ptr %loaded_4
+  condbr bool %condition_6, label %word, label %done
 
 word:
-  %7: ptr = load ptr, ptr %5
-  call void __ep_gc_mark_ptr(ptr %7)
-  %8: ptr = gep i8, ptr %5, i64 8
-  store ptr %8, ptr %3
+  %loaded_7: ptr = load ptr, ptr %loaded_5
+  call void __ep_gc_mark_ptr(ptr %loaded_7)
+  %address_8: ptr = gep i8, ptr %loaded_5, i64 8
+  store ptr %address_8, ptr %slot_3
   br label %scan
 
 done:
@@ -724,73 +724,73 @@ done:
 
 define void @__ep_gc_drain_marks() {
 entry:
-  %30: ptr = alloca ptr
-  %31: ptr = alloca i64
-  %32: ptr = alloca i64
+  %slot_30: ptr = alloca ptr
+  %slot_31: ptr = alloca i64
+  %slot_32: ptr = alloca i64
   br label %next_object
 
 next_object:
-  %1: i64 = load i64, ptr gc_work_count
-  %2: bool = icmp.eq i64 %1, i64 0
-  condbr bool %2, label %done, label %pop
+  %loaded_1: i64 = load i64, ptr gc_work_count
+  %condition_2: bool = icmp.eq i64 %loaded_1, i64 0
+  condbr bool %condition_2, label %done, label %pop
 
 pop:
-  %3: i64 = sub i64 %1, i64 1
-  store i64 %3, ptr gc_work_count
-  %4: ptr = load ptr, ptr gc_work
-  %5: ptr = gep i64, ptr %4, i64 %3
-  %6: i64 = load i64, ptr %5
-  %33: i64 = urem i64 %6, i64 2
-  %34: bool = icmp.eq i64 %33, i64 1
-  condbr bool %34, label %small, label %large
+  %difference_3: i64 = sub i64 %loaded_1, i64 1
+  store i64 %difference_3, ptr gc_work_count
+  %loaded_4: ptr = load ptr, ptr gc_work
+  %address_5: ptr = gep i64, ptr %loaded_4, i64 %difference_3
+  %loaded_6: i64 = load i64, ptr %address_5
+  %remainder_33: i64 = urem i64 %loaded_6, i64 2
+  %condition_34: bool = icmp.eq i64 %remainder_33, i64 1
+  condbr bool %condition_34, label %small, label %large
 
 large:
-  %35: i64 = udiv i64 %6, i64 2
-  %7: ptr = load ptr, ptr gc_objects
-  %8: ptr = gep ptr, ptr %7, i64 %35
-  %9: ptr = load ptr, ptr %8
-  %10: ptr = load ptr, ptr gc_sizes
-  %11: ptr = gep i64, ptr %10, i64 %35
-  %12: i64 = load i64, ptr %11
-  store ptr %9, ptr %30
-  store i64 %12, ptr %31
+  %quotient_35: i64 = udiv i64 %loaded_6, i64 2
+  %loaded_7: ptr = load ptr, ptr gc_objects
+  %address_8: ptr = gep ptr, ptr %loaded_7, i64 %quotient_35
+  %loaded_9: ptr = load ptr, ptr %address_8
+  %loaded_10: ptr = load ptr, ptr gc_sizes
+  %address_11: ptr = gep i64, ptr %loaded_10, i64 %quotient_35
+  %loaded_12: i64 = load i64, ptr %address_11
+  store ptr %loaded_9, ptr %slot_30
+  store i64 %loaded_12, ptr %slot_31
   br label %start_scan
 
 small:
-  %36: i64 = sub i64 %6, i64 1
-  %37: i64 = udiv i64 %36, i64 2
-  %38: i64 = udiv i64 %37, i64 8192
-  %39: i64 = urem i64 %37, i64 8192
-  %40: ptr = load ptr, ptr gc_small_page_states
-  %41: ptr = gep i8, ptr %40, i64 %38
-  %44: i64 = load i8, ptr %41
-  %45: i64 = mul i64 %44, i64 8
-  %46: i64 = mul i64 %38, i64 65536
-  %47: i64 = mul i64 %39, i64 %45
-  %48: i64 = add i64 %46, i64 %47
-  %49: ptr = load ptr, ptr gc_small_arena
-  %50: ptr = gep i8, ptr %49, i64 %48
-  store ptr %50, ptr %30
-  store i64 %45, ptr %31
+  %difference_36: i64 = sub i64 %loaded_6, i64 1
+  %quotient_37: i64 = udiv i64 %difference_36, i64 2
+  %quotient_38: i64 = udiv i64 %quotient_37, i64 8192
+  %remainder_39: i64 = urem i64 %quotient_37, i64 8192
+  %loaded_40: ptr = load ptr, ptr gc_small_page_states
+  %address_41: ptr = gep i8, ptr %loaded_40, i64 %quotient_38
+  %loaded_44: i64 = load i8, ptr %address_41
+  %product_45: i64 = mul i64 %loaded_44, i64 8
+  %product_46: i64 = mul i64 %quotient_38, i64 65536
+  %product_47: i64 = mul i64 %remainder_39, i64 %product_45
+  %sum_48: i64 = add i64 %product_46, i64 %product_47
+  %loaded_49: ptr = load ptr, ptr gc_small_arena
+  %address_50: ptr = gep i8, ptr %loaded_49, i64 %sum_48
+  store ptr %address_50, ptr %slot_30
+  store i64 %product_45, ptr %slot_31
   br label %start_scan
 
 start_scan:
-  store i64 0, ptr %32
+  store i64 0, ptr %slot_32
   br label %scan
 
 scan:
-  %14: i64 = load i64, ptr %32
-  %15: i64 = add i64 %14, i64 8
-  %51: i64 = load i64, ptr %31
-  %16: bool = icmp.ule i64 %15, i64 %51
-  condbr bool %16, label %word, label %next_object
+  %loaded_14: i64 = load i64, ptr %slot_32
+  %sum_15: i64 = add i64 %loaded_14, i64 8
+  %loaded_51: i64 = load i64, ptr %slot_31
+  %condition_16: bool = icmp.ule i64 %sum_15, i64 %loaded_51
+  condbr bool %condition_16, label %word, label %next_object
 
 word:
-  %52: ptr = load ptr, ptr %30
-  %17: ptr = gep i8, ptr %52, i64 %14
-  %18: ptr = load ptr, ptr %17
-  call void __ep_gc_mark_ptr(ptr %18)
-  store i64 %15, ptr %32
+  %loaded_52: ptr = load ptr, ptr %slot_30
+  %address_17: ptr = gep i8, ptr %loaded_52, i64 %loaded_14
+  %loaded_18: ptr = load ptr, ptr %address_17
+  call void __ep_gc_mark_ptr(ptr %loaded_18)
+  store i64 %sum_15, ptr %slot_32
   br label %scan
 
 done:
@@ -799,279 +799,279 @@ done:
 
 define void @__ep_gc_sweep_large() {
 entry:
-  %1: ptr = load ptr, ptr gc_objects
-  %2: ptr = load ptr, ptr gc_sizes
-  %3: i64 = load i64, ptr gc_object_count
-  %4: ptr = load ptr, ptr gc_marks
-  %5: ptr = alloca i64
-  %6: ptr = alloca i64
-  %7: ptr = alloca i64
-  store i64 0, ptr %5
-  store i64 0, ptr %6
-  store i64 0, ptr %7
+  %loaded_1: ptr = load ptr, ptr gc_objects
+  %loaded_2: ptr = load ptr, ptr gc_sizes
+  %loaded_3: i64 = load i64, ptr gc_object_count
+  %loaded_4: ptr = load ptr, ptr gc_marks
+  %slot_5: ptr = alloca i64
+  %slot_6: ptr = alloca i64
+  %slot_7: ptr = alloca i64
+  store i64 0, ptr %slot_5
+  store i64 0, ptr %slot_6
+  store i64 0, ptr %slot_7
   br label %loop
 
 loop:
-  %8: i64 = load i64, ptr %5
-  %9: bool = icmp.ult i64 %8, i64 %3
-  condbr bool %9, label %read, label %done
+  %loaded_8: i64 = load i64, ptr %slot_5
+  %condition_9: bool = icmp.ult i64 %loaded_8, i64 %loaded_3
+  condbr bool %condition_9, label %read, label %done
 
 read:
-  %10: ptr = gep ptr, ptr %1, i64 %8
-  %11: ptr = load ptr, ptr %10
-  %12: ptr = gep i64, ptr %2, i64 %8
-  %13: i64 = load i64, ptr %12
-  %14: ptr = gep i8, ptr %4, i64 %8
-  %15: i8 = load i8, ptr %14
-  %16: bool = icmp.eq i8 %15, i8 0
-  condbr bool %16, label %free, label %keep
+  %address_10: ptr = gep ptr, ptr %loaded_1, i64 %loaded_8
+  %loaded_11: ptr = load ptr, ptr %address_10
+  %address_12: ptr = gep i64, ptr %loaded_2, i64 %loaded_8
+  %loaded_13: i64 = load i64, ptr %address_12
+  %address_14: ptr = gep i8, ptr %loaded_4, i64 %loaded_8
+  %loaded_15: i8 = load i8, ptr %address_14
+  %condition_16: bool = icmp.eq i8 %loaded_15, i8 0
+  condbr bool %condition_16, label %free, label %keep
 
 free:
-  call void __ep_gc_raw_free(ptr %11)
+  call void __ep_gc_raw_free(ptr %loaded_11)
   br label %advance
 
 keep:
-  %17: i64 = load i64, ptr %6
-  %18: ptr = gep ptr, ptr %1, i64 %17
-  store ptr %11, ptr %18
-  %19: ptr = gep i64, ptr %2, i64 %17
-  store i64 %13, ptr %19
-  %20: i64 = add i64 %17, i64 1
-  store i64 %20, ptr %6
-  %21: i64 = load i64, ptr %7
-  %22: i64 = add i64 %21, i64 %13
-  store i64 %22, ptr %7
+  %loaded_17: i64 = load i64, ptr %slot_6
+  %address_18: ptr = gep ptr, ptr %loaded_1, i64 %loaded_17
+  store ptr %loaded_11, ptr %address_18
+  %address_19: ptr = gep i64, ptr %loaded_2, i64 %loaded_17
+  store i64 %loaded_13, ptr %address_19
+  %sum_20: i64 = add i64 %loaded_17, i64 1
+  store i64 %sum_20, ptr %slot_6
+  %loaded_21: i64 = load i64, ptr %slot_7
+  %sum_22: i64 = add i64 %loaded_21, i64 %loaded_13
+  store i64 %sum_22, ptr %slot_7
   br label %advance
 
 advance:
-  %23: i64 = add i64 %8, i64 1
-  store i64 %23, ptr %5
+  %sum_23: i64 = add i64 %loaded_8, i64 1
+  store i64 %sum_23, ptr %slot_5
   br label %loop
 
 done:
-  %24: i64 = load i64, ptr %6
-  %25: i64 = load i64, ptr %7
-  store i64 %24, ptr gc_object_count
-  store i64 %25, ptr gc_large_live_bytes
+  %loaded_24: i64 = load i64, ptr %slot_6
+  %loaded_25: i64 = load i64, ptr %slot_7
+  store i64 %loaded_24, ptr gc_object_count
+  store i64 %loaded_25, ptr gc_large_live_bytes
   ret void
 }
 
 define void @__ep_gc_sweep_small() {
 entry:
-  %1: ptr = alloca i64
-  %2: ptr = alloca i64
-  %3: ptr = alloca i64
-  %4: ptr = alloca i64
-  store i64 0, ptr %1
-  store i64 0, ptr %2
-  store i64 0, ptr %3
-  %5: ptr = load ptr, ptr gc_small_active_pages
-  store i64 0, ptr %5
-  %6: ptr = gep i64, ptr %5, i64 1
-  store i64 0, ptr %6
-  %7: ptr = gep i64, ptr %5, i64 2
-  store i64 0, ptr %7
-  %8: ptr = gep i64, ptr %5, i64 3
-  store i64 0, ptr %8
+  %slot_1: ptr = alloca i64
+  %slot_2: ptr = alloca i64
+  %slot_3: ptr = alloca i64
+  %slot_4: ptr = alloca i64
+  store i64 0, ptr %slot_1
+  store i64 0, ptr %slot_2
+  store i64 0, ptr %slot_3
+  %loaded_5: ptr = load ptr, ptr gc_small_active_pages
+  store i64 0, ptr %loaded_5
+  %address_6: ptr = gep i64, ptr %loaded_5, i64 1
+  store i64 0, ptr %address_6
+  %address_7: ptr = gep i64, ptr %loaded_5, i64 2
+  store i64 0, ptr %address_7
+  %address_8: ptr = gep i64, ptr %loaded_5, i64 3
+  store i64 0, ptr %address_8
   br label %page
 
 page:
-  %9: i64 = load i64, ptr %1
-  %10: i64 = load i64, ptr gc_small_page_count
-  %11: bool = icmp.ult i64 %9, i64 %10
-  condbr bool %11, label %page_setup, label %done
+  %loaded_9: i64 = load i64, ptr %slot_1
+  %loaded_10: i64 = load i64, ptr gc_small_page_count
+  %condition_11: bool = icmp.ult i64 %loaded_9, i64 %loaded_10
+  condbr bool %condition_11, label %page_setup, label %done
 
 page_setup:
-  %12: ptr = load ptr, ptr gc_small_page_states
-  %13: ptr = gep i8, ptr %12, i64 %9
-  %16: i64 = load i8, ptr %13
-  %17: i64 = mul i64 %16, i64 8
-  %18: i64 = udiv i64 65536, i64 %17
-  store i64 0, ptr %4
-  %19: ptr = load ptr, ptr gc_small_page_alloc_counts
-  %20: ptr = gep i64, ptr %19, i64 %9
-  store i64 0, ptr %20
+  %loaded_12: ptr = load ptr, ptr gc_small_page_states
+  %address_13: ptr = gep i8, ptr %loaded_12, i64 %loaded_9
+  %loaded_16: i64 = load i8, ptr %address_13
+  %product_17: i64 = mul i64 %loaded_16, i64 8
+  %quotient_18: i64 = udiv i64 65536, i64 %product_17
+  store i64 0, ptr %slot_4
+  %loaded_19: ptr = load ptr, ptr gc_small_page_alloc_counts
+  %address_20: ptr = gep i64, ptr %loaded_19, i64 %loaded_9
+  store i64 0, ptr %address_20
   br label %slot
 
 slot:
-  %21: i64 = load i64, ptr %4
-  %22: bool = icmp.ult i64 %21, i64 %18
-  condbr bool %22, label %allocation, label %page_finish
+  %loaded_21: i64 = load i64, ptr %slot_4
+  %condition_22: bool = icmp.ult i64 %loaded_21, i64 %quotient_18
+  condbr bool %condition_22, label %allocation, label %page_finish
 
 allocation:
-  %59: i64 = shr i64 %21, i64 3
-  %60: i64 = and i64 %21, i64 7
-  %61: i64 = shl i64 1, i64 %60
-  %64: i64 = xor i64 %61, i64 255
-  %23: ptr = load ptr, ptr gc_small_page_alloc_maps
-  %24: ptr = gep ptr, ptr %23, i64 %9
-  %25: ptr = load ptr, ptr %24
-  %26: ptr = gep i8, ptr %25, i64 %59
-  %27: i64 = load i8, ptr %26
-  %62: i64 = and i64 %27, i64 %61
-  %28: bool = icmp.eq i64 %62, i64 0
-  condbr bool %28, label %slot_next, label %mark
+  %result_59: i64 = shr i64 %loaded_21, i64 3
+  %bitwise_60: i64 = and i64 %loaded_21, i64 7
+  %shifted_61: i64 = shl i64 1, i64 %bitwise_60
+  %bitwise_64: i64 = xor i64 %shifted_61, i64 255
+  %loaded_23: ptr = load ptr, ptr gc_small_page_alloc_maps
+  %address_24: ptr = gep ptr, ptr %loaded_23, i64 %loaded_9
+  %loaded_25: ptr = load ptr, ptr %address_24
+  %address_26: ptr = gep i8, ptr %loaded_25, i64 %result_59
+  %loaded_27: i64 = load i8, ptr %address_26
+  %bitwise_62: i64 = and i64 %loaded_27, i64 %shifted_61
+  %condition_28: bool = icmp.eq i64 %bitwise_62, i64 0
+  condbr bool %condition_28, label %slot_next, label %mark
 
 mark:
-  %29: ptr = load ptr, ptr gc_small_page_mark_maps
-  %30: ptr = gep ptr, ptr %29, i64 %9
-  %31: ptr = load ptr, ptr %30
-  %32: ptr = gep i8, ptr %31, i64 %59
-  %33: i64 = load i8, ptr %32
-  %63: i64 = and i64 %33, i64 %61
-  %34: bool = icmp.eq i64 %63, i64 0
-  condbr bool %34, label %free, label %keep
+  %loaded_29: ptr = load ptr, ptr gc_small_page_mark_maps
+  %address_30: ptr = gep ptr, ptr %loaded_29, i64 %loaded_9
+  %loaded_31: ptr = load ptr, ptr %address_30
+  %address_32: ptr = gep i8, ptr %loaded_31, i64 %result_59
+  %loaded_33: i64 = load i8, ptr %address_32
+  %bitwise_63: i64 = and i64 %loaded_33, i64 %shifted_61
+  %condition_34: bool = icmp.eq i64 %bitwise_63, i64 0
+  condbr bool %condition_34, label %free, label %keep
 
 keep:
-  %65: i64 = and i64 %33, i64 %64
-  store i8 %65, ptr %32
-  %35: i64 = load i64, ptr %20
-  %36: i64 = add i64 %35, i64 1
-  store i64 %36, ptr %20
-  %37: i64 = load i64, ptr %2
-  %38: i64 = add i64 %37, i64 1
-  store i64 %38, ptr %2
-  %39: i64 = load i64, ptr %3
-  %40: i64 = add i64 %39, i64 %17
-  store i64 %40, ptr %3
+  %bitwise_65: i64 = and i64 %loaded_33, i64 %bitwise_64
+  store i8 %bitwise_65, ptr %address_32
+  %loaded_35: i64 = load i64, ptr %address_20
+  %sum_36: i64 = add i64 %loaded_35, i64 1
+  store i64 %sum_36, ptr %address_20
+  %loaded_37: i64 = load i64, ptr %slot_2
+  %sum_38: i64 = add i64 %loaded_37, i64 1
+  store i64 %sum_38, ptr %slot_2
+  %loaded_39: i64 = load i64, ptr %slot_3
+  %sum_40: i64 = add i64 %loaded_39, i64 %product_17
+  store i64 %sum_40, ptr %slot_3
   br label %slot_next
 
 free:
-  %66: i64 = and i64 %27, i64 %64
-  store i8 %66, ptr %26
-  %41: i64 = mul i64 %9, i64 65536
-  %42: i64 = mul i64 %21, i64 %17
-  %43: i64 = add i64 %41, i64 %42
-  %44: ptr = load ptr, ptr gc_small_arena
-  %45: ptr = gep i8, ptr %44, i64 %43
-  %46: ptr = load ptr, ptr gc_small_page_free_heads
-  %47: ptr = gep i64, ptr %46, i64 %9
-  %48: i64 = load i64, ptr %47
-  store i64 %48, ptr %45
-  %49: i64 = add i64 %21, i64 1
-  store i64 %49, ptr %47
+  %bitwise_66: i64 = and i64 %loaded_27, i64 %bitwise_64
+  store i8 %bitwise_66, ptr %address_26
+  %product_41: i64 = mul i64 %loaded_9, i64 65536
+  %product_42: i64 = mul i64 %loaded_21, i64 %product_17
+  %sum_43: i64 = add i64 %product_41, i64 %product_42
+  %loaded_44: ptr = load ptr, ptr gc_small_arena
+  %address_45: ptr = gep i8, ptr %loaded_44, i64 %sum_43
+  %loaded_46: ptr = load ptr, ptr gc_small_page_free_heads
+  %address_47: ptr = gep i64, ptr %loaded_46, i64 %loaded_9
+  %loaded_48: i64 = load i64, ptr %address_47
+  store i64 %loaded_48, ptr %address_45
+  %sum_49: i64 = add i64 %loaded_21, i64 1
+  store i64 %sum_49, ptr %address_47
   br label %slot_next
 
 slot_next:
-  %50: i64 = add i64 %21, i64 1
-  store i64 %50, ptr %4
+  %sum_50: i64 = add i64 %loaded_21, i64 1
+  store i64 %sum_50, ptr %slot_4
   br label %slot
 
 page_finish:
-  %51: i64 = load i64, ptr %20
-  %52: bool = icmp.ult i64 %51, i64 %18
-  condbr bool %52, label %make_active, label %page_next
+  %loaded_51: i64 = load i64, ptr %address_20
+  %condition_52: bool = icmp.ult i64 %loaded_51, i64 %quotient_18
+  condbr bool %condition_52, label %make_active, label %page_next
 
 make_active:
-  %53: i64 = sub i64 %16, i64 1
-  %54: ptr = gep i64, ptr %5, i64 %53
-  %55: i64 = add i64 %9, i64 1
-  store i64 %55, ptr %54
+  %difference_53: i64 = sub i64 %loaded_16, i64 1
+  %address_54: ptr = gep i64, ptr %loaded_5, i64 %difference_53
+  %sum_55: i64 = add i64 %loaded_9, i64 1
+  store i64 %sum_55, ptr %address_54
   br label %page_next
 
 page_next:
-  %56: i64 = add i64 %9, i64 1
-  store i64 %56, ptr %1
+  %sum_56: i64 = add i64 %loaded_9, i64 1
+  store i64 %sum_56, ptr %slot_1
   br label %page
 
 done:
-  %57: i64 = load i64, ptr %2
-  %58: i64 = load i64, ptr %3
-  store i64 %57, ptr gc_small_object_count
-  store i64 %58, ptr gc_small_live_bytes
+  %loaded_57: i64 = load i64, ptr %slot_2
+  %loaded_58: i64 = load i64, ptr %slot_3
+  store i64 %loaded_57, ptr gc_small_object_count
+  store i64 %loaded_58, ptr gc_small_live_bytes
   ret void
 }
 
 define void @__ep_gc_update_thresholds() {
 entry:
-  %1: i64 = load i64, ptr gc_large_live_bytes
-  %2: i64 = load i64, ptr gc_small_live_bytes
-  %3: i64 = add i64 %1, i64 %2
-  store i64 %3, ptr gc_live_bytes
-  %4: i64 = mul i64 %3, i64 2
-  %5: bool = icmp.ult i64 %4, i64 8388608
-  condbr bool %5, label %bytes_minimum, label %bytes_adaptive
+  %loaded_1: i64 = load i64, ptr gc_large_live_bytes
+  %loaded_2: i64 = load i64, ptr gc_small_live_bytes
+  %sum_3: i64 = add i64 %loaded_1, i64 %loaded_2
+  store i64 %sum_3, ptr gc_live_bytes
+  %product_4: i64 = mul i64 %sum_3, i64 2
+  %condition_5: bool = icmp.ult i64 %product_4, i64 8388608
+  condbr bool %condition_5, label %bytes_minimum, label %bytes_adaptive
 
 bytes_minimum:
   store i64 8388608, ptr gc_threshold
   ret void
 
 bytes_adaptive:
-  store i64 %4, ptr gc_threshold
+  store i64 %product_4, ptr gc_threshold
   ret void
 }
 
-define void @__ep_gc_write_stderr(ptr %1, ptr %2, i64 %3) {
+define void @__ep_gc_write_stderr(ptr %handle, ptr %data, i64 %length) {
 entry:
-  %4: ptr = alloca i64
-  store i64 0, ptr %4
-  %5: i64 = call i64 __ep_import$kernel32.dll$WriteFile(ptr %1, ptr %2, i64 %3, ptr %4, ptr null)
+  %slot_4: ptr = alloca i64
+  store i64 0, ptr %slot_4
+  %call_result_5: i64 = call i64 __ep_import$kernel32.dll$WriteFile(ptr %handle, ptr %data, i64 %length, ptr %slot_4, ptr null)
   ret void
 }
 
-define void @__ep_gc_write_stderr_str(ptr %1, ptr %2) {
+define void @__ep_gc_write_stderr_str(ptr %handle, ptr %text) {
 entry:
-  %3: ptr = gep i8, ptr %2, i64 8
-  %4: ptr = gep struct str, ptr %2, i64 0, i64 0
-  %5: i64 = load i64, ptr %4
-  call void __ep_gc_write_stderr(ptr %1, ptr %3, i64 %5)
+  %address_3: ptr = gep i8, ptr %text, i64 8
+  %address_4: ptr = gep struct str, ptr %text, i64 0, i64 0
+  %loaded_5: i64 = load i64, ptr %address_4
+  call void __ep_gc_write_stderr(ptr %handle, ptr %address_3, i64 %loaded_5)
   ret void
 }
 
-define void @__ep_gc_write_u64(ptr %1, i64 %2) {
+define void @__ep_gc_write_u64(ptr %handle, i64 %value) {
 entry:
-  %3: ptr = call ptr __ep_gc_raw_alloc(i64 32)
-  %4: ptr = alloca i64
-  %5: ptr = alloca i64
-  store i64 32, ptr %4
-  store i64 %2, ptr %5
-  %6: bool = icmp.eq i64 %2, i64 0
-  condbr bool %6, label %zero, label %digit
+  %call_result_3: ptr = call ptr __ep_gc_raw_alloc(i64 32)
+  %slot_4: ptr = alloca i64
+  %slot_5: ptr = alloca i64
+  store i64 32, ptr %slot_4
+  store i64 %value, ptr %slot_5
+  %condition_6: bool = icmp.eq i64 %value, i64 0
+  condbr bool %condition_6, label %zero, label %digit
 
 zero:
-  store i64 31, ptr %4
-  %7: ptr = gep i8, ptr %3, i64 31
-  store i8 48, ptr %7
+  store i64 31, ptr %slot_4
+  %address_7: ptr = gep i8, ptr %call_result_3, i64 31
+  store i8 48, ptr %address_7
   br label %write
 
 digit:
-  %8: i64 = load i64, ptr %5
-  %9: i64 = urem i64 %8, i64 10
-  %10: i64 = add i64 %9, i64 48
-  %11: ptr = alloca i64
-  store i64 %10, ptr %11
-  %12: i8 = load i8, ptr %11
-  %13: i64 = load i64, ptr %4
-  %14: i64 = sub i64 %13, i64 1
-  store i64 %14, ptr %4
-  %15: ptr = gep i8, ptr %3, i64 %14
-  store i8 %12, ptr %15
-  %16: i64 = udiv i64 %8, i64 10
-  store i64 %16, ptr %5
-  %17: bool = icmp.ne i64 %16, i64 0
-  condbr bool %17, label %digit, label %write
+  %loaded_8: i64 = load i64, ptr %slot_5
+  %remainder_9: i64 = urem i64 %loaded_8, i64 10
+  %sum_10: i64 = add i64 %remainder_9, i64 48
+  %slot_11: ptr = alloca i64
+  store i64 %sum_10, ptr %slot_11
+  %loaded_12: i8 = load i8, ptr %slot_11
+  %loaded_13: i64 = load i64, ptr %slot_4
+  %difference_14: i64 = sub i64 %loaded_13, i64 1
+  store i64 %difference_14, ptr %slot_4
+  %address_15: ptr = gep i8, ptr %call_result_3, i64 %difference_14
+  store i8 %loaded_12, ptr %address_15
+  %quotient_16: i64 = udiv i64 %loaded_8, i64 10
+  store i64 %quotient_16, ptr %slot_5
+  %condition_17: bool = icmp.ne i64 %quotient_16, i64 0
+  condbr bool %condition_17, label %digit, label %write
 
 write:
-  %18: i64 = load i64, ptr %4
-  %19: ptr = gep i8, ptr %3, i64 %18
-  %20: i64 = sub i64 32, i64 %18
-  call void __ep_gc_write_stderr(ptr %1, ptr %19, i64 %20)
-  call void __ep_gc_raw_free(ptr %3)
+  %loaded_18: i64 = load i64, ptr %slot_4
+  %address_19: ptr = gep i8, ptr %call_result_3, i64 %loaded_18
+  %difference_20: i64 = sub i64 32, i64 %loaded_18
+  call void __ep_gc_write_stderr(ptr %handle, ptr %address_19, i64 %difference_20)
+  call void __ep_gc_raw_free(ptr %call_result_3)
   ret void
 }
 
-define void @__ep_gc_print_stw(i64 %1) {
+define void @__ep_gc_print_stw(i64 %elapsed_ms) {
 entry:
-  %2: ptr = call ptr __ep_import$kernel32.dll$GetStdHandle(i64 -12)
-  call void __ep_gc_write_stderr_str(ptr %2, ptr str.gc.stw.prefix)
-  call void __ep_gc_write_u64(ptr %2, i64 %1)
-  call void __ep_gc_write_stderr_str(ptr %2, ptr str.gc.stw.suffix)
+  %call_result_2: ptr = call ptr __ep_import$kernel32.dll$GetStdHandle(i64 -12)
+  call void __ep_gc_write_stderr_str(ptr %call_result_2, ptr str.gc.stw.prefix)
+  call void __ep_gc_write_u64(ptr %call_result_2, i64 %elapsed_ms)
+  call void __ep_gc_write_stderr_str(ptr %call_result_2, ptr str.gc.stw.suffix)
   ret void
 }
 
 define void @__ep_gc_collect() {
 entry:
-  %1: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
+  %call_result_1: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
   call void __ep_gc_prepare_collection()
   call void __ep_gc_mark_roots()
   call void __ep_gc_drain_marks()
@@ -1079,22 +1079,22 @@ entry:
   call void __ep_gc_sweep_small()
   call void __ep_gc_update_thresholds()
   call void __ep_gc_release_collection()
-  %2: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
-  %3: i64 = sub i64 %2, i64 %1
-  call void __ep_gc_print_stw(i64 %3)
-  %4: i64 = load i64, ptr gc_collection_count
-  %5: i64 = add i64 %4, i64 1
-  store i64 %5, ptr gc_collection_count
+  %call_result_2: i64 = call i64 __ep_import$kernel32.dll$GetTickCount64()
+  %difference_3: i64 = sub i64 %call_result_2, i64 %call_result_1
+  call void __ep_gc_print_stw(i64 %difference_3)
+  %loaded_4: i64 = load i64, ptr gc_collection_count
+  %sum_5: i64 = add i64 %loaded_4, i64 1
+  store i64 %sum_5, ptr gc_collection_count
   ret void
 }
 
 define void @__ep_gc_init() {
 entry:
-  %1: ptr = alloca ptr
-  %2: ptr = alloca ptr
-  call void __ep_import$kernel32.dll$GetCurrentThreadStackLimits(ptr %1, ptr %2)
-  %3: ptr = load ptr, ptr %2
-  store ptr %3, ptr gc_stack_high
+  %slot_1: ptr = alloca ptr
+  %slot_2: ptr = alloca ptr
+  call void __ep_import$kernel32.dll$GetCurrentThreadStackLimits(ptr %slot_1, ptr %slot_2)
+  %loaded_3: ptr = load ptr, ptr %slot_2
+  store ptr %loaded_3, ptr gc_stack_high
   call void __ep_gc_grow_objects(i64 1024)
   call void __ep_gc_small_init()
   ret void
@@ -1102,11 +1102,11 @@ entry:
 
 define void @__ep_runtime_start() {
 entry:
-  %1: i64 = call i64 __ep_import$kernel32.dll$GetProcessHeap()
-  store i64 %1, ptr heap
+  %call_result_1: i64 = call i64 __ep_import$kernel32.dll$GetProcessHeap()
+  store i64 %call_result_1, ptr heap
   call void __ep_gc_init()
-  %2: ptr = call ptr __ep_argv_init()
-  store ptr %2, ptr argv
+  %call_result_2: ptr = call ptr __ep_argv_init()
+  store ptr %call_result_2, ptr argv
   ret void
 }
 
@@ -1115,109 +1115,109 @@ entry:
   ret void
 }
 
-define void @__ep_gc_record_object(ptr %1, i64 %2) {
+define void @__ep_gc_record_object(ptr %address, i64 %size) {
 entry:
-  %3: ptr = load ptr, ptr gc_objects
-  %4: ptr = load ptr, ptr gc_sizes
-  %5: i64 = load i64, ptr gc_object_count
-  %6: ptr = gep ptr, ptr %3, i64 %5
-  store ptr %1, ptr %6
-  %7: ptr = gep i64, ptr %4, i64 %5
-  store i64 %2, ptr %7
-  %8: i64 = add i64 %5, i64 1
-  store i64 %8, ptr gc_object_count
-  %9: i64 = load i64, ptr gc_live_bytes
-  %10: i64 = add i64 %9, i64 %2
-  store i64 %10, ptr gc_live_bytes
-  %16: i64 = load i64, ptr gc_large_live_bytes
-  %17: i64 = add i64 %16, i64 %2
-  store i64 %17, ptr gc_large_live_bytes
-  %11: bool = icmp.eq i64 %5, i64 0
-  condbr bool %11, label %initial_bounds, label %check_low
+  %loaded_3: ptr = load ptr, ptr gc_objects
+  %loaded_4: ptr = load ptr, ptr gc_sizes
+  %loaded_5: i64 = load i64, ptr gc_object_count
+  %address_6: ptr = gep ptr, ptr %loaded_3, i64 %loaded_5
+  store ptr %address, ptr %address_6
+  %address_7: ptr = gep i64, ptr %loaded_4, i64 %loaded_5
+  store i64 %size, ptr %address_7
+  %sum_8: i64 = add i64 %loaded_5, i64 1
+  store i64 %sum_8, ptr gc_object_count
+  %loaded_9: i64 = load i64, ptr gc_live_bytes
+  %sum_10: i64 = add i64 %loaded_9, i64 %size
+  store i64 %sum_10, ptr gc_live_bytes
+  %loaded_16: i64 = load i64, ptr gc_large_live_bytes
+  %sum_17: i64 = add i64 %loaded_16, i64 %size
+  store i64 %sum_17, ptr gc_large_live_bytes
+  %condition_11: bool = icmp.eq i64 %loaded_5, i64 0
+  condbr bool %condition_11, label %initial_bounds, label %check_low
 
 initial_bounds:
-  store ptr %1, ptr gc_low_addr
-  store ptr %1, ptr gc_high_addr
+  store ptr %address, ptr gc_low_addr
+  store ptr %address, ptr gc_high_addr
   ret void
 
 check_low:
-  %12: ptr = load ptr, ptr gc_low_addr
-  %13: bool = icmp.ult ptr %1, ptr %12
-  condbr bool %13, label %set_low, label %check_high
+  %loaded_12: ptr = load ptr, ptr gc_low_addr
+  %condition_13: bool = icmp.ult ptr %address, ptr %loaded_12
+  condbr bool %condition_13, label %set_low, label %check_high
 
 set_low:
-  store ptr %1, ptr gc_low_addr
+  store ptr %address, ptr gc_low_addr
   br label %check_high
 
 check_high:
-  %14: ptr = load ptr, ptr gc_high_addr
-  %15: bool = icmp.ugt ptr %1, ptr %14
-  condbr bool %15, label %set_high, label %done
+  %loaded_14: ptr = load ptr, ptr gc_high_addr
+  %condition_15: bool = icmp.ugt ptr %address, ptr %loaded_14
+  condbr bool %condition_15, label %set_high, label %done
 
 set_high:
-  store ptr %1, ptr gc_high_addr
+  store ptr %address, ptr gc_high_addr
   ret void
 
 done:
   ret void
 }
 
-define ptr @__ep_alloc(i64 %1) {
+define ptr @__ep_alloc(i64 %size) {
 entry:
-  %2: bool = icmp.slt i64 %1, i64 0
-  condbr bool %2, label %fail, label %threshold
+  %condition_2: bool = icmp.slt i64 %size, i64 0
+  condbr bool %condition_2, label %fail, label %threshold
 
 threshold:
-  %3: i64 = load i64, ptr gc_live_bytes
-  %4: i64 = add i64 %3, i64 %1
-  %5: i64 = load i64, ptr gc_threshold
-  %6: bool = icmp.uge i64 %4, i64 %5
-  condbr bool %6, label %collect, label %allocate
+  %loaded_3: i64 = load i64, ptr gc_live_bytes
+  %sum_4: i64 = add i64 %loaded_3, i64 %size
+  %loaded_5: i64 = load i64, ptr gc_threshold
+  %condition_6: bool = icmp.uge i64 %sum_4, i64 %loaded_5
+  condbr bool %condition_6, label %collect, label %allocate
 
 collect:
   call void __ep_gc_collect()
   br label %allocate
 
 allocate:
-  %18: bool = icmp.ule i64 %1, i64 32
-  condbr bool %18, label %allocate_small, label %allocate_large
+  %condition_18: bool = icmp.ule i64 %size, i64 32
+  condbr bool %condition_18, label %allocate_small, label %allocate_large
 
 allocate_small:
-  %19: ptr = call ptr __ep_gc_small_alloc(i64 %1)
-  %20: bool = icmp.eq ptr %19, ptr null
-  condbr bool %20, label %retry_small, label %return_small
+  %call_result_19: ptr = call ptr __ep_gc_small_alloc(i64 %size)
+  %condition_20: bool = icmp.eq ptr %call_result_19, ptr null
+  condbr bool %condition_20, label %retry_small, label %return_small
 
 retry_small:
   call void __ep_gc_collect()
-  %21: ptr = call ptr __ep_gc_small_alloc(i64 %1)
-  %22: bool = icmp.eq ptr %21, ptr null
-  condbr bool %22, label %fail, label %return_small_retry
+  %call_result_21: ptr = call ptr __ep_gc_small_alloc(i64 %size)
+  %condition_22: bool = icmp.eq ptr %call_result_21, ptr null
+  condbr bool %condition_22, label %fail, label %return_small_retry
 
 return_small_retry:
-  ret ptr %21
+  ret ptr %call_result_21
 
 return_small:
-  ret ptr %19
+  ret ptr %call_result_19
 
 allocate_large:
   call void __ep_gc_ensure_object_capacity()
-  %12: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
-  %13: bool = icmp.eq ptr %12, ptr null
-  condbr bool %13, label %retry, label %record
+  %call_result_12: ptr = call ptr __ep_gc_raw_try_alloc(i64 %size)
+  %condition_13: bool = icmp.eq ptr %call_result_12, ptr null
+  condbr bool %condition_13, label %retry, label %record
 
 retry:
   call void __ep_gc_collect()
-  %14: ptr = call ptr __ep_gc_raw_try_alloc(i64 %1)
-  %15: bool = icmp.eq ptr %14, ptr null
-  condbr bool %15, label %fail, label %record_retry
+  %call_result_14: ptr = call ptr __ep_gc_raw_try_alloc(i64 %size)
+  %condition_15: bool = icmp.eq ptr %call_result_14, ptr null
+  condbr bool %condition_15, label %fail, label %record_retry
 
 record_retry:
-  call void __ep_gc_record_object(ptr %14, i64 %1)
-  ret ptr %14
+  call void __ep_gc_record_object(ptr %call_result_14, i64 %size)
+  ret ptr %call_result_14
 
 record:
-  call void __ep_gc_record_object(ptr %12, i64 %1)
-  ret ptr %12
+  call void __ep_gc_record_object(ptr %call_result_12, i64 %size)
+  ret ptr %call_result_12
 
 fail:
   call void __ep_import$kernel32.dll$ExitProcess(i64 1)
@@ -1232,12 +1232,12 @@ entry:
 
 define i64 @__ep_gc_live_byte_count() {
 entry:
-  %1: i64 = load i64, ptr gc_live_bytes
-  ret i64 %1
+  %loaded_1: i64 = load i64, ptr gc_live_bytes
+  ret i64 %loaded_1
 }
 
 define i64 @__ep_gc_collection_count_value() {
 entry:
-  %1: i64 = load i64, ptr gc_collection_count
-  ret i64 %1
+  %loaded_1: i64 = load i64, ptr gc_collection_count
+  ret i64 %loaded_1
 }

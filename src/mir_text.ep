@@ -159,27 +159,80 @@ fun mrt_is_int_text(s: str): bool {
     ret true
 }
 
-fun mrt_parse_local_id(text: str): i64 {
+struct MirTextLocalMap {
+    names: str[]
+    ids: i64[]
+    next_id: i64
+}
+
+fun mrt_local_map_new(function_text: str): MirTextLocalMap {
+    let map = new MirTextLocalMap
+    map.names = new str[]
+    map.ids = new i64[]
+    map.next_id = 1
+    let i = 0
+    for i < len(function_text) {
+        if function_text[i] != '%' {
+            i += 1
+        } else {
+            let end = i + 1
+            for end < len(function_text) && function_text[end] >= '0' && function_text[end] <= '9' {
+                end += 1
+            }
+            if end > i + 1 {
+                let id = mrt_parse_i64(function_text[i + 1:end])
+                if id >= map.next_id { map.next_id = id + 1 }
+            }
+            i = end
+        }
+    }
+    ret map
+}
+
+fun mrt_is_local_name(text: str): bool {
+    if len(text) == 0 { ret false }
+    let first = text[0]
+    if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') { ret false }
+    for i: 1:len(text) {
+        let c = text[i]
+        if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.') {
+            ret false
+        }
+    }
+    ret true
+}
+
+fun mrt_parse_local_id(map: MirTextLocalMap, text: str, define: bool): i64 {
     if len(text) < 2 || text[0:1] != "%" {
-        mir_text_die(f"local value must use numeric %id: {text}")
+        mir_text_die(f"local value must start with %: {text}")
     }
     let raw = text[1:len(text)]
-    if mrt_is_int_text(raw) == false {
-        mir_text_die(f"local value must use numeric %id: {text}")
+    if mrt_is_int_text(raw) {
+        let value_id = mrt_parse_i64(raw)
+        if value_id <= 0 { mir_text_die(f"local value id must be positive: {text}") }
+        ret value_id
     }
-    let value_id = mrt_parse_i64(raw)
-    if value_id <= 0 {
-        mir_text_die(f"local value id must be positive: {text}")
+    if !mrt_is_local_name(raw) { mir_text_die(f"invalid local value name: {text}") }
+    for i: 0:len(map.names) {
+        if map.names[i] == raw {
+            if define { mir_text_die(f"duplicate local value name: {text}") }
+            ret map.ids[i]
+        }
     }
+    if !define { mir_text_die(f"unknown local value name: {text}") }
+    let value_id = map.next_id
+    map.next_id += 1
+    map.names.push(raw)
+    map.ids.push(value_id)
     ret value_id
 }
 
-fun mrt_parse_typed_operand(text: str): MirOperand {
+fun mrt_parse_typed_operand(map: MirTextLocalMap, text: str): MirOperand {
     let typ_raw = mrt_first_word(text)
     let typ = mrt_strip_trailing_comma(typ_raw)
     let value = mrt_after_first_word(text)
     if len(value) == 0 { mir_text_die(f"missing operand: {text}") }
-    if value[0:1] == "%" { ret mir_value_operand(typ, mrt_parse_local_id(value)) }
+    if value[0:1] == "%" { ret mir_value_operand(typ, mrt_parse_local_id(map, value, false)) }
     if value == "null" { ret mir_operand_null() }
     if value == "true" { ret mir_const_bool(true) }
     if value == "false" { ret mir_const_bool(false) }
@@ -187,7 +240,7 @@ fun mrt_parse_typed_operand(text: str): MirOperand {
     ret mir_symbol_operand(typ, value)
 }
 
-fun mrt_parse_params(text: str): MirParam[] {
+fun mrt_parse_params(map: MirTextLocalMap, text: str): MirParam[] {
     let out = new MirParam[]
     let t = mrt_trim(text)
     if len(t) == 0 { ret out }
@@ -197,24 +250,24 @@ fun mrt_parse_params(text: str): MirParam[] {
         let p = new MirParam
         p.typ = mrt_first_word(part)
         p.source_type = p.typ
-        p.value_id = mrt_parse_local_id(mrt_after_first_word(part))
+        p.value_id = mrt_parse_local_id(map, mrt_after_first_word(part), true)
         out.push(p)
     }
     ret out
 }
 
-fun mrt_parse_operands(text: str): MirOperand[] {
+fun mrt_parse_operands(map: MirTextLocalMap, text: str): MirOperand[] {
     let out = new MirOperand[]
     let t = mrt_trim(text)
     if len(t) == 0 { ret out }
     let parts = mrt_split_commas(t)
     for i: 0:len(parts) {
-        out.push(mrt_parse_typed_operand(parts[i]))
+        out.push(mrt_parse_typed_operand(map, parts[i]))
     }
     ret out
 }
 
-fun mrt_parse_inst(line: str): MirInst {
+fun mrt_parse_inst(map: MirTextLocalMap, line: str): MirInst {
     let body = line
     let result_id = 0
     let result_type = ""
@@ -224,7 +277,7 @@ fun mrt_parse_inst(line: str): MirInst {
         body = line[eq + 3:len(line)]
         let colon = mrt_find(lhs, ":")
         if colon < 0 { mir_text_die(f"bad result lhs: {line}") }
-        result_id = mrt_parse_local_id(mrt_trim(lhs[0:colon]))
+        result_id = mrt_parse_local_id(map, mrt_trim(lhs[0:colon]), true)
         result_type = mrt_trim(lhs[colon + 1:len(lhs)])
     }
 
@@ -235,18 +288,18 @@ fun mrt_parse_inst(line: str): MirInst {
         let rest = body[5:len(body)]
         let comma = mrt_find(rest, ",")
         if comma < 0 { mir_text_die(f"bad load: {line}") }
-        ret mir_load(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(rest[comma + 1:len(rest)]))
+        ret mir_load(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_typed_operand(map, rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "store ") {
         let store_body = body[6:len(body)]
         let from_pos = mrt_find(store_body, " from ")
         if from_pos >= 0 {
             let access_type = mrt_trim(store_body[0:from_pos])
-            let ops = mrt_parse_operands(store_body[from_pos + 6:len(store_body)])
+            let ops = mrt_parse_operands(map, store_body[from_pos + 6:len(store_body)])
             if len(ops) != 2 { mir_text_die(f"bad store: {line}") }
             ret mir_store_as(ops[0], access_type, ops[1])
         }
-        let ops = mrt_parse_operands(store_body)
+        let ops = mrt_parse_operands(map, store_body)
         if len(ops) != 2 { mir_text_die(f"bad store: {line}") }
         ret mir_store(ops[0], ops[1])
     }
@@ -254,7 +307,7 @@ fun mrt_parse_inst(line: str): MirInst {
         let rest = body[4:len(body)]
         let comma = mrt_find(rest, ",")
         if comma < 0 { mir_text_die(f"bad gep: {line}") }
-        ret mir_gep(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_operands(rest[comma + 1:len(rest)]))
+        ret mir_gep(result_id, result_type, mrt_trim(rest[0:comma]), mrt_parse_operands(map, rest[comma + 1:len(rest)]))
     }
     if mrt_starts_with(body, "call ") {
         let rest = body[5:len(body)]
@@ -264,7 +317,7 @@ fun mrt_parse_inst(line: str): MirInst {
         let rp = mrt_find(after_ret, ")")
         if lp < 0 || rp < lp { mir_text_die(f"bad call: {line}") }
         let callee = after_ret[0:lp]
-        let args = mrt_parse_operands(after_ret[lp + 1:rp])
+        let args = mrt_parse_operands(map, after_ret[lp + 1:rp])
         ret new MirInst(new MirCallInst {
             callee: callee,
             return_type: ret_type,
@@ -282,16 +335,16 @@ fun mrt_parse_inst(line: str): MirInst {
         let to_pos = mrt_find(rest, " to ")
         if to_pos < 0 { mir_text_die(f"bad {op}: {line}") }
         let target_type = mrt_trim(rest[to_pos + 4:len(rest)])
-        let operand = mrt_parse_typed_operand(rest[0:to_pos])
+        let operand = mrt_parse_typed_operand(map, rest[0:to_pos])
         if op == "inttoptr" { ret mir_inttoptr(result_id, result_type, operand, target_type) }
         ret mir_ptrtoint(result_id, result_type, operand, target_type)
     }
     if mrt_starts_with(body, "not ") {
-        ret mir_not(result_id, mrt_parse_typed_operand(body[4:len(body)]))
+        ret mir_not(result_id, mrt_parse_typed_operand(map, body[4:len(body)]))
     }
 
     let op = mrt_first_word(body)
-    let operands = mrt_parse_operands(mrt_after_first_word(body))
+    let operands = mrt_parse_operands(map, mrt_after_first_word(body))
     if len(operands) != 2 { mir_text_die(f"bad binary instruction: {line}") }
     if mrt_starts_with(op, "icmp.") {
         ret mir_compare(mir_compare_kind(op), result_id, operands[0], operands[1])
@@ -303,7 +356,7 @@ fun mrt_is_terminator(line: str): bool {
     ret mrt_starts_with(line, "br ") || mrt_starts_with(line, "condbr ") || mrt_starts_with(line, "ret ")
 }
 
-fun mrt_parse_terminator(line: str): MirTerminator {
+fun mrt_parse_terminator(map: MirTextLocalMap, line: str): MirTerminator {
     if mrt_starts_with(line, "br label %") {
         ret mir_br(line[10:len(line)])
     }
@@ -315,12 +368,12 @@ fun mrt_parse_terminator(line: str): MirTerminator {
         if !mrt_starts_with(then_part, "label %") || !mrt_starts_with(else_part, "label %") {
             mir_text_die(f"bad condbr labels: {line}")
         }
-        ret mir_condbr(mrt_parse_typed_operand(parts[0]), then_part[7:len(then_part)], else_part[7:len(else_part)])
+        ret mir_condbr(mrt_parse_typed_operand(map, parts[0]), then_part[7:len(then_part)], else_part[7:len(else_part)])
     }
     if mrt_starts_with(line, "ret ") {
         let rest = line[4:len(line)]
         if rest == "void" { ret mir_ret_void() }
-        ret mir_ret_value(mrt_parse_typed_operand(rest))
+        ret mir_ret_value(mrt_parse_typed_operand(map, rest))
     }
     mir_text_die(f"bad terminator: {line}")
     ret mir_ret_void()
@@ -490,7 +543,8 @@ fun mrt_parse_function(text: str): MirFunction {
     let name = after_at[0:lp]
     let params_text = after_at[lp + 1:rp]
     let fn = mir_function_empty(name, ret_type)
-    fn.params = mrt_parse_params(params_text)
+    let locals = mrt_local_map_new(text)
+    fn.params = mrt_parse_params(locals, params_text)
 
     let current = mir_block_empty("")
     let has_current = false
@@ -507,10 +561,10 @@ fun mrt_parse_function(text: str): MirFunction {
         } else {
             if !has_current { mir_text_die(f"statement before block: {line}") }
             if mrt_is_terminator(line) {
-                current.terminator = mrt_parse_terminator(line)
+                current.terminator = mrt_parse_terminator(locals, line)
                 current.has_terminator = true
             } else {
-                current.instructions.push(mrt_parse_inst(line))
+                current.instructions.push(mrt_parse_inst(locals, line))
             }
         }
     }
