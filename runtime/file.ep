@@ -7,7 +7,7 @@ extern "kernel32.dll" fun WriteFile(file: ptr, buffer: ptr, count: u32, write_co
 extern "kernel32.dll" fun CloseHandle(file: ptr): i32
 
 fun __ep_file_u32_le(buffer: u8[]): i64 {
-    ret i64(buffer[0]) + i64(buffer[1]) * 256 + i64(buffer[2]) * 65536 + i64(buffer[3]) * 16777216
+    ret i64(buffer[0]) | (i64(buffer[1]) << 8) | (i64(buffer[2]) << 16) | (i64(buffer[3]) << 24)
 }
 
 fun __ep_write_file(path: str, data: u8[]): i64 {
