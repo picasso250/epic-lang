@@ -2,13 +2,6 @@
 # This file is automatically merged by the Epic compiler.
 
 
-fun __ep_str_cat(left: str, right: str): str {
-    let out = new u8[] {}
-    for i: 0:len(left) { out.push(left[i]) }
-    for i: 0:len(right) { out.push(right[i]) }
-    ret str(out)
-}
-
 fun __ep_str_eq(left: str, right: str): bool {
     let left_len = len(left)
     if left_len != len(right) {

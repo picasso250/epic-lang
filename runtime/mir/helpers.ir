@@ -253,6 +253,49 @@ alloc:
   ret ptr %call_result_5
 }
 
+define ptr @__ep_str_cat(ptr %left, ptr %right) {
+entry:
+  %left_length_address: ptr = gep struct str, ptr %left, i64 0, i64 0
+  %left_length: i64 = load i64, ptr %left_length_address
+  %right_length_address: ptr = gep struct str, ptr %right, i64 0, i64 0
+  %right_length: i64 = load i64, ptr %right_length_address
+  %total_length: i64 = add i64 %left_length, i64 %right_length
+  %is_empty: bool = icmp.eq i64 %total_length, i64 0
+  condbr bool %is_empty, label %empty, label %alloc
+
+empty:
+  ret ptr str.runtime.empty
+
+alloc:
+  %allocation_size: i64 = add i64 %total_length, i64 9
+  %out: ptr = call ptr __ep_alloc(i64 %allocation_size)
+  %out_length_address: ptr = gep struct str, ptr %out, i64 0, i64 0
+  store i64 %total_length, ptr %out_length_address
+  %out_data: ptr = gep i8, ptr %out, i64 8
+  %left_is_empty: bool = icmp.eq i64 %left_length, i64 0
+  condbr bool %left_is_empty, label %copy_right_check, label %copy_left
+
+copy_left:
+  %left_data: ptr = gep i8, ptr %left, i64 8
+  call void __ep_import$kernel32.dll$RtlMoveMemory(ptr %out_data, ptr %left_data, i64 %left_length)
+  br label %copy_right_check
+
+copy_right_check:
+  %right_is_empty: bool = icmp.eq i64 %right_length, i64 0
+  condbr bool %right_is_empty, label %terminate, label %copy_right
+
+copy_right:
+  %right_data: ptr = gep i8, ptr %right, i64 8
+  %right_destination: ptr = gep i8, ptr %out_data, i64 %left_length
+  call void __ep_import$kernel32.dll$RtlMoveMemory(ptr %right_destination, ptr %right_data, i64 %right_length)
+  br label %terminate
+
+terminate:
+  %terminator: ptr = gep i8, ptr %out_data, i64 %total_length
+  store i8 0, ptr %terminator
+  ret ptr %out
+}
+
 define ptr @__ep_str_from_bytes(ptr %bytes) {
 entry:
   %address_2: ptr = gep struct _slice, ptr %bytes, i64 0, i64 1

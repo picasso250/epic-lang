@@ -236,7 +236,7 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
 | `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 通过 `__ep_str_from_bytes` 深拷贝。struct、非 `u8[]` array 不支持 | 公开 |
-| `str + str`         | `__ep_str_cat`，分配新字符串并复制两侧内容 | 公开语法 |
+| `str + str`         | MIR `__ep_str_cat` 一次分配最终 inline string，并用至多两次 `RtlMoveMemory` 复制两侧内容 | 公开语法 |
 | `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
 | `read_file`        | `runtime/file.ep` 中的 `__ep_read_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
 | `write_file`       | `runtime/file.ep` 中的 `__ep_write_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
