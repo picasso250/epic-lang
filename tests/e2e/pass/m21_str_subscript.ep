@@ -1,6 +1,5 @@
 # EXIT: 66
 fun main(): void {
     let s = "ABC"
-    let bs = bytes(s)
-    exit(i64(bs[1]))
+    exit(i64(s[1]))
 }

@@ -16,8 +16,8 @@ fun check(ok: bool): void {
 
 fun main(): void {
     let embedded = str(new u8[] { 'A', u8(0), 'B' })
-    check(lstrlenA(cptr(embedded)) == i32(1))
-    check(cstr(embedded) == cptr(embedded))
+    check(lstrlenA(cstr(embedded)) == i32(1))
+    check(cstr(embedded) != ptr(0))
 
     let buffer = new u8[4]
     buffer[0] = 'E'

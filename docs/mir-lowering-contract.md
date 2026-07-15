@@ -16,15 +16,18 @@ MIR -> MirToX64Lower -> X64Program -> machine -> COFF -> PE
 mir_to_x64_lower_program(program):
   ├─ x64.global("_start")
   ├─ x64.extern(...) for each referenced WinAPI/source extern
+  ├─ x64.section(".rdata")
+  ├─ emit_program_rdata(x64, program)  # inline string objects
   ├─ x64.section(".data")
-  ├─ emit_program_data(x64, program)    # MIR globals、string header
+  ├─ emit_program_data(x64, program)   # mutable/scalar globals
   ├─ x64.section(".text")
   └─ for each fn: _lower_function(fn)
 ```
 
 lowering 后，`X64Program` 包含：
-1. 数据段：MIR program globals 与 string headers
-2. 代码段：prune 后保留的所有 MIR functions
+1. 只读数据段：literal / `embed` inline string objects
+2. 可写数据段：MIR scalar 与 declaration globals
+3. 代码段：prune 后保留的所有 MIR functions
 
 ## 2. Function lowering
 
@@ -130,24 +133,20 @@ pointer result 继续物化。
 | `ValueOperand(value_id)` — value slot | `mov reg, [rbp+slot]` |
 | `ValueOperand(value_id)` — address slot | `lea reg, [rbp+slot]` |
 | `SymbolOperand("argv")` | `mov reg, [_argv]` |
-| `SymbolOperand(string_global)` | 构造 string header 到 reg（见下文） |
+| `SymbolOperand(string_global)` | `lea reg, [string_object]`（见下文） |
 
 当目标寄存器是 `rax`，且 lowering 记录的 resident value ID 与 operand 相同，加载不发射任何
 X64IR item，并消费该 residency 状态。
 
-### 4.1 String global materialization
+### 4.1 String global address
 
-SymbolOperand 用于字面量字符串。`_load_operand` 会构造一个 Epic string header（`{ptr, len}`）：
+SymbolOperand 用于字面量字符串。`_load_operand` 直接取得 `.rdata` inline object 地址：
 
 ```
-lea  r11, [data_label]        # string data pointer
-lea  reg,  [header_label]     # string header slot
-mov  [reg], r11               # header.ptr = data_label
-mov  r11, length              # length 立即数
-mov  [reg+8], r11             # header.len = length
+lea  reg, [string_object]
 ```
 
-注意：`r11` 是固定的临时寄存器，不经过 slot 分配。如果 `_load_operand` 在 r11 未释放时被嵌套调用可能导致状态污染——但当前 lowering 中 string global 只在 `load` 指令中调用一次，无嵌套。
+object 内容为 `[len:i64][bytes...][NUL][padding...]`，每个 object 按 8 bytes 对齐。
 
 ## 5. Core op lowering
 
@@ -365,13 +364,13 @@ jmp  LabelRef(fn_name.else_target)
 
 ## 8. Runtime boundary
 
-### 8.1 Program data
+### 8.1 Program static data
 
-`emit_program_data()` 在 `.data` section 按 MIR globals 生成。普通字符串字面量和 `embed` 文件内容使用同一 global 表示：
+`emit_program_rdata()` 与 `emit_program_data()` 按 MIR globals 分区生成：
 
-- 无初始化 global：8-byte zero slot，例如 `argv` 和 cached process `heap`
-- ptr/string global：零结尾 data bytes 与 24-byte header
-- scalar global：8-byte little-endian value
+- 普通字符串字面量和 `embed`：`.rdata` 中的 inline `[len:i64][bytes...][NUL]` object
+- 无初始化 global：`.data` 中的 8-byte zero slot，例如 `argv` 和 cached process `heap`
+- scalar global：`.data` 中的 8-byte little-endian value
 
 ### 8.2 Startup hook
 
@@ -400,13 +399,12 @@ All array headers use the single `_slice { data, len, cap }` MIR layout. Helpers
 return raw slot addresses where scalar semantics matter; AST-to-MIR emits the
 static `i8`/`i16`/`u16`/`i32`/`u32`/`i64`/`ptr` load or store so narrow signedness
 and truncation remain compile-time properties rather than runtime dispatch.
-`bytes(str)` is lowered as an identity cast. `str(u8[])` calls `__ep_str_from_bytes`,
-which preserves the header and logical length while reserving `len + 1` capacity when
-needed and writing `data[len] = 0`. `cptr(str/T[])`, where `T` is `bool`, an integer, or
-`ptr`, loads the aggregate `data` field, while `cptr(FFI-safe struct)` returns the payload
-pointer unchanged; deprecated `cstr(str)` uses the same lowering and performs no validation.
+`bytes(str)` calls `__ep_bytes_from_str`; `str(u8[])` calls `__ep_str_from_bytes`.
+Both deep-copy logical bytes. `cptr(T[])`, where `T` is `bool`, an integer, or `ptr`,
+loads the array `data` field, while `cptr(FFI-safe struct)` returns the payload pointer
+unchanged. `cptr(str)` is rejected. `cstr(str)` lowers to the first inline byte at offset 8.
 Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and
-use `cptr(str/u8[])` plus explicit pointer-typed WinAPI externs. Their MIR signatures match the
+use `cstr(str)` for paths and `cptr(u8[])` for buffers plus explicit pointer-typed WinAPI externs. Their MIR signatures match the
 public builtins exactly: one path operand for read, and path plus data operands for write.
 `runtime/mir/helpers.ir` contains no same-named fallback bodies.
 The x64 backend contains only generic instruction lowering in `src/mir_to_x64.ep`.
@@ -440,6 +438,6 @@ values because the current machine encoder supports `add reg, imm8`. Larger
 offsets still lower as `mov rcx, imm; add rax, rcx` until the encoder grows
 imm32 support.
 
-### 9.6 No `.data` relocations
+### 9.6 No static-data relocations
 
-`machine.py` 支持 `data_relocs` API 但当前不发射任何 `.data` section relocations。string header 初始化由 runtime `_load_operand` 以代码形式生成（lea + mov 序列），而非数据重定位。
+`src/machine.ep` 保留 `data_relocs` API，但当前不发射 `.rdata` / `.data` section relocation。string operand 通过 `.text` 中的 RIP-relative `lea` 引用 `.rdata` symbol。

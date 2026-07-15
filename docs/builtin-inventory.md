@@ -23,10 +23,10 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `println()` | `() -> void`; writes one newline | `__ep_print_newline` |
 | `println(text)` | `str -> void`; writes text and one newline | `__ep_print_str`, then `__ep_print_newline` |
 | `exit(code)` | `i64 -> void`; terminates the process | `ExitProcess` |
-| `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity for `str`, NUL-normalizing same-header conversion for `u8[]`, runtime formatting for scalar values |
-| `bytes(text)` | `str -> u8[]` | zero-copy view with the shared byte-slice layout |
-| `cptr(value)` | accepts `str`, a bool/integer/ptr array, or a non-empty FFI-safe user struct; returns `ptr` | direct data/payload pointer lowering with no runtime checks |
-| `cstr(text)` | `str -> ptr` | deprecated alias of `cptr(text)`; no NUL validation or helper call |
+| `str(value)` | accepts `str`, integer types, `bool`, or `u8[]`; returns `str` | identity for `str`, deep copy for `u8[]`, runtime formatting for scalar values |
+| `bytes(text)` | `str -> u8[]` | deep copy to an independent mutable byte array |
+| `cptr(value)` | accepts a bool/integer/ptr array or a non-empty FFI-safe user struct; returns `ptr` | direct data/payload pointer lowering; rejects `str` |
+| `cstr(text)` | `str -> ptr` | borrowed pointer to the inline object's first byte (`text + 8`) |
 | `len(value)` | `str` or any array -> `i64` | reads the public logical length |
 | `i64(x)` | integer or `ptr` -> `i64` | integer conversion or pointer bit-pattern extraction |
 | `u64(x)` | integer or `ptr` -> `u64` | integer conversion or pointer bit-pattern extraction |
@@ -38,10 +38,8 @@ normally and builtin behavior is resolved during sema and MIR lowering.
 | `read_file(path)` | `str -> u8[]` | `__ep_read_file` |
 | `write_file(path, data)` | `(str, u8[]) -> i64` | `__ep_write_file` |
 
-`bytes(str)` is a representation-preserving zero-copy view. `str(u8[])` keeps the same
-header and logical bytes, but invokes `__ep_str_from_bytes` to reserve a trailing slot and
-write NUL; it may therefore replace and copy the backing allocation. Neither conversion
-performs UTF-8 validation.
+`bytes(str)` and `str(u8[])` deep-copy logical bytes, so later mutation of a `u8[]`
+cannot affect a `str`. Neither conversion performs UTF-8 validation.
 
 ## Public array methods
 
@@ -49,7 +47,7 @@ performs UTF-8 validation.
 |---|---|
 | `xs.push(value)` | appends one value; returns `void` |
 | `xs.pop()` | removes and returns the final value; an empty array panics |
-| `dst.extend(src)` | appends an array with the same element type; returns `void` |
+| `dst.extend(src)` | appends an array with the same element type; `u8[]` also accepts `str` and copies it directly; returns `void` |
 
 These names are not reserved globally. `push(...)`, `pop(...)`, and `extend(...)` are
 ordinary user-function or extern calls when written without a receiver; only the dot
@@ -92,8 +90,8 @@ extern "kernel32.dll" fun Sleep(milliseconds: u32): void
 
 The public extern ABI accepts the public integer scalar types and opaque `ptr`, plus
 those types or `void` as returns. Foreign pointers, nullable addresses, and handles use
-`ptr`. Strings, byte buffers, and FFI-safe struct payloads cross the boundary only through
-explicit borrowed pointers from `cptr(...)`; `cptr` itself performs no conversion or NUL validation.
+`ptr`. Strings cross through `cstr(...)`; byte buffers and FFI-safe struct payloads cross
+through `cptr(...)`. Both are explicit synchronous borrowed pointers.
 
 The compiler lowers source imports to self-describing symbols of the form
 `__ep_import$<dll>$<symbol>`. The linker groups them by DLL and does not use a function
@@ -105,7 +103,7 @@ Backend-private helpers are ordinary MIR functions, not language builtins. Curre
 categories include:
 
 - allocation, GC, and startup: `__ep_alloc`, collector helpers, `__ep_runtime_start`;
-- string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers, `__ep_str_from_bytes`, and `__ep_str_copy`; `cptr`/`cstr` themselves require no runtime helper;
+- string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers, `__ep_str_from_bytes`, `__ep_bytes_from_str`, and `__ep_str_copy`; `cstr` itself requires no runtime helper;
 - string operations used by syntax: equality, concatenation, and slicing;
 - file operations: Epic implementations of `__ep_read_file` and `__ep_write_file` from `runtime/file.ep`;
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
@@ -121,8 +119,8 @@ Reachability begins at `main`; unused helpers and imports are pruned before x64 
 ## Name reservation
 
 Sema reserves names whose call syntax is always interpreted as a
-builtin or pseudo-builtin, including `print`, `println`, `exit`, `cptr`, deprecated
-`cstr`, conversions such as `i64`/`u8`/`bool`, file I/O, `len`, and `argv`.
+builtin or pseudo-builtin, including `print`, `println`, `exit`, `cptr`, `cstr`,
+conversions such as `i64`/`u8`/`bool`, file I/O, `len`, and `argv`.
 
 Array operations are different: their builtin meaning is selected by receiver syntax.
 Therefore `push`, `pop`, `extend`, and the removed builtin name `cap` are intentionally

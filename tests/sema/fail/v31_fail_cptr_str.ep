@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: cptr expected scalar/ptr array or FFI-safe struct, got str
+fun main(): void {
+    let p = cptr("Epic")
+}

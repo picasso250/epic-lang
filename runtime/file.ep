@@ -11,7 +11,7 @@ fun __ep_file_u32_le(buffer: u8[]): i64 {
 }
 
 fun __ep_write_file(path: str, data: u8[]): i64 {
-    let file = CreateFileA(cptr(path), u32(1073741824), u32(0), ptr(0), u32(2), u32(128), ptr(0))
+    let file = CreateFileA(cstr(path), u32(1073741824), u32(0), ptr(0), u32(2), u32(128), ptr(0))
     if file == ptr(u64(0) - u64(1)) {
         ret -1
     }
@@ -23,7 +23,7 @@ fun __ep_write_file(path: str, data: u8[]): i64 {
 }
 
 fun __ep_read_file(path: str): u8[] {
-    let file = CreateFileA(cptr(path), u32(2147483648), u32(1), ptr(0), u32(3), u32(128), ptr(0))
+    let file = CreateFileA(cstr(path), u32(2147483648), u32(1), ptr(0), u32(3), u32(128), ptr(0))
     if file == ptr(u64(0) - u64(1)) {
         ret new u8[]
     }

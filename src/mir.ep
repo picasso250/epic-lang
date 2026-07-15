@@ -933,7 +933,7 @@ fun mir_hex_digit(value: i64): u8 {
 
 fun mir_escape_bytes(text: str): str {
     let out = new u8[]
-    let bs = bytes(text)
+    let bs = text
     for i: 0:len(bs) {
         let c = bs[i]
         if c == u8(92) {
@@ -964,8 +964,8 @@ fun mir_escape_bytes(text: str): str {
 }
 
 fun mir_ascii_less(a: str, b: str): bool {
-    let ab = bytes(a)
-    let bb = bytes(b)
+    let ab = a
+    let bb = b
     let n = len(ab)
     if len(bb) < n { n = len(bb) }
     for i: 0:n {

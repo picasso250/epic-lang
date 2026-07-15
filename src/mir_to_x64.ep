@@ -85,12 +85,8 @@ fun mir_to_x64_die(msg: str): void {
     panic f"MIR-to-X64 error: {msg}"
 }
 
-fun mir_to_x64_data_label(name: str): str {
-    ret f"{name}_data"
-}
-
-fun mir_to_x64_header_label(name: str): str {
-    ret f"{name}_header"
+fun mir_to_x64_string_label(name: str): str {
+    ret f"{name}_object"
 }
 
 fun mir_to_x64_add_string_global(lower: MirToX64Lower, name: str, length: i64): void {
@@ -558,13 +554,7 @@ fun mir_to_x64_load_operand(lower: MirToX64Lower, reg: str, operand: MirOperand)
         MirSymbolOperand value: {
             let string_index = mir_to_x64_string_index(lower, value.name)
             if string_index >= 0 {
-                let data_label = mir_to_x64_data_label(value.name)
-                let header_label = mir_to_x64_header_label(value.name)
-                x64_add_inst2(lower.x64, 2, x64_reg("r11"), x64_mem_symbol(data_label, 8)) # x64 lea
-                x64_add_inst2(lower.x64, 2, x64_reg(reg), x64_mem_symbol(header_label, 8)) # x64 lea
-                x64_add_inst2(lower.x64, 1, x64_mem_base(reg, 0, 8), x64_reg("r11")) # x64 mov
-                x64_add_inst2(lower.x64, 1, x64_reg("r11"), x64_imm(lower.string_lengths[string_index])) # x64 mov
-                x64_add_inst2(lower.x64, 1, x64_mem_base(reg, 8, 8), x64_reg("r11")) # x64 mov
+                x64_add_inst2(lower.x64, 2, x64_reg(reg), x64_mem_symbol(mir_to_x64_string_label(value.name), 8)) # x64 lea
                 ret
             }
             let global_index = mir_to_x64_global_index(lower, value.name)

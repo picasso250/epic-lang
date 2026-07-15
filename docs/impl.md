@@ -58,7 +58,7 @@ src/epic.ep
 
 #### v0 bootstrap branch
 
-`v0` 是可演进的 bootstrap 分支。其 Python `bootstrap/` 与 Epic `src/` 对公开语言语义保持一致：`>>` / `>>=` 按左值 signedness 选择 `sar` / `shr`，所有 shift count 都必须是 `i64`。当前 `dev` 对裸整数字面量由 sema 按左侧位宽静态检查，非字面量由 MIR lowering 生成运行时检查；`v0` 为保持 bootstrap 简单，对所有 count 一律生成运行时检查。`>>>` / `>>>=` 已删除，`embed "path"` 在两条实现中都按包含源文件解析并嵌入原始字节。
+`v0` 是可演进的 bootstrap 分支，只实现构建当前 `dev` 所需的最小源码语义，不作为当前公开 ABI 的第二份实现。它支持只读 `s[i]` 以编译新 frontend，但保留旧 `str`/slice bootstrap 布局。`>>` / `>>=` 按左值 signedness 选择 `sar` / `shr`，所有 shift count 都必须是 `i64`；当前 `dev` 对裸整数字面量由 sema 按左侧位宽静态检查，非字面量由 MIR lowering 生成运行时检查，`v0` 为保持 bootstrap 简单，对所有 count 一律生成运行时检查。`>>>` / `>>>=` 已删除，`embed "path"` 按包含源文件解析并嵌入原始字节。
 
 `build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，运行该 revision 自己的 fixed-point 构建，并校验 revision 中提交的 SHA-256。当前 seed 本身已嵌入其 runtime 资源，不依赖调用目录中的 `runtime/`。
 
@@ -76,7 +76,7 @@ python test_bootstrap_fixed_point.py
 
 `build_epic_v0.py` 导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest；digest 从目标 revision 自己读取。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时自动使用或重建 `v0` 分支 seed。
 
-Self-hosted `epic.exe` 从自身 `.data` 读取 `src/runtime_bundle.ep` 声明的 runtime source 与 MIR bundle。所有 Epic runtime source 与用户源码进入同一个 frontend；完全一致的重复 extern 会折叠，冲突声明会报错。当前工作目录无需包含 `runtime/`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
+Self-hosted `epic.exe` 从自身 `.rdata` 中的只读 inline string object 读取 `src/runtime_bundle.ep` 声明的 runtime source 与 MIR bundle。所有 Epic runtime source 与用户源码进入同一个 frontend；完全一致的重复 extern 会折叠，冲突声明会报错。当前工作目录无需包含 `runtime/`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
 
 ## 工具链 (Toolchain)
 
@@ -103,7 +103,7 @@ mark-sweep。managed payload 由 `__ep_alloc` 统一登记；collector 扫描活
 | `u32`      | 64-bit value；struct/storage lane 为 4 bytes，读取时零扩展 |
 | `i64`      | `i64`             |
 | `u64`      | `u64`             |
-| `str`      | `&str`；header representation 与 `&_slice` 相同 |
+| `str`      | `&str`；指向 inline `{len, bytes..., NUL}` object |
 | `Token`    | `&Token`          |
 | `u8[]`     | `&_slice`         |
 | `Token[]`  | `&_slice`         |
@@ -112,13 +112,13 @@ mark-sweep。managed payload 由 `__ep_alloc` 统一登记；collector 扫描活
 
 ## 运行时布局 (Runtime Layouts)
 
-### `str` byte-string / shared byte-slice layout
+### `str` read-only inline byte-string layout
 
 ```
 str = {
-    data: &u8,
     len: i64,
-    cap: i64,
+    bytes: u8[len],
+    terminator: u8,
 }
 
 _slice = {
@@ -128,13 +128,11 @@ _slice = {
 }
 ```
 
-当前实现保留独立的源码级 `str` 类型，但让它与 `u8[]` 共享运行时 header 布局。字符串字面量在 `.data` 中发射 `len + 1` 字节并显式附加 NUL；动态字符串通过 `__ep_str_from_bytes` 保证 `data[len] == 0`。`len` 不包含 NUL。动态字符串的 backing capacity 至少覆盖 `len + 1`，静态字符串 header 可保留 `cap = 0` 作为静态/需迁移标记。
+`str` value 指向 object base。长度位于 offset 0，字节从 offset 8 开始，最后附加一个不计入 `len` 的 NUL。动态非空字符串只分配一个 `8 + len + 1` byte GC object；空结果可复用静态空字符串。字符串字面量与 `embed` 将整个 object 发射到 `.rdata`。
 
 > 当前 `str` 是 byte-oriented string，不定义 UTF-8/Unicode 字符语义。
-> 语言不承诺 string literal 物理不可变：相同内容的字面量可能共享同一 buffer，
-> 修改 `bytes(s)` 的结果对所有共享 view 可见。
-> `str` 和 `u8[]` header 布局完全相同（`{data, len, cap}`，24 字节）。
-> `bytes(str)` 是 identity view；`str(bytes)` 复用同一 header，但会确保尾部 NUL，必要时扩容并替换 backing data。
+> `str` 只读；`s[i]` 只提供 checked `u8` read。
+> `str(u8[])` 与 `bytes(str)` 都深拷贝，不共享可变 storage。
 
 ### 动态数组 / Slice Header (Dynamic Array)
 
@@ -225,7 +223,7 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 - **循环降级**：条件 `for` 解析为 `Loop` AST，降级为 condition/body/end blocks。`ForRange` 对 `start`、`end` 从左到右各求值一次；cursor 保存到 local slot，不可变的 `end` 直接作为跨 block MIR value 复用，使用 condition/body/increment/end blocks；`continue` 指向 increment，`break` 指向 end。源码没有隐式数组迭代 AST 或 iterable 协议，数组索引必须显式写 `for i: 0:len(xs)`。
 - **复合赋值降级**：Parser 为所有 `op=` 语句生成 `AstAssignOp`；Sema 只接受类型完全相同的整数左值和右值。AST-to-MIR 对局部变量保存其 slot 地址；对字段先求值 object 并计算一次 `gep` 地址；对数组下标先求值并保存 base 与 index。随后读取旧值，再求值 RHS，发射对应整数 MIR op并按目标窄整数类型规范化。数组写回会用保存的 base/index 重新调用 `__ep_slice_at`，避免 RHS 扩容同一数组后使用失效的 backing 地址；base 和 index 表达式本身不会重复求值。
 - **Map 删除**：内建 map 类型、语法、sema/codegen 分支和 MIR runtime helper 均已删除。普通小集合仍使用显式数组；MIR 函数/extern 与 machine symbol 的热查找使用 `src/util.ep` 中固定容量、开放寻址的 `NameIndex`，名称本身继续保存为 `str`。
-- **字符串运算**：`str == str` / `!=` 调用 `__ep_str_eq` 做按字节内容比较；`str + str` 调用 `__ep_str_cat`，分配新的 header 和连续字节区并复制两侧内容。字符串排序比较在 sema 拒绝；`str += str` 也拒绝，避免暗示原地扩容或共享 buffer 修改。
+- **字符串运算**：`s[i]` 调用 `__ep_str_at` 做 checked byte read；`str == str` / `!=` 调用 `__ep_str_eq` 做按字节内容比较；`str + str` 调用 `__ep_str_cat` 并产生新的 inline object。字符串下标写入、排序比较与 `str += str` 均在 sema 拒绝。
 
 ## 链接器 (Linker)
 
@@ -237,14 +235,14 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 复用 header 并通过 `__ep_str_from_bytes` 保证尾部 NUL，必要时扩容。struct、非 `u8[]` array 不支持 | 公开 |
+| `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 通过 `__ep_str_from_bytes` 深拷贝。struct、非 `u8[]` array 不支持 | 公开 |
 | `str + str`         | `__ep_str_cat`，分配新字符串并复制两侧内容 | 公开语法 |
 | `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
 | `read_file`        | `runtime/file.ep` 中的 `__ep_read_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
 | `write_file`       | `runtime/file.ep` 中的 `__ep_write_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
-| `str(u8[])`        | 复用 header，保持逻辑字节不变，必要时扩容并写入尾部 NUL | 公开 |
-| `bytes(str)`       | zero-copy layout view                       | 公开 |
-| `cptr` / `cstr`    | inline aggregate data/payload pointer lowering；`cstr` 是 deprecated alias；无 runtime helper 或检查 | 公开 |
+| `str(u8[])`        | 深拷贝为只读 inline string object | 公开 |
+| `bytes(str)`       | 深拷贝为独立可变 `u8[]` | 公开 |
+| `cptr` / `cstr`    | `cptr` 用于支持的 array/struct；`cstr` 返回 `str` 首字节的同步 borrowed pointer | 公开 |
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
 | `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
@@ -252,7 +250,7 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 | `str_trim`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除，helper 已删除 |
 | `xs.push(x)`      | `__ep_slice_push_slot(slice, slot_size)` 返回槽地址；lowering 发出静态宽度 store | 公开容器点调用 |
 | `xs.pop()`        | `__ep_slice_pop_slot(slice, slot_size)` 返回槽地址；lowering 发出静态宽度 load；空数组 panic | 公开容器点调用 |
-| `dst.extend(src)`  | `__ep_slice_extend(dst, src, slot_size)`；一次性扩容并通过 `RtlMoveMemory` 块复制 | 公开容器点调用 |
+| `dst.extend(src)`  | 同类型数组调用 `__ep_slice_extend`；`u8[].extend(str)` 调用 `__ep_slice_extend_str` 直接复制，无中间 byte array | 公开容器点调用 |
 | `len`              | 直接内联发射                                | 公开 |
 | 切片语法           | 字符串用 `__ep_str_slice`；所有数组用 `__ep_slice_copy_range` 块复制 | 语法公开，helper internal |
 

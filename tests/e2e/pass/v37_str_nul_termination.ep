@@ -4,7 +4,7 @@
 extern "kernel32.dll" fun lstrlenA(text: ptr): i32
 
 fun c_len(value: str): i64 {
-    ret i64(lstrlenA(cptr(value)))
+    ret i64(lstrlenA(cstr(value)))
 }
 
 fun check_text(value: str, expected: i64): void {

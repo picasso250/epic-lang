@@ -5,6 +5,7 @@
 
 struct MachineObject {
     text: u8[]
+    rdata: u8[]
     data: u8[]
     text_reloc_offsets: i64[]
     text_reloc_symbol_indexes: i64[]
@@ -22,12 +23,15 @@ struct MachineLabelFixup {
 
 struct MachineBuilder {
     text: u8[]
+    rdata: u8[]
     data: u8[]
     section: str
     label_offsets: i64[]
     label_defined: i64[]
     text_label_names: str[]
     text_label_offsets: i64[]
+    rdata_label_names: str[]
+    rdata_label_offsets: i64[]
     data_label_names: str[]
     data_label_offsets: i64[]
     fixups: MachineLabelFixup[]
@@ -40,12 +44,15 @@ struct MachineBuilder {
 fun machine_builder_empty(label_count: i64): MachineBuilder {
     let b = new MachineBuilder
     b.text = new u8[]
+    b.rdata = new u8[]
     b.data = new u8[]
     b.section = ""
     b.label_offsets = new i64[label_count]
     b.label_defined = new i64[label_count]
     b.text_label_names = new str[]
     b.text_label_offsets = new i64[]
+    b.rdata_label_names = new str[]
+    b.rdata_label_offsets = new i64[]
     b.data_label_names = new str[]
     b.data_label_offsets = new i64[]
     b.fixups = new MachineLabelFixup[]
@@ -185,8 +192,8 @@ fun machine_name_index_set(index: NameIndex, name: str, value: i64): void {
 }
 
 fun machine_ascii_less(a: str, b: str): bool {
-    let ab = bytes(a)
-    let bb = bytes(b)
+    let ab = a
+    let bb = b
     let n = len(ab)
     if len(bb) < n {
         n = len(bb)
@@ -1010,6 +1017,14 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
                 }
                 ret
             }
+            if b.section == ".rdata" {
+                machine_bind_label(b, it.label, len(b.rdata))
+                if len(it.label.symbol_name) != 0 {
+                    b.rdata_label_names.push(it.label.symbol_name)
+                    b.rdata_label_offsets.push(len(b.rdata))
+                }
+                ret
+            }
             machine_die(f"label outside section: {x64_label_text(it.label)}")
         }
         X64InstItem it: {
@@ -1018,16 +1033,26 @@ fun machine_emit_item(b: MachineBuilder, item: X64Item): void {
             ret
         }
         X64DataBytesItem it: {
-            if b.section != ".data" { machine_die(f"data outside .data: {it.name}") }
+            if b.section == ".rdata" {
+                b.rdata_label_names.push(it.name)
+                b.rdata_label_offsets.push(len(b.rdata))
+                for i: 0:len(it.values) { machine_append_byte(b.rdata, it.values[i]) }
+                ret
+            }
+            if b.section != ".data" { machine_die(f"data outside data section: {it.name}") }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
-            for i: 0:len(it.values) {
-                machine_append_byte(b.data, it.values[i])
-            }
+            for i: 0:len(it.values) { machine_append_byte(b.data, it.values[i]) }
             ret
         }
         X64DataZeroItem it: {
-            if b.section != ".data" { machine_die(f"data outside .data: {it.name}") }
+            if b.section == ".rdata" {
+                b.rdata_label_names.push(it.name)
+                b.rdata_label_offsets.push(len(b.rdata))
+                bytes_append_zero(b.rdata, it.count)
+                ret
+            }
+            if b.section != ".data" { machine_die(f"data outside data section: {it.name}") }
             b.data_label_names.push(it.name)
             b.data_label_offsets.push(len(b.data))
             bytes_append_zero(b.data, it.count)
@@ -1047,6 +1072,7 @@ fun machine_print_timing(label: str, start: i64, stop: i64): void {
 fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     let obj = new MachineObject
     obj.text = b.text
+    obj.rdata = b.rdata
     obj.data = b.data
     obj.text_reloc_offsets = b.text_reloc_offsets
     obj.text_reloc_symbol_indexes = new i64[]
@@ -1055,7 +1081,7 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
     obj.symbol_names = new str[]
     obj.symbol_sections = new i64[]
     obj.symbol_values = new i64[]
-    let name_index = machine_name_index_new(len(b.text_label_names) + len(b.data_label_names) + len(b.text_reloc_names) + len(b.data_reloc_names))
+    let name_index = machine_name_index_new(len(b.text_label_names) + len(b.rdata_label_names) + len(b.data_label_names) + len(b.text_reloc_names) + len(b.data_reloc_names))
 
     for i: 0:len(b.text_label_names) {
         machine_name_index_insert(name_index, b.text_label_names[i], len(obj.symbol_names))
@@ -1063,10 +1089,16 @@ fun machine_object_from_builder(b: MachineBuilder): MachineObject {
         obj.symbol_sections.push(1)
         obj.symbol_values.push(b.text_label_offsets[i])
     }
+    for i: 0:len(b.rdata_label_names) {
+        machine_name_index_insert(name_index, b.rdata_label_names[i], len(obj.symbol_names))
+        obj.symbol_names.push(b.rdata_label_names[i])
+        obj.symbol_sections.push(2)
+        obj.symbol_values.push(b.rdata_label_offsets[i])
+    }
     for i: 0:len(b.data_label_names) {
         machine_name_index_insert(name_index, b.data_label_names[i], len(obj.symbol_names))
         obj.symbol_names.push(b.data_label_names[i])
-        obj.symbol_sections.push(2)
+        obj.symbol_sections.push(3)
         obj.symbol_values.push(b.data_label_offsets[i])
     }
 
@@ -1123,7 +1155,7 @@ fun machine_build_object_timed(program: X64Program): MachineObject {
     let emit_stop = machine_now_ms()
     machine_print_timing("emit items", emit_start, emit_stop)
 
-    println(f"  timing: machine counts: items={len(program.items)} text_labels={len(b.text_label_names)} data_labels={len(b.data_label_names)} fixups={len(b.fixups)} text_relocs={len(b.text_reloc_names)} text_bytes={len(b.text)} data_bytes={len(b.data)}")
+    println(f"  timing: machine counts: items={len(program.items)} text_labels={len(b.text_label_names)} rdata_labels={len(b.rdata_label_names)} data_labels={len(b.data_label_names)} fixups={len(b.fixups)} text_relocs={len(b.text_reloc_names)} text_bytes={len(b.text)} rdata_bytes={len(b.rdata)} data_bytes={len(b.data)}")
 
     let patch_start = machine_now_ms()
     machine_patch_fixups(b)
@@ -1147,5 +1179,6 @@ fun machine_print_bytes(label: str, values: u8[]): void {
 
 fun machine_print_object(obj: MachineObject): void {
     machine_print_bytes("TEXT", obj.text)
+    machine_print_bytes("RDATA", obj.rdata)
     machine_print_bytes("DATA", obj.data)
 }

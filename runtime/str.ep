@@ -4,8 +4,8 @@
 
 fun __ep_str_cat(left: str, right: str): str {
     let out = new u8[] {}
-    out.extend(bytes(left))
-    out.extend(bytes(right))
+    for i: 0:len(left) { out.push(left[i]) }
+    for i: 0:len(right) { out.push(right[i]) }
     ret str(out)
 }
 
@@ -14,10 +14,8 @@ fun __ep_str_eq(left: str, right: str): bool {
     if left_len != len(right) {
         ret false
     }
-    let left_bytes = bytes(left)
-    let right_bytes = bytes(right)
     for i: 0:left_len {
-        if left_bytes[i] != right_bytes[i] {
+        if left[i] != right[i] {
             ret false
         }
     }
@@ -37,10 +35,10 @@ fun __ep_str_from_i64(value: i64): str {
         ret "-9223372036854775808"
     }
     if value < 0 {
-        let digits = bytes(__ep_str_from_u64(u64(0 - value)))
+        let digits = __ep_str_from_u64(u64(0 - value))
         let out = new u8[] {}
         out.push('-')
-        out.extend(digits)
+        for i: 0:len(digits) { out.push(digits[i]) }
         ret str(out)
     }
     ret __ep_str_from_u64(u64(value))
@@ -78,10 +76,9 @@ fun __ep_str_slice(s: str, start: i64, end: i64): str {
         panic "invalid string slice"
     }
 
-    let bytes_view = bytes(s)
     let out = new u8[] {}
     for i: start:end {
-        out.push(bytes_view[i])
+        out.push(s[i])
     }
     ret str(out)
 }

@@ -9,7 +9,7 @@ fun make_str_buf(): u8[] {
 }
 
 fun str_buf_extend(buf: u8[], s: str): void {
-    buf.extend(bytes(s))
+    for i: 0:len(s) { buf.push(s[i]) }
 }
 
 fun str_buf_finish(buf: u8[]): str {
@@ -89,7 +89,7 @@ fun bytes_append_u64_le(buf: u8[], value: u64): void {
 }
 
 fun bytes_append_name8(buf: u8[], name: str): void {
-    let value = bytes(name)
+    let value = name
     for i: 0:8 {
         if i < len(value) {
             buf.push(value[i])
@@ -119,7 +119,7 @@ fun name_index_new(expected_count: i64): NameIndex {
 
 fun name_index_hash(name: str): i64 {
     let value = -3750763034362895579
-    let bs = bytes(name)
+    let bs = name
     for i: 0:len(bs) {
         value = (value ^ i64(bs[i])) * 1099511628211
     }

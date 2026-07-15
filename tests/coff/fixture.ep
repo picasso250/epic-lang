@@ -5,6 +5,7 @@ fun expect_byte(data: u8[], index: i64, expected: i64): void {
 fun main(): void {
     let obj = new MachineObject
     obj.text = new u8[] { u8(195) }
+    obj.rdata = new u8[] { u8(7) }
     obj.data = new u8[] { u8(1), u8(2) }
     obj.text_reloc_offsets = new i64[] { 0 }
     obj.text_reloc_symbol_indexes = new i64[] { 1 }
@@ -15,16 +16,17 @@ fun main(): void {
     obj.symbol_values = new i64[] { 0, 0 }
 
     let data = coff_build_obj(obj)
-    if len(data) != 165 { panic "COFF size mismatch" }
+    if len(data) != 206 { panic "COFF size mismatch" }
     expect_byte(data, 0, 100)       # AMD64 machine 0x8664
     expect_byte(data, 1, 134)
-    expect_byte(data, 2, 2)         # two sections
-    expect_byte(data, 8, 113)       # symbol table offset
+    expect_byte(data, 2, 3)         # three sections
+    expect_byte(data, 8, 154)       # symbol table offset
     expect_byte(data, 12, 2)        # symbol count
-    expect_byte(data, 100, 195)     # .text
-    expect_byte(data, 101, 1)       # .data
-    expect_byte(data, 102, 2)
-    expect_byte(data, 107, 1)       # relocation symbol index
-    expect_byte(data, 111, 4)       # IMAGE_REL_AMD64_REL32
-    expect_byte(data, 149, 16)       # string table size with long symbol
+    expect_byte(data, 140, 195)     # .text
+    expect_byte(data, 141, 7)       # .rdata
+    expect_byte(data, 142, 1)       # .data
+    expect_byte(data, 143, 2)
+    expect_byte(data, 148, 1)       # relocation symbol index
+    expect_byte(data, 152, 4)       # IMAGE_REL_AMD64_REL32
+    expect_byte(data, 190, 16)      # string table size with long symbol
 }

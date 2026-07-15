@@ -154,7 +154,7 @@ fun decode_escape(e: u8): u8 {
 }
 
 fun decode_escaped_range(src: str, start: i64, end: i64, line: i64): str {
-    let src_bytes = bytes(src)
+    let src_bytes = src
     let buf = new u8[]
     let pos = start
     for pos < end {
@@ -179,7 +179,7 @@ fun char_at(src: str, pos: i64): i64 {
     if pos < 0 || pos >= len(src) {
         ret 0
     }
-    let src_bytes = bytes(src)
+    let src_bytes = src
     ret i64(src_bytes[pos])
 }
 
@@ -188,7 +188,7 @@ fun is_ascii_space(c: u8): bool {
 }
 
 fun trim_ascii(s: str): str {
-    let s_bytes = bytes(s)
+    let s_bytes = s
     let start = 0
     let end = len(s)
     for start < end && is_ascii_space(s_bytes[start]) {
@@ -201,7 +201,7 @@ fun trim_ascii(s: str): str {
 }
 
 fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
-    let src_bytes = bytes(src)
+    let src_bytes = src
     let n = len(src)
     let parens = 0
     let brackets = 0
@@ -278,7 +278,7 @@ fun scan_fstring_expr_end(src: str, pos: i64, line: i64): i64 {
 }
 
 fun scan_fstring(src: str, start: i64, line: i64): Token {
-    let src_bytes = bytes(src)
+    let src_bytes = src
     let n = len(src)
     let parts = new FStringPart[]
     let pos = start + 2
@@ -332,7 +332,7 @@ fun scan_fstring(src: str, start: i64, line: i64): Token {
 # ── Lexer ───────────────────────────────────────────────────────────────
 
 fun lex(src: str): Token[] {
-    let src_bytes = bytes(src)
+    let src_bytes = src
     let tokens = new Token[]
     let n = len(src)
     let pos = 0

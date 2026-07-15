@@ -62,6 +62,8 @@ fun build_machine_x64_fixture(): X64Program {
     let program = x64_program_empty()
     x64_add_global(program, "_start")
     x64_add_extern(program, "ExitProcess")
+    x64_add_section(program, ".rdata")
+    x64_add_data_bytes(program, "ro", new u8[] { u8(7) })
     x64_add_section(program, ".data")
 
     let msg = new u8[]
@@ -368,11 +370,14 @@ fun main(): void {
         panic "machine name index collision lookup failed"
     }
     let obj = machine_build_object(build_machine_x64_fixture())
-    if len(obj.symbol_names) != 4 || obj.symbol_names[0] != "_start" || obj.symbol_names[1] != "msg" || obj.symbol_names[2] != "scratch" || obj.symbol_names[3] != "ExitProcess" {
+    if len(obj.symbol_names) != 5 || obj.symbol_names[0] != "_start" || obj.symbol_names[1] != "ro" || obj.symbol_names[2] != "msg" || obj.symbol_names[3] != "scratch" || obj.symbol_names[4] != "ExitProcess" {
         panic "machine symbol order mismatch"
     }
-    if len(obj.text) != 40 || i64(obj.text[0]) != 72 || i64(obj.text[39]) != 195 || len(obj.data) != 11 || i64(obj.data[0]) != 65 || i64(obj.data[1]) != 255 {
+    if len(obj.text) != 40 || i64(obj.text[0]) != 72 || i64(obj.text[39]) != 195 || len(obj.rdata) != 1 || i64(obj.rdata[0]) != 7 || len(obj.data) != 11 || i64(obj.data[0]) != 65 || i64(obj.data[1]) != 255 {
         panic "machine bytes mismatch"
+    }
+    if obj.symbol_sections[1] != 2 || obj.symbol_sections[2] != 3 {
+        panic "machine static data section mismatch"
     }
     if len(obj.text_reloc_offsets) != 2 || len(obj.data_reloc_offsets) != 0 {
         panic "machine relocation mismatch"

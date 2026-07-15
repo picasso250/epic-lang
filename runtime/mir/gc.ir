@@ -1011,11 +1011,10 @@ entry:
 
 define void @__ep_gc_write_stderr_str(ptr %1, ptr %2) {
 entry:
-  %3: ptr = gep struct str, ptr %2, i64 0, i64 0
-  %4: ptr = load ptr, ptr %3
-  %5: ptr = gep struct str, ptr %2, i64 0, i64 1
-  %6: i64 = load i64, ptr %5
-  call void __ep_gc_write_stderr(ptr %1, ptr %4, i64 %6)
+  %3: ptr = gep i8, ptr %2, i64 8
+  %4: ptr = gep struct str, ptr %2, i64 0, i64 0
+  %5: i64 = load i64, ptr %4
+  call void __ep_gc_write_stderr(ptr %1, ptr %3, i64 %5)
   ret void
 }
 

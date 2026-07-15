@@ -12,9 +12,9 @@ extern "kernel32.dll" fun CloseHandle(handle: ptr): i32
 fun main(): void {
     Sleep(u32(1))
     let t = GetTickCount64()
-    let n = lstrlenA(cptr("abc"))
-    let c = lstrcmpA(cptr("a"), cptr("b"))
-    let h = CreateFileA(cptr("test_sys_create.tmp"), u32(1073741824), u32(0), ptr(0), u32(2), u32(128), ptr(0))
+    let n = lstrlenA(cstr("abc"))
+    let c = lstrcmpA(cstr("a"), cstr("b"))
+    let h = CreateFileA(cstr("test_sys_create.tmp"), u32(1073741824), u32(0), ptr(0), u32(2), u32(128), ptr(0))
     let invalid = ptr(u64(0) - u64(1))
     if t >= u64(0) && n == i32(3) && c < i32(0) && h != invalid {
         CloseHandle(h)

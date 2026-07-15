@@ -1,0 +1,22 @@
+# EXIT: 0
+# STDOUT: abcABc
+# STDOUT: <abc>
+fun main(): void {
+    let s = "abc"
+    let bs = bytes(s)
+    bs[0] = 'A'
+    print(s)
+
+    let arr = new u8[] { 'A', 'B', 'c' }
+    let s2 = str(arr)
+    arr[0] = 'X'
+    let bs2 = bytes(s2)
+    bs2[1] = 'x'
+    println(s2)
+
+    let out = new u8[] { '<' }
+    out.extend(s)
+    out.push('>')
+    println(str(out))
+    exit(0)
+}

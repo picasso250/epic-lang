@@ -1,6 +1,6 @@
 #
 # Minimal AMD64 COFF object writer for the self-hosted compiler.
-# Emits the two active sections: .text and .data.
+# Emits the active .text, .rdata, and .data sections.
 #
 
 struct CoffSectionSpec {
@@ -24,7 +24,7 @@ fun coff_section_spec(name: str, size: i64, raw: i64, rel_off: i64): CoffSection
 }
 
 fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
-    let bs = bytes(name)
+    let bs = name
     if len(bs) <= 8 {
         bytes_append_name8(buf, name)
         ret
@@ -32,7 +32,7 @@ fun coff_append_coff_name(buf: u8[], name: str, strings: u8[]): void {
     let off = 4 + len(strings)
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, off)
-    strings.extend(bs)
+    for i: 0:len(bs) { strings.push(bs[i]) }
     strings.push(u8(0))
 }
 
@@ -83,12 +83,13 @@ fun coff_append_reloc(buf: u8[], off: i64, symbol_index: i64): void {
 }
 
 fun coff_build_obj(obj: MachineObject): u8[] {
-    let section_count = 2
+    let section_count = 3
     let header_size = 20
     let section_table_size = section_count * 40
     let raw_offset = header_size + section_table_size
     let text_raw = raw_offset
-    let data_raw = text_raw + len(obj.text)
+    let rdata_raw = text_raw + len(obj.text)
+    let data_raw = rdata_raw + len(obj.rdata)
     let text_rel_off = data_raw + len(obj.data)
     let data_rel_off = text_rel_off + len(obj.text_reloc_offsets) * 10
     let symtab_off = data_rel_off + len(obj.data_reloc_offsets) * 10
@@ -110,12 +111,16 @@ fun coff_build_obj(obj: MachineObject): u8[] {
     text_spec.rel_count = len(obj.text_reloc_offsets)
     text_spec.chars = 1610612768
     coff_append_section_header(buf, text_spec)
+    let rdata_spec = coff_section_spec(".rdata", len(obj.rdata), rdata_raw, 0)
+    rdata_spec.chars = 1073741888
+    coff_append_section_header(buf, rdata_spec)
     let data_spec = coff_section_spec(".data", len(obj.data), data_raw, data_rel_off)
     data_spec.rel_count = len(obj.data_reloc_offsets)
     data_spec.chars = 3221225536
     coff_append_section_header(buf, data_spec)
 
     buf.extend(obj.text)
+    buf.extend(obj.rdata)
     buf.extend(obj.data)
 
     for i: 0:len(obj.text_reloc_offsets) {
@@ -132,12 +137,13 @@ fun coff_build_obj(obj: MachineObject): u8[] {
 }
 
 fun coff_build_obj_timed(obj: MachineObject): u8[] {
-    let section_count = 2
+    let section_count = 3
     let header_size = 20
     let section_table_size = section_count * 40
     let raw_offset = header_size + section_table_size
     let text_raw = raw_offset
-    let data_raw = text_raw + len(obj.text)
+    let rdata_raw = text_raw + len(obj.text)
+    let data_raw = rdata_raw + len(obj.rdata)
     let text_rel_off = data_raw + len(obj.data)
     let data_rel_off = text_rel_off + len(obj.text_reloc_offsets) * 10
     let symtab_off = data_rel_off + len(obj.data_reloc_offsets) * 10
@@ -163,6 +169,9 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     text_spec.rel_count = len(obj.text_reloc_offsets)
     text_spec.chars = 1610612768
     coff_append_section_header(buf, text_spec)
+    let rdata_spec = coff_section_spec(".rdata", len(obj.rdata), rdata_raw, 0)
+    rdata_spec.chars = 1073741888
+    coff_append_section_header(buf, rdata_spec)
     let data_spec = coff_section_spec(".data", len(obj.data), data_raw, data_rel_off)
     data_spec.rel_count = len(obj.data_reloc_offsets)
     data_spec.chars = 3221225536
@@ -172,6 +181,7 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
 
     let raw_start = coff_now_ms()
     buf.extend(obj.text)
+    buf.extend(obj.rdata)
     buf.extend(obj.data)
     let raw_stop = coff_now_ms()
     coff_print_timing("raw sections", raw_start, raw_stop)
@@ -192,7 +202,7 @@ fun coff_build_obj_timed(obj: MachineObject): u8[] {
     buf.extend(strings)
     let final_stop = coff_now_ms()
     coff_print_timing("final append", final_start, final_stop)
-    println(f"  timing: coff counts: text={len(obj.text)} data={len(obj.data)} text_relocs={len(obj.text_reloc_offsets)} data_relocs={len(obj.data_reloc_offsets)} symbols={len(obj.symbol_names)} symtab={len(symtab)} strings={len(strings)} total={len(buf)}")
+    println(f"  timing: coff counts: text={len(obj.text)} rdata={len(obj.rdata)} data={len(obj.data)} text_relocs={len(obj.text_reloc_offsets)} data_relocs={len(obj.data_reloc_offsets)} symbols={len(obj.symbol_names)} symtab={len(symtab)} strings={len(strings)} total={len(buf)}")
     ret buf
 }
 

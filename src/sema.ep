@@ -94,7 +94,6 @@ fun sema_is_extern_scalar_abi_type(t: str): bool {
 }
 
 fun sema_validate_cptr_type(st: SemaState, type_name: str): void {
-    if type_name == "str" { ret }
     if sema_is_array(type_name) {
         let elem_type = sema_array_elem(type_name)
         if elem_type == "bool" || sema_is_extern_scalar_abi_type(elem_type) { ret }
@@ -102,7 +101,7 @@ fun sema_validate_cptr_type(st: SemaState, type_name: str): void {
     }
     let struct_index = sema_struct_index(st, type_name)
     if struct_index < 0 {
-        sema_die(f"cptr expected str, scalar/ptr array, or FFI-safe struct, got {type_name}")
+        sema_die(f"cptr expected scalar/ptr array or FFI-safe struct, got {type_name}")
     }
     let def = st.structs[struct_index]
     if len(def.fields) == 0 {
@@ -137,7 +136,7 @@ fun sema_validate_extern_struct_param(st: SemaState, extern_name: str, param_nam
 
 fun sema_validate_extern_library(name: str, library: str): void {
     if len(library) == 0 { sema_die(f"extern {name} requires a non-empty library") }
-    let data = bytes(library)
+    let data = library
     for i: 0:len(data) {
         if data[i] == u8(0) || data[i] == u8(36) {
             sema_die(f"extern {name} library contains an unsupported character")
@@ -335,7 +334,7 @@ fun sema_digit_value(c: u8): i64 {
 }
 
 fun sema_parse_i64(s: str): i64 {
-    let bs = bytes(s)
+    let bs = s
     let n = 0
     for i: 0:len(bs) {
         n = n * 10 + sema_digit_value(bs[i])
@@ -350,8 +349,8 @@ fun sema_decimal_gt(a: str, b: str): bool {
     if len(a) < len(b) {
         ret false
     }
-    let ab = bytes(a)
-    let bb = bytes(b)
+    let ab = a
+    let bb = b
     for i: 0:len(ab) {
         if ab[i] > bb[i] {
             ret true
@@ -768,7 +767,7 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     let base = sema_expr_type(st, base_expr)
     sema_expect_int(st, index_expr, "subscript index")
     if base == "str" {
-        sema_die("str subscript is removed; use bytes(s)[i]")
+        ret "u8"
     }
     if sema_is_array(base) {
         ret sema_array_elem(base)
@@ -973,6 +972,9 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         if node.name == "extend" {
             sema_check_arity("extend", 1, node.args)
             let src = sema_expr_type(st, node.args[0])
+            if receiver == "u8[]" && src == "str" {
+                ret "void"
+            }
             if sema_is_array(src) == false || sema_array_elem(src) != sema_array_elem(receiver) {
                 sema_die("extend expects an array with the same element type")
             }
@@ -1182,10 +1184,21 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             ret
         }
         AstSubscriptAssign n: {
+            if sema_expr_type(st, n.base) == "str" {
+                sema_die("str is read-only; subscript assignment is not allowed")
+            }
             sema_check_assign(st, sema_subscript_type(st, n.base, n.index), n.value_expr, "subscript assignment")
             ret
         }
         AstAssignOp n: {
+            match n.expr {
+                AstSubscript sub: {
+                    if sema_expr_type(st, sub.base) == "str" {
+                        sema_die("str is read-only; compound subscript assignment is not allowed")
+                    }
+                }
+                _: {}
+            }
             let target = sema_lvalue_type(st, n.expr)
             let rhs = sema_expr_type(st, n.value_expr)
             if n.op == "+" && target == "str" {

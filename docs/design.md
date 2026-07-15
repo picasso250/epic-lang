@@ -313,11 +313,10 @@ match n {
 
 `str` 是保留的源码级字节字符串/文本类型；`u8[]` 是可变字节缓冲。字符串字面量产生 `str`，`==` / `!=` 做内容比较，`+` 分配并返回新的 `str`。`u8[]` 使用数组索引和 `push` / `pop` / `extend`，不获得隐式文本语义。
 
-当前两者运行时 header 相同，均为 `{data, len, cap}`。`bytes(str)` 是零拷贝 view；`str(bytes)` 复用同一 header，但会保证 `data[len] == 0`，必要时扩容并替换 backing data。共享布局不代表源码类型相同，也不引入隐式赋值转换。`len(s)` 计数字节数，不包含尾部 NUL；当前不做 UTF-8 校验、不提供 Unicode 字符索引，也不承诺不可变。详见 [`str-u8-layout-contract.md`](str-u8-layout-contract.md)。
+两者运行时布局分开：`str` 指向 inline `[len:i64][bytes...][NUL]` object，`u8[]` 使用可增长的 `{data, len, cap}` header。`bytes(str)` 与 `str(bytes)` 都深拷贝，不产生共享 mutable view。`len(s)` 计数字节数，不包含尾部 NUL；当前不做 UTF-8 校验或 Unicode 字符索引。详见 [`str-u8-layout-contract.md`](str-u8-layout-contract.md)。
 
-> 当前 Epic compiler 依赖 `str` layout 与 `u8[]` 完全一致（{data, len, cap} 均为 24 字节）。
-> `bytes(str)` 是 identity cast；`str(bytes)` 是同-header 的 NUL-normalizing conversion。
-> 按字节读取或修改必须显式转成 byte view：`let b = bytes(s); b[i] = v`。
+> `str` 只读；`s[i]` 是 checked `u8` read，写入必须先显式复制到 `u8[]`。
+> string literal 与 `embed` 的 inline object 位于 `.rdata`；动态字符串是单个 GC object。
 
 ### 动态数组 (Dynamic Arrays)
 
@@ -329,17 +328,17 @@ match n {
 | `new T[n]`            | 长度为 `n` 的零初始化数组                         |
 | `a.push(x)`          | 追加并扩容                                        |
 | `a.pop()`            | 删除并返回最后一个元素；空数组 runtime panic      |
-| `dst.extend(src)`    | `dst` 和 `src` 必须是相同元素类型的 `T[]`；将 `src` 的当前元素追加到 `dst` |
+| `dst.extend(src)`    | 追加相同元素类型数组；`u8[]` 还可直接追加 `str` bytes，无中间转换 |
 | `a[i]`                | 带边界检查的元素访问（推荐）                      |
 | `len(a)`              | 当前长度（推荐）                                  |
 
 ### 索引与切片 (Indexing and Slices)
 
-索引带边界检查。`str` 的直接下标已删除；按字节访问必须写 `bytes(s)[i]`。
+索引带边界检查。`s[i]` 对 `str` 做只读 byte access 并返回 `u8`；下标赋值与复合赋值被拒绝。
 
 切片语法（复制语义，半开区间 `[start, end)`）：
 
-> 注意：`s[i]` 已删除；按字节读取字符串必须显式写 `bytes(s)[i]`。`s[start:end]`、`==` / `!=` 仍是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper（`str_slice` / `str_eq`），但这些 helper 用户不可直接调用。
+> `s[i]`、`s[start:end]`、`==` / `!=` 是语法能力，不是 public builtin。它们内部 lower 到 compiler-internal helper，但这些 helper 用户不可直接调用。
 >
 > `str` 和所有数组类型都支持复制式切片。数组切片返回相同的 `T[]` 类型；
 > `str` 继续使用独立的字符串复制路径并维护末尾 NUL。
@@ -371,7 +370,7 @@ let d = s[0:len(s)]
 | 场景 | 推荐写法 | 底层/过时写法 |
 |------|----------|---------------|
 | 数组索引 | `a[i]` | `a.data[i]`（已从 public surface 删除） |
-| 字符串字节索引 | `bytes(s)[i]` | `s[i]` 和 `s.data[i]`（已从 public surface 删除） |
+| 字符串字节索引 | `s[i]`（只读，返回 `u8`） | `s.data[i]`（已从 public surface 删除） |
 | 长度 | `len(x)` | `x.len`（已从 public surface 删除） |
 | 内部容量 | 无 public API | `a.cap`（已从 public surface 删除） |
 | 切片 | `s[start:end]` / `array[start:end]`（必须显式写出 start 和 end） | 无 public 替代（`str_slice` 已从 public surface 删除） |
@@ -380,7 +379,7 @@ let d = s[0:len(s)]
 
 **三档分类**：
 
-1. **推荐语法** — 普通代码应使用：`a[i]`、`bytes(s)[i]`、`len(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
+1. **推荐语法** — 普通代码应使用：`a[i]`、`s[i]`、`len(a)`、`s[start:end]`、`bytes[start:end]`、`str(bytes)`、`new S`、`println(f"...")` 等。
 2. **底层接口** — compiler / runtime 内部 helper 和 MIR helper 可使用布局；Epic 源码不可直接访问 `data/len/cap` layout 字段。
 3. **历史写法** — 旧的 `a.data`、`s.data`、`x.len`、`a.cap` 字段访问已删除。
 
@@ -393,14 +392,14 @@ str(bytes: u8[]): str
 bytes(s: str): u8[]
 ```
 
-`read_file` 在失败时返回空的 `u8[]`。当前实现写在 `runtime/file.ep`，通过 `cptr(str/u8[])` 调用同步 WinAPI；`write_file` 返回 WinAPI 报告的写入字节数，打开失败返回 `-1`。`str(u8[])` 复用原 header，并通过 `__ep_str_from_bytes` 保证尾部 NUL；如果原容量没有 `len + 1` 空间，会扩容并复制 backing bytes。`bytes(str)` 仍是零拷贝 view。
+`read_file` 在失败时返回空的 `u8[]`。当前实现写在 `runtime/file.ep`，路径通过 `cstr(str)`、buffer 通过 `cptr(u8[])` 传给同步 WinAPI；`write_file` 返回 WinAPI 报告的写入字节数，打开失败返回 `-1`。`str(u8[])` 与 `bytes(str)` 都深拷贝逻辑字节，转换后两侧独立。
 
 这两个显式转换连接文本与可变字节缓冲边界，但不会消除 `str` 这个独立源码类型。
 
-`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 是同-header 的 NUL-normalizing conversion；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显示转换。`str(struct)`、`str(i64[])`、`str(str[])` 和 `str(bool[])` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
+`str(x)` 只支持 `str`、整数、`bool`、`u8[]`。其中 `str(u8[])` 深拷贝为 read-only inline string object；`str(i64)` / `str(u64)` / `str(u8)` / `str(bool)` 是显式转换。`str(struct)`、`str(i64[])`、`str(str[])` 和 `str(bool[])` 不属于语言 surface。f-string 插值 `{expr}` 使用同一套 `str(expr)` 可转换性规则。
 
 
-> ⚠ 修改 `bytes(str)` 返回的 `u8[]` 会修改原 `str` 的底层 buffer。如果多个 `str` 共享同一 buffer（例如相同内容的字面量），修改对所有 view 可见。增长或填满 buffer 还可能覆盖尾部 NUL；在传给 C 字符串 API 前可用 `str(bytes(s))` 重新规范化。语言不承诺 string literal 物理不可变。
+`u8[].extend(str)` 直接把 string bytes 复制进可变 buffer，不创建中间 `u8[]`。`str` 自身只读，不提供 `extend`。
 
 常规源码加载方式：
 
@@ -416,8 +415,8 @@ let source = str(read_file(path))
 |----------------------------------------|---------------------------------------------|
 | `print(x: str): void`                  | 写入字符串（无换行）；不做隐式 `str(x)`      |
 | `println(x: str): void`                | 写入字符串并追加换行；不做隐式 `str(x)`      |
-| `cptr(x): ptr`                         | 返回 `str` / bool、整数或 `ptr` 数组 backing data，或 FFI-safe struct payload 的 borrowed 地址；不检查 |
-| `cstr(s: str): ptr`                    | deprecated `cptr(s)` alias；不检查 NUL 或内嵌 NUL |
+| `cptr(x): ptr`                         | 返回 bool、整数或 `ptr` 数组 backing data，或 FFI-safe struct payload 的 borrowed 地址；拒绝 `str` |
+| `cstr(s: str): ptr`                    | 返回 `s + 8`，即首字节的同步 borrowed pointer；末尾有 NUL，允许内嵌 NUL |
 
 以下 builtin 已从 public surface 删除。只有语法 lowering 必需的操作继续保留为 compiler-internal helper；普通库式字符串算法不保留内部 helper：
 
@@ -425,7 +424,7 @@ let source = str(read_file(path))
 |------------------------|---------------------------------------------|
 | `itoa(n)`              | `str(n)`                                    |
 | `str_new(ptr, len)`    | `str(bytes)`                                |
-| `str_get(s, i)`        | 已删除；使用 `bytes(s)[i]`                  |
+| `str_get(s, i)`        | 已删除；使用 `s[i]`                         |
 | `str_slice(s, start, end)` | `s[start:end]`（语法）                   |
 | `str_eq(s1, s2)`       | `s1 == s2`（语法）                          |
 | `str_find`             | 自己写 `u8[]` 扫描；未来可提供 `s.find(...)` 方法 |
@@ -435,13 +434,13 @@ let source = str(read_file(path))
 | `str_cat`              | `s1 + s2`（语法；分配新 `str`）             |
 | `a.push(x)`             | 追加到动态数组                              |
 | `a.pop()`              | 删除并返回最后一个元素；空数组 panic            |
-| `dst.extend(src)`     | 追加相同元素类型数组的当前元素                                |
+| `dst.extend(src)`     | 追加相同元素类型数组；`u8[]` 还可直接追加 `str`                |
 
-`cptr` 接受 `str`、元素为 `bool`/整数/`ptr` 的数组和非空 FFI-safe 用户 struct。`cptr(str)` / `cptr(T[])` 直接读取 `{data,len,cap}` header 的 `data`；空数组自然返回 `ptr(0)`。数组 data 按元素的自然宽度连续存放：`bool/u8=1`、`i16/u16=2`、`i32/u32=4`、`i64/u64/ptr=8`。`cptr(struct)` 直接返回 non-moving heap payload 地址。`cptr` 本身不做 null、NUL、长度、容量或内容检查，不分配、不复制，也不转移所有权；正常字符串构造路径会维护 `data[len] == 0`，但显式 byte-view 修改可能破坏该条件。外部代码必须按静态元素表示访问数组；Win32 `BOOL[]` 应使用 `i32[]`，一字节 `BOOLEAN[]` 才对应 `bool[]` 或 `u8[]`。内嵌 NUL 合法，传给 C 字符串 API 时，C 只能看到第一个 NUL 之前的前缀。
+`cptr` 接受元素为 `bool`/整数/`ptr` 的数组和非空 FFI-safe 用户 struct，并拒绝 `str`。`cptr(T[])` 读取 `{data,len,cap}` header 的 `data`；空数组自然返回 `ptr(0)`。数组 data 按元素的自然宽度连续存放：`bool/u8=1`、`i16/u16=2`、`i32/u32=4`、`i64/u64/ptr=8`。`cptr(struct)` 直接返回 non-moving heap payload 地址。`cptr` 不做 null、长度、容量或内容检查，不分配、不复制，也不转移所有权。外部代码必须按静态元素表示访问数组；Win32 `BOOL[]` 应使用 `i32[]`，一字节 `BOOLEAN[]` 才对应 `bool[]` 或 `u8[]`。
 
 `cptr` 拒绝 `str[]`、struct/union 数组、嵌套数组等 managed-reference 元素数组。Epic 的这些数组保存连续的 8-byte managed reference，不能充当 WinAPI 所要求的 inline C struct 数组；需要显式指针数组时先构造 `ptr[]`。当前语言不提供 inline aggregate array。
 
-返回地址只在 owner 仍可达且外部调用遵守同步 borrowed 契约时有效。`str` 和 struct payload 地址在当前 non-moving GC 下稳定；任意数组的 backing data 都可能被 `push` / `extend` 等扩容操作替换，因此任何可能增长数组的操作后必须重新调用 `cptr(array)`。`new bool[n]`、`new integer[n]` 和 `new ptr[n]` 可作为同步 WinAPI output buffer；其中 `u16[]` 可承载显式构造并自行 NUL 结尾的 UTF-16 code units。`cstr(str)` 暂时保留为 deprecated alias，lowering 与 `cptr(str)` 完全相同，不再存在 `__ep_cstr` runtime helper 或运行时诊断。
+返回地址只在 owner 仍可达且外部调用遵守同步 borrowed 契约时有效。任意数组的 backing data 都可能被 `push` / `extend` 等扩容操作替换，因此任何可能增长数组的操作后必须重新调用 `cptr(array)`。`new bool[n]`、`new integer[n]` 和 `new ptr[n]` 可作为同步 WinAPI output buffer；其中 `u16[]` 可承载显式构造并自行 NUL 结尾的 UTF-16 code units。`cstr(str)` 返回 inline object 中 offset 8 的首字节；末尾 NUL 由 string invariant 保证，内嵌 NUL 合法。外部代码通过该 pointer 修改字符串属于 FFI contract violation。
 
 ### Extern FFI
 
@@ -487,7 +486,7 @@ fun main(): void {
 
 `ptr` 是公开的 64-bit opaque address scalar。它可用于变量、参数、返回值、struct 字段、`ptr[]` 和 extern ABI；只支持同类型的 `==` / `!=`，不支持直接算术、位运算、排序比较、解引用、字段访问、下标或 postfix `?`。地址运算必须显式经过整数：`ptr(u64(base) + offset)`。只允许 `ptr(i64/u64)` 与 `i64/u64(ptr)` 双向 bit-pattern 转换；空地址写作 `ptr(0)`，`INVALID_HANDLE_VALUE` 可写作 `ptr(u64(0) - u64(1))`。`ptr` 不拥有内存，也不延长外部资源或 managed allocation 的生命周期。
 
-extern 不提供隐式字符串或 buffer 转换；调用者必须显式使用 `cptr(...)`。`cstr(str)` 仅为 deprecated source alias，也返回 `ptr`，没有额外保证。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
+extern 不提供隐式字符串或 buffer 转换；字符串调用者必须显式使用 `cstr(...)`，array/struct 调用者使用 `cptr(...)`。DLL 名必须是非空编译期字符串，不能包含 `$` 或 NUL；函数名是声明中的精确符号名。`os.*` 语法已删除。
 
 同名 extern 可以重复声明，但 DLL、参数数量、每个 canonical 参数类型和 canonical 返回类型必须完全一致；参数名不参与等价判断。等价声明在 sema 中折叠为一个导入，任一签名或 DLL 差异都会报告 conflicting extern declaration。
 
@@ -495,7 +494,7 @@ extern 不提供隐式字符串或 buffer 转换；调用者必须显式使用 `
 
 ## 编译期文件嵌入 (Compile-time Embed)
 
-`embed "path"` 是类型为 `str` 的编译期表达式。路径必须是字符串字面量，并相对包含该表达式的 Epic 源文件目录解析；当前工作目录不参与语义。文件不存在时编译失败。文件内容按原始字节映射到 Epic 的 byte-oriented `str`，允许 NUL 和非 UTF-8 字节，并像普通字符串 global 一样进入可执行文件 `.data`。
+`embed "path"` 是类型为 `str` 的编译期表达式。路径必须是字符串字面量，并相对包含该表达式的 Epic 源文件目录解析；当前工作目录不参与语义。文件不存在时编译失败。文件内容按原始字节映射到 Epic 的 byte-oriented `str`，允许 NUL 和非 UTF-8 字节，并像普通字符串 literal 一样以 inline object 进入可执行文件 `.rdata`。
 
 ```epic
 let source = embed "../runtime/file.ep"
@@ -523,7 +522,7 @@ Git 标签是可复现的历史里程碑，不是当前分支的兼容承诺。`
 v0 branch epic-v0.exe -> current Epic compiler -> current Epic compiler
 ```
 
-当前活跃编译器只位于 `src/`。`v0` 分支维护 Python stage-0 和同语义的 self-hosted 实现；`build_epic_v0.py` 可在 detached worktree 中重建并校验 seed。当前 `dev` 不维护 Python oracle 或阶段 lockstep。
+当前活跃编译器只位于 `src/`。`v0` 分支维护 Python stage-0 与可复现 seed，只覆盖构建当前 `dev` 所需的最小源码语义，不承诺当前公开 ABI；`build_epic_v0.py` 可在 detached worktree 中重建并校验 seed。当前 `dev` 不维护 Python oracle 或阶段 lockstep。
 
 当前活跃验收入口包括 `python tests/run.py`、`python tests/examples/run.py` 和 `python test_bootstrap_fixed_point.py`。模块测试覆盖各阶段的意图与 canonical fixture，examples 和 e2e 约束公开行为，不动点测试连续使用生成的 Epic 编译器重新编译自身并检查输出稳定。
 

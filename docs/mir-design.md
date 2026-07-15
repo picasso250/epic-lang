@@ -469,7 +469,7 @@ entry:
 %value: i64 = load i64, ptr %f1
 ```
 
-Array header、string header 都按同样规则处理：layout 由 `struct` / `array` 类型描述，地址由 `gep` 计算，访问由 `load/store` 完成；扩容、复制、追加等操作 lower 成显式控制流和内存操作，或者普通 runtime call，例如 `call void @array_push_i64(ptr %arr, i64 %value)`。
+Array 使用 `{data,len,cap}` header；read-only string 使用 inline `[len][bytes...][NUL]` object。两者 layout 都由 MIR type metadata 描述，地址由 `gep` 计算，访问由 `load/store` 完成；扩容、复制、追加等操作 lower 成显式控制流和内存操作，或者普通 runtime call。
 
 ### 11.8 调用
 

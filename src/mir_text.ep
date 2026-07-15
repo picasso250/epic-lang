@@ -18,7 +18,7 @@ fun mrt_ends_with(s: str, suffix: str): bool {
 }
 
 fun mrt_trim(s: str): str {
-    let bs = bytes(s)
+    let bs = s
     let start = 0
     let end = len(bs)
     for start < end && (bs[start] == u8(32) || bs[start] == u8(9) || bs[start] == u8(13)) {
@@ -45,7 +45,7 @@ fun mrt_find(s: str, needle: str): i64 {
 }
 
 fun mrt_strip_comment(line: str): str {
-    let bs = bytes(line)
+    let bs = line
     let in_string = false
     let escaped = false
     for i: 0:len(bs) {
@@ -75,7 +75,7 @@ fun mrt_strip_comment(line: str): str {
 
 fun mrt_split_lines(text: str): str[] {
     let out = new str[]
-    let bs = bytes(text)
+    let bs = text
     let start = 0
     for i: 0:len(bs) {
         if bs[i] == u8(10) {
@@ -93,7 +93,7 @@ fun mrt_split_lines(text: str): str[] {
 
 fun mrt_split_commas(text: str): str[] {
     let out = new str[]
-    let bs = bytes(text)
+    let bs = text
     let start = 0
     for i: 0:len(bs) {
         if bs[i] == u8(44) {
@@ -130,7 +130,7 @@ fun mrt_strip_trailing_comma(s: str): str {
 
 fun mrt_parse_i64(s: str): i64 {
     let t = mrt_trim(s)
-    let bs = bytes(t)
+    let bs = t
     let sign = 1
     let start = 0
     if len(bs) > 0 && bs[0] == u8(45) {
@@ -146,7 +146,7 @@ fun mrt_parse_i64(s: str): i64 {
 
 fun mrt_is_int_text(s: str): bool {
     let t = mrt_trim(s)
-    let bs = bytes(t)
+    let bs = t
     if len(bs) == 0 { ret false }
     let start = 0
     if bs[0] == u8(45) {
@@ -338,7 +338,7 @@ fun mrt_parse_bytes_literal(text: str): str {
     if len(t) < 2 || t[0:1] != "\"" || t[len(t) - 1:len(t)] != "\"" {
         mir_text_die(f"bad bytes literal: {text}")
     }
-    let raw = bytes(t[1:len(t) - 1])
+    let raw = t[1:len(t) - 1]
     let out = new u8[]
     let i = 0
     for i < len(raw) {

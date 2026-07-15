@@ -80,7 +80,7 @@ fun use_arrays_and_strings(): i64 {
     let joined = "hello, " + again
     let same = joined == "hello, hello"
     let different = joined != text
-    let first: u8 = bs[0]
+    let first: u8 = text[0]
     let b0: u8 = bs[0]
     let sub = text[0:2]
     let bsub = bs[0:2]

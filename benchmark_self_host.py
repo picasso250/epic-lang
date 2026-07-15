@@ -29,9 +29,9 @@ BENCH_DIR = ROOT / "build" / "self-host-benchmark"
 BENCH_COMPILER = BENCH_DIR / "compiler.exe"
 BENCH_OUTPUT = BENCH_DIR / "epic.exe"
 RUNTIME_BUNDLE_SOURCE = "src/runtime_bundle.ep"
-CACHE_SCHEMA = 2
+CACHE_SCHEMA = 3
 BOOTSTRAP_CONTRACT = "fixed-point-embedded-runtime-v2"
-BENCHMARK_CONTRACT = "self-host-compiler-v2"
+BENCHMARK_CONTRACT = "self-host-compiler-v3-rdata"
 
 
 def sha256_file(path: Path) -> str:
@@ -217,6 +217,7 @@ def benchmark_command() -> list[str]:
 def parse_benchmark_row(stdout: str, elapsed_ns: int) -> dict[str, Any]:
     x64_match = re.search(r"lower counts:.*x64_items=(\d+)", stdout)
     text_match = re.search(r"machine counts:.*text_bytes=(\d+)", stdout)
+    rdata_match = re.search(r"machine counts:.*rdata_bytes=(\d+)", stdout)
     data_match = re.search(r"machine counts:.*data_bytes=(\d+)", stdout)
     total_match = re.search(r"timing: total: (\d+) ms", stdout)
     if not x64_match or not text_match or not data_match or not total_match:
@@ -226,6 +227,7 @@ def parse_benchmark_row(stdout: str, elapsed_ns: int) -> dict[str, Any]:
         "internal_ms": int(total_match.group(1)),
         "x64_items": int(x64_match.group(1)),
         "text_bytes": int(text_match.group(1)),
+        "rdata_bytes": int(rdata_match.group(1)) if rdata_match else 0,
         "data_bytes": int(data_match.group(1)),
         "exe_bytes": BENCH_OUTPUT.stat().st_size,
     }
@@ -243,7 +245,7 @@ def run_benchmark(compiler: Path, runs: int, log_dir: Path) -> list[dict[str, An
         row = parse_benchmark_row(completed.stdout, elapsed_ns)
         rows.append(row)
         print(render_run("benchmark", index + 1, row))
-    for metric in ("x64_items", "text_bytes", "data_bytes", "exe_bytes"):
+    for metric in ("x64_items", "text_bytes", "rdata_bytes", "data_bytes", "exe_bytes"):
         values = {row[metric] for row in rows}
         if len(values) != 1:
             raise RuntimeError(f"non-deterministic {metric}: {sorted(values)}")
@@ -256,6 +258,7 @@ def result_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "median_internal_ms": statistics.median(row["internal_ms"] for row in rows),
         "x64_items": rows[0]["x64_items"],
         "text_bytes": rows[0]["text_bytes"],
+        "rdata_bytes": rows[0]["rdata_bytes"],
         "data_bytes": rows[0]["data_bytes"],
         "exe_bytes": rows[0]["exe_bytes"],
     }
@@ -265,7 +268,8 @@ def render_run(label: str, index: int, row: dict[str, Any]) -> str:
     return (
         f"{label} run {index}: wall_ms={row['wall_ms']:.4f} "
         f"internal_ms={row['internal_ms']} x64_items={row['x64_items']} "
-        f"text_bytes={row['text_bytes']} data_bytes={row['data_bytes']} "
+        f"text_bytes={row['text_bytes']} rdata_bytes={row['rdata_bytes']} "
+        f"data_bytes={row['data_bytes']} "
         f"exe_bytes={row['exe_bytes']}"
     )
 
@@ -294,6 +298,7 @@ def render_result(
             f"{label} median_internal_ms={summary['median_internal_ms']:.0f}",
             f"{label} x64_items=[{summary['x64_items']}]",
             f"{label} text_bytes=[{summary['text_bytes']}]",
+            f"{label} rdata_bytes=[{summary['rdata_bytes']}]",
             f"{label} data_bytes=[{summary['data_bytes']}]",
             f"{label} exe_bytes=[{summary['exe_bytes']}]",
         ]

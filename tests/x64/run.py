@@ -15,6 +15,8 @@ FIXTURE = ROOT / "tests" / "x64" / "fixture.ep"
 EXE = ROOT / "build" / "tests" / "x64.exe"
 EXPECTED = """global _start
 extern ExitProcess
+section .rdata
+ro: db 7
 section .data
 msg: db 65, 255, 0
 scratch: times 8 db 0

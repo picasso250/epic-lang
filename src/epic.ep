@@ -82,16 +82,25 @@ fun epic_push_u64_le(out: u8[], value: u64): void {
     }
 }
 
-fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
+fun epic_emit_program_rdata(x64: X64Program, program: MirProgram): void {
     for i: 0:len(program.globals) {
         match program.globals[i] {
             MirStringGlobal g: {
                 let values = new u8[]
-                values.extend(bytes(g.init))
+                epic_push_u64_le(values, u64(len(g.init)))
+                for j: 0:len(g.init) { values.push(g.init[j]) }
                 values.push(u8(0))
-                x64_add_data_bytes(x64, mir_to_x64_data_label(g.name), values)
-                x64_add_data_zero(x64, mir_to_x64_header_label(g.name), 24)
+                for len(values) % 8 != 0 { values.push(u8(0)) }
+                x64_add_data_bytes(x64, mir_to_x64_string_label(g.name), values)
             }
+            _: {}
+        }
+    }
+}
+
+fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
+    for i: 0:len(program.globals) {
+        match program.globals[i] {
             MirScalarGlobal g: {
                 let values = new u8[]
                 epic_push_u64_le(values, u64(sema_parse_i64(g.init)))
@@ -100,6 +109,7 @@ fun epic_emit_program_data(x64: X64Program, program: MirProgram): void {
             MirDeclGlobal g: {
                 x64_add_data_zero(x64, g.name, 8)
             }
+            _: {}
         }
     }
 }
@@ -119,9 +129,11 @@ fun epic_lower_program(program: MirProgram, verbose: bool): X64Program {
             x64_add_extern(lower.x64, ext.name)
         }
     }
-    x64_add_section(lower.x64, ".data")
+    x64_add_section(lower.x64, ".rdata")
 
     let data_start = epic_now_ms()
+    epic_emit_program_rdata(lower.x64, program)
+    x64_add_section(lower.x64, ".data")
     epic_emit_program_data(lower.x64, program)
     let data_stop = epic_now_ms()
     epic_timing(verbose, "lower program data", data_start, data_stop)
