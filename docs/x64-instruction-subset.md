@@ -243,7 +243,7 @@ ret
 | `mov [mem], r16/r32` | ✅ 支持 | word/dword narrow store |
 | `mov [rsp+disp], r64` | ✅ 支持 | 通过 `Mem("rsp", disp)` |
 | `mov [rbp+disp], r64` | ✅ 支持 | 通过 `Mem("rbp", disp)` |
-| `mov [reg+disp], r64` | ✅ 支持 | base 需属于当前 REG64 集合（`rax`–`r11`） |
+| `mov [reg+disp], r64` | ✅ 支持 | base 需属于完整 REG64 集合（`rax`–`r15`） |
 
 #### Byte load/store contract
 
