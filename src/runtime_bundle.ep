@@ -7,8 +7,7 @@ struct EmbeddedRuntimeSource {
 
 fun embedded_runtime_sources(): EmbeddedRuntimeSource[] {
     ret new EmbeddedRuntimeSource[] {
-        new EmbeddedRuntimeSource { path: "runtime/str.ep", text: embed "../runtime/str.ep" },
-        new EmbeddedRuntimeSource { path: "runtime/file.ep", text: embed "../runtime/file.ep" }
+        new EmbeddedRuntimeSource { path: "runtime/str.ep", text: embed "../runtime/str.ep" }
     }
 }
 

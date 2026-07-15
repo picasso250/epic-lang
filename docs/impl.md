@@ -238,8 +238,8 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 | `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 通过 `__ep_str_from_bytes` 深拷贝。struct、非 `u8[]` array 不支持 | 公开 |
 | `str + str`         | MIR `__ep_str_cat` 一次分配最终 inline string，并用至多两次 `RtlMoveMemory` 复制两侧内容 | 公开语法 |
 | `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
-| `read_file`        | `runtime/file.ep` 中的 `__ep_read_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
-| `write_file`       | `runtime/file.ep` 中的 `__ep_write_file`，使用 `cptr(u8[])` 调用 WinAPI | 公开 |
+| `read_file`        | MIR `__ep_read_file`，一次分配结果 slice，用栈上 `u32` 接收实际读取数 | 公开 |
+| `write_file`       | MIR `__ep_write_file`，用栈上 `u32` 接收实际写入数 | 公开 |
 | `str(u8[])`        | 深拷贝为只读 inline string object | 公开 |
 | `bytes(str)`       | 深拷贝为独立可变 `u8[]` | 公开 |
 | `cptr` / `cstr`    | `cptr` 用于支持的 array/struct；`cstr` 返回 `str` 首字节的同步 borrowed pointer | 公开 |

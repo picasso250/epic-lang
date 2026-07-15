@@ -1,5 +1,13 @@
 declare void @__ep_import$kernel32.dll$ExitProcess(i64)
 
+declare ptr @__ep_import$kernel32.dll$CreateFileA(ptr, i64, i64, ptr, i64, i64, ptr)
+
+declare i64 @__ep_import$kernel32.dll$GetFileSize(ptr, ptr)
+
+declare i64 @__ep_import$kernel32.dll$ReadFile(ptr, ptr, i64, ptr, ptr)
+
+declare i64 @__ep_import$kernel32.dll$CloseHandle(ptr)
+
 declare ptr @__ep_import$kernel32.dll$GetStdHandle(i64)
 
 declare i64 @__ep_import$kernel32.dll$WriteFile(ptr, ptr, i64, ptr, ptr)
@@ -36,6 +44,67 @@ define void @__ep_print_newline() {
 entry:
   call void __ep_print_str(ptr str.runtime.newline)
   ret void
+}
+
+define i64 @__ep_write_file(ptr %path, ptr %data) {
+entry:
+  call void __ep_require_nonnull(ptr %path)
+  %path_data: ptr = gep i8, ptr %path, i64 8
+  %file: ptr = call ptr __ep_import$kernel32.dll$CreateFileA(ptr %path_data, i64 1073741824, i64 0, ptr null, i64 2, i64 128, ptr null)
+  %invalid_file: ptr = inttoptr i64 -1 to ptr
+  %open_failed: bool = icmp.eq ptr %file, ptr %invalid_file
+  condbr bool %open_failed, label %fail, label %write
+
+fail:
+  ret i64 -1
+
+write:
+  call void __ep_require_nonnull(ptr %data)
+  %data_address: ptr = gep struct _slice, ptr %data, i64 0, i64 0
+  %data_pointer: ptr = load ptr, ptr %data_address
+  %length_address: ptr = gep struct _slice, ptr %data, i64 0, i64 1
+  %length: i64 = load i64, ptr %length_address
+  %written: ptr = alloca u32
+  store u32 0, ptr %written
+  %write_result: i64 = call i64 __ep_import$kernel32.dll$WriteFile(ptr %file, ptr %data_pointer, i64 %length, ptr %written, ptr null)
+  %close_result: i64 = call i64 __ep_import$kernel32.dll$CloseHandle(ptr %file)
+  %written_value: i64 = load u32, ptr %written
+  ret i64 %written_value
+}
+
+define ptr @__ep_read_file(ptr %path) {
+entry:
+  call void __ep_require_nonnull(ptr %path)
+  %path_data: ptr = gep i8, ptr %path, i64 8
+  %file: ptr = call ptr __ep_import$kernel32.dll$CreateFileA(ptr %path_data, i64 2147483648, i64 1, ptr null, i64 3, i64 128, ptr null)
+  %invalid_file: ptr = inttoptr i64 -1 to ptr
+  %open_failed: bool = icmp.eq ptr %file, ptr %invalid_file
+  condbr bool %open_failed, label %fail, label %opened
+
+fail:
+  %empty_data: ptr = call ptr __ep_slice_new(i64 0, i64 1)
+  ret ptr %empty_data
+
+opened:
+  %size: i64 = call i64 __ep_import$kernel32.dll$GetFileSize(ptr %file, ptr null)
+  %data: ptr = call ptr __ep_slice_new(i64 %size, i64 1)
+  %is_empty: bool = icmp.eq i64 %size, i64 0
+  condbr bool %is_empty, label %close, label %read
+
+read:
+  %data_address: ptr = gep struct _slice, ptr %data, i64 0, i64 0
+  %data_pointer: ptr = load ptr, ptr %data_address
+  %read_count: ptr = alloca u32
+  store u32 0, ptr %read_count
+  %read_result: i64 = call i64 __ep_import$kernel32.dll$ReadFile(ptr %file, ptr %data_pointer, i64 %size, ptr %read_count, ptr null)
+  %actual: i64 = load u32, ptr %read_count
+  %length_address: ptr = gep struct _slice, ptr %data, i64 0, i64 1
+  store i64 %actual, ptr %length_address
+  br label %close
+
+close:
+  %close_result: i64 = call i64 __ep_import$kernel32.dll$CloseHandle(ptr %file)
+  ret ptr %data
 }
 
 define void @__ep_require_nonnull(ptr %value) {

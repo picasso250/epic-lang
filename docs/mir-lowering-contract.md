@@ -389,7 +389,7 @@ and the element-size-parameterized `__ep_slice_new`, `__ep_slice_reserve`,
 `__ep_slice_extend`, and `__ep_slice_copy_range` are
 ordinary `MirFunction`s loaded from the embedded `runtime/mir/helpers.ir` bundle and
 injected by `src/mir_runtime.ep`. Array slicing/extension and panic helpers are part of the
-same bundle. The remaining string and file helpers come from Epic sources embedded by
+same bundle. The remaining string helpers come from Epic source embedded by
 `src/runtime_bundle.ep` and merged with user source before sema. Canonically identical
 repeated extern declarations are folded; conflicts are rejected.
 After injection, the compiler prunes unreachable MIR functions from the final
@@ -403,10 +403,10 @@ and truncation remain compile-time properties rather than runtime dispatch.
 Both deep-copy logical bytes. `cptr(T[])`, where `T` is `bool`, an integer, or `ptr`,
 loads the array `data` field, while `cptr(FFI-safe struct)` returns the payload pointer
 unchanged. `cptr(str)` is rejected. `cstr(str)` lowers to the first inline byte at offset 8.
-Active `__ep_read_file` / `__ep_write_file` bodies come only from `runtime/file.ep` and
-use `cstr(str)` for paths and `cptr(u8[])` for buffers plus explicit pointer-typed WinAPI externs. Their MIR signatures match the
-public builtins exactly: one path operand for read, and path plus data operands for write.
-`runtime/mir/helpers.ir` contains no same-named fallback bodies.
+Active `__ep_read_file` / `__ep_write_file` bodies live in `runtime/mir/helpers.ir`. They
+use stack `u32` output slots for the synchronous WinAPI byte counts, so no temporary four-byte
+slice or per-byte decode is needed. Their MIR signatures match the public builtins exactly:
+one path operand for read, and path plus data operands for write.
 The x64 backend contains only generic instruction lowering in `src/mir_to_x64.ep`.
 
 Current helper ownership is documented by this contract plus `docs/builtin-inventory.md`. The old standalone MIR runtime helper migration plan was removed after the numeric/string helper migration completed.

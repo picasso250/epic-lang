@@ -105,7 +105,7 @@ categories include:
 - allocation, GC, and startup: `__ep_alloc`, collector helpers, `__ep_runtime_start`;
 - string output/conversion: `__ep_print_str`, `__ep_print_newline`, scalar-to-string helpers, `__ep_str_from_bytes`, `__ep_bytes_from_str`, and `__ep_str_copy`; `cstr` itself requires no runtime helper;
 - string operations used by syntax: equality, concatenation, and slicing;
-- file operations: Epic implementations of `__ep_read_file` and `__ep_write_file` from `runtime/file.ep`;
+- file operations: MIR implementations of `__ep_read_file` and `__ep_write_file` using stack `u32` output slots;
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
 - panic and bounds/null failure paths.
 

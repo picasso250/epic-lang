@@ -38,3 +38,6 @@ project's three-run rule.
 Retain shift + OR because it states the byte-layout operation directly and
 reduces `.text` by 9 bytes without increasing any reported size metric. Do not
 claim a performance improvement.
+
+This decision was later superseded when file I/O moved to MIR stack `u32`
+output slots and `__ep_file_u32_le` was deleted.

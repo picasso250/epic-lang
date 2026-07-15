@@ -393,9 +393,9 @@ prunes unreachable functions.
 `__ep_str_at`. String literals are inline `{len, bytes..., NUL}` objects in
 `.rdata`.
 
-Base helper bodies, array helpers, and panic are bundled in `runtime/mir/helpers.ir`;
-string and file helpers are written in Epic. `src/runtime_bundle.ep` embeds both MIR bundles
-and the Epic runtime sources. The Epic sources are merged with user input; equivalent extern declarations are
+Base helper bodies, array helpers, file I/O, and panic are bundled in `runtime/mir/helpers.ir`;
+the remaining string helpers are written in Epic. `src/runtime_bundle.ep` embeds both MIR bundles
+and the Epic string runtime source. The Epic source is merged with user input; equivalent extern declarations are
 canonicalized before MIR lowering.
 The x64 layer owns only ABI lowering, program data emission, and WinAPI
 imports.
