@@ -384,7 +384,7 @@ module.exports = grammar({
 
     identifier: _ => /[A-Za-z_][A-Za-z0-9_]*/,
 
-    number: _ => /[0-9]+/,
+    number: _ => /0[xX][0-9a-fA-F]+|[0-9]+/,
 
     fstring: $ => seq(
       "f\"",

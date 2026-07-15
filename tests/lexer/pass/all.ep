@@ -151,3 +151,7 @@ fun calls(): i64 {
     let v = a.b.c.d(1)
     ret 0
 }
+
+fun hex_literals(): i64 {
+    ret 0x2a + 0X2A
+}

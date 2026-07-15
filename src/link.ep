@@ -493,7 +493,7 @@ fun build_idata(st: LinkState): void {
 fun section_rva(st: LinkState, sec_index: i64): i64 {
     let sec = st.sections[sec_index]
     if sec.name == ".text" {
-        ret 4096
+        ret 0x1000
     }
     if sec.name == ".rdata" {
         ret st.rdata_rva
@@ -505,7 +505,7 @@ fun section_rva(st: LinkState, sec_index: i64): i64 {
 }
 
 fun find_entry(st: LinkState): void {
-    st.entry_rva = 4096
+    st.entry_rva = 0x1000
     for i: 0:len(st.syms) {
         let sym = st.syms[i]
         if sym.section > 0 {
@@ -523,7 +523,7 @@ fun patch_thunks(st: LinkState, text_sec: Section): void {
         let name = st.imports[i]
         let thunk = get_name_value(st.thunk_rvas, name)
         let iat = get_name_value(st.iat_offsets, name)
-        let off = thunk - 4096 + 2
+        let off = thunk - 0x1000 + 2
         let disp = st.idata_rva + iat - (thunk + 6)
         bytes_patch_u32_bits_le(text_sec.data, off, u32(disp))
     }
@@ -541,7 +541,7 @@ fun patch_relocs(st: LinkState, text_sec: Section): void {
         }
         if target != 0 {
             let old = le32_as_i64(text_sec.data, rel.rva)
-            let disp = old + target - (4096 + rel.rva + 4)
+            let disp = old + target - (0x1000 + rel.rva + 4)
             bytes_patch_u32_bits_le(text_sec.data, rel.rva, u32(disp))
         }
     }
@@ -551,18 +551,18 @@ fun append_section_header(buf: u8[], name: str, rva: i64, raw_sz: i64): void {
     bytes_append_name8(buf, name)
     bytes_append_u32_le(buf, raw_sz)
     bytes_append_u32_le(buf, rva)
-    bytes_append_u32_le(buf, align_to(raw_sz, 512))
+    bytes_append_u32_le(buf, align_to(raw_sz, 0x200))
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, 0)
     bytes_append_u16_le(buf, 0)
     bytes_append_u16_le(buf, 0)
     if name == ".text" {
-        bytes_append_u32_le(buf, 1610612768)
+        bytes_append_u32_le(buf, 0x60000020)
     } else if name == ".rdata" {
-        bytes_append_u32_le(buf, 1073741888)
+        bytes_append_u32_le(buf, 0x40000040)
     } else {
-        bytes_append_u32_le(buf, 3221225536)
+        bytes_append_u32_le(buf, 0xc0000040)
     }
 }
 
@@ -570,16 +570,16 @@ fun patch_section_raw(buf: u8[], index: i64, raw_pos: i64, raw_sz: i64): void {
     let opt_start = 120 + 4 + 20
     let hdr_pos = opt_start + 240 + index * 40
     bytes_patch_u32_le(buf, hdr_pos + 20, raw_pos)
-    bytes_patch_u32_le(buf, hdr_pos + 16, align_to(raw_sz, 512))
+    bytes_patch_u32_le(buf, hdr_pos + 16, align_to(raw_sz, 0x200))
 }
 
 fun append_padded_section(buf: u8[], name: str, data: u8[]): void {
     buf.extend(data)
     let pad = 0
     if name == ".text" {
-        pad = 204
+        pad = 0xcc
     }
-    for len(buf) % 512 != 0 {
+    for len(buf) % 0x200 != 0 {
         buf.push(u8(pad))
     }
 }
@@ -587,36 +587,36 @@ fun append_padded_section(buf: u8[], name: str, data: u8[]): void {
 fun write_pe(st: LinkState, exe_path: str, text_sec: Section, rdata_sec: Section, data_sec: Section): i64 {
     let buf = new u8[]
     let num_sec = 3
-    let text_raw = align_to(len(text_sec.data), 512)
-    let rdata_raw = align_to(len(rdata_sec.data), 512)
-    let data_raw = align_to(len(data_sec.data), 512)
+    let text_raw = align_to(len(text_sec.data), 0x200)
+    let rdata_raw = align_to(len(rdata_sec.data), 0x200)
+    let data_raw = align_to(len(data_sec.data), 0x200)
     let last_rva = st.data_rva
     let last_sz = len(data_sec.data)
-    let image_size = align_to(last_rva + last_sz, 4096)
-    let headers_sz = 1024
+    let image_size = align_to(last_rva + last_sz, 0x1000)
+    let headers_sz = 0x400
 
     append_dos_stub(buf)
     append_str(buf, "PE")
     bytes_append_zero(buf, 2)
-    bytes_append_u16_le(buf, 34404)
+    bytes_append_u16_le(buf, 0x8664)
     bytes_append_u16_le(buf, num_sec)
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, 0)
     bytes_append_u16_le(buf, 240)
-    bytes_append_u16_le(buf, 34)
+    bytes_append_u16_le(buf, 0x22)
 
-    bytes_append_u16_le(buf, 523)
+    bytes_append_u16_le(buf, 0x20b)
     buf.push(u8(14))
     buf.push(u8(0))
     bytes_append_u32_le(buf, text_raw)
     bytes_append_u32_le(buf, rdata_raw + data_raw)
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, st.entry_rva)
-    bytes_append_u32_le(buf, 4096)
-    bytes_append_u64_le(buf, u64(5368709120))
-    bytes_append_u32_le(buf, 4096)
-    bytes_append_u32_le(buf, 512)
+    bytes_append_u32_le(buf, 0x1000)
+    bytes_append_u64_le(buf, u64(0x140000000))
+    bytes_append_u32_le(buf, 0x1000)
+    bytes_append_u32_le(buf, 0x200)
     bytes_append_u16_le(buf, 6)
     bytes_append_u16_le(buf, 0)
     bytes_append_u16_le(buf, 0)
@@ -628,11 +628,11 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, rdata_sec: Section
     bytes_append_u32_le(buf, headers_sz)
     bytes_append_u32_le(buf, 0)
     bytes_append_u16_le(buf, 3)
-    bytes_append_u16_le(buf, 33120)
-    bytes_append_u64_le(buf, u64(1048576))
-    bytes_append_u64_le(buf, u64(4096))
-    bytes_append_u64_le(buf, u64(1048576))
-    bytes_append_u64_le(buf, u64(4096))
+    bytes_append_u16_le(buf, 0x8160)
+    bytes_append_u64_le(buf, u64(0x100000))
+    bytes_append_u64_le(buf, u64(0x1000))
+    bytes_append_u64_le(buf, u64(0x100000))
+    bytes_append_u64_le(buf, u64(0x1000))
     bytes_append_u32_le(buf, 0)
     bytes_append_u32_le(buf, 16)
 
@@ -655,7 +655,7 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, rdata_sec: Section
     }
     bytes_append_zero(buf, 24)
 
-    append_section_header(buf, ".text", 4096, len(text_sec.data))
+    append_section_header(buf, ".text", 0x1000, len(text_sec.data))
     append_section_header(buf, ".rdata", st.rdata_rva, len(rdata_sec.data))
     append_section_header(buf, ".data", st.data_rva, len(data_sec.data))
 
@@ -665,9 +665,9 @@ fun write_pe(st: LinkState, exe_path: str, text_sec: Section, rdata_sec: Section
 
     let raw_pos = headers_sz
     patch_section_raw(buf, 0, raw_pos, len(text_sec.data))
-    raw_pos += align_to(len(text_sec.data), 512)
+    raw_pos += align_to(len(text_sec.data), 0x200)
     patch_section_raw(buf, 1, raw_pos, len(rdata_sec.data))
-    raw_pos += align_to(len(rdata_sec.data), 512)
+    raw_pos += align_to(len(rdata_sec.data), 0x200)
     patch_section_raw(buf, 2, raw_pos, len(data_sec.data))
 
     append_padded_section(buf, ".text", text_sec.data)
@@ -692,13 +692,13 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
     st.idata_rva = 0
     st.rdata_rva = 0
     st.data_rva = 0
-    st.entry_rva = 4096
+    st.entry_rva = 0x1000
 
     if len(st.data) < 20 {
         die_link("input object is too small")
     }
     let machine = le16_as_i64(st.data, 0)
-    if machine != 34404 {
+    if machine != 0x8664 {
         die_link("expected AMD64 COFF object")
     }
     let nsects = le16_as_i64(st.data, 2)
@@ -714,8 +714,8 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
     let text_sec = find_section(st, ".text")
     let rdata_sec = find_section(st, ".rdata")
     let data_sec = find_section(st, ".data")
-    append_import_thunks(st, text_sec, 4096)
-    st.rdata_rva = align_to(4096 + text_sec.virtual_sz, 4096)
+    append_import_thunks(st, text_sec, 0x1000)
+    st.rdata_rva = align_to(0x1000 + text_sec.virtual_sz, 0x1000)
     st.idata_rva = st.rdata_rva + align_to(len(rdata_sec.data), 8)
     build_idata(st)
     if len(st.idata) > 0 {
@@ -723,7 +723,7 @@ fun link_obj(obj_path: str, exe_path: str): i64 {
         rdata_sec.data.extend(st.idata)
     }
     rdata_sec.virtual_sz = len(rdata_sec.data)
-    st.data_rva = align_to(st.rdata_rva + len(rdata_sec.data), 4096)
+    st.data_rva = align_to(st.rdata_rva + len(rdata_sec.data), 0x1000)
     patch_thunks(st, text_sec)
     find_entry(st)
     patch_relocs(st, text_sec)
