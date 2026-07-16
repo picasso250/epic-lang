@@ -80,7 +80,7 @@ fun sema_union_member_index(st: SemaState, union_name: str, member_name: str): i
     ret -1
 }
 
-fun sema_set_type(node: AstNode, typ: str): str {
+fun sema_set_type(node: AstExpr, typ: str): str {
     ast_set_resolved_type(node, typ)
     ret typ
 }
@@ -298,15 +298,15 @@ fun sema_is_reference_type(st: SemaState, typ: str): bool {
     ret typ == "str" || sema_is_array(typ) || sema_struct_index(st, typ) >= 0 || sema_union_index(st, typ) >= 0
 }
 
-fun sema_null_check_type(st: SemaState, expr: AstNode): str {
-    let inner = sema_expr_type(st, expr)
+fun sema_null_check_type(st: SemaState, node: AstNullCheck): str {
+    let inner = sema_expr_type(st, node.expr)
     if sema_is_reference_type(st, inner) == false {
         sema_die(f"null check expected reference, got {inner}")
     }
     ret "bool"
 }
 
-fun sema_field_access_type(st: SemaState, object: AstNode, field: str): str {
+fun sema_field_access_type(st: SemaState, object: AstExpr, field: str): str {
     ret sema_field_type(st, sema_expr_type(st, object), field)
 }
 
@@ -431,7 +431,7 @@ fun sema_check_i64_literal(s: str, context: str): void {
     }
 }
 
-fun sema_has_literal_int(node: AstNode): bool {
+fun sema_has_literal_int(node: AstExpr): bool {
     match node {
         AstLiteral n: { ret true }
         AstChar n: { ret true }
@@ -442,7 +442,7 @@ fun sema_has_literal_int(node: AstNode): bool {
     ret false
 }
 
-fun sema_literal_int(node: AstNode): i64 {
+fun sema_literal_int(node: AstExpr): i64 {
     match node {
         AstLiteral n: { ret sema_parse_i64(n.value) }
         AstChar n: { ret sema_parse_i64(n.value) }
@@ -501,7 +501,7 @@ fun sema_literal_int(node: AstNode): i64 {
     ret 0
 }
 
-fun sema_has_shift_literal(node: AstNode): bool {
+fun sema_has_shift_literal(node: AstExpr): bool {
     match node {
         AstLiteral literal: { ret true }
         AstUnary unary: {
@@ -523,7 +523,7 @@ fun sema_shift_width(type_name: str): i64 {
     ret 64
 }
 
-fun sema_check_shift_count(left_type: str, right_type: str, right_node: AstNode, context: str): void {
+fun sema_check_shift_count(left_type: str, right_type: str, right_node: AstExpr, context: str): void {
     if right_type != "i64" {
         sema_die(f"{context} expected i64, got {right_type}")
     }
@@ -574,7 +574,7 @@ fun sema_check_int_literal_range(target: str, value: i64, context: str): void {
     }
 }
 
-fun sema_check_assign_info(target: str, value_type: str, value_node: AstNode, context: str): void {
+fun sema_check_assign_info(target: str, value_type: str, value_node: AstExpr, context: str): void {
     if target == "void" {
         if value_type == "void" {
             ret
@@ -596,18 +596,18 @@ fun sema_check_assign_info(target: str, value_type: str, value_node: AstNode, co
     sema_die(f"{context} expected {target}, got {value_type}")
 }
 
-fun sema_check_assign(st: SemaState, target: str, value_node: AstNode, context: str): void {
+fun sema_check_assign(st: SemaState, target: str, value_node: AstExpr, context: str): void {
     sema_check_assign_info(target, sema_expr_type(st, value_node), value_node, context)
 }
 
-fun sema_expect_bool(st: SemaState, node: AstNode, context: str): void {
+fun sema_expect_bool(st: SemaState, node: AstExpr, context: str): void {
     let t = sema_expr_type(st, node)
     if t != "bool" {
         sema_die(f"{context} expected bool, got {t}")
     }
 }
 
-fun sema_expect_int(st: SemaState, node: AstNode, context: str): str {
+fun sema_expect_int(st: SemaState, node: AstExpr, context: str): str {
     let t = sema_expr_type(st, node)
     if sema_is_int(t) == false {
         sema_die(f"{context} expected integer, got {t}")
@@ -625,13 +625,13 @@ fun sema_check_str_convertible(info_type: str, context: str): void {
     sema_die(f"{context} expected str, integer, bool, or u8[], got {info_type}")
 }
 
-fun sema_check_arity(name: str, expected: i64, args: AstNode[]): void {
+fun sema_check_arity(name: str, expected: i64, args: AstExpr[]): void {
     if len(args) != expected {
         sema_die(f"{name} expected {expected} arguments, got {len(args)}")
     }
 }
 
-fun sema_check_func_call_args(st: SemaState, name: str, args: AstNode[]): void {
+fun sema_check_func_call_args(st: SemaState, name: str, args: AstExpr[]): void {
     let func_index = sema_func_index(st, name)
     if func_index < 0 {
         sema_die(f"unknown function {name}")
@@ -812,7 +812,7 @@ fun sema_reset_locals(st: SemaState): void {
     sema_define_local(st, "argv", epic_type_array_of("str"))
 }
 
-fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode): str {
+fun sema_subscript_type(st: SemaState, base_expr: AstExpr, index_expr: AstExpr): str {
     let base = sema_expr_type(st, base_expr)
     sema_expect_int(st, index_expr, "subscript index")
     if base == "str" {
@@ -825,7 +825,7 @@ fun sema_subscript_type(st: SemaState, base_expr: AstNode, index_expr: AstNode):
     ret ""
 }
 
-fun sema_expr_type(st: SemaState, node: AstNode): str {
+fun sema_expr_type(st: SemaState, node: AstExpr): str {
     match node {
         AstLiteral n: {
             sema_check_i64_literal(n.value, "integer")
@@ -848,9 +848,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
                 let part = n.fields[i]
                 match part {
                     AstFStringText text: {}
-                    _: {
-                        sema_check_str_convertible(sema_expr_type(st, part), "f-string expression")
-                    }
+                    AstFStringExpr expr: { sema_check_str_convertible(sema_expr_type(st, expr.expr), "f-string expression") }
                 }
             }
             ret sema_set_type(node, "str")
@@ -939,7 +937,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, sema_field_access_type(st, n.object, n.name))
         }
         AstNullCheck n: {
-            ret sema_set_type(node, sema_null_check_type(st, n.expr))
+            ret sema_set_type(node, sema_null_check_type(st, n))
         }
         AstSubscript n: {
             ret sema_set_type(node, sema_subscript_type(st, n.base, n.index))
@@ -955,11 +953,8 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
         }
         AstNewArray n: {
             let elem = sema_type_name(st, n.elem_type)
-            match n.count {
-                AstEmpty e: {}
-                _: {
-                    sema_expect_int(st, n.count, "array length")
-                }
+            if n.has_count {
+                sema_expect_int(st, n.count, "array length")
             }
             ret sema_set_type(node, f"{elem}[]")
         }
@@ -1037,7 +1032,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         if method_index < 0 {
             sema_die(f"type {receiver} has no method {node.name}; expected function {method_symbol}")
         }
-        let args = new AstNode[]
+        let args = new AstExpr[]
         args.push(node.object)
         args.extend(node.args)
         sema_check_func_call_args(st, method_symbol, args)
@@ -1189,7 +1184,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
     ret fn.meta.resolved_type
 }
 
-fun sema_lvalue_type(st: SemaState, node: AstNode): str {
+fun sema_lvalue_type(st: SemaState, node: AstExpr): str {
     match node {
         AstVar n: { ret sema_set_type(node, sema_lookup(st, n.name)) }
         AstFieldAccess n: { ret sema_expr_type(st, node) }
@@ -1200,7 +1195,7 @@ fun sema_lvalue_type(st: SemaState, node: AstNode): str {
     ret ""
 }
 
-fun sema_stmt(st: SemaState, node: AstNode): void {
+fun sema_stmt(st: SemaState, node: AstStmt): void {
     match node {
         AstLet n: {
             let target = ""
@@ -1219,7 +1214,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
             if target == "void" {
                 sema_die(f"let {n.name} cannot have type void")
             }
-            ast_set_resolved_type(node, target)
+            n.meta.resolved_type = target
             sema_define_local(st, n.name, target)
             ret
         }
@@ -1274,19 +1269,13 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
         }
         AstReturn n: {
             if st.current_ret == "void" {
-                match n.expr {
-                    AstEmpty e: {}
-                    _: {
-                        sema_check_assign(st, "void", n.expr, "return")
-                    }
+                if n.has_expr {
+                    sema_check_assign(st, "void", n.expr, "return")
                 }
                 ret
             }
-            match n.expr {
-                AstEmpty e: {
-                    sema_die(f"return expected {st.current_ret}, got void")
-                }
-                _: {}
+            if n.has_expr == false {
+                sema_die(f"return expected {st.current_ret}, got void")
             }
             sema_check_assign(st, st.current_ret, n.expr, "return")
             ret
@@ -1309,7 +1298,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
         AstForRange n: {
             sema_check_assign(st, "i64", n.start, "for range start")
             sema_check_assign(st, "i64", n.end, "for range end")
-            ast_set_resolved_type(node, "i64")
+            n.meta.resolved_type = "i64"
             sema_push_scope(st)
             sema_define_local(st, n.name, "i64")
             st.loop_depth += 1
@@ -1341,10 +1330,7 @@ fun sema_stmt(st: SemaState, node: AstNode): void {
                 let seen = new str[]
                 for i: 0:len(n.fields) {
                     let c = n.fields[i]
-                    match c.expr {
-                        AstEmpty e: {}
-                        _: { sema_die(f"ADT match on {scrutinee} requires variant binding cases") }
-                    }
+                    if c.has_expr { sema_die(f"ADT match on {scrutinee} requires variant binding cases") }
                     if c.variant_name? == false || c.binding_name? == false {
                         sema_die(f"ADT match on {scrutinee} requires variant binding cases")
                     }
@@ -1397,26 +1383,10 @@ fun sema_block(st: SemaState, block: AstBlock): void {
     for i: 0:len(block.stmts) {
         sema_stmt(st, block.stmts[i])
     }
-    if block.has_value {
-        sema_expr_type(st, block.value_expr)
-    }
     sema_pop_scope(st)
 }
 
-fun sema_function_body(st: SemaState, block: AstBlock): str {
-    let tail_type = ""
-    sema_push_scope(st)
-    for i: 0:len(block.stmts) {
-        sema_stmt(st, block.stmts[i])
-    }
-    if block.has_value {
-        tail_type = sema_expr_type(st, block.value_expr)
-    }
-    sema_pop_scope(st)
-    ret tail_type
-}
-
-fun sema_expr_is_exit(node: AstNode): bool {
+fun sema_expr_is_exit(node: AstExpr): bool {
     match node {
         AstCall call: { ret call.name == "exit" }
         _: {}
@@ -1424,7 +1394,7 @@ fun sema_expr_is_exit(node: AstNode): bool {
     ret false
 }
 
-fun sema_stmt_returns(node: AstNode): bool {
+fun sema_stmt_returns(node: AstStmt): bool {
     match node {
         AstReturn ret_stmt: { ret true }
         AstPanic panic_stmt: { ret true }
@@ -1463,9 +1433,6 @@ fun sema_block_returns(block: AstBlock): bool {
             ret true
         }
     }
-    if block.has_value && sema_expr_is_exit(block.value_expr) {
-        ret true
-    }
     ret false
 }
 
@@ -1482,15 +1449,9 @@ fun sema_program(st: SemaState, program: AstProgram): void {
             let p = f.params[j]
             sema_define_local(st, p.name, p.meta.resolved_type)
         }
-        let tail_type = sema_function_body(st, f.body)
-        if sema_block_returns(f.body) == false {
-            if f.body.has_value {
-                sema_check_assign_info(st.current_ret, tail_type, f.body.value_expr, "function tail")
-            } else {
-                if st.current_ret != "void" {
-                    sema_die(f"function must return {st.current_ret} on all paths")
-                }
-            }
+        sema_block(st, f.body)
+        if sema_block_returns(f.body) == false && st.current_ret != "void" {
+            sema_die(f"function must return {st.current_ret} on all paths")
         }
     }
 }

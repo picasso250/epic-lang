@@ -394,7 +394,7 @@ fun mir_shift_width(source_type: str): i64 {
     ret 64
 }
 
-fun mir_shift_count_needs_runtime_check(node: AstNode): bool {
+fun mir_shift_count_needs_runtime_check(node: AstExpr): bool {
     ret !sema_has_shift_literal(node)
 }
 
@@ -513,7 +513,7 @@ fun mir_load_field(st: MirCodegenState, base: MirOperand, struct_name: str, fiel
     ret mir_value_operand(field_typ, result_id)
 }
 
-fun mir_emit_cptr(st: MirCodegenState, block: MirBlock, arg: AstNode): MirValueFlow {
+fun mir_emit_cptr(st: MirCodegenState, block: MirBlock, arg: AstExpr): MirValueFlow {
     st.current_block = block
     let source_type = ast_resolved_type(arg)
     let arg_flow = mir_emit_expr(st, st.current_block, arg)
@@ -528,7 +528,7 @@ fun mir_emit_cptr(st: MirCodegenState, block: MirBlock, arg: AstNode): MirValueF
     ret mir_value_flow(mir_operand_null(), st.current_block)
 }
 
-fun mir_emit_cstr(st: MirCodegenState, block: MirBlock, arg: AstNode): MirValueFlow {
+fun mir_emit_cstr(st: MirCodegenState, block: MirBlock, arg: AstExpr): MirValueFlow {
     st.current_block = block
     let arg_flow = mir_emit_expr(st, st.current_block, arg)
     st.current_block = arg_flow.block
@@ -759,7 +759,7 @@ fun mir_string_label(st: MirCodegenState, value: str): str {
     ret label
 }
 
-fun mir_emit_str_conversion(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+fun mir_emit_str_conversion(st: MirCodegenState, block: MirBlock, expr: AstExpr): MirValueFlow {
     st.current_block = block
     let typ = ast_resolved_type(expr)
     if typ == "str" {
@@ -794,8 +794,8 @@ fun mir_emit_fstring(st: MirCodegenState, block: MirBlock, expr: AstFString): Mi
                     piece = mir_symbol_operand("ptr", mir_string_label(st, text.value))
                 }
             }
-            _: {
-                let piece_flow = mir_emit_str_conversion(st, st.current_block, part)
+            AstFStringExpr value: {
+                let piece_flow = mir_emit_str_conversion(st, st.current_block, value.expr)
                 st.current_block = piece_flow.block
                 piece = piece_flow.value
             }
@@ -928,7 +928,7 @@ fun mir_emit_print_text(st: MirCodegenState, text: str): void {
     ret
 }
 
-fun mir_emit_print_expr(st: MirCodegenState, expr: AstNode): void {
+fun mir_emit_print_expr(st: MirCodegenState, expr: AstExpr): void {
     let value_flow = mir_emit_str_conversion(st, st.current_block, expr)
     st.current_block = value_flow.block
     let args = new MirOperand[]
@@ -990,13 +990,10 @@ fun mir_emit_array_literal_storage(st: MirCodegenState, elem_type: str, count: M
 fun mir_emit_new_array(st: MirCodegenState, block: MirBlock, expr: AstNewArray): MirValueFlow {
     st.current_block = block
     let count = mir_const_int("i64", 0)
-    match expr.count {
-        AstEmpty e: {}
-        _: {
-            let count_flow = mir_emit_expr(st, st.current_block, expr.count)
-            st.current_block = count_flow.block
-            count = count_flow.value
-        }
+    if expr.has_count {
+        let count_flow = mir_emit_expr(st, st.current_block, expr.count)
+        st.current_block = count_flow.block
+        count = count_flow.value
     }
     let arr = mir_emit_empty_array(st, epic_type_array_elem(ast_require_resolved_type(expr.meta)), count)
     ret mir_value_flow(arr, st.current_block)
@@ -1180,7 +1177,7 @@ fun mir_embed_read(source_path: str, path: str): str {
     ret str(read_file(ready))
 }
 
-fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstNode): MirValueFlow {
+fun mir_emit_expr(st: MirCodegenState, block: MirBlock, expr: AstExpr): MirValueFlow {
     st.current_block = block
     match expr {
         AstLiteral n: {
@@ -1744,7 +1741,7 @@ fun mir_emit_loop(st: MirCodegenState, block: MirBlock, stmt: AstLoop): MirBlock
     ret mir_reachable_flow(end_block)
 }
 
-fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlockFlow {
+fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstStmt): MirBlockFlow {
     st.current_block = block
     match stmt {
         AstExprStmt n: {
@@ -1898,15 +1895,12 @@ fun mir_emit_stmt(st: MirCodegenState, block: MirBlock, stmt: AstNode): MirBlock
             ret mir_unreachable_flow()
         }
         AstReturn n: {
-            match n.expr {
-                AstEmpty e: {
-                    st.current_block.terminator = mir_ret_void()
-                }
-                _: {
-                    let value_flow = mir_emit_expr(st, st.current_block, n.expr)
-                    st.current_block = value_flow.block
-                    st.current_block.terminator = mir_ret_value(value_flow.value)
-                }
+            if n.has_expr {
+                let value_flow = mir_emit_expr(st, st.current_block, n.expr)
+                st.current_block = value_flow.block
+                st.current_block.terminator = mir_ret_value(value_flow.value)
+            } else {
+                st.current_block.terminator = mir_ret_void()
             }
             st.current_block.has_terminator = true
             ret mir_unreachable_flow()
@@ -1936,15 +1930,6 @@ fun mir_emit_block_stmts(st: MirCodegenState, block: MirBlock, ast_block: AstBlo
 fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
     let local_count = len(st.local_names)
     let flow = mir_emit_block_stmts(st, block, ast_block)
-    if flow.reachable == false {
-        mir_truncate_locals(st, local_count)
-        ret flow
-    }
-    if ast_block.has_value {
-        let value_flow = mir_emit_expr(st, flow.block, ast_block.value_expr)
-        mir_truncate_locals(st, local_count)
-        ret mir_reachable_flow(value_flow.block)
-    }
     mir_truncate_locals(st, local_count)
     ret flow
 }
@@ -1986,24 +1971,12 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
         st.current_block = body_flow.block
     }
     if st.current_block.has_terminator == false {
-        if fn_ast.body.has_value {
-            let value_flow = mir_emit_expr(st, st.current_block, fn_ast.body.value_expr)
-            st.current_block = value_flow.block
-            if st.current_fn.return_type == "void" {
-                st.current_block.terminator = mir_ret_void()
-                st.current_block.has_terminator = true
-            } else {
-                st.current_block.terminator = mir_ret_value(value_flow.value)
-                st.current_block.has_terminator = true
-            }
+        if st.current_fn.return_type == "void" {
+            st.current_block.terminator = mir_ret_void()
+            st.current_block.has_terminator = true
         } else {
-            if st.current_fn.return_type == "void" {
-                st.current_block.terminator = mir_ret_void()
-                st.current_block.has_terminator = true
-            } else {
-                st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
-                st.current_block.has_terminator = true
-            }
+            st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
+            st.current_block.has_terminator = true
         }
     }
     mir_truncate_locals(st, body_local_count)

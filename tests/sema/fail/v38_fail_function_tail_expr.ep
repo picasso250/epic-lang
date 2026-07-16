@@ -1,0 +1,8 @@
+# COMPILE_FAIL_CONTAINS: function must return i64 on all paths
+
+fun answer(): i64 {
+    42
+}
+
+fun main(): void {
+}
