@@ -11,8 +11,10 @@ examples/           正向学习示例程序
 tests/              self-hosted 模块测试、e2e 与负向用例
 tools/              开发辅助脚本与可选本地工具
 docs/               文档
-editors/            编辑器支持
 ```
+
+Tree-sitter grammar 与 Zed extension 是下游适配，分别维护在独立仓库
+`tree-sitter-epic` 和 `zed-epic`。
 
 当前活跃实现只有 `src/` 下的 Epic self-hosted compiler。冻结的 Python stage-0
 只存在于 `v0` 标签中，用于重建 `epic-v0.exe`；当前分支不维护双实现或阶段对拍。

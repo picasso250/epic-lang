@@ -12,7 +12,7 @@
 
 - 开发之前先读 docs/ 中的相关文档
 - `src/` 是当前 Epic 自举编译器源码和 Epic 工具源码。
-- `runtime/`、`examples/`、`docs/`、`editors/` 都服务当前语言实现。
+- `runtime/`、`examples/`、`docs/` 都服务当前语言实现；编辑器适配维护在独立仓库。
 - 当前测试入口（按推荐顺序）：
   - `python tests/run.py`             # 模块级测试体系
   - `python tests/examples/run.py`      # examples/ 正向学习示例
