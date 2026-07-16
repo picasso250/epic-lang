@@ -8,5 +8,5 @@ repository = "https://github.com/picasso250/epic-lang"
 
 [grammars.epic]
 repository = "https://github.com/picasso250/epic-lang"
-rev = "52e6a415d7d5fe677155b8525b3d38d02e4b1ecc"
+rev = "06fa9145c87b6cf1f610c531f2cb1b4664cf05c2"
 path = "editors/zed/tree-sitter-epic"
