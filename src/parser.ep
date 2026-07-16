@@ -80,10 +80,6 @@ fun ast_meta(line: i64): AstMeta {
     ret new AstMeta { line: line }
 }
 
-struct AstEmpty {
-    meta: AstMeta
-}
-
 struct AstProgram {
     meta: AstMeta
     funcs: AstFunDef[]
@@ -137,51 +133,52 @@ struct AstStructField {
 
 struct AstBlock {
     meta: AstMeta
-    stmts: AstNode[]
+    stmts: AstStmt[]
 }
 
 struct AstLet {
     meta: AstMeta
     name: str
     source_type: TypeExpr
-    value_expr: AstNode
+    value_expr: AstExpr
 }
 
 struct AstReturn {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
+    has_expr: bool
 }
 
 struct AstAssign {
     meta: AstMeta
     name: str
-    value_expr: AstNode
+    value_expr: AstExpr
 }
 
 struct AstAssignOp {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
     op: str
-    value_expr: AstNode
+    value_expr: AstExpr
 }
 
 struct AstFieldSet {
     meta: AstMeta
-    object: AstNode
+    object: AstExpr
     name: str
-    value_expr: AstNode
+    value_expr: AstExpr
 }
 
 struct AstSubscriptAssign {
     meta: AstMeta
-    base: AstNode
-    index: AstNode
-    value_expr: AstNode
+    base: AstExpr
+    index: AstExpr
+    value_expr: AstExpr
 }
 
 struct AstIf {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
     then_block: AstBlock
     else_block: AstBlock
     has_else: bool
@@ -189,15 +186,15 @@ struct AstIf {
 
 struct AstLoop {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
     body: AstBlock
 }
 
 struct AstForRange {
     meta: AstMeta
     name: str
-    start: AstNode
-    end: AstNode
+    start: AstExpr
+    end: AstExpr
     body: AstBlock
 }
 
@@ -211,12 +208,12 @@ struct AstContinue {
 
 struct AstPanic {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
 }
 
 struct AstMatch {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
     fields: AstMatchCase[]
     else_block: AstBlock
     has_else: bool
@@ -226,13 +223,14 @@ struct AstMatchCase {
     meta: AstMeta
     variant_name: str
     binding_name: str
-    expr: AstNode
+    expr: AstExpr
+    has_expr: bool
     body: AstBlock
 }
 
 struct AstExprStmt {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
 }
 
 struct AstLiteral {
@@ -263,12 +261,17 @@ struct AstEmbed {
 
 struct AstFString {
     meta: AstMeta
-    fields: AstNode[]
+    fields: AstFStringPart[]
 }
 
 struct AstFStringText {
     meta: AstMeta
     value: str
+}
+
+struct AstFStringExpr {
+    meta: AstMeta
+    expr: AstExpr
 }
 
 struct AstVar {
@@ -279,63 +282,64 @@ struct AstVar {
 struct AstBinary {
     meta: AstMeta
     op: str
-    left: AstNode
-    right: AstNode
+    left: AstExpr
+    right: AstExpr
 }
 
 struct AstUnary {
     meta: AstMeta
     op: str
-    expr: AstNode
+    expr: AstExpr
 }
 
 struct AstCall {
     meta: AstMeta
     name: str
-    args: AstNode[]
+    args: AstExpr[]
 }
 
 struct AstDotCall {
     meta: AstMeta
-    object: AstNode
+    object: AstExpr
     name: str
-    args: AstNode[]
+    args: AstExpr[]
 }
 
 struct AstFieldAccess {
     meta: AstMeta
-    object: AstNode
+    object: AstExpr
     name: str
 }
 
 struct AstNullCheck {
     meta: AstMeta
-    expr: AstNode
+    expr: AstExpr
 }
 
 struct AstSubscript {
     meta: AstMeta
-    base: AstNode
-    index: AstNode
+    base: AstExpr
+    index: AstExpr
 }
 
 struct AstSlice {
     meta: AstMeta
-    base: AstNode
-    start: AstNode
-    end: AstNode
+    base: AstExpr
+    start: AstExpr
+    end: AstExpr
 }
 
 struct AstNewArray {
     meta: AstMeta
     elem_type: TypeExpr
-    count: AstNode
+    count: AstExpr
+    has_count: bool
 }
 
 struct AstArrayLiteral {
     meta: AstMeta
     elem_type: TypeExpr
-    args: AstNode[]
+    args: AstExpr[]
 }
 
 struct AstStructInit {
@@ -347,24 +351,30 @@ struct AstStructInit {
 struct AstInitField {
     meta: AstMeta
     name: str
-    value_expr: AstNode
+    value_expr: AstExpr
 }
 
 struct AstUnionInit {
     meta: AstMeta
     type_name: str
-    expr: AstNode
+    expr: AstExpr
 }
 
-type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstEmbed | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstStmt = AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstExprStmt
+type AstExpr = AstLiteral | AstChar | AstBool | AstString | AstEmbed | AstFString | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstUnionInit
+type AstFStringPart = AstFStringText | AstFStringExpr
 
-fun ast_empty(): AstNode {
-    ret new AstNode(new AstEmpty { meta: ast_meta(0) })
+fun ast_error_expr(): AstExpr {
+    ret new AstExpr(new AstLiteral { meta: ast_meta(0), value: "0" })
 }
 
-fun ast_line(node: AstNode): i64 { ret node.meta.line }
+fun ast_error_stmt(): AstStmt {
+    ret new AstStmt(new AstExprStmt { meta: ast_meta(0), expr: ast_error_expr() })
+}
 
-fun ast_resolved_type(node: AstNode): str {
+fun ast_line(node: AstExpr): i64 { ret node.meta.line }
+
+fun ast_resolved_type(node: AstExpr): str {
     if node.meta.resolved_type? {
         ret node.meta.resolved_type
     }
@@ -378,25 +388,7 @@ fun ast_require_resolved_type(meta: AstMeta): str {
     ret meta.resolved_type
 }
 
-fun ast_set_resolved_type(node: AstNode, value: str): void { node.meta.resolved_type = value }
-
-fun ast_expr(node: AstNode): AstNode {
-    match node {
-        AstReturn n: { ret n.expr }
-        AstAssignOp n: { ret n.expr }
-        AstIf n: { ret n.expr }
-        AstLoop n: { ret n.expr }
-        AstPanic n: { ret n.expr }
-        AstMatch n: { ret n.expr }
-        AstMatchCase n: { ret n.expr }
-        AstExprStmt n: { ret n.expr }
-        AstUnary n: { ret n.expr }
-        AstNullCheck n: { ret n.expr }
-        AstUnionInit n: { ret n.expr }
-        _: {}
-    }
-    ret ast_empty()
-}
+fun ast_set_resolved_type(node: AstExpr, value: str): void { node.meta.resolved_type = value }
 
 struct Parser {
     tokens: Token[]
@@ -602,7 +594,7 @@ fun (p: Parser) parse_union_def(): AstUnionDef {
     ret node
 }
 
-fun (p: Parser) parse_program(): AstNode {
+fun (p: Parser) parse_program(): AstProgram {
     let program = new AstProgram { meta: ast_meta(0), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
     p.skip_newlines()
     for p.peek_kind("EXTERN") == 1 || p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("TYPE") == 1 {
@@ -621,12 +613,12 @@ fun (p: Parser) parse_program(): AstNode {
         let t = p.peek()
         parse_error(token_line(t), "Unexpected token at top level")
     }
-    ret new AstNode(program)
+    ret program
 }
 
 fun (p: Parser) parse_block(): AstBlock {
     let open = p.expect("LBRACE")
-    let node = new AstBlock { meta: ast_meta(token_line(open)), stmts: new AstNode[] }
+    let node = new AstBlock { meta: ast_meta(token_line(open)), stmts: new AstStmt[] }
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
         if p.peek_kind("EOF") == 1 {
@@ -682,17 +674,18 @@ fun (p: Parser) is_assignment(): i64 {
     ret 0
 }
 
-fun (p: Parser) parse_return_stmt(): AstNode {
+fun (p: Parser) parse_return_stmt(): AstStmt {
     let tok = p.expect("RETURN")
-    let expr = ast_empty()
     if p.peek_kind("NEWLINE") == 0 && p.peek_kind("RBRACE") == 0 {
-        expr = p.parse_expr()
+        let expr = p.parse_expr()
+        p.expect_stmt_end()
+        ret new AstStmt(new AstReturn { meta: ast_meta(token_line(tok)), expr: expr, has_expr: true })
     }
     p.expect_stmt_end()
-    ret new AstNode(new AstReturn { meta: ast_meta(token_line(tok)), expr: expr })
+    ret new AstStmt(new AstReturn { meta: ast_meta(token_line(tok)), has_expr: false })
 }
 
-fun (p: Parser) parse_let_stmt(): AstNode {
+fun (p: Parser) parse_let_stmt(): AstStmt {
     p.expect("LET")
     let name = p.expect("ID")
     let source_type = type_missing()
@@ -704,17 +697,17 @@ fun (p: Parser) parse_let_stmt(): AstNode {
     }
     let value = p.parse_expr()
     p.expect_stmt_end()
-    ret new AstNode(new AstLet { meta: ast_meta(token_line(name)), name: token_text(name), source_type: source_type, value_expr: value })
+    ret new AstStmt(new AstLet { meta: ast_meta(token_line(name)), name: token_text(name), source_type: source_type, value_expr: value })
 }
 
-fun (p: Parser) parse_assign_stmt(): AstNode {
+fun (p: Parser) parse_assign_stmt(): AstStmt {
     let name = p.expect("ID")
-    let lhs = new AstNode(new AstVar { meta: ast_meta(token_line(name)), name: token_text(name) })
+    let lhs = new AstExpr(new AstVar { meta: ast_meta(token_line(name)), name: token_text(name) })
     let done = 0
     for done == 0 {
         if p.check("DOT") == 1 {
             let field = p.expect("ID")
-            lhs = new AstNode(new AstFieldAccess { meta: ast_meta(token_line(field)), object: lhs, name: token_text(field) })
+            lhs = new AstExpr(new AstFieldAccess { meta: ast_meta(token_line(field)), object: lhs, name: token_text(field) })
         } else {
             if p.check("LBRACKET") == 1 {
                 lhs = p.parse_bracket_postfix(lhs)
@@ -731,25 +724,25 @@ fun (p: Parser) parse_assign_stmt(): AstNode {
     let value = p.parse_expr()
     p.expect_stmt_end()
     if op != "=" {
-        ret new AstNode(new AstAssignOp { meta: ast_meta(token_line(op_token)), expr: lhs, op: op, value_expr: value })
+        ret new AstStmt(new AstAssignOp { meta: ast_meta(token_line(op_token)), expr: lhs, op: op, value_expr: value })
     }
     match lhs {
         AstVar n: {
-            ret new AstNode(new AstAssign { meta: ast_meta(token_line(name)), name: n.name, value_expr: value })
+            ret new AstStmt(new AstAssign { meta: ast_meta(token_line(name)), name: n.name, value_expr: value })
         }
         AstFieldAccess n: {
-            ret new AstNode(new AstFieldSet { meta: ast_meta(token_line(name)), object: n.object, name: n.name, value_expr: value })
+            ret new AstStmt(new AstFieldSet { meta: ast_meta(token_line(name)), object: n.object, name: n.name, value_expr: value })
         }
         AstSubscript n: {
-            ret new AstNode(new AstSubscriptAssign { meta: ast_meta(token_line(name)), base: n.base, index: n.index, value_expr: value })
+            ret new AstStmt(new AstSubscriptAssign { meta: ast_meta(token_line(name)), base: n.base, index: n.index, value_expr: value })
         }
         _: {}
     }
     parse_error(token_line(name), "Invalid assignment target")
-    ret ast_empty()
+    ret ast_error_stmt()
 }
 
-fun (p: Parser) parse_bracket_postfix(base: AstNode): AstNode {
+fun (p: Parser) parse_bracket_postfix(base: AstExpr): AstExpr {
     if p.peek_kind("COLON") == 1 {
         let t = p.peek()
         parse_error(token_line(t), "slice requires explicit start and end")
@@ -760,20 +753,20 @@ fun (p: Parser) parse_bracket_postfix(base: AstNode): AstNode {
             let t = p.peek()
             parse_error(token_line(t), "slice requires explicit start and end")
         }
-        let out = new AstNode(new AstSlice { meta: ast_meta(ast_line(base)), base: base, start: first, end: p.parse_expr() })
+        let out = new AstExpr(new AstSlice { meta: ast_meta(ast_line(base)), base: base, start: first, end: p.parse_expr() })
         p.expect("RBRACKET")
         ret out
     }
-    let out = new AstNode(new AstSubscript { meta: ast_meta(ast_line(base)), base: base, index: first })
+    let out = new AstExpr(new AstSubscript { meta: ast_meta(ast_line(base)), base: base, index: first })
     p.expect("RBRACKET")
     ret out
 }
 
-fun (p: Parser) parse_if_stmt(): AstNode {
+fun (p: Parser) parse_if_stmt(): AstStmt {
     let token = p.expect("IF")
     let expr = p.parse_expr()
     let then_block = p.parse_block()
-    let else_block = new AstBlock { meta: ast_meta(token_line(token)), stmts: new AstNode[] }
+    let else_block = new AstBlock { meta: ast_meta(token_line(token)), stmts: new AstStmt[] }
     let has_else = false
     p.skip_newlines()
     if p.check("ELSE") == 1 {
@@ -785,62 +778,62 @@ fun (p: Parser) parse_if_stmt(): AstNode {
             else_block = p.parse_block()
         }
     }
-    ret new AstNode(new AstIf { meta: ast_meta(token_line(token)), expr: expr, then_block: then_block, else_block: else_block, has_else: has_else })
+    ret new AstStmt(new AstIf { meta: ast_meta(token_line(token)), expr: expr, then_block: then_block, else_block: else_block, has_else: has_else })
 }
 
-fun (p: Parser) parse_break_stmt(): AstNode {
+fun (p: Parser) parse_break_stmt(): AstStmt {
     let t = p.expect("BREAK")
     if p.loop_depth == 0 {
         parse_error(token_line(t), "break outside loop")
     }
     p.expect_stmt_end()
-    ret new AstNode(new AstBreak { meta: ast_meta(token_line(t)) })
+    ret new AstStmt(new AstBreak { meta: ast_meta(token_line(t)) })
 }
 
-fun (p: Parser) parse_continue_stmt(): AstNode {
+fun (p: Parser) parse_continue_stmt(): AstStmt {
     let t = p.expect("CONTINUE")
     if p.loop_depth == 0 {
         parse_error(token_line(t), "continue outside loop")
     }
     p.expect_stmt_end()
-    ret new AstNode(new AstContinue { meta: ast_meta(token_line(t)) })
+    ret new AstStmt(new AstContinue { meta: ast_meta(token_line(t)) })
 }
 
-fun (p: Parser) parse_panic_stmt(): AstNode {
+fun (p: Parser) parse_panic_stmt(): AstStmt {
     let t = p.expect("PANIC")
     if p.peek_kind("NEWLINE") == 1 {
         parse_error(token_line(t), "panic expects message")
     }
     let expr = p.parse_expr()
     p.expect_stmt_end()
-    ret new AstNode(new AstPanic { meta: ast_meta(token_line(t)), expr: expr })
+    ret new AstStmt(new AstPanic { meta: ast_meta(token_line(t)), expr: expr })
 }
 
-fun (p: Parser) parse_match_literal(): AstNode {
+fun (p: Parser) parse_match_literal(): AstExpr {
     let t = p.advance()
     if token_kind(t) == "NUMBER" {
-        ret new AstNode(new AstLiteral { meta: ast_meta(token_line(t)), value: token_text(t) })
+        ret new AstExpr(new AstLiteral { meta: ast_meta(token_line(t)), value: token_text(t) })
     }
     if token_kind(t) == "CHAR" {
-        ret new AstNode(new AstChar { meta: ast_meta(token_line(t)), value: token_text(t) })
+        ret new AstExpr(new AstChar { meta: ast_meta(token_line(t)), value: token_text(t) })
     }
     if token_kind(t) == "STRING" {
-        ret new AstNode(new AstString { meta: ast_meta(token_line(t)), value: token_text(t) })
+        ret new AstExpr(new AstString { meta: ast_meta(token_line(t)), value: token_text(t) })
     }
     if token_kind(t) == "TRUE" {
-        ret new AstNode(new AstBool { meta: ast_meta(token_line(t)), value: "1" })
+        ret new AstExpr(new AstBool { meta: ast_meta(token_line(t)), value: "1" })
     }
     if token_kind(t) == "FALSE" {
-        ret new AstNode(new AstBool { meta: ast_meta(token_line(t)), value: "0" })
+        ret new AstExpr(new AstBool { meta: ast_meta(token_line(t)), value: "0" })
     }
     parse_error(token_line(t), "Expected match literal case")
-    ret ast_empty()
+    ret ast_error_expr()
 }
 
-fun (p: Parser) parse_match_stmt(): AstNode {
+fun (p: Parser) parse_match_stmt(): AstStmt {
     let t = p.expect("MATCH")
     let expr = p.parse_expr()
-    let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstNode[] }, has_else: false }
+    let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstStmt[] }, has_else: false }
     p.expect("LBRACE")
     p.skip_newlines()
     let saw_default = 0
@@ -863,21 +856,21 @@ fun (p: Parser) parse_match_stmt(): AstNode {
             let binding = p.expect("ID")
             p.expect("COLON")
             let body = p.parse_block()
-            node.fields.push(new AstMatchCase { meta: ast_meta(token_line(variant)), variant_name: token_text(variant), binding_name: token_text(binding), expr: ast_empty(), body: body })
+            node.fields.push(new AstMatchCase { meta: ast_meta(token_line(variant)), variant_name: token_text(variant), binding_name: token_text(binding), body: body, has_expr: false })
         } else {
             let first = p.peek()
             let pattern = p.parse_match_literal()
             p.expect("COLON")
             let body = p.parse_block()
-            node.fields.push(new AstMatchCase { meta: ast_meta(token_line(first)), expr: pattern, body: body })
+            node.fields.push(new AstMatchCase { meta: ast_meta(token_line(first)), expr: pattern, body: body, has_expr: true })
         }
         p.skip_newlines()
     }
     p.expect("RBRACE")
-    ret new AstNode(node)
+    ret new AstStmt(node)
 }
 
-fun (p: Parser) parse_for_stmt(): AstNode {
+fun (p: Parser) parse_for_stmt(): AstStmt {
     let token = p.expect("FOR")
     if p.peek_kind("ID") == 1 && p.pos + 1 < len(p.tokens) && token_kind(p.tokens[p.pos + 1]) == "COLON" {
         let name = p.expect("ID")
@@ -888,19 +881,19 @@ fun (p: Parser) parse_for_stmt(): AstNode {
         p.loop_depth += 1
         let body = p.parse_block()
         p.loop_depth -= 1
-        ret new AstNode(new AstForRange { meta: ast_meta(token_line(token)), name: token_text(name), start: start, end: end, body: body })
+        ret new AstStmt(new AstForRange { meta: ast_meta(token_line(token)), name: token_text(name), start: start, end: end, body: body })
     }
     let expr = p.parse_expr()
     p.loop_depth += 1
     let body = p.parse_block()
     p.loop_depth -= 1
-    ret new AstNode(new AstLoop { meta: ast_meta(token_line(token)), expr: expr, body: body })
+    ret new AstStmt(new AstLoop { meta: ast_meta(token_line(token)), expr: expr, body: body })
 }
 
-fun (p: Parser) parse_expr_stmt(): AstNode {
+fun (p: Parser) parse_expr_stmt(): AstStmt {
     let expr = p.parse_expr()
     p.expect_stmt_end()
-    ret new AstNode(new AstExprStmt { meta: ast_meta(ast_line(expr)), expr: expr })
+    ret new AstStmt(new AstExprStmt { meta: ast_meta(ast_line(expr)), expr: expr })
 }
 
 fun is_expr_first(kind: str): i64 {
@@ -1029,7 +1022,7 @@ fun assignment_op_from_kind(kind: str): str {
     ret ""
 }
 
-fun (p: Parser) parse_stmt(): AstNode {
+fun (p: Parser) parse_stmt(): AstStmt {
     let t = p.peek()
     if token_kind(t) == "RETURN" {
         ret p.parse_return_stmt()
@@ -1064,7 +1057,7 @@ fun (p: Parser) parse_stmt(): AstNode {
         ret p.parse_expr_stmt()
     }
     parse_error(token_line(t), "Unexpected token in statement")
-    ret ast_empty()
+    ret ast_error_stmt()
 }
 
 fun op_text(kind: str): str {
@@ -1135,8 +1128,8 @@ fun op_text(kind: str): str {
     ret ""
 }
 
-fun (p: Parser) parse_args(): AstNode[] {
-    let args = new AstNode[]
+fun (p: Parser) parse_args(): AstExpr[] {
+    let args = new AstExpr[]
     if p.peek_kind("RPAREN") == 0 {
         args.push(p.parse_expr())
         for p.check("COMMA") == 1 {
@@ -1146,7 +1139,7 @@ fun (p: Parser) parse_args(): AstNode[] {
     ret args
 }
 
-fun (p: Parser) parse_struct_init(name: Token): AstNode {
+fun (p: Parser) parse_struct_init(name: Token): AstExpr {
     let node = new AstStructInit { meta: ast_meta(token_line(name)), name: token_text(name), fields: new AstInitField[] }
     p.expect("LBRACE")
     p.skip_newlines()
@@ -1167,11 +1160,11 @@ fun (p: Parser) parse_struct_init(name: Token): AstNode {
         }
     }
     p.expect("RBRACE")
-    ret new AstNode(node)
+    ret new AstExpr(node)
 }
 
-fun (p: Parser) parse_array_literal(name: Token): AstNode {
-    let node = new AstArrayLiteral { meta: ast_meta(token_line(name)), elem_type: type_name_expr(token_text(name)), args: new AstNode[] }
+fun (p: Parser) parse_array_literal(name: Token): AstExpr {
+    let node = new AstArrayLiteral { meta: ast_meta(token_line(name)), elem_type: type_name_expr(token_text(name)), args: new AstExpr[] }
     p.expect("LBRACE")
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
@@ -1188,16 +1181,16 @@ fun (p: Parser) parse_array_literal(name: Token): AstNode {
         }
     }
     p.expect("RBRACE")
-    ret new AstNode(node)
+    ret new AstExpr(node)
 }
 
-fun parse_fstring_parts(parts: FStringPart[], line: i64, source_path: str): AstNode[] {
-    let out = new AstNode[]
+fun parse_fstring_parts(parts: FStringPart[], line: i64, source_path: str): AstFStringPart[] {
+    let out = new AstFStringPart[]
     for i: 0:len(parts) {
         match parts[i] {
             FStringTextPart part: {
                 if len(part.text) > 0 {
-                    out.push(new AstNode(new AstFStringText { meta: ast_meta(line), value: part.text }))
+                    out.push(new AstFStringPart(new AstFStringText { meta: ast_meta(line), value: part.text }))
                 }
             }
             FStringExprPart part: {
@@ -1207,14 +1200,14 @@ fun parse_fstring_parts(parts: FStringPart[], line: i64, source_path: str): AstN
                 if p.peek_kind("EOF") == 0 {
                     parse_error(line, "Unexpected token in f-string expression")
                 }
-                out.push(expr)
+                out.push(new AstFStringPart(new AstFStringExpr { meta: ast_meta(line), expr: expr }))
             }
         }
     }
     ret out
 }
 
-fun (p: Parser) parse_postfix(node: AstNode): AstNode {
+fun (p: Parser) parse_postfix(node: AstExpr): AstExpr {
     let current = node
     let done = 0
     for done == 0 {
@@ -1223,14 +1216,14 @@ fun (p: Parser) parse_postfix(node: AstNode): AstNode {
             if p.check("LPAREN") == 1 {
                 let args = p.parse_args()
                 p.expect("RPAREN")
-                current = new AstNode(new AstDotCall { meta: ast_meta(token_line(field)), object: current, name: token_text(field), args: args })
+                current = new AstExpr(new AstDotCall { meta: ast_meta(token_line(field)), object: current, name: token_text(field), args: args })
             } else {
-                current = new AstNode(new AstFieldAccess { meta: ast_meta(token_line(field)), object: current, name: token_text(field) })
+                current = new AstExpr(new AstFieldAccess { meta: ast_meta(token_line(field)), object: current, name: token_text(field) })
             }
         } else if p.check("LBRACKET") == 1 {
             current = p.parse_bracket_postfix(current)
         } else if p.check("QUESTION") == 1 {
-            current = new AstNode(new AstNullCheck { meta: ast_meta(ast_line(current)), expr: current })
+            current = new AstExpr(new AstNullCheck { meta: ast_meta(ast_line(current)), expr: current })
         } else {
             done = 1
         }
@@ -1238,81 +1231,77 @@ fun (p: Parser) parse_postfix(node: AstNode): AstNode {
     ret current
 }
 
-fun (p: Parser) parse_primary(): AstNode {
+fun (p: Parser) parse_primary(): AstExpr {
     if p.peek_kind("NEW") == 1 {
         p.expect("NEW")
         let t = p.expect("ID")
         if p.check("LBRACKET") == 1 {
-            let count = ast_empty()
-            if p.peek_kind("RBRACKET") == 0 {
-                count = p.parse_expr()
-            }
-            p.expect("RBRACKET")
-            match count {
-                AstEmpty n: {
-                    if p.peek_kind("LBRACE") == 1 {
-                        ret p.parse_postfix(p.parse_array_literal(t))
-                    }
+            if p.peek_kind("RBRACKET") == 1 {
+                p.expect("RBRACKET")
+                if p.peek_kind("LBRACE") == 1 {
+                    ret p.parse_postfix(p.parse_array_literal(t))
                 }
-                _: {}
+                ret p.parse_postfix(new AstExpr(new AstNewArray { meta: ast_meta(token_line(t)), elem_type: type_name_expr(token_text(t)), has_count: false }))
             }
-            ret p.parse_postfix(new AstNode(new AstNewArray { meta: ast_meta(token_line(t)), elem_type: type_name_expr(token_text(t)), count: count }))
+            let count = p.parse_expr()
+            p.expect("RBRACKET")
+            ret p.parse_postfix(new AstExpr(new AstNewArray { meta: ast_meta(token_line(t)), elem_type: type_name_expr(token_text(t)), count: count, has_count: true }))
         }
         if p.check("LPAREN") == 1 {
             let expr = p.parse_expr()
             p.expect("RPAREN")
-            ret p.parse_postfix(new AstNode(new AstUnionInit { meta: ast_meta(token_line(t)), type_name: token_text(t), expr: expr }))
+            ret p.parse_postfix(new AstExpr(new AstUnionInit { meta: ast_meta(token_line(t)), type_name: token_text(t), expr: expr }))
         }
         if p.peek_kind("LBRACE") == 1 {
             ret p.parse_postfix(p.parse_struct_init(t))
         }
-        ret p.parse_postfix(new AstNode(new AstStructInit { meta: ast_meta(token_line(t)), name: token_text(t), fields: new AstInitField[] }))
+        ret p.parse_postfix(new AstExpr(new AstStructInit { meta: ast_meta(token_line(t)), name: token_text(t), fields: new AstInitField[] }))
     }
     if p.peek_kind("NUMBER") == 1 {
         let t = p.advance()
-        ret p.parse_postfix(new AstNode(new AstLiteral { meta: ast_meta(token_line(t)), value: token_text(t) }))
+        ret p.parse_postfix(new AstExpr(new AstLiteral { meta: ast_meta(token_line(t)), value: token_text(t) }))
     }
     if p.peek_kind("CHAR") == 1 {
         let t = p.advance()
-        ret p.parse_postfix(new AstNode(new AstChar { meta: ast_meta(token_line(t)), value: token_text(t) }))
+        ret p.parse_postfix(new AstExpr(new AstChar { meta: ast_meta(token_line(t)), value: token_text(t) }))
     }
     if p.peek_kind("EMBED") == 1 {
         let t = p.advance()
         let path = p.expect("STRING")
-        ret p.parse_postfix(new AstNode(new AstEmbed { meta: ast_meta(token_line(t)), path: token_text(path), source_path: p.source_path }))
+        ret p.parse_postfix(new AstExpr(new AstEmbed { meta: ast_meta(token_line(t)), path: token_text(path), source_path: p.source_path }))
     }
     if p.peek_kind("STRING") == 1 {
         let t = p.advance()
-        ret p.parse_postfix(new AstNode(new AstString { meta: ast_meta(token_line(t)), value: token_text(t) }))
+        ret p.parse_postfix(new AstExpr(new AstString { meta: ast_meta(token_line(t)), value: token_text(t) }))
     }
     if p.peek_kind("FSTRING") == 1 {
         let t = p.advance()
         match t {
             FStringToken ft: {
-                ret p.parse_postfix(new AstNode(new AstFString { meta: ast_meta(ft.line), fields: parse_fstring_parts(ft.parts, ft.line, p.source_path) }))
+                ret p.parse_postfix(new AstExpr(new AstFString { meta: ast_meta(ft.line), fields: parse_fstring_parts(ft.parts, ft.line, p.source_path) }))
             }
             PlainToken pt: {
                 parse_error(pt.line, "Expected f-string parts")
             }
         }
-        ret ast_empty()
+        ret ast_error_expr()
     }
     if p.peek_kind("TRUE") == 1 {
         let t = p.advance()
-        ret p.parse_postfix(new AstNode(new AstBool { meta: ast_meta(token_line(t)), value: "1" }))
+        ret p.parse_postfix(new AstExpr(new AstBool { meta: ast_meta(token_line(t)), value: "1" }))
     }
     if p.peek_kind("FALSE") == 1 {
         let t = p.advance()
-        ret p.parse_postfix(new AstNode(new AstBool { meta: ast_meta(token_line(t)), value: "0" }))
+        ret p.parse_postfix(new AstExpr(new AstBool { meta: ast_meta(token_line(t)), value: "0" }))
     }
     if p.peek_kind("ID") == 1 {
         let t = p.advance()
         if p.check("LPAREN") == 1 {
             let args = p.parse_args()
             p.expect("RPAREN")
-            ret p.parse_postfix(new AstNode(new AstCall { meta: ast_meta(token_line(t)), name: token_text(t), args: args }))
+            ret p.parse_postfix(new AstExpr(new AstCall { meta: ast_meta(token_line(t)), name: token_text(t), args: args }))
         }
-        ret p.parse_postfix(new AstNode(new AstVar { meta: ast_meta(token_line(t)), name: token_text(t) }))
+        ret p.parse_postfix(new AstExpr(new AstVar { meta: ast_meta(token_line(t)), name: token_text(t) }))
     }
     if p.check("LPAREN") == 1 {
         let expr = p.parse_expr()
@@ -1321,22 +1310,22 @@ fun (p: Parser) parse_primary(): AstNode {
     }
     let t = p.peek()
     parse_error(token_line(t), "Unexpected token in expression")
-    ret ast_empty()
+    ret ast_error_expr()
 }
 
-fun bin_node(op: str, left: AstNode, right: AstNode, line: i64): AstNode {
-    ret new AstNode(new AstBinary { meta: ast_meta(line), op: op, left: left, right: right })
+fun bin_node(op: str, left: AstExpr, right: AstExpr, line: i64): AstExpr {
+    ret new AstExpr(new AstBinary { meta: ast_meta(line), op: op, left: left, right: right })
 }
 
-fun (p: Parser) parse_unary(): AstNode {
+fun (p: Parser) parse_unary(): AstExpr {
     if p.peek_kind("BANG") == 1 || p.peek_kind("MINUS") == 1 || p.peek_kind("TILDE") == 1 {
         let op = p.advance()
-        ret new AstNode(new AstUnary { meta: ast_meta(token_line(op)), op: op_text(token_kind(op)), expr: p.parse_unary() })
+        ret new AstExpr(new AstUnary { meta: ast_meta(token_line(op)), op: op_text(token_kind(op)), expr: p.parse_unary() })
     }
     ret p.parse_primary()
 }
 
-fun (p: Parser) parse_factor(): AstNode {
+fun (p: Parser) parse_factor(): AstExpr {
     let left = p.parse_unary()
     for p.peek_kind("STAR") == 1 || p.peek_kind("SLASH") == 1 || p.peek_kind("PERCENT") == 1 {
         let op = p.advance()
@@ -1345,7 +1334,7 @@ fun (p: Parser) parse_factor(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_term(): AstNode {
+fun (p: Parser) parse_term(): AstExpr {
     let left = p.parse_factor()
     for p.peek_kind("PLUS") == 1 || p.peek_kind("MINUS") == 1 {
         let op = p.advance()
@@ -1354,7 +1343,7 @@ fun (p: Parser) parse_term(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_shift(): AstNode {
+fun (p: Parser) parse_shift(): AstExpr {
     let left = p.parse_term()
     for p.peek_kind("SHL") == 1 || p.peek_kind("SHR") == 1 {
         let op = p.advance()
@@ -1363,7 +1352,7 @@ fun (p: Parser) parse_shift(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_comparison(): AstNode {
+fun (p: Parser) parse_comparison(): AstExpr {
     let left = p.parse_shift()
     for p.peek_kind("LT") == 1 || p.peek_kind("GT") == 1 || p.peek_kind("LTE") == 1 || p.peek_kind("GTE") == 1 {
         let op = p.advance()
@@ -1372,7 +1361,7 @@ fun (p: Parser) parse_comparison(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_equality(): AstNode {
+fun (p: Parser) parse_equality(): AstExpr {
     let left = p.parse_comparison()
     for p.peek_kind("EQEQ") == 1 || p.peek_kind("NEQ") == 1 {
         let op = p.advance()
@@ -1381,7 +1370,7 @@ fun (p: Parser) parse_equality(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_bit_and(): AstNode {
+fun (p: Parser) parse_bit_and(): AstExpr {
     let left = p.parse_equality()
     for p.peek_kind("AMPERSAND") == 1 {
         let op = p.advance()
@@ -1390,7 +1379,7 @@ fun (p: Parser) parse_bit_and(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_bit_xor(): AstNode {
+fun (p: Parser) parse_bit_xor(): AstExpr {
     let left = p.parse_bit_and()
     for p.peek_kind("CARET") == 1 {
         let op = p.advance()
@@ -1399,7 +1388,7 @@ fun (p: Parser) parse_bit_xor(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_bit_or(): AstNode {
+fun (p: Parser) parse_bit_or(): AstExpr {
     let left = p.parse_bit_xor()
     for p.peek_kind("PIPE") == 1 {
         let op = p.advance()
@@ -1408,7 +1397,7 @@ fun (p: Parser) parse_bit_or(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_logic_and(): AstNode {
+fun (p: Parser) parse_logic_and(): AstExpr {
     let left = p.parse_bit_or()
     for p.peek_kind("AND") == 1 {
         let op = p.advance()
@@ -1417,7 +1406,7 @@ fun (p: Parser) parse_logic_and(): AstNode {
     ret left
 }
 
-fun (p: Parser) parse_expr(): AstNode {
+fun (p: Parser) parse_expr(): AstExpr {
     let left = p.parse_logic_and()
     for p.peek_kind("OR") == 1 {
         let op = p.advance()
@@ -1433,13 +1422,6 @@ fun indent(n: i64): i64 {
     ret 0
 }
 
-fun dump_list(nodes: AstNode[], depth: i64): i64 {
-    for i: 0:len(nodes) {
-        dump_node(nodes[i], depth)
-    }
-    ret 0
-}
-
 fun dump_print_type(t: str): void {
     if t != "" {
         print(" : ")
@@ -1447,15 +1429,15 @@ fun dump_print_type(t: str): void {
     }
 }
 
-fun dump_node_line(node: AstNode, depth: i64, kind: str, name: str, source_type: str, is_decl: bool, op: str, value: str, print_empty_value: bool): void {
+fun dump_node_line(meta: AstMeta, depth: i64, kind: str, name: str, source_type: str, is_decl: bool, op: str, value: str, print_empty_value: bool): void {
     indent(depth)
     print(kind)
     if name != "" {
         print(f" {name}")
     }
     let displayed_type = source_type
-    if is_decl && ast_resolved_type(node) != "" {
-        displayed_type = ast_resolved_type(node)
+    if is_decl && meta.resolved_type? {
+        displayed_type = meta.resolved_type
     }
     dump_print_type(displayed_type)
     if op != "" {
@@ -1465,291 +1447,215 @@ fun dump_node_line(node: AstNode, depth: i64, kind: str, name: str, source_type:
         print(f" {value}")
     }
     if is_decl == false {
-        dump_print_type(ast_resolved_type(node))
+        if meta.resolved_type? {
+            dump_print_type(meta.resolved_type)
+        }
     }
     println("")
 }
 
-fun dump_node(node: AstNode, depth: i64): i64 {
+fun dump_expr_list(nodes: AstExpr[], depth: i64): void {
+    for i: 0:len(nodes) { dump_expr(nodes[i], depth) }
+}
+
+fun dump_stmt_list(nodes: AstStmt[], depth: i64): void {
+    for i: 0:len(nodes) { dump_stmt(nodes[i], depth) }
+}
+
+fun dump_block(node: AstBlock, depth: i64): void {
+    indent(depth)
+    println("Block")
+    dump_stmt_list(node.stmts, depth + 1)
+}
+
+fun dump_match_case(node: AstMatchCase, depth: i64): void {
+    indent(depth)
+    if node.variant_name? {
+        print("MatchCase ")
+        print(node.variant_name)
+        print(" ")
+        println(node.binding_name)
+    } else {
+        println("MatchCase")
+        dump_expr(node.expr, depth + 1)
+    }
+    dump_block(node.body, depth + 1)
+}
+
+fun dump_expr(node: AstExpr, depth: i64): void {
     match node {
-        AstEmpty n: { ret 0 }
-        AstProgram n: {
-            indent(depth)
-            println("Program")
-            for i: 0:len(n.structs) {
-                dump_node(new AstNode(n.structs[i]), depth + 1)
-            }
-            for i: 0:len(n.unions) {
-                dump_node(new AstNode(n.unions[i]), depth + 1)
-            }
-            for i: 0:len(n.externs) {
-                dump_node(new AstNode(n.externs[i]), depth + 1)
-            }
-            for i: 0:len(n.funcs) {
-                dump_node(new AstNode(n.funcs[i]), depth + 1)
-            }
-            ret 0
-        }
-        AstMatch n: {
-            indent(depth)
-            println("Match")
-            dump_node(n.expr, depth + 1)
-            for i: 0:len(n.fields) {
-                dump_node(new AstNode(n.fields[i]), depth + 1)
-            }
-            if n.has_else {
-                indent(depth + 1)
-                println("MatchCase _")
-                dump_node(new AstNode(n.else_block), depth + 2)
-            }
-            ret 0
-        }
-        AstMatchCase n: {
-            indent(depth)
-            if n.variant_name? {
-                print("MatchCase ")
-                print(n.variant_name)
-                print(" ")
-                println(n.binding_name)
-            } else {
-                println("MatchCase")
-                dump_node(n.expr, depth + 1)
-            }
-            dump_node(new AstNode(n.body), depth + 1)
-            ret 0
-        }
-        AstUnionDef n: {
-            indent(depth)
-            print("UnionDef ")
-            println(n.name)
-            for i: 0:len(n.members) {
-                indent(depth + 1)
-                print("UnionMember ")
-                println(n.members[i])
-            }
-            ret 0
-        }
         AstUnionInit n: {
-            dump_node_line(node, depth, "UnionInit", n.type_name, "", false, "", "", false)
-            dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstExternDef n: {
-            dump_node_line(node, depth, "ExternDef", n.name, type_expr_text(n.source_type), true, "", "", false)
-            for i: 0:len(n.params) {
-                dump_node(new AstNode(n.params[i]), depth + 1)
-            }
-            ret 0
-        }
-        AstFunDef n: {
-            if n.method_name? {
-                dump_node_line(node, depth, "Method", ((n.receiver_type + ".") + n.method_name), type_expr_text(n.source_type), true, "", "", false)
-            } else {
-                dump_node_line(node, depth, "FunDef", n.name, type_expr_text(n.source_type), true, "", "", false)
-            }
-            for i: 0:len(n.params) {
-                dump_node(new AstNode(n.params[i]), depth + 1)
-            }
-            dump_node(new AstNode(n.body), depth + 1)
-            ret 0
-        }
-        AstStructDef n: {
-            dump_node_line(node, depth, "StructDef", n.name, "", false, "", "", false)
-            for i: 0:len(n.fields) {
-                dump_node(new AstNode(n.fields[i]), depth + 1)
-            }
-            ret 0
-        }
-        AstParam n: {
-            dump_node_line(node, depth, "Param", n.name, type_expr_text(n.source_type), true, "", "", false)
-            ret 0
-        }
-        AstStructField n: {
-            dump_node_line(node, depth, "StructField", n.name, type_expr_text(n.source_type), true, "", "", false)
-            ret 0
-        }
-        AstBlock n: {
-            indent(depth)
-            println("Block")
-            dump_list(n.stmts, depth + 1)
-            ret 0
-        }
-        AstLet n: {
-            dump_node_line(node, depth, "Let", n.name, type_expr_text(n.source_type), true, "", "", false)
-            dump_node(n.value_expr, depth + 1)
-            ret 0
-        }
-        AstReturn n: {
-            dump_node_line(node, depth, "Return", "", "", false, "", "", false)
-            dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstAssign n: {
-            dump_node_line(node, depth, "Assign", n.name, "", false, "", "", false)
-            dump_node(n.value_expr, depth + 1)
-            ret 0
-        }
-        AstAssignOp n: {
-            dump_node_line(node, depth, "AssignOp", "", "", false, n.op, "", false)
-            dump_node(n.expr, depth + 1)
-            dump_node(n.value_expr, depth + 1)
-            ret 0
-        }
-        AstFieldSet n: {
-            dump_node_line(node, depth, "FieldSet", n.name, "", false, "", "", false)
-            dump_node(n.value_expr, depth + 1)
-            dump_node(n.object, depth + 1)
-            ret 0
-        }
-        AstSubscriptAssign n: {
-            dump_node_line(node, depth, "SubscriptAssign", "", "", false, "", "", false)
-            dump_node(n.value_expr, depth + 1)
-            dump_node(n.base, depth + 1)
-            dump_node(n.index, depth + 1)
-            ret 0
-        }
-        AstIf n: {
-            dump_node_line(node, depth, "If", "", "", false, "", "", false)
-            dump_node(new AstNode(n.then_block), depth + 1)
-            if n.has_else {
-                dump_node(new AstNode(n.else_block), depth + 1)
-            }
-            dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstLoop n: {
-            dump_node_line(node, depth, "Loop", "", "", false, "", "", false)
-            dump_node(new AstNode(n.body), depth + 1)
-            dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstForRange n: {
-            dump_node_line(node, depth, "ForRange", n.name, "", false, "", "", false)
-            dump_node(new AstNode(n.body), depth + 1)
-            dump_node(n.start, depth + 1)
-            dump_node(n.end, depth + 1)
-            ret 0
-        }
-        AstBreak n: {
-            dump_node_line(node, depth, "Break", "", "", false, "", "", false)
-            ret 0
-        }
-        AstContinue n: {
-            dump_node_line(node, depth, "Continue", "", "", false, "", "", false)
-            ret 0
-        }
-        AstPanic n: {
-            dump_node_line(node, depth, "Panic", "", "", false, "", "", false)
-            dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstExprStmt n: {
-            dump_node_line(node, depth, "ExprStmt", "", "", false, "", "", false)
-            dump_node(n.expr, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "UnionInit", n.type_name, "", false, "", "", false)
+            dump_expr(n.expr, depth + 1)
         }
         AstLiteral n: {
-            dump_node_line(node, depth, "Literal", "", "", false, "", n.value, false)
-            ret 0
+            dump_node_line(n.meta, depth, "Literal", "", "", false, "", n.value, false)
         }
         AstChar n: {
-            dump_node_line(node, depth, "Char", "", "", false, "", n.value, false)
-            ret 0
+            dump_node_line(n.meta, depth, "Char", "", "", false, "", n.value, false)
         }
         AstBool n: {
-            dump_node_line(node, depth, "Bool", "", "", false, "", n.value, false)
-            ret 0
+            dump_node_line(n.meta, depth, "Bool", "", "", false, "", n.value, false)
         }
         AstString n: {
-            dump_node_line(node, depth, "String", "", "", false, "", n.value, true)
-            ret 0
+            dump_node_line(n.meta, depth, "String", "", "", false, "", n.value, true)
         }
         AstEmbed n: {
-            dump_node_line(node, depth, "Embed", "", "", false, "", n.path, false)
-            ret 0
+            dump_node_line(n.meta, depth, "Embed", "", "", false, "", n.path, false)
         }
         AstFString n: {
-            dump_node_line(node, depth, "FString", "", "", false, "", "", false)
-            dump_list(n.fields, depth + 1)
-            ret 0
-        }
-        AstFStringText n: {
-            dump_node_line(node, depth, "FStringText", "", "", false, "", n.value, false)
-            ret 0
+            dump_node_line(n.meta, depth, "FString", "", "", false, "", "", false)
+            for i: 0:len(n.fields) {
+                match n.fields[i] {
+                    AstFStringText part: { dump_node_line(part.meta, depth + 1, "FStringText", "", "", false, "", part.value, false) }
+                    AstFStringExpr part: { dump_expr(part.expr, depth + 1) }
+                }
+            }
         }
         AstVar n: {
-            dump_node_line(node, depth, "Var", n.name, "", false, "", "", false)
-            ret 0
+            dump_node_line(n.meta, depth, "Var", n.name, "", false, "", "", false)
         }
         AstBinary n: {
-            dump_node_line(node, depth, "Binary", "", "", false, n.op, "", false)
-            dump_node(n.left, depth + 1)
-            dump_node(n.right, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "Binary", "", "", false, n.op, "", false)
+            dump_expr(n.left, depth + 1)
+            dump_expr(n.right, depth + 1)
         }
         AstUnary n: {
-            dump_node_line(node, depth, "Unary", "", "", false, n.op, "", false)
-            dump_node(n.expr, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "Unary", "", "", false, n.op, "", false)
+            dump_expr(n.expr, depth + 1)
         }
         AstCall n: {
-            dump_node_line(node, depth, "Call", n.name, "", false, "", "", false)
-            dump_list(n.args, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "Call", n.name, "", false, "", "", false)
+            dump_expr_list(n.args, depth + 1)
         }
         AstDotCall n: {
-            dump_node_line(node, depth, "DotCall", n.name, "", false, "", "", false)
-            dump_node(n.object, depth + 1)
-            dump_list(n.args, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "DotCall", n.name, "", false, "", "", false)
+            dump_expr(n.object, depth + 1)
+            dump_expr_list(n.args, depth + 1)
         }
         AstFieldAccess n: {
-            dump_node_line(node, depth, "FieldAccess", n.name, "", false, "", "", false)
-            dump_node(n.object, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "FieldAccess", n.name, "", false, "", "", false)
+            dump_expr(n.object, depth + 1)
         }
         AstNullCheck n: {
-            dump_node_line(node, depth, "NullCheck", "", "", false, "", "", false)
-            dump_node(n.expr, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "NullCheck", "", "", false, "", "", false)
+            dump_expr(n.expr, depth + 1)
         }
         AstSubscript n: {
-            dump_node_line(node, depth, "Subscript", "", "", false, "", "", false)
-            dump_node(n.base, depth + 1)
-            dump_node(n.index, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "Subscript", "", "", false, "", "", false)
+            dump_expr(n.base, depth + 1)
+            dump_expr(n.index, depth + 1)
         }
         AstSlice n: {
-            dump_node_line(node, depth, "Slice", "", "", false, "", "", false)
-            dump_node(n.base, depth + 1)
-            dump_node(n.start, depth + 1)
-            dump_node(n.end, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "Slice", "", "", false, "", "", false)
+            dump_expr(n.base, depth + 1)
+            dump_expr(n.start, depth + 1)
+            dump_expr(n.end, depth + 1)
         }
         AstNewArray n: {
-            dump_node_line(node, depth, "NewArray", "", type_expr_text(n.elem_type), false, "", "", false)
-            dump_node(n.count, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "NewArray", "", type_expr_text(n.elem_type), false, "", "", false)
+            if n.has_count { dump_expr(n.count, depth + 1) }
         }
         AstArrayLiteral n: {
-            dump_node_line(node, depth, "ArrayLiteral", "", type_expr_text(n.elem_type), false, "", "", false)
-            dump_list(n.args, depth + 1)
-            ret 0
+            dump_node_line(n.meta, depth, "ArrayLiteral", "", type_expr_text(n.elem_type), false, "", "", false)
+            dump_expr_list(n.args, depth + 1)
         }
         AstStructInit n: {
-            dump_node_line(node, depth, "StructInit", n.name, "", false, "", "", false)
+            dump_node_line(n.meta, depth, "StructInit", n.name, "", false, "", "", false)
             for i: 0:len(n.fields) {
-                dump_node(new AstNode(n.fields[i]), depth + 1)
+                let field = n.fields[i]
+                dump_node_line(field.meta, depth + 1, "InitField", field.name, "", false, "", "", false)
+                dump_expr(field.value_expr, depth + 2)
             }
-            ret 0
-        }
-        AstInitField n: {
-            dump_node_line(node, depth, "InitField", n.name, "", false, "", "", false)
-            dump_node(n.value_expr, depth + 1)
-            ret 0
         }
     }
-    ret 0
+}
+
+fun dump_stmt(node: AstStmt, depth: i64): void {
+    match node {
+        AstLet n: { dump_node_line(n.meta, depth, "Let", n.name, type_expr_text(n.source_type), true, "", "", false)
+            dump_expr(n.value_expr, depth + 1) }
+        AstReturn n: { dump_node_line(n.meta, depth, "Return", "", "", false, "", "", false)
+            if n.has_expr { dump_expr(n.expr, depth + 1) } }
+        AstAssign n: { dump_node_line(n.meta, depth, "Assign", n.name, "", false, "", "", false)
+            dump_expr(n.value_expr, depth + 1) }
+        AstAssignOp n: { dump_node_line(n.meta, depth, "AssignOp", "", "", false, n.op, "", false)
+            dump_expr(n.expr, depth + 1)
+            dump_expr(n.value_expr, depth + 1) }
+        AstFieldSet n: { dump_node_line(n.meta, depth, "FieldSet", n.name, "", false, "", "", false)
+            dump_expr(n.value_expr, depth + 1)
+            dump_expr(n.object, depth + 1) }
+        AstSubscriptAssign n: { dump_node_line(n.meta, depth, "SubscriptAssign", "", "", false, "", "", false)
+            dump_expr(n.value_expr, depth + 1)
+            dump_expr(n.base, depth + 1)
+            dump_expr(n.index, depth + 1) }
+        AstIf n: { dump_node_line(n.meta, depth, "If", "", "", false, "", "", false)
+            dump_block(n.then_block, depth + 1)
+            if n.has_else { dump_block(n.else_block, depth + 1) }
+            dump_expr(n.expr, depth + 1) }
+        AstLoop n: { dump_node_line(n.meta, depth, "Loop", "", "", false, "", "", false)
+            dump_block(n.body, depth + 1)
+            dump_expr(n.expr, depth + 1) }
+        AstForRange n: { dump_node_line(n.meta, depth, "ForRange", n.name, "", false, "", "", false)
+            dump_block(n.body, depth + 1)
+            dump_expr(n.start, depth + 1)
+            dump_expr(n.end, depth + 1) }
+        AstBreak n: { dump_node_line(n.meta, depth, "Break", "", "", false, "", "", false) }
+        AstContinue n: { dump_node_line(n.meta, depth, "Continue", "", "", false, "", "", false) }
+        AstPanic n: { dump_node_line(n.meta, depth, "Panic", "", "", false, "", "", false)
+            dump_expr(n.expr, depth + 1) }
+        AstMatch n: { indent(depth)
+            println("Match")
+            dump_expr(n.expr, depth + 1)
+            for i: 0:len(n.fields) { dump_match_case(n.fields[i], depth + 1) }
+            if n.has_else { indent(depth + 1)
+                println("MatchCase _")
+                dump_block(n.else_block, depth + 2) } }
+        AstExprStmt n: { dump_node_line(n.meta, depth, "ExprStmt", "", "", false, "", "", false)
+            dump_expr(n.expr, depth + 1) }
+    }
+}
+
+fun dump_program(node: AstProgram, depth: i64): void {
+    indent(depth)
+    println("Program")
+    for i: 0:len(node.structs) {
+        let def = node.structs[i]
+        dump_node_line(def.meta, depth + 1, "StructDef", def.name, "", false, "", "", false)
+        for j: 0:len(def.fields) {
+            let field = def.fields[j]
+            dump_node_line(field.meta, depth + 2, "StructField", field.name, type_expr_text(field.source_type), true, "", "", false)
+        }
+    }
+    for i: 0:len(node.unions) {
+        let def = node.unions[i]
+        indent(depth + 1)
+        print("UnionDef ")
+        println(def.name)
+        for j: 0:len(def.members) {
+            indent(depth + 2)
+            print("UnionMember ")
+            println(def.members[j])
+        }
+    }
+    for i: 0:len(node.externs) {
+        let def = node.externs[i]
+        dump_node_line(def.meta, depth + 1, "ExternDef", def.name, type_expr_text(def.source_type), true, "", "", false)
+        for j: 0:len(def.params) {
+            let param = def.params[j]
+            dump_node_line(param.meta, depth + 2, "Param", param.name, type_expr_text(param.source_type), true, "", "", false)
+        }
+    }
+    for i: 0:len(node.funcs) {
+        let def = node.funcs[i]
+        if def.method_name? { dump_node_line(def.meta, depth + 1, "Method", ((def.receiver_type + ".") + def.method_name), type_expr_text(def.source_type), true, "", "", false) }
+        else { dump_node_line(def.meta, depth + 1, "FunDef", def.name, type_expr_text(def.source_type), true, "", "", false) }
+        for j: 0:len(def.params) {
+            let param = def.params[j]
+            dump_node_line(param.meta, depth + 2, "Param", param.name, type_expr_text(param.source_type), true, "", "", false)
+        }
+        dump_block(def.body, depth + 2)
+    }
 }
 
 fun main(): void {
@@ -1760,6 +1666,6 @@ fun main(): void {
     let tokens = lex(src)
     let p = make_parser_at(tokens, argv[1])
     let ast = p.parse_program()
-    dump_node(ast, 0)
+    dump_program(ast, 0)
     ret
 }

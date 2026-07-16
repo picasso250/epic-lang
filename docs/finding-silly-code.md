@@ -12,7 +12,7 @@ The goal is not to chase every large function. The goal is to find code where th
 - the implementation loses that knowledge across an expression, helper boundary, container, or projection;
 - the generated MIR reconstructs the same fact with repeated tags, strings, branches, or field dispatch.
 
-In this project, the strongest examples appeared after dogfooding the full AST as an ADT. Many AST values were semantically known to be `AstCall`, `AstFunDef`, `AstMatchCase`, and so on, but the code kept treating them as `AstNode` and paid for large union projections.
+In this project, the strongest examples appeared after dogfooding the full AST as one ADT. Many AST values were semantically known to be expressions, statements, definitions, or helper records, but the code kept treating them as one `AstNode` and paid for large union projections. The current model keeps only `AstExpr` and `AstStmt` as general AST families; program structure and child records use concrete types.
 
 The key question is:
 
@@ -94,8 +94,8 @@ Likely silly work:
 
 - many blocks that all load the same field at the same offset;
 - repeated `ast_kind()` checks in code that could use `match`;
-- helper functions taking `AstNode` after the caller already matched a concrete variant;
-- arrays typed as `AstNode[]` even though a specific accessor returns only one variant kind;
+- helper functions taking `AstExpr` or `AstStmt` after the caller already matched a concrete variant;
+- arrays typed as a broad union even though every element belongs to one concrete child type;
 - common direct fields in all ADT variants still using tag dispatch;
 - guarded field access that redoes the guard's work.
 
@@ -147,7 +147,7 @@ match expr {
     _: {}
 }
 
-fun sema_call_type(st: SemaState, node: AstNode): str {
+fun sema_call_type(st: SemaState, node: AstExpr): str {
     if node.name == "print" { ... }
     ...
 }
@@ -169,7 +169,7 @@ fun sema_call_type(st: SemaState, node: AstCall): str {
 }
 ```
 
-The caller already proved `AstCall`. Passing the original `AstNode` throws that proof away and makes the callee rediscover it through union field projection.
+The caller already proved `AstCall`. Passing the original `AstExpr` throws that proof away and makes the callee rediscover it through union field projection.
 
 This also applies to MIR helpers:
 
@@ -178,7 +178,7 @@ fun mir_emit_struct_init(st: MirCodegenState, block: MirBlock, expr: AstStructIn
 fun mir_emit_match(st: MirCodegenState, block: MirBlock, stmt: AstMatch): MirBlockFlow
 ```
 
-## Pattern 3: homogeneous `AstNode[]` without element narrowing
+## Pattern 3: broad AST arrays without element narrowing
 
 Some lists are truly heterogeneous, for example call arguments or block statements. Other lists are semantically homogeneous and should be represented with the narrowest element type practical.
 
@@ -194,7 +194,7 @@ The core AST buckets and homogeneous child lists are narrow:
 - function, loop, and match-case bodies are `AstBlock`.
 - `if.then_block` is `AstBlock`.
 
-Keep `AstNode[]` for truly heterogeneous lists, such as block statements, call arguments, array literal expressions, and f-string parts. Keep `AstNode` for optional block slots such as `else_block` until there is a dedicated optional-block representation.
+Use `AstStmt[]` for block statement streams and `AstExpr[]` for call arguments and array literal elements. F-string parts have their own `AstFStringPart[]` because text fragments are not expressions. Optional children use an explicit presence flag beside their precise field type; the old `AstEmpty` sentinel has been removed.
 
 Bad shape:
 
@@ -217,7 +217,7 @@ node.fields.push(field)
 
 Once the parser knows a child has a concrete type, keep that type until the value actually crosses into a heterogeneous AST position. Downstream code should trust concrete container element types instead of re-matching every element.
 
-The same rule applies to AST construction: use a direct struct literal and supply every semantically required field immediately. Wrap with `new AstNode(payload)` only at heterogeneous boundaries such as block statements, expression operands, and call arguments. Reuse alone is not enough to justify a placeholder builder; keep a helper only when it encodes a real semantic abstraction or sentinel. In the current parser, `ast_empty()` remains because it denotes an explicit optional AST slot, while the `ast_new_*` default block/param/literal builders were removed.
+The same rule applies to AST construction: use a direct struct literal and supply every semantically required field immediately. Wrap statements with `AstStmt` only when they enter a statement stream, and expressions with `AstExpr` only when they enter an expression position. Reuse alone is not enough to justify a placeholder builder; keep a helper only when it encodes a real semantic abstraction.
 
 ## Pattern 4: uniform union projection still using tag dispatch
 

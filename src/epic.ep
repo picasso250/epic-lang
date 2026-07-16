@@ -22,40 +22,35 @@ fun epic_timing(verbose: bool, label: str, start: i64, stop: i64): void {
     }
 }
 
-fun epic_parse_text(path: str, src: str): AstNode {
+fun epic_parse_text(path: str, src: str): AstProgram {
     let tokens = lex(src)
     let p = make_parser_at(tokens, path)
     ret p.parse_program()
 }
 
-fun epic_parse_file(path: str): AstNode {
+fun epic_parse_file(path: str): AstProgram {
     ret epic_parse_text(path, str(read_file(cstr_ready_path(path))))
 }
 
-fun epic_merge_ast(merged: AstProgram, parsed: AstNode, is_main: bool): bool {
+fun epic_merge_ast(merged: AstProgram, parsed: AstProgram, is_main: bool): bool {
     let found_main = false
-    match parsed {
-        AstProgram ast: {
-            merged.externs.extend(ast.externs)
-            merged.structs.extend(ast.structs)
-            merged.unions.extend(ast.unions)
-            for fi: 0:len(ast.funcs) {
-                if ast.funcs[fi].name == "main" {
-                    if is_main {
-                        merged.funcs.push(ast.funcs[fi])
-                        found_main = true
-                    }
-                } else {
-                    merged.funcs.push(ast.funcs[fi])
-                }
+    merged.externs.extend(parsed.externs)
+    merged.structs.extend(parsed.structs)
+    merged.unions.extend(parsed.unions)
+    for fi: 0:len(parsed.funcs) {
+        if parsed.funcs[fi].name == "main" {
+            if is_main {
+                merged.funcs.push(parsed.funcs[fi])
+                found_main = true
             }
+        } else {
+            merged.funcs.push(parsed.funcs[fi])
         }
-        _: { epic_die("internal: expected parsed program") }
     }
     ret found_main
 }
 
-fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
+fun epic_merge_program(input_paths: str[], main_path: str): AstProgram {
     let merged = new AstProgram { meta: ast_meta(0), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
     epic_merge_ast(merged, epic_parse_text("runtime/array.ep", runtime_array_source()), false)
     epic_merge_ast(merged, epic_parse_text("runtime/panic.ep", runtime_panic_source()), false)
@@ -70,7 +65,7 @@ fun epic_merge_program(input_paths: str[], main_path: str): AstNode {
     if !found_main {
         epic_die(("main file has no main function: " + main_path))
     }
-    ret new AstNode(merged)
+    ret merged
 }
 
 fun epic_push_bytes_i64(out: i64[], bs: u8[]): void {
