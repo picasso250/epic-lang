@@ -185,10 +185,6 @@ def build_with_epic(compiler, output_path, label):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--seed",
-        help="build the current compiler from this existing Epic compiler instead of Python",
-    )
-    parser.add_argument(
         "-o",
         "--output",
         help="write the converged compiler to this path after verification",
@@ -211,41 +207,20 @@ def main():
         remove_tree_with_retry(BOOT_DIR)
     os.makedirs(BOOT_DIR, exist_ok=True)
 
-    if args.seed:
-        seed = os.path.abspath(args.seed)
-        if not os.path.isfile(seed):
-            raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
+    epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
+    epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
 
-        generation1 = os.path.join(BOOT_DIR, "epic-seed-1.exe")
-        generation2 = os.path.join(BOOT_DIR, "epic-seed-2.exe")
+    build_with_python(epic_py)
+    build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
 
-        build_with_epic(seed, generation1, "seed -> epic-seed-1")
-        build_with_epic(generation1, generation2, "epic-seed-1 -> epic-seed-2")
-
-        checks = [(generation1, generation2)]
-        converged = generation2
-    else:
-        epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
-        epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
-
-        build_with_python(epic_py)
-        build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
-
-        checks = [(epic_py, epic_epic)]
-        converged = epic_epic
-
-    for left, right in checks:
-        if not filecmp.cmp(left, right, shallow=False):
-            raise RuntimeError(
-                "bootstrap output is not byte-identical: "
-                + os.path.basename(left)
-                + " != "
-                + os.path.basename(right)
-            )
+    if not filecmp.cmp(epic_py, epic_epic, shallow=False):
+        raise RuntimeError(
+            "bootstrap output is not byte-identical: epic-py.exe != epic-epic.exe"
+        )
 
     print("bootstrap fixed point reached")
     if args.output:
-        write_output(converged, args.output)
+        write_output(epic_epic, args.output)
     return 0
 
 
