@@ -88,13 +88,13 @@ python build_epic_v0.py
 产物：
 
 ```text
-build/bootstrap-v0/epic-v0.exe
+build/bootstrap-v0/epic-v0-<full-commit-hash>.exe
 ```
 
-后续编译器、GC 或后端开发可以用该 v0 compiler 作为稳定 seed，并检查当前源码能否再次收敛：
+文件名使用完整 v0 commit hash；同一 revision 的产物可安全复用，v0 前进后会自然生成新的缓存文件。后续编译器、GC 或后端开发通常直接运行：
 
 ```powershell
-python bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
+python bootstrap_fixed_point.py
 ```
 
 `v0` 是可演进的 bootstrap 分支。它的 Python `bootstrap/` 与 Epic `src/` 必须保持语言语义一致；当前两边都支持 `embed "path"`，并让 `>>` / `>>=` 对有符号整数生成算术右移、对无符号整数生成逻辑右移。`>>>` / `>>>=` 不属于语言。

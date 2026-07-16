@@ -60,8 +60,8 @@ def build(ref: str, output_dir: Path) -> None:
     revision = git_revision(ref)
     output_dir = output_dir if output_dir.is_absolute() else ROOT / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    staged = output_dir / "epic-v0.exe.staged"
-    final = output_dir / "epic-v0.exe"
+    final = output_dir / f"epic-v0-{revision}.exe"
+    staged = output_dir / f"{final.name}.staged"
     staged.unlink(missing_ok=True)
 
     print(f"reproducing {ref} at {revision}", flush=True)

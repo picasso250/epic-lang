@@ -62,7 +62,7 @@ src/epic.ep
 
 `v0` 是可演进的 bootstrap 分支，只实现构建当前 `dev` 所需的最小源码语义，不作为当前公开 ABI 的第二份实现。它支持只读 `s[i]` 以编译新 frontend，但保留旧 `str`/slice bootstrap 布局。`>>` / `>>=` 按左值 signedness 选择 `sar` / `shr`，所有 shift count 都必须是 `i64`；当前 `dev` 对裸整数字面量由 sema 按左侧位宽静态检查，非字面量由 MIR lowering 生成运行时检查，`v0` 为保持 bootstrap 简单，对所有 count 一律生成运行时检查。`>>>` / `>>>=` 已删除，`embed "path"` 按包含源文件解析并嵌入原始字节。
 
-`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，并运行该 revision 自己的 fixed-point 构建。当前 seed 本身已嵌入其 runtime 资源，不依赖调用目录中的 `runtime/`。
+`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，并运行该 revision 自己的 fixed-point 构建。产物名为 `epic-v0-<full-commit-hash>.exe`；commit hash 是不可变缓存键，v0 前进时不会误用旧 seed。当前 seed 本身已嵌入其 runtime 资源，不依赖调用目录中的 `runtime/`。
 
 ## 验收检查 (Acceptance)
 
@@ -76,7 +76,7 @@ python bootstrap_fixed_point.py
 
 `tests/run.py` 使用当前 self-hosted compiler 运行模块级意图测试和 e2e；`tests/examples/run.py` 验证正向用户示例；`bootstrap_fixed_point.py` 从 `v0` 分支 seed 验证当前编译器的不动点。
 
-`build_epic_v0.py` 导出 `build/bootstrap-v0/epic-v0.exe`。`bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时自动使用或重建 `v0` 分支 seed。
+`build_epic_v0.py` 导出 `build/bootstrap-v0/epic-v0-<full-commit-hash>.exe`。`bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时解析当前 v0 commit，自动复用或构建该 hash 对应的 seed。
 
 Self-hosted `epic.exe` 从自身 `.rdata` 中的只读 inline string object 读取 `src/runtime_bundle.ep` 声明的 MIR bundles。当前工作目录无需包含 `runtime/`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
 

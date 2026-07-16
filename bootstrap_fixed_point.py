@@ -18,7 +18,7 @@ def rel(path):
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
-DEFAULT_SEED = os.path.join(BUILD_DIR, "bootstrap-v0", "epic-v0.exe")
+V0_SEED_DIR = os.path.join(BUILD_DIR, "bootstrap-v0")
 COMPILER_SOURCES = [
     str(path.relative_to(SCRIPT_DIR))
     for path in sorted((Path(SCRIPT_DIR) / "src").glob("*.ep"))
@@ -208,7 +208,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--seed",
-        help="existing Epic seed compiler (default: frozen build/bootstrap-v0/epic-v0.exe)",
+        help="existing Epic seed compiler (default: compiler cached by the current v0 commit)",
     )
     parser.add_argument(
         "-o",
@@ -228,14 +228,31 @@ def write_output(source_path, destination_path):
 
 
 def resolve_seed(requested):
-    seed = os.path.abspath(requested or DEFAULT_SEED)
+    if requested:
+        seed = os.path.abspath(requested)
+        if not os.path.isfile(seed):
+            raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
+        return seed
+
+    revision_result = subprocess.run(
+        ["git", "rev-parse", "--verify", "v0^{commit}"],
+        cwd=SCRIPT_DIR,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if revision_result.returncode != 0:
+        raise RuntimeError("failed to resolve v0 commit\n" + revision_result.stderr[-4000:])
+    revision = revision_result.stdout.strip()
+    seed = os.path.join(V0_SEED_DIR, f"epic-v0-{revision}.exe")
     if os.path.isfile(seed):
         return seed
-    if requested:
-        raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
+
     build_script = os.path.join(SCRIPT_DIR, "build_epic_v0.py")
     run_checked(
-        [sys.executable, build_script],
+        [sys.executable, build_script, "--ref", revision],
         "rebuild v0 branch seed",
     )
     if not os.path.isfile(seed):

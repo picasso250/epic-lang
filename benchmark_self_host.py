@@ -21,7 +21,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 COMPILER_SOURCES = [path.relative_to(ROOT).as_posix() for path in sorted((ROOT / "src").glob("*.ep"))]
-DEFAULT_SEED = ROOT / "build" / "bootstrap-v0" / "epic-v0.exe"
+V0_SEED_DIR = ROOT / "build" / "bootstrap-v0"
 DEFAULT_CACHE_ROOT = ROOT / "build" / "cache" / "self-host-benchmark"
 BENCH_DIR = ROOT / "build" / "self-host-benchmark"
 BENCH_COMPILER = BENCH_DIR / "compiler.exe"
@@ -93,13 +93,30 @@ def host_record() -> dict[str, Any]:
 
 
 def resolve_seed(requested: str | None) -> Path:
-    seed = Path(requested).resolve() if requested else DEFAULT_SEED
+    if requested:
+        seed = Path(requested).resolve()
+        if not seed.is_file():
+            raise RuntimeError(f"seed compiler does not exist: {seed}")
+        return seed
+
+    revision_result = subprocess.run(
+        ["git", "rev-parse", "--verify", "v0^{commit}"],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if revision_result.returncode != 0:
+        raise RuntimeError("failed to resolve v0 commit\n" + revision_result.stderr[-4000:])
+    revision = revision_result.stdout.strip()
+    seed = V0_SEED_DIR / f"epic-v0-{revision}.exe"
     if seed.is_file():
         return seed
-    if requested:
-        raise RuntimeError(f"seed compiler does not exist: {seed}")
+
     completed = subprocess.run(
-        [sys.executable, "build_epic_v0.py"],
+        [sys.executable, "build_epic_v0.py", "--ref", revision],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
@@ -379,7 +396,7 @@ def ensure_build(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seed", help="seed compiler; default is the reproducible v0 branch compiler")
+    parser.add_argument("--seed", help="seed compiler; default is the compiler cached by the current v0 commit")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--label", default="self-host")
     parser.add_argument("--cache-dir", default=str(DEFAULT_CACHE_ROOT))
