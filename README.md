@@ -1,10 +1,10 @@
 # Epic
 
-一个已完成自举、正在准备首次 v0 发布的 **Windows x64** 原生编程语言。当前面向愿意直接从源码 bootstrap、接受破坏性变化的 early adopters。
+一个已完成自举的 **Windows x64** 原生编程语言。
 
 - **可复现自举**：从 Python stage-0 构建 self-hosted compiler，并达到字节一致的不动点
-- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 16 个 Epic 模块组成
-- **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World 为 **5632 bytes（5.5 KiB）**
+- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 16 个 Epic 源码文件组成
+- **直接生成原生 PE**：无需额外第三方； Hello World 只有 **5.5 KiB**
 - **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
 
 包含一个 Python 参考编译器、一个用 Epic 自身编写的自托管编译器、一个类型化的 LLVM 风格 MIR、一个结构化的 x64 后端、一个小型 COFF/PE 工具链，以及用于构建真实 Windows 可执行文件的运行时辅助代码。
@@ -27,13 +27,7 @@ python bootstrap_fixed_point.py -o build\epic.exe
 .\build\hello.exe
 ```
 
-默认输出只包含成功结果或错误。需要查看编译阶段、timing 和 stats 时加 `--verbose`：
-
-```powershell
-.\build\epic.exe examples\00_hello_world.ep -o build\hello.exe --verbose
-```
-
-第一条命令从 Python stage-0 启动完整 bootstrap，只用于生成稳定的 `build\epic.exe`。self-hosted compiler 会自动从当前工作目录的 `runtime/` 加入标准 runtime 源码；之后的 examples 可以沿用同一形式，只替换目标 `.ep` 文件。
+第一条命令从 Python stage-0 启动完整 bootstrap，只用于生成稳定的 `build\epic.exe`。self-hosted compiler 会自动从当前工作目录的 `runtime/` 嵌入到 exe。
 
 程序输出：
 
