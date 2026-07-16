@@ -914,7 +914,6 @@ fun mir_emit_array_store(st: MirCodegenState, slice: MirOperand, index: MirOpera
     mir_emit_inst(st, mir_store_as(value, mir_array_access_type(array_type), addr))
 }
 
-
 fun mir_dummy_return(st: MirCodegenState): MirTerminator {
     if st.current_fn.return_type == "void" {
         ret mir_ret_void()
@@ -2015,7 +2014,7 @@ fun mir_register_slice_layout(st: MirCodegenState, name: str): void {
     mir_register_runtime_struct3(st, name, "data")
 }
 
-fun mir_ast_to_mir(ast: AstNode): MirProgram {
+fun mir_ast_to_mir(program: AstProgram): MirProgram {
     let st = new MirCodegenState
     st.program = mir_program_empty()
     st.current_fn = mir_function_empty("", "void")
@@ -2039,77 +2038,70 @@ fun mir_ast_to_mir(ast: AstNode): MirProgram {
     st.string_labels = new str[]
     st.string_counter = 0
 
-    match ast {
-        AstProgram program: {
-            for si: 0:len(program.structs) {
-                let sdef = program.structs[si]
-                st.struct_names.push(sdef.name)
-                let offset = 0
-                let struct_align = 1
-                for fi2: 0:len(sdef.fields) {
-                    let field = sdef.fields[fi2]
-                    let source_type = ast_require_resolved_type(field.meta)
-                    let field_mir_type = mir_epic_type(source_type)
-                    let access_type = mir_storage_type(source_type)
-                    let field_align = mir_storage_align(access_type)
-                    offset = mir_align_to(offset, field_align)
-                    mir_register_struct_field(st, sdef.name, field.name, field_mir_type, access_type, fi2, offset)
-                    offset += mir_storage_size(access_type)
-                    if field_align > struct_align { struct_align = field_align }
-                }
-                let struct_size = mir_align_to(offset, struct_align)
-                if struct_size == 0 { struct_size = 1 }
-                mir_program_add_struct_layout(st.program, sdef.name, struct_size, struct_align)
-            }
-            for ui: 0:len(program.unions) {
-                let union = program.unions[ui]
-                st.union_names.push(union.name)
-                st.struct_names.push(union.name)
-                for mi2: 0:len(union.members) {
-                    st.union_members.push(mir_union_member_layout(union.name, union.members[mi2], mi2 + 1))
-                }
-                mir_program_add_struct_layout(st.program, union.name, 16, 8)
-                mir_register_struct_field(st, union.name, "tag", "i64", "i64", 0, 0)
-                mir_register_struct_field(st, union.name, "payload", "ptr", "ptr", 1, 8)
-            }
-
-            st.struct_names.push("str")
-            mir_program_add_struct_layout(st.program, "str", 8, 8)
-            mir_register_struct_field(st, "str", "len", "i64", "i64", 0, 0)
-            mir_register_slice_layout(st, "_slice")
-
-            for ei: 0:len(program.externs) {
-                let ext = program.externs[ei]
-                let callee = f"__ep_import${ext.library}${ext.name}"
-                st.func_names.push(ext.name)
-                st.func_return_types.push(mir_epic_type(ast_require_resolved_type(ext.meta)))
-                st.func_callees.push(callee)
-                st.func_source_returns.push(ast_require_resolved_type(ext.meta))
-                let params = new str[]
-                for pi: 0:len(ext.params) { params.push(mir_epic_type(ast_require_resolved_type(ext.params[pi].meta))) }
-                st.program.externs.push(mir_extern(callee, mir_epic_type(ast_require_resolved_type(ext.meta)), params))
-            }
-            for fi: 0:len(program.funcs) {
-                let fn = program.funcs[fi]
-                st.func_names.push(fn.name)
-                st.func_return_types.push(mir_epic_type(ast_require_resolved_type(fn.meta)))
-                st.func_callees.push(fn.name)
-                st.func_source_returns.push(ast_require_resolved_type(fn.meta))
-            }
-
-            st.program.globals.push(mir_global_decl("argv", "ptr"))
-
-            for i: 0:len(program.funcs) {
-                let fn_ast = program.funcs[i]
-                let fn = mir_emit_function(st, fn_ast)
-                st.program.functions.push(fn)
-            }
-            mir_declare_unresolved_calls(st.program)
-            ret st.program
+    for si: 0:len(program.structs) {
+        let sdef = program.structs[si]
+        st.struct_names.push(sdef.name)
+        let offset = 0
+        let struct_align = 1
+        for fi2: 0:len(sdef.fields) {
+            let field = sdef.fields[fi2]
+            let source_type = ast_require_resolved_type(field.meta)
+            let field_mir_type = mir_epic_type(source_type)
+            let access_type = mir_storage_type(source_type)
+            let field_align = mir_storage_align(access_type)
+            offset = mir_align_to(offset, field_align)
+            mir_register_struct_field(st, sdef.name, field.name, field_mir_type, access_type, fi2, offset)
+            offset += mir_storage_size(access_type)
+            if field_align > struct_align { struct_align = field_align }
         }
-        _: {}
+        let struct_size = mir_align_to(offset, struct_align)
+        if struct_size == 0 { struct_size = 1 }
+        mir_program_add_struct_layout(st.program, sdef.name, struct_size, struct_align)
     }
-    ast_to_mir_die("internal: expected program")
+    for ui: 0:len(program.unions) {
+        let union = program.unions[ui]
+        st.union_names.push(union.name)
+        st.struct_names.push(union.name)
+        for mi2: 0:len(union.members) {
+            st.union_members.push(mir_union_member_layout(union.name, union.members[mi2], mi2 + 1))
+        }
+        mir_program_add_struct_layout(st.program, union.name, 16, 8)
+        mir_register_struct_field(st, union.name, "tag", "i64", "i64", 0, 0)
+        mir_register_struct_field(st, union.name, "payload", "ptr", "ptr", 1, 8)
+    }
+
+    st.struct_names.push("str")
+    mir_program_add_struct_layout(st.program, "str", 8, 8)
+    mir_register_struct_field(st, "str", "len", "i64", "i64", 0, 0)
+    mir_register_slice_layout(st, "_slice")
+
+    for ei: 0:len(program.externs) {
+        let ext = program.externs[ei]
+        let callee = f"__ep_import${ext.library}${ext.name}"
+        st.func_names.push(ext.name)
+        st.func_return_types.push(mir_epic_type(ast_require_resolved_type(ext.meta)))
+        st.func_callees.push(callee)
+        st.func_source_returns.push(ast_require_resolved_type(ext.meta))
+        let params = new str[]
+        for pi: 0:len(ext.params) { params.push(mir_epic_type(ast_require_resolved_type(ext.params[pi].meta))) }
+        st.program.externs.push(mir_extern(callee, mir_epic_type(ast_require_resolved_type(ext.meta)), params))
+    }
+    for fi: 0:len(program.funcs) {
+        let fn = program.funcs[fi]
+        st.func_names.push(fn.name)
+        st.func_return_types.push(mir_epic_type(ast_require_resolved_type(fn.meta)))
+        st.func_callees.push(fn.name)
+        st.func_source_returns.push(ast_require_resolved_type(fn.meta))
+    }
+
+    st.program.globals.push(mir_global_decl("argv", "ptr"))
+
+    for i: 0:len(program.funcs) {
+        let fn_ast = program.funcs[i]
+        let fn = mir_emit_function(st, fn_ast)
+        st.program.functions.push(fn)
+    }
+    mir_declare_unresolved_calls(st.program)
     ret st.program
 }
 

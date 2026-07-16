@@ -359,7 +359,7 @@ struct AstUnionInit {
     expr: AstNode
 }
 
-type AstNode = AstEmpty | AstProgram | AstExternDef | AstStructDef | AstUnionDef | AstFunDef | AstParam | AstStructField | AstBlock | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstMatchCase | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstEmbed | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstInitField | AstUnionInit
+type AstNode = AstEmpty | AstLet | AstReturn | AstAssign | AstAssignOp | AstFieldSet | AstSubscriptAssign | AstIf | AstLoop | AstForRange | AstBreak | AstContinue | AstPanic | AstMatch | AstExprStmt | AstLiteral | AstChar | AstBool | AstString | AstEmbed | AstFString | AstFStringText | AstVar | AstBinary | AstUnary | AstCall | AstDotCall | AstFieldAccess | AstNullCheck | AstSubscript | AstSlice | AstNewArray | AstArrayLiteral | AstStructInit | AstUnionInit
 
 fun ast_empty(): AstNode {
     ret new AstNode(new AstEmpty { meta: ast_meta(0) })
@@ -382,24 +382,6 @@ fun ast_require_resolved_type(meta: AstMeta): str {
 }
 
 fun ast_set_resolved_type(node: AstNode, value: str): void { node.meta.resolved_type = value }
-
-fun ast_expr(node: AstNode): AstNode {
-    match node {
-        AstReturn n: { ret n.expr }
-        AstAssignOp n: { ret n.expr }
-        AstIf n: { ret n.expr }
-        AstLoop n: { ret n.expr }
-        AstPanic n: { ret n.expr }
-        AstMatch n: { ret n.expr }
-        AstMatchCase n: { ret n.expr }
-        AstExprStmt n: { ret n.expr }
-        AstUnary n: { ret n.expr }
-        AstNullCheck n: { ret n.expr }
-        AstUnionInit n: { ret n.expr }
-        _: {}
-    }
-    ret ast_empty()
-}
 
 struct Parser {
     tokens: Token[]
@@ -605,7 +587,7 @@ fun (p: Parser) parse_union_def(): AstUnionDef {
     ret node
 }
 
-fun (p: Parser) parse_program(): AstNode {
+fun (p: Parser) parse_program(): AstProgram {
     let program = new AstProgram { meta: ast_meta(0), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
     p.skip_newlines()
     for p.peek_kind("EXTERN") == 1 || p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("TYPE") == 1 {
@@ -624,7 +606,7 @@ fun (p: Parser) parse_program(): AstNode {
         let t = p.peek()
         parse_error(token_line(t), "Unexpected token at top level")
     }
-    ret new AstNode(program)
+    ret program
 }
 
 fun (p: Parser) parse_block(): AstBlock {
@@ -1462,15 +1444,15 @@ fun dump_print_type(t: str): void {
     }
 }
 
-fun dump_node_line(node: AstNode, depth: i64, kind: str, name: str, source_type: str, is_decl: bool, op: str, value: str, print_empty_value: bool): void {
+fun dump_meta_line(meta: AstMeta, depth: i64, kind: str, name: str, source_type: str, is_decl: bool, op: str, value: str, print_empty_value: bool): void {
     indent(depth)
     print(kind)
     if name != "" {
         print(f" {name}")
     }
     let displayed_type = source_type
-    if is_decl && ast_resolved_type(node) != "" {
-        displayed_type = ast_resolved_type(node)
+    if is_decl && meta.resolved_type? {
+        displayed_type = meta.resolved_type
     }
     dump_print_type(displayed_type)
     if op != "" {
@@ -1480,118 +1462,135 @@ fun dump_node_line(node: AstNode, depth: i64, kind: str, name: str, source_type:
         print(f" {value}")
     }
     if is_decl == false {
-        dump_print_type(ast_resolved_type(node))
+        if meta.resolved_type? {
+            dump_print_type(meta.resolved_type)
+        }
     }
     println("")
+}
+
+fun dump_node_line(node: AstNode, depth: i64, kind: str, name: str, source_type: str, is_decl: bool, op: str, value: str, print_empty_value: bool): void {
+    dump_meta_line(node.meta, depth, kind, name, source_type, is_decl, op, value, print_empty_value)
+}
+
+fun dump_param(node: AstParam, depth: i64): void {
+    dump_meta_line(node.meta, depth, "Param", node.name, type_expr_text(node.source_type), true, "", "", false)
+    ret
+}
+
+fun dump_block(node: AstBlock, depth: i64): void {
+    indent(depth)
+    println("Block")
+    dump_list(node.stmts, depth + 1)
+    if node.has_value {
+        indent(depth + 1)
+        println("BlockValue")
+        dump_node(node.value_expr, depth + 2)
+    }
+    ret
+}
+
+fun dump_match_case(node: AstMatchCase, depth: i64): void {
+    indent(depth)
+    if node.variant_name? {
+        print("MatchCase ")
+        print(node.variant_name)
+        print(" ")
+        println(node.binding_name)
+    } else {
+        println("MatchCase")
+        dump_node(node.expr, depth + 1)
+    }
+    dump_block(node.body, depth + 1)
+    ret
+}
+
+fun dump_union_def(node: AstUnionDef, depth: i64): void {
+    indent(depth)
+    print("UnionDef ")
+    println(node.name)
+    for i: 0:len(node.members) {
+        indent(depth + 1)
+        print("UnionMember ")
+        println(node.members[i])
+    }
+    ret
+}
+
+fun dump_extern_def(node: AstExternDef, depth: i64): void {
+    dump_meta_line(node.meta, depth, "ExternDef", node.name, type_expr_text(node.source_type), true, "", "", false)
+    for i: 0:len(node.params) {
+        dump_param(node.params[i], depth + 1)
+    }
+    ret
+}
+
+fun dump_fun_def(node: AstFunDef, depth: i64): void {
+    if node.method_name? {
+        dump_meta_line(node.meta, depth, "Method", f"{node.receiver_type}.{node.method_name}", type_expr_text(node.source_type), true, "", "", false)
+    } else {
+        dump_meta_line(node.meta, depth, "FunDef", node.name, type_expr_text(node.source_type), true, "", "", false)
+    }
+    for i: 0:len(node.params) {
+        dump_param(node.params[i], depth + 1)
+    }
+    dump_block(node.body, depth + 1)
+    ret
+}
+
+fun dump_struct_def(node: AstStructDef, depth: i64): void {
+    dump_meta_line(node.meta, depth, "StructDef", node.name, "", false, "", "", false)
+    for i: 0:len(node.fields) {
+        let field = node.fields[i]
+        dump_meta_line(field.meta, depth + 1, "StructField", field.name, type_expr_text(field.source_type), true, "", "", false)
+    }
+    ret
+}
+
+fun dump_init_field(node: AstInitField, depth: i64): void {
+    dump_meta_line(node.meta, depth, "InitField", node.name, "", false, "", "", false)
+    dump_node(node.value_expr, depth + 1)
+    ret
+}
+
+fun dump_program(node: AstProgram, depth: i64): void {
+    indent(depth)
+    println("Program")
+    for i: 0:len(node.structs) {
+        dump_struct_def(node.structs[i], depth + 1)
+    }
+    for i: 0:len(node.unions) {
+        dump_union_def(node.unions[i], depth + 1)
+    }
+    for i: 0:len(node.externs) {
+        dump_extern_def(node.externs[i], depth + 1)
+    }
+    for i: 0:len(node.funcs) {
+        dump_fun_def(node.funcs[i], depth + 1)
+    }
+    ret
 }
 
 fun dump_node(node: AstNode, depth: i64): i64 {
     match node {
         AstEmpty n: { ret 0 }
-        AstProgram n: {
-            indent(depth)
-            println("Program")
-            for i: 0:len(n.structs) {
-                dump_node(new AstNode(n.structs[i]), depth + 1)
-            }
-            for i: 0:len(n.unions) {
-                dump_node(new AstNode(n.unions[i]), depth + 1)
-            }
-            for i: 0:len(n.externs) {
-                dump_node(new AstNode(n.externs[i]), depth + 1)
-            }
-            for i: 0:len(n.funcs) {
-                dump_node(new AstNode(n.funcs[i]), depth + 1)
-            }
-            ret 0
-        }
         AstMatch n: {
             indent(depth)
             println("Match")
             dump_node(n.expr, depth + 1)
             for i: 0:len(n.fields) {
-                dump_node(new AstNode(n.fields[i]), depth + 1)
+                dump_match_case(n.fields[i], depth + 1)
             }
             if n.has_else {
                 indent(depth + 1)
                 println("MatchCase _")
-                dump_node(new AstNode(n.else_block), depth + 2)
-            }
-            ret 0
-        }
-        AstMatchCase n: {
-            indent(depth)
-            if n.variant_name? {
-                print("MatchCase ")
-                print(n.variant_name)
-                print(" ")
-                println(n.binding_name)
-            } else {
-                println("MatchCase")
-                dump_node(n.expr, depth + 1)
-            }
-            dump_node(new AstNode(n.body), depth + 1)
-            ret 0
-        }
-        AstUnionDef n: {
-            indent(depth)
-            print("UnionDef ")
-            println(n.name)
-            for i: 0:len(n.members) {
-                indent(depth + 1)
-                print("UnionMember ")
-                println(n.members[i])
+                dump_block(n.else_block, depth + 2)
             }
             ret 0
         }
         AstUnionInit n: {
             dump_node_line(node, depth, "UnionInit", n.type_name, "", false, "", "", false)
             dump_node(n.expr, depth + 1)
-            ret 0
-        }
-        AstExternDef n: {
-            dump_node_line(node, depth, "ExternDef", n.name, type_expr_text(n.source_type), true, "", "", false)
-            for i: 0:len(n.params) {
-                dump_node(new AstNode(n.params[i]), depth + 1)
-            }
-            ret 0
-        }
-        AstFunDef n: {
-            if n.method_name? {
-                dump_node_line(node, depth, "Method", f"{n.receiver_type}.{n.method_name}", type_expr_text(n.source_type), true, "", "", false)
-            } else {
-                dump_node_line(node, depth, "FunDef", n.name, type_expr_text(n.source_type), true, "", "", false)
-            }
-            for i: 0:len(n.params) {
-                dump_node(new AstNode(n.params[i]), depth + 1)
-            }
-            dump_node(new AstNode(n.body), depth + 1)
-            ret 0
-        }
-        AstStructDef n: {
-            dump_node_line(node, depth, "StructDef", n.name, "", false, "", "", false)
-            for i: 0:len(n.fields) {
-                dump_node(new AstNode(n.fields[i]), depth + 1)
-            }
-            ret 0
-        }
-        AstParam n: {
-            dump_node_line(node, depth, "Param", n.name, type_expr_text(n.source_type), true, "", "", false)
-            ret 0
-        }
-        AstStructField n: {
-            dump_node_line(node, depth, "StructField", n.name, type_expr_text(n.source_type), true, "", "", false)
-            ret 0
-        }
-        AstBlock n: {
-            indent(depth)
-            println("Block")
-            dump_list(n.stmts, depth + 1)
-            if n.has_value {
-                indent(depth + 1)
-                println("BlockValue")
-                dump_node(n.value_expr, depth + 2)
-            }
             ret 0
         }
         AstLet n: {
@@ -1630,22 +1629,22 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         }
         AstIf n: {
             dump_node_line(node, depth, "If", "", "", false, "", "", false)
-            dump_node(new AstNode(n.then_block), depth + 1)
+            dump_block(n.then_block, depth + 1)
             if n.has_else {
-                dump_node(new AstNode(n.else_block), depth + 1)
+                dump_block(n.else_block, depth + 1)
             }
             dump_node(n.expr, depth + 1)
             ret 0
         }
         AstLoop n: {
             dump_node_line(node, depth, "Loop", "", "", false, "", "", false)
-            dump_node(new AstNode(n.body), depth + 1)
+            dump_block(n.body, depth + 1)
             dump_node(n.expr, depth + 1)
             ret 0
         }
         AstForRange n: {
             dump_node_line(node, depth, "ForRange", n.name, "", false, "", "", false)
-            dump_node(new AstNode(n.body), depth + 1)
+            dump_block(n.body, depth + 1)
             dump_node(n.start, depth + 1)
             dump_node(n.end, depth + 1)
             ret 0
@@ -1759,13 +1758,8 @@ fun dump_node(node: AstNode, depth: i64): i64 {
         AstStructInit n: {
             dump_node_line(node, depth, "StructInit", n.name, "", false, "", "", false)
             for i: 0:len(n.fields) {
-                dump_node(new AstNode(n.fields[i]), depth + 1)
+                dump_init_field(n.fields[i], depth + 1)
             }
-            ret 0
-        }
-        AstInitField n: {
-            dump_node_line(node, depth, "InitField", n.name, "", false, "", "", false)
-            dump_node(n.value_expr, depth + 1)
             ret 0
         }
     }
@@ -1779,7 +1773,7 @@ fun main(): void {
     let src = str(read_file(argv[1]))
     let tokens = lex(src)
     let p = make_parser_at(tokens, argv[1])
-    let ast = p.parse_program()
-    dump_node(ast, 0)
+    let program = p.parse_program()
+    dump_program(program, 0)
     ret
 }

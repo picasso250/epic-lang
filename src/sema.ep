@@ -298,8 +298,8 @@ fun sema_is_reference_type(st: SemaState, typ: str): bool {
     ret typ == "str" || sema_is_array(typ) || sema_struct_index(st, typ) >= 0 || sema_union_index(st, typ) >= 0
 }
 
-fun sema_null_check_type(st: SemaState, node: AstNode): str {
-    let inner = sema_expr_type(st, ast_expr(node))
+fun sema_null_check_type(st: SemaState, expr: AstNode): str {
+    let inner = sema_expr_type(st, expr)
     if sema_is_reference_type(st, inner) == false {
         sema_die(f"null check expected reference, got {inner}")
     }
@@ -678,54 +678,47 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: str[]): str {
     ret out
 }
 
-fun sema_build_types(st: SemaState, ast: AstNode): void {
-    match ast {
-        AstProgram program: {
-            st.structs = program.structs
-            for i: 0:len(program.unions) {
-                let u = program.unions[i]
-                if sema_struct_index(st, u.name) >= 0 {
-                    sema_die(f"type {u.name} conflicts with struct {u.name}")
-                }
-                if sema_union_index(st, u.name) >= 0 {
-                    sema_die(f"duplicate type {u.name}")
-                }
-                if len(u.members) == 0 {
-                    sema_die(f"union {u.name} requires at least one member")
-                }
-                st.unions.push(u)
-            }
-            for i: 0:len(st.structs) {
-                let s = st.structs[i]
-                let seen = new str[]
-                for j: 0:len(s.fields) {
-                    let f = s.fields[j]
-                    if sema_string_contains(seen, f.name) {
-                        sema_die(f"duplicate field {s.name}.{f.name}")
-                    }
-                    seen.push(f.name)
-                    f.meta.resolved_type = sema_type_name(st, f.source_type)
-                }
-            }
-            for i: 0:len(st.unions) {
-                let u = st.unions[i]
-                let seen = new str[]
-                for j: 0:len(u.members) {
-                    let member = u.members[j]
-                    if sema_string_contains(seen, member) {
-                        sema_die(f"duplicate union member {u.name}.{member}")
-                    }
-                    seen.push(member)
-                    if sema_struct_index(st, member) < 0 {
-                        sema_die(f"union member {u.name}.{member} must be a struct")
-                    }
-                }
-            }
-            ret
+fun sema_build_types(st: SemaState, program: AstProgram): void {
+    st.structs = program.structs
+    for i: 0:len(program.unions) {
+        let u = program.unions[i]
+        if sema_struct_index(st, u.name) >= 0 {
+            sema_die(f"type {u.name} conflicts with struct {u.name}")
         }
-        _: {}
+        if sema_union_index(st, u.name) >= 0 {
+            sema_die(f"duplicate type {u.name}")
+        }
+        if len(u.members) == 0 {
+            sema_die(f"union {u.name} requires at least one member")
+        }
+        st.unions.push(u)
     }
-    sema_die("internal: expected program")
+    for i: 0:len(st.structs) {
+        let s = st.structs[i]
+        let seen = new str[]
+        for j: 0:len(s.fields) {
+            let f = s.fields[j]
+            if sema_string_contains(seen, f.name) {
+                sema_die(f"duplicate field {s.name}.{f.name}")
+            }
+            seen.push(f.name)
+            f.meta.resolved_type = sema_type_name(st, f.source_type)
+        }
+    }
+    for i: 0:len(st.unions) {
+        let u = st.unions[i]
+        let seen = new str[]
+        for j: 0:len(u.members) {
+            let member = u.members[j]
+            if sema_string_contains(seen, member) {
+                sema_die(f"duplicate union member {u.name}.{member}")
+            }
+            seen.push(member)
+            if sema_struct_index(st, member) < 0 {
+                sema_die(f"union member {u.name}.{member} must be a struct")
+            }
+        }
+    }
 }
 
 fun sema_extern_signature_equal(left: AstExternDef, right: AstExternDef): bool {
@@ -738,85 +731,78 @@ fun sema_extern_signature_equal(left: AstExternDef, right: AstExternDef): bool {
     ret true
 }
 
-fun sema_build_funcs(st: SemaState, ast: AstNode): void {
-    match ast {
-        AstProgram program: {
-            st.externs = new AstExternDef[]
-            for ei: 0:len(program.externs) {
-                let ext = program.externs[ei]
-                sema_validate_extern_library(ext.name, ext.library)
-                if sema_is_reserved_func(ext.name) { sema_die(f"reserved builtin function name: {ext.name}") }
-                ext.meta.resolved_type = sema_type_name(st, ext.source_type)
-                if ext.meta.resolved_type != "void" && sema_is_extern_scalar_abi_type(ext.meta.resolved_type) == false {
-                    sema_die(f"extern {ext.name} has unsupported ABI return type {ext.meta.resolved_type}")
-                }
-                for pi: 0:len(ext.params) {
-                    let p = ext.params[pi]
-                    p.meta.resolved_type = sema_type_name(st, p.source_type)
-                    if sema_is_extern_scalar_abi_type(p.meta.resolved_type) == false {
-                        sema_validate_extern_struct_param(st, ext.name, p.name, p.meta.resolved_type)
-                    }
-                }
-                let existing = sema_extern_index(st, ext.name)
-                if existing >= 0 {
-                    if sema_extern_signature_equal(st.externs[existing], ext) == false {
-                        sema_die(f"conflicting extern declaration {ext.name}")
-                    }
-                } else {
-                    if sema_func_index(st, ext.name) >= 0 { sema_die(f"duplicate function {ext.name}") }
-                    st.externs.push(ext)
-                }
-            }
-            program.externs = st.externs
-            for i: 0:len(program.funcs) {
-                let f = program.funcs[i]
-                if sema_func_index(st, f.name) >= 0 || sema_extern_index(st, f.name) >= 0 {
-                    sema_die(f"duplicate function {f.name}")
-                }
-                if f.method_name? {
-                    if f.receiver_type? == false || f.receiver_name? == false {
-                        sema_die("method metadata is incomplete")
-                    }
-                    if sema_struct_index(st, f.receiver_type) < 0 {
-                        sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
-                    }
-                }
-                if sema_is_reserved_func(f.name) {
-                    sema_die(f"reserved builtin function name: {f.name}")
-                }
-                f.meta.resolved_type = sema_type_name(st, f.source_type)
-                for j: 0:len(f.params) {
-                    let p = f.params[j]
-                    p.meta.resolved_type = sema_type_name(st, p.source_type)
-                    if p.meta.resolved_type == "void" {
-                        sema_die(f"function {f.name} parameter {p.name} cannot have type void")
-                    }
-                }
-                if f.name == "main" {
-                    if len(f.params) != 0 {
-                        sema_die("main function cannot have parameters")
-                    }
-                    if f.meta.resolved_type != "void" {
-                        sema_die(f"main function must return void, got {f.meta.resolved_type}")
-                    }
-                }
-                if f.method_name? {
-                    if len(f.params) == 0 {
-                        sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
-                    }
-                    let receiver = f.params[0]
-                    if receiver.meta.resolved_type != f.receiver_type {
-                        sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
-                    }
-                }
-                st.funcs.push(f)
-
-            }
-            ret
+fun sema_build_funcs(st: SemaState, program: AstProgram): void {
+    st.externs = new AstExternDef[]
+    for ei: 0:len(program.externs) {
+        let ext = program.externs[ei]
+        sema_validate_extern_library(ext.name, ext.library)
+        if sema_is_reserved_func(ext.name) { sema_die(f"reserved builtin function name: {ext.name}") }
+        ext.meta.resolved_type = sema_type_name(st, ext.source_type)
+        if ext.meta.resolved_type != "void" && sema_is_extern_scalar_abi_type(ext.meta.resolved_type) == false {
+            sema_die(f"extern {ext.name} has unsupported ABI return type {ext.meta.resolved_type}")
         }
-        _: {}
+        for pi: 0:len(ext.params) {
+            let p = ext.params[pi]
+            p.meta.resolved_type = sema_type_name(st, p.source_type)
+            if sema_is_extern_scalar_abi_type(p.meta.resolved_type) == false {
+                sema_validate_extern_struct_param(st, ext.name, p.name, p.meta.resolved_type)
+            }
+        }
+        let existing = sema_extern_index(st, ext.name)
+        if existing >= 0 {
+            if sema_extern_signature_equal(st.externs[existing], ext) == false {
+                sema_die(f"conflicting extern declaration {ext.name}")
+            }
+        } else {
+            if sema_func_index(st, ext.name) >= 0 { sema_die(f"duplicate function {ext.name}") }
+            st.externs.push(ext)
+        }
     }
-    sema_die("internal: expected program")
+    program.externs = st.externs
+    for i: 0:len(program.funcs) {
+        let f = program.funcs[i]
+        if sema_func_index(st, f.name) >= 0 || sema_extern_index(st, f.name) >= 0 {
+            sema_die(f"duplicate function {f.name}")
+        }
+        if f.method_name? {
+            if f.receiver_type? == false || f.receiver_name? == false {
+                sema_die("method metadata is incomplete")
+            }
+            if sema_struct_index(st, f.receiver_type) < 0 {
+                sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
+            }
+        }
+        if sema_is_reserved_func(f.name) {
+            sema_die(f"reserved builtin function name: {f.name}")
+        }
+        f.meta.resolved_type = sema_type_name(st, f.source_type)
+        for j: 0:len(f.params) {
+            let p = f.params[j]
+            p.meta.resolved_type = sema_type_name(st, p.source_type)
+            if p.meta.resolved_type == "void" {
+                sema_die(f"function {f.name} parameter {p.name} cannot have type void")
+            }
+        }
+        if f.name == "main" {
+            if len(f.params) != 0 {
+                sema_die("main function cannot have parameters")
+            }
+            if f.meta.resolved_type != "void" {
+                sema_die(f"main function must return void, got {f.meta.resolved_type}")
+            }
+        }
+        if f.method_name? {
+            if len(f.params) == 0 {
+                sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
+            }
+            let receiver = f.params[0]
+            if receiver.meta.resolved_type != f.receiver_type {
+                sema_die(f"method {f.receiver_type}.{f.method_name} receiver mismatch")
+            }
+        }
+        st.funcs.push(f)
+
+    }
 }
 
 fun sema_reset_locals(st: SemaState): void {
@@ -953,7 +939,7 @@ fun sema_expr_type(st: SemaState, node: AstNode): str {
             ret sema_set_type(node, sema_field_access_type(st, n.object, n.name))
         }
         AstNullCheck n: {
-            ret sema_set_type(node, sema_null_check_type(st, node))
+            ret sema_set_type(node, sema_null_check_type(st, n.expr))
         }
         AstSubscript n: {
             ret sema_set_type(node, sema_subscript_type(st, n.base, n.index))
@@ -1483,41 +1469,34 @@ fun sema_block_returns(block: AstBlock): bool {
     ret false
 }
 
-fun sema_program(st: SemaState, ast: AstNode): void {
-    sema_build_types(st, ast)
-    sema_build_funcs(st, ast)
-    match ast {
-        AstProgram program: {
-            for i: 0:len(program.funcs) {
-                let f = program.funcs[i]
-                sema_reset_locals(st)
-                st.current_fn = f.name
-                st.current_ret = f.meta.resolved_type
-                st.loop_depth = 0
-                for j: 0:len(f.params) {
-                    let p = f.params[j]
-                    sema_define_local(st, p.name, p.meta.resolved_type)
-                }
-                let tail_type = sema_function_body(st, f.body)
-                if sema_block_returns(f.body) == false {
-                    if f.body.has_value {
-                        sema_check_assign_info(st.current_ret, tail_type, f.body.value_expr, "function tail")
-                    } else {
-                        if st.current_ret != "void" {
-                            sema_die(f"function must return {st.current_ret} on all paths")
-                        }
-                    }
+fun sema_program(st: SemaState, program: AstProgram): void {
+    sema_build_types(st, program)
+    sema_build_funcs(st, program)
+    for i: 0:len(program.funcs) {
+        let f = program.funcs[i]
+        sema_reset_locals(st)
+        st.current_fn = f.name
+        st.current_ret = f.meta.resolved_type
+        st.loop_depth = 0
+        for j: 0:len(f.params) {
+            let p = f.params[j]
+            sema_define_local(st, p.name, p.meta.resolved_type)
+        }
+        let tail_type = sema_function_body(st, f.body)
+        if sema_block_returns(f.body) == false {
+            if f.body.has_value {
+                sema_check_assign_info(st.current_ret, tail_type, f.body.value_expr, "function tail")
+            } else {
+                if st.current_ret != "void" {
+                    sema_die(f"function must return {st.current_ret} on all paths")
                 }
             }
-            ret
         }
-        _: {}
     }
-    sema_die("internal: expected program")
 }
 
-fun sema_dump_typed_ast(ast: AstNode): void {
-    dump_node(ast, 0)
+fun sema_dump_typed_ast(program: AstProgram): void {
+    dump_program(program, 0)
     ret
 }
 
