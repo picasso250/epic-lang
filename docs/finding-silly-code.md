@@ -76,7 +76,7 @@ For correctness and fixed-point validation, use the normal test entry points:
 ```powershell
 python tests/run.py
 python tests/examples/run.py
-python test_bootstrap_fixed_point.py
+python bootstrap_fixed_point.py
 ```
 
 ## Ranking a large function

@@ -37,7 +37,7 @@
    - 增加 formatter fixture 测试。
    - 对 `src/*.ep` 跑 formatter 后再跑：
      - `python tests/examples/run.py`
-     - `python test_bootstrap_fixed_point.py`
+     - `python bootstrap_fixed_point.py`
 
 ## 参考模型
 

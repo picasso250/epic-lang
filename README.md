@@ -1,9 +1,9 @@
 # Epic
 
-一个已完成自举的 **Windows x64** 原生编程语言。v0 公开语言契约已冻结。
+一个已完成自举、正在准备首次 v0 发布的 **Windows x64** 原生编程语言。当前面向愿意直接从源码 bootstrap、接受破坏性变化的 early adopters。
 
 - **可复现自举**：从 Python stage-0 构建 self-hosted compiler，并达到字节一致的不动点
-- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 15 个 Epic 模块组成
+- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 16 个 Epic 模块组成
 - **直接生成原生 PE**：无需额外部署 Epic runtime 或第三方运行库；下面的 Hello World 为 **5632 bytes（5.5 KiB）**
 - **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
 
@@ -22,7 +22,7 @@ fun main(): void {
 仓库中的 `examples/00_hello_world.ep` 就是上面的程序。先生成达到不动点的 self-hosted compiler，再用它编译并运行 Hello World：
 
 ```powershell
-python test_bootstrap_fixed_point.py -o build\epic.exe
+python bootstrap_fixed_point.py -o build\epic.exe
 .\build\epic.exe examples\00_hello_world.ep -o build\hello.exe
 .\build\hello.exe
 ```
@@ -50,7 +50,7 @@ Epic 目前支持：
 - 函数与结构体接收者方法、局部变量、块尾部值、显式返回
 - `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
 - `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`；`_:` 是唯一的默认分支形式
-- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、显式整数类型转换、带检查的算术运算
+- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、十进制与十六进制整数字面量、显式整数类型转换、带检查的算术运算
 - 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
 - 动态数组（`T[]`）——字面量、定长零初始化、带检查的索引、`len`、`push`、`pop`、`extend`
 - 堆分配结构体——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
@@ -59,57 +59,23 @@ Epic 目前支持：
 
 主要语言特性可通过 `examples/` 渐进学习；完整语言边界由 `docs/` 和意图级测试共同定义。
 
-v0 的公开语言特性由当前编译器、`examples/` 和 `docs/` 共同定义并保持稳定。内部实现（编译器、runtime、GC、IR、后端）不属于冻结边界，可持续演进。
+`v0` 分支正在收敛首次公开版本；创建发布 tag 前不承诺源码、ABI 或工具行为兼容。发布 tag 冻结该版本的用户可见行为，内部实现仍可演进。
 
 ## 自举不动点
 
-项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。
-
-| 世代 | 使用的编译器 | 生成产物 | 本次耗时 | exe 体积 |
-|------|--------------|----------|----------|----------|
-| 1 | Python reference compiler | `epic-py.exe` | 2.79s | 0.70 MiB |
-| 2 | `epic-py.exe` | `epic-epic.exe` | 2.50s | 0.70 MiB |
-| 3 | `epic-epic.exe` | `epic-epic-epic.exe` | 2.52s | 0.70 MiB |
-| 4 | `epic-epic-epic.exe` | `epic-epic-epic-epic.exe` | 2.51s | 0.70 MiB |
-
-- **self-hosted 产物已达到字节不动点**：连续三个 self-hosted generations 字节一致
-- 表中的时间来自一次本机构建记录，用于观察 bootstrap 过程，不是跨环境 benchmark
+项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。连续三个 self-hosted generations 字节一致；当前收敛编译器为 **746,496 bytes（0.71 MiB）**。
 
 生成并保留最终收敛的编译器：
 
 ```powershell
-python test_bootstrap_fixed_point.py -o build\epic.exe
+python bootstrap_fixed_point.py -o build\epic.exe
 ```
 
-### 重建 v0 bootstrap compiler
-
-`v0` 标签包含可复现的 bootstrap 构建入口。脚本将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，校验已提交的 SHA-256，随后清理 worktree：
-
-这是发布与复现路径，不是日常编译路径；临时 worktree 用来隔离当前工作区的未提交改动。
-
-```powershell
-python build_epic_v0.py --require-expected
-```
-
-产物：
-
-```text
-build/bootstrap-v0/epic-v0.exe
-build/bootstrap-v0/epic-v0.exe.sha256
-build/bootstrap-v0/manifest.json
-```
-
-后续编译器、GC 或后端开发可以用该 v0 compiler 作为稳定 seed，并检查当前源码能否再次收敛：
-
-```powershell
-python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
-```
-
-Python reference compiler 继续作为语言判定基准（oracle）和完整 bootstrap 的恢复入口；日常 self-hosted 演进可以从 `epic-v0.exe` 起步。
+该命令直接构建当前 checkout，不检出其他 revision，也不依赖预构建的 Epic binary。将来复现某个发布版本时，先 checkout 对应的不可移动 tag，再运行同一命令。Python reference compiler 继续作为语言判定基准（oracle）和完整 bootstrap 的起点。
 
 ## 当前边界
 
-Epic v0 已冻结公开语言契约，但仍有以下明确边界：
+Epic v0 当前仍在发布前收敛，并有以下明确边界：
 
 - 仅面向 Windows x64；尚无跨平台 ABI 承诺
 - MIR 是 LLVM 风格，但并非 LLVM IR 兼容
@@ -139,7 +105,7 @@ build/              忽略的本地构建输出
 ```powershell
 python tests/run.py                    # 模块级编译测试
 python tests/examples/run.py           # examples/ 正向示例
-python test_bootstrap_fixed_point.py   # 从 Python 开始的完整自举不动点检查
+python bootstrap_fixed_point.py        # 从 Python 开始构建并验证自举不动点
 ```
 
 模块级测试：
@@ -159,7 +125,7 @@ python tests/link/run.py
 - 修改编译器某个区域之前，先阅读对应的 `docs/` 文件。
 - 保持示例正向友好；负向测试放在 `tests/<module>/fail/`。
 - 倾向清晰的编译器代码，而非过早的性能优化。
-- 遵守 v0 稳定边界：公开语义变更必须显式讨论并同步更新设计文档与意图级测试；内部实现无需维持兼容。
+- 发布前允许破坏性变化，但公开语义变更必须显式讨论并同步更新设计文档与意图级测试。
 
 ## 编译器流水线
 

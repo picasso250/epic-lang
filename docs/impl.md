@@ -93,12 +93,12 @@ src/epic.ep
 ```powershell
 python tests/run.py
 python tests/examples/run.py
-python test_bootstrap_fixed_point.py
+python bootstrap_fixed_point.py
 ```
 
-`tests/run.py` 运行模块级 Python/self-hosted 对拍和 e2e；`tests/examples/run.py` 验证正向用户示例；`test_bootstrap_fixed_point.py` 是活跃的自举不动点验收。需要单独验证 self-hosted 编译用户示例时，可运行 `python tests/examples/run.py --self-hosted`。
+`tests/run.py` 运行模块级 Python/self-hosted 对拍和 e2e；`tests/examples/run.py` 验证正向用户示例；`bootstrap_fixed_point.py` 从 Python 构建收敛的 self-hosted compiler，并验证自举不动点。需要单独验证 self-hosted 编译用户示例时，可运行 `python tests/examples/run.py --self-hosted`。
 
-`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，在目标 revision 自己的构建脚本和 canonical source list 上完成不动点构建，并导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest。提交在 `bootstrap/v0/epic-v0.sha256` 的 digest 是冻结产物的预期值。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代，适合 GC 和后端开发期间的日常 bootstrap 验证；`-o <compiler.exe>` 将验证后的最终收敛世代写到指定位置。
+`bootstrap_fixed_point.py` 直接构建当前 checkout，不负责检出 revision，也不依赖已提交的预期产物哈希。`--seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代；`-o <compiler.exe>` 将验证后的最终收敛世代写到指定位置。复现发布版本时，先 checkout 对应的不可移动 tag，再运行该脚本。
 
 Self-hosted `epic.exe` 会自动把当前工作目录下的 `runtime/array.ep`、`runtime/panic.ep`、`runtime/str.ep` 放在用户输入之前，因此普通调用只需提供用户源码。当前工作目录仍需包含 `runtime/mir/helpers.mir`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。Python reference CLI 接受相同的 `--verbose` 开关。
 

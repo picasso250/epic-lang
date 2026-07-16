@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Check that the compiler reaches a bootstrap fixed point.
+Build the self-hosted compiler and verify that it reaches a bootstrap fixed point.
 
 Stages:
   epic-py: Python compiler builds the Epic compiler.
