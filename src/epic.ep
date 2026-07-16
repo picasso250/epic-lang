@@ -116,6 +116,7 @@ fun main(): void {
     let exe_path = base + ".exe"
     let e = make_emitter(asm_path)
     emit_program(e, ast)
+    let image = assemble_text(read_file(asm_path))
     let cmd_path = "build/epic/build.cmd"
     write_build_script(cmd_path, asm_path, obj_path, exe_path)
     let code = system("cmd /c build\\epic\\build.cmd")
