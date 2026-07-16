@@ -51,11 +51,11 @@ python epic.py --main main.ep main.ep lib.ep
 
 ```epic
 fun add(a: i64, b: i64): i64 {
-    a + b
+    ret a + b
 }
 ```
 
-Epic 调用遵循 Windows x64 ABI：前四个整数参数使用寄存器，更多参数使用 8 字节栈槽。函数体是一个 block：非 `void` 函数可以用最后一个裸表达式作为返回值，也可以显式 `ret expr`；`void` 函数可以使用 `ret` 或自然结束，尾表达式如果存在必须是 `void`。
+Epic 调用遵循 Windows x64 ABI：前四个整数参数使用寄存器，更多参数使用 8 字节栈槽。非 `void` 函数必须在所有可达路径上显式 `ret expr`；`void` 函数可以使用 `ret` 或自然结束。
 
 程序入口函数必须是不接收参数、返回 `void` 的 `main`：
 
@@ -64,7 +64,7 @@ fun main(): void {
 }
 ```
 
-自然结束时进程退出码为 `0`。需要其他退出状态时必须显式调用 `exit(code)`；入口函数本身不通过返回值表达进程状态。普通非 `void` 函数仍可使用 `ret expr` 或尾表达式返回值。
+自然结束时进程退出码为 `0`。需要其他退出状态时必须显式调用 `exit(code)`；入口函数本身不通过返回值表达进程状态。普通非 `void` 函数使用 `ret expr` 返回值。
 
 ### 用户方法 (User Methods)
 
@@ -182,7 +182,7 @@ let runtime_source = embed "../runtime/file.ep"
 `assert` 不是关键字或内建语句；需要运行时检查时显式写
 `if !cond { panic "消息" }`。`assert` 可作为普通标识符。
 
-Block 的最后一个裸表达式是该 block 的 value；没有尾表达式的 block 类型是 `void`。当前语法没有分号；如果 `void` 函数或 block 末尾需要丢弃一个非 `void` 表达式，写一个后续 statement（例如裸 `ret`）来避免它成为 block value。
+Block 是 statement 序列，不产生 value。裸表达式在 block 的任何位置都是 expression statement，其结果会被丢弃。当前语法没有分号；换行或右花括号结束 statement。
 
 
 ### 内置容器点调用 (Builtin Container Dot Calls)

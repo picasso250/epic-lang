@@ -145,13 +145,7 @@ class MirCodegen(MirFunctionBuilder):
         try:
             body = self._emit_block_stmts_from(entry, ast_fn.body)
             if body.reachable:
-                if ast_fn.body.value_expr is not None:
-                    value = self._expr_from(body.block, ast_fn.body.value_expr)
-                    if self.fn.return_type == VOID:
-                        self.ret(value.block)
-                    else:
-                        self.ret(value.block, value.value)
-                elif self.fn.return_type == VOID:
+                if self.fn.return_type == VOID:
                     self.ret(body.block)
                 else:
                     self.ret(body.block, ConstIntOperand(self.fn.return_type, 0))
@@ -455,11 +449,7 @@ class MirCodegen(MirFunctionBuilder):
     def _emit_block_from(self, in_block, block):
         self._push_local_scope()
         try:
-            flow = self._emit_block_stmts_from(in_block, block)
-            if flow.reachable and block.value_expr is not None:
-                value = self._expr_from(flow.block, block.value_expr)
-                return self._reachable(value.block)
-            return flow
+            return self._emit_block_stmts_from(in_block, block)
         finally:
             self._pop_local_scope()
 

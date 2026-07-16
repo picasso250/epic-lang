@@ -57,7 +57,7 @@ Epic 目前支持：
 
 ## 自举不动点
 
-项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。连续三个 self-hosted generations 字节一致；当前收敛编译器为 **746,496 bytes（0.71 MiB）**。
+项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。连续三个 self-hosted generations 字节一致；当前收敛编译器为 **742,400 bytes（0.71 MiB）**。
 
 生成并保留最终收敛的编译器：
 

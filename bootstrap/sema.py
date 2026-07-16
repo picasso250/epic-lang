@@ -141,35 +141,18 @@ class SemanticAnalyzer:
         for param in fn.params:
             self._define_local(param.name, param.resolved_type)
 
-        tail_info = self._analyze_function_body(fn.body)
+        self._analyze_block(fn.body)
         ret_type = fn.resolved_type
         if self._block_returns(fn.body):
             return
-        if tail_info is not None:
-            self._check_assign(ret_type, tail_info, "function tail")
-            return
         if ret_type != VOID:
             self._fail(f"function must return {ret_type} on all paths")
-
-    def _analyze_function_body(self, block):
-        tail_info = None
-        self._push_scope()
-        try:
-            for stmt in block.stmts:
-                self._analyze_stmt(stmt)
-            if block.value_expr is not None:
-                tail_info = self._expr(block.value_expr)
-        finally:
-            self._pop_scope()
-        return tail_info
 
     def _analyze_block(self, block):
         self._push_scope()
         try:
             for stmt in block.stmts:
                 self._analyze_stmt(stmt)
-            if block.value_expr is not None:
-                self._expr(block.value_expr)
         finally:
             self._pop_scope()
 
@@ -726,8 +709,6 @@ class SemanticAnalyzer:
         for stmt in block.stmts:
             if self._stmt_returns(stmt):
                 return True
-        if block.value_expr is not None and self._is_terminating_call(block.value_expr):
-            return True
         return False
 
     def _stmt_returns(self, stmt):
@@ -868,8 +849,6 @@ def assert_typed_program(program):
     def block(node, path):
         for idx, stmt in enumerate(node.stmts):
             statement(stmt, f"{path}.stmts[{idx}]")
-        if node.value_expr is not None:
-            expr(node.value_expr, f"{path}.value")
 
     def statement(node, path):
         if isinstance(node, ExprStmtNode):

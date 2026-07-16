@@ -785,7 +785,6 @@ fun mir_slice_struct_name(st: MirCodegenState, type_name: str): str {
     ret ""
 }
 
-
 fun mir_dummy_return(st: MirCodegenState): MirTerminator {
     if st.current_fn.return_type == "void" {
         ret mir_ret_void()
@@ -1876,15 +1875,6 @@ fun mir_emit_block_stmts(st: MirCodegenState, block: MirBlock, ast_block: AstBlo
 fun mir_emit_block(st: MirCodegenState, block: MirBlock, ast_block: AstBlock): MirBlockFlow {
     let local_count = len(st.local_names)
     let flow = mir_emit_block_stmts(st, block, ast_block)
-    if flow.reachable == false {
-        mir_truncate_locals(st, local_count)
-        ret flow
-    }
-    if ast_block.has_value {
-        let value_flow = mir_emit_expr(st, flow.block, ast_block.value_expr)
-        mir_truncate_locals(st, local_count)
-        ret mir_reachable_flow(value_flow.block)
-    }
     mir_truncate_locals(st, local_count)
     ret flow
 }
@@ -1928,24 +1918,12 @@ fun mir_emit_function(st: MirCodegenState, fn_ast: AstFunDef): MirFunction {
         st.current_block = body_flow.block
     }
     if st.current_block.has_terminator == false {
-        if fn_ast.body.has_value {
-            let value_flow = mir_emit_expr(st, st.current_block, fn_ast.body.value_expr)
-            st.current_block = value_flow.block
-            if st.current_fn.return_type == "void" {
-                st.current_block.terminator = mir_ret_void()
-                st.current_block.has_terminator = true
-            } else {
-                st.current_block.terminator = mir_ret_value(value_flow.value)
-                st.current_block.has_terminator = true
-            }
+        if st.current_fn.return_type == "void" {
+            st.current_block.terminator = mir_ret_void()
+            st.current_block.has_terminator = true
         } else {
-            if st.current_fn.return_type == "void" {
-                st.current_block.terminator = mir_ret_void()
-                st.current_block.has_terminator = true
-            } else {
-                st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
-                st.current_block.has_terminator = true
-            }
+            st.current_block.terminator = mir_ret_value(mir_const_int(st.current_fn.return_type, 0))
+            st.current_block.has_terminator = true
         }
     }
     mir_truncate_locals(st, body_local_count)

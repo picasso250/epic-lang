@@ -138,8 +138,6 @@ struct AstStructField {
 struct AstBlock {
     meta: AstMeta
     stmts: AstNode[]
-    value_expr: AstNode
-    has_value: bool
 }
 
 struct AstLet {
@@ -628,7 +626,7 @@ fun (p: Parser) parse_program(): AstNode {
 
 fun (p: Parser) parse_block(): AstBlock {
     let open = p.expect("LBRACE")
-    let node = new AstBlock { meta: ast_meta(token_line(open)), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }
+    let node = new AstBlock { meta: ast_meta(token_line(open)), stmts: new AstNode[] }
     p.skip_newlines()
     for p.peek_kind("RBRACE") == 0 {
         if p.peek_kind("EOF") == 1 {
@@ -637,19 +635,7 @@ fun (p: Parser) parse_block(): AstBlock {
         }
         let stmt = p.parse_stmt()
         p.skip_newlines()
-        if p.peek_kind("RBRACE") == 1 {
-            match stmt {
-                AstExprStmt expr_stmt: {
-                    node.value_expr = expr_stmt.expr
-                    node.has_value = true
-                }
-                _: {
-                    node.stmts.push(stmt)
-                }
-            }
-        } else {
-            node.stmts.push(stmt)
-        }
+        node.stmts.push(stmt)
     }
     p.expect("RBRACE")
     ret node
@@ -787,7 +773,7 @@ fun (p: Parser) parse_if_stmt(): AstNode {
     let token = p.expect("IF")
     let expr = p.parse_expr()
     let then_block = p.parse_block()
-    let else_block = new AstBlock { meta: ast_meta(token_line(token)), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }
+    let else_block = new AstBlock { meta: ast_meta(token_line(token)), stmts: new AstNode[] }
     let has_else = false
     p.skip_newlines()
     if p.check("ELSE") == 1 {
@@ -854,7 +840,7 @@ fun (p: Parser) parse_match_literal(): AstNode {
 fun (p: Parser) parse_match_stmt(): AstNode {
     let t = p.expect("MATCH")
     let expr = p.parse_expr()
-    let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstNode[], value_expr: ast_empty(), has_value: false }, has_else: false }
+    let node = new AstMatch { meta: ast_meta(token_line(t)), expr: expr, fields: new AstMatchCase[], else_block: new AstBlock { meta: ast_meta(token_line(t)), stmts: new AstNode[] }, has_else: false }
     p.expect("LBRACE")
     p.skip_newlines()
     let saw_default = 0
@@ -1586,11 +1572,6 @@ fun dump_node(node: AstNode, depth: i64): i64 {
             indent(depth)
             println("Block")
             dump_list(n.stmts, depth + 1)
-            if n.has_value {
-                indent(depth + 1)
-                println("BlockValue")
-                dump_node(n.value_expr, depth + 2)
-            }
             ret 0
         }
         AstLet n: {

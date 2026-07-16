@@ -1242,23 +1242,7 @@ fun sema_block(st: SemaState, block: AstBlock): void {
     for i: 0:len(block.stmts) {
         sema_stmt(st, block.stmts[i])
     }
-    if block.has_value {
-        sema_expr_type(st, block.value_expr)
-    }
     sema_pop_scope(st)
-}
-
-fun sema_function_body(st: SemaState, block: AstBlock): str {
-    let tail_type = ""
-    sema_push_scope(st)
-    for i: 0:len(block.stmts) {
-        sema_stmt(st, block.stmts[i])
-    }
-    if block.has_value {
-        tail_type = sema_expr_type(st, block.value_expr)
-    }
-    sema_pop_scope(st)
-    ret tail_type
 }
 
 fun sema_expr_is_exit(node: AstNode): bool {
@@ -1305,9 +1289,6 @@ fun sema_block_returns(block: AstBlock): bool {
             ret true
         }
     }
-    if block.has_value && sema_expr_is_exit(block.value_expr) {
-        ret true
-    }
     ret false
 }
 
@@ -1326,15 +1307,9 @@ fun sema_program(st: SemaState, ast: AstNode): void {
                     let p = f.params[j]
                     sema_define_local(st, p.name, p.meta.resolved_type)
                 }
-                let tail_type = sema_function_body(st, f.body)
-                if sema_block_returns(f.body) == false {
-                    if f.body.has_value {
-                        sema_check_assign_info(st.current_ret, tail_type, f.body.value_expr, "function tail")
-                    } else {
-                        if st.current_ret != "void" {
-                            sema_die(f"function must return {st.current_ret} on all paths")
-                        }
-                    }
+                sema_block(st, f.body)
+                if sema_block_returns(f.body) == false && st.current_ret != "void" {
+                    sema_die(f"function must return {st.current_ret} on all paths")
                 }
             }
             ret
