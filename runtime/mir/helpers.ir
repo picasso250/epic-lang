@@ -28,6 +28,18 @@ global @str.runtime.null.deref: ptr = bytes "runtime trap: null deref"
 
 global @str.runtime.panic.prefix: ptr = bytes "runtime panic: "
 
+global @str.runtime.true: ptr = bytes "true"
+
+global @str.runtime.false: ptr = bytes "false"
+
+global @str.runtime.zero: ptr = bytes "0"
+
+global @str.runtime.minus: ptr = bytes "-"
+
+global @str.runtime.i64.min: ptr = bytes "-9223372036854775808"
+
+global @str.runtime.invalid.string.slice: ptr = bytes "invalid string slice"
+
 define void @__ep_print_str(ptr %text) {
 entry:
   %call_result_2: ptr = call ptr __ep_import$kernel32.dll$GetStdHandle(i64 -11)
@@ -300,6 +312,172 @@ swap:
 
 done:
   ret void
+}
+
+define bool @__ep_str_eq(ptr %left, ptr %right) {
+entry:
+  %left_length_address: ptr = gep struct str, ptr %left, i64 0, i64 0
+  %left_length: i64 = load i64, ptr %left_length_address
+  %right_length_address: ptr = gep struct str, ptr %right, i64 0, i64 0
+  %right_length: i64 = load i64, ptr %right_length_address
+  %same_length: bool = icmp.eq i64 %left_length, i64 %right_length
+  condbr bool %same_length, label %prepare, label %different
+
+prepare:
+  %left_data: ptr = gep i8, ptr %left, i64 8
+  %right_data: ptr = gep i8, ptr %right, i64 8
+  %index_slot: ptr = alloca i64
+  store i64 0, ptr %index_slot
+  br label %check
+
+check:
+  %index: i64 = load i64, ptr %index_slot
+  %has_byte: bool = icmp.slt i64 %index, i64 %left_length
+  condbr bool %has_byte, label %compare, label %equal
+
+compare:
+  %left_address: ptr = gep i8, ptr %left_data, i64 %index
+  %left_byte: i64 = load i8, ptr %left_address
+  %right_address: ptr = gep i8, ptr %right_data, i64 %index
+  %right_byte: i64 = load i8, ptr %right_address
+  %same_byte: bool = icmp.eq i64 %left_byte, i64 %right_byte
+  condbr bool %same_byte, label %next, label %different
+
+next:
+  %next_index: i64 = add i64 %index, i64 1
+  store i64 %next_index, ptr %index_slot
+  br label %check
+
+equal:
+  ret bool true
+
+different:
+  ret bool false
+}
+
+define ptr @__ep_str_from_bool(bool %value) {
+entry:
+  condbr bool %value, label %is_true, label %is_false
+
+is_true:
+  ret ptr str.runtime.true
+
+is_false:
+  ret ptr str.runtime.false
+}
+
+define ptr @__ep_str_from_i64(i64 %value) {
+entry:
+  %is_minimum: bool = icmp.eq i64 %value, i64 -9223372036854775808
+  condbr bool %is_minimum, label %minimum, label %check_negative
+
+minimum:
+  ret ptr str.runtime.i64.min
+
+check_negative:
+  %is_negative: bool = icmp.slt i64 %value, i64 0
+  condbr bool %is_negative, label %negative, label %positive
+
+negative:
+  %magnitude: i64 = sub i64 0, i64 %value
+  %digits: ptr = call ptr __ep_str_from_u64(i64 %magnitude)
+  %negative_text: ptr = call ptr __ep_str_cat(ptr str.runtime.minus, ptr %digits)
+  ret ptr %negative_text
+
+positive:
+  %positive_text: ptr = call ptr __ep_str_from_u64(i64 %value)
+  ret ptr %positive_text
+}
+
+define ptr @__ep_str_from_u64(i64 %value) {
+entry:
+  %is_zero: bool = icmp.eq i64 %value, i64 0
+  condbr bool %is_zero, label %zero, label %count_prepare
+
+zero:
+  ret ptr str.runtime.zero
+
+count_prepare:
+  %count_value_slot: ptr = alloca i64
+  %count_slot: ptr = alloca i64
+  store i64 %value, ptr %count_value_slot
+  store i64 0, ptr %count_slot
+  br label %count_check
+
+count_check:
+  %count_value: i64 = load i64, ptr %count_value_slot
+  %count_more: bool = icmp.ne i64 %count_value, i64 0
+  condbr bool %count_more, label %count_digit, label %allocate
+
+count_digit:
+  %next_count_value: i64 = udiv i64 %count_value, i64 10
+  store i64 %next_count_value, ptr %count_value_slot
+  %count: i64 = load i64, ptr %count_slot
+  %next_count: i64 = add i64 %count, i64 1
+  store i64 %next_count, ptr %count_slot
+  br label %count_check
+
+allocate:
+  %length: i64 = load i64, ptr %count_slot
+  %allocation_size: i64 = add i64 %length, i64 9
+  %out: ptr = call ptr __ep_alloc(i64 %allocation_size)
+  %length_address: ptr = gep struct str, ptr %out, i64 0, i64 0
+  store i64 %length, ptr %length_address
+  %data: ptr = gep i8, ptr %out, i64 8
+  %terminator: ptr = gep i8, ptr %data, i64 %length
+  store i8 0, ptr %terminator
+  %fill_value_slot: ptr = alloca i64
+  %index_slot: ptr = alloca i64
+  store i64 %value, ptr %fill_value_slot
+  store i64 %length, ptr %index_slot
+  br label %fill_check
+
+fill_check:
+  %index: i64 = load i64, ptr %index_slot
+  %has_digit: bool = icmp.sgt i64 %index, i64 0
+  condbr bool %has_digit, label %fill_digit, label %done
+
+fill_digit:
+  %digit_index: i64 = sub i64 %index, i64 1
+  store i64 %digit_index, ptr %index_slot
+  %fill_value: i64 = load i64, ptr %fill_value_slot
+  %digit: i64 = urem i64 %fill_value, i64 10
+  %ascii: i64 = add i64 %digit, i64 48
+  %digit_address: ptr = gep i8, ptr %data, i64 %digit_index
+  store i8 %ascii, ptr %digit_address
+  %next_fill_value: i64 = udiv i64 %fill_value, i64 10
+  store i64 %next_fill_value, ptr %fill_value_slot
+  br label %fill_check
+
+done:
+  ret ptr %out
+}
+
+define ptr @__ep_str_slice(ptr %text, i64 %start, i64 %end) {
+entry:
+  %start_valid: bool = icmp.sge i64 %start, i64 0
+  condbr bool %start_valid, label %check_order, label %fail
+
+check_order:
+  %order_valid: bool = icmp.sge i64 %end, i64 %start
+  condbr bool %order_valid, label %check_end, label %fail
+
+check_end:
+  %length_address: ptr = gep struct str, ptr %text, i64 0, i64 0
+  %text_length: i64 = load i64, ptr %length_address
+  %end_valid: bool = icmp.sle i64 %end, i64 %text_length
+  condbr bool %end_valid, label %copy, label %fail
+
+copy:
+  %data: ptr = gep i8, ptr %text, i64 8
+  %start_data: ptr = gep i8, ptr %data, i64 %start
+  %slice_length: i64 = sub i64 %end, i64 %start
+  %result: ptr = call ptr __ep_str_copy(ptr %start_data, i64 %slice_length)
+  ret ptr %result
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.invalid.string.slice)
+  ret ptr null
 }
 
 define ptr @__ep_str_copy(ptr %data, i64 %length) {

@@ -1,15 +1,4 @@
-# Runtime resources embedded into the compiler image as ordinary string globals.
-
-struct EmbeddedRuntimeSource {
-    path: str
-    text: str
-}
-
-fun embedded_runtime_sources(): EmbeddedRuntimeSource[] {
-    ret new EmbeddedRuntimeSource[] {
-        new EmbeddedRuntimeSource { path: "runtime/str.ep", text: embed "../runtime/str.ep" }
-    }
-}
+# Runtime MIR resources embedded into the compiler image as ordinary string globals.
 
 fun embedded_runtime_helpers_mir(): str { ret embed "../runtime/mir/helpers.ir" }
 fun embedded_runtime_gc_mir(): str { ret embed "../runtime/mir/gc.ir" }

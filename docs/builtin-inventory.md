@@ -10,7 +10,7 @@ This document describes the current compiler, not removed NASM-era code.
 | Reserved public names | `sema_is_reserved_func` in `src/sema.ep` |
 | Type checking | `src/sema.ep` |
 | MIR lowering | `src/ast_to_mir.ep` |
-| Runtime definitions | MIR bundles plus Epic runtime sources, injected through `src/mir_runtime.ep` |
+| Runtime definitions | MIR bundles injected through `src/mir_runtime.ep` |
 
 The parser does not own builtin semantics or builtin-name reservation. Calls are parsed
 normally and builtin behavior is resolved during sema and MIR lowering.

@@ -34,7 +34,7 @@ python bootstrap_fixed_point.py -o build\epic.exe
 .\build\epic.exe examples\00_hello_world.ep -o build\hello.exe --verbose
 ```
 
-第一条命令使用 `v0` 分支导出的 seed 启动完整 bootstrap；本地缺少 seed 时会从该分支的 detached worktree 自动重建。生成的 self-hosted compiler 已把标准 Epic runtime source 与 MIR bundle 嵌入自身 `.data`，运行时不依赖当前工作目录中的 `runtime/`。
+第一条命令使用 `v0` 分支导出的 seed 启动完整 bootstrap；本地缺少 seed 时会从该分支的 detached worktree 自动重建。生成的 self-hosted compiler 已把 MIR runtime bundle 嵌入自身 `.data`，运行时不依赖当前工作目录中的 `runtime/`。
 
 程序输出：
 

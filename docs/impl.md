@@ -6,7 +6,7 @@
 
 ```
 src/                Epic-written compiler modules and tools
-runtime/            runtime sources and MIR helper bundle
+runtime/            MIR runtime bundles
 examples/           正向学习示例程序
 tests/              self-hosted 模块测试、e2e 与负向用例
 tools/              开发辅助脚本与可选本地工具
@@ -76,7 +76,7 @@ python bootstrap_fixed_point.py
 
 `build_epic_v0.py` 导出 `build/bootstrap-v0/epic-v0.exe`。`bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时自动使用或重建 `v0` 分支 seed。
 
-Self-hosted `epic.exe` 从自身 `.rdata` 中的只读 inline string object 读取 `src/runtime_bundle.ep` 声明的 runtime source 与 MIR bundle。所有 Epic runtime source 与用户源码进入同一个 frontend；完全一致的重复 extern 会折叠，冲突声明会报错。当前工作目录无需包含 `runtime/`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
+Self-hosted `epic.exe` 从自身 `.rdata` 中的只读 inline string object 读取 `src/runtime_bundle.ep` 声明的 MIR bundles。当前工作目录无需包含 `runtime/`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
 
 ## 工具链 (Toolchain)
 
