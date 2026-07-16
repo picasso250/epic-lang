@@ -1,11 +1,11 @@
 # EXIT: 1
 # STDOUT: runtime trap: null deref
 
-struct Inner {
+type Inner = {
     ok: bool
 }
 
-struct Outer {
+type Outer = {
     inner: Inner
 }
 

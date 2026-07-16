@@ -1,5 +1,5 @@
 # EXIT: 67
-struct Box {
+type Box = {
     value: i64
     small: u8
 }

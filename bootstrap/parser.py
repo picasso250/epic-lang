@@ -70,15 +70,17 @@ class Parser:
         unions = []
         externs = []
         self.skip_newlines()
-        while self.peek()[0] in ("EXTERN", "FUN", "STRUCT", "TYPE"):
+        while self.peek()[0] in ("EXTERN", "FUN", "TYPE"):
             if self.peek_kind("EXTERN"):
                 externs.append(self.parse_extern_def())
             elif self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
-            elif self.peek_kind("STRUCT"):
-                structs.append(self.parse_struct_def())
             else:
-                unions.append(self.parse_union_def())
+                type_def = self.parse_type_def()
+                if isinstance(type_def, StructDefNode):
+                    structs.append(type_def)
+                else:
+                    unions.append(type_def)
             self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
@@ -100,25 +102,21 @@ class Parser:
 
     # ── fun definition ─────────────────────────────────────────────────
 
-    def parse_struct_def(self):
-        self.expect("STRUCT")
-        name = self.expect("ID")
-        self.expect("LBRACE")
-        self.skip_newlines()
-        fields = []
-        while not self.peek_kind("RBRACE"):
-            fname = self.expect("ID")
-            self.expect("COLON")
-            ftype = self.parse_type()
-            self.expect_stmt_end()
-            fields.append(StructField(name=fname[1], type=ftype, line=fname[2]))
-        self.expect("RBRACE")
-        return StructDefNode(name=name[1], fields=fields)
-
-    def parse_union_def(self):
+    def parse_type_def(self):
         self.expect("TYPE")
         name = self.expect("ID")
         self.expect("ASSIGN")
+        if self.check("LBRACE"):
+            self.skip_newlines()
+            fields = []
+            while not self.peek_kind("RBRACE"):
+                fname = self.expect("ID")
+                self.expect("COLON")
+                ftype = self.parse_type()
+                self.expect_stmt_end()
+                fields.append(StructField(name=fname[1], type=ftype, line=fname[2]))
+            self.expect("RBRACE")
+            return StructDefNode(name=name[1], fields=fields)
         members = []
         while True:
             member = self.expect("ID")
@@ -671,7 +669,7 @@ class Parser:
                 self.skip_newlines()
             elif not self.peek_kind("RBRACE"):
                 t = self.peek()
-                raise ParseError("Expected comma or newline in struct initializer", t[2])
+                raise ParseError("Expected comma or newline in type initializer", t[2])
         self.expect("RBRACE")
         return fields
 

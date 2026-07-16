@@ -1,0 +1,7 @@
+# COMPILE_FAIL: Unexpected token
+struct Legacy {
+    value: i64
+}
+
+fun main(): void {
+}

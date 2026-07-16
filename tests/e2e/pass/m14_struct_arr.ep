@@ -1,6 +1,6 @@
 # EXIT: 150
 
-struct Token {
+type Token = {
     kind: i64
     value: i64
 }

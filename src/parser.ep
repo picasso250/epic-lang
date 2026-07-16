@@ -28,15 +28,15 @@ fun epic_type_array_elem(t: str): str {
     ret t[0:len(t) - 2]
 }
 
-struct TypeMissing {
+type TypeMissing = {
     dummy: i64
 }
 
-struct TypeName {
+type TypeName = {
     name: str
 }
 
-struct TypeArray {
+type TypeArray = {
     elem: TypeExpr
 }
 
@@ -71,7 +71,7 @@ fun type_expr_text(t: TypeExpr): str {
     ret ""
 }
 
-struct AstMeta {
+type AstMeta = {
     line: i64
     resolved_type: str
 }
@@ -80,7 +80,7 @@ fun ast_meta(line: i64): AstMeta {
     ret new AstMeta { line: line }
 }
 
-struct AstProgram {
+type AstProgram = {
     meta: AstMeta
     funcs: AstFunDef[]
     externs: AstExternDef[]
@@ -88,19 +88,19 @@ struct AstProgram {
     unions: AstUnionDef[]
 }
 
-struct AstStructDef {
+type AstStructDef = {
     meta: AstMeta
     name: str
     fields: AstStructField[]
 }
 
-struct AstUnionDef {
+type AstUnionDef = {
     meta: AstMeta
     name: str
     members: str[]
 }
 
-struct AstExternDef {
+type AstExternDef = {
     meta: AstMeta
     library: str
     name: str
@@ -108,7 +108,7 @@ struct AstExternDef {
     source_type: TypeExpr
 }
 
-struct AstFunDef {
+type AstFunDef = {
     meta: AstMeta
     name: str
     params: AstParam[]
@@ -119,64 +119,64 @@ struct AstFunDef {
     method_name: str
 }
 
-struct AstParam {
+type AstParam = {
     meta: AstMeta
     name: str
     source_type: TypeExpr
 }
 
-struct AstStructField {
+type AstStructField = {
     meta: AstMeta
     name: str
     source_type: TypeExpr
 }
 
-struct AstBlock {
+type AstBlock = {
     meta: AstMeta
     stmts: AstStmt[]
 }
 
-struct AstLet {
+type AstLet = {
     meta: AstMeta
     name: str
     source_type: TypeExpr
     value_expr: AstExpr
 }
 
-struct AstReturn {
+type AstReturn = {
     meta: AstMeta
     expr: AstExpr
     has_expr: bool
 }
 
-struct AstAssign {
+type AstAssign = {
     meta: AstMeta
     name: str
     value_expr: AstExpr
 }
 
-struct AstAssignOp {
+type AstAssignOp = {
     meta: AstMeta
     expr: AstExpr
     op: str
     value_expr: AstExpr
 }
 
-struct AstFieldSet {
+type AstFieldSet = {
     meta: AstMeta
     object: AstExpr
     name: str
     value_expr: AstExpr
 }
 
-struct AstSubscriptAssign {
+type AstSubscriptAssign = {
     meta: AstMeta
     base: AstExpr
     index: AstExpr
     value_expr: AstExpr
 }
 
-struct AstIf {
+type AstIf = {
     meta: AstMeta
     expr: AstExpr
     then_block: AstBlock
@@ -184,13 +184,13 @@ struct AstIf {
     has_else: bool
 }
 
-struct AstLoop {
+type AstLoop = {
     meta: AstMeta
     expr: AstExpr
     body: AstBlock
 }
 
-struct AstForRange {
+type AstForRange = {
     meta: AstMeta
     name: str
     start: AstExpr
@@ -198,20 +198,20 @@ struct AstForRange {
     body: AstBlock
 }
 
-struct AstBreak {
+type AstBreak = {
     meta: AstMeta
 }
 
-struct AstContinue {
+type AstContinue = {
     meta: AstMeta
 }
 
-struct AstPanic {
+type AstPanic = {
     meta: AstMeta
     expr: AstExpr
 }
 
-struct AstMatch {
+type AstMatch = {
     meta: AstMeta
     expr: AstExpr
     fields: AstMatchCase[]
@@ -219,7 +219,7 @@ struct AstMatch {
     has_else: bool
 }
 
-struct AstMatchCase {
+type AstMatchCase = {
     meta: AstMeta
     variant_name: str
     binding_name: str
@@ -228,133 +228,133 @@ struct AstMatchCase {
     body: AstBlock
 }
 
-struct AstExprStmt {
+type AstExprStmt = {
     meta: AstMeta
     expr: AstExpr
 }
 
-struct AstLiteral {
+type AstLiteral = {
     meta: AstMeta
     value: str
 }
 
-struct AstChar {
+type AstChar = {
     meta: AstMeta
     value: str
 }
 
-struct AstBool {
+type AstBool = {
     meta: AstMeta
     value: str
 }
 
-struct AstString {
+type AstString = {
     meta: AstMeta
     value: str
 }
 
-struct AstEmbed {
+type AstEmbed = {
     meta: AstMeta
     path: str
     source_path: str
 }
 
-struct AstFString {
+type AstFString = {
     meta: AstMeta
     fields: AstFStringPart[]
 }
 
-struct AstFStringText {
+type AstFStringText = {
     meta: AstMeta
     value: str
 }
 
-struct AstFStringExpr {
+type AstFStringExpr = {
     meta: AstMeta
     expr: AstExpr
 }
 
-struct AstVar {
+type AstVar = {
     meta: AstMeta
     name: str
 }
 
-struct AstBinary {
+type AstBinary = {
     meta: AstMeta
     op: str
     left: AstExpr
     right: AstExpr
 }
 
-struct AstUnary {
+type AstUnary = {
     meta: AstMeta
     op: str
     expr: AstExpr
 }
 
-struct AstCall {
+type AstCall = {
     meta: AstMeta
     name: str
     args: AstExpr[]
 }
 
-struct AstDotCall {
+type AstDotCall = {
     meta: AstMeta
     object: AstExpr
     name: str
     args: AstExpr[]
 }
 
-struct AstFieldAccess {
+type AstFieldAccess = {
     meta: AstMeta
     object: AstExpr
     name: str
 }
 
-struct AstNullCheck {
+type AstNullCheck = {
     meta: AstMeta
     expr: AstExpr
 }
 
-struct AstSubscript {
+type AstSubscript = {
     meta: AstMeta
     base: AstExpr
     index: AstExpr
 }
 
-struct AstSlice {
+type AstSlice = {
     meta: AstMeta
     base: AstExpr
     start: AstExpr
     end: AstExpr
 }
 
-struct AstNewArray {
+type AstNewArray = {
     meta: AstMeta
     elem_type: TypeExpr
     count: AstExpr
     has_count: bool
 }
 
-struct AstArrayLiteral {
+type AstArrayLiteral = {
     meta: AstMeta
     elem_type: TypeExpr
     args: AstExpr[]
 }
 
-struct AstStructInit {
+type AstStructInit = {
     meta: AstMeta
     name: str
     fields: AstInitField[]
 }
 
-struct AstInitField {
+type AstInitField = {
     meta: AstMeta
     name: str
     value_expr: AstExpr
 }
 
-struct AstUnionInit {
+type AstUnionInit = {
     meta: AstMeta
     type_name: str
     expr: AstExpr
@@ -390,7 +390,7 @@ fun ast_require_resolved_type(meta: AstMeta): str {
 
 fun ast_set_resolved_type(node: AstExpr, value: str): void { node.meta.resolved_type = value }
 
-struct Parser {
+type Parser = {
     tokens: Token[]
     pos: i64
     for_counter: i64
@@ -521,9 +521,7 @@ fun (p: Parser) parse_extern_def(): AstExternDef {
     ret new AstExternDef { meta: ast_meta(start.line), library: library.text, name: name.text, params: params, source_type: ret_type }
 }
 
-fun (p: Parser) parse_struct_def(): AstStructDef {
-    p.expect("STRUCT")
-    let name = p.expect("ID")
+fun (p: Parser) parse_product_type_def(name: Token): AstStructDef {
     let node = new AstStructDef { meta: ast_meta(name.line), name: name.text, fields: new AstStructField[] }
     p.expect("LBRACE")
     p.skip_newlines()
@@ -577,10 +575,7 @@ fun (p: Parser) parse_fn_def(): AstFunDef {
     ret new AstFunDef { meta: ast_meta(line), name: symbol_name, params: params, source_type: ret_type, body: body }
 }
 
-fun (p: Parser) parse_union_def(): AstUnionDef {
-    p.expect("TYPE")
-    let name = p.expect("ID")
-    p.expect("ASSIGN")
+fun (p: Parser) parse_sum_type_def(name: Token): AstUnionDef {
     let node = new AstUnionDef { meta: ast_meta(name.line), name: name.text, members: new str[] }
     let done = 0
     for done == 0 {
@@ -594,18 +589,27 @@ fun (p: Parser) parse_union_def(): AstUnionDef {
     ret node
 }
 
+fun (p: Parser) parse_type_def(program: AstProgram): void {
+    p.expect("TYPE")
+    let name = p.expect("ID")
+    p.expect("ASSIGN")
+    if p.peek_kind("LBRACE") == 1 {
+        program.structs.push(p.parse_product_type_def(name))
+        ret
+    }
+    program.unions.push(p.parse_sum_type_def(name))
+}
+
 fun (p: Parser) parse_program(): AstProgram {
     let program = new AstProgram { meta: ast_meta(0), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
     p.skip_newlines()
-    for p.peek_kind("EXTERN") == 1 || p.peek_kind("FUN") == 1 || p.peek_kind("STRUCT") == 1 || p.peek_kind("TYPE") == 1 {
+    for p.peek_kind("EXTERN") == 1 || p.peek_kind("FUN") == 1 || p.peek_kind("TYPE") == 1 {
         if p.peek_kind("EXTERN") == 1 {
             program.externs.push(p.parse_extern_def())
         } else if p.peek_kind("FUN") == 1 {
             program.funcs.push(p.parse_fn_def())
-        } else if p.peek_kind("STRUCT") == 1 {
-            program.structs.push(p.parse_struct_def())
         } else {
-            program.unions.push(p.parse_union_def())
+            p.parse_type_def(program)
         }
         p.skip_newlines()
     }
@@ -1155,7 +1159,7 @@ fun (p: Parser) parse_struct_init(name: Token): AstExpr {
                 p.skip_newlines()
             } else if p.peek_kind("RBRACE") == 0 {
                 let t = p.peek()
-                parse_error(t.line, "Expected comma or newline in struct initializer")
+                parse_error(t.line, "Expected comma or newline in type initializer")
             }
         }
     }

@@ -1,16 +1,16 @@
 # EXIT: 0
 # STDOUT: 42
 
-struct Meta {
+type Meta = {
     line: i64
 }
 
-struct Leaf {
+type Leaf = {
     meta: Meta
     value: i64
 }
 
-struct Pair {
+type Pair = {
     meta: Meta
     left: i64
     right: i64

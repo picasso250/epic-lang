@@ -94,7 +94,7 @@ The current contract does not introduce:
 - Unicode ordering or locale-aware comparison.
 - Immutable string literals.
 - Copy-on-write aliasing.
-- Automatic formatting for structs or arbitrary arrays.
+- Automatic formatting for product types or arbitrary arrays.
 - Implicit `str`/`u8[]` coercions.
 
 This v0 branch is a bootstrap implementation. Its shared zero-copy representation

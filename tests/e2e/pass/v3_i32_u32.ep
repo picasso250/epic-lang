@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: ok
 
-struct Pair32 {
+type Pair32 = {
     a: i32
     b: u32
 }

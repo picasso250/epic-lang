@@ -1,0 +1,14 @@
+# EXIT: 0
+
+type struct = {
+    value: i64
+}
+
+fun struct(value: i64): i64 {
+    ret value
+}
+
+fun main(): void {
+    let item = new struct { value: 42 }
+    exit(struct(item.value) - 42)
+}

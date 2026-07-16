@@ -1,4 +1,4 @@
-struct Box {
+type Box = {
     value: i64
 }
 

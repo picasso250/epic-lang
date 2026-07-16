@@ -3,7 +3,6 @@
 [
   "extern"
   "fun"
-  "struct"
   "type"
   "let"
   "ret"

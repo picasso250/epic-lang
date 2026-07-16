@@ -189,24 +189,24 @@ Expr wrapper:
   payload pointer
 
 payload:
-  user-defined struct instance
+  user-defined product instance
 ```
 
 编译器流程：
 
-1. 收集所有 struct 定义。
-2. 收集 `type Name = A | B | C` union 定义。
-3. 验证 union member 都是 struct。
+1. 收集所有 `type Name = { ... }` product 定义。
+2. 收集 `type Name = A | B | C` sum 定义。
+3. 验证 sum member 都是 product。
 4. 为 wrapper 生成 tag namespace。
 5. `new Expr(payload)` 生成 wrapper。
 6. ADT `match` 根据 wrapper tag 分派，并绑定 payload struct。
 
 不支持：
 
-- primitive union member
+- primitive sum member
 - implicit boxing
 - tag 访问
-- union extension
+- sum extension
 - variant-specific constructor namespace
 
 ## 代码生成模型 (Codegen Model)
@@ -223,9 +223,9 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 
 ### 降级说明 (Lowering Notes)
 
-- **用户方法 v1**：Parser 将 `fun (p: Parser) peek(): Token` 解析为带 receiver metadata 的函数定义，并占用内部符号 `Parser__peek`。Sema 对 `p.peek(args...)` 先求 receiver 类型；如果是用户 struct `Parser`，只查 `Parser__peek(p, args...)`，不 fallback 到 `peek(p, args...)`。普通函数名允许包含 `__`；mangled method symbol 与已有函数重复时，复用普通重复定义错误。
-- **Null check postfix**：Parser 将 `expr?` 解析为 `NullCheck`。Sema 只允许 reference 类型（`str`、array、struct、ADT wrapper），返回 `bool`。AST-to-MIR 对被检查表达式求值一次，然后发射 `icmp.ne <ptr>, null`；`?` 本身不 deref 被检查值，不触发 null trap。
-- **方法边界**：第一版只支持用户 struct receiver，不支持 primitive / `str` / array receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 struct 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
+- **用户方法 v1**：Parser 将 `fun (p: Parser) peek(): Token` 解析为带 receiver metadata 的函数定义，并占用内部符号 `Parser__peek`。Sema 对 `p.peek(args...)` 先求 receiver 类型；如果 `Parser` 使用 `{ ... }` 声明，只查 `Parser__peek(p, args...)`，不 fallback 到 `peek(p, args...)`。普通函数名允许包含 `__`；mangled method symbol 与已有函数重复时，复用普通重复定义错误。
+- **Null check postfix**：Parser 将 `expr?` 解析为 `NullCheck`。Sema 只允许 reference 类型（`str`、array、product、sum wrapper），返回 `bool`。AST-to-MIR 对被检查表达式求值一次，然后发射 `icmp.ne <ptr>, null`；`?` 本身不 deref 被检查值，不触发 null trap。
+- **方法边界**：第一版只支持使用 `{ ... }` 声明的 product receiver，不支持 sum / primitive / `str` / array receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 product 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
@@ -245,7 +245,7 @@ Python reference compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF 
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(x)`           | formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。struct、非 `u8[]` array 不支持 | 公开 |
+| `str(x)`           | formatting/view 操作：`str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` zero-copy view。product、非 `u8[]` array 不支持 | 公开 |
 | `str + str`         | `__ep_str_cat`，分配新字符串并复制两侧内容 | 公开语法 |
 | `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
 | `read_file`        | `__ep_read_file` helper，返回 `u8[]`        | 公开 |

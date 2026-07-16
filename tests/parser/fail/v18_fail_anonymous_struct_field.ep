@@ -1,9 +1,9 @@
 # COMPILE_FAIL: Expected COLON
-struct Meta {
+type Meta = {
     line: i64
 }
 
-struct Node {
+type Node = {
     Meta
 }
 

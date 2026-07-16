@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: 612
-struct Box {
+type Box = {
     value: i64
 }
 

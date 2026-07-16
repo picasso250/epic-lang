@@ -1,10 +1,10 @@
 # EXIT: 0
 # STDOUT: 42
-struct Lit {
+type Lit = {
     value: i64
 }
 
-struct Add {
+type Add = {
     left: i64
     right: i64
 }

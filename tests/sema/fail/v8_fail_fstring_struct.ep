@@ -1,6 +1,6 @@
 # COMPILE_FAIL: f-string expression expected str, integer, bool, or u8[], got Val
 
-struct Val {
+type Val = {
     val: i64
 }
 

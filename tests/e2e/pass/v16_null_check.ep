@@ -3,11 +3,11 @@
 # STDOUT: true
 # STDOUT: true
 
-struct Inner {
+type Inner = {
     ok: bool
 }
 
-struct Outer {
+type Outer = {
     inner: Inner
 }
 

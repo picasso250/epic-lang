@@ -38,7 +38,7 @@ Hello, Epic!
 - `i64`、`u64`、`i32`、`u32`、`u8`、`bool`，带检查的算术运算，显式整数转换
 - `str`：字节字符串、f-string、内容等值比较、切片、分配式拼接
 - 动态数组 `T[]`：字面量、零初始化、索引、`push`/`pop`/`extend`
-- 堆分配结构体：具名/部分初始化；省略的引用字段为 null
+- 堆分配的具名字段类型：具名/部分初始化；省略的引用字段为 null
 - 封闭 ADT：`type Name = A | B`，显式包装构造，公共字段直接访问
 - 面向字节的文件 I/O、`argv`、进程退出、类型化的直接 WinAPI 导入
 
@@ -46,10 +46,10 @@ Hello, Epic!
 
 ## 代码一览
 
-**结构体与方法：**
+**类型与方法：**
 
 ```epic
-struct Parser {
+type Parser = {
     pos: i64
 }
 
@@ -67,11 +67,11 @@ fun main(): void {
 **ADT 与 match：**
 
 ```epic
-struct LiteralExpr {
+type LiteralExpr = {
     value: i64
 }
 
-struct BinaryExpr {
+type BinaryExpr = {
     op: str
 }
 

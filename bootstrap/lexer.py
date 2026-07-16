@@ -19,7 +19,6 @@ TOKEN_SPEC = [
     ("FALSE",     r'\bfalse\b'),
     ("BREAK",     r'\bbreak\b'),
     ("CONTINUE",  r'\bcontinue\b'),
-    ("STRUCT",    r'\bstruct\b'),
     ("NEW",       r'\bnew\b'),
     ("EMBED",     r'\bembed\b'),
     ("LET",       r'\blet\b'),

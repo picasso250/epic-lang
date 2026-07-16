@@ -1,7 +1,7 @@
 # Epic minimal PE linker.
 # MVP: one NASM COFF obj -> PE64 console exe, matching link.py's support shape.
 
-struct Section {
+type Section = {
     name: str
     data: u8[]
     raw_sz: i64
@@ -11,7 +11,7 @@ struct Section {
     virtual_sz: i64
 }
 
-struct Symbol {
+type Symbol = {
     name_off: i64
     raw_off: i64
     value: i64
@@ -19,18 +19,18 @@ struct Symbol {
     aux: i64
 }
 
-struct Reloc {
+type Reloc = {
     si: i64
     rva: i64
     sym_i: i64
 }
 
-struct NameValue {
+type NameValue = {
     name: str
     value: i64
 }
 
-struct LinkState {
+type LinkState = {
     data: u8[]
     sections: Section[]
     syms: Symbol[]

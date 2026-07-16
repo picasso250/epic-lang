@@ -2,7 +2,7 @@
 # STDOUT: 6
 # STDOUT: abab
 # STDOUT: 5
-struct Box {
+type Box = {
     value: i64
 }
 

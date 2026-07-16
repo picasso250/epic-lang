@@ -140,7 +140,7 @@ def _merge_programs(input_paths, main_path, verbose=True):
         for struct in ast.structs:
             if struct.name in seen_structs:
                 raise RuntimeError(
-                    f"Duplicate struct {struct.name}: {input_path} and {seen_structs[struct.name]}"
+                    f"duplicate type {struct.name}: {input_path} and {seen_structs[struct.name]}"
                 )
             seen_structs[struct.name] = input_path
             structs.append(struct)
@@ -148,7 +148,7 @@ def _merge_programs(input_paths, main_path, verbose=True):
         for union in ast.unions:
             if union.name in seen_unions:
                 raise RuntimeError(
-                    f"Duplicate type {union.name}: {input_path} and {seen_unions[union.name]}"
+                    f"duplicate type {union.name}: {input_path} and {seen_unions[union.name]}"
                 )
             seen_unions[union.name] = input_path
             unions.append(union)

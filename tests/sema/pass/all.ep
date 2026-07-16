@@ -9,24 +9,24 @@ fun check(ok: bool): void {
 
 extern "kernel32.dll" fun GetTickCount64(): u64
 
-struct Point {
+type Point = {
     x: i64
     y: i64
     label: str
 }
 
-struct Holder {
+type Holder = {
     point: Point
     bytes: u8[]
     count: i64
 }
 
 
-struct SemLit {
+type SemLit = {
     value: i64
 }
 
-struct SemAdd {
+type SemAdd = {
     left: i64
     right: i64
 }

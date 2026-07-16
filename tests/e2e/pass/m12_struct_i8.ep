@@ -1,6 +1,6 @@
 # EXIT: 65
 
-struct Data {
+type Data = {
     flag: u8
     value: i64
 }

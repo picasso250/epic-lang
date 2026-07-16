@@ -3,7 +3,7 @@
 # Current milestone: integer ops plus basic branches.
 #
 
-struct MirToX64Lower {
+type MirToX64Lower = {
     x64: X64Program
     value_slots: i64[]
     addr_slots: i64[]

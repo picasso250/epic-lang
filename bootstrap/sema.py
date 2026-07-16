@@ -80,7 +80,11 @@ class SemanticAnalyzer:
         return self.program
 
     def _build_types(self):
+        seen_types = set()
         for struct in self.program.structs:
+            if struct.name in seen_types:
+                self._fail_global(f"duplicate type {struct.name}")
+            seen_types.add(struct.name)
             fields = {}
             for field in struct.fields:
                 if field.name in fields:
@@ -90,19 +94,23 @@ class SemanticAnalyzer:
             self.struct_fields[struct.name] = fields
 
     def _build_unions(self):
+        seen_unions = set()
         for union in self.program.unions:
             if union.name in self.struct_names:
-                self._fail_global(f"type {union.name} conflicts with struct {union.name}")
-            if not union.members:
-                self._fail_global(f"union {union.name} requires at least one member")
+                self._fail_global(f"duplicate type {union.name}")
+            if union.name in seen_unions:
+                self._fail_global(f"duplicate type {union.name}")
+            seen_unions.add(union.name)
+            if len(union.members) < 2:
+                self._fail_global(f"sum type {union.name} requires at least two members")
             seen = set()
             tags = {}
             for idx, member in enumerate(union.members, start=1):
                 if member in seen:
-                    self._fail_global(f"duplicate union member {union.name}.{member}")
+                    self._fail_global(f"duplicate sum member {union.name}.{member}")
                 seen.add(member)
                 if member not in self.struct_names:
-                    self._fail_global(f"union member {union.name}.{member} must be a struct")
+                    self._fail_global(f"sum member {union.name}.{member} must name a type declared with {{ ... }}")
                 tags[member] = idx
             self.union_tags[union.name] = tags
 
@@ -112,7 +120,7 @@ class SemanticAnalyzer:
                 self._fail_global(f"duplicate function {fn.name}")
             if fn.method_name:
                 if fn.receiver_type.kind != "named" or fn.receiver_type.name not in self.struct_names:
-                    self._fail_global(f"method receiver must be a user-defined struct, got {fn.receiver_type}")
+                    self._fail_global(f"method receiver must name a type declared with {{ ... }}, got {fn.receiver_type}")
             params = []
             for param in fn.params:
                 param.resolved_type = self._type_name(param.type)
@@ -278,7 +286,7 @@ class SemanticAnalyzer:
                 self._analyze_block(case.body)
                 continue
             if case.variant_name or case.binding_name:
-                self._fail("ADT match case requires union scrutinee")
+                self._fail("match case requires a sum type")
             self._analyze_match_case(scrutinee.type, case)
 
     def _analyze_union_match(self, stmt, union_name):
@@ -294,9 +302,9 @@ class SemanticAnalyzer:
                 self._analyze_block(case.body)
                 continue
             if case.pattern is not None:
-                self._fail(f"ADT match on {union_name} requires variant binding cases")
+                self._fail(f"match on sum type {union_name} requires variant binding cases")
             if not case.variant_name or not case.binding_name:
-                self._fail(f"ADT match on {union_name} requires variant binding cases")
+                self._fail(f"match on sum type {union_name} requires variant binding cases")
             if case.variant_name not in members:
                 self._fail(f"{case.variant_name} is not a member of {union_name}")
             if case.variant_name in seen:
@@ -520,21 +528,21 @@ class SemanticAnalyzer:
             params, ret = self.func_sigs[method_symbol]
             self._check_call_args(method_symbol, params, [expr.object] + expr.args)
             return ExprInfo(ret)
-        self._fail("method calls are only supported for arrays and user structs")
+        self._fail("method calls are only supported for arrays and types declared with { ... }")
         return ExprInfo(VOID)
 
     def _struct_init_expr(self, expr):
         if expr.type_name not in self.struct_fields:
-            self._fail(f"unknown struct {expr.type_name}")
+            self._fail(f"unknown type {expr.type_name}")
         self._check_named_fields(self.struct_fields[expr.type_name], expr.fields, expr.type_name)
         return ExprInfo(NAMED(expr.type_name))
 
     def _union_init_expr(self, expr):
         if expr.type_name not in self.union_names:
-            self._fail(f"unknown union {expr.type_name}")
+            self._fail(f"unknown type {expr.type_name}")
         payload = self._expr(expr.payload)
         if payload.type.kind != "named" or payload.type.name not in self.struct_names:
-            self._fail(f"new {expr.type_name}(...) expected struct payload, got {payload.type}")
+            self._fail(f"new {expr.type_name}(...) requires a value whose type is declared with {{ ... }}, got {payload.type}")
         if payload.type.name not in self.union_defs[expr.type_name]:
             self._fail(f"new {expr.type_name}(...) expected one of {', '.join(self.union_defs[expr.type_name])}, got {payload.type.name}")
         return ExprInfo(NAMED(expr.type_name))
@@ -575,13 +583,13 @@ class SemanticAnalyzer:
         for member in self.union_defs[union_name]:
             fields = self.struct_fields[member]
             if field not in fields:
-                self._fail(f"union {union_name} has no common field {field}")
+                self._fail(f"type {union_name} has no common field {field}")
             candidate = fields[field]
             if found is not None and candidate != found:
-                self._fail(f"union {union_name} field {field} has inconsistent types")
+                self._fail(f"type {union_name} field {field} has inconsistent types")
             found = candidate
         if found is None:
-            self._fail(f"union {union_name} has no common field {field}")
+            self._fail(f"type {union_name} has no common field {field}")
         return found
 
     def _is_reference_type(self, typ):
@@ -606,7 +614,7 @@ class SemanticAnalyzer:
             if fields is None:
                 if base_type.name in self.union_names:
                     return self._union_common_field_type(base_type.name, field)
-                self._fail(f"field access expected struct, got {base_type}")
+                self._fail(f"field access requires a type with fields, got {base_type}")
             if field in fields:
                 return fields[field]
             self._fail(f"unknown field {base_type.name}.{field}")
