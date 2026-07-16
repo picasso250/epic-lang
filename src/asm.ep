@@ -20,7 +20,6 @@ type ExeImage {
     data: u8[]
     symbols: AsmSymbol[]
     relocs: AsmReloc[]
-    imports: str[]
     entry_offset: i64
     section: i64
     scope: str
@@ -317,7 +316,6 @@ fun asm_image_new(): ExeImage {
     image.data = new u8[]
     image.symbols = new AsmSymbol[]
     image.relocs = new AsmReloc[]
-    image.imports = new str[]
     image.section = 0
     image.scope = ""
     return image
@@ -350,13 +348,6 @@ fun asm_u32(image: ExeImage, value: i64): i64 {
 fun asm_u64(image: ExeImage, value: i64): i64 {
     asm_u32(image, value)
     asm_u32(image, value >> 32)
-    return 0
-}
-fun asm_patch_u32(buf: u8[], off: i64, value: i64): i64 {
-    buf[off] = value
-    buf[off + 1] = value >> 8
-    buf[off + 2] = value >> 16
-    buf[off + 3] = value >> 24
     return 0
 }
 fun asm_symbol_find(image: ExeImage, name: str): i64 {

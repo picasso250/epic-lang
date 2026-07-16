@@ -1,9 +1,10 @@
 # Epic v1
 
 Epic v1 is the first self-hosted Epic compiler. Its source is written in the
-v0 language subset and emits NASM assembly. This keeps the bootstrap step small
-while v1 implements the language capabilities needed by the next compiler
-generation.
+v0 language subset, emits its private assembly text, encodes AMD64 instructions,
+and writes deterministic PE executables. This keeps the bootstrap step small
+while making the self-hosted compiler independent of external assembly and
+linking tools during normal compilation.
 
 The bootstrap chain is:
 
@@ -20,8 +21,9 @@ python build_epic_v1.py
 The script resolves the current local `v0` branch, creates a temporary detached
 Git worktree at its exact commit, and uses that worktree's Python compiler to
 compile `src/`. The temporary worktree is removed when the build finishes.
-NASM remains part of the trusted toolchain, and `link.py` remains until a later
-Epic generation takes ownership of machine-code emission and linking.
+NASM remains only in the trusted stage-0 path that builds the first v1 seed from
+Python v0. Self-hosted generations and programs compiled by v1 use Epic's
+internal assembler and PE writer.
 
 The resulting compiler is `build/epic-v1.exe`.
 

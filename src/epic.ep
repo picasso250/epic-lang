@@ -88,42 +88,17 @@ fun output_base(main_path: str): str {
     let safe2 = str_replace_char(safe1, 92, '_')
     return "build/epic/" + safe2
 }
-fun write_build_script(cmd_path: str, asm_path: str, obj_path: str, exe_path: str): i64 {
-    let script = new u8[256]
-    extend(script, bytes("@echo off\n"))
-    extend(script, bytes("tools\\nasm.exe -f win64 \""))
-    extend(script, bytes(asm_path))
-    extend(script, bytes("\" -o \""))
-    extend(script, bytes(obj_path))
-    extend(script, bytes("\"\n"))
-    extend(script, bytes("if errorlevel 1 exit /b 1\n"))
-    extend(script, bytes("python link.py \""))
-    extend(script, bytes(obj_path))
-    extend(script, bytes("\" -o \""))
-    extend(script, bytes(exe_path))
-    extend(script, bytes("\"\n"))
-    extend(script, bytes("if errorlevel 1 exit /b 1\n"))
-    write_file(cmd_path, script)
-    return 0
-}
 fun main(): void {
     system("cmd /c if not exist build mkdir build")
     system("cmd /c if not exist build\\epic mkdir build\\epic")
     let ast = merge_inputs()
     let base = output_base(argv.data[1])
     let asm_path = base + ".asm"
-    let obj_path = base + ".obj"
     let exe_path = base + ".exe"
     let e = make_emitter(asm_path)
     emit_program(e, ast)
     let image = assemble_text(read_file(asm_path))
-    pe_write_exe(base + ".native.exe", image)
-    let cmd_path = "build/epic/build.cmd"
-    write_build_script(cmd_path, asm_path, obj_path, exe_path)
-    let code = system("cmd /c build\\epic\\build.cmd")
-    if code != 0 {
-        die_driver("build failed")
-    }
+    pe_write_exe(exe_path, image)
     putstr(exe_path)
     putc(10)
 }

@@ -52,10 +52,10 @@ fun pe_u64(out: u8[], value: i64): i64 {
     return 0
 }
 fun pe_patch_u32(out: u8[], off: i64, value: i64): i64 {
-    out[off] = value
-    out[off + 1] = value >> 8
-    out[off + 2] = value >> 16
-    out[off + 3] = value >> 24
+    out.data[off] = value
+    out.data[off + 1] = value >> 8
+    out.data[off + 2] = value >> 16
+    out.data[off + 3] = value >> 24
     return 0
 }
 fun pe_patch_u64(out: u8[], off: i64, value: i64): i64 {
@@ -345,8 +345,14 @@ fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): i64 {
             out = image.data
         }
         if r.kind == 1 || r.kind == 2 {
+            if r.offset < 0 || r.offset + 4 > out.len {
+                pe_die("rel32 offset out of bounds")
+            }
             pe_patch_u32(out, r.offset, target + r.addend - (source_rva + r.offset + 4))
         } else if r.kind == 3 {
+            if r.offset < 0 || r.offset + 8 > out.len {
+                pe_die("abs64 offset out of bounds")
+            }
             pe_patch_u64(out, r.offset, 5368709120 + target + r.addend)
         } else {
             pe_die("unknown relocation kind")

@@ -7,7 +7,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "build", "epic-v1.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 E2E_PASS_DIR = os.path.join(SCRIPT_DIR, "tests", "e2e", "pass")
-EXEC_TIMEOUT = 1  # seconds, prevent link.py bugs from hanging
+EXEC_TIMEOUT = 1  # seconds, prevent generated programs from hanging
 
 
 def parse_annotations(source):
@@ -86,19 +86,12 @@ def run_test(ep_file):
     
     safe = rel.replace("/", "_").replace("\\", "_")
     exe_path = os.path.join(SCRIPT_DIR, "build", "epic", safe + ".exe")
-    native_path = os.path.join(SCRIPT_DIR, "build", "epic", safe + ".native.exe")
     if not os.path.exists(exe_path):
         return False, f"no exe produced: {exe_path}"
-    if not os.path.exists(native_path):
-        return False, f"no native exe produced: {native_path}"
 
-    failures = [f"old: {failure}" for failure in check_executable(
+    failures = check_executable(
         exe_path, argv, exit_expected, stdout_expected,
-    )]
-    clean_test_paths(clean_paths)
-    failures.extend(f"native: {failure}" for failure in check_executable(
-        native_path, argv, exit_expected, stdout_expected,
-    ))
+    )
     
     if failures:
         try:
