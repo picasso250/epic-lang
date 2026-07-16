@@ -144,10 +144,13 @@ runtime/            MIR 运行时辅助代码和后端运行时支持
 examples/           正向学习示例
 tests/              测试、验收入口与负向用例
 docs/               设计笔记与实现契约
-editors/            编辑器集成资源
 tools/              开发辅助脚本与可选本地工具（如 lld-link.exe）
 build/              忽略的本地构建输出
 ```
+
+编辑器适配独立维护在
+[`tree-sitter-epic`](https://github.com/picasso250/tree-sitter-epic) 和
+[`zed-epic`](https://github.com/picasso250/zed-epic)。
 
 早期阶段的自举目录保存在 Git 历史与标签中。存档标签：`staged-bootstrap-archive-2026-06-30`、`python-asm-archive-2026-07-02`。
 

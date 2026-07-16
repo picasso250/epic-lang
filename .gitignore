@@ -10,13 +10,6 @@ __pycache__/
 # Binary tools (see README for setup)
 tools/*.exe
 
-# Zed editor - generated grammar files (compiled WASM)
-editors/zed/grammars/
-
 # Temporary files produced by examples
 test_out.txt
 test_write_file.txt
-
-# Tree-sitter local native parser link artifacts
-editors/zed/tree-sitter-epic/parser.exp
-editors/zed/tree-sitter-epic/parser.lib

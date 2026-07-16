@@ -10,9 +10,10 @@ src/                Epic-written compiler modules and tools
 examples/           正向学习示例程序
 tools/              开发辅助脚本与可选本地工具；LLD-Link 可选
 docs/               文档
-editors/            编辑器支持
-tree-sitter-epic/   Tree-sitter 语法
 ```
+
+Tree-sitter grammar 与 Zed extension 是下游适配，分别维护在独立仓库
+`tree-sitter-epic` 和 `zed-epic`。
 
 ## Python 参考编译器 (Python Reference Compiler)
 
