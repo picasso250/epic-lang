@@ -5,10 +5,10 @@ Build the self-hosted compiler and verify that it reaches a bootstrap fixed poin
 Stages:
   epic-py: Python compiler builds the Epic compiler.
   epic-epic: epic-py builds the Epic compiler.
-  epic-epic-epic: epic-epic builds the Epic compiler again.
 
-The later stages should be byte-identical. If they are not, self-hosting is not
-yet a stable bootstrap anchor.
+The two outputs should be byte-identical. This verifies both that the Python and
+Epic implementations agree and that the first self-hosted compiler is already a
+bootstrap fixed point.
 """
 
 import argparse
@@ -218,31 +218,21 @@ def main():
 
         generation1 = os.path.join(BOOT_DIR, "epic-seed-1.exe")
         generation2 = os.path.join(BOOT_DIR, "epic-seed-2.exe")
-        generation3 = os.path.join(BOOT_DIR, "epic-seed-3.exe")
 
         build_with_epic(seed, generation1, "seed -> epic-seed-1")
         build_with_epic(generation1, generation2, "epic-seed-1 -> epic-seed-2")
-        build_with_epic(generation2, generation3, "epic-seed-2 -> epic-seed-3")
 
-        checks = [(generation2, generation3)]
-        converged = generation3
+        checks = [(generation1, generation2)]
+        converged = generation2
     else:
         epic_py = os.path.join(BOOT_DIR, "epic-py.exe")
         epic_epic = os.path.join(BOOT_DIR, "epic-epic.exe")
-        epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic.exe")
-        epic_epic_epic_epic = os.path.join(BOOT_DIR, "epic-epic-epic-epic.exe")
 
         build_with_python(epic_py)
         build_with_epic(epic_py, epic_epic, "epic-py -> epic-epic")
-        build_with_epic(epic_epic, epic_epic_epic, "epic-epic -> epic-epic-epic")
-        build_with_epic(
-            epic_epic_epic,
-            epic_epic_epic_epic,
-            "epic-epic-epic -> epic-epic-epic-epic",
-        )
 
-        checks = [(epic_epic, epic_epic_epic), (epic_epic_epic, epic_epic_epic_epic)]
-        converged = epic_epic_epic_epic
+        checks = [(epic_py, epic_epic)]
+        converged = epic_epic
 
     for left, right in checks:
         if not filecmp.cmp(left, right, shallow=False):

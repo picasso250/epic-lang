@@ -97,9 +97,9 @@ python tests/examples/run.py
 python bootstrap_fixed_point.py
 ```
 
-`tests/run.py` 运行模块级 Python/self-hosted 对拍和 e2e；`tests/examples/run.py` 验证正向用户示例；`bootstrap_fixed_point.py` 从 Python 构建收敛的 self-hosted compiler，并验证自举不动点。需要单独验证 self-hosted 编译用户示例时，可运行 `python tests/examples/run.py --self-hosted`。
+`tests/run.py` 运行模块级 Python/self-hosted 对拍和 e2e；`tests/examples/run.py` 验证正向用户示例；`bootstrap_fixed_point.py` 比较 Python 直接生成的编译器与该编译器第一次自举生成的编译器，验证两者字节一致。需要单独验证 self-hosted 编译用户示例时，可运行 `python tests/examples/run.py --self-hosted`。
 
-`bootstrap_fixed_point.py` 直接构建当前 checkout，不负责检出 revision，也不依赖已提交的预期产物哈希。`--seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的连续世代；`-o <compiler.exe>` 将验证后的最终收敛世代写到指定位置。复现发布版本时，先 checkout 对应的不可移动 tag，再运行该脚本。
+`bootstrap_fixed_point.py` 直接构建当前 checkout，不负责检出 revision，也不依赖已提交的预期产物哈希。`--seed <compiler.exe>` 使用已有 Epic 编译器构建当前源码的两个世代并比较；`-o <compiler.exe>` 将验证后的收敛编译器写到指定位置。复现发布版本时，先 checkout 对应的不可移动 tag，再运行该脚本。
 
 Self-hosted `epic.exe` 直接编译用户输入；内部 runtime 已作为 `runtime/mir/helpers.mir` 嵌入编译器。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。Python reference CLI 接受相同的 `--verbose` 开关。
 

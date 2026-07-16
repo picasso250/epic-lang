@@ -125,7 +125,7 @@ Epic v0 是一个正在收敛的 early-stage 项目，当前：
 
 ### 自举不动点
 
-项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。连续三个 self-hosted generations 字节一致；当前收敛编译器为 **742,400 bytes（0.71 MiB）**。
+项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 编译 Epic compiler 源码得到 `epic-py.exe`，该编译器再编译同一份源码得到 `epic-epic.exe`；两条编译路径的产物字节一致。当前收敛编译器为 **743,936 bytes（0.71 MiB）**，SHA-256 为 `bd316a0d7e07911d3a405d4dc4cdca125a35cab5d8e97a9321971ab19d00123f`。
 
 生成并保留最终收敛的编译器：
 
