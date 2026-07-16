@@ -41,7 +41,7 @@ Hello, Epic!
 
 Epic 目前支持：
 
-- 函数与结构体接收者方法、局部变量、块尾部值、显式返回
+- 函数与结构体接收者方法、局部变量、显式返回
 - `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
 - `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`；`_:` 是唯一的默认分支形式
 - `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、十进制与十六进制整数字面量、显式整数类型转换、带检查的算术运算
