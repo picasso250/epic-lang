@@ -1,0 +1,17 @@
+# EXIT: 0
+# STDOUT: 42
+# STDOUT: 47
+# STDOUT: 4
+fun main(): void {
+    let x = 40 + 2
+    putstr(itoa(x))
+    putc(10)
+
+    x = x + 5
+    putstr(itoa(x))
+    putc(10)
+
+    let y = (10 / 3) + (10 % 3)
+    putstr(itoa(y))
+    putc(10)
+}

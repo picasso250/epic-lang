@@ -13,8 +13,8 @@ python epic.py <file.ep>
 Useful forms:
 
 ```text
-python epic.py examples/m1_exit.ep
-python epic.py examples/m1_exit.ep --linker lld-link
+python epic.py examples/00_hello_world.ep
+python epic.py examples/00_hello_world.ep --linker lld-link
 python epic.py --main main.ep main.ep lib.ep
 python epic.py examples/m1_exit.ep --out-dir build/custom
 ```
@@ -22,9 +22,9 @@ python epic.py examples/m1_exit.ep --out-dir build/custom
 Generated files are written under `build/` by default while preserving source-relative paths:
 
 ```text
-examples/m1_exit.ep -> build/examples/m1_exit.asm
-examples/m1_exit.ep -> build/examples/m1_exit.obj
-examples/m1_exit.ep -> build/examples/m1_exit.exe
+examples/00_hello_world.ep -> build/examples/00_hello_world.asm
+examples/00_hello_world.ep -> build/examples/00_hello_world.obj
+examples/00_hello_world.ep -> build/examples/00_hello_world.exe
 ```
 
 The driver parses all input files, merges top-level definitions, emits one NASM assembly file, assembles it with NASM, then links it with either `link.py` or `lld-link`.

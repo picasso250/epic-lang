@@ -11,10 +11,12 @@ python runtests.py --linker py
 Compile one program:
 
 ```powershell
-python epic.py examples/m1_exit.ep
+python epic.py examples/00_hello_world.ep
 ```
 
 Product types use `type Name { ... }`. The `struct` keyword and sum declarations are not part of v0.
+
+`examples/` contains five small, ordered learning programs. Broader regression coverage lives under `tests/e2e/pass/`; `runtests.py` executes both suites.
 
 The intended bootstrap chain is:
 

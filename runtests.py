@@ -10,6 +10,7 @@ import os, sys, subprocess, re, shlex, argparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "epic.py")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
+E2E_PASS_DIR = os.path.join(SCRIPT_DIR, "tests", "e2e", "pass")
 EXEC_TIMEOUT = 1  # seconds, prevent link.py bugs from hanging
 
 
@@ -107,20 +108,22 @@ def run_test(ep_file, linker="lld-link"):
 
 
 def run_all(linker):
-    examples = sorted(
-        f for f in os.listdir(EXAMPLES_DIR) if f.endswith(".ep")
-    )
-    if not examples:
-        print("No .ep files found in examples/")
+    cases = []
+    for suite, directory in (("examples", EXAMPLES_DIR), ("e2e", E2E_PASS_DIR)):
+        if not os.path.isdir(directory):
+            continue
+        for name in sorted(f for f in os.listdir(directory) if f.endswith(".ep")):
+            cases.append((suite, name, os.path.join(directory, name)))
+    if not cases:
+        print("No .ep test cases found")
         return 0, 1, 0
 
     passed = 0
     failed = 0
     skipped = 0
 
-    print(f"Running {len(examples)} tests...\n")
-    for ep_name in examples:
-        ep_path = os.path.join(EXAMPLES_DIR, ep_name)
+    print(f"Running {len(cases)} tests...\n")
+    for suite, ep_name, ep_path in cases:
         try:
             ok, detail = run_test(ep_path, linker=linker)
         except subprocess.TimeoutExpired:
@@ -135,7 +138,8 @@ def run_all(linker):
             passed += 1
         else:
             failed += 1
-        print(f"  {status:5}  {ep_name:20s}  {detail}")
+        case_name = f"{suite}/{ep_name}"
+        print(f"  {status:5}  {case_name:32s}  {detail}")
 
     print(f"\n{passed} passed, {failed} failed, {skipped} skipped")
     return passed, failed, skipped

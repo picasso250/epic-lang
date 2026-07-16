@@ -1,0 +1,20 @@
+# EXIT: 0
+# STDOUT: if
+# STDOUT: loop 0
+# STDOUT: loop 1
+fun main(): void {
+    let n = 2
+    if n > 1 {
+        putstr("if\n")
+    } else {
+        putstr("else\n")
+    }
+
+    let i = 0
+    while i < 2 {
+        putstr("loop ")
+        putstr(itoa(i))
+        putc(10)
+        i = i + 1
+    }
+}

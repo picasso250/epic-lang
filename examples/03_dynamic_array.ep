@@ -1,0 +1,24 @@
+# EXIT: 0
+# STDOUT: 3
+# STDOUT: 1
+# STDOUT: 6
+fun main(): void {
+    let xs = new i64[4]
+    push(xs, 1)
+    push(xs, 2)
+    push(xs, 3)
+
+    putstr(itoa(xs.len))
+    putc(10)
+    putstr(itoa(xs.data[0]))
+    putc(10)
+
+    let total = 0
+    let i = 0
+    while i < xs.len {
+        total = total + xs.data[i]
+        i = i + 1
+    }
+    putstr(itoa(total))
+    putc(10)
+}
