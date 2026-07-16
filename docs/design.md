@@ -8,6 +8,8 @@ Epic 是一门面向 Windows x64 的小型 C-like 系统语言（systems languag
 
 本实现不保留向前兼容性。语言变化时，编译器源码随当前设计一起演进。
 
+v0 之后计划将 product、unit sum 与 payload sum 统一到一套 nominal `type` 声明中，并删除独立的 `struct` surface；这不是当前语法。已接受的方向与实施前仍需解决的问题见 [`unified-type-declarations.md`](unified-type-declarations.md)。
+
 ## 程序模型 (Program Model)
 
 一个程序由一组顶层 `struct`、`type`、`fun` 和 `extern` 声明组成。没有包（package）、可见性规则或按文件的命名空间。
