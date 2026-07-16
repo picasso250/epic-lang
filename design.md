@@ -48,7 +48,7 @@ User-facing types:
 | Type | Meaning |
 | --- | --- |
 | `i64` | signed 64-bit integer |
-| `i8` | signed byte |
+| `u8` | unsigned byte storage; reads zero-extend to `i64` |
 | `str` | immutable heap string |
 | `Name` | heap-allocated product reference |
 | `T[]` | heap-allocated dynamic array |
@@ -140,7 +140,7 @@ String and character literals are ASCII-only in v0. Non-ASCII literals are compi
 
 `len` counts bytes, not characters.
 
-For bootstrapping v1, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new i8[n]` for mutable byte buffers.
+For bootstrapping v1, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new u8[n]` for mutable byte buffers.
 
 ## Dynamic arrays
 

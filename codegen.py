@@ -31,6 +31,7 @@ class Emitter:
         self.local_types = {}
         self.label_counter = 0
         self.current_fn = ""
+        self.current_ret_type = "void"
         self.alloc_size = 0     # bytes allocated after push rbp / mov rbp, rsp
         self.strings = {}       # literal text → label name
         self.string_counter = 0
@@ -182,6 +183,7 @@ class Emitter:
         self.local_bytes = 0
         name = fn.name
         self.current_fn = name
+        self.current_ret_type = self._internal_type(fn.ret_type)
         self.current_ep_label = f"{name}_ep"
         params = fn.params
         body = fn.body
@@ -225,7 +227,7 @@ class Emitter:
             slot = self.get_var_slot(p.name)
             ptype = self._internal_type(p.type)
             self.local_types[p.name] = ptype
-            if ptype == "i8":
+            if ptype == "u8":
                 self.emit_stack_store(slot, param_low[i])
             else:
                 self.emit_stack_store(slot, param_regs[i])
@@ -339,7 +341,7 @@ class Emitter:
         typ = self._internal_type(typ) if typ else typ
         if typ == "i64":
             return 8
-        if typ == "i8":
+        if typ == "u8":
             return 1
         if typ in self.structs:
             return self.structs[typ]["size"]
@@ -365,12 +367,12 @@ class Emitter:
                 elem = elem[1:]
             self._ensure_array_type(elem)
             return f"&_arr_{elem}"
-        if typ in ("i64", "i8", "void"):
+        if typ in ("i64", "u8", "void"):
             return typ
         return f"&{typ}"
 
     def _array_data_type(self, elem):
-        return f"&{elem}" if elem in ("i64", "i8") else f"&&{elem}"
+        return f"&{elem}" if elem in ("i64", "u8") else f"&&{elem}"
 
     def _register_len_data_type(self, name, elem_ptr_type, has_cap=False):
         """Register a {data, len[, cap]} layout type. data is always offset 0."""
@@ -395,8 +397,8 @@ class Emitter:
 
     def _compute_struct_layouts(self, ast):
         self.structs = {}
-        # Built-in str type: { data: &i8, len: i64 }
-        self._register_len_data_type("str", "&i8")
+        # Built-in str type: { data: &u8, len: i64 }
+        self._register_len_data_type("str", "&u8")
         # Array-of-str type used by argv.
         self._register_len_data_type("_arr_str", "&&str", has_cap=True)
         for s in ast.structs:
@@ -487,6 +489,8 @@ class Emitter:
         else:
             if stmt.expr is not None:
                 self.emit_expr(stmt.expr)
+                if self.current_ret_type == "u8":
+                    self.emit_inst("movzx eax, al")
             ep_label = getattr(self, "current_ep_label", f"{self.current_fn}_ep")
             self.emit_jmp(ep_label)
 
@@ -516,7 +520,7 @@ class Emitter:
         if value is None:
             return  # declaration without initializer
         self.emit_expr(value)
-        if var_type == "i8":
+        if var_type == "u8":
             self.emit_stack_store(slot, "al")
         else:
             self.emit_stack_store(slot, "rax")
@@ -567,7 +571,7 @@ class Emitter:
         if slot is None:
             raise RuntimeError(f"Undefined variable: {name}")
         var_type = self.local_types.get(name, "i64")
-        if var_type == "i8":
+        if var_type == "u8":
             self.emit_stack_store(slot, "al")
         else:
             self.emit_stack_store(slot, "rax")
@@ -592,8 +596,8 @@ class Emitter:
             if slot is None:
                 raise RuntimeError(f"Undefined variable: {name}")
             var_type = self.local_types.get(name, "i64")
-            if var_type == "i8":
-                self.emit(f"    movsx rax, byte [rbp{slot:+d}]")
+            if var_type == "u8":
+                self.emit(f"    movzx rax, byte [rbp{slot:+d}]")
             else:
                 self.emit_stack_load("rax", slot)
         elif isinstance(expr, CallNode):
@@ -678,7 +682,7 @@ class Emitter:
                 self.emit_call_inst("_write_file")
                 self.emit("    add rsp, 8")
             elif name == "str_new":
-                # str(bytes: &i8, len: i64) → &str (deep-copy via _str_alloc)
+                # str(bytes: &u8, len: i64) → &str (deep-copy via _str_alloc)
                 slots = self._spill_args(args)
                 self.emit_stack_load("rcx", slots[0])
                 self.emit_stack_load("rdx", slots[1])
@@ -705,7 +709,7 @@ class Emitter:
                 slots = self._spill_args(args)
                 self.emit_stack_load("rcx", slots[0])
                 self.emit_stack_load("rdx", slots[1])
-                self.emit_call_inst("_extend_i8")
+                self.emit_call_inst("_extend_u8")
                 self.emit("    xor eax, eax")
             return
 
@@ -860,8 +864,8 @@ class Emitter:
                 return
             slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
             self._emit_struct_base(slot, is_ptr)
-            if ftype == "i8":
-                self.emit(f"    movsx rax, byte [rax+{off}]")
+            if ftype == "u8":
+                self.emit(f"    movzx rax, byte [rax+{off}]")
             else:
                 self.emit(f"    mov rax, [rax+{off}]")
         elif isinstance(obj, SubscriptNode):
@@ -887,8 +891,8 @@ class Emitter:
         info = self.structs[struct_name]
         for f in info["fields"]:
             if f["name"] == field_name:
-                if f["type"] == "i8":
-                    self.emit(f"    movsx rax, byte [rax+{f['offset']}]")
+                if f["type"] == "u8":
+                    self.emit(f"    movzx rax, byte [rax+{f['offset']}]")
                 else:
                     self.emit(f"    mov rax, [rax+{f['offset']}]")
                 return
@@ -905,7 +909,7 @@ class Emitter:
         info = self.structs[struct_name]
         for f in info["fields"]:
             if f["name"] == field_name:
-                if f["type"] == "i8":
+                if f["type"] == "u8":
                     self.emit(f"    mov [rax+{f['offset']}], cl")
                 else:
                     self.emit(f"    mov [rax+{f['offset']}], rcx")
@@ -923,7 +927,7 @@ class Emitter:
             slot, off, ftype, is_ptr = self._resolve_field(obj.name, field_name)
             self._emit_struct_base_rcx(slot, is_ptr)
             self.emit("    pop rax")
-            if ftype == "i8":
+            if ftype == "u8":
                 self.emit(f"    mov [rcx+{off}], al")
             else:
                 self.emit(f"    mov [rcx+{off}], rax")
@@ -945,7 +949,7 @@ class Emitter:
             info = self.structs[struct_name]
             for f in info["fields"]:
                 if f["name"] == field_name:
-                    if f["type"] == "i8":
+                    if f["type"] == "u8":
                         self.emit(f"    mov [rax+{f['offset']}], cl")
                     else:
                         self.emit(f"    mov [rax+{f['offset']}], rcx")
@@ -969,7 +973,7 @@ class Emitter:
         # Compute element type from a synthetic subscript expression
         synth = SubscriptNode(base=base, index=index)
         elem_type = self._expr_type(synth)
-        is_i8 = (elem_type == "i8")
+        is_u8 = (elem_type == "u8")
         # Evaluate value first
         self.emit_expr(value)
         self.emit("    push rax")
@@ -981,12 +985,12 @@ class Emitter:
         self.emit("    push rax")
         self.emit_expr(index)       # rax = index
         self.emit("    pop rcx")    # rcx = base pointer
-        if is_i8:
+        if is_u8:
             self.emit(f"    lea rcx, [rcx + rax]")
         else:
             self.emit(f"    lea rcx, [rcx + rax*8]")
         self.emit("    pop rax")
-        if is_i8:
+        if is_u8:
             self.emit(f"    mov [rcx], al")
         else:
             self.emit(f"    mov [rcx], rax")
@@ -1034,7 +1038,7 @@ class Emitter:
         self.emit_stack_load("rcx", tmp_header)
         self.emit_mov("qword [rcx+8]", "0")
         self.emit_mov("[rcx+16]", "rax")
-        el_size = 1 if elem == "i8" else 8
+        el_size = 1 if elem == "u8" else 8
         self.emit_mov("r8", "rax")
         if el_size != 1:
             self.emit(f"    imul r8, {el_size}")
@@ -1054,7 +1058,7 @@ class Emitter:
         if not (arr_type.startswith("&_arr_")):
             raise RuntimeError(f"push on non-array type '{arr_type}'")
         elem = arr_type[6:]
-        el_size = 1 if elem == "i8" else 8
+        el_size = 1 if elem == "u8" else 8
         tmp_arr = self._alloc_temp()
         tmp_val = self._alloc_temp()
         tmp_new_data = self._alloc_temp()
@@ -1138,8 +1142,8 @@ class Emitter:
         self.emit("    push rax")
         self.emit_expr(index)       # rax = index
         self.emit("    pop rcx")    # rcx = base pointer
-        if elem_type == "i8":
-            self.emit(f"    movsx rax, byte [rcx + rax]")
+        if elem_type == "u8":
+            self.emit(f"    movzx rax, byte [rcx + rax]")
         else:
             # i64, struct pointer, or anything else: 8-byte stride
             self.emit(f"    mov rax, [rcx + rax*8]")
@@ -1162,7 +1166,7 @@ class Emitter:
             if name in ("itoa", "str_new", "read_file", "str_slice", "str_replace_char"):
                 return "&str"
             if name == "bytes":
-                return "&_arr_i8"
+                return "&_arr_u8"
             if name in ("system", "write_file"):
                 return "i64"
             if name in ("putc", "putstr", "extend"):
@@ -1183,12 +1187,12 @@ class Emitter:
             return "i64"  # fallback
         if isinstance(expr, SubscriptNode):
             base_type = self._expr_type(expr.base)
-            # base_type is like &T where T may be _arr_X, i8, i64, or &Struct
+            # base_type is like &T where T may be _arr_X, u8, i64, or &Struct
             if base_type.startswith("&"):
                 inner = base_type[1:]  # strip one layer of pointer
                 if inner.startswith("_arr_"):
                     elem = inner[5:]  # element type name
-                    if elem in ("i64", "i8"):
+                    if elem in ("i64", "u8"):
                         return elem
                     return "&" + elem  # struct arrays return &Struct
                 # Direct pointer: subscript returns the pointee type

@@ -72,7 +72,7 @@ User-facing types lower to implementation types:
 | User type | Internal type |
 | --- | --- |
 | `i64` | `i64` |
-| `i8` | `i8` |
+| `u8` | `u8` |
 | `str` | `&str` |
 | `Token` | `&Token` |
 | `i64[]` | `&_arr_i64` |
@@ -86,7 +86,7 @@ User programs do not write pointer types. `&T` and `&&T` are compiler-internal c
 
 ```text
 str = {
-    data: &i8,
+    data: &u8,
     len: i64,
 }
 ```
@@ -111,7 +111,7 @@ User product fields use fixed 8-byte slots in v0.
 
 - Field offset is `index * 8`.
 - Struct size is `field_count * 8`.
-- `i8` fields load/store one byte inside their 8-byte slot.
+- `u8` fields load/store one byte inside their 8-byte slot.
 - Built-in runtime layouts such as `str` and dynamic arrays keep their explicit layouts.
 
 ## Parser notes

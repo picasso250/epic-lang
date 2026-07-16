@@ -1,6 +1,6 @@
 ; ── _str_cat: concatenate two str values ──
 ; rcx = left &str, rdx = right &str
-; returns: rax = &str { data: &i8, len: i64 }
+; returns: rax = &str { data: &u8, len: i64 }
 _str_cat:
     push rbp
     mov rbp, rsp

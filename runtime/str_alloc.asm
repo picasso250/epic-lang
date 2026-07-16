@@ -1,6 +1,6 @@
 ; ── _str_alloc: deep-copy bytes into heap-allocated str ──
 ; rcx = src pointer, rdx = len
-; returns: rax = &str { data: &i8, len: i64 }
+; returns: rax = &str { data: &u8, len: i64 }
 ; clobbers: rax, rcx, rdx, r8, r9, r10, r11
 _str_alloc:
     push rbp

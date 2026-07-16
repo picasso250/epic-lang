@@ -1,6 +1,6 @@
-; ── _bytes: copy str bytes into a new i8[] ──
+; ── _bytes: copy str bytes into a new u8[] ──
 ; rcx = &str
-; returns: rax = &_arr_i8 { data: &i8, len: i64, cap: i64 }
+; returns: rax = &_arr_u8 { data: &u8, len: i64, cap: i64 }
 _bytes:
     push rbp
     mov rbp, rsp

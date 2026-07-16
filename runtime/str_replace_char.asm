@@ -1,6 +1,6 @@
 ; ── _str_replace_char: copy str while replacing one byte ──
 ; rcx = &str, rdx = from byte, r8 = to byte
-; returns: rax = &str { data: &i8, len: i64 }
+; returns: rax = &str { data: &u8, len: i64 }
 _str_replace_char:
     push rbp
     mov rbp, rsp
