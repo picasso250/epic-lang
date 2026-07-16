@@ -1,6 +1,3 @@
-# Runtime sources embedded into the compiler image.
+# Runtime MIR embedded into the compiler image.
 
-fun runtime_array_source(): str { ret embed "../runtime/array.ep" }
-fun runtime_panic_source(): str { ret embed "../runtime/panic.ep" }
-fun runtime_str_source(): str { ret embed "../runtime/str.ep" }
 fun runtime_helpers_mir_source(): str { ret embed "../runtime/mir/helpers.mir" }

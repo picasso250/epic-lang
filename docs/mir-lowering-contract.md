@@ -360,7 +360,8 @@ Helpers such as `__ep_alloc`, `__ep_cstr`, `__ep_read_file`,
 and `__ep_slice_u8_extend` are
 ordinary `MirFunction`s loaded from `runtime/mir/helpers.mir` and injected by
 `bootstrap/mir_runtime_helpers.py` in the Python compiler and `src/mir_runtime.ep`
-in the self-hosted compiler. Composite helpers also come from `runtime/*.ep`.
+in the self-hosted compiler. The bundle is the sole runtime implementation source;
+the frontend does not merge hidden Epic source files into user programs.
 After injection, both compilers prune unreachable MIR functions from the final
 program starting at `main`; startup and helper dependencies remain reachable
 through explicit MIR calls.

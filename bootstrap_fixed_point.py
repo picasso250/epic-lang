@@ -19,7 +19,7 @@ import subprocess
 import sys
 import time
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES
+from compiler_sources import SELF_HOST_COMPILER_SOURCES
 
 
 def rel(path):
@@ -30,7 +30,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPICC = os.path.join(SCRIPT_DIR, "bootstrap", "epic.py")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
-RUNTIME_SOURCES = list(SELF_HOST_RUNTIME_SOURCES)
 COMPILER_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_COMPILER_SOURCES]
 
 TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "30"))

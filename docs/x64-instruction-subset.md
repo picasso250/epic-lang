@@ -378,10 +378,9 @@ runtime, insert preparation calls, and prune unreachable functions.
 `bytes(str)` and `str(u8[])` are identity casts in lowering, not runtime helper
 calls.
 
-Base helper bodies are bundled in `runtime/mir/helpers.mir`; composite helpers
-are written in `runtime/*.ep`. Python and self-hosted compilers consume the same
-sources. The x64 layer owns only ABI lowering, program data emission, and WinAPI
-imports.
+All helper bodies are bundled in `runtime/mir/helpers.mir`. Python and
+self-hosted compilers consume that same source. The x64 layer owns only ABI
+lowering, program data emission, and WinAPI imports.
 
 ### 8.2 X64Program validator exists
 

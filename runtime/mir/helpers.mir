@@ -18,10 +18,6 @@ extern i64 @CloseHandle(i64)
 
 extern ptr @GetCommandLineA()
 
-extern void @__ep_runtime_panic(ptr)
-
-extern ptr @__ep_str_from_i64(i64)
-
 global @argv: ptr
 
 global @heap: i64
@@ -35,6 +31,16 @@ global @str.runtime.null.deref: ptr = bytes "runtime trap: null deref"
 global @str.runtime.cstr.prefix: ptr = bytes "panic line "
 
 global @str.runtime.cstr.suffix: ptr = bytes ": invalid cstr"
+
+global @str.runtime.panic.prefix: ptr = bytes "runtime panic: "
+
+global @str.runtime.invalid.string.slice: ptr = bytes "invalid string slice"
+
+global @str.runtime.true: ptr = bytes "true"
+
+global @str.runtime.false: ptr = bytes "false"
+
+global @str.runtime.i64.min: ptr = bytes "-9223372036854775808"
 
 define ptr @__ep_alloc(i64 %1) {
 entry:
@@ -850,4 +856,285 @@ swap:
   %33: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 2
   store i64 %32, ptr %33
   condbr bool %11, label %store, label %store
+}
+
+define void @__ep_runtime_panic(ptr %1) {
+entry:
+  call void __ep_print_str(ptr str.runtime.panic.prefix)
+  call void __ep_print_str(ptr %1)
+  call void __ep_print_newline()
+  call void ExitProcess(i64 1)
+  ret void
+}
+
+define ptr @__ep_slice_u8_slice(ptr %1, i64 %2, i64 %3) {
+entry:
+  %4: bool = icmp.sge i64 %2, i64 0
+  condbr bool %4, label %check_order, label %fail
+
+check_order:
+  %5: bool = icmp.sge i64 %3, i64 %2
+  condbr bool %5, label %check_high, label %fail
+
+check_high:
+  %6: ptr = gep struct _slice_u8, ptr %1, i64 0, i64 1
+  %7: i64 = load i64, ptr %6
+  %8: bool = icmp.sle i64 %3, i64 %7
+  condbr bool %8, label %prepare, label %fail
+
+prepare:
+  %9: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  %10: ptr = alloca i64
+  store i64 %2, ptr %10
+  br label %loop_check
+
+loop_check:
+  %11: i64 = load i64, ptr %10
+  %12: bool = icmp.slt i64 %11, i64 %3
+  condbr bool %12, label %loop_body, label %done
+
+loop_body:
+  %13: i64 = call i64 __ep_slice_u8_get(ptr %1, i64 %11)
+  call void __ep_slice_u8_push(ptr %9, i64 %13)
+  %14: i64 = add i64 %11, i64 1
+  store i64 %14, ptr %10
+  br label %loop_check
+
+done:
+  ret ptr %9
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.slice.oob)
+  ret ptr null
+}
+
+define void @__ep_slice_u8_extend(ptr %1, ptr %2) {
+entry:
+  %3: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = alloca i64
+  store i64 0, ptr %5
+  br label %loop_check
+
+loop_check:
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.slt i64 %6, i64 %4
+  condbr bool %7, label %loop_body, label %done
+
+loop_body:
+  %8: i64 = call i64 __ep_slice_u8_get(ptr %2, i64 %6)
+  call void __ep_slice_u8_push(ptr %1, i64 %8)
+  %9: i64 = add i64 %6, i64 1
+  store i64 %9, ptr %5
+  br label %loop_check
+
+done:
+  ret void
+}
+
+define void @__ep_slice_i64_extend(ptr %1, ptr %2) {
+entry:
+  %3: ptr = gep struct _slice_i64, ptr %2, i64 0, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = alloca i64
+  store i64 0, ptr %5
+  br label %loop_check
+
+loop_check:
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.slt i64 %6, i64 %4
+  condbr bool %7, label %loop_body, label %done
+
+loop_body:
+  %8: i64 = call i64 __ep_slice_i64_get(ptr %2, i64 %6)
+  call void __ep_slice_i64_push(ptr %1, i64 %8)
+  %9: i64 = add i64 %6, i64 1
+  store i64 %9, ptr %5
+  br label %loop_check
+
+done:
+  ret void
+}
+
+define ptr @__ep_str_cat(ptr %1, ptr %2) {
+entry:
+  %3: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  call void __ep_slice_u8_extend(ptr %3, ptr %1)
+  call void __ep_slice_u8_extend(ptr %3, ptr %2)
+  ret ptr %3
+}
+
+define bool @__ep_str_eq(ptr %1, ptr %2) {
+entry:
+  %3: ptr = gep struct str, ptr %1, i64 0, i64 1
+  %4: i64 = load i64, ptr %3
+  %5: ptr = gep struct str, ptr %2, i64 0, i64 1
+  %6: i64 = load i64, ptr %5
+  %7: bool = icmp.eq i64 %4, i64 %6
+  condbr bool %7, label %prepare, label %different
+
+prepare:
+  %8: ptr = gep struct str, ptr %1, i64 0, i64 0
+  %9: ptr = load ptr, ptr %8
+  %10: ptr = gep struct str, ptr %2, i64 0, i64 0
+  %11: ptr = load ptr, ptr %10
+  %12: ptr = alloca i64
+  store i64 0, ptr %12
+  br label %loop_check
+
+loop_check:
+  %13: i64 = load i64, ptr %12
+  %14: bool = icmp.slt i64 %13, i64 %4
+  condbr bool %14, label %loop_body, label %equal
+
+loop_body:
+  %15: ptr = gep i8, ptr %9, i64 %13
+  %16: i8 = load i8, ptr %15
+  %17: ptr = gep i8, ptr %11, i64 %13
+  %18: i8 = load i8, ptr %17
+  %19: bool = icmp.eq i8 %16, i8 %18
+  condbr bool %19, label %loop_next, label %different
+
+loop_next:
+  %20: i64 = add i64 %13, i64 1
+  store i64 %20, ptr %12
+  br label %loop_check
+
+equal:
+  ret bool true
+
+different:
+  ret bool false
+}
+
+define ptr @__ep_str_from_bool(bool %1) {
+entry:
+  condbr bool %1, label %is_true, label %is_false
+
+is_true:
+  ret ptr str.runtime.true
+
+is_false:
+  ret ptr str.runtime.false
+}
+
+define ptr @__ep_str_from_i64(i64 %1) {
+entry:
+  %2: bool = icmp.eq i64 %1, i64 -9223372036854775808
+  condbr bool %2, label %minimum, label %check_negative
+
+minimum:
+  ret ptr str.runtime.i64.min
+
+check_negative:
+  %3: bool = icmp.slt i64 %1, i64 0
+  condbr bool %3, label %negative, label %positive
+
+negative:
+  %4: i64 = sub i64 0, i64 %1
+  %5: ptr = call ptr __ep_str_from_u64(i64 %4)
+  %6: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  call void __ep_slice_u8_push(ptr %6, i64 45)
+  call void __ep_slice_u8_extend(ptr %6, ptr %5)
+  ret ptr %6
+
+positive:
+  %7: ptr = call ptr __ep_str_from_u64(i64 %1)
+  ret ptr %7
+}
+
+define ptr @__ep_str_from_u64(i64 %1) {
+entry:
+  %2: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  %3: bool = icmp.eq i64 %1, i64 0
+  condbr bool %3, label %zero, label %prepare_digits
+
+zero:
+  call void __ep_slice_u8_push(ptr %2, i64 48)
+  br label %reverse_prepare
+
+prepare_digits:
+  %4: ptr = alloca i64
+  store i64 %1, ptr %4
+  br label %digit_check
+
+digit_check:
+  %5: i64 = load i64, ptr %4
+  %6: bool = icmp.ne i64 %5, i64 0
+  condbr bool %6, label %digit_body, label %reverse_prepare
+
+digit_body:
+  %7: i64 = urem i64 %5, i64 10
+  %8: i64 = add i64 %7, i64 48
+  call void __ep_slice_u8_push(ptr %2, i64 %8)
+  %9: i64 = udiv i64 %5, i64 10
+  store i64 %9, ptr %4
+  br label %digit_check
+
+reverse_prepare:
+  %10: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  %11: ptr = gep struct _slice_u8, ptr %2, i64 0, i64 1
+  %12: i64 = load i64, ptr %11
+  %13: ptr = alloca i64
+  store i64 %12, ptr %13
+  br label %reverse_check
+
+reverse_check:
+  %14: i64 = load i64, ptr %13
+  %15: bool = icmp.sgt i64 %14, i64 0
+  condbr bool %15, label %reverse_body, label %done
+
+reverse_body:
+  %16: i64 = sub i64 %14, i64 1
+  store i64 %16, ptr %13
+  %17: i64 = call i64 __ep_slice_u8_get(ptr %2, i64 %16)
+  call void __ep_slice_u8_push(ptr %10, i64 %17)
+  br label %reverse_check
+
+done:
+  ret ptr %10
+}
+
+define ptr @__ep_str_slice(ptr %1, i64 %2, i64 %3) {
+entry:
+  %4: bool = icmp.sge i64 %2, i64 0
+  condbr bool %4, label %check_order, label %fail
+
+check_order:
+  %5: bool = icmp.sge i64 %3, i64 %2
+  condbr bool %5, label %check_high, label %fail
+
+check_high:
+  %6: ptr = gep struct str, ptr %1, i64 0, i64 1
+  %7: i64 = load i64, ptr %6
+  %8: bool = icmp.sle i64 %3, i64 %7
+  condbr bool %8, label %prepare, label %fail
+
+prepare:
+  %9: ptr = call ptr __ep_slice_u8_alloc(i64 0, i64 0)
+  %10: ptr = gep struct str, ptr %1, i64 0, i64 0
+  %11: ptr = load ptr, ptr %10
+  %12: ptr = alloca i64
+  store i64 %2, ptr %12
+  br label %loop_check
+
+loop_check:
+  %13: i64 = load i64, ptr %12
+  %14: bool = icmp.slt i64 %13, i64 %3
+  condbr bool %14, label %loop_body, label %done
+
+loop_body:
+  %15: ptr = gep i8, ptr %11, i64 %13
+  %16: i64 = load i8, ptr %15
+  call void __ep_slice_u8_push(ptr %9, i64 %16)
+  %17: i64 = add i64 %13, i64 1
+  store i64 %17, ptr %12
+  br label %loop_check
+
+done:
+  ret ptr %9
+
+fail:
+  call void __ep_runtime_panic(ptr str.runtime.invalid.string.slice)
+  ret ptr null
 }

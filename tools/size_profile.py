@@ -18,14 +18,13 @@ BOOTSTRAP = ROOT / "bootstrap"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(BOOTSTRAP))
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES, SELF_HOST_RUNTIME_SOURCES  # noqa: E402
+from compiler_sources import SELF_HOST_COMPILER_SOURCES  # noqa: E402
 import epic  # noqa: E402
 import machine  # noqa: E402
 from machine import MachineObjectBuilder  # noqa: E402
 from mir_to_x64 import MirLower, prepare_mir_for_x64  # noqa: E402
 
 
-RUNTIME_SOURCES = [Path(path) for path in SELF_HOST_RUNTIME_SOURCES]
 COMPILER_SOURCES = [Path(path) for path in SELF_HOST_COMPILER_SOURCES]
 
 
@@ -39,9 +38,9 @@ def mir_inst_count(fn) -> int:
 
 
 def build_profile_rows():
-    sources = [rel(p) for p in RUNTIME_SOURCES + COMPILER_SOURCES]
+    sources = [rel(p) for p in COMPILER_SOURCES]
     main_path = rel(Path("src") / "epic.ep")
-    ast = epic._merge_programs(sources, main_path, verbose=False, include_runtime=False)
+    ast = epic._merge_programs(sources, main_path, verbose=False)
     ast = epic.analyze_program(ast)
     program = epic.ast_to_mir(ast)
     prepare_mir_for_x64(program)

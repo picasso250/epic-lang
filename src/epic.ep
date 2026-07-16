@@ -52,10 +52,6 @@ fun epic_merge_ast(merged: AstProgram, parsed: AstProgram, is_main: bool): bool 
 
 fun epic_merge_program(input_paths: str[], main_path: str): AstProgram {
     let merged = new AstProgram { meta: ast_meta(0), funcs: new AstFunDef[], externs: new AstExternDef[], structs: new AstStructDef[], unions: new AstUnionDef[] }
-    epic_merge_ast(merged, epic_parse_text("runtime/array.ep", runtime_array_source()), false)
-    epic_merge_ast(merged, epic_parse_text("runtime/panic.ep", runtime_panic_source()), false)
-    epic_merge_ast(merged, epic_parse_text("runtime/str.ep", runtime_str_source()), false)
-
     let found_main = false
     for i: 0:len(input_paths) {
         if epic_merge_ast(merged, epic_parse_file(input_paths[i]), input_paths[i] == main_path) {

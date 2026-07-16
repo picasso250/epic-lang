@@ -10,7 +10,7 @@ This document describes the current compiler, not removed NASM-era code.
 | Reserved public names | `bootstrap/epic_builtins.py`, consumed by `bootstrap/sema.py` | `sema_is_reserved_func` in `src/sema.ep` |
 | Type checking | `bootstrap/sema.py` | `src/sema.ep` |
 | MIR lowering | `bootstrap/ast_to_mir.py` | `src/ast_to_mir.ep` |
-| Runtime definitions | `runtime/mir/helpers.mir`, `runtime/*.ep`, `bootstrap/mir_runtime_helpers.py` | the same runtime sources through `src/mir_runtime.ep` |
+| Runtime definitions | `runtime/mir/helpers.mir`, loaded by `bootstrap/mir_runtime_helpers.py` | the same MIR bundle through `src/mir_runtime.ep` |
 
 The parser does not own builtin semantics or builtin-name reservation. Both compiler
 implementations parse ordinary calls first and resolve builtin behavior during sema and
@@ -112,8 +112,8 @@ categories include:
 - array allocation, checked access, mutation, slicing, `push`, `pop`, and `extend` for supported element representations;
 - panic and bounds/null failure paths.
 
-Python and self-hosted compilers load the committed MIR helper bundle, merge helpers
-compiled from `runtime/*.ep`, and prune unreachable functions. Reachability begins at
+Python and self-hosted compilers load the committed MIR helper bundle and prune
+unreachable functions. Reachability begins at
 `main`; startup and runtime dependencies are normal MIR calls. The x64 backend lowers
 this MIR and imports only the WinAPI symbols that remain reachable.
 
