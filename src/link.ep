@@ -472,6 +472,27 @@ fun import_symbol_name(name: str): str {
     ret name
 }
 
+fun imports_for_dll(st: LinkState, dll: str): str[] {
+    let out = new str[]
+    for i: 0:len(st.imports) {
+        let encoded = st.imports[i]
+        if import_dll_name(encoded) == dll {
+            let next = new str[]
+            let inserted = false
+            for j: 0:len(out) {
+                if !inserted && import_less_casefold(import_symbol_name(encoded), import_symbol_name(out[j])) {
+                    next.push(encoded)
+                    inserted = true
+                }
+                next.push(out[j])
+            }
+            if !inserted { next.push(encoded) }
+            out = next
+        }
+    }
+    ret out
+}
+
 fun import_dlls(st: LinkState): str[] {
     let dlls = new str[]
     for i: 0:len(st.imports) {
@@ -575,22 +596,25 @@ fun build_idata(st: LinkState): void {
         append_zero(st.idata, (import_count_for_dll(st, dll) + 1) * 8)
     }
 
-    for i: 0:len(st.imports) {
-        let encoded = st.imports[i]
-        let dll = import_dll_name(encoded)
-        let symbol = import_symbol_name(encoded)
-        let index = get_name_value(next_indexes, dll)
-        let hint_rva = st.idata_rva + len(st.idata)
-        append_u16(st.idata, import_hint(encoded))
-        append_str(st.idata, symbol)
-        st.idata.push(u8(0))
-        if len(st.idata) % 2 != 0 { st.idata.push(u8(0)) }
-        let ilt = get_name_value(ilt_offsets, dll)
-        let iat = get_name_value(iat_group_offsets, dll)
-        put_u64_le(st.idata, ilt + index * 8, u64(hint_rva))
-        put_u64_le(st.idata, iat + index * 8, u64(hint_rva))
-        put_name_value(st.iat_offsets, encoded, iat + index * 8)
-        set_name_value(next_indexes, dll, index + 1)
+    for di: 0:len(dlls) {
+        let dll = dlls[di]
+        let imports = imports_for_dll(st, dll)
+        for i: 0:len(imports) {
+            let encoded = imports[i]
+            let symbol = import_symbol_name(encoded)
+            let index = get_name_value(next_indexes, dll)
+            let hint_rva = st.idata_rva + len(st.idata)
+            append_u16(st.idata, import_hint(encoded))
+            append_str(st.idata, symbol)
+            st.idata.push(u8(0))
+            if len(st.idata) % 2 != 0 { st.idata.push(u8(0)) }
+            let ilt = get_name_value(ilt_offsets, dll)
+            let iat = get_name_value(iat_group_offsets, dll)
+            put_u64_le(st.idata, ilt + index * 8, u64(hint_rva))
+            put_u64_le(st.idata, iat + index * 8, u64(hint_rva))
+            put_name_value(st.iat_offsets, encoded, iat + index * 8)
+            set_name_value(next_indexes, dll, index + 1)
+        }
     }
 
     for di: 0:len(dlls) {
