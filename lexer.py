@@ -13,7 +13,7 @@ TOKEN_SPEC = [
     ("WHILE",     r'\bwhile\b'),
     ("BREAK",     r'\bbreak\b'),
     ("CONTINUE",  r'\bcontinue\b'),
-    ("STRUCT",    r'\bstruct\b'),
+    ("TYPE",      r'\btype\b'),
     ("NEW",       r'\bnew\b'),
     ("LET",       r'\blet\b'),
     ("ID",        r'[a-zA-Z_][a-zA-Z0-9_]*'),

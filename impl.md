@@ -34,9 +34,9 @@ The driver parses all input files, merges top-level definitions, emits one NASM 
 `epic.py` supports whole-program source merging.
 
 - More than one input file requires `--main`.
-- All structs share one global namespace.
+- All product types share one global namespace.
 - All functions share one global namespace.
-- Duplicate struct names are rejected.
+- Duplicate product type names are rejected.
 - Duplicate function names are rejected.
 - A `main` function in a non-main input file is ignored.
 - This is not a module system.
@@ -105,9 +105,9 @@ _arr_T = {
 
 Primitive arrays store primitive values. Struct and `str` arrays store references.
 
-### Struct layout
+### Product layout
 
-User struct fields use fixed 8-byte slots in v0.
+User product fields use fixed 8-byte slots in v0.
 
 - Field offset is `index * 8`.
 - Struct size is `field_count * 8`.
@@ -160,18 +160,6 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `str_new` | calls `_str_alloc` runtime helper |
 | `push` | emitted by codegen for dynamic arrays |
 
-## Codegen self-hosting
-
-The Epic implementation of codegen is currently a standalone program:
-
-```text
-codegen <input.ep> <output.asm>
-```
-
-It reads one source file, calls the self-hosted lexer and parser directly, and emits a complete NASM file to `output.asm`.
-
-Runtime helpers live as separate files under `runtime/*.asm`; Epic codegen reads those files into the generated program.
-
 ## Status and acceptance
 
 Primary runtime acceptance:
@@ -186,14 +174,11 @@ Current known result:
 41 passed, 0 failed
 ```
 
-Bootstrap checks:
+Stage-0 checks:
 
 ```text
-python test_lexer_bootstrap.py
-python test_parser_bootstrap.py
-python test_codegen_bootstrap.py
-python test_epic_bootstrap.py
-python test_bootstrap_fixed_point.py
+python test_stage0_surface.py
+pwsh ./testall.ps1
 ```
 
-The examples are the current behavioral acceptance suite, not a complete language specification.
+v0 has no Epic compiler implementation and no v0 fixed-point test. Its eventual bootstrap acceptance is that the Python compiler builds an Epic v1 compiler, after which v1 reaches its own fixed point. The examples remain the current stage-0 behavioral suite, not a complete language specification.

@@ -1,5 +1,5 @@
 # EXIT: 18
-struct Token {
+type Token {
     kind: i64
 }
 fun main(): void {

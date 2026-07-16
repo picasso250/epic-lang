@@ -1,5 +1,5 @@
 # EXIT: 42
-struct Node {
+type Node {
     kind: i64
     value: i64
 }

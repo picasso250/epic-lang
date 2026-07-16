@@ -17,12 +17,21 @@ try {
         }
     }
 
+    Write-Host "=== runtests.py ==="
+    python runtests.py --linker py
+    if ($LASTEXITCODE -ne 0) {
+        $failed += "runtests.py"
+        Write-Host "FAILED runtests.py exit=$LASTEXITCODE"
+    } else {
+        Write-Host "PASSED runtests.py"
+    }
+
     if ($failed.Count -gt 0) {
         Write-Host "Failed tests: $($failed -join ', ')"
         exit 1
     }
 
-    Write-Host "All $($tests.Count) test_*.py files passed."
+    Write-Host "All stage-0 tests passed."
 } finally {
     Pop-Location
 }

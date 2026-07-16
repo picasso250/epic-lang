@@ -90,7 +90,7 @@ def _merge_programs(input_paths, main_path):
         for struct in ast.structs:
             if struct.name in seen_structs:
                 raise RuntimeError(
-                    f"Duplicate struct {struct.name}: {input_path} and {seen_structs[struct.name]}"
+                    f"Duplicate type {struct.name}: {input_path} and {seen_structs[struct.name]}"
                 )
             seen_structs[struct.name] = input_path
             structs.append(struct)

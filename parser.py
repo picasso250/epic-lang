@@ -59,7 +59,7 @@ class Parser:
         funcs = []
         structs = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "STRUCT"):
+        while self.peek()[0] in ("FUN", "TYPE"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
             else:
@@ -73,7 +73,7 @@ class Parser:
     # ── fun definition ─────────────────────────────────────────────────
 
     def parse_struct_def(self):
-        self.expect("STRUCT")
+        self.expect("TYPE")
         name = self.expect("ID")
         self.expect("LBRACE")
         self.skip_newlines()

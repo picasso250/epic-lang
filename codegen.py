@@ -828,12 +828,12 @@ class Emitter:
         is_ptr = var_type.startswith("&")
         struct_name = var_type[1:] if is_ptr else var_type
         if struct_name not in self.structs:
-            raise RuntimeError(f"Field access on non-struct type '{var_type}'")
+            raise RuntimeError(f"Field access on non-product type '{var_type}'")
         info = self.structs[struct_name]
         for f in info["fields"]:
             if f["name"] == field_name:
                 return slot, f["offset"], f["type"], is_ptr
-        raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+        raise RuntimeError(f"Type '{struct_name}' has no field '{field_name}'")
 
     def _emit_struct_base(self, slot, is_ptr):
         """Emit instruction to load base address into rax."""
@@ -892,7 +892,7 @@ class Emitter:
                 else:
                     self.emit(f"    mov rax, [rax+{f['offset']}]")
                 return
-        raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+        raise RuntimeError(f"Type '{struct_name}' has no field '{field_name}'")
 
     def _emit_field_write_to_rax(self, source_expr, field_name):
         """Write rcx to field_name of struct pointer in rax."""
@@ -910,7 +910,7 @@ class Emitter:
                 else:
                     self.emit(f"    mov [rax+{f['offset']}], rcx")
                 return
-        raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+        raise RuntimeError(f"Type '{struct_name}' has no field '{field_name}'")
 
     def emit_field_set(self, stmt):
         """stmt.object.field = stmt.value"""
@@ -950,7 +950,7 @@ class Emitter:
                     else:
                         self.emit(f"    mov [rax+{f['offset']}], rcx")
                     return
-            raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+            raise RuntimeError(f"Type '{struct_name}' has no field '{field_name}'")
         elif isinstance(obj, FieldAccessNode):
             # Chain: obj.field2.field1 = value
             self.emit_expr(stmt.value)
@@ -995,7 +995,7 @@ class Emitter:
         """new StructName → HeapAlloc, returns &StructName in rax."""
         struct_name = expr.struct_name
         if struct_name not in self.structs:
-            raise RuntimeError(f"Unknown struct in new: {struct_name}")
+            raise RuntimeError(f"Unknown product type in new: {struct_name}")
         size = self.structs[struct_name]["size"]
         self.emit_mov("rcx", "[_heap]")
         self.emit_mov("edx", "8")   # HEAP_ZERO_MEMORY

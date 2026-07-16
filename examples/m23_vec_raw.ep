@@ -1,5 +1,5 @@
-# Test: dynamic struct arrays store object references
-struct Point {
+# Test: dynamic product arrays store object references
+type Point {
     x: i64
     y: i64
 }
