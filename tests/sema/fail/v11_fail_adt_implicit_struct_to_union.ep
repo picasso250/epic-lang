@@ -1,6 +1,6 @@
 # COMPILE_FAIL: let e expected Expr, got Leaf
-type Leaf = { value: i64 }
-type Branch = { value: i64 }
+type Leaf { value: i64 }
+type Branch { value: i64 }
 type Expr = Leaf | Branch
 fun main(): void {
     let e: Expr = new Leaf { value: 1 }

@@ -3,11 +3,11 @@
 # STDOUT: true
 # STDOUT: true
 
-type Inner = {
+type Inner {
     ok: bool
 }
 
-type Outer = {
+type Outer {
     inner: Inner
 }
 

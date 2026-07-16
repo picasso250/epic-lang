@@ -1,6 +1,6 @@
 # EXIT: 0
 
-type struct = {
+type struct {
     value: i64
 }
 

@@ -1,6 +1,6 @@
 # COMPILE_FAIL: str expected str, integer, bool, or u8[], got Val
 
-type Val = {
+type Val {
     val: i64
 }
 

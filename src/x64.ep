@@ -4,74 +4,74 @@
 # machine encoding belong to later bootstrap stages.
 #
 
-type X64RegOperand = {
+type X64RegOperand {
     name: str
 }
 
-type X64ImmOperand = {
+type X64ImmOperand {
     value: i64
 }
 
-type X64SymbolOperand = {
+type X64SymbolOperand {
     name: str
 }
 
-type X64Label = {
+type X64Label {
     id: i64
     symbol_name: str
 }
 
-type X64LabelRefOperand = {
+type X64LabelRefOperand {
     label: X64Label
 }
 
-type X64MemBaseOperand = {
+type X64MemBaseOperand {
     base: str
     disp: i64
     size: i64
 }
 
-type X64MemSymbolOperand = {
+type X64MemSymbolOperand {
     symbol: str
     size: i64
 }
 
 type X64Operand = X64RegOperand | X64ImmOperand | X64SymbolOperand | X64LabelRefOperand | X64MemBaseOperand | X64MemSymbolOperand
 
-type X64GlobalItem = {
+type X64GlobalItem {
     name: str
 }
 
-type X64ExternItem = {
+type X64ExternItem {
     name: str
 }
 
-type X64SectionItem = {
+type X64SectionItem {
     name: str
 }
 
-type X64LabelItem = {
+type X64LabelItem {
     label: X64Label
 }
 
-type X64InstItem = {
+type X64InstItem {
     op: str
     operands: X64Operand[]
 }
 
-type X64DataBytesItem = {
+type X64DataBytesItem {
     name: str
     values: i64[]
 }
 
-type X64DataZeroItem = {
+type X64DataZeroItem {
     name: str
     count: i64
 }
 
 type X64Item = X64GlobalItem | X64ExternItem | X64SectionItem | X64LabelItem | X64InstItem | X64DataBytesItem | X64DataZeroItem
 
-type X64Program = {
+type X64Program {
     items: X64Item[]
     label_count: i64
 }

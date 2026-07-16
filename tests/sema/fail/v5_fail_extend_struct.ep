@@ -1,9 +1,9 @@
 # COMPILE_FAIL: extend expects an array with the same element type
-type Box = {
+type Box {
     value: i64
 }
 
-type Other = {
+type Other {
     value: i64
 }
 

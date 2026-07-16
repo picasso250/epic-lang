@@ -7,7 +7,7 @@ fun check(ok: bool): void {
     }
 }
 
-type S = {
+type S {
     xs: i64[]
 }
 

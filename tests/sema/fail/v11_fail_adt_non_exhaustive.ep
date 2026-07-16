@@ -1,6 +1,6 @@
 # COMPILE_FAIL: non-exhaustive match for Expr; missing Right
-type Left = { value: i64 }
-type Right = { value: i64 }
+type Left { value: i64 }
+type Right { value: i64 }
 type Expr = Left | Right
 fun main(): void {
     let e: Expr = new Expr(new Left { value: 1 })

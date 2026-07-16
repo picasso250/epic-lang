@@ -1,16 +1,16 @@
 # EXIT: 0
 # STDOUT: 42
 
-type Meta = {
+type Meta {
     line: i64
 }
 
-type Leaf = {
+type Leaf {
     meta: Meta
     value: i64
 }
 
-type Pair = {
+type Pair {
     meta: Meta
     left: i64
     right: i64

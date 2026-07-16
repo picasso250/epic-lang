@@ -4,19 +4,19 @@
 
 ## 决策
 
-Epic 只使用 `type` 声明 nominal type。v0 当前支持两种 RHS：
+Epic 只使用 `type` 声明 nominal type。Product 使用紧邻类型名的定义体；sum 使用类型等式：
 
 ```epic
-type Point = {
+type Point {
     x: i64
     y: i64
 }
 
-type Lit = {
+type Lit {
     value: i64
 }
 
-type Add = {
+type Add {
     left: Expr
     right: Expr
 }
@@ -28,14 +28,16 @@ type Expr = Lit | Add
 
 | 声明形态 | 类型结构 | v0 状态 |
 |---|---|---|
-| `type A = { ... }` | 单一 product | 已支持 |
+| `type A { ... }` | 单一 product | 已支持 |
 | `type A = X \| Y` | 由已声明 product 组成的 named payload sum | 已支持，至少两个 member |
 | `type A = X \| Y`，其中 `X` / `Y` 未声明 product | unit sum | 未支持 |
 | `type A = X { ... } \| Y { ... }` | inline payload sum | 未支持 |
 
 `enum` 不成为独立的顶层声明或全局关键字。未来全为 unit variant 的 sum type 自然承担 enum 的用途。
 
-每个 `type` 都声明新的 nominal type。`type Point = { ... }` 不创建 structural type alias；两个字段完全相同的声明仍是两个不同类型。
+每个 `type` 都声明新的 nominal type。`type Point { ... }` 不创建 structural type alias；两个字段完全相同的声明仍是两个不同类型。
+
+这里的标点差异是有意的：`{ ... }` 是 product 的定义体，不是赋给名称的表达式；`A | B` 则组合已经命名的类型。`type A = B` 在 v0 中非法，并为未来可能的 nominal alias 保留，不能解释成单成员 sum。
 
 ## Future variant namespace
 
@@ -95,7 +97,7 @@ Unit sum 是独立 nominal type，不是整数 alias。第一版不开放 tag、
 v0 删除了独立的 `struct` 关键字，`struct` 已恢复为普通标识符。当前 product 与 named sum 语法是：
 
 ```epic
-type Point = {
+type Point {
     x: i64
     y: i64
 }
@@ -104,6 +106,8 @@ type Expr = Lit | Add
 ```
 
 Product 字段每行一个，不使用逗号；空 product 与单行单字段合法。Named sum 必须写在一个逻辑行内并至少有两个 member。Product 支持 receiver method、前向引用、自递归和 mutual recursion；sum 暂不支持 receiver。初始化器继续支持全省略、部分指定和全指定字段。
+
+`type Alias = Existing` 当前同样非法；这一形态被保留给未来 alias 设计。
 
 v0 不加入以下过渡语法：
 

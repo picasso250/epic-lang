@@ -3,7 +3,7 @@
 # Mirrors bootstrap/coff.py for two sections: .text and .data.
 #
 
-type CoffSectionSpec = {
+type CoffSectionSpec {
     name: str
     size: i64
     raw: i64

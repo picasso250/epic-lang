@@ -1,6 +1,6 @@
 # EXIT: 7
 
-type point = {
+type point {
     x: i64
     y: i64
 }

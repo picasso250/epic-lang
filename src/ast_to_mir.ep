@@ -5,20 +5,20 @@ extern "kernel32.dll" fun GetFileAttributesA(path: u64): u32
 # First milestone path: user-function MIR text oracle comparison against Python.
 #
 
-type MirStructFieldLayout = {
+type MirStructFieldLayout {
     struct_name: str
     field_name: str
     field_type: str
     field_index: i64
 }
 
-type MirUnionMemberLayout = {
+type MirUnionMemberLayout {
     union_name: str
     member_name: str
     tag: i64
 }
 
-type MirCodegenState = {
+type MirCodegenState {
     program: MirProgram
     current_fn: MirFunction
     current_block: MirBlock
@@ -42,12 +42,12 @@ type MirCodegenState = {
     string_counter: i64
 }
 
-type MirValueFlow = {
+type MirValueFlow {
     value: MirOperand
     block: MirBlock
 }
 
-type MirBlockFlow = {
+type MirBlockFlow {
     reachable: bool
     block: MirBlock
 }

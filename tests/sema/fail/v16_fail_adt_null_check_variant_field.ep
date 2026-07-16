@@ -1,6 +1,6 @@
 # COMPILE_FAIL: type Node has no common field name
-type Leaf = { name: str }
-type Pair = { value: i64 }
+type Leaf { name: str }
+type Pair { value: i64 }
 type Node = Leaf | Pair
 fun main(): void {
     let n: Node = new Node(new Pair { value: 1 })

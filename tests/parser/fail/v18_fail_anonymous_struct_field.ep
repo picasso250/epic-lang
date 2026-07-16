@@ -1,9 +1,9 @@
 # COMPILE_FAIL: Expected COLON
-type Meta = {
+type Meta {
     line: i64
 }
 
-type Node = {
+type Node {
     Meta
 }
 

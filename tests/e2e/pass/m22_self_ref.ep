@@ -1,5 +1,5 @@
 # Test a self-referencing type with fields
-type Node = {
+type Node {
     val: i64
     next: Node
 }

@@ -49,7 +49,7 @@ Hello, Epic!
 **类型与方法：**
 
 ```epic
-type Parser = {
+type Parser {
     pos: i64
 }
 
@@ -67,11 +67,11 @@ fun main(): void {
 **ADT 与 match：**
 
 ```epic
-type LiteralExpr = {
+type LiteralExpr {
     value: i64
 }
 
-type BinaryExpr = {
+type BinaryExpr {
     op: str
 }
 

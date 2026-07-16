@@ -28,15 +28,15 @@ fun epic_type_array_elem(t: str): str {
     ret t[0:len(t) - 2]
 }
 
-type TypeMissing = {
+type TypeMissing {
     dummy: i64
 }
 
-type TypeName = {
+type TypeName {
     name: str
 }
 
-type TypeArray = {
+type TypeArray {
     elem: TypeExpr
 }
 
@@ -71,7 +71,7 @@ fun type_expr_text(t: TypeExpr): str {
     ret ""
 }
 
-type AstMeta = {
+type AstMeta {
     line: i64
     resolved_type: str
 }
@@ -80,7 +80,7 @@ fun ast_meta(line: i64): AstMeta {
     ret new AstMeta { line: line }
 }
 
-type AstProgram = {
+type AstProgram {
     meta: AstMeta
     funcs: AstFunDef[]
     externs: AstExternDef[]
@@ -88,19 +88,19 @@ type AstProgram = {
     unions: AstUnionDef[]
 }
 
-type AstStructDef = {
+type AstStructDef {
     meta: AstMeta
     name: str
     fields: AstStructField[]
 }
 
-type AstUnionDef = {
+type AstUnionDef {
     meta: AstMeta
     name: str
     members: str[]
 }
 
-type AstExternDef = {
+type AstExternDef {
     meta: AstMeta
     library: str
     name: str
@@ -108,7 +108,7 @@ type AstExternDef = {
     source_type: TypeExpr
 }
 
-type AstFunDef = {
+type AstFunDef {
     meta: AstMeta
     name: str
     params: AstParam[]
@@ -119,64 +119,64 @@ type AstFunDef = {
     method_name: str
 }
 
-type AstParam = {
+type AstParam {
     meta: AstMeta
     name: str
     source_type: TypeExpr
 }
 
-type AstStructField = {
+type AstStructField {
     meta: AstMeta
     name: str
     source_type: TypeExpr
 }
 
-type AstBlock = {
+type AstBlock {
     meta: AstMeta
     stmts: AstStmt[]
 }
 
-type AstLet = {
+type AstLet {
     meta: AstMeta
     name: str
     source_type: TypeExpr
     value_expr: AstExpr
 }
 
-type AstReturn = {
+type AstReturn {
     meta: AstMeta
     expr: AstExpr
     has_expr: bool
 }
 
-type AstAssign = {
+type AstAssign {
     meta: AstMeta
     name: str
     value_expr: AstExpr
 }
 
-type AstAssignOp = {
+type AstAssignOp {
     meta: AstMeta
     expr: AstExpr
     op: str
     value_expr: AstExpr
 }
 
-type AstFieldSet = {
+type AstFieldSet {
     meta: AstMeta
     object: AstExpr
     name: str
     value_expr: AstExpr
 }
 
-type AstSubscriptAssign = {
+type AstSubscriptAssign {
     meta: AstMeta
     base: AstExpr
     index: AstExpr
     value_expr: AstExpr
 }
 
-type AstIf = {
+type AstIf {
     meta: AstMeta
     expr: AstExpr
     then_block: AstBlock
@@ -184,13 +184,13 @@ type AstIf = {
     has_else: bool
 }
 
-type AstLoop = {
+type AstLoop {
     meta: AstMeta
     expr: AstExpr
     body: AstBlock
 }
 
-type AstForRange = {
+type AstForRange {
     meta: AstMeta
     name: str
     start: AstExpr
@@ -198,20 +198,20 @@ type AstForRange = {
     body: AstBlock
 }
 
-type AstBreak = {
+type AstBreak {
     meta: AstMeta
 }
 
-type AstContinue = {
+type AstContinue {
     meta: AstMeta
 }
 
-type AstPanic = {
+type AstPanic {
     meta: AstMeta
     expr: AstExpr
 }
 
-type AstMatch = {
+type AstMatch {
     meta: AstMeta
     expr: AstExpr
     fields: AstMatchCase[]
@@ -219,7 +219,7 @@ type AstMatch = {
     has_else: bool
 }
 
-type AstMatchCase = {
+type AstMatchCase {
     meta: AstMeta
     variant_name: str
     binding_name: str
@@ -228,133 +228,133 @@ type AstMatchCase = {
     body: AstBlock
 }
 
-type AstExprStmt = {
+type AstExprStmt {
     meta: AstMeta
     expr: AstExpr
 }
 
-type AstLiteral = {
+type AstLiteral {
     meta: AstMeta
     value: str
 }
 
-type AstChar = {
+type AstChar {
     meta: AstMeta
     value: str
 }
 
-type AstBool = {
+type AstBool {
     meta: AstMeta
     value: str
 }
 
-type AstString = {
+type AstString {
     meta: AstMeta
     value: str
 }
 
-type AstEmbed = {
+type AstEmbed {
     meta: AstMeta
     path: str
     source_path: str
 }
 
-type AstFString = {
+type AstFString {
     meta: AstMeta
     fields: AstFStringPart[]
 }
 
-type AstFStringText = {
+type AstFStringText {
     meta: AstMeta
     value: str
 }
 
-type AstFStringExpr = {
+type AstFStringExpr {
     meta: AstMeta
     expr: AstExpr
 }
 
-type AstVar = {
+type AstVar {
     meta: AstMeta
     name: str
 }
 
-type AstBinary = {
+type AstBinary {
     meta: AstMeta
     op: str
     left: AstExpr
     right: AstExpr
 }
 
-type AstUnary = {
+type AstUnary {
     meta: AstMeta
     op: str
     expr: AstExpr
 }
 
-type AstCall = {
+type AstCall {
     meta: AstMeta
     name: str
     args: AstExpr[]
 }
 
-type AstDotCall = {
+type AstDotCall {
     meta: AstMeta
     object: AstExpr
     name: str
     args: AstExpr[]
 }
 
-type AstFieldAccess = {
+type AstFieldAccess {
     meta: AstMeta
     object: AstExpr
     name: str
 }
 
-type AstNullCheck = {
+type AstNullCheck {
     meta: AstMeta
     expr: AstExpr
 }
 
-type AstSubscript = {
+type AstSubscript {
     meta: AstMeta
     base: AstExpr
     index: AstExpr
 }
 
-type AstSlice = {
+type AstSlice {
     meta: AstMeta
     base: AstExpr
     start: AstExpr
     end: AstExpr
 }
 
-type AstNewArray = {
+type AstNewArray {
     meta: AstMeta
     elem_type: TypeExpr
     count: AstExpr
     has_count: bool
 }
 
-type AstArrayLiteral = {
+type AstArrayLiteral {
     meta: AstMeta
     elem_type: TypeExpr
     args: AstExpr[]
 }
 
-type AstStructInit = {
+type AstStructInit {
     meta: AstMeta
     name: str
     fields: AstInitField[]
 }
 
-type AstInitField = {
+type AstInitField {
     meta: AstMeta
     name: str
     value_expr: AstExpr
 }
 
-type AstUnionInit = {
+type AstUnionInit {
     meta: AstMeta
     type_name: str
     expr: AstExpr
@@ -390,7 +390,7 @@ fun ast_require_resolved_type(meta: AstMeta): str {
 
 fun ast_set_resolved_type(node: AstExpr, value: str): void { node.meta.resolved_type = value }
 
-type Parser = {
+type Parser {
     tokens: Token[]
     pos: i64
     for_counter: i64
@@ -592,11 +592,11 @@ fun (p: Parser) parse_sum_type_def(name: Token): AstUnionDef {
 fun (p: Parser) parse_type_def(program: AstProgram): void {
     p.expect("TYPE")
     let name = p.expect("ID")
-    p.expect("ASSIGN")
     if p.peek_kind("LBRACE") == 1 {
         program.structs.push(p.parse_product_type_def(name))
         ret
     }
+    p.expect("ASSIGN")
     program.unions.push(p.parse_sum_type_def(name))
 }
 

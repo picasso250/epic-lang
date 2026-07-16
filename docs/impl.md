@@ -194,7 +194,7 @@ payload:
 
 编译器流程：
 
-1. 收集所有 `type Name = { ... }` product 定义。
+1. 收集所有 `type Name { ... }` product 定义。
 2. 收集 `type Name = A | B | C` sum 定义。
 3. 验证 sum member 都是 product。
 4. 为 wrapper 生成 tag namespace。

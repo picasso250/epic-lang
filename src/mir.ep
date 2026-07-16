@@ -4,32 +4,32 @@
 # first EP typed-AST -> MIR oracle comparison path.
 #
 
-type MirValueOperand = {
+type MirValueOperand {
     typ: str
     value_id: i64
 }
 
-type MirIntOperand = {
+type MirIntOperand {
     typ: str
     value: i64
 }
 
-type MirBoolOperand = {
+type MirBoolOperand {
     value: bool
 }
 
-type MirNullOperand = {
+type MirNullOperand {
     dummy: i64
 }
 
-type MirSymbolOperand = {
+type MirSymbolOperand {
     typ: str
     name: str
 }
 
 type MirOperand = MirValueOperand | MirIntOperand | MirBoolOperand | MirNullOperand | MirSymbolOperand
 
-type MirInst = {
+type MirInst {
     op: str
     operands: MirOperand[]
     result_id: i64
@@ -39,56 +39,56 @@ type MirInst = {
     has_result: bool
 }
 
-type MirBrTerminator = {
+type MirBrTerminator {
     target: str
 }
 
-type MirCondBrTerminator = {
+type MirCondBrTerminator {
     cond: MirOperand
     then_target: str
     else_target: str
 }
 
-type MirRetVoidTerminator = {
+type MirRetVoidTerminator {
     dummy: i64
 }
 
-type MirRetValueTerminator = {
+type MirRetValueTerminator {
     value: MirOperand
 }
 
 type MirTerminator = MirBrTerminator | MirCondBrTerminator | MirRetVoidTerminator | MirRetValueTerminator
 
-type MirBlock = {
+type MirBlock {
     name: str
     instructions: MirInst[]
     terminator: MirTerminator
     has_terminator: bool
 }
 
-type MirParam = {
+type MirParam {
     value_id: i64
     typ: str
 }
 
-type MirFunction = {
+type MirFunction {
     name: str
     params: MirParam[]
     return_type: str
     blocks: MirBlock[]
 }
 
-type MirStringGlobal = {
+type MirStringGlobal {
     name: str
     init: str
 }
 
-type MirDeclGlobal = {
+type MirDeclGlobal {
     name: str
     typ: str
 }
 
-type MirScalarGlobal = {
+type MirScalarGlobal {
     name: str
     typ: str
     init: str
@@ -96,19 +96,19 @@ type MirScalarGlobal = {
 
 type MirGlobal = MirStringGlobal | MirDeclGlobal | MirScalarGlobal
 
-type MirExtern = {
+type MirExtern {
     name: str
     return_type: str
     param_types: str[]
 }
 
-type MirStructField = {
+type MirStructField {
     struct_name: str
     field_type: str
     field_index: i64
 }
 
-type MirProgram = {
+type MirProgram {
     externs: MirExtern[]
     globals: MirGlobal[]
     struct_fields: MirStructField[]

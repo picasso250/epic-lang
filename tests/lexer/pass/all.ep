@@ -10,7 +10,7 @@ fun main(): i64 {
     else { ret 2 }
     for false { break }
     for i: 0:10 { continue }
-    type Point = {
+    type Point {
         x: i64
         y: i64
     }

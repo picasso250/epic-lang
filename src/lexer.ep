@@ -1,18 +1,18 @@
 #
 
-type FStringTextPart = {
+type FStringTextPart {
     text: str
     dump_text: str
 }
 
-type FStringExprPart = {
+type FStringExprPart {
     text: str
     dump_text: str
 }
 
 type FStringPart = FStringTextPart | FStringExprPart
 
-type Token = {
+type Token {
     kind: str
     text: str
     dump_text: str

@@ -1,5 +1,5 @@
 # EXIT: 9
-type Box = {
+type Box {
     n: i64
     missing: i64
 }

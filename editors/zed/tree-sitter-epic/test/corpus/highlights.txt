@@ -4,16 +4,16 @@ declarations and methods
 
 extern "kernel32.dll" fun GetTickCount64(): u64
 
-type Parser = {
+type Parser {
     pos: i64
     name: str
 }
 
-type Lit = {
+type Lit {
     value: str
 }
 
-type Add = {
+type Add {
     left: i64
     right: i64
 }

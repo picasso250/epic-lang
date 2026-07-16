@@ -3,7 +3,7 @@
 # First milestone: enough structured encoding for the X64IR fixture oracle.
 #
 
-type MachineObject = {
+type MachineObject {
     text: i64[]
     data: i64[]
     text_reloc_offsets: i64[]
@@ -15,12 +15,12 @@ type MachineObject = {
     symbol_values: i64[]
 }
 
-type MachineLabelFixup = {
+type MachineLabelFixup {
     offset: i64
     label: X64Label
 }
 
-type MachineBuilder = {
+type MachineBuilder {
     text: i64[]
     data: i64[]
     section: str
@@ -37,7 +37,7 @@ type MachineBuilder = {
     data_reloc_names: str[]
 }
 
-type MachineNameIndex = {
+type MachineNameIndex {
     capacity: i64
     names: str[]
     values: i64[]

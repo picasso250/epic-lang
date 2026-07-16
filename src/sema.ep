@@ -6,7 +6,7 @@
 # epic_type_* helpers instead of ad hoc string slicing.
 #
 
-type SemaState = {
+type SemaState {
     structs: AstStructDef[]
     unions: AstUnionDef[]
     funcs: AstFunDef[]

@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 0
 
-type Box = {
+type Box {
     n: i64
 }
 

@@ -1,8 +1,8 @@
 # COMPILE_FAIL: duplicate type Pair
-type Pair = {
+type Pair {
     left: i64
 }
 
-type Pair = {
+type Pair {
     right: i64
 }

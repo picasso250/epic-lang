@@ -3,7 +3,7 @@
 # STDOUT: 2/65
 # STDOUT: 1/7
 
-type Cell = {
+type Cell {
     value: i64
 }
 

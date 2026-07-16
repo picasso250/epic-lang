@@ -105,7 +105,6 @@ class Parser:
     def parse_type_def(self):
         self.expect("TYPE")
         name = self.expect("ID")
-        self.expect("ASSIGN")
         if self.check("LBRACE"):
             self.skip_newlines()
             fields = []
@@ -117,6 +116,7 @@ class Parser:
                 fields.append(StructField(name=fname[1], type=ftype, line=fname[2]))
             self.expect("RBRACE")
             return StructDefNode(name=name[1], fields=fields)
+        self.expect("ASSIGN")
         members = []
         while True:
             member = self.expect("ID")

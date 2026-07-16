@@ -1,12 +1,12 @@
 # COMPILE_FAIL: type Node has no common field meta
-type Meta = {
+type Meta {
     line: i64
 }
-type Leaf = {
+type Leaf {
     meta: Meta
     value: i64
 }
-type Pair = {
+type Pair {
     value: i64
 }
 type Node = Leaf | Pair

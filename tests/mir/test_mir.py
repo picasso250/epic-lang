@@ -179,7 +179,7 @@ def test_validator_rejects_unknown_and_high_level_ops():
 
 def test_codegen_emits_target_mir_only_for_aggregates():
     source = """
-type Point = {
+type Point {
     x: i64
     y: i64
 }
@@ -368,7 +368,7 @@ entry:
 
 
 def test_user_method_lowers_to_mangled_function_call():
-    source = """type Counter = {
+    source = """type Counter {
     value: i64
 }
 
@@ -400,7 +400,7 @@ fun main(): void {
 
 
 def test_user_method_conflicts_with_mangled_function_name():
-    source = """type Counter = {
+    source = """type Counter {
     value: i64
 }
 
