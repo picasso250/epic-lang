@@ -137,7 +137,7 @@ def process_peak_memory(process):
 
 
 def run_checked(cmd, label):
-    start = time.perf_counter()
+    start = time.perf_counter_ns()
     process = subprocess.Popen(
         cmd,
         cwd=SCRIPT_DIR,
@@ -169,7 +169,7 @@ def run_checked(cmd, label):
             + "\n--- stderr tail ---\n"
             + result.stderr[-8000:]
         )
-    elapsed = time.perf_counter() - start
+    elapsed_ns = time.perf_counter_ns() - start
     for line in result.stdout.splitlines():
         if line.startswith("  timing: ") or line.startswith("  stats: "):
             print(f"  {label} {line.strip()}", flush=True)
@@ -182,12 +182,12 @@ def run_checked(cmd, label):
             + f"peak commit={format_size(peak_commit)}",
             flush=True,
         )
-    print(f"{label}: {elapsed:.2f}s", flush=True)
-    return result
+    print(f"{label}: {elapsed_ns / 1_000_000_000:.2f}s", flush=True)
+    return result, elapsed_ns
 
 
 def build_with_epic(compiler, output_path, label):
-    run_checked(
+    measurement = run_checked(
         [
             compiler,
             *COMPILER_SOURCES,
@@ -202,6 +202,28 @@ def build_with_epic(compiler, output_path, label):
     if not os.path.exists(output_path):
         raise RuntimeError(f"expected compiler output missing: {output_path}")
     print_exe_size(output_path, label)
+    return measurement
+
+
+def print_profile(result, elapsed_ns, output_path):
+    x64_match = re.search(r"lower counts:.*x64_items=(\d+)", result.stdout)
+    machine_match = re.search(
+        r"machine counts:.*text_bytes=(\d+)(?: rdata_bytes=(\d+))? data_bytes=(\d+)",
+        result.stdout,
+    )
+    total_match = re.search(r"timing: total: (\d+) ms", result.stdout)
+    if not x64_match or not machine_match or not total_match:
+        raise RuntimeError("final bootstrap generation is missing profile metrics")
+    print(
+        f"profile: wall_ms={elapsed_ns / 1_000_000:.3f} "
+        + f"internal_ms={total_match.group(1)} "
+        + f"x64_items={x64_match.group(1)} "
+        + f"text_bytes={machine_match.group(1)} "
+        + f"rdata_bytes={machine_match.group(2) or '0'} "
+        + f"data_bytes={machine_match.group(3)} "
+        + f"exe_bytes={os.path.getsize(output_path)}",
+        flush=True,
+    )
 
 
 def parse_args():
@@ -273,7 +295,11 @@ def main():
 
     build_with_epic(seed, generation1, "v0 seed -> epic-seed-1")
     build_with_epic(generation1, generation2, "epic-seed-1 -> epic-seed-2")
-    build_with_epic(generation2, generation3, "epic-seed-2 -> epic-seed-3")
+    final_result, final_elapsed_ns = build_with_epic(
+        generation2,
+        generation3,
+        "epic-seed-2 -> epic-seed-3",
+    )
 
     checks = [(generation2, generation3)]
     converged = generation3
@@ -288,6 +314,7 @@ def main():
             )
 
     print("bootstrap fixed point reached")
+    print_profile(final_result, final_elapsed_ns, generation3)
     if args.output:
         write_output(converged, args.output)
     return 0

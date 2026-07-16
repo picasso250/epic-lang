@@ -146,13 +146,13 @@ python tests/parser/run.py
 python tests/link/run.py
 ```
 
-重复做自举性能实验时，可使用内容寻址缓存：
+当前未提交代码的 fixed-point 最后一代会直接输出单次 `profile:` 摘要。查看某个已提交 revision 的历史 profile：
 
 ```powershell
-python benchmark_self_host.py --label baseline
+python benchmark_self_host.py HEAD
 ```
 
-脚本把 seed compiler、canonical compiler 源码、嵌入的 runtime `.ep/.ir`、测量工具版本和宿主信息纳入 key，并在 `build/cache/self-host-benchmark/` 分层保存收敛编译器、原始日志、结构化结果和文本报告。输入未变时直接复用；需要重新取得当前环境下的 wall-time 样本时加 `--refresh`，此时仍会复用相同的收敛编译器；需要连 fixed point 一起强制重建时使用 `--rebuild`。
+脚本以完整 dev commit hash 和当前完整 v0 commit hash 命名 `build/profile/*.txt`，保存该 revision 的完整 bootstrap stdout；已有文件直接读取。需要重测时删除对应 txt。
 
 `test_*.py` 是可直接运行的脚本，非 pytest。
 

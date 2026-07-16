@@ -23,10 +23,10 @@
 
 ## 性能测量
 
-- 基线优先运行 `python benchmark_self_host.py --label <name>`。脚本按 seed exe、canonical compiler 源码、embedded runtime `.ep/.ir`、测量工具和宿主指纹生成内容 key，并分层缓存 fixed-point compiler 与 3 次等价 benchmark 到 `build/cache/self-host-benchmark/`；输入未变时直接呈现缓存结果。需要同日实时重测时使用 `--refresh`，它仍复用相同的收敛编译器。
-- `bootstrap_fixed_point.py` 的三代编译由不同代编译器执行，不能直接当作三次等价性能样本。先运行一次 fixed point 验证收敛，再复用收敛编译器测量同一 workload。
+- 当前未提交代码直接运行 `python bootstrap_fixed_point.py`；最后一次 `generation 2 -> generation 3` 编译既验证不动点，也输出唯一的 `profile:` 性能样本。
+- 已提交基线运行 `python benchmark_self_host.py <revision>`。脚本以完整 dev commit hash 与当前完整 v0 commit hash 缓存完整 bootstrap stdout 到 `build/profile/`；缓存存在时直接读取。需要重测时删除对应 txt。
 - wall time 使用外部高精度计时（例如 Python `time.perf_counter_ns()`）；编译器内部的 `GetTickCount64()` 适合阶段诊断，不适合判断约 1% 以内的差异。
-- 性能对比测 3 次并报告 median；如果 3 次不能显示稳定、显著的变化，直接结论为“性能变化不显著”，不要增加到 9 次或 15 次继续追逐噪声。
+- 性能只测一次；3% 以内视为噪声。既有实验中真正值得保留的优化通常接近或超过 10%，不要为追逐小差异增加样本。
 - A/B 必须使用相同源码、相同 seed、相同参数和相同输出位置条件；同时报告 wall time、X64 items、`.text` / `.data` bytes 和最终 exe size。
 
 ## 现状
