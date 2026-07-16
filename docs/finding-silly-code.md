@@ -208,8 +208,8 @@ Better shape:
 
 ```epic
 let field = new AstStructField {
-    meta: ast_meta(token_line(fname)),
-    name: token_text(fname),
+    meta: ast_meta(fname.line),
+    name: fname.text,
     source_type: p.parse_type()
 }
 node.fields.push(field)
@@ -218,6 +218,8 @@ node.fields.push(field)
 Once the parser knows a child has a concrete type, keep that type until the value actually crosses into a heterogeneous AST position. Downstream code should trust concrete container element types instead of re-matching every element.
 
 The same rule applies to AST construction: use a direct struct literal and supply every semantically required field immediately. Wrap statements with `AstStmt` only when they enter a statement stream, and expressions with `AstExpr` only when they enter an expression position. Reuse alone is not enough to justify a placeholder builder; keep a helper only when it encodes a real semantic abstraction.
+
+Tokens follow a different rule from AST nodes. The parser branches according to its current grammar position; it never performs one exhaustive semantic dispatch over every token kind. Therefore `Token` is a concrete record with `kind`, `text`, `dump_text`, `line`, and optional f-string parts. Token kinds are values, while expression and statement shapes are ADT variants.
 
 ## Pattern 4: uniform union projection still using tag dispatch
 
