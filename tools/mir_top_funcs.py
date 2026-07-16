@@ -23,10 +23,10 @@ from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from compiler_sources import SELF_HOST_COMPILER_SOURCES
-
-DEFAULT_COMPILER_SOURCES = SELF_HOST_COMPILER_SOURCES
+DEFAULT_COMPILER_SOURCES = [
+    path.relative_to(ROOT).as_posix()
+    for path in sorted((ROOT / "src").glob("*.ep"))
+]
 
 
 @dataclass

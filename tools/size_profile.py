@@ -18,14 +18,13 @@ BOOTSTRAP = ROOT / "bootstrap"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(BOOTSTRAP))
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES  # noqa: E402
 import epic  # noqa: E402
 import machine  # noqa: E402
 from machine import MachineObjectBuilder  # noqa: E402
 from mir_to_x64 import MirLower, prepare_mir_for_x64  # noqa: E402
 
 
-COMPILER_SOURCES = [Path(path) for path in SELF_HOST_COMPILER_SOURCES]
+COMPILER_SOURCES = [path.relative_to(ROOT) for path in sorted((ROOT / "src").glob("*.ep"))]
 
 
 

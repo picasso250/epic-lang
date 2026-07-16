@@ -14,9 +14,10 @@ import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT_DIR))
-
-from compiler_sources import SELF_HOST_COMPILER_SOURCES
+COMPILER_SOURCES = [
+    path.relative_to(ROOT_DIR).as_posix()
+    for path in sorted((ROOT_DIR / "src").glob("*.ep"))
+]
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
@@ -42,7 +43,7 @@ def compile_self_hosted_compiler():
         ep_runner.EPICC,
         "--main",
         "src/epic.ep",
-        *SELF_HOST_COMPILER_SOURCES,
+        *COMPILER_SOURCES,
         "--out-dir",
         SELF_HOST_COMPILER_DIR,
         "--linker",
