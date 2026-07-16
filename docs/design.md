@@ -8,7 +8,7 @@ Epic 是一门面向 Windows x64 的小型 C-like 系统语言（systems languag
 
 本实现不保留向前兼容性。语言变化时，编译器源码随当前设计一起演进。
 
-当前语言使用统一的 nominal `type` 声明表达 product 与 named payload sum。未来的 unit sum、inline payload variant 和 variant namespace 方向见 [`unified-type-declarations.md`](unified-type-declarations.md)。
+当前语言使用统一的 nominal `type` 声明表达 product、unit sum 与 named payload sum；完整边界见 [`unified-type-declarations.md`](unified-type-declarations.md)。
 
 ## 程序模型 (Program Model)
 
@@ -37,11 +37,11 @@ python epic.py --main main.ep main.ep lib.ep
 | `i64`   | 有符号 64 位整数                        |
 | `u64`   | 无符号 64 位整数                        |
 | `str`   | 字节字符串/文本值；支持字面量、内容相等、切片和分配式拼接 |
-| `Name`  | 用户声明的 product 或 named sum 引用 |
+| `Name`  | 用户声明的 product、unit sum 或 named payload sum |
 | `T[]`   | 堆分配的动态数组描述符 (dynamic array descriptor) |
 | `void`  | unit 类型，表示唯一的“无信息”值；常用于函数返回和副作用表达式 |
 
-`str`、用户具名类型和动态数组具有引用语义。赋值和参数传递复制引用，而非对象内容。没有按值复制 product、sum wrapper 或数组的语义。`void` 是 unit 类型，但不能作为参数、local 绑定或数组元素类型使用。
+`str`、product、named payload sum 和动态数组具有引用语义。Unit sum 是按值传递的 nominal scalar。没有按值复制 product、payload sum wrapper 或数组的语义。`void` 是 unit 类型，但不能作为参数、local 绑定或数组元素类型使用。
 
 ### 内置全局变量 (Built-in Globals)
 
@@ -131,7 +131,7 @@ let xs = new u8[]
 
 `let` 绑定是 lexical block scoped：只在当前 `{ ... }` block 及其内部嵌套 block 中可见。内层 block 可以 shadow 外层同名绑定；离开 block 后恢复外层绑定。
 
-`str`、`T[]`、用户 product 和 named sum wrapper 都是 heap-backed reference 类型。对 null reference 执行 `len`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
+`str`、`T[]`、用户 product 和 named payload sum wrapper 都是 heap-backed reference 类型。Unit sum 是非 null 的 scalar。对 null reference 执行 `len`、索引、切片、`push`、`pop`、`extend` 或字段访问是运行时错误；编译器不会在使用点自动 materialize 空容器。
 
 Postfix `?` 是 reference non-null check：`expr?` 对 `expr` 求值一次，并返回该 reference 是否非 null。`expr` 必须是 reference 类型；`bool` 和整数不允许使用 `?`。`?` 不引入 truthiness，`if` / 条件 `for` 仍然只接受 `bool`；例如 `if foo.ok {}` 读取 bool 字段，`if foo.child? {}` 检查 reference 字段是否非 null。`foo.child?` 会读取 `foo.child`，所以若 `foo` 本身为 null，仍然会触发 null deref trap；它不会 deref `child`。
 

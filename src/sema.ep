@@ -80,6 +80,12 @@ fun sema_union_member_index(st: SemaState, union_name: str, member_name: str): i
     ret -1
 }
 
+fun sema_union_is_unit(st: SemaState, name: str): bool {
+    let index = sema_union_index(st, name)
+    if index < 0 { ret false }
+    ret st.unions[index].is_unit
+}
+
 fun sema_set_type(node: AstExpr, typ: str): str {
     ast_set_resolved_type(node, typ)
     ret typ
@@ -275,6 +281,9 @@ fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): st
     if union_index < 0 {
         sema_die(f"unknown type {union_name}")
     }
+    if st.unions[union_index].is_unit {
+        sema_die(f"unit sum {union_name} has no fields")
+    }
     let found = ""
     let members = st.unions[union_index].members
     for i: 0:len(members) {
@@ -295,7 +304,7 @@ fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): st
 }
 
 fun sema_is_reference_type(st: SemaState, typ: str): bool {
-    ret typ == "str" || sema_is_array(typ) || sema_struct_index(st, typ) >= 0 || sema_union_index(st, typ) >= 0
+    ret typ == "str" || sema_is_array(typ) || sema_struct_index(st, typ) >= 0 || (sema_union_index(st, typ) >= 0 && sema_union_is_unit(st, typ) == false)
 }
 
 fun sema_null_check_type(st: SemaState, node: AstNullCheck): str {
@@ -306,7 +315,25 @@ fun sema_null_check_type(st: SemaState, node: AstNullCheck): str {
     ret "bool"
 }
 
+fun sema_unit_variant_type_or_empty(st: SemaState, object: AstExpr, field: str): str {
+    match object {
+        AstVar n: {
+            if sema_union_is_unit(st, n.name) {
+                if sema_union_member_index(st, n.name, field) < 0 {
+                    sema_die(f"unknown unit variant {n.name}.{field}")
+                }
+                ast_set_resolved_type(object, n.name)
+                ret n.name
+            }
+        }
+        _: {}
+    }
+    ret ""
+}
+
 fun sema_field_access_type(st: SemaState, object: AstExpr, field: str): str {
+    let unit_type = sema_unit_variant_type_or_empty(st, object, field)
+    if unit_type != "" { ret unit_type }
     ret sema_field_type(st, sema_expr_type(st, object), field)
 }
 
@@ -678,6 +705,24 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: str[]): str {
     ret out
 }
 
+fun sema_unit_match_variant(st: SemaState, union_name: str, pattern: AstExpr): str {
+    match pattern {
+        AstFieldAccess access: {
+            match access.object {
+                AstVar owner: {
+                    if owner.name == union_name && sema_union_member_index(st, union_name, access.name) >= 0 {
+                        ret access.name
+                    }
+                }
+                _: {}
+            }
+        }
+        _: {}
+    }
+    sema_die(f"match on unit sum {union_name} requires {union_name}.Variant cases")
+    ret ""
+}
+
 fun sema_build_types(st: SemaState, program: AstProgram): void {
     st.structs = program.structs
     for i: 0:len(st.structs) {
@@ -715,15 +760,21 @@ fun sema_build_types(st: SemaState, program: AstProgram): void {
     for i: 0:len(st.unions) {
         let u = st.unions[i]
         let seen = new str[]
+        let product_members = 0
         for j: 0:len(u.members) {
             let member = u.members[j]
             if sema_string_contains(seen, member) {
                 sema_die(f"duplicate sum member {u.name}.{member}")
             }
             seen.push(member)
-            if sema_struct_index(st, member) < 0 {
-                sema_die(("sum member " + ((u.name + ".") + member)) + " must name a type declared with { ... }")
-            }
+            if sema_struct_index(st, member) >= 0 { product_members += 1 }
+        }
+        if product_members == 0 {
+            u.is_unit = true
+        } else if product_members == len(u.members) {
+            u.is_unit = false
+        } else {
+            sema_die(f"sum type {u.name} cannot mix product members and unit variants")
         }
     }
 }
@@ -909,6 +960,15 @@ fun sema_expr_type(st: SemaState, node: AstExpr): str {
                 }
                 ret sema_set_type(node, "bool")
             }
+            if sema_union_is_unit(st, left) || sema_union_is_unit(st, right) {
+                if n.op != "==" && n.op != "!=" {
+                    sema_die(f"unit sum operator only supports == and !=, got {n.op}")
+                }
+                if left != right {
+                    sema_die(f"unit sum comparison expected {left}, got {right}")
+                }
+                ret sema_set_type(node, "bool")
+            }
             if n.op == "==" || n.op == "!=" || n.op == "<" || n.op == ">" || n.op == "<=" || n.op == ">=" {
                 if sema_is_int(left) && sema_is_int(right) {
                     if left != right {
@@ -991,6 +1051,9 @@ fun sema_expr_type(st: SemaState, node: AstExpr): str {
         AstUnionInit n: {
             if sema_union_index(st, n.type_name) < 0 {
                 sema_die(f"unknown type {n.type_name}")
+            }
+            if sema_union_is_unit(st, n.type_name) {
+                sema_die(f"unit sum {n.type_name} values use {n.type_name}.Variant")
             }
             let payload_type = sema_expr_type(st, n.expr)
             if sema_struct_index(st, payload_type) < 0 {
@@ -1335,6 +1398,32 @@ fun sema_stmt(st: SemaState, node: AstStmt): void {
             n.is_exhaustive = false
             if sema_union_index(st, scrutinee) >= 0 {
                 let seen = new str[]
+                if sema_union_is_unit(st, scrutinee) {
+                    for i: 0:len(n.fields) {
+                        let c = n.fields[i]
+                        if c.has_expr == false {
+                            sema_die(f"match on unit sum {scrutinee} requires namespaced variant cases without bindings")
+                        }
+                        sema_check_assign(st, scrutinee, c.expr, "match pattern")
+                        let variant = sema_unit_match_variant(st, scrutinee, c.expr)
+                        if sema_string_contains(seen, variant) {
+                            sema_die(f"duplicate match case {scrutinee}.{variant}")
+                        }
+                        seen.push(variant)
+                        c.meta.resolved_type = scrutinee
+                        sema_block(st, c.body)
+                    }
+                    if n.has_else {
+                        sema_block(st, n.else_block)
+                    } else {
+                        let missing = sema_union_missing_text(st, scrutinee, seen)
+                        if missing != "" {
+                            sema_die(f"non-exhaustive match for {scrutinee}; missing {missing}")
+                        }
+                    }
+                    n.is_exhaustive = true
+                    ret
+                }
                 for i: 0:len(n.fields) {
                     let c = n.fields[i]
                     if c.has_expr { sema_die(f"match on sum type {scrutinee} requires variant binding cases") }

@@ -1,0 +1,9 @@
+# COMPILE_FAIL_CONTAINS: non-exhaustive match for State; missing Done
+type State = Ready | Done
+
+fun main(): void {
+    let state = State.Ready
+    match state {
+        State.Ready: { ret }
+    }
+}

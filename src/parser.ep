@@ -98,6 +98,7 @@ type AstUnionDef {
     meta: AstMeta
     name: str
     members: str[]
+    is_unit: bool
 }
 
 type AstExternDef {
@@ -864,7 +865,12 @@ fun (p: Parser) parse_match_stmt(): AstStmt {
             node.fields.push(new AstMatchCase { meta: ast_meta(variant.line), variant_name: variant.text, binding_name: binding.text, body: body, has_expr: false })
         } else {
             let first = p.peek()
-            let pattern = p.parse_match_literal()
+            let pattern = ast_error_expr()
+            if p.peek_kind("ID") == 1 && p.pos + 1 < len(p.tokens) && p.tokens[p.pos + 1].kind == "DOT" {
+                pattern = p.parse_expr()
+            } else {
+                pattern = p.parse_match_literal()
+            }
             p.expect("COLON")
             let body = p.parse_block()
             node.fields.push(new AstMatchCase { meta: ast_meta(first.line), expr: pattern, body: body, has_expr: true })

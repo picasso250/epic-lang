@@ -1,16 +1,16 @@
 # Unified Type Declarations
 
-本文档记录 Epic 统一类型声明的当前边界和后续方向。当前语言已统一 product 与 named payload sum 的顶层声明；unit sum、inline payload variant 和 variant namespace 留给后续版本。
+本文档记录 Epic 统一 nominal type 声明的当前语义。Epic 不增加 `enum` 关键字；product、unit sum 与 named payload sum 都由 `type` 表达。
 
-## 决策
-
-Epic 只使用 `type` 声明 nominal type。Product 使用紧邻类型名的定义体；sum 使用类型等式：
+## 声明形态
 
 ```epic
 type Point {
     x: i64
     y: i64
 }
+
+type TokenKind = EOF | ID | FUN
 
 type Lit {
     value: i64
@@ -24,43 +24,43 @@ type Add {
 type Expr = Lit | Add
 ```
 
-对应关系：
+| 声明形态 | 类型结构 |
+|---|---|
+| `type A { ... }` | product |
+| `type A = X \| Y`，所有 member 都是已声明 product | named payload sum |
+| `type A = X \| Y`，所有 member 都不是已声明 product | unit sum |
 
-| 声明形态 | 类型结构 | 当前状态 |
-|---|---|---|
-| `type A { ... }` | 单一 product | 已支持 |
-| `type A = X \| Y` | 由已声明 product 组成的 named payload sum | 已支持，至少两个 member |
-| `type A = X \| Y`，其中 `X` / `Y` 未声明 product | unit sum | 未支持 |
-| `type A = X { ... } \| Y { ... }` | inline payload sum | 未支持 |
+分类发生在收集全部 product 声明之后，因此不依赖源码先后顺序。部分 member 是 product、部分不是 product 的声明非法；重复 member 非法。Named sum 至少包含两个 member。
 
-`enum` 不成为独立的顶层声明或全局关键字。未来全为 unit variant 的 sum type 自然承担 enum 的用途。
+Product member 是可独立复用、可拥有 receiver method 的普通 nominal product。Epic 不支持 inline payload variant，例如 `type A = X { ... } | Y { ... }`；payload 必须先声明为 product。这条边界是有意的，不是待实现的临时缺口。
 
-每个 `type` 都声明新的 nominal type。`type Point { ... }` 不创建 structural type alias；两个字段完全相同的声明仍是两个不同类型。
+`type A = Existing` 保留给未来可能的 nominal alias，不解释为单成员 sum。独立的 `struct` 和 `enum` 关键字都不存在。
 
-这里的标点差异是有意的：`{ ... }` 是 product 的定义体，不是赋给名称的表达式；`A | B` 则组合已经命名的类型。`type A = B` 当前非法，并为未来可能的 nominal alias 保留，不能解释成单成员 sum。
+## Unit sum 值
 
-## Future variant namespace
-
-Variant 属于其 sum type 的 namespace：
+Unit variant 始终通过 sum namespace 引用：
 
 ```epic
-let kind = TokenKind.FUN
-let expr = new Expr.Lit { value: 42 }
-```
-
-Payload variant 应当是可命名的具体类型，以便 match narrowing 能跨 helper 边界继续保留：
-
-```epic
-fun emit_lit(expr: Expr.Lit): void {
-    println(str(expr.value))
+let kind = TokenKind.ID
+if kind != TokenKind.EOF {
 }
 ```
 
-这避免重新引入“调用者已经知道具体 variant，helper 却重新接收宽 union”的信息损失。
+裸 `ID` 不根据赋值目标、比较另一侧或 match scrutinee 推断。不同 unit sum 可以复用同名 variant，例如 `TokenKind.ID` 与 `NodeKind.ID` 是不同类型的值。
 
-## Future match extensions
+Unit sum 是独立 nominal type，不是整数 alias。它支持：
 
-Unit sum 与 payload sum 使用同一套 `match`：
+- local、函数参数和返回值
+- product 字段
+- `T[]` 动态数组及其 `push`、`pop`、`extend`
+- 同类型的 `==`、`!=`
+- `match`
+
+它不支持整数转换、ordinal/tag 观察、算术、排序、位运算、`str`/print/f-string 转换、postfix `?`、receiver method、extern ABI 或 `cptr`。不同 unit sum 即使 member 完全相同也不能比较或赋值。
+
+## Match
+
+Unit sum case 使用完整 namespace，不绑定 payload：
 
 ```epic
 match kind {
@@ -68,80 +68,49 @@ match kind {
     TokenKind.ID: {}
     TokenKind.FUN: {}
 }
-
-match expr {
-    Expr.Lit lit: {
-        emit_lit(lit)
-    }
-    Expr.Add add: {
-    }
-}
 ```
 
-封闭 sum 应进行穷尽性检查；`_` 保持显式兜底分支。
-
-## Source semantics and representation
-
-统一源码模型不要求统一运行时布局：
-
-| 类型形态 | 初始表示方向 |
-|---|---|
-| 单一 product | heap-backed reference |
-| unit sum | unboxed scalar tag |
-| payload sum | tagged payload reference |
-
-Unit sum 是独立 nominal type，不是整数 alias。第一版不开放 tag、ordinal、整数转换、算术、排序或位运算。内部 tag 分配和宽度不属于源码合约。
-
-## 当前边界
-
-独立的 `struct` 关键字已经删除，`struct` 已恢复为普通标识符。当前 product 与 named sum 语法是：
+Payload sum 保留 product member 与 binding 形式：
 
 ```epic
-type Point {
-    x: i64
-    y: i64
+match expr {
+    Lit lit: {
+        println(str(lit.value))
+    }
+    Add add: {}
 }
-
-type Expr = Lit | Add
 ```
 
-Product 字段每行一个，不使用逗号；空 product 与单行单字段合法。Named sum 必须写在一个逻辑行内并至少有两个 member。Product 支持 receiver method、前向引用、自递归和 mutual recursion；sum 暂不支持 receiver。初始化器继续支持全省略、部分指定和全指定字段。
+两种封闭 sum 都必须覆盖全部 member，或提供 `_` 兜底。重复 case 非法。Unit case 写成 `ID value:` 非法，因为 unit variant 没有 payload。
 
-`type Alias = Existing` 当前同样非法；这一形态被保留给未来 alias 设计。
+## 构造与默认值
 
-当前语言不加入以下过渡语法：
+Payload sum 继续显式包装：
+
+```epic
+let expr: Expr = new Expr(new Lit { value: 42 })
+```
+
+Unit sum 不使用 `new`。声明顺序中的第一个 variant 是语言层面的零值；零初始化的 product 字段和 `new TokenKind[n]` 数组槽都取第一个 variant。除此之外，variant 的数值、位宽和 tag 分配不属于源码合约。
+
+## 表示
+
+| 类型形态 | 当前 v1 表示 |
+|---|---|
+| product | heap-backed reference |
+| unit sum | unboxed 64-bit scalar tag |
+| payload sum | heap-backed `{ tag, payload pointer }` wrapper |
+
+Unit sum 的 product 字段和数组槽当前均占 8 bytes。未来后端可以在不改变第一 variant 为零值这一语义的前提下压缩存储宽度。
+
+## 语法边界
+
+Product 字段每行一个，不使用逗号；空 product 与单行单字段合法。Named sum 写在一个逻辑行内。Product 支持前向引用、自递归、mutual recursion 和 receiver method；sum 不支持 receiver。Product 初始化器支持全省略、部分指定和全指定字段。
+
+以下过渡语法不属于语言：
 
 ```epic
 enum TokenKind = EOF | ID
 type TokenKind: enum = EOF | ID
 type TokenKind: i64 = EOF | ID
 ```
-
-实现临时 enum surface 会迫使 Python reference、Epic 自举编译器、测试和文档迁移两次，并可能提前固定错误的 namespace、constructor 或 representation 语义。
-
-## 实现前必须 grill
-
-以下问题尚未决定，不能从示例语法反推实现：
-
-- Product variant 是否允许独立 receiver method。
-- Unit variant 与 payload variant 是否允许出现在同一个 sum 中。
-- Payload sum 使用一层还是两层分配。
-- Variant payload 是否内联于 tagged object。
-- Common-field access 是否保留。
-- Unit sum 作为未显式初始化的 product 字段时采用什么默认值。
-- Recursive product 与 recursive sum 的合法边界。
-- Variant 与 type、function、field 名称的冲突规则。
-- 是否允许复用已声明 product 作为 variant payload。
-
-## Future migration principles
-
-这次变化不提供向前兼容语法。实施时应一次性完成：
-
-1. 确定 namespace、constructor、match 和 representation 语义。
-2. 在 Python reference compiler 中实现完整语义。
-3. 在 Epic 自举编译器中实现相同语义。
-4. 将 compiler、examples 和 tests 迁移到扩展后的 sum 声明。
-5. 删除当前 named-member payload-sum surface。
-6. 运行模块测试、examples、e2e 和 bootstrap fixed point。
-
-在这些决策完成以前，字符串 `Token.kind` 是有意保留的简单实现，不应成为引入临时 enum 语法的理由。

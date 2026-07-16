@@ -57,6 +57,7 @@ Epic 目前支持：
 - 堆分配的具名字段类型——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
 - 自动垃圾回收；对象地址在生命周期内保持稳定
 - 封闭的 named payload sum——`type Name = A | B` 声明、显式包装构造、公共字段访问
+- 封闭的 unit sum——`type TokenKind = EOF | ID` 声明、命名空间值、穷尽匹配和零值
 - `embed "path"` 编译期原始字节嵌入、面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
 
 主要语言特性可通过 `examples/` 渐进学习；完整语言边界由 `docs/` 和意图级测试共同定义。

@@ -1,0 +1,16 @@
+# EXIT: 0
+# STDOUT: connected
+type Connection = Disconnected | Connecting | Connected
+
+fun describe(connection: Connection): str {
+    match connection {
+        Connection.Disconnected: { ret "disconnected" }
+        Connection.Connecting: { ret "connecting" }
+        Connection.Connected: { ret "connected" }
+    }
+}
+
+fun main(): void {
+    let connection = Connection.Connected
+    println(describe(connection))
+}

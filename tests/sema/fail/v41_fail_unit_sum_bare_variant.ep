@@ -1,0 +1,6 @@
+# COMPILE_FAIL_CONTAINS: undefined variable Ready
+type State = Ready | Done
+
+fun main(): void {
+    let state: State = Ready
+}

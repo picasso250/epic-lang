@@ -1,0 +1,10 @@
+# COMPILE_FAIL_CONTAINS: match on unit sum State requires namespaced variant cases without bindings
+type State = Ready | Done
+
+fun main(): void {
+    let state = State.Ready
+    match state {
+        Ready value: { ret }
+        Done value: { ret }
+    }
+}

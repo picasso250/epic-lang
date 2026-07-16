@@ -1,0 +1,38 @@
+# EXIT: 42
+type State = Ready | Running | Done
+type OtherState = Ready | Stopped
+
+type Holder {
+    state: State
+}
+
+fun advance(state: State): State {
+    match state {
+        State.Ready: { ret State.Running }
+        State.Running: { ret State.Done }
+        State.Done: { ret State.Done }
+    }
+}
+
+fun main(): void {
+    let holder = new Holder
+    if holder.state != State.Ready { exit(1) }
+
+    let states = new State[2]
+    states[1] = State.Running
+    states.push(State.Done)
+    let more = new State[] { State.Ready, State.Running }
+    states.extend(more)
+    let last = states.pop()
+
+    let result = 0
+    match advance(states[1]) {
+        State.Ready: { result = 1 }
+        State.Running: { result = 2 }
+        State.Done: { result = 42 }
+    }
+    if last == State.Running && OtherState.Ready == OtherState.Ready {
+        exit(result)
+    }
+    exit(3)
+}

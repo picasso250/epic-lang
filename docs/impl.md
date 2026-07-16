@@ -107,6 +107,7 @@ mark-sweep。managed payload 由 `__ep_alloc` 统一登记；collector 扫描活
 | `u64`      | `u64`             |
 | `str`      | `&str`；指向 inline `{len, bytes..., NUL}` object |
 | `Token`    | `&Token`          |
+| unit sum   | `i64` scalar tag  |
 | `u8[]`     | `&_slice`         |
 | `Token[]`  | `&_slice`         |
 
@@ -172,9 +173,9 @@ Extern FFI 可把只含整数 scalar 字段的非空用户 product 作为同步 
 
 `MirParam.source_type` 保存被统一 64-bit MIR value lane 擦除前的源码参数类型。lowering 先建立 address-taken function 索引；只有这些函数在共享真实入口把 `bool/u8/i16/u16/i32/u32` 的寄存器和栈参数按自然宽度 load 并扩展到 64 bit。直接调用专用函数不额外生成入口规范化，`i64/u64/ptr/reference` 也不改写。callback 没有 thunk、closure 或 runtime helper。
 
-### ADT (Algebraic Data Types)
+### Sum types
 
-ADT v1 使用 tagged payload lowering：
+Named payload sum 使用 tagged payload lowering：
 
 ```text
 Expr wrapper:
@@ -189,18 +190,19 @@ payload:
 
 1. 收集所有 `type Name { ... }` product 定义。
 2. 收集 `type Name = A | B | C` sum 定义。
-3. 验证 sum member 都是 product。
+3. 全部 member 是 product 时分类为 payload sum；全部不是 product 时分类为 unit sum；拒绝混合声明。
 4. 为 wrapper 生成 tag namespace。
 5. `new Expr(payload)` 生成 wrapper。
-6. ADT `match` 根据 wrapper tag 分派，并绑定 payload struct。
+6. Payload sum `match` 根据 wrapper tag 分派，并绑定 payload product。
+7. Unit sum variant 直接降低为从 0 开始的 `i64` tag；首 variant 是零值。
+8. Unit sum 的 local、参数、返回值、product 字段和数组槽都走 64-bit scalar 路径，match 直接比较 tag。
 
 不支持：
 
-- primitive sum member
 - implicit boxing
 - tag 访问
 - sum extension
-- variant-specific constructor namespace
+- unit sum 的 extern ABI、整数转换和 receiver method
 
 ## 代码生成模型 (Codegen Model)
 

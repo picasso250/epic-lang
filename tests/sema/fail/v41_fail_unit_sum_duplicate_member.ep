@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: duplicate sum member State.Ready
+type State = Ready | Ready
+
+fun main(): void {}

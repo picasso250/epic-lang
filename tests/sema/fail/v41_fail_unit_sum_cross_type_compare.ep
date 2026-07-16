@@ -1,0 +1,7 @@
+# COMPILE_FAIL_CONTAINS: unit sum comparison expected State, got OtherState
+type State = Ready | Done
+type OtherState = Ready | Done
+
+fun main(): void {
+    let same = State.Ready == OtherState.Ready
+}
