@@ -17,14 +17,17 @@ TOKEN_SPEC = [
     ("NEW",       r'\bnew\b'),
     ("LET",       r'\blet\b'),
     ("ID",        r'[a-zA-Z_][a-zA-Z0-9_]*'),
-    ("NUMBER",    r'[0-9]+'),
+    ("NUMBER",    r'0[xX][0-9a-fA-F]+|[0-9]+'),
     ("EQEQ",      r'=='),
     ("NEQ",       r'!='),
     ("LTE",       r'<='),
     ("GTE",       r'>='),
+    ("SHL",       r'<<'),
+    ("SHR",       r'>>'),
     ("AND",       r'&&'),
     ("AMPERSAND", r'&'),
     ("OR",        r'\|\|'),
+    ("BIT_OR",    r'\|'),
     ("LT",        r'<'),
     ("GT",        r'>'),
     ("PLUS",      r'\+'),
@@ -115,7 +118,9 @@ def lex(source_text):
             continue
         line = line_numbers[m.start()] if m.start() < len(line_numbers) else 1
         if kind == "NUMBER":
-            value = int(value)
+            value = int(value, 16) if value.lower().startswith("0x") else int(value, 10)
+            if value > 0x7FFFFFFFFFFFFFFF:
+                raise LexError("Integer literal is out of i64 range", line)
         elif kind == "STRING":
             value = decode_escaped(value[1:-1], line)
         elif kind == "CHAR":

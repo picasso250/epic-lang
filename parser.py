@@ -303,10 +303,22 @@ class Parser:
         return left
 
     def parse_logic_and(self):
-        left = self.parse_equality()
+        left = self.parse_bit_or()
         while self.check("AND"):
-            right = self.parse_equality()
+            right = self.parse_bit_or()
             left = BinaryNode(op="&&", left=left, right=right)
+        return left
+
+    def parse_bit_or(self):
+        left = self.parse_bit_and()
+        while self.check("BIT_OR"):
+            left = BinaryNode(op="|", left=left, right=self.parse_bit_and())
+        return left
+
+    def parse_bit_and(self):
+        left = self.parse_equality()
+        while self.check("AMPERSAND"):
+            left = BinaryNode(op="&", left=left, right=self.parse_equality())
         return left
 
     # Token kind → operator string
@@ -314,6 +326,7 @@ class Parser:
         "PLUS": "+", "MINUS": "-", "STAR": "*", "SLASH": "/", "PERCENT": "%",
         "EQEQ": "==", "NEQ": "!=", "LT": "<", "GT": ">",
         "LTE": "<=", "GTE": ">=", "AND": "&&", "OR": "||",
+        "BIT_OR": "|", "AMPERSAND": "&", "SHL": "<<", "SHR": ">>",
     }
 
     def parse_equality(self):
@@ -323,9 +336,15 @@ class Parser:
         return left
 
     def parse_comparison(self):
-        left = self.parse_term()
+        left = self.parse_shift()
         while op := (self.check("LT") or self.check("GT")
                      or self.check("LTE") or self.check("GTE")):
+            left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_shift())
+        return left
+
+    def parse_shift(self):
+        left = self.parse_term()
+        while op := self.check("SHL") or self.check("SHR"):
             left = BinaryNode(op=self.OP_MAP[op[0]], left=left, right=self.parse_term())
         return left
 

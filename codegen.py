@@ -764,6 +764,22 @@ class Emitter:
 
         if op in op_map:
             self.emit(f"    {op_map[op]}")
+        elif op == "&":
+            self.emit("    and rax, rcx")
+        elif op == "|":
+            self.emit("    or rax, rcx")
+        elif op in ("<<", ">>"):
+            count_ok = self.fresh_label()
+            count_bad = self.fresh_label()
+            self.emit("    cmp rcx, 0")
+            self.emit(f"    jl {count_bad}")
+            self.emit("    cmp rcx, 64")
+            self.emit(f"    jl {count_ok}")
+            self.emit_label(count_bad)
+            self.emit_mov("ecx", "1")
+            self.emit_call_inst("ExitProcess")
+            self.emit_label(count_ok)
+            self.emit("    shl rax, cl" if op == "<<" else "    sar rax, cl")
         elif op == "/":
             self.emit("    cqo")
             self.emit("    idiv rcx")

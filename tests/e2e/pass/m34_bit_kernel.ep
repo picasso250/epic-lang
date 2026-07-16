@@ -1,0 +1,18 @@
+# EXIT: 0
+# STDOUT: 255
+# STDOUT: 4660
+# STDOUT: -1
+# STDOUT: 195
+# STDOUT: 1
+fun line(value: i64): void {
+    putstr(itoa(value))
+    putc(10)
+}
+fun main(): void {
+    line(0xFF)
+    line((0x12 << 8) | 0x34)
+    line((0 - 2) >> 1)
+    line((0xF0 & 0xCC) | 0x03)
+    line(1 | 2 & 4)
+    os.ExitProcess(0)
+}

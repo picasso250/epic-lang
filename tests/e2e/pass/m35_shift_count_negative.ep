@@ -1,0 +1,5 @@
+# EXIT: 1
+fun main(): void {
+    let value = 1 << (0 - 1)
+    os.ExitProcess(0)
+}
