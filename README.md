@@ -41,9 +41,8 @@ Hello, Epic!
 
 Epic 目前支持：
 
-- 函数与结构体接收者方法、局部变量、显式返回
 - `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
-- `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`；`_:` 是唯一的默认分支形式
+- `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`
 - `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、十进制与十六进制整数字面量、显式整数类型转换、带检查的算术运算
 - 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
 - 动态数组（`T[]`）——字面量、定长零初始化、带检查的索引、`len`、`push`、`pop`、`extend`
@@ -52,8 +51,6 @@ Epic 目前支持：
 - 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
 
 主要语言特性可通过 `examples/` 渐进学习；完整语言边界由 `docs/` 和意图级测试共同定义。
-
-`v0` 分支正在收敛首次公开版本；创建发布 tag 前不承诺源码、ABI 或工具行为兼容。发布 tag 冻结该版本的用户可见行为，内部实现仍可演进。
 
 ## 自举不动点
 
@@ -64,8 +61,6 @@ Epic 目前支持：
 ```powershell
 python bootstrap_fixed_point.py -o build\epic.exe
 ```
-
-该命令直接构建当前 checkout，不检出其他 revision，也不依赖预构建的 Epic binary。将来复现某个发布版本时，先 checkout 对应的不可移动 tag，再运行同一命令。Python reference compiler 继续作为语言判定基准（oracle）和完整 bootstrap 的起点。
 
 ## 当前边界
 
@@ -123,8 +118,6 @@ python tests/link/run.py
 
 ## 编译器流水线
 
-当前活跃的编译路径：
-
 ```text
 解析 / 合并（parse / merge）
   -> 语义分析（semantic analysis）
@@ -152,4 +145,4 @@ bootstrap/coff.py          最小 AMD64 COFF 写入器
 bootstrap/link.py          最小 PE 链接器
 ```
 
-Python 参考编译器是当前语言的判定基准（oracle）。用 Epic 编写的编译器代码应先与参考路径保持一致，再发展独立的优化行为。未来的优化工作应置于显式的优化模式之下，而非放在默认的 oracle 路径中。
+Python 参考编译器是当前语言的判定基准（oracle）。用 Epic 编写的编译器代码应先与参考路径保持一致，再发展独立的优化行为（在别的分支上）。
