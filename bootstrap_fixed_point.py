@@ -15,7 +15,7 @@ BUILD = ROOT / "build"
 FIXED_POINT = BUILD / "fixed-point"
 SEED = BUILD / "epic-v1.exe"
 SELF_OUTPUT = BUILD / "epic" / "src_epic.ep.exe"
-SOURCES = ("src/epic.ep", "src/lexer.ep", "src/parser.ep", "src/codegen.ep", "src/asm.ep")
+SOURCES = ("src/epic.ep", "src/lexer.ep", "src/parser.ep", "src/codegen.ep", "src/asm.ep", "src/pe.ep")
 
 
 def run(command: list[str]) -> None:

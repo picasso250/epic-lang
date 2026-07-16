@@ -19,7 +19,7 @@ SRC_DIR = ROOT / "src"
 BUILD_DIR = ROOT / "build"
 BOOTSTRAP_DIR = BUILD_DIR / "v1-bootstrap"
 OUTPUT = BUILD_DIR / "epic-v1.exe"
-SOURCE_NAMES = ("epic.ep", "lexer.ep", "parser.ep", "codegen.ep", "asm.ep")
+SOURCE_NAMES = ("epic.ep", "lexer.ep", "parser.ep", "codegen.ep", "asm.ep", "pe.ep")
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:

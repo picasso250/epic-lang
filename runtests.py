@@ -45,6 +45,22 @@ def clean_test_paths(paths):
             os.remove(path)
 
 
+def check_executable(exe_path, argv, exit_expected, stdout_expected):
+    proc = subprocess.run(
+        [exe_path, *argv],
+        capture_output=True, cwd=SCRIPT_DIR, timeout=EXEC_TIMEOUT,
+    )
+    failures = []
+    if exit_expected is not None and proc.returncode != exit_expected:
+        failures.append(f"EXIT: expected {exit_expected}, got {proc.returncode}")
+    if stdout_expected is not None:
+        raw = proc.stdout or b''
+        actual = raw.decode('ascii', errors='replace').strip()[:len(stdout_expected) + 100]
+        if actual != stdout_expected.strip():
+            failures.append(f"STDOUT: expected {stdout_expected!r}, got {actual!r}")
+    return failures
+
+
 def run_test(ep_file):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
@@ -70,26 +86,19 @@ def run_test(ep_file):
     
     safe = rel.replace("/", "_").replace("\\", "_")
     exe_path = os.path.join(SCRIPT_DIR, "build", "epic", safe + ".exe")
+    native_path = os.path.join(SCRIPT_DIR, "build", "epic", safe + ".native.exe")
     if not os.path.exists(exe_path):
         return False, f"no exe produced: {exe_path}"
+    if not os.path.exists(native_path):
+        return False, f"no native exe produced: {native_path}"
 
-    proc = subprocess.run(
-        [exe_path, *argv],
-        capture_output=True, cwd=SCRIPT_DIR, timeout=EXEC_TIMEOUT,
-    )
-    # Check exit code
-    failures = []
-    if exit_expected is not None:
-        if proc.returncode != exit_expected:
-            failures.append(f"EXIT: expected {exit_expected}, got {proc.returncode}")
-    
-    # Check stdout
-    if stdout_expected is not None:
-        raw = proc.stdout or b''
-        # Take only the first N bytes matching expected length
-        actual = raw.decode('ascii', errors='replace').strip()[:len(stdout_expected) + 100]
-        if actual != stdout_expected.strip():
-            failures.append(f"STDOUT: expected {stdout_expected!r}, got {actual!r}")
+    failures = [f"old: {failure}" for failure in check_executable(
+        exe_path, argv, exit_expected, stdout_expected,
+    )]
+    clean_test_paths(clean_paths)
+    failures.extend(f"native: {failure}" for failure in check_executable(
+        native_path, argv, exit_expected, stdout_expected,
+    ))
     
     if failures:
         try:
