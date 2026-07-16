@@ -31,10 +31,11 @@ type StructInfo {
 }
 type EmitterState {
     out_path: str
-    out_buf: i8[]
+    out_buf: u8[]
     label_counter: i64
     string_counter: i64
     current_fn: str
+    current_ret_type: TypeInfo
     current_ep_id: i64
     local_bytes: i64
     alloc_size: i64
@@ -307,7 +308,7 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, "runtime/str_cat.asm")
     emit_runtime(e, "runtime/str_slice.asm")
     emit_runtime(e, "runtime/str_replace_char.asm")
-    emit_runtime(e, "runtime/extend_i8.asm")
+    emit_runtime(e, "runtime/extend_u8.asm")
     emit_runtime(e, "runtime/itoa.asm")
     emit_runtime(e, "runtime/argv.asm")
     emit_runtime(e, "runtime/system.asm")
@@ -318,10 +319,11 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
 fun make_emitter(out_path: str): EmitterState {
     let e = new EmitterState
     e.out_path = out_path
-    e.out_buf = new i8[65536]
+    e.out_buf = new u8[65536]
     e.label_counter = 0
     e.string_counter = 0
     e.current_fn = ""
+    e.current_ret_type = type_void()
     e.current_ep_id = 0
     e.local_bytes = 0
     e.alloc_size = 0
@@ -344,8 +346,8 @@ fun type_info(kind: str, name: str): TypeInfo {
 fun type_i64(): TypeInfo {
     return type_info("i64", "")
 }
-fun type_i8(): TypeInfo {
-    return type_info("i8", "")
+fun type_u8(): TypeInfo {
+    return type_info("u8", "")
 }
 fun type_void(): TypeInfo {
     return type_info("void", "")
@@ -359,14 +361,14 @@ fun type_struct(name: str): TypeInfo {
 fun type_array(elem: str): TypeInfo {
     return type_info("array", elem)
 }
-fun type_is_i8(t: TypeInfo): i64 {
-    if t.kind == "i8" {
+fun type_is_u8(t: TypeInfo): i64 {
+    if t.kind == "u8" {
         return 1
     }
     return 0
 }
-fun type_is_value_i8(t: TypeInfo): i64 {
-    return type_is_i8(t)
+fun type_is_value_u8(t: TypeInfo): i64 {
+    return type_is_u8(t)
 }
 fun type_is_complex(t: TypeInfo): i64 {
     if t.kind == "str" {
@@ -398,8 +400,8 @@ fun user_type(name: str): TypeInfo {
     if name == "i64" {
         return type_i64()
     }
-    if name == "i8" {
-        return type_i8()
+    if name == "u8" {
+        return type_u8()
     }
     if name == "void" {
         return type_void()
@@ -543,10 +545,10 @@ fun array_layout_name(elem: str): str {
 fun compute_struct_layouts(e: EmitterState, ast: AstNode): i64 {
     e.structs = new StructInfo[64]
     let s = add_struct_info(e, "str", 16)
-    add_field(s, "data", type_info("ptr", "i8"), 0)
+    add_field(s, "data", type_info("ptr", "u8"), 0)
     add_field(s, "len", type_i64(), 8)
-    let a = add_struct_info(e, "_arr_i8", 24)
-    add_field(a, "data", type_info("ptr", "i8"), 0)
+    let a = add_struct_info(e, "_arr_u8", 24)
+    add_field(a, "data", type_info("ptr", "u8"), 0)
     add_field(a, "len", type_i64(), 8)
     add_field(a, "cap", type_i64(), 16)
     a = add_struct_info(e, "_arr_i64", 24)
@@ -664,7 +666,7 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
             return type_str()
         }
         if expr.name == "bytes" {
-            return type_array("i8")
+            return type_array("u8")
         }
         if expr.name == "str_new" {
             return type_str()
@@ -940,7 +942,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         let arr_type = expr_type(e, expr.args.data[0])
         let elem = arr_type.name
         let el_size = 8
-        if elem == "i8" {
+        if elem == "u8" {
             el_size = 1
         }
         emit_expr(e, expr.args.data[0])
@@ -1018,7 +1020,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
         let slots = spill_args(e, expr.args)
         emit_stack_load(e, "rcx", slots.data[0])
         emit_stack_load(e, "rdx", slots.data[1])
-        emit_call_inst(e, "_extend_i8")
+        emit_call_inst(e, "_extend_u8")
         emit_inst(e, "xor eax, eax")
         return 0
     }
@@ -1093,6 +1095,32 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
         emit_inst(e, "imul rax, rcx")
         return 0
     }
+    if expr.op == "&" {
+        emit_inst(e, "and rax, rcx")
+        return 0
+    }
+    if expr.op == "|" {
+        emit_inst(e, "or rax, rcx")
+        return 0
+    }
+    if expr.op == "<<" || expr.op == ">>" {
+        let count_ok = fresh_label(e)
+        let count_bad = fresh_label(e)
+        emit_inst(e, "cmp rcx, 0")
+        emit_jmp_id(e, "jl", "L", count_bad)
+        emit_inst(e, "cmp rcx, 64")
+        emit_jmp_id(e, "jl", "L", count_ok)
+        emit_label_id(e, "L", count_bad)
+        emit_mov(e, "ecx", "1")
+        emit_call_inst(e, "ExitProcess")
+        emit_label_id(e, "L", count_ok)
+        if expr.op == "<<" {
+            emit_inst(e, "shl rax, cl")
+        } else {
+            emit_inst(e, "sar rax, cl")
+        }
+        return 0
+    }
     if expr.op == "/" {
         emit_inst(e, "cqo")
         emit_inst(e, "idiv rcx")
@@ -1156,7 +1184,7 @@ fun emit_new(e: EmitterState, expr: AstNode): i64 {
 fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
     let elem = expr.type_name
     let el_size = 8
-    if elem == "i8" {
+    if elem == "u8" {
         el_size = 1
     }
     let header_slot = 0
@@ -1217,8 +1245,8 @@ fun emit_field_access(e: EmitterState, expr: AstNode): i64 {
     let obj_type = expr_type(e, expr.object)
     emit_expr(e, expr.object)
     let field = find_field_info(e, field_layout_name(obj_type), expr.name)
-    if type_is_i8(field.typ) == 1 {
-        out_s(e, "    movsx rax, byte [rax+")
+    if type_is_u8(field.typ) == 1 {
+        out_s(e, "    movzx rax, byte [rax+")
         out_i(e, field.offset)
         out_line(e, "]")
     } else {
@@ -1234,8 +1262,8 @@ fun emit_subscript(e: EmitterState, expr: AstNode): i64 {
     let base_slot = temp_save_rax(e)
     emit_expr(e, expr.index)
     emit_stack_load(e, "rcx", base_slot)
-    if type_is_i8(elem_type) == 1 {
-        emit_inst(e, "movsx rax, byte [rcx+rax]")
+    if type_is_u8(elem_type) == 1 {
+        emit_inst(e, "movzx rax, byte [rcx+rax]")
     } else {
         emit_inst(e, "mov rax, [rcx+rax*8]")
     }
@@ -1258,8 +1286,8 @@ fun emit_expr(e: EmitterState, expr: AstNode): i64 {
             emit_mov(e, "rax", "[_argv]")
             return 0
         }
-        if type_is_i8(find_local_type(e, expr.name)) == 1 {
-            out_s(e, "    movsx rax, byte ")
+        if type_is_u8(find_local_type(e, expr.name)) == 1 {
+            out_s(e, "    movzx rax, byte ")
             emit_slot_ref(e, find_local_slot(e, expr.name))
             out_nl(e)
         } else {
@@ -1306,6 +1334,9 @@ fun emit_return(e: EmitterState, stmt: AstNode): i64 {
     } else {
         if stmt.expr.kind != "" {
             emit_expr(e, stmt.expr)
+            if type_is_u8(e.current_ret_type) == 1 {
+                emit_inst(e, "movzx eax, al")
+            }
         }
         emit_jmp_id(e, "jmp", "L", e.current_ep_id)
     }
@@ -1316,7 +1347,7 @@ fun emit_let(e: EmitterState, stmt: AstNode): i64 {
         return 0
     }
     emit_expr(e, stmt.value_expr)
-    if type_is_i8(find_local_type(e, stmt.name)) == 1 {
+    if type_is_u8(find_local_type(e, stmt.name)) == 1 {
         emit_stack_store(e, find_local_slot(e, stmt.name), "al")
     } else {
         emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
@@ -1325,7 +1356,7 @@ fun emit_let(e: EmitterState, stmt: AstNode): i64 {
 }
 fun emit_assign(e: EmitterState, stmt: AstNode): i64 {
     emit_expr(e, stmt.value_expr)
-    if type_is_i8(find_local_type(e, stmt.name)) == 1 {
+    if type_is_u8(find_local_type(e, stmt.name)) == 1 {
         emit_stack_store(e, find_local_slot(e, stmt.name), "al")
     } else {
         emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
@@ -1343,13 +1374,13 @@ fun emit_subscript_assign(e: EmitterState, stmt: AstNode): i64 {
     let base_slot = temp_save_rax(e)
     emit_expr(e, stmt.index)
     emit_stack_load(e, "rcx", base_slot)
-    if type_is_i8(elem_type) == 1 {
+    if type_is_u8(elem_type) == 1 {
         emit_inst(e, "lea rcx, [rcx+rax]")
     } else {
         emit_inst(e, "lea rcx, [rcx+rax*8]")
     }
     emit_stack_load(e, "rax", val_slot)
-    if type_is_i8(elem_type) == 1 {
+    if type_is_u8(elem_type) == 1 {
         emit_inst(e, "mov [rcx], al")
     } else {
         emit_inst(e, "mov [rcx], rax")
@@ -1363,7 +1394,7 @@ fun emit_field_set(e: EmitterState, stmt: AstNode): i64 {
     let val_slot = temp_save_rax(e)
     emit_expr(e, stmt.object)
     emit_stack_load(e, "rcx", val_slot)
-    if type_is_i8(field.typ) == 1 {
+    if type_is_u8(field.typ) == 1 {
         out_s(e, "    mov [rax+")
         out_i(e, field.offset)
         out_line(e, "], cl")
@@ -1471,6 +1502,7 @@ fun emit_block(e: EmitterState, block: AstNode): i64 {
 fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
     reset_locals(e)
     e.current_fn = fn.name
+    e.current_ret_type = user_type(fn.type_name)
     e.current_ep_id = fresh_label(e)
     let i = 0
     while i < fn.params.len {
@@ -1493,7 +1525,7 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
         emit_mov(e, "[_argv]", "rax")
     }
     if fn.params.len > 0 {
-        if type_is_i8(find_local_type(e, fn.params.data[0].name)) == 1 {
+        if type_is_u8(find_local_type(e, fn.params.data[0].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "cl")
         }
         else {
@@ -1501,7 +1533,7 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
         }
     }
     if fn.params.len > 1 {
-        if type_is_i8(find_local_type(e, fn.params.data[1].name)) == 1 {
+        if type_is_u8(find_local_type(e, fn.params.data[1].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "dl")
         }
         else {
@@ -1509,7 +1541,7 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
         }
     }
     if fn.params.len > 2 {
-        if type_is_i8(find_local_type(e, fn.params.data[2].name)) == 1 {
+        if type_is_u8(find_local_type(e, fn.params.data[2].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8b")
         }
         else {
@@ -1517,7 +1549,7 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
         }
     }
     if fn.params.len > 3 {
-        if type_is_i8(find_local_type(e, fn.params.data[3].name)) == 1 {
+        if type_is_u8(find_local_type(e, fn.params.data[3].name)) == 1 {
             emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9b")
         }
         else {

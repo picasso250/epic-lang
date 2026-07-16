@@ -3,8 +3,8 @@ $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $root
 try {
-    Write-Host "=== build_epic_v1.py ==="
-    python build_epic_v1.py
+    Write-Host "=== bootstrap_fixed_point.py ==="
+    python bootstrap_fixed_point.py
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

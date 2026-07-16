@@ -507,6 +507,18 @@ fun op_text(kind: str): str {
     if same(kind, "OR") == 1 {
         return "||"
     }
+    if same(kind, "BIT_OR") == 1 {
+        return "|"
+    }
+    if same(kind, "AMPERSAND") == 1 {
+        return "&"
+    }
+    if same(kind, "SHL") == 1 {
+        return "<<"
+    }
+    if same(kind, "SHR") == 1 {
+        return ">>"
+    }
     return ""
 }
 fun parse_args(p: Parser): AstNode[] {
@@ -636,11 +648,19 @@ fun parse_term(p: Parser): AstNode {
     }
     return left
 }
-fun parse_comparison(p: Parser): AstNode {
+fun parse_shift(p: Parser): AstNode {
     let left = parse_term(p)
-    while peek_kind(p, "LT") == 1 || peek_kind(p, "GT") == 1 || peek_kind(p, "LTE") == 1 || peek_kind(p, "GTE") == 1 {
+    while peek_kind(p, "SHL") == 1 || peek_kind(p, "SHR") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_term(p))
+    }
+    return left
+}
+fun parse_comparison(p: Parser): AstNode {
+    let left = parse_shift(p)
+    while peek_kind(p, "LT") == 1 || peek_kind(p, "GT") == 1 || peek_kind(p, "LTE") == 1 || peek_kind(p, "GTE") == 1 {
+        let op = advance(p)
+        left = bin_node(op_text(op.kind), left, parse_shift(p))
     }
     return left
 }
@@ -653,10 +673,26 @@ fun parse_equality(p: Parser): AstNode {
     return left
 }
 fun parse_logic_and(p: Parser): AstNode {
-    let left = parse_equality(p)
+    let left = parse_bit_or(p)
     while peek_kind(p, "AND") == 1 {
         let op = advance(p)
+        left = bin_node(op_text(op.kind), left, parse_bit_or(p))
+    }
+    return left
+}
+fun parse_bit_and(p: Parser): AstNode {
+    let left = parse_equality(p)
+    while peek_kind(p, "AMPERSAND") == 1 {
+        let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_equality(p))
+    }
+    return left
+}
+fun parse_bit_or(p: Parser): AstNode {
+    let left = parse_bit_and(p)
+    while peek_kind(p, "BIT_OR") == 1 {
+        let op = advance(p)
+        left = bin_node(op_text(op.kind), left, parse_bit_and(p))
     }
     return left
 }

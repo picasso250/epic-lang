@@ -1,6 +1,6 @@
 ; ── _str_slice: copy s[start:end] into a new str ──
 ; rcx = &str, rdx = start, r8 = end
-; returns: rax = &str { data: &i8, len: i64 }
+; returns: rax = &str { data: &u8, len: i64 }
 _str_slice:
     push rbp
     mov rbp, rsp

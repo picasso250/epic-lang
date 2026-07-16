@@ -1,6 +1,6 @@
 ; ── _itoa: convert integer to heap-allocated str ──
 ; rcx = number
-; returns: rax = &str (heap-allocated { data: &i8, len: i64 })
+; returns: rax = &str (heap-allocated { data: &u8, len: i64 })
 _itoa:
     push rbp
     mov rbp, rsp

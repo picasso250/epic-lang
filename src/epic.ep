@@ -89,7 +89,7 @@ fun output_base(main_path: str): str {
     return "build/epic/" + safe2
 }
 fun write_build_script(cmd_path: str, asm_path: str, obj_path: str, exe_path: str): i64 {
-    let script = new i8[256]
+    let script = new u8[256]
     extend(script, bytes("@echo off\n"))
     extend(script, bytes("tools\\nasm.exe -f win64 \""))
     extend(script, bytes(asm_path))

@@ -34,6 +34,64 @@ fun is_digit(c: i64): i64 {
     }
     return 0
 }
+fun is_hex_digit(c: i64): i64 {
+    if is_digit(c) == 1 || (c >= 65 && c <= 70) || (c >= 97 && c <= 102) {
+        return 1
+    }
+    return 0
+}
+fun decimal_literal_fits_i64(text: str): i64 {
+    let start = 0
+    while start + 1 < text.len && text.data[start] == 48 {
+        start = start + 1
+    }
+    let digits = text.len - start
+    if digits < 19 {
+        return 1
+    }
+    if digits > 19 {
+        return 0
+    }
+    let limit = "9223372036854775807"
+    let i = 0
+    while i < 19 {
+        let value = text.data[start + i]
+        let maximum = limit.data[i]
+        if value < maximum {
+            return 1
+        }
+        if value > maximum {
+            return 0
+        }
+        i = i + 1
+    }
+    return 1
+}
+fun hex_literal_fits_i64(text: str): i64 {
+    let start = 2
+    while start + 1 < text.len && text.data[start] == 48 {
+        start = start + 1
+    }
+    let digits = text.len - start
+    if digits < 16 {
+        return 1
+    }
+    if digits > 16 {
+        return 0
+    }
+    return text.data[start] <= 55
+}
+fun reject_large_literal(text: str, hex: i64): i64 {
+    let fits = decimal_literal_fits_i64(text)
+    if hex == 1 {
+        fits = hex_literal_fits_i64(text)
+    }
+    if fits == 0 {
+        putstr("integer literal is out of i64 range\n")
+        os.ExitProcess(1)
+    }
+    return 0
+}
 # ── Lexer ───────────────────────────────────────────────────────────────
 fun lex(src: str): Token[] {
     let tokens = new Token[4096]
@@ -67,7 +125,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && ch == 34 {
             let start_line = line
             pos = pos + 1
-            let buf = new i8[n - pos + 1]
+            let buf = new u8[n - pos + 1]
             let out_len = 0
             let scanning = 1
             while scanning == 1 && pos < n {
@@ -159,10 +217,25 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_digit(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_digit(p[pos]) == 1 {
-                pos = pos + 1
+            let hex = 0
+            if ch == 48 && pos + 1 < n && (p[pos + 1] == 120 || p[pos + 1] == 88) {
+                hex = 1
+                pos = pos + 2
+                let digit_start = pos
+                while pos < n && is_hex_digit(p[pos]) == 1 {
+                    pos = pos + 1
+                }
+                if pos == digit_start {
+                    putstr("hexadecimal literal requires at least one digit\n")
+                    os.ExitProcess(1)
+                }
+            } else {
+                while pos < n && is_digit(p[pos]) == 1 {
+                    pos = pos + 1
+                }
             }
             let text = str_new(p + start, pos - start)
+            reject_large_literal(text, hex)
             push_token(tokens, "NUMBER", text, start_line)
             consumed = 1
         }
@@ -230,7 +303,10 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 60 {
-            if p[pos + 1] == 61 {
+            if p[pos + 1] == 60 {
+                push_token(tokens, "SHL", "<<", line)
+                pos = pos + 2
+            } else if p[pos + 1] == 61 {
                 push_token(tokens, "LTE", "<=", line)
                 pos = pos + 2
             } else {
@@ -240,7 +316,10 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 62 {
-            if p[pos + 1] == 61 {
+            if p[pos + 1] == 62 {
+                push_token(tokens, "SHR", ">>", line)
+                pos = pos + 2
+            } else if p[pos + 1] == 61 {
                 push_token(tokens, "GTE", ">=", line)
                 pos = pos + 2
             } else {
@@ -263,6 +342,9 @@ fun lex(src: str): Token[] {
             if p[pos + 1] == 124 {
                 push_token(tokens, "OR", "||", line)
                 pos = pos + 2
+            } else {
+                push_token(tokens, "BIT_OR", "|", line)
+                pos = pos + 1
             }
             consumed = 1
         }

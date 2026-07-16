@@ -17,13 +17,22 @@ Python v0 stage-0 -> Epic v1 -> Epic v1 fixed point
 python build_epic_v1.py
 ```
 
-The script finds the exact v0 ancestor of the current branch, creates a
-temporary detached Git worktree at that commit, and uses its Python compiler to
+The script resolves the current local `v0` branch, creates a temporary detached
+Git worktree at its exact commit, and uses that worktree's Python compiler to
 compile `src/`. The temporary worktree is removed when the build finishes.
 NASM remains part of the trusted toolchain, and `link.py` remains until a later
 Epic generation takes ownership of machine-code emission and linking.
 
 The resulting compiler is `build/epic-v1.exe`.
+
+Verify the self-hosted fixed point:
+
+```powershell
+python bootstrap_fixed_point.py
+```
+
+The v0-built seed compiles generation 1, then generation 1 compiles generation
+2. The check succeeds only when generations 1 and 2 are byte-identical.
 
 ## Test
 

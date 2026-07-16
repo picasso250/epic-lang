@@ -38,8 +38,8 @@ def git_output(*args: str) -> str:
 
 
 def v0_seed_commit() -> str:
-    """Return the exact v0 ancestor from which this v1 branch diverged."""
-    return git_output("merge-base", "HEAD", "v0")
+    """Return the current local v0 stage-0 commit."""
+    return git_output("rev-parse", "refs/heads/v0")
 
 
 def temporary_worktree_path() -> Path:
