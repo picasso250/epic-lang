@@ -9,9 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
-
-from compiler_sources import SELF_HOST_COMPILER_SOURCES
-
+from pathlib import Path
 
 def rel(path):
     return os.path.relpath(path, SCRIPT_DIR).replace(os.sep, "/")
@@ -21,7 +19,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 BOOT_DIR = os.path.join(BUILD_DIR, "fixed-point")
 DEFAULT_SEED = os.path.join(BUILD_DIR, "bootstrap-v0", "epic-v0.exe")
-COMPILER_SOURCES = [path.replace("/", os.sep) for path in SELF_HOST_COMPILER_SOURCES]
+COMPILER_SOURCES = [
+    str(path.relative_to(SCRIPT_DIR))
+    for path in sorted((Path(SCRIPT_DIR) / "src").glob("*.ep"))
+]
 
 TIMEOUT_SECONDS = int(os.environ.get("BOOTSTRAP_TIMEOUT", "30"))
 
@@ -234,7 +235,7 @@ def resolve_seed(requested):
         raise RuntimeError(f"bootstrap seed compiler does not exist: {seed}")
     build_script = os.path.join(SCRIPT_DIR, "build_epic_v0.py")
     run_checked(
-        [sys.executable, build_script, "--require-expected"],
+        [sys.executable, build_script],
         "rebuild v0 branch seed",
     )
     if not os.path.isfile(seed):

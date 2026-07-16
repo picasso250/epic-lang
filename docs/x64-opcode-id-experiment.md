@@ -58,7 +58,7 @@ X64 item 数同时下降，是因为较短的 numeric dispatch implementation �
 ```powershell
 python tests/run.py
 python tests/examples/run.py
-python test_bootstrap_fixed_point.py
+python bootstrap_fixed_point.py
 python benchmark_self_host.py --label x64-opcode-i64-final --refresh
 ```
 

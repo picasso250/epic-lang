@@ -36,7 +36,7 @@ MODULES = [
 def main():
     TEST_COMPILER.parent.mkdir(parents=True, exist_ok=True)
     bootstrap = subprocess.run(
-        [sys.executable, str(ROOT_DIR / "test_bootstrap_fixed_point.py"), "-o", str(TEST_COMPILER)],
+        [sys.executable, str(ROOT_DIR / "bootstrap_fixed_point.py"), "-o", str(TEST_COMPILER)],
         cwd=ROOT_DIR,
     )
     if bootstrap.returncode != 0:

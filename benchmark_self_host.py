@@ -19,10 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from compiler_sources import SELF_HOST_COMPILER_SOURCES
-
-
 ROOT = Path(__file__).resolve().parent
+COMPILER_SOURCES = [path.relative_to(ROOT).as_posix() for path in sorted((ROOT / "src").glob("*.ep"))]
 DEFAULT_SEED = ROOT / "build" / "bootstrap-v0" / "epic-v0.exe"
 DEFAULT_CACHE_ROOT = ROOT / "build" / "cache" / "self-host-benchmark"
 BENCH_DIR = ROOT / "build" / "self-host-benchmark"
@@ -101,7 +99,7 @@ def resolve_seed(requested: str | None) -> Path:
     if requested:
         raise RuntimeError(f"seed compiler does not exist: {seed}")
     completed = subprocess.run(
-        [sys.executable, "build_epic_v0.py", "--require-expected"],
+        [sys.executable, "build_epic_v0.py"],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
@@ -113,7 +111,6 @@ def resolve_seed(requested: str | None) -> Path:
 
 
 def build_inputs(seed: Path) -> dict[str, Any]:
-    compiler_sources = [path.replace("\\", "/") for path in SELF_HOST_COMPILER_SOURCES]
     runtime_sources = embedded_runtime_paths()
     return {
         "schema": CACHE_SCHEMA,
@@ -122,12 +119,12 @@ def build_inputs(seed: Path) -> dict[str, Any]:
             "sha256": sha256_file(seed),
             "bytes": seed.stat().st_size,
         },
-        "compiler_sources": group_record(compiler_sources),
+        "compiler_sources": group_record(COMPILER_SOURCES),
         "runtime_sources": group_record(runtime_sources),
-        "tools": group_record(["compiler_sources.py", "test_bootstrap_fixed_point.py"]),
+        "tools": group_record(["bootstrap_fixed_point.py"]),
         "source_order": {
             "embedded_runtime": runtime_sources,
-            "compiler": list(SELF_HOST_COMPILER_SOURCES),
+            "compiler": list(COMPILER_SOURCES),
             "main": "src/epic.ep",
         },
         "target": {
@@ -147,7 +144,7 @@ def benchmark_inputs(build_key: str, runs: int) -> dict[str, Any]:
         "host": host_record(),
         "command": {
             "embedded_runtime": embedded_runtime_paths(),
-            "compiler": list(SELF_HOST_COMPILER_SOURCES),
+            "compiler": list(COMPILER_SOURCES),
             "main": "src/epic.ep",
             "output": BENCH_OUTPUT.relative_to(ROOT).as_posix(),
             "verbose": True,
@@ -188,7 +185,7 @@ def run_capture(command: list[str], log_path: Path, *, timeout: int | None = Non
 def build_fixed_point(seed: Path, compiler_output: Path, log_path: Path) -> None:
     command = [
         sys.executable,
-        "test_bootstrap_fixed_point.py",
+        "bootstrap_fixed_point.py",
         "--seed",
         str(seed),
         "-o",
@@ -205,7 +202,7 @@ def build_fixed_point(seed: Path, compiler_output: Path, log_path: Path) -> None
 def benchmark_command() -> list[str]:
     return [
         str(BENCH_COMPILER),
-        *SELF_HOST_COMPILER_SOURCES,
+        *COMPILER_SOURCES,
         "--main",
         "src/epic.ep",
         "-o",

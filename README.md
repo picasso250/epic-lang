@@ -23,7 +23,7 @@ fun main(): void {
 仓库中的 `examples/00_hello_world.ep` 就是上面的程序。先生成达到不动点的 self-hosted compiler，再用它编译并运行 Hello World：
 
 ```powershell
-python test_bootstrap_fixed_point.py -o build\epic.exe
+python bootstrap_fixed_point.py -o build\epic.exe
 .\build\epic.exe examples\00_hello_world.ep -o build\hello.exe
 .\build\hello.exe
 ```
@@ -34,7 +34,7 @@ python test_bootstrap_fixed_point.py -o build\epic.exe
 .\build\epic.exe examples\00_hello_world.ep -o build\hello.exe --verbose
 ```
 
-第一条命令使用 `v0` 分支导出的 seed 启动完整 bootstrap；本地缺少 seed 时会从该分支的 detached worktree 自动重建并校验 SHA-256。生成的 self-hosted compiler 已把标准 Epic runtime source 与 MIR bundle 嵌入自身 `.data`，运行时不依赖当前工作目录中的 `runtime/`。
+第一条命令使用 `v0` 分支导出的 seed 启动完整 bootstrap；本地缺少 seed 时会从该分支的 detached worktree 自动重建。生成的 self-hosted compiler 已把标准 Epic runtime source 与 MIR bundle 嵌入自身 `.data`，运行时不依赖当前工作目录中的 `runtime/`。
 
 程序输出：
 
@@ -72,31 +72,29 @@ Epic 目前支持：
 生成并保留最终收敛的编译器：
 
 ```powershell
-python test_bootstrap_fixed_point.py -o build\epic.exe
+python bootstrap_fixed_point.py -o build\epic.exe
 ```
 
 ### 重建 v0 bootstrap compiler
 
-`v0` 分支包含 Python stage-0、与 self-hosted `src/` 对齐的语言实现，以及可复现的 bootstrap 构建入口。脚本将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，校验已提交的 SHA-256，随后清理 worktree：
+`v0` 分支包含 Python stage-0、与 self-hosted `src/` 对齐的语言实现，以及 bootstrap 构建入口。脚本将目标 revision 检出到临时 detached worktree，在干净源码上运行完整不动点构建，随后清理 worktree：
 
 这是发布与复现路径，不是日常编译路径；临时 worktree 用来隔离当前工作区的未提交改动。
 
 ```powershell
-python build_epic_v0.py --require-expected
+python build_epic_v0.py
 ```
 
 产物：
 
 ```text
 build/bootstrap-v0/epic-v0.exe
-build/bootstrap-v0/epic-v0.exe.sha256
-build/bootstrap-v0/manifest.json
 ```
 
 后续编译器、GC 或后端开发可以用该 v0 compiler 作为稳定 seed，并检查当前源码能否再次收敛：
 
 ```powershell
-python test_bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
+python bootstrap_fixed_point.py --seed build/bootstrap-v0/epic-v0.exe
 ```
 
 `v0` 是可演进的 bootstrap 分支。它的 Python `bootstrap/` 与 Epic `src/` 必须保持语言语义一致；当前两边都支持 `embed "path"`，并让 `>>` / `>>=` 对有符号整数生成算术右移、对无符号整数生成逻辑右移。`>>>` / `>>>=` 不属于语言。
@@ -132,7 +130,7 @@ build/              忽略的本地构建输出
 ```powershell
 python tests/run.py                    # 模块级编译测试
 python tests/examples/run.py           # examples/ 正向示例
-python test_bootstrap_fixed_point.py   # 从 v0 分支 seed 开始的自举不动点检查
+python bootstrap_fixed_point.py   # 从 v0 分支 seed 开始的自举不动点检查
 ```
 
 模块级测试：

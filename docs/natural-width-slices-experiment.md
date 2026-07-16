@@ -51,7 +51,7 @@ The following acceptance commands passed:
 ```text
 python tests/run.py
 python tests/examples/run.py
-python test_bootstrap_fixed_point.py
+python bootstrap_fixed_point.py
 ```
 
 The module runner passed all 13 modules, 90 end-to-end cases, and the GC stress

@@ -36,7 +36,7 @@ Parser 将构造器简写降低为与空初始化器相同的 AST 形式：`new 
 
 ## Epic 编译器 (Epic Compiler)
 
-`src/` 包含完整的自托管编译器和工具源码。规范构建顺序由仓库根目录的 `compiler_sources.py` 维护，主要阶段包括：
+`src/` 包含完整的自托管编译器和工具源码。构建工具按路径排序自动发现 `src/*.ep`；`src/epic.ep` 仍是显式 main。主要阶段包括：
 
 ```text
 src/lexer.ep
@@ -60,7 +60,7 @@ src/epic.ep
 
 `v0` 是可演进的 bootstrap 分支，只实现构建当前 `dev` 所需的最小源码语义，不作为当前公开 ABI 的第二份实现。它支持只读 `s[i]` 以编译新 frontend，但保留旧 `str`/slice bootstrap 布局。`>>` / `>>=` 按左值 signedness 选择 `sar` / `shr`，所有 shift count 都必须是 `i64`；当前 `dev` 对裸整数字面量由 sema 按左侧位宽静态检查，非字面量由 MIR lowering 生成运行时检查，`v0` 为保持 bootstrap 简单，对所有 count 一律生成运行时检查。`>>>` / `>>>=` 已删除，`embed "path"` 按包含源文件解析并嵌入原始字节。
 
-`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，运行该 revision 自己的 fixed-point 构建，并校验 revision 中提交的 SHA-256。当前 seed 本身已嵌入其 runtime 资源，不依赖调用目录中的 `runtime/`。
+`build_epic_v0.py` 从 `v0`（或显式 `--ref`）创建临时 detached worktree，并运行该 revision 自己的 fixed-point 构建。当前 seed 本身已嵌入其 runtime 资源，不依赖调用目录中的 `runtime/`。
 
 ## 验收检查 (Acceptance)
 
@@ -69,12 +69,12 @@ src/epic.ep
 ```powershell
 python tests/run.py
 python tests/examples/run.py
-python test_bootstrap_fixed_point.py
+python bootstrap_fixed_point.py
 ```
 
-`tests/run.py` 使用当前 self-hosted compiler 运行模块级意图测试和 e2e；`tests/examples/run.py` 验证正向用户示例；`test_bootstrap_fixed_point.py` 从 `v0` 分支 seed 验证当前编译器的不动点。
+`tests/run.py` 使用当前 self-hosted compiler 运行模块级意图测试和 e2e；`tests/examples/run.py` 验证正向用户示例；`bootstrap_fixed_point.py` 从 `v0` 分支 seed 验证当前编译器的不动点。
 
-`build_epic_v0.py` 导出 `build/bootstrap-v0/epic-v0.exe`、SHA-256 与 manifest；digest 从目标 revision 自己读取。`test_bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时自动使用或重建 `v0` 分支 seed。
+`build_epic_v0.py` 导出 `build/bootstrap-v0/epic-v0.exe`。`bootstrap_fixed_point.py --seed <compiler.exe>` 使用已有 Epic compiler 构建当前源码的连续世代；未指定 seed 时自动使用或重建 `v0` 分支 seed。
 
 Self-hosted `epic.exe` 从自身 `.rdata` 中的只读 inline string object 读取 `src/runtime_bundle.ep` 声明的 runtime source 与 MIR bundle。所有 Epic runtime source 与用户源码进入同一个 frontend；完全一致的重复 extern 会折叠，冲突声明会报错。当前工作目录无需包含 `runtime/`。CLI 默认只打印最终成功信息和错误；`--verbose` 打开阶段、timing 与 stats 输出。
 

@@ -524,6 +524,6 @@ v0 branch epic-v0.exe -> current Epic compiler -> current Epic compiler
 
 当前活跃编译器只位于 `src/`。`v0` 分支维护 Python stage-0 与可复现 seed，只覆盖构建当前 `dev` 所需的最小源码语义，不承诺当前公开 ABI；`build_epic_v0.py` 可在 detached worktree 中重建并校验 seed。当前 `dev` 不维护 Python oracle 或阶段 lockstep。
 
-当前活跃验收入口包括 `python tests/run.py`、`python tests/examples/run.py` 和 `python test_bootstrap_fixed_point.py`。模块测试覆盖各阶段的意图与 canonical fixture，examples 和 e2e 约束公开行为，不动点测试连续使用生成的 Epic 编译器重新编译自身并检查输出稳定。
+当前活跃验收入口包括 `python tests/run.py`、`python tests/examples/run.py` 和 `python bootstrap_fixed_point.py`。模块测试覆盖各阶段的意图与 canonical fixture，examples 和 e2e 约束公开行为，不动点测试连续使用生成的 Epic 编译器重新编译自身并检查输出稳定。
 
 分阶段的 v0/v1/v2 目录链是历史遗留；它不再是当前维护源码布局的一部分。

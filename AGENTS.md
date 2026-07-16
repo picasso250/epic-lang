@@ -16,7 +16,7 @@
 - 当前测试入口（按推荐顺序）：
   - `python tests/run.py`             # 模块级测试体系
   - `python tests/examples/run.py`      # examples/ 正向学习示例
-  - `python test_bootstrap_fixed_point.py` # 从 v0 分支 seed 开始的自举不动点
+  - `python bootstrap_fixed_point.py` # 从 v0 分支 seed 开始的自举不动点
 - `examples/` 只放正向、典型、适合初学者学习的示例程序，不放负向测试。
 - 负向测试放 `tests/<module>/fail/`。
 - `test_*.py` 是可直接运行的脚本测试，不是 pytest 测试；不要把 `python -m pytest` 当作支持入口。
@@ -24,7 +24,7 @@
 ## 性能测量
 
 - 基线优先运行 `python benchmark_self_host.py --label <name>`。脚本按 seed exe、canonical compiler 源码、embedded runtime `.ep/.ir`、测量工具和宿主指纹生成内容 key，并分层缓存 fixed-point compiler 与 3 次等价 benchmark 到 `build/cache/self-host-benchmark/`；输入未变时直接呈现缓存结果。需要同日实时重测时使用 `--refresh`，它仍复用相同的收敛编译器。
-- `test_bootstrap_fixed_point.py` 的三代编译由不同代编译器执行，不能直接当作三次等价性能样本。先运行一次 fixed point 验证收敛，再复用收敛编译器测量同一 workload。
+- `bootstrap_fixed_point.py` 的三代编译由不同代编译器执行，不能直接当作三次等价性能样本。先运行一次 fixed point 验证收敛，再复用收敛编译器测量同一 workload。
 - wall time 使用外部高精度计时（例如 Python `time.perf_counter_ns()`）；编译器内部的 `GetTickCount64()` 适合阶段诊断，不适合判断约 1% 以内的差异。
 - 性能对比测 3 次并报告 median；如果 3 次不能显示稳定、显著的变化，直接结论为“性能变化不显著”，不要增加到 9 次或 15 次继续追逐噪声。
 - A/B 必须使用相同源码、相同 seed、相同参数和相同输出位置条件；同时报告 wall time、X64 items、`.text` / `.data` bytes 和最终 exe size。

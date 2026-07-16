@@ -96,6 +96,6 @@ Machine symbol resolution 也复用同一实现，但保留自己的 duplicate/u
 ```powershell
 python tests/run.py
 python tests/examples/run.py
-python test_bootstrap_fixed_point.py
+python bootstrap_fixed_point.py
 python benchmark_self_host.py --label mir-name-index-final --refresh
 ```

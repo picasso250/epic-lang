@@ -11,8 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from compiler_sources import SELF_HOST_COMPILER_SOURCES
+COMPILER_SOURCES = sorted((ROOT / "src").glob("*.ep"))
 DEFAULT_COMPILER = ROOT / "build" / "test-compiler" / "epic.exe"
 
 
@@ -27,11 +26,10 @@ def _embedded_runtime_paths() -> list[Path]:
 def _compiler_fingerprint() -> str:
     digest = hashlib.sha256()
     inputs = [
-        ROOT / "compiler_sources.py",
-        ROOT / "test_bootstrap_fixed_point.py",
+        ROOT / "bootstrap_fixed_point.py",
         ROOT / "build_epic_v0.py",
         ROOT / "build" / "bootstrap-v0" / "epic-v0.exe",
-        *(ROOT / path for path in SELF_HOST_COMPILER_SOURCES),
+        *COMPILER_SOURCES,
         *_embedded_runtime_paths(),
     ]
     for path in inputs:
@@ -59,7 +57,7 @@ def compiler_path() -> Path:
         return compiler
     compiler.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [sys.executable, str(ROOT / "test_bootstrap_fixed_point.py"), "-o", str(compiler)],
+        [sys.executable, str(ROOT / "bootstrap_fixed_point.py"), "-o", str(compiler)],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
