@@ -13,23 +13,31 @@ from epic_types import EpicType
 
 @dataclass(kw_only=True)
 class ASTNode:
-    """Base class for all AST nodes."""
+    """Common source metadata; compiler passes should use concrete node families."""
     line: int = 0
+
+
+class StmtNode(ASTNode):
+    """Base class for nodes that may appear in a block statement list."""
+
+
+class ExprNode(ASTNode):
+    """Base class for nodes that produce a value."""
 
 
 @dataclass
 class ProgramNode(ASTNode):
-    funcs: list
-    structs: list
-    unions: list = field(default_factory=list)
-    externs: list = field(default_factory=list)
+    funcs: list[FunDefNode]
+    structs: list[StructDefNode]
+    unions: list[UnionDefNode] = field(default_factory=list)
+    externs: list[ExternDefNode] = field(default_factory=list)
 
 
 @dataclass
 class ExternDefNode(ASTNode):
     library: str
     name: str
-    params: list
+    params: list[Param]
     ret_type: EpicType
     resolved_type: Optional[EpicType] = None
 
@@ -44,13 +52,13 @@ class StructField(ASTNode):
 @dataclass
 class StructDefNode(ASTNode):
     name: str
-    fields: list     # list[StructField]
+    fields: list[StructField]
 
 
 @dataclass
 class UnionDefNode(ASTNode):
     name: str
-    members: list    # list[str], each a struct name
+    members: list[str]
 
 
 @dataclass
@@ -63,7 +71,7 @@ class Param(ASTNode):
 @dataclass
 class FunDefNode(ASTNode):
     name: str
-    params: list     # list[Param]
+    params: list[Param]
     ret_type: EpicType
     body: 'BlockNode'
     resolved_type: Optional[EpicType] = None
@@ -74,94 +82,94 @@ class FunDefNode(ASTNode):
 
 @dataclass
 class BlockNode(ASTNode):
-    stmts: list      # list of statement ASTNode
+    stmts: list[StmtNode]
 
 
 # ── statements ──────────────────────────────────────────────────────────
 
 @dataclass
-class ReturnNode(ASTNode):
-    expr: Optional[ASTNode]
+class ReturnNode(StmtNode):
+    expr: Optional[ExprNode]
 
 
 @dataclass
-class LetNode(ASTNode):
+class LetNode(StmtNode):
     name: str
-    value: ASTNode
+    value: ExprNode
     var_type: Optional[EpicType] = None
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class AssignNode(ASTNode):
+class AssignNode(StmtNode):
     name: str
-    value: ASTNode
+    value: ExprNode
 
 
 @dataclass
-class AssignOpNode(ASTNode):
+class AssignOpNode(StmtNode):
     op: str
-    target: ASTNode
-    value: ASTNode
+    target: ExprNode
+    value: ExprNode
 
 
 @dataclass
-class FieldSetNode(ASTNode):
-    object: ASTNode
+class FieldSetNode(StmtNode):
+    object: ExprNode
     field: str
-    value: ASTNode
+    value: ExprNode
 
 
 
 @dataclass
-class SubscriptAssignNode(ASTNode):
-    base: ASTNode
-    index: ASTNode
-    value: ASTNode
+class SubscriptAssignNode(StmtNode):
+    base: ExprNode
+    index: ExprNode
+    value: ExprNode
 
 
 
 @dataclass
-class IfNode(ASTNode):
-    cond: ASTNode
+class IfNode(StmtNode):
+    cond: ExprNode
     then_block: BlockNode
     else_block: Optional[BlockNode] = None
 
 
 @dataclass
-class LoopNode(ASTNode):
-    cond: ASTNode
+class LoopNode(StmtNode):
+    cond: ExprNode
     body: BlockNode
 
 
 @dataclass
-class BreakNode(ASTNode):
+class BreakNode(StmtNode):
     pass
 
 
 @dataclass
-class ContinueNode(ASTNode):
+class ContinueNode(StmtNode):
     pass
 
 
 @dataclass
-class ForRangeNode(ASTNode):
+class ForRangeNode(StmtNode):
     name: str
-    start: ASTNode
-    end: ASTNode
+    start: ExprNode
+    end: ExprNode
     body: 'BlockNode'
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class PanicNode(ASTNode):
-    message: ASTNode
+class PanicNode(StmtNode):
+    message: ExprNode
 
 
 
 @dataclass
 class MatchCase(ASTNode):
-    pattern: Optional[ASTNode]
+    pattern: Optional[ExprNode]
     body: 'BlockNode'
     is_else: bool = False
     variant_name: Optional[str] = None
@@ -170,45 +178,45 @@ class MatchCase(ASTNode):
 
 
 @dataclass
-class MatchNode(ASTNode):
-    expr: ASTNode
-    cases: list
+class MatchNode(StmtNode):
+    expr: ExprNode
+    cases: list[MatchCase]
     union_name: Optional[str] = None
 
 
 @dataclass
-class ExprStmtNode(ASTNode):
-    expr: ASTNode
+class ExprStmtNode(StmtNode):
+    expr: ExprNode
 
 
 # ── expressions ─────────────────────────────────────────────────────────
 
 @dataclass
-class LiteralNode(ASTNode):
+class LiteralNode(ExprNode):
     value: int
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class CharNode(ASTNode):
+class CharNode(ExprNode):
     value: int
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class BoolNode(ASTNode):
+class BoolNode(ExprNode):
     value: int
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class StringNode(ASTNode):
+class StringNode(ExprNode):
     value: str
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class EmbedNode(ASTNode):
+class EmbedNode(ExprNode):
     path: str
     source_path: str
     resolved_type: Optional[EpicType] = None
@@ -225,102 +233,102 @@ class FStringTextPart(FStringPart):
 
 @dataclass
 class FStringExprPart(FStringPart):
-    expr: ASTNode
+    expr: ExprNode
 
 
 @dataclass
-class FStringNode(ASTNode):
+class FStringNode(ExprNode):
     parts: list[FStringPart]
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class VarNode(ASTNode):
+class VarNode(ExprNode):
     name: str
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class CallNode(ASTNode):
+class CallNode(ExprNode):
     name: str
-    args: list      # list[ASTNode]
+    args: list[ExprNode]
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class BinaryNode(ASTNode):
+class BinaryNode(ExprNode):
     op: str
-    left: ASTNode
-    right: ASTNode
+    left: ExprNode
+    right: ExprNode
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class UnaryNode(ASTNode):
+class UnaryNode(ExprNode):
     op: str
-    expr: ASTNode
+    expr: ExprNode
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class FieldAccessNode(ASTNode):
-    object: ASTNode
+class FieldAccessNode(ExprNode):
+    object: ExprNode
     field: str
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class NullCheckNode(ASTNode):
-    expr: ASTNode
+class NullCheckNode(ExprNode):
+    expr: ExprNode
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class DotCallNode(ASTNode):
-    object: ASTNode
+class DotCallNode(ExprNode):
+    object: ExprNode
     name: str
-    args: list      # list[ASTNode]
+    args: list[ExprNode]
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class SubscriptNode(ASTNode):
-    base: ASTNode
-    index: ASTNode
+class SubscriptNode(ExprNode):
+    base: ExprNode
+    index: ExprNode
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class SliceNode(ASTNode):
-    base: ASTNode
-    start: ASTNode
-    end: ASTNode
+class SliceNode(ExprNode):
+    base: ExprNode
+    start: ExprNode
+    end: ExprNode
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class NewArrayNode(ASTNode):
+class NewArrayNode(ExprNode):
     elem_type: EpicType
-    count: Optional[ASTNode] = None
+    count: Optional[ExprNode] = None
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class StructInitNode(ASTNode):
+class StructInitNode(ExprNode):
     type_name: str
     fields: list
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class UnionInitNode(ASTNode):
+class UnionInitNode(ExprNode):
     type_name: str
-    payload: ASTNode
+    payload: ExprNode
     resolved_type: Optional[EpicType] = None
 
 
 @dataclass
-class ArrayLiteralNode(ASTNode):
+class ArrayLiteralNode(ExprNode):
     elem_type: EpicType
-    values: list
+    values: list[ExprNode]
     resolved_type: Optional[EpicType] = None
