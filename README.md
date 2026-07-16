@@ -1,6 +1,6 @@
 # Epic
 
-Epic 是一门**编译快速、零依赖二进制、高表达力**的语言，当前在 Windows x64 上自举运行。
+Epic 是一门**编译快速、无需随附运行时、高表达力**的语言，当前在 Windows x64 上自举运行。
 
 最终目标是达到 Go 级的编译速度和性能，拥有 GC 运行时，以及比 Go 更丰富的表达力——ADT、f-string、直接 WinAPI 导入等。
 GC 将在后续版本加入。
@@ -53,22 +53,39 @@ struct Parser {
     pos: i64
 }
 
-fun (p: Parser) peek(): Token {
-    ...
+fun (p: Parser) advance(): i64 {
+    p.pos += 1
+    ret p.pos
 }
 
-let p = new Parser { pos: 0 }
-let tok = p.peek()
+fun main(): void {
+    let p = new Parser { pos: 0 }
+    println(str(p.advance()))
+}
 ```
 
 **ADT 与 match：**
 
 ```epic
+struct LiteralExpr {
+    value: i64
+}
+
+struct BinaryExpr {
+    op: str
+}
+
 type Expr = LiteralExpr | BinaryExpr
 
-match expr {
-    LiteralExpr lit: { print(lit.value) }
-    BinaryExpr b:   { print(b.op) }
+fun print_expr(expr: Expr): void {
+    match expr {
+        LiteralExpr lit: { println(f"literal {lit.value}") }
+        BinaryExpr binary: { println(f"binary {binary.op}") }
+    }
+}
+
+fun main(): void {
+    print_expr(new Expr(new LiteralExpr { value: 42 }))
 }
 ```
 
@@ -76,7 +93,10 @@ match expr {
 
 ```epic
 extern "kernel32.dll" fun GetTickCount64(): u64
-let ms = GetTickCount64()
+
+fun main(): void {
+    println(str(GetTickCount64()))
+}
 ```
 
 ## 当前状态
@@ -113,7 +133,7 @@ Epic v0 是一个正在收敛的 early-stage 项目，当前：
 python bootstrap_fixed_point.py -o build\epic.exe
 ```
 
-`self-hosted epic.exe` 会自动从当前工作目录的 `runtime/` 嵌入标准运行时。Python reference compiler（`bootstrap/`）是当前语言的判定基准（oracle）；自托管的 Epic compiler（`src/`）在默认路径下逐阶段复现 oracle 的行为。
+`self-hosted epic.exe` 已内嵌标准 runtime 源码，编译用户程序时无需另行提供 runtime 文件。Python reference compiler（`bootstrap/`）是当前语言的判定基准（oracle）；自托管的 Epic compiler（`src/`）在默认路径下逐阶段复现 oracle 的行为。
 
 ## 仓库布局
 
