@@ -1,17 +1,11 @@
 # Epic
 
-一个已完成自举的 **Windows x64** 原生编程语言。
+Epic 是一门**编译快速、零依赖二进制、高表达力**的语言，当前在 Windows x64 上自举运行。
 
-- **可复现自举**：从 Python stage-0 构建 self-hosted compiler，并达到字节一致的不动点
-- **约 1.1 万行 Epic 源码完成自举**：自托管编译器由 16 个 Epic 源码文件组成
-- **直接生成原生 PE**：无需额外第三方； Hello World 只有 **5.5 KiB**
-- **完整编译器栈**：typed MIR、结构化 x64 后端、COFF writer 和 PE linker
-
-包含一个 Python 参考编译器、一个用 Epic 自身编写的自托管编译器、一个类型化的 LLVM 风格 MIR、一个结构化的 x64 后端、一个小型 COFF/PE 工具链，以及用于构建真实 Windows 可执行文件的运行时辅助代码。
+最终目标是达到 Go 级的编译速度和性能，拥有 GC 运行时，以及比 Go 更丰富的表达力——ADT、f-string、直接 WinAPI 导入等。
+GC 将在后续版本加入。
 
 ## 快速上手
-
-先看一段 Epic 代码：
 
 ```epic
 fun main(): void {
@@ -19,7 +13,7 @@ fun main(): void {
 }
 ```
 
-仓库中的 `examples/00_hello_world.ep` 就是上面的程序。先生成达到不动点的 self-hosted compiler，再用它编译并运行 Hello World：
+仓库中的 `examples/00_hello_world.ep` 就是上面的程序。从源码构建自举编译器，然后编译并运行 Hello World：
 
 ```powershell
 python bootstrap_fixed_point.py -o build\epic.exe
@@ -27,9 +21,9 @@ python bootstrap_fixed_point.py -o build\epic.exe
 .\build\hello.exe
 ```
 
-第一条命令从 Python stage-0 启动完整 bootstrap，只用于生成稳定的 `build\epic.exe`。self-hosted compiler 会自动从当前工作目录的 `runtime/` 嵌入到 exe。
+第一条命令从 Python stage-0 启动完整 bootstrap，得到达到不动点的自托管编译器；之后直接用 `epic.exe` 编译用户程序。
 
-程序输出：
+输出：
 
 ```
 Hello, Epic!
@@ -39,20 +33,77 @@ Hello, Epic!
 
 ## 语言特性
 
-Epic 目前支持：
+- `if`/`else`、`for` 条件循环和范围循环、`break`/`continue`、`panic`
+- 字面量和 ADT 的 `match`、`_` 默认分支
+- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`，带检查的算术运算，显式整数转换
+- `str`：字节字符串、f-string、内容等值比较、切片、分配式拼接
+- 动态数组 `T[]`：字面量、零初始化、索引、`push`/`pop`/`extend`
+- 堆分配结构体：具名/部分初始化；省略的引用字段为 null
+- 封闭 ADT：`type Name = A | B`，显式包装构造，公共字段直接访问
+- 面向字节的文件 I/O、`argv`、进程退出、类型化的直接 WinAPI 导入
 
-- `if`/`else`、`for condition` 条件循环、`for i: start:end` 半开区间循环
-- `break`、`continue`、`panic`、字面量 `match`、穷举 ADT `match`
-- `i64`、`u64`、`i32`、`u32`、`u8`、`bool`、十进制与十六进制整数字面量、显式整数类型转换、带检查的算术运算
-- 面向字节的 `str`、字符字面量和 f-string 字面量、内容等值比较、切片、分配型 `str + str`
-- 动态数组（`T[]`）——字面量、定长零初始化、带检查的索引、`len`、`push`、`pop`、`extend`
-- 堆分配结构体——具名和部分初始化；省略的引用字段为 null，可用后缀 `?` 检查
-- 封闭的结构体-联合 ADT——`type Name = A | B` 声明、显式包装构造、公共字段访问
-- 面向字节的文件 I/O、`argv`、进程退出、Windows 上类型化的直接 WinAPI 导入
+完整语言边界由 `docs/` 和意图级测试共同定义。
 
-主要语言特性可通过 `examples/` 渐进学习；完整语言边界由 `docs/` 和意图级测试共同定义。
+## 代码一览
 
-## 自举不动点
+**结构体与方法：**
+
+```epic
+struct Parser {
+    pos: i64
+}
+
+fun (p: Parser) peek(): Token {
+    ...
+}
+
+let p = new Parser { pos: 0 }
+let tok = p.peek()
+```
+
+**ADT 与 match：**
+
+```epic
+type Expr = LiteralExpr | BinaryExpr
+
+match expr {
+    LiteralExpr lit: { print(lit.value) }
+    BinaryExpr b:   { print(b.op) }
+}
+```
+
+**直接调用 WinAPI：**
+
+```epic
+extern "kernel32.dll" fun GetTickCount64(): u64
+let ms = GetTickCount64()
+```
+
+## 当前状态
+
+Epic v0 是一个正在收敛的 early-stage 项目，当前：
+
+- ✅ 自举完成，已验证字节一致的不动点
+- ✅ 完整编译器栈：parse → sema → MIR → x64 → machine code → COFF → PE
+- ✅ 可独立编译用户程序，生成原生 Windows exe（Hello World 仅 **5.5 KiB**）
+- ✅ 可直接导入 Windows DLL 函数
+
+近期方向：
+
+- GC 运行时
+- 跨平台支持（Linux）
+- 更丰富的标准库
+
+### 当前边界
+
+- 仅面向 Windows x64；尚无跨平台 ABI 承诺
+- MIR 是 LLVM 风格，并非 LLVM IR 兼容
+- 尚无完整的 SSA / phi-node 优化器流水线
+- 旧的 NASM 文本汇编后端已归档，不再活跃
+
+## 从源码构建
+
+### 自举不动点
 
 项目已通过完整 bootstrap fixed-point 验证：Python reference compiler 先编译 Epic compiler 源码，得到 `epic-py.exe`；之后连续使用生成的 self-hosted compiler 重新编译同一份源码。连续三个 self-hosted generations 字节一致；当前收敛编译器为 **742,400 bytes（0.71 MiB）**。
 
@@ -62,16 +113,7 @@ Epic 目前支持：
 python bootstrap_fixed_point.py -o build\epic.exe
 ```
 
-## 当前边界
-
-Epic v0 当前仍在发布前收敛，并有以下明确边界：
-
-- 仅面向 Windows x64；尚无跨平台 ABI 承诺
-- MIR 是 LLVM 风格，但并非 LLVM IR 兼容
-- 一等用户指针类型不纳入公开语言特性
-- 尚无完整的 SSA / phi-node 优化器流水线
-- 尚无通用汇编器或通用寄存器分配器
-- 旧的 NASM 文本汇编后端路径已归档，不再活跃
+`self-hosted epic.exe` 会自动从当前工作目录的 `runtime/` 嵌入标准运行时。Python reference compiler（`bootstrap/`）是当前语言的判定基准（oracle）；自托管的 Epic compiler（`src/`）在默认路径下逐阶段复现 oracle 的行为。
 
 ## 仓库布局
 
@@ -115,34 +157,3 @@ python tests/link/run.py
 - 保持示例正向友好；负向测试放在 `tests/<module>/fail/`。
 - 倾向清晰的编译器代码，而非过早的性能优化。
 - 发布前允许破坏性变化，但公开语义变更必须显式讨论并同步更新设计文档与意图级测试。
-
-## 编译器流水线
-
-```text
-解析 / 合并（parse / merge）
-  -> 语义分析（semantic analysis）
-  -> AST 到 MIR
-  -> MIR 验证（MIR validation）
-  -> MIR 到 X64IR
-  -> X64IR 验证（X64IR validation）
-  -> 机器码字节 + COFF 重定位（machine bytes + COFF relocations）
-  -> PE 链接（PE linking）
-```
-
-关键实现文件：
-
-```text
-bootstrap/epic.py          编译器驱动
-bootstrap/lexer.py         词法分析器
-bootstrap/parser.py        语法解析器
-bootstrap/sema.py          语义分析
-bootstrap/ast_to_mir.py    AST -> MIR
-bootstrap/mir.py           类型化 MIR 模型与验证器
-bootstrap/mir_to_x64.py    MIR -> 结构化 X64IR
-bootstrap/x64.py           X64IR 模型与美化打印
-bootstrap/machine.py       X64IR -> 机器码字节 + COFF 记录
-bootstrap/coff.py          最小 AMD64 COFF 写入器
-bootstrap/link.py          最小 PE 链接器
-```
-
-Python 参考编译器是当前语言的判定基准（oracle）。用 Epic 编写的编译器代码应先与参考路径保持一致，再发展独立的优化行为（在别的分支上）。
