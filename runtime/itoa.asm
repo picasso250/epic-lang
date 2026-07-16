@@ -27,7 +27,7 @@ _itoa:
     xor rdx, rdx
     mov rcx, 10
     div rcx
-    add dl, '0'
+    add dl, 48
     dec r10
     mov [r10], dl
     inc r11
@@ -68,7 +68,7 @@ _itoa:
     mov r9, rax           ; dst cursor
     test r8, r8
     jz .copy_digits
-    mov byte [r9], '-'
+    mov byte [r9], 45
     inc r9
 .copy_digits:
     mov rcx, r11
@@ -87,4 +87,5 @@ _itoa:
     mov rsp, rbp
     pop rbp
     ret
-zero_str_data: db '0', 0
+zero_str_data:
+    db 48, 0

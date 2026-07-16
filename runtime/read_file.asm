@@ -63,4 +63,5 @@ _read_file_done:
     mov rsp, rbp
     pop rbp
     ret
-_read_file_empty_data: db 0
+_read_file_empty_data:
+    db 0
