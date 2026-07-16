@@ -3,7 +3,7 @@
 # Emits the active .text, .rdata, and .data sections.
 #
 
-struct CoffSectionSpec {
+type CoffSectionSpec {
     name: str
     size: i64
     raw: i64

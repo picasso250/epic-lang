@@ -99,7 +99,7 @@ fun bytes_append_name8(buf: u8[], name: str): void {
     }
 }
 
-struct NameIndex {
+type NameIndex {
     capacity: i64
     count: i64
     names: str[]

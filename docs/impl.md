@@ -164,7 +164,7 @@ storage size 分别为 1/2/4/8 字节；reference 始终按 8 字节对齐。后
 Epic 表达式值仍统一经过 64-bit value representation：窄字段 load 后符号扩展或零扩展，store 时仅写目标
 lane。heap allocation 使用显式 struct size；`gep struct` 的 element stride 同样使用该 size。
 
-Extern FFI 可把只含整数 scalar 字段的非空用户 struct 作为同步 borrowed pointer 参数。Sema 在 extern 声明处拒绝 `bool`、reference、nested struct 和 ADT 字段；AST-to-MIR 将该参数类型降低为 `ptr`，现有 Windows x64 call lowering 直接传 payload 地址。该规则不表示 C by-value aggregate，也不允许 struct 返回。
+Extern FFI 可把只含整数 scalar 字段的非空用户 product 作为同步 borrowed pointer 参数。Sema 在 extern 声明处拒绝 `bool`、reference、nested product 和 named sum 字段；AST-to-MIR 将该参数类型降低为 `ptr`，现有 Windows x64 call lowering 直接传 payload 地址。该规则不表示 C by-value aggregate，也不允许 product 返回。
 
 源码 `ptr(function_name)` 由 Sema 在 lexical local 未命中时解析为普通顶层函数地址；main、extern、builtin 和 method symbol 被拒绝。AST-to-MIR 直接产生 `ptr` 类型的 function symbol operand。MIR DCE 在 call edge 之外也扫描 instruction 与 terminator operand 中的内部 function symbol，保留只通过地址引用的函数。x64 lowering 将该 operand 发射为 `lea reg, [symbol]`，沿用现有 RIP-relative text relocation。
 
@@ -172,7 +172,7 @@ Extern FFI 可把只含整数 scalar 字段的非空用户 struct 作为同步 b
 
 ### ADT (Algebraic Data Types)
 
-ADT v1 使用 struct union lowering：
+ADT v1 使用 tagged payload lowering：
 
 ```text
 Expr wrapper:
@@ -180,24 +180,24 @@ Expr wrapper:
   payload pointer
 
 payload:
-  user-defined struct instance
+  user-defined product instance
 ```
 
 编译器流程：
 
-1. 收集所有 struct 定义。
-2. 收集 `type Name = A | B | C` union 定义。
-3. 验证 union member 都是 struct。
+1. 收集所有 `type Name { ... }` product 定义。
+2. 收集 `type Name = A | B | C` sum 定义。
+3. 验证 sum member 都是 product。
 4. 为 wrapper 生成 tag namespace。
 5. `new Expr(payload)` 生成 wrapper。
 6. ADT `match` 根据 wrapper tag 分派，并绑定 payload struct。
 
 不支持：
 
-- primitive union member
+- primitive sum member
 - implicit boxing
 - tag 访问
-- union extension
+- sum extension
 - variant-specific constructor namespace
 
 ## 代码生成模型 (Codegen Model)
@@ -214,9 +214,9 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 
 ### 降级说明 (Lowering Notes)
 
-- **用户方法 v1**：Parser 将 `fun (p: Parser) peek(): Token` 解析为带 receiver metadata 的函数定义，并占用内部符号 `Parser__peek`。Sema 对 `p.peek(args...)` 先求 receiver 类型；如果是用户 struct `Parser`，只查 `Parser__peek(p, args...)`，不 fallback 到 `peek(p, args...)`。普通函数名允许包含 `__`；mangled method symbol 与已有函数重复时，复用普通重复定义错误。
-- **Null check postfix**：Parser 将 `expr?` 解析为 `NullCheck`。Sema 只允许 reference 类型（`str`、array、struct、ADT wrapper），返回 `bool`。AST-to-MIR 对被检查表达式求值一次，然后发射 `icmp.ne <ptr>, null`；`?` 本身不 deref 被检查值，不触发 null trap。
-- **方法边界**：第一版只支持用户 struct receiver，不支持 primitive / `str` / array receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 struct 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
+- **用户方法 v1**：Parser 将 `fun (p: Parser) peek(): Token` 解析为带 receiver metadata 的函数定义，并占用内部符号 `Parser__peek`。Sema 对 `p.peek(args...)` 先求 receiver 类型；如果 `Parser` 使用 `{ ... }` 声明，只查 `Parser__peek(p, args...)`，不 fallback 到 `peek(p, args...)`。普通函数名允许包含 `__`；mangled method symbol 与已有函数重复时，复用普通重复定义错误。
+- **Null check postfix**：Parser 将 `expr?` 解析为 `NullCheck`。Sema 只允许 reference 类型（`str`、array、product、sum wrapper），返回 `bool`。AST-to-MIR 对被检查表达式求值一次，然后发射 `icmp.ne <ptr>, null`；`?` 本身不 deref 被检查值，不触发 null trap。
+- **方法边界**：第一版只支持使用 `{ ... }` 声明的 product receiver，不支持 sum / primitive / `str` / array receiver，不支持 overload、trait、inheritance、virtual dispatch、method value 或 generic method。所有 product 都是 heap-backed reference，因此没有 value receiver / pointer receiver lowering split。
 
 - **花括号语境 (Brace contexts)**：`new S { ... }` 在表达式位置表示初始化器；Parser 按语境解析，语义检查和 codegen 拒绝非法使用。
 - **Match 冒号规则 (Match colon rule)**：每个 match 分支在模式和主体之间使用冒号。Parser 在语法级别强制此规则。
@@ -235,14 +235,14 @@ Epic compiler 后端发射结构化 X64IR，再编码为 AMD64 COFF object，
 |--------------------|---------------------------------------------|----------|
 | `exit`             | `ExitProcess` 系统调用                      | 公开 |
 | `print` / `println` | `WriteFile` + `GetStdHandle` 系统调用      | 公开 |
-| `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 通过 `__ep_str_from_bytes` 深拷贝。struct、非 `u8[]` array 不支持 | 公开 |
+| `str(x)`           | `str` identity；整数用 decimal helper；`bool` 用 `__ep_str_from_bool`；`u8[]` 通过 `__ep_str_from_bytes` 深拷贝。product、非 `u8[]` array 不支持 | 公开 |
 | `str + str`         | MIR `__ep_str_cat` 一次分配最终 inline string，并用至多两次 `RtlMoveMemory` 复制两侧内容 | 公开语法 |
 | `str == str` / `!=` | `__ep_str_eq` 内容比较；`!=` 对结果取反 | 公开语法 |
 | `read_file`        | MIR `__ep_read_file`，一次分配结果 slice，用栈上 `u32` 接收实际读取数 | 公开 |
 | `write_file`       | MIR `__ep_write_file`，用栈上 `u32` 接收实际写入数 | 公开 |
 | `str(u8[])`        | 深拷贝为只读 inline string object | 公开 |
 | `bytes(str)`       | 深拷贝为独立可变 `u8[]` | 公开 |
-| `cptr` / `cstr`    | `cptr` 用于支持的 array/struct；`cstr` 返回 `str` 首字节的同步 borrowed pointer | 公开 |
+| `cptr` / `cstr`    | `cptr` 用于支持的 array/product；`cstr` 返回 `str` 首字节的同步 borrowed pointer | 公开 |
 | `str_slice`        | `__ep_str_slice` MIR helper                 | 🚫 已从 public surface 删除，internal helper |
 | `str_starts_with`  | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |
 | `str_find`         | 自己写 `u8[]` 扫描                          | 🚫 已从 public surface 删除 |

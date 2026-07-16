@@ -3,7 +3,6 @@
 [
   "extern"
   "fun"
-  "struct"
   "type"
   "let"
   "ret"
@@ -20,7 +19,7 @@
 (boolean) @boolean
 
 ((identifier) @type.builtin
-  (#match? @type.builtin "^(i64|u64|i32|u32|u8|bool|void|str)$"))
+  (#match? @type.builtin "^(i64|u64|i32|u32|i16|u16|u8|bool|void|str|ptr)$"))
 
 (number) @number
 (string) @string

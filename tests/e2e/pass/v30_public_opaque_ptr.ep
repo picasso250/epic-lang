@@ -4,7 +4,7 @@
 extern "kernel32.dll" fun GetCommandLineA(): ptr
 extern "kernel32.dll" fun lstrlenA(value: ptr): i32
 
-struct Holder {
+type Holder {
     value: ptr
 }
 

@@ -1,12 +1,12 @@
-# COMPILE_FAIL_CONTAINS: union Node has no common field meta
-struct Meta {
+# COMPILE_FAIL_CONTAINS: type Node has no common field meta
+type Meta {
     line: i64
 }
-struct Leaf {
+type Leaf {
     meta: Meta
     value: i64
 }
-struct Pair {
+type Pair {
     value: i64
 }
 type Node = Leaf | Pair

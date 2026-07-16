@@ -5,7 +5,7 @@ extern "kernel32.dll" fun GetFileAttributesA(path: u64): u32
 # Source AST to canonical typed MIR lowering.
 #
 
-struct MirStructFieldLayout {
+type MirStructFieldLayout {
     struct_name: str
     field_name: str
     field_type: str
@@ -14,13 +14,13 @@ struct MirStructFieldLayout {
     field_offset: i64
 }
 
-struct MirUnionMemberLayout {
+type MirUnionMemberLayout {
     union_name: str
     member_name: str
     tag: i64
 }
 
-struct MirCodegenState {
+type MirCodegenState {
     program: MirProgram
     current_fn: MirFunction
     current_block: MirBlock
@@ -44,12 +44,12 @@ struct MirCodegenState {
     string_counter: i64
 }
 
-struct MirValueFlow {
+type MirValueFlow {
     value: MirOperand
     block: MirBlock
 }
 
-struct MirBlockFlow {
+type MirBlockFlow {
     reachable: bool
     block: MirBlock
 }

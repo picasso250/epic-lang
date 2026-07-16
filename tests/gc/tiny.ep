@@ -1,4 +1,4 @@
-struct TinyBox {
+type TinyBox {
     value: i64
 }
 

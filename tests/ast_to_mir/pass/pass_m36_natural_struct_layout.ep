@@ -1,4 +1,4 @@
-struct Compact {
+type Compact {
     a: u8
     b: u16
     c: i16

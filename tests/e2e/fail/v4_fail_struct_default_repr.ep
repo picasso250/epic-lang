@@ -1,10 +1,10 @@
 # COMPILE_FAIL_CONTAINS: str expected str, integer, bool, or u8[], got Outer
 
-struct Inner {
+type Inner {
     x: i64
 }
 
-struct Outer {
+type Outer {
     inner: Inner
 }
 

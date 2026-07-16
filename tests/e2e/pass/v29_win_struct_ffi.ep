@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: true
 
-struct WinSystemTime {
+type WinSystemTime {
     year: u16
     month: u16
     day_of_week: u16

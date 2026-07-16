@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: true
 
-struct CallbackAllocation {
+type CallbackAllocation {
     flags: u32
 }
 

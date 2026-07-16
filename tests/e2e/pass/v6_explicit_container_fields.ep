@@ -7,7 +7,7 @@ fun check(ok: bool): void {
     }
 }
 
-struct S {
+type S {
     xs: i64[]
 }
 

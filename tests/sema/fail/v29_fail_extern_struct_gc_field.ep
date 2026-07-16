@@ -1,6 +1,6 @@
 # COMPILE_FAIL_CONTAINS: extern UseBad parameter value struct BadWinStruct field text has unsupported FFI type str
 
-struct BadWinStruct {
+type BadWinStruct {
     text: str
 }
 

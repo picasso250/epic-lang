@@ -27,10 +27,10 @@
    - detached comments：与节点间有空行的注释块。
 
 4. 写 AST printer
-   - Program / type / struct / fun。
+   - Program / type / fun。
    - statement。
    - expression，包含 precedence，避免重印后语义变化。
-   - match pattern、struct init、array literal、f-string。
+   - match pattern、type init、array literal、f-string。
 
 5. Formatter 验证
    - `python tools/epicfmt.py -w` 写入前先 parse formatted text。

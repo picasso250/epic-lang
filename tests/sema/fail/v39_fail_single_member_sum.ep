@@ -1,0 +1,9 @@
+# COMPILE_FAIL_CONTAINS: sum type Wrapper requires at least two members
+type Item {
+    value: i64
+}
+
+type Wrapper = Item
+
+fun main(): void {
+}

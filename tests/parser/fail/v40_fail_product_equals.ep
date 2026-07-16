@@ -1,0 +1,4 @@
+# COMPILE_FAIL_CONTAINS: Expected ID
+type Legacy = {
+    value: i64
+}

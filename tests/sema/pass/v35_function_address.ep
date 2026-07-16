@@ -1,4 +1,4 @@
-struct CallbackSlot {
+type CallbackSlot {
     callback: ptr
 }
 

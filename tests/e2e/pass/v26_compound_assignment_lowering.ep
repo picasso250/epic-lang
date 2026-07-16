@@ -1,11 +1,11 @@
 # EXIT: 0
 
-struct Counter {
+type Counter {
     lhs_calls: i64
     rhs_calls: i64
 }
 
-struct Box {
+type Box {
     value: i64
     small: u8
     signed: i16

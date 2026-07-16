@@ -16,7 +16,7 @@
 
 extern "kernel32.dll" fun GetTickCount64(): u64
 
-struct Mat {
+type Mat {
     data: i64[]
     rows: i64
     cols: i64

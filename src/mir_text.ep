@@ -159,7 +159,7 @@ fun mrt_is_int_text(s: str): bool {
     ret true
 }
 
-struct MirTextLocalMap {
+type MirTextLocalMap {
     names: str[]
     ids: i64[]
     next_id: i64

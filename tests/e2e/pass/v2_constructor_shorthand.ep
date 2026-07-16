@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 0
 
-struct Box {
+type Box {
     n: i64
 }
 

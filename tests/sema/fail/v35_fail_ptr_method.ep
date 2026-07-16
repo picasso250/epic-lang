@@ -1,6 +1,6 @@
 # COMPILE_FAIL_CONTAINS: ptr cannot take the address of method Box__touch
 
-struct Box {
+type Box {
     value: i64
 }
 

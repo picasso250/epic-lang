@@ -4,74 +4,74 @@
 # machine encoding belongs to the next compiler stage.
 #
 
-struct X64RegOperand {
+type X64RegOperand {
     name: str
 }
 
-struct X64ImmOperand {
+type X64ImmOperand {
     value: i64
 }
 
-struct X64SymbolOperand {
+type X64SymbolOperand {
     name: str
 }
 
-struct X64Label {
+type X64Label {
     id: i64
     symbol_name: str
 }
 
-struct X64LabelRefOperand {
+type X64LabelRefOperand {
     label: X64Label
 }
 
-struct X64MemBaseOperand {
+type X64MemBaseOperand {
     base: str
     disp: i64
     size: i64
 }
 
-struct X64MemSymbolOperand {
+type X64MemSymbolOperand {
     symbol: str
     size: i64
 }
 
 type X64Operand = X64RegOperand | X64ImmOperand | X64SymbolOperand | X64LabelRefOperand | X64MemBaseOperand | X64MemSymbolOperand
 
-struct X64GlobalItem {
+type X64GlobalItem {
     name: str
 }
 
-struct X64ExternItem {
+type X64ExternItem {
     name: str
 }
 
-struct X64SectionItem {
+type X64SectionItem {
     name: str
 }
 
-struct X64LabelItem {
+type X64LabelItem {
     label: X64Label
 }
 
-struct X64InstItem {
+type X64InstItem {
     op: i64
     operands: X64Operand[]
 }
 
-struct X64DataBytesItem {
+type X64DataBytesItem {
     name: str
     values: u8[]
 }
 
-struct X64DataZeroItem {
+type X64DataZeroItem {
     name: str
     count: i64
 }
 
 type X64Item = X64GlobalItem | X64ExternItem | X64SectionItem | X64LabelItem | X64InstItem | X64DataBytesItem | X64DataZeroItem
 
-struct X64Program {
+type X64Program {
     items: X64Item[]
     label_count: i64
 }

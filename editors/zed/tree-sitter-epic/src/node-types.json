@@ -1651,10 +1651,6 @@
     "named": true
   },
   {
-    "type": "struct",
-    "named": false
-  },
-  {
     "type": "true",
     "named": false
   },

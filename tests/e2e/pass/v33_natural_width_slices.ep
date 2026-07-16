@@ -1,14 +1,14 @@
 # EXIT: 0
 
-struct Box {
+type Box {
     value: i64
 }
 
-struct Left {
+type Left {
     value: i64
 }
 
-struct Right {
+type Right {
     value: i64
 }
 

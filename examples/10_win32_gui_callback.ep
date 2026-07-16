@@ -1,6 +1,6 @@
 # COMPILE_ONLY
 
-struct WndClassW {
+type WndClassW {
     style: u32
     wnd_proc: ptr
     class_extra: i32
@@ -13,7 +13,7 @@ struct WndClassW {
     class_name: ptr
 }
 
-struct Msg {
+type Msg {
     hwnd: ptr
     message: u32
     wparam: u64

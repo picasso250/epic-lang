@@ -2,12 +2,12 @@
 # STDOUT: 42
 # STDOUT: answer
 # STDOUT: 43
-struct Point {
+type Point {
     x: i64
     y: i64
 }
 
-struct NamedPoint {
+type NamedPoint {
     point: Point
     name: str
 }

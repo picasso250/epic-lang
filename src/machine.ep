@@ -3,7 +3,7 @@
 # Structured encoding for the active X64IR subset.
 #
 
-struct MachineObject {
+type MachineObject {
     text: u8[]
     rdata: u8[]
     data: u8[]
@@ -16,12 +16,12 @@ struct MachineObject {
     symbol_values: i64[]
 }
 
-struct MachineLabelFixup {
+type MachineLabelFixup {
     offset: i64
     label: X64Label
 }
 
-struct MachineBuilder {
+type MachineBuilder {
     text: u8[]
     rdata: u8[]
     data: u8[]

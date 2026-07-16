@@ -1,6 +1,6 @@
-# COMPILE_FAIL_CONTAINS: union Node has no common field name
-struct Leaf { name: str }
-struct Pair { value: i64 }
+# COMPILE_FAIL_CONTAINS: type Node has no common field name
+type Leaf { name: str }
+type Pair { value: i64 }
 type Node = Leaf | Pair
 fun main(): void {
     let n: Node = new Node(new Pair { value: 1 })

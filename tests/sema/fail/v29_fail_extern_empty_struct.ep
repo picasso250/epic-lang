@@ -1,6 +1,6 @@
 # COMPILE_FAIL_CONTAINS: extern UseEmpty parameter value struct EmptyWinStruct must not be empty
 
-struct EmptyWinStruct {}
+type EmptyWinStruct {}
 
 extern "demo.dll" fun UseEmpty(value: EmptyWinStruct): void
 

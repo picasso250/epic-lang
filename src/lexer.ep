@@ -1,18 +1,18 @@
 #
 
-struct FStringTextPart {
+type FStringTextPart {
     text: str
     dump_text: str
 }
 
-struct FStringExprPart {
+type FStringExprPart {
     text: str
     dump_text: str
 }
 
 type FStringPart = FStringTextPart | FStringExprPart
 
-struct Token {
+type Token {
     kind: str
     text: str
     dump_text: str
@@ -97,7 +97,6 @@ fun keyword_kind(text: str): str {
     if text == "match" { ret "MATCH" }
     if text == "false" { ret "FALSE" }
     if text == "ret" { ret "RETURN" }
-    if text == "struct" { ret "STRUCT" }
     if text == "continue" { ret "CONTINUE" }
     ret "ID"
 }

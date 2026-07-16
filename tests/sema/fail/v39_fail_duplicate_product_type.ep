@@ -1,0 +1,8 @@
+# COMPILE_FAIL_CONTAINS: duplicate type Pair
+type Pair {
+    left: i64
+}
+
+type Pair {
+    right: i64
+}

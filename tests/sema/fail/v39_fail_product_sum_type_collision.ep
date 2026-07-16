@@ -1,0 +1,8 @@
+# COMPILE_FAIL_CONTAINS: duplicate type Value
+type Left {}
+type Right {}
+
+type Value {}
+type Value = Left | Right
+
+fun main(): void {}

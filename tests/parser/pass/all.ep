@@ -4,23 +4,23 @@
 
 extern "kernel32.dll" fun GetTickCount64(): u64
 
-struct Point {
+type Point {
     x: i64
     y: i64
     name: str
 }
 
-struct Box {
+type Box {
     point: Point
     bytes: u8[]
 }
 
 
-struct LiteralExpr {
+type LiteralExpr {
     value: str
 }
 
-struct BinaryExpr {
+type BinaryExpr {
     op: str
     left: Expr
     right: Expr

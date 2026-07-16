@@ -1,6 +1,6 @@
 # COMPILE_FAIL_CONTAINS: extern MakeValue has unsupported ABI return type WinValue
 
-struct WinValue {
+type WinValue {
     bits: u64
 }
 

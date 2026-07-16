@@ -4,46 +4,46 @@
 # shared by typed-AST lowering, runtime preparation, and the backend.
 #
 
-struct MirValueOperand {
+type MirValueOperand {
     typ: str
     value_id: i64
 }
 
-struct MirIntOperand {
+type MirIntOperand {
     typ: str
     value: i64
 }
 
-struct MirBoolOperand {
+type MirBoolOperand {
     value: bool
 }
 
-struct MirNullOperand {
+type MirNullOperand {
     dummy: i64
 }
 
-struct MirSymbolOperand {
+type MirSymbolOperand {
     typ: str
     name: str
 }
 
 type MirOperand = MirValueOperand | MirIntOperand | MirBoolOperand | MirNullOperand | MirSymbolOperand
 
-struct MirLoadInst {
+type MirLoadInst {
     result_id: i64
     result_type: str
     access_type: str
     address: MirOperand
 }
 
-struct MirStoreInst {
+type MirStoreInst {
     value: MirOperand
     access_type: str
     address: MirOperand
     immediate_address: bool
 }
 
-struct MirBinaryInst {
+type MirBinaryInst {
     kind: i64
     result_id: i64
     result_type: str
@@ -51,21 +51,21 @@ struct MirBinaryInst {
     right: MirOperand
 }
 
-struct MirCompareInst {
+type MirCompareInst {
     kind: i64
     result_id: i64
     left: MirOperand
     right: MirOperand
 }
 
-struct MirGepInst {
+type MirGepInst {
     result_id: i64
     result_type: str
     source_type: str
     operands: MirOperand[]
 }
 
-struct MirCallInst {
+type MirCallInst {
     callee: str
     return_type: str
     args: MirOperand[]
@@ -75,12 +75,12 @@ struct MirCallInst {
     has_result: bool
 }
 
-struct MirAllocaInst {
+type MirAllocaInst {
     result_id: i64
     elem_type: str
 }
 
-struct MirCastInst {
+type MirCastInst {
     kind: i64
     result_id: i64
     result_type: str
@@ -88,64 +88,64 @@ struct MirCastInst {
     target_type: str
 }
 
-struct MirNotInst {
+type MirNotInst {
     result_id: i64
     operand: MirOperand
 }
 
 type MirInst = MirLoadInst | MirStoreInst | MirBinaryInst | MirCompareInst | MirGepInst | MirCallInst | MirAllocaInst | MirCastInst | MirNotInst
 
-struct MirBrTerminator {
+type MirBrTerminator {
     target: str
 }
 
-struct MirCondBrTerminator {
+type MirCondBrTerminator {
     cond: MirOperand
     then_target: str
     else_target: str
 }
 
-struct MirRetVoidTerminator {
+type MirRetVoidTerminator {
     dummy: i64
 }
 
-struct MirRetValueTerminator {
+type MirRetValueTerminator {
     value: MirOperand
 }
 
 type MirTerminator = MirBrTerminator | MirCondBrTerminator | MirRetVoidTerminator | MirRetValueTerminator
 
-struct MirBlock {
+type MirBlock {
     name: str
     instructions: MirInst[]
     terminator: MirTerminator
     has_terminator: bool
 }
 
-struct MirParam {
+type MirParam {
     value_id: i64
     typ: str
     source_type: str
 }
 
-struct MirFunction {
+type MirFunction {
     name: str
     params: MirParam[]
     return_type: str
     blocks: MirBlock[]
 }
 
-struct MirStringGlobal {
+type MirStringGlobal {
     name: str
     init: str
 }
 
-struct MirDeclGlobal {
+type MirDeclGlobal {
     name: str
     typ: str
 }
 
-struct MirScalarGlobal {
+type MirScalarGlobal {
     name: str
     typ: str
     init: str
@@ -153,26 +153,26 @@ struct MirScalarGlobal {
 
 type MirGlobal = MirStringGlobal | MirDeclGlobal | MirScalarGlobal
 
-struct MirExtern {
+type MirExtern {
     name: str
     return_type: str
     param_types: str[]
 }
 
-struct MirStructLayout {
+type MirStructLayout {
     name: str
     size: i64
     align: i64
 }
 
-struct MirStructField {
+type MirStructField {
     struct_name: str
     field_type: str
     field_index: i64
     field_offset: i64
 }
 
-struct MirProgram {
+type MirProgram {
     externs: MirExtern[]
     globals: MirGlobal[]
     struct_layouts: MirStructLayout[]

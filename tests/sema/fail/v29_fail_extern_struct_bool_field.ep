@@ -1,6 +1,6 @@
 # COMPILE_FAIL_CONTAINS: extern UseBad parameter value struct BadWinStruct field enabled has unsupported FFI type bool
 
-struct BadWinStruct {
+type BadWinStruct {
     enabled: bool
 }
 

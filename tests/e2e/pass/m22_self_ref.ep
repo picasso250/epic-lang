@@ -1,5 +1,5 @@
 # Test self-referencing struct
-struct Node {
+type Node {
     val: i64
     next: Node
 }

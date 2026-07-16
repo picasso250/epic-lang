@@ -6,7 +6,7 @@ fun check(ok: bool): void {
     }
 }
 
-struct Pair {
+type Pair {
     value: i64
 }
 

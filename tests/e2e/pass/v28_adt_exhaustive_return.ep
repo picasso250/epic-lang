@@ -1,11 +1,11 @@
 # EXIT: 0
 # STDOUT: 42,7
 
-struct LeftValue {
+type LeftValue {
     value: i64
 }
 
-struct RightValue {
+type RightValue {
     value: i64
 }
 

@@ -4,7 +4,7 @@
 extern "kernel32.dll" fun lstrlenA(text: ptr): i32
 extern "kernel32.dll" fun lstrlenW(text: ptr): i32
 
-struct RawPair {
+type RawPair {
     left: i32
     right: u32
     next: ptr

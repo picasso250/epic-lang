@@ -75,7 +75,7 @@ module.exports = grammar({
     ),
 
     struct_definition: $ => seq(
-      "struct",
+      "type",
       field("name", $.identifier),
       "{",
       repeat($.struct_field),
@@ -86,14 +86,16 @@ module.exports = grammar({
       field("name", $.identifier),
       ":",
       field("type", $.type),
-      optional(","),
     ),
 
     union_definition: $ => seq(
       "type",
       field("name", $.identifier),
       "=",
-      sep1(field("member", $.identifier), "|"),
+      field("member", $.identifier),
+      "|",
+      field("member", $.identifier),
+      repeat(seq("|", field("member", $.identifier))),
     ),
 
     type: $ => seq(

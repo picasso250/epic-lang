@@ -6,7 +6,7 @@
 # epic_type_* helpers instead of ad hoc string slicing.
 #
 
-struct SemaState {
+type SemaState {
     structs: AstStructDef[]
     unions: AstUnionDef[]
     funcs: AstFunDef[]
@@ -273,7 +273,7 @@ fun sema_direct_field_type(st: SemaState, base_type: str, field: str): str {
 fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): str {
     let union_index = sema_union_index(st, union_name)
     if union_index < 0 {
-        sema_die(f"unknown union {union_name}")
+        sema_die(f"unknown type {union_name}")
     }
     let found = ""
     let members = st.unions[union_index].members
@@ -281,15 +281,15 @@ fun sema_union_common_field_type(st: SemaState, union_name: str, field: str): st
         let member = members[i]
         let candidate = sema_direct_field_type_or_empty(st, member, field)
         if candidate == "" {
-            sema_die(f"union {union_name} has no common field {field}")
+            sema_die(f"type {union_name} has no common field {field}")
         }
         if found != "" && found != candidate {
-            sema_die(f"union {union_name} field {field} has inconsistent types")
+            sema_die(f"type {union_name} field {field} has inconsistent types")
         }
         found = candidate
     }
     if found == "" {
-        sema_die(f"union {union_name} has no common field {field}")
+        sema_die(f"type {union_name} has no common field {field}")
     }
     ret found
 }
@@ -321,7 +321,7 @@ fun sema_field_type(st: SemaState, base_type: str, field: str): str {
         ret sema_union_common_field_type(st, base_type, field)
     }
     if sema_struct_index(st, base_type) < 0 {
-        sema_die(f"field access expected aggregate, got {base_type}")
+        sema_die(f"field access requires a type with fields, got {base_type}")
     }
     ret sema_direct_field_type(st, base_type, field)
 }
@@ -646,7 +646,7 @@ fun sema_check_func_call_args(st: SemaState, name: str, args: AstExpr[]): void {
 fun sema_union_members_text(st: SemaState, union_name: str): str {
     let union_index = sema_union_index(st, union_name)
     if union_index < 0 {
-        sema_die(f"unknown union {union_name}")
+        sema_die(f"unknown type {union_name}")
     }
     let out = ""
     let members = st.unions[union_index].members
@@ -662,7 +662,7 @@ fun sema_union_members_text(st: SemaState, union_name: str): str {
 fun sema_union_missing_text(st: SemaState, union_name: str, seen: str[]): str {
     let union_index = sema_union_index(st, union_name)
     if union_index < 0 {
-        sema_die(f"unknown union {union_name}")
+        sema_die(f"unknown type {union_name}")
     }
     let out = ""
     let members = st.unions[union_index].members
@@ -680,16 +680,23 @@ fun sema_union_missing_text(st: SemaState, union_name: str, seen: str[]): str {
 
 fun sema_build_types(st: SemaState, program: AstProgram): void {
     st.structs = program.structs
+    for i: 0:len(st.structs) {
+        for j: 0:i {
+            if st.structs[i].name == st.structs[j].name {
+                sema_die(f"duplicate type {st.structs[i].name}")
+            }
+        }
+    }
     for i: 0:len(program.unions) {
         let u = program.unions[i]
         if sema_struct_index(st, u.name) >= 0 {
-            sema_die(f"type {u.name} conflicts with struct {u.name}")
+            sema_die(f"duplicate type {u.name}")
         }
         if sema_union_index(st, u.name) >= 0 {
             sema_die(f"duplicate type {u.name}")
         }
-        if len(u.members) == 0 {
-            sema_die(f"union {u.name} requires at least one member")
+        if len(u.members) < 2 {
+            sema_die(f"sum type {u.name} requires at least two members")
         }
         st.unions.push(u)
     }
@@ -711,11 +718,11 @@ fun sema_build_types(st: SemaState, program: AstProgram): void {
         for j: 0:len(u.members) {
             let member = u.members[j]
             if sema_string_contains(seen, member) {
-                sema_die(f"duplicate union member {u.name}.{member}")
+                sema_die(f"duplicate sum member {u.name}.{member}")
             }
             seen.push(member)
             if sema_struct_index(st, member) < 0 {
-                sema_die(f"union member {u.name}.{member} must be a struct")
+                sema_die(("sum member " + ((u.name + ".") + member)) + " must name a type declared with { ... }")
             }
         }
     }
@@ -769,7 +776,7 @@ fun sema_build_funcs(st: SemaState, program: AstProgram): void {
                 sema_die("method metadata is incomplete")
             }
             if sema_struct_index(st, f.receiver_type) < 0 {
-                sema_die(f"method receiver must be a user-defined struct, got {f.receiver_type}")
+                sema_die("method receiver must name a type declared with { ... }, got " + f.receiver_type)
             }
         }
         if sema_is_reserved_func(f.name) {
@@ -967,7 +974,7 @@ fun sema_expr_type(st: SemaState, node: AstExpr): str {
         }
         AstStructInit n: {
             if sema_struct_index(st, n.name) < 0 {
-                sema_die(f"unknown struct {n.name}")
+                sema_die(f"unknown type {n.name}")
             }
             let seen = new str[]
             for i: 0:len(n.fields) {
@@ -983,11 +990,11 @@ fun sema_expr_type(st: SemaState, node: AstExpr): str {
         }
         AstUnionInit n: {
             if sema_union_index(st, n.type_name) < 0 {
-                sema_die(f"unknown union {n.type_name}")
+                sema_die(f"unknown type {n.type_name}")
             }
             let payload_type = sema_expr_type(st, n.expr)
             if sema_struct_index(st, payload_type) < 0 {
-                sema_die(f"new {n.type_name}(...) expected struct payload, got {payload_type}")
+                sema_die((("new " + n.type_name) + "(...) requires a value whose type is declared with { ... }, got ") + payload_type)
             }
             if sema_union_member_index(st, n.type_name, payload_type) < 0 {
                 sema_die(f"new {n.type_name}(...) expected one of {sema_union_members_text(st, n.type_name)}, got {payload_type}")
@@ -1038,7 +1045,7 @@ fun sema_dot_call_type(st: SemaState, node: AstDotCall): str {
         sema_check_func_call_args(st, method_symbol, args)
         ret st.funcs[method_index].meta.resolved_type
     }
-    sema_die("method calls are only supported for arrays and user structs")
+    sema_die("method calls are only supported for arrays and types declared with { ... }")
     ret ""
 }
 
@@ -1330,9 +1337,9 @@ fun sema_stmt(st: SemaState, node: AstStmt): void {
                 let seen = new str[]
                 for i: 0:len(n.fields) {
                     let c = n.fields[i]
-                    if c.has_expr { sema_die(f"ADT match on {scrutinee} requires variant binding cases") }
+                    if c.has_expr { sema_die(f"match on sum type {scrutinee} requires variant binding cases") }
                     if c.variant_name? == false || c.binding_name? == false {
-                        sema_die(f"ADT match on {scrutinee} requires variant binding cases")
+                        sema_die(f"match on sum type {scrutinee} requires variant binding cases")
                     }
                     if sema_union_member_index(st, scrutinee, c.variant_name) < 0 {
                         sema_die(f"{c.variant_name} is not a member of {scrutinee}")
@@ -1361,7 +1368,7 @@ fun sema_stmt(st: SemaState, node: AstStmt): void {
             for i: 0:len(n.fields) {
                 let c = n.fields[i]
                 if c.variant_name? || c.binding_name? {
-                    sema_die("ADT match case requires union scrutinee")
+                    sema_die("match case requires a sum type")
                 }
                 sema_check_assign(st, scrutinee, c.expr, "match pattern")
                 sema_block(st, c.body)
