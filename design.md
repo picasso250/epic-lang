@@ -1,4 +1,4 @@
-# Epic v0 language design
+# Epic v1 bootstrap language design
 
 ## Core direction
 
@@ -10,8 +10,8 @@
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
 - Memory is not freed in v0; process exit is the reclamation boundary.
-- v0 is a non-self-hosted Python stage-0. Its sole bootstrap responsibility is compiling an Epic v1 compiler written in the v0 subset.
-- v0 does not preserve forward compatibility.
+- The Epic v1 compiler is self-hosted, but its source deliberately stays within the v0 language subset documented here.
+- v1 does not preserve forward compatibility.
 
 **Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v1 fixed point.
 
@@ -26,14 +26,14 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-python epic.py --main main.ep main.ep lib.ep
+build\epic-v1.exe main.ep lib.ep
 ```
 
 This is whole-program source merging, not a module system.
 
 All top-level product types and functions from input files are merged into one global namespace. Duplicate type or function names are rejected.
 
-When more than one input file is provided, `--main` is required. Only the `main` function from the selected main file is used; `main` functions in non-main files are ignored.
+The first input is the main file. Only its `main` function is used; `main` functions in later files are ignored.
 
 ## Future modules
 
@@ -122,7 +122,7 @@ type Token {
 
 `new Token` allocates a zero-initialized object and returns a `Token` value at the language level. Product values have reference semantics in v0.
 
-`struct` is not a keyword. `type Name = A | B` payload sums and unit sums are reserved for v1 and rejected by v0.
+`struct` is not a keyword. `type Name = A | B` payload sums and unit sums are outside the bootstrap subset. v1 may implement them for client programs without using them in its own source.
 
 Field access uses `obj.field`. Field assignment uses `obj.field = value`.
 

@@ -2,5 +2,7 @@
 - 新 feature / bug fix / refactor 完成之后，git 提交 并 push。
 - 马斯克五步工作法。（第一步：质疑需求；第二步：删掉所有可能的部件；第三步：简化与优化；第四步：加速周转；第五步：自动化）
 - v0 是非自举的 Python stage-0，只负责编译使用 v0 子集编写的 Epic v1。
-- 不在 v0 维护 Epic 编译器实现，也不要求 v0 fixed point；第一次 fixed point 发生在 v0 -> v1。
+- v1 自身只使用 v0 子集并继续输出 NASM；它可以实现新语言能力，但当代源码不 dogfood。
+- Python compiler 只存在于临时 v0 worktree；v1 仓库只保留过渡期仍需的 Python linker。
+- 第一次 fixed point 发生在 v0 -> v1。
 - 新语言特性由第 N 代实现，第 N+1 代编译器源码才 dogfood，禁止为当代 dogfood 向 seed 倒灌特性。

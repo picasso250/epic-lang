@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""
-Epic v0 test runner.
-Scans examples/*.ep, reads # EXIT: and # STDOUT: annotations,
-compiles, runs, and reports pass/fail.
-"""
+"""Compile and run the Epic v1 examples and end-to-end tests."""
 
-import os, sys, subprocess, re, shlex, argparse
+import os, sys, subprocess, re, shlex
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EPICC = os.path.join(SCRIPT_DIR, "epic.py")
+EPICC = os.path.join(SCRIPT_DIR, "build", "epic-v1.exe")
 EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
 E2E_PASS_DIR = os.path.join(SCRIPT_DIR, "tests", "e2e", "pass")
 EXEC_TIMEOUT = 1  # seconds, prevent link.py bugs from hanging
@@ -49,7 +45,7 @@ def clean_test_paths(paths):
             os.remove(path)
 
 
-def run_test(ep_file, linker="lld-link"):
+def run_test(ep_file):
     """Compile and run a single .ep file, return (pass, detail)."""
     with open(ep_file, "r", encoding="utf-8") as f:
         source = f.read()
@@ -64,15 +60,16 @@ def run_test(ep_file, linker="lld-link"):
         return False, str(e)
     
     # Compile
+    rel = os.path.relpath(ep_file, SCRIPT_DIR)
     result = subprocess.run(
-        [sys.executable, EPICC, ep_file, "--linker", linker],
+        [EPICC, rel],
         capture_output=True, text=True, cwd=SCRIPT_DIR, timeout=30,
     )
     if result.returncode != 0:
         return False, f"compile failed:\n{result.stderr[:500]}"
     
-    rel = os.path.relpath(ep_file, SCRIPT_DIR)
-    exe_path = os.path.join(SCRIPT_DIR, "build", os.path.splitext(rel)[0] + ".exe")
+    safe = rel.replace("/", "_").replace("\\", "_")
+    exe_path = os.path.join(SCRIPT_DIR, "build", "epic", safe + ".exe")
     if not os.path.exists(exe_path):
         return False, f"no exe produced: {exe_path}"
 
@@ -107,7 +104,7 @@ def run_test(ep_file, linker="lld-link"):
     return True, "OK"
 
 
-def run_all(linker):
+def run_all():
     cases = []
     for suite, directory in (("examples", EXAMPLES_DIR), ("e2e", E2E_PASS_DIR)):
         if not os.path.isdir(directory):
@@ -125,7 +122,7 @@ def run_all(linker):
     print(f"Running {len(cases)} tests...\n")
     for suite, ep_name, ep_path in cases:
         try:
-            ok, detail = run_test(ep_path, linker=linker)
+            ok, detail = run_test(ep_path)
         except subprocess.TimeoutExpired:
             ok, detail = False, "TIMEOUT (compile >30s)"
         except Exception as e:
@@ -146,18 +143,13 @@ def run_all(linker):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Epic test runner")
-    parser.add_argument("--linker", choices=["lld", "py"], default="py",
-                        help="Which linker to use (default: py)")
-    args = parser.parse_args()
+    if not os.path.isfile(EPICC):
+        print("Missing build/epic-v1.exe; run python build_epic_v1.py first", file=sys.stderr)
+        return 1
+    _, failed, _ = run_all()
 
-    if args.linker == "lld":
-        _, failed, _ = run_all("lld-link")
-    else:
-        _, failed, _ = run_all("py")
-
-    sys.exit(0 if failed == 0 else 1)
+    return 0 if failed == 0 else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

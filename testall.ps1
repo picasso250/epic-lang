@@ -3,6 +3,12 @@ $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $root
 try {
+    Write-Host "=== build_epic_v1.py ==="
+    python build_epic_v1.py
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     $tests = @(Get-ChildItem -File -Filter "test_*.py" | Sort-Object Name)
     $failed = @()
 
@@ -18,7 +24,7 @@ try {
     }
 
     Write-Host "=== runtests.py ==="
-    python runtests.py --linker py
+    python runtests.py
     if ($LASTEXITCODE -ne 0) {
         $failed += "runtests.py"
         Write-Host "FAILED runtests.py exit=$LASTEXITCODE"
@@ -31,7 +37,7 @@ try {
         exit 1
     }
 
-    Write-Host "All stage-0 tests passed."
+    Write-Host "All v1 tests passed."
 } finally {
     Pop-Location
 }
