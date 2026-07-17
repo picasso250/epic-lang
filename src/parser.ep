@@ -102,12 +102,6 @@ fun make_parser(tokens: Token[]): Parser {
     p.loop_depth = 0
     return p
 }
-fun same(a: str, b: str): i64 {
-    if a == b {
-        return 1
-    }
-    return 0
-}
 fun peek(p: Parser): Token {
     if p.pos < p.tokens.len {
         return p.tokens.data[p.pos]
@@ -116,7 +110,7 @@ fun peek(p: Parser): Token {
 }
 fun peek_kind(p: Parser, kind: str): i64 {
     let t = peek(p)
-    if same(t.kind, kind) == 1 {
+    if t.kind == kind {
         return 1
     }
     return 0
@@ -137,7 +131,7 @@ fun parse_error(line: i64, msg: str): i64 {
 }
 fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
-    if same(t.kind, kind) == 0 {
+    if t.kind != kind {
         putstr("Parse error line ")
         putstr(itoa(t.line))
         putstr(": Expected ")
@@ -175,7 +169,7 @@ fun expect_stmt_end(p: Parser): i64 {
 }
 fun parse_type(p: Parser): str {
     let t = advance(p)
-    if same(t.kind, "ID") == 0 {
+    if t.kind != "ID" {
         parse_error(t.line, "Expected type")
     }
     let typ = t.text
@@ -282,9 +276,9 @@ fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     i = i + 1
     while i < p.tokens.len && depth > 0 {
         let kind = p.tokens.data[i].kind
-        if same(kind, "LBRACKET") == 1 {
+        if kind == "LBRACKET" {
             depth = depth + 1
-        } else if same(kind, "RBRACKET") == 1 {
+        } else if kind == "RBRACKET" {
             depth = depth - 1
         }
         i = i + 1
@@ -298,15 +292,15 @@ fun is_assignment(p: Parser): i64 {
     let i = p.pos + 1
     while i < p.tokens.len {
         let kind = p.tokens.data[i].kind
-        if same(kind, "DOT") == 1 {
-            if i + 1 >= p.tokens.len || same(p.tokens.data[i + 1].kind, "ID") == 0 {
+        if kind == "DOT" {
+            if i + 1 >= p.tokens.len || p.tokens.data[i + 1].kind != "ID" {
                 return 0
             }
             i = i + 2
-        } else if same(kind, "LBRACKET") == 1 {
+        } else if kind == "LBRACKET" {
             i = skip_balanced_brackets(p, i)
         } else {
-            if same(kind, "ASSIGN") == 1 {
+            if kind == "ASSIGN" {
                 return 1
             }
             return 0
@@ -365,20 +359,20 @@ fun parse_assign_stmt(p: Parser): AstStmt {
     expect(p, "ASSIGN")
     let value = parse_expr(p)
     expect_stmt_end(p)
-    if same(lhs.kind, "Var") == 1 {
+    if lhs.kind == "Var" {
         let node = ast_stmt("Assign")
         node.name = lhs.name
         node.value_expr = value
         return node
     }
-    if same(lhs.kind, "FieldAccess") == 1 {
+    if lhs.kind == "FieldAccess" {
         let node = ast_stmt("FieldSet")
         node.object = lhs.object
         node.name = lhs.name
         node.value_expr = value
         return node
     }
-    if same(lhs.kind, "Subscript") == 1 {
+    if lhs.kind == "Subscript" {
         let node = ast_stmt("SubscriptAssign")
         node.base = lhs.base
         node.index = lhs.index
@@ -441,47 +435,47 @@ fun parse_expr_stmt(p: Parser): AstStmt {
     return node
 }
 fun is_expr_first(kind: str): i64 {
-    if same(kind, "NUMBER") == 1 {
+    if kind == "NUMBER" {
         return 1
     }
-    if same(kind, "CHAR") == 1 {
+    if kind == "CHAR" {
         return 1
     }
-    if same(kind, "STRING") == 1 {
+    if kind == "STRING" {
         return 1
     }
-    if same(kind, "ID") == 1 {
+    if kind == "ID" {
         return 1
     }
-    if same(kind, "NEW") == 1 {
+    if kind == "NEW" {
         return 1
     }
-    if same(kind, "LPAREN") == 1 {
+    if kind == "LPAREN" {
         return 1
     }
     return 0
 }
 fun parse_stmt(p: Parser): AstStmt {
     let t = peek(p)
-    if same(t.kind, "RETURN") == 1 {
+    if t.kind == "RETURN" {
         return parse_return_stmt(p)
     }
-    if same(t.kind, "LET") == 1 {
+    if t.kind == "LET" {
         return parse_let_stmt(p)
     }
-    if same(t.kind, "IF") == 1 {
+    if t.kind == "IF" {
         return parse_if_stmt(p)
     }
-    if same(t.kind, "WHILE") == 1 {
+    if t.kind == "WHILE" {
         return parse_while_stmt(p)
     }
-    if same(t.kind, "BREAK") == 1 {
+    if t.kind == "BREAK" {
         return parse_break_stmt(p)
     }
-    if same(t.kind, "CONTINUE") == 1 {
+    if t.kind == "CONTINUE" {
         return parse_continue_stmt(p)
     }
-    if same(t.kind, "ID") == 1 {
+    if t.kind == "ID" {
         if is_assignment(p) == 1 {
             return parse_assign_stmt(p)
         }
@@ -493,55 +487,55 @@ fun parse_stmt(p: Parser): AstStmt {
     return ast_stmt("")
 }
 fun op_text(kind: str): str {
-    if same(kind, "PLUS") == 1 {
+    if kind == "PLUS" {
         return "+"
     }
-    if same(kind, "MINUS") == 1 {
+    if kind == "MINUS" {
         return "-"
     }
-    if same(kind, "STAR") == 1 {
+    if kind == "STAR" {
         return "*"
     }
-    if same(kind, "SLASH") == 1 {
+    if kind == "SLASH" {
         return "/"
     }
-    if same(kind, "PERCENT") == 1 {
+    if kind == "PERCENT" {
         return "%"
     }
-    if same(kind, "EQEQ") == 1 {
+    if kind == "EQEQ" {
         return "=="
     }
-    if same(kind, "NEQ") == 1 {
+    if kind == "NEQ" {
         return "!="
     }
-    if same(kind, "LT") == 1 {
+    if kind == "LT" {
         return "<"
     }
-    if same(kind, "GT") == 1 {
+    if kind == "GT" {
         return ">"
     }
-    if same(kind, "LTE") == 1 {
+    if kind == "LTE" {
         return "<="
     }
-    if same(kind, "GTE") == 1 {
+    if kind == "GTE" {
         return ">="
     }
-    if same(kind, "AND") == 1 {
+    if kind == "AND" {
         return "&&"
     }
-    if same(kind, "OR") == 1 {
+    if kind == "OR" {
         return "||"
     }
-    if same(kind, "BIT_OR") == 1 {
+    if kind == "BIT_OR" {
         return "|"
     }
-    if same(kind, "AMPERSAND") == 1 {
+    if kind == "AMPERSAND" {
         return "&"
     }
-    if same(kind, "SHL") == 1 {
+    if kind == "SHL" {
         return "<<"
     }
-    if same(kind, "SHR") == 1 {
+    if kind == "SHR" {
         return ">>"
     }
     return ""
