@@ -1,17 +1,14 @@
-# Epic v2
+# Epic v3
 
-Epic v2 starts from the completed v1 self-hosted compiler. Its source remains
-in the v0 language subset and retains v1's internal AMD64 assembler and
-deterministic PE writer. v2 adds conservative garbage collection, semantic
-analysis, integer compound assignment, nominal unit enums, and statement-only
-enum matching. Its final language surface also includes snapshot-bound integer
-range loops and integer unary `-` / `!`, without changing the stage-0 or v1
-milestones.
+Epic v3 starts from the sealed v2 compiler and dogfoods the language surface
+implemented there: unary operators, compound assignment, integer range loops,
+nominal unit enums, and statement-only matching. It retains the self-contained
+AMD64 assembler, deterministic PE writer, and conservative garbage collector.
 
 The bootstrap chain is:
 
 ```text
-Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v2 fixed point
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v3 fixed point
 ```
 
 ## Build
@@ -20,13 +17,13 @@ Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v2 fixed point
 python build_epic.py
 ```
 
-The script resolves the current local `v1` branch to an exact commit. It reuses
-`build/epic-v1-<hash>.exe` when present; otherwise it creates a detached v1
-worktree and calls that generation's `build_epic.py`. The resulting v1 compiler
-then compiles the current v2 working tree.
+The script resolves the current local `v2` branch to an exact commit. It reuses
+`build/epic-v2-<hash>.exe` when present; otherwise it creates a detached v2
+worktree and calls that generation's `build_epic.py`. The resulting v2 compiler
+then compiles the current v3 working tree.
 
-The default output is `build/epic-v2.exe`. Pass `-o PATH` to copy only the
-final v2 executable elsewhere; relative paths are resolved from the calling
+The default output is `build/epic-v3.exe`. Pass `-o PATH` to copy only the
+final v3 executable elsewhere; relative paths are resolved from the calling
 working directory.
 
 ## Documentation
@@ -41,7 +38,7 @@ Verify the self-hosted fixed point:
 python bootstrap_fixed_point.py
 ```
 
-The v1-built v2 seed compiles generation 1, then generation 1 compiles
+The v2-built v3 seed compiles generation 1, then generation 1 compiles
 generation 2. The check succeeds only when generations 1 and 2 are
 byte-identical.
 

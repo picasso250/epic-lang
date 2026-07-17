@@ -1,4 +1,4 @@
-# Epic v2 language reference
+# Epic v3 language reference
 
 ## Core direction
 
@@ -9,11 +9,11 @@
 - `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
-- v2 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
-- The Epic v2 compiler is self-hosted and begins with the v1 language surface.
-- v2 does not preserve forward compatibility.
+- v3 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
+- The Epic v3 compiler is self-hosted and begins with the v2 language surface.
+- v3 does not preserve forward compatibility.
 
-**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v2 fixed point.
+**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v3 fixed point.
 
 ## Program model
 
@@ -27,7 +27,7 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-build\epic-v2.exe [-S] [-o path] main.ep lib.ep
+build\epic-v3.exe [-S] [-o path] main.ep lib.ep
 ```
 
 Normal compilation assembles in memory and writes only the executable. `-S`
@@ -128,7 +128,7 @@ fun add(a: i64, b: i64): i64 {
 
 `void` functions may use `return` or fall off the end. `return expr` is invalid
 in a `void` function. A non-`void` function must return a compatible value on
-every path. The v2 analysis recognizes explicit `return` and `if/else` where
+every path. The v3 analysis recognizes explicit `return` and `if/else` where
 both branches must return, and exhaustive `match` statements where every arm
 returns; a `while` loop never proves a return.
 
@@ -185,7 +185,7 @@ such as `for i: -3:2`.
 The iterator is an implicit, read-only `i64` local visible only in the loop
 body. It cannot be assigned or used as a compound-assignment target. `continue`
 advances the iterator before the next condition check, while `break` exits the
-nearest `while` or `for`. v2 has no range step, automatic reverse iteration,
+nearest `while` or `for`. v3 has no range step, automatic reverse iteration,
 or `len(x)` builtin; strings and arrays expose `.len`.
 
 ## Product types
@@ -242,7 +242,7 @@ must appear exactly once. With `else`, explicit arms may cover a strict subset;
 an `else` after all members is rejected as unreachable and must be the final
 arm. Arms execute in source order and each arm body is a lexical block.
 
-v2 has statement-only matching: there are no match expressions, payloads,
+v3 has statement-only matching: there are no match expressions, payloads,
 guards, fallthrough, explicit discriminants, or enum-to-integer conversions.
 Declaration order determines the current internal values starting at zero,
 but those values are not source-visible or a stable ABI.
@@ -272,7 +272,7 @@ is a statement and does not produce a value.
 Unary `-` negates an `i64`. Logical `!` also requires `i64`, producing `1` for
 zero and `0` for every nonzero value. Unary operators bind more tightly than
 `*`, `/`, and `%` and may be chained, as in `--x` or `!!x`. Epic does not have
-unary `+` or bitwise `~` in v2.
+unary `+` or bitwise `~` in v3.
 
 The lexer accepts only non-negative integer literal magnitudes through
 `9223372036854775807`. The minimum `i64` is therefore written as

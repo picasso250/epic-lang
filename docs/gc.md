@@ -1,6 +1,6 @@
 # Garbage collector
 
-Epic v2 uses a single-threaded, conservative, non-moving mark-and-sweep
+Epic v3 uses a single-threaded, conservative, non-moving mark-and-sweep
 collector. It is an internal runtime facility: the language has no manual
 `gc()` builtin, finalizers, weak references, or collection diagnostics.
 
