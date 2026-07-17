@@ -14,6 +14,8 @@ import tempfile
 import time
 import uuid
 
+from process_metrics import format_peak_working_set, run_measured
+
 
 ROOT = Path(__file__).resolve().parent
 BUILD_DIR = ROOT / "build"
@@ -124,7 +126,7 @@ def main() -> int:
     start = time.perf_counter()
     seed = v1_seed_commit()
     compiler = ensure_v1_seed(seed)
-    run([str(compiler), *SOURCE_PATHS])
+    compile_metrics = run_measured([str(compiler), *SOURCE_PATHS], cwd=ROOT)
     if not SELF_OUTPUT.is_file():
         raise RuntimeError(f"v1 did not produce the expected v2 compiler: {SELF_OUTPUT}")
     if SELF_OUTPUT.resolve() != output.resolve():
@@ -134,6 +136,10 @@ def main() -> int:
     print(f"built: {output}")
     print(f"size: {output.stat().st_size} bytes")
     print(f"sha256: {sha256(output)}")
+    print(
+        f"compiler: {compile_metrics.elapsed_seconds:.3f} s, "
+        f"peak memory: {format_peak_working_set(compile_metrics.peak_working_set_bytes)}"
+    )
     print(f"elapsed: {elapsed:.3f} s")
     return 0
 
