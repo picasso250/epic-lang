@@ -369,11 +369,11 @@ fun parse_assign_stmt(p: Parser): AstStmt {
             n.name = field.text
             lhs = n
         } else if check(p, "LBRACKET") == 1 {
-            let n = ast_expr("Subscript", lhs.line)
-            n.base = lhs
-            n.index = parse_expr(p)
+            let subscript = ast_expr("Subscript", lhs.line)
+            subscript.base = lhs
+            subscript.index = parse_expr(p)
             expect(p, "RBRACKET")
-            lhs = n
+            lhs = subscript
         } else {
             done = 1
         }
@@ -388,18 +388,18 @@ fun parse_assign_stmt(p: Parser): AstStmt {
         return node
     }
     if lhs.kind == "FieldAccess" {
-        let node = ast_stmt("FieldSet", name.line)
-        node.object = lhs.object
-        node.name = lhs.name
-        node.value_expr = value
-        return node
+        let field_set = ast_stmt("FieldSet", name.line)
+        field_set.object = lhs.object
+        field_set.name = lhs.name
+        field_set.value_expr = value
+        return field_set
     }
     if lhs.kind == "Subscript" {
-        let node = ast_stmt("SubscriptAssign", name.line)
-        node.base = lhs.base
-        node.index = lhs.index
-        node.value_expr = value
-        return node
+        let subscript_set = ast_stmt("SubscriptAssign", name.line)
+        subscript_set.base = lhs.base
+        subscript_set.index = lhs.index
+        subscript_set.value_expr = value
+        return subscript_set
     }
     parse_error(name.line, "Invalid assignment target")
     return ast_stmt("", name.line)
@@ -591,17 +591,17 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
                 expect(p, "RPAREN")
                 current = n
             } else {
-                let n = ast_expr("FieldAccess", field.line)
-                n.object = current
-                n.name = field.text
-                current = n
+                let field_access = ast_expr("FieldAccess", field.line)
+                field_access.object = current
+                field_access.name = field.text
+                current = field_access
             }
         } else if check(p, "LBRACKET") == 1 {
-            let n = ast_expr("Subscript", current.line)
-            n.base = current
-            n.index = parse_expr(p)
+            let subscript = ast_expr("Subscript", current.line)
+            subscript.base = current
+            subscript.index = parse_expr(p)
             expect(p, "RBRACKET")
-            current = n
+            current = subscript
         } else {
             done = 1
         }
@@ -659,34 +659,34 @@ fun parse_primary(p: Parser): AstExpr {
             expect(p, "RBRACKET")
             return n
         }
-        let n = ast_expr("New", keyword.line)
-        n.name = t.text
-        return n
+        let new_object = ast_expr("New", keyword.line)
+        new_object.name = t.text
+        return new_object
     }
     if peek_kind(p, "NUMBER") == 1 {
-        let t = advance(p)
-        let n = ast_expr("Literal", t.line)
-        n.value = t.text
-        return n
+        let number = advance(p)
+        let literal = ast_expr("Literal", number.line)
+        literal.value = number.text
+        return literal
     }
     if peek_kind(p, "CHAR") == 1 {
-        let t = advance(p)
-        let n = ast_expr("Literal", t.line)
-        n.value = t.text
-        return n
+        let character = advance(p)
+        let char_literal = ast_expr("Literal", character.line)
+        char_literal.value = character.text
+        return char_literal
     }
     if peek_kind(p, "STRING") == 1 {
-        let t = advance(p)
-        let n = ast_expr("String", t.line)
-        n.value = t.text
-        return n
+        let string_token = advance(p)
+        let string_literal = ast_expr("String", string_token.line)
+        string_literal.value = string_token.text
+        return string_literal
     }
     if peek_kind(p, "ID") == 1 {
-        let t = advance(p)
-        let node = ast_expr("Var", t.line)
-        node.name = t.text
+        let identifier = advance(p)
+        let node = ast_expr("Var", identifier.line)
+        node.name = identifier.text
         if check(p, "LPAREN") == 1 {
-            if t.text == "embed" {
+            if identifier.text == "embed" {
                 let path = expect(p, "STRING")
                 expect(p, "RPAREN")
                 node.kind = "Embed"
@@ -698,7 +698,7 @@ fun parse_primary(p: Parser): AstExpr {
             node.args = parse_args(p)
             expect(p, "RPAREN")
             if node.args.len > 4 {
-                parse_error(t.line, "function calls may have at most 4 arguments in v0")
+                parse_error(identifier.line, "function calls may have at most 4 arguments in v0")
             }
             return parse_postfix(p, node)
         }
@@ -709,8 +709,8 @@ fun parse_primary(p: Parser): AstExpr {
         expect(p, "RPAREN")
         return expr
     }
-    let t = peek(p)
-    parse_error(t.line, "Unexpected token in expression")
+    let unexpected = peek(p)
+    parse_error(unexpected.line, "Unexpected token in expression")
     return ast_expr_empty()
 }
 fun bin_node(op: Token, left: AstExpr, right: AstExpr): AstExpr {

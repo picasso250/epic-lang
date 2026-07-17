@@ -1,0 +1,4 @@
+# ERROR: argument 1 of 'itoa' expects i64, got str
+fun main(): void {
+    itoa("wrong")
+}

@@ -25,13 +25,13 @@ fun main(): void {
         i = i + 1
     }
 
-    let node = kept.data[0]
+    let cursor = kept.data[0]
     i = 0
     while i < 256 {
-        if node.value != i {
+        if cursor.value != i {
             os.ExitProcess(1)
         }
-        node = node.next
+        cursor = cursor.next
         i = i + 1
     }
     os.ExitProcess(0)

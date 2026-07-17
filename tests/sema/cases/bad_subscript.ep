@@ -1,0 +1,5 @@
+# ERROR: type i64 is not subscriptable
+fun main(): void {
+    let number = 1
+    let value = number[0]
+}

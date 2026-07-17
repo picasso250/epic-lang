@@ -221,10 +221,10 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
     }
     i = 0
     while i < dlls.len {
-        let group = dlls.data[i]
-        let j = 0
-        while j < group.items.len {
-            let item = group.items.data[j]
+        let names_group = dlls.data[i]
+        let names_j = 0
+        while names_j < names_group.items.len {
+            let item = names_group.items.data[names_j]
             item.hint_offset = out.len
             pe_u16(out, 0)
             pe_append_str(out, item.name)
@@ -232,25 +232,25 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
             if (out.len & 1) != 0 {
                 pe_byte(out, 0)
             }
-            j = j + 1
+            names_j = names_j + 1
         }
-        group.name_offset = out.len
-        pe_append_str(out, group.name)
+        names_group.name_offset = out.len
+        pe_append_str(out, names_group.name)
         pe_byte(out, 0)
         i = i + 1
     }
     i = 0
     while i < dlls.len {
-        let group = dlls.data[i]
-        pe_patch_u32(out, i * 20, rva + group.ilt_offset)
-        pe_patch_u32(out, i * 20 + 12, rva + group.name_offset)
-        pe_patch_u32(out, i * 20 + 16, rva + group.iat_offset)
-        let j = 0
-        while j < group.items.len {
-            let hint_rva = rva + group.items.data[j].hint_offset
-            pe_patch_u64(out, group.ilt_offset + j * 8, hint_rva)
-            pe_patch_u64(out, group.iat_offset + j * 8, hint_rva)
-            j = j + 1
+        let patch_group = dlls.data[i]
+        pe_patch_u32(out, i * 20, rva + patch_group.ilt_offset)
+        pe_patch_u32(out, i * 20 + 12, rva + patch_group.name_offset)
+        pe_patch_u32(out, i * 20 + 16, rva + patch_group.iat_offset)
+        let patch_j = 0
+        while patch_j < patch_group.items.len {
+            let hint_rva = rva + patch_group.items.data[patch_j].hint_offset
+            pe_patch_u64(out, patch_group.ilt_offset + patch_j * 8, hint_rva)
+            pe_patch_u64(out, patch_group.iat_offset + patch_j * 8, hint_rva)
+            patch_j = patch_j + 1
         }
         i = i + 1
     }

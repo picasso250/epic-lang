@@ -1,0 +1,6 @@
+# ERROR: if condition requires i64, got str
+fun main(): void {
+    if "yes" {
+        return
+    }
+}

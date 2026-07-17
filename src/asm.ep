@@ -558,25 +558,25 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         return 0
     }
     if dst.kind == 3 && src.kind == 1 {
-        let opcode = 137
+        let store_opcode = 137
         if width == 8 {
-            opcode = 136
+            store_opcode = 136
         }
         let base = dst.base
         let index = dst.index
         asm_rex(image, asm_rex_bits(width, src.reg, index, base), asm_force_rex8(src))
-        asm_byte(image, opcode)
+        asm_byte(image, store_opcode)
         asm_emit_rm(image, src.reg, dst)
         return 0
     }
     if dst.kind == 3 && src.kind == 2 {
-        let opcode = 199
+        let immediate_opcode = 199
         if width == 8 {
-            opcode = 198
+            immediate_opcode = 198
         }
         let reloc_count = image.relocs.len
         dst.width = width
-        asm_emit_opcode_rm(image, opcode, 0, dst)
+        asm_emit_opcode_rm(image, immediate_opcode, 0, dst)
         if image.relocs.len > reloc_count {
             let reloc = image.relocs.data[reloc_count]
             if width == 8 {
@@ -904,27 +904,27 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
         return 0
     }
     if (name == "inc" || name == "dec") && count == 1 {
-        let ext = 0
+        let inc_ext = 0
         if name == "dec" {
-            ext = 1
+            inc_ext = 1
         }
         let width = a.width
         if width == 0 {
             width = 64
         }
         a.width = width
-        asm_emit_group(image, 255, ext, a)
+        asm_emit_group(image, 255, inc_ext, a)
         return 0
     }
     if (name == "div" || name == "idiv" || name == "neg") && count == 1 {
-        let ext = 6
+        let unary_ext = 6
         if name == "idiv" {
-            ext = 7
+            unary_ext = 7
         }
         if name == "neg" {
-            ext = 3
+            unary_ext = 3
         }
-        asm_emit_group(image, 247, ext, a)
+        asm_emit_group(image, 247, unary_ext, a)
         return 0
     }
     if (name == "push" || name == "pop") && count == 1 && a.kind == 1 {
@@ -1028,20 +1028,20 @@ fun asm_parse_data(image: ExeImage, line: str): i64 {
         }
         return 1
     }
-    let width = 0
+    let data_width = 0
     if name == "db" {
-        width = 1
+        data_width = 1
     }
     else if name == "dd" {
-        width = 4
+        data_width = 4
     }
     else if name == "dq" {
-        width = 8
+        data_width = 8
     }
-    if width == 0 {
+    if data_width == 0 {
         return 0
     }
-    asm_emit_data_list(image, width, args)
+    asm_emit_data_list(image, data_width, args)
     return 1
 }
 fun asm_parse_inst_line(image: ExeImage, line: str): i64 {

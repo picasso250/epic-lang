@@ -123,7 +123,7 @@ fun lex(src: str): Token[] {
         }
         # ── string literal ──
         if consumed == 0 && ch == 34 {
-            let start_line = line
+            let string_line = line
             pos = pos + 1
             let buf = new u8[n - pos + 1]
             let out_len = 0
@@ -174,30 +174,30 @@ fun lex(src: str): Token[] {
             }
             let text = str_new(buf.data, out_len)
             pos = pos + 1
-            push_token(tokens, "STRING", text, start_line)
+            push_token(tokens, "STRING", text, string_line)
             consumed = 1
         }
         # ── char literal ──
         if consumed == 0 && ch == 39 {
-            let start_line = line
+            let char_line = line
             pos = pos + 1
             let ch_val = p[pos]
             if ch_val == 92 {
                 pos = pos + 1
-                let e = p[pos]
-                if e == 110 {
+                let char_escape = p[pos]
+                if char_escape == 110 {
                     ch_val = 10
-                } else if e == 114 {
+                } else if char_escape == 114 {
                     ch_val = 13
-                } else if e == 116 {
+                } else if char_escape == 116 {
                     ch_val = 9
-                } else if e == 92 {
+                } else if char_escape == 92 {
                     ch_val = 92
-                } else if e == 34 {
+                } else if char_escape == 34 {
                     ch_val = 34
-                } else if e == 39 {
+                } else if char_escape == 39 {
                     ch_val = 39
-                } else if e == 48 {
+                } else if char_escape == 48 {
                     ch_val = 0
                 } else {
                     print("bad escape\n")
@@ -210,13 +210,13 @@ fun lex(src: str): Token[] {
                 os.ExitProcess(1)
             }
             pos = pos + 1
-            push_token(tokens, "CHAR", itoa(ch_val), start_line)
+            push_token(tokens, "CHAR", itoa(ch_val), char_line)
             consumed = 1
         }
         # ── number ──
         if consumed == 0 && is_digit(ch) == 1 {
-            let start_line = line
-            let start = pos
+            let number_line = line
+            let number_start = pos
             let hex = 0
             if ch == 48 && pos + 1 < n && (p[pos + 1] == 120 || p[pos + 1] == 88) {
                 hex = 1
@@ -234,51 +234,51 @@ fun lex(src: str): Token[] {
                     pos = pos + 1
                 }
             }
-            let text = str_new(p + start, pos - start)
-            reject_large_literal(text, hex)
-            push_token(tokens, "NUMBER", text, start_line)
+            let number_text = str_new(p + number_start, pos - number_start)
+            reject_large_literal(number_text, hex)
+            push_token(tokens, "NUMBER", number_text, number_line)
             consumed = 1
         }
         # ── identifier / keyword ──
         if consumed == 0 && is_alpha(ch) == 1 {
-            let start_line = line
-            let start = pos
+            let identifier_line = line
+            let identifier_start = pos
             while pos < n && is_alnum(p[pos]) == 1 {
                 pos = pos + 1
             }
-            let text = str_new(p + start, pos - start)
+            let identifier_text = str_new(p + identifier_start, pos - identifier_start)
             let kind = "ID"
-            if text == "fun"    {
+            if identifier_text == "fun"    {
                 kind = "FUN"
             }
-            if text == "return" {
+            if identifier_text == "return" {
                 kind = "RETURN"
             }
-            if text == "if"     {
+            if identifier_text == "if"     {
                 kind = "IF"
             }
-            if text == "else"   {
+            if identifier_text == "else"   {
                 kind = "ELSE"
             }
-            if text == "while"  {
+            if identifier_text == "while"  {
                 kind = "WHILE"
             }
-            if text == "break"  {
+            if identifier_text == "break"  {
                 kind = "BREAK"
             }
-            if text == "continue" {
+            if identifier_text == "continue" {
                 kind = "CONTINUE"
             }
-            if text == "type" {
+            if identifier_text == "type" {
                 kind = "TYPE"
             }
-            if text == "new"    {
+            if identifier_text == "new"    {
                 kind = "NEW"
             }
-            if text == "let"    {
+            if identifier_text == "let"    {
                 kind = "LET"
             }
-            push_token(tokens, kind, text, start_line)
+            push_token(tokens, kind, identifier_text, identifier_line)
             consumed = 1
         }
         # ── multi-char operators ──

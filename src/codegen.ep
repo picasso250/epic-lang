@@ -926,9 +926,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         return 0
     }
     if name == "str_new" {
-        let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rcx", slots.data[0])
-        emit_stack_load(e, "rdx", slots.data[1])
+        let str_new_slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", str_new_slots.data[0])
+        emit_stack_load(e, "rdx", str_new_slots.data[1])
         emit_call_inst(e, "_str_alloc")
         return 0
     }
@@ -939,20 +939,20 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         return 0
     }
     if name == "str_slice" {
-        let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rcx", slots.data[0])
-        emit_stack_load(e, "rdx", slots.data[1])
-        emit_stack_load(e, "r8", slots.data[2])
+        let slice_slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", slice_slots.data[0])
+        emit_stack_load(e, "rdx", slice_slots.data[1])
+        emit_stack_load(e, "r8", slice_slots.data[2])
         emit_inst(e, "sub rsp, 32")
         emit_call_inst(e, "_str_slice")
         emit_inst(e, "add rsp, 32")
         return 0
     }
     if name == "str_replace_char" {
-        let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rcx", slots.data[0])
-        emit_stack_load(e, "rdx", slots.data[1])
-        emit_stack_load(e, "r8", slots.data[2])
+        let replace_slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", replace_slots.data[0])
+        emit_stack_load(e, "rdx", replace_slots.data[1])
+        emit_stack_load(e, "r8", replace_slots.data[2])
         emit_inst(e, "sub rsp, 32")
         emit_call_inst(e, "_str_replace_char")
         emit_inst(e, "add rsp, 32")
@@ -967,10 +967,10 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         return 0
     }
     if name == "write_file" {
-        let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rax", slots.data[0])
+        let write_slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rax", write_slots.data[0])
         emit_mov(e, "rcx", "[rax]")
-        emit_stack_load(e, "rax", slots.data[1])
+        emit_stack_load(e, "rax", write_slots.data[1])
         emit_mov(e, "rdx", "[rax]")
         emit_mov(e, "r8", "[rax+8]")
         emit_inst(e, "sub rsp, 8")
@@ -1056,15 +1056,15 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         return 0
     }
     if name == "extend" {
-        let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rcx", slots.data[0])
-        emit_stack_load(e, "rdx", slots.data[1])
+        let extend_slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", extend_slots.data[0])
+        emit_stack_load(e, "rdx", extend_slots.data[1])
         emit_call_inst(e, "_extend_u8")
         emit_inst(e, "xor eax, eax")
         return 0
     }
-    let slots = spill_args(e, expr.args)
-    load_spilled_args(e, slots)
+    let call_slots = spill_args(e, expr.args)
+    load_spilled_args(e, call_slots)
     emit_inst(e, "sub rsp, 32")
     emit_call_inst(e, name)
     emit_inst(e, "add rsp, 32")
@@ -1286,10 +1286,10 @@ fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64
                 emit_cond_jump(e, expr.left, 1, label)
                 emit_cond_jump(e, expr.right, 1, label)
             } else {
-                let skip = fresh_label(e)
-                emit_cond_jump(e, expr.left, 1, skip)
+                let or_skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, 1, or_skip)
                 emit_cond_jump(e, expr.right, 0, label)
-                emit_label_id(e, "L", skip)
+                emit_label_id(e, "L", or_skip)
             }
             return 0
         }
@@ -1409,8 +1409,8 @@ fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
         return 0
     }
     if expr.kind == "Embed" {
-        let id = get_string_id(e, expr.value)
-        emit_lea_ref_id(e, "rcx", "_str_", id)
+        let embed_id = get_string_id(e, expr.value)
+        emit_lea_ref_id(e, "rcx", "_str_", embed_id)
         emit_mov_i(e, "rdx", expr.value.len)
         emit_call_inst(e, "_embed_bytes")
         return 0

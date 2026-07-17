@@ -1,0 +1,4 @@
+# ERROR: operator - requires integer operands
+fun main(): void {
+    let value = "a" - "b"
+}

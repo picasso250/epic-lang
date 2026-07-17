@@ -1,0 +1,11 @@
+# ERROR: duplicate local 'value'
+fun main(): void {
+    if 1 {
+        let value = 1
+        print(itoa(value))
+    }
+    if 1 {
+        let value = 2
+        print(itoa(value))
+    }
+}
