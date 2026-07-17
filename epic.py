@@ -11,6 +11,7 @@ import argparse
 import os
 import subprocess
 import sys
+import time
 
 from codegen import Emitter
 from ast_nodes import ProgramNode
@@ -60,7 +61,6 @@ def _output_paths(input_path, out_dir):
 
 
 def _parse_file(input_path):
-    print(f"      Reading {input_path}")
     with open(input_path, "r", encoding="utf-8") as f:
         source = f.read()
     tokens = lex(source)
@@ -117,24 +117,28 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
     main_path = main_path or input_paths[0]
     asm_path, obj_path, exe_path = _output_paths(main_path, out_dir)
 
-    print(f"[1/4] Reading {len(input_paths)} file(s)")
+    total_start = time.perf_counter()
+    stage_start = total_start
     ast = _merge_programs(input_paths, main_path)
+    print(f"[1/4] Parsing {len(input_paths)} file(s) ({time.perf_counter() - stage_start:.3f} s)")
 
-    print(f"[2/4] Compiling → {asm_path}")
+    stage_start = time.perf_counter()
     emitter = Emitter(asm_path)
     emitter.emit_program(ast)
     _emit_runtime_helpers(emitter)
     emitter.close()
+    print(f"[2/4] Compiling → {asm_path} ({time.perf_counter() - stage_start:.3f} s)")
 
-    print(f"[3/4] Assembling → {obj_path}")
+    stage_start = time.perf_counter()
     result = subprocess.run(
         [NASM, "-f", "win64", asm_path, "-o", obj_path],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
         raise RuntimeError("NASM error:\n" + result.stderr[:500])
+    print(f"[3/4] Assembling → {obj_path} ({time.perf_counter() - stage_start:.3f} s)")
 
-    print(f"[4/4] Linking (via {linker}) → {exe_path}")
+    stage_start = time.perf_counter()
     if linker == "py":
         result = subprocess.run(
             [sys.executable, LINK_PY, obj_path, "-o", exe_path],
@@ -150,9 +154,10 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
         )
     if result.returncode != 0:
         raise RuntimeError("Link error:\n" + result.stderr[:500])
+    print(f"[4/4] Linking (via {linker}) → {exe_path} ({time.perf_counter() - stage_start:.3f} s)")
 
     size = os.path.getsize(exe_path)
-    print(f"  OK: {exe_path} ({size} bytes)")
+    print(f"  OK: {exe_path} ({size} bytes, total {time.perf_counter() - total_start:.3f} s)")
     return exe_path
 
 
