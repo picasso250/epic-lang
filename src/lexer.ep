@@ -1,13 +1,14 @@
 #
 # Epic v0 lexer — self-hosting bootstrap
 #
+type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | WHILE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
 type Token {
-    kind: str
+    kind: TokenKind
     text: str
     line: i64
 }
 # ── Token ───────────────────────────────────────────────────────────────
-fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
+fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): i64 {
     let t = new Token
     t.kind = kind
     t.text = text
@@ -106,7 +107,7 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if !consumed && ch == 10 {
-            push_token(tokens, "NEWLINE", "\n", line)
+            push_token(tokens, TokenKind.NEWLINE, "\n", line)
             pos += 1
             line += 1
             consumed = 1
@@ -172,7 +173,7 @@ fun lex(src: str): Token[] {
             }
             let text = str_new(buf.data, out_len)
             pos += 1
-            push_token(tokens, "STRING", text, string_line)
+            push_token(tokens, TokenKind.STRING, text, string_line)
             consumed = 1
         }
         # ── char literal ──
@@ -208,7 +209,7 @@ fun lex(src: str): Token[] {
                 os.ExitProcess(1)
             }
             pos += 1
-            push_token(tokens, "CHAR", itoa(ch_val), char_line)
+            push_token(tokens, TokenKind.CHAR, itoa(ch_val), char_line)
             consumed = 1
         }
         # ── number ──
@@ -234,7 +235,7 @@ fun lex(src: str): Token[] {
             }
             let number_text = str_new(p + number_start, pos - number_start)
             reject_large_literal(number_text, hex)
-            push_token(tokens, "NUMBER", number_text, number_line)
+            push_token(tokens, TokenKind.NUMBER, number_text, number_line)
             consumed = 1
         }
         # ── identifier / keyword ──
@@ -245,135 +246,135 @@ fun lex(src: str): Token[] {
                 pos += 1
             }
             let identifier_text = str_new(p + identifier_start, pos - identifier_start)
-            let kind = "ID"
+            let kind = TokenKind.ID
             if identifier_text == "fun"    {
-                kind = "FUN"
+                kind = TokenKind.FUN
             }
             if identifier_text == "return" {
-                kind = "RETURN"
+                kind = TokenKind.RETURN
             }
             if identifier_text == "if"     {
-                kind = "IF"
+                kind = TokenKind.IF
             }
             if identifier_text == "else"   {
-                kind = "ELSE"
+                kind = TokenKind.ELSE
             }
             if identifier_text == "while"  {
-                kind = "WHILE"
+                kind = TokenKind.WHILE
             }
             if identifier_text == "for" {
-                kind = "FOR"
+                kind = TokenKind.FOR
             }
             if identifier_text == "break"  {
-                kind = "BREAK"
+                kind = TokenKind.BREAK
             }
             if identifier_text == "continue" {
-                kind = "CONTINUE"
+                kind = TokenKind.CONTINUE
             }
             if identifier_text == "type" {
-                kind = "TYPE"
+                kind = TokenKind.TYPE
             }
             if identifier_text == "new"    {
-                kind = "NEW"
+                kind = TokenKind.NEW
             }
             if identifier_text == "let"    {
-                kind = "LET"
+                kind = TokenKind.LET
             }
             if identifier_text == "match" {
-                kind = "MATCH"
+                kind = TokenKind.MATCH
             }
             push_token(tokens, kind, identifier_text, identifier_line)
             consumed = 1
         }
         # ── multi-char operators ──
         if !consumed && ch == 60 && p[pos + 1] == 60 && p[pos + 2] == 61 {
-            push_token(tokens, "ASSIGN_OP", "<<=", line)
+            push_token(tokens, TokenKind.ASSIGN_OP, "<<=", line)
             pos += 3
             consumed = 1
         }
         if !consumed && ch == 62 && p[pos + 1] == 62 && p[pos + 2] == 61 {
-            push_token(tokens, "ASSIGN_OP", ">>=", line)
+            push_token(tokens, TokenKind.ASSIGN_OP, ">>=", line)
             pos += 3
             consumed = 1
         }
         if !consumed && ch == 61 {
             if p[pos + 1] == 61 {
-                push_token(tokens, "EQEQ", "==", line)
+                push_token(tokens, TokenKind.EQEQ, "==", line)
                 pos += 2
             } else {
-                push_token(tokens, "ASSIGN", "=", line)
+                push_token(tokens, TokenKind.ASSIGN, "=", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 33 {
             if p[pos + 1] == 61 {
-                push_token(tokens, "NEQ", "!=", line)
+                push_token(tokens, TokenKind.NEQ, "!=", line)
                 pos += 2
             } else {
-                push_token(tokens, "BANG", "!", line)
+                push_token(tokens, TokenKind.BANG, "!", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 60 {
             if p[pos + 1] == 60 {
-                push_token(tokens, "SHL", "<<", line)
+                push_token(tokens, TokenKind.SHL, "<<", line)
                 pos += 2
             } else if p[pos + 1] == 61 {
-                push_token(tokens, "LTE", "<=", line)
+                push_token(tokens, TokenKind.LTE, "<=", line)
                 pos += 2
             } else {
-                push_token(tokens, "LT", "<", line)
+                push_token(tokens, TokenKind.LT, "<", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 62 {
             if p[pos + 1] == 62 {
-                push_token(tokens, "SHR", ">>", line)
+                push_token(tokens, TokenKind.SHR, ">>", line)
                 pos += 2
             } else if p[pos + 1] == 61 {
-                push_token(tokens, "GTE", ">=", line)
+                push_token(tokens, TokenKind.GTE, ">=", line)
                 pos += 2
             } else {
-                push_token(tokens, "GT", ">", line)
+                push_token(tokens, TokenKind.GT, ">", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 38 {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "&=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "&=", line)
                 pos += 2
             } else if p[pos + 1] == 38 {
-                push_token(tokens, "AND", "&&", line)
+                push_token(tokens, TokenKind.AND, "&&", line)
                 pos += 2
             } else {
-                push_token(tokens, "AMPERSAND", "&", line)
+                push_token(tokens, TokenKind.AMPERSAND, "&", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 124 {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "|=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "|=", line)
                 pos += 2
             } else if p[pos + 1] == 124 {
-                push_token(tokens, "OR", "||", line)
+                push_token(tokens, TokenKind.OR, "||", line)
                 pos += 2
             } else {
-                push_token(tokens, "BIT_OR", "|", line)
+                push_token(tokens, TokenKind.BIT_OR, "|", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 45 {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "-=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "-=", line)
                 pos += 2
             } else {
-                push_token(tokens, "MINUS", "-", line)
+                push_token(tokens, TokenKind.MINUS, "-", line)
                 pos += 1
             }
             consumed = 1
@@ -381,76 +382,76 @@ fun lex(src: str): Token[] {
         # ── single-char operators ──
         if !consumed && ch == 43  {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "+=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "+=", line)
                 pos += 2
             } else {
-                push_token(tokens, "PLUS", "+", line)
+                push_token(tokens, TokenKind.PLUS, "+", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 42  {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "*=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "*=", line)
                 pos += 2
             } else {
-                push_token(tokens, "STAR", "*", line)
+                push_token(tokens, TokenKind.STAR, "*", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 47  {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "/=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "/=", line)
                 pos += 2
             } else {
-                push_token(tokens, "SLASH", "/", line)
+                push_token(tokens, TokenKind.SLASH, "/", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 37  {
             if p[pos + 1] == 61 {
-                push_token(tokens, "ASSIGN_OP", "%=", line)
+                push_token(tokens, TokenKind.ASSIGN_OP, "%=", line)
                 pos += 2
             } else {
-                push_token(tokens, "PERCENT", "%", line)
+                push_token(tokens, TokenKind.PERCENT, "%", line)
                 pos += 1
             }
             consumed = 1
         }
         if !consumed && ch == 46  {
-            push_token(tokens, "DOT",    ".", line)
+            push_token(tokens, TokenKind.DOT,    ".", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 91  {
-            push_token(tokens, "LBRACKET", "[", line)
+            push_token(tokens, TokenKind.LBRACKET, "[", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 93  {
-            push_token(tokens, "RBRACKET", "]", line)
+            push_token(tokens, TokenKind.RBRACKET, "]", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 40  {
-            push_token(tokens, "LPAREN", "(", line)
+            push_token(tokens, TokenKind.LPAREN, "(", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 41  {
-            push_token(tokens, "RPAREN", ")", line)
+            push_token(tokens, TokenKind.RPAREN, ")", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 123 {
-            push_token(tokens, "LBRACE", "{", line)
+            push_token(tokens, TokenKind.LBRACE, "{", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 125 {
-            push_token(tokens, "RBRACE", "}", line)
+            push_token(tokens, TokenKind.RBRACE, "}", line)
             pos += 1
             consumed = 1
         }
@@ -459,12 +460,12 @@ fun lex(src: str): Token[] {
             os.ExitProcess(1)
         }
         if !consumed && ch == 44  {
-            push_token(tokens, "COMMA", ",", line)
+            push_token(tokens, TokenKind.COMMA, ",", line)
             pos += 1
             consumed = 1
         }
         if !consumed && ch == 58  {
-            push_token(tokens, "COLON", ":", line)
+            push_token(tokens, TokenKind.COLON, ":", line)
             pos += 1
             consumed = 1
         }
@@ -479,8 +480,6 @@ fun lex(src: str): Token[] {
 fun dump_tokens(tokens: Token[]): i64 {
     for i: 0:tokens.len {
         let t = tokens.data[i]
-        print(t.kind)
-        print(" ")
         print(t.text)
         print(" ")
         print(itoa(t.line))

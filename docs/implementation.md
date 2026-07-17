@@ -22,19 +22,20 @@ that generations 1 and 2 are byte-identical.
 The normal v3 compiler is entirely written in Epic:
 
 ```text
-source -> lexer -> parser -> x64 assembly text -> assembler -> PE writer
+source -> lexer -> parser -> semantic analysis -> x64 assembly text -> assembler -> PE writer
 ```
 
 The assembly text stays in memory during normal compilation. `-S` writes it
 to disk and stops before the assembler; ordinary executable builds do not
 create an assembly-file intermediate.
 
-The six compiler source files are compiled as one program:
+The seven compiler source files are compiled as one program:
 
 ```text
 src/epic.ep
 src/lexer.ep
 src/parser.ep
+src/sema.ep
 src/codegen.ep
 src/asm.ep
 src/pe.ep
@@ -44,6 +45,11 @@ The self-hosted generations do not invoke NASM or an external linker. NASM is
 only part of the trusted Python stage-0 route used to create the first seed.
 
 ## Syntax model
+
+The lexer and parser dogfood nominal enums directly: `Token.kind` is a
+`TokenKind`, and the main statement parser dispatches on it with `match`.
+Expression and statement tags remain strings because they deliberately use
+empty sentinels and are consumed by several partial dispatches.
 
 The parser returns exact records for program structure, including programs,
 product declarations, functions, parameters, fields, and blocks. Expressions
