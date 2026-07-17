@@ -326,8 +326,7 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
 fun make_emitter(out_path: str): EmitterState {
     let e = new EmitterState
     e.out_path = out_path
-    e.out_buf = new u8[65536]
-    e.out_buf.len = 0
+    e.out_buf = new u8[]
     e.label_counter = 0
     e.string_counter = 0
     e.current_fn = ""
@@ -339,18 +338,12 @@ fun make_emitter(out_path: str): EmitterState {
     e.temp_base = 0
     e.temp_count = 0
     e.temp_peak = 0
-    e.locals = new Local[128]
-    e.locals.len = 0
-    e.funcs = new FuncInfo[64]
-    e.funcs.len = 0
-    e.strings = new StringLit[256]
-    e.strings.len = 0
-    e.structs = new StructInfo[64]
-    e.structs.len = 0
-    e.loop_starts = new i64[16]
-    e.loop_starts.len = 0
-    e.loop_ends = new i64[16]
-    e.loop_ends.len = 0
+    e.locals = new Local[]
+    e.funcs = new FuncInfo[]
+    e.strings = new StringLit[]
+    e.structs = new StructInfo[]
+    e.loop_starts = new i64[]
+    e.loop_ends = new i64[]
     return e
 }
 fun type_info(kind: str, name: str): TypeInfo {
@@ -551,8 +544,7 @@ fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     let s = new StructInfo
     s.name = name
     s.size = size
-    s.fields = new FieldInfo[16]
-    s.fields.len = 0
+    s.fields = new FieldInfo[]
     push(e.structs, s)
     return s
 }
@@ -595,8 +587,7 @@ fun array_layout_name(elem: str): str {
     return "_arr_" + elem
 }
 fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
-    e.structs = new StructInfo[64]
-    e.structs.len = 0
+    e.structs = new StructInfo[]
     let s = add_struct_info(e, "str", 16)
     add_field(s, "data", type_info("ptr", "u8"), 0)
     add_field(s, "len", type_i64(), 8)
@@ -640,8 +631,7 @@ fun find_func_ret(e: EmitterState, name: str): TypeInfo {
     return type_i64()
 }
 fun reset_locals(e: EmitterState): i64 {
-    e.locals = new Local[128]
-    e.locals.len = 0
+    e.locals = new Local[]
     e.local_bytes = 0
     e.temp_count = 0
     e.temp_peak = 0
@@ -844,8 +834,7 @@ fun emit_epilogue(e: EmitterState): i64 {
     return 0
 }
 fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
-    let slots = new i64[4]
-    slots.len = 0
+    let slots = new i64[]
     let i = 0
     while i < args.len {
         emit_expr(e, args.data[i])
@@ -876,8 +865,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         sys_symbol = sys_member_symbol(expr.type_name, expr.name)
     }
     if sys_symbol != "" {
-        let slots = new i64[4]
-        slots.len = 0
+        let slots = new i64[]
         let i = 0
         while i < expr.args.len {
             let arg = expr.args.data[i]
