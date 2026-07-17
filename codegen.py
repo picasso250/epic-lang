@@ -15,7 +15,7 @@ class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
         self.builtins = {"print",
-                         "itoa", "system",
+                         "itoa",
                          "str_new", "bytes", "read_file", "write_file",
                          "str_slice",
                          "str_replace_char", "push", "extend"}
@@ -24,7 +24,7 @@ class Emitter:
             "GetStdHandle", "CloseHandle", "lstrlenA", "lstrcmpA",
             "MessageBoxA", "Beep", "GetCurrentProcess",
             "GetCurrentProcessId", "GetCurrentThreadId", "ExitProcess",
-            "GetFileAttributesA", "CreateFileA", "ReadFile", "WriteFile",
+            "GetFileAttributesA", "CreateDirectoryA", "CreateFileA", "ReadFile", "WriteFile",
         }
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
@@ -91,11 +91,7 @@ class Emitter:
         self.emit("extern CloseHandle")
         self.emit("extern GetFileSize")
         self.emit("extern lstrcmpA")
-        self.emit("extern lstrcpyA")
         self.emit("extern lstrlenA")
-        self.emit("extern CreateProcessA")
-        self.emit("extern WaitForSingleObject")
-        self.emit("extern GetExitCodeProcess")
         self.emit("extern GetCommandLineA")
         self.emit("extern HeapAlloc")
         self.emit("extern GetProcessHeap")
@@ -643,13 +639,6 @@ class Emitter:
                 self.emit_expr(args[0])     # rax = n
                 self.emit_mov("rcx", "rax")  # rcx = n
                 self.emit_call_inst("_itoa")
-            elif name == "system":
-                # system(cmd: &str) → extract cmd.data, call _system
-                self.emit_expr(args[0])       # rax = &str
-                self.emit_mov("rcx", "[rax]")    # rcx = cmd.data (offset 0)
-                self.emit("    sub rsp, 8")       # align for _system entry
-                self.emit_call_inst("_system")
-                self.emit("    add rsp, 8")
             elif name == "read_file":
                 self.emit_expr(args[0])
                 self.emit_mov("rcx", "[rax]")
@@ -1168,7 +1157,7 @@ class Emitter:
                 return "&str"
             if name == "bytes":
                 return "&_arr_u8"
-            if name in ("system", "write_file"):
+            if name == "write_file":
                 return "i64"
             if name in ("print", "extend"):
                 return "void"

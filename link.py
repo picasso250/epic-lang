@@ -20,16 +20,13 @@ DOS_STUB = bytes.fromhex(
 KERNEL32_HINTS = {
     "CloseHandle": 157,
     "CreateFileA": 222,
-    "CreateProcessA": 253,
     "ExitProcess": 390,
     "GetCommandLineA": 511,
-    "GetExitCodeProcess": 615,
     "GetFileSize": 631,
     "GetProcessHeap": 740,
     "HeapAlloc": 892,
     "ReadFile": 1193,
     "SetFilePointer": 1384,
-    "WaitForSingleObject": 1573,
     "WriteFile": 1632,
 }
 

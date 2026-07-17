@@ -36,7 +36,6 @@ RUNTIME_ASM_FILES = [
     "extend_u8.asm",
     "itoa.asm",
     "argv.asm",
-    "system.asm",
     "read_file.asm",
     "write_file.asm",
 ]
