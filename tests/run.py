@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "build" / "fixed-point" / "generation-1.exe"
-SUITES = ("self_contained", "examples", "e2e")
+SUITES = ("self_contained", "examples", "e2e", "assembler")
 
 
 def main() -> int:

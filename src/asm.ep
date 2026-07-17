@@ -574,8 +574,17 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         if width == 8 {
             opcode = 198
         }
+        let reloc_count = image.relocs.len
         dst.width = width
         asm_emit_opcode_rm(image, opcode, 0, dst)
+        if image.relocs.len > reloc_count {
+            let reloc = image.relocs.data[reloc_count]
+            if width == 8 {
+                reloc.addend = reloc.addend - 1
+            } else {
+                reloc.addend = reloc.addend - 4
+            }
+        }
         if width == 8 {
             asm_byte(image, src.imm)
         }
