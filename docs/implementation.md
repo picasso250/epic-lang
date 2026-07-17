@@ -1,6 +1,6 @@
 # Epic v0 implementation notes
 
-This document describes the current compiler implementation. It is not the language spec. User-visible language semantics live in `design.md`.
+This document describes the current compiler implementation. It is not the language spec. User-visible language semantics live in [`language.md`](language.md).
 
 ## Compiler driver
 
@@ -58,11 +58,16 @@ The driver appends runtime assembly helpers after emitted program assembly:
 
 ```text
 runtime/str_alloc.asm
+runtime/bytes.asm
+runtime/extend_u8.asm
 runtime/itoa.asm
 runtime/argv.asm
 runtime/system.asm
 runtime/read_file.asm
 runtime/write_file.asm
+runtime/str_slice.asm
+runtime/str_replace_char.asm
+runtime/str_cat.asm
 ```
 
 ## Type lowering
@@ -138,9 +143,9 @@ The backend emits NASM x64 assembly for Windows x64.
 - Runtime and Win32 calls are wrapped by helper code where needed.
 - Heap allocation uses Win32 heap APIs through runtime/codegen helpers.
 
-The first Epic codegen implementation uses compiler-generated temp locals for expression intermediates.
+The backend uses compiler-generated temp locals for expression intermediates.
 
-- Each function reserves 64 hidden `i64` temp locals in its stack frame.
+- A pre-scan computes the temp slots required by each function; there is no fixed temp-slot limit.
 - Temps are reset at the start of each statement.
 - Call arguments are evaluated left-to-right into temps before loading `rcx`, `rdx`, `r8`, and `r9`.
 - Unsupported AST shapes should fail fast through a simple codegen error and `exit(1)`.
@@ -154,11 +159,15 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `putc` | writes one byte through `WriteFile` |
 | `putstr` | writes `s.data` for `s.len` bytes |
 | `itoa` | calls `_itoa` runtime helper |
+| `str_new` | calls `_str_alloc` runtime helper |
+| `bytes` | calls `_bytes` runtime helper |
+| `str_slice` | calls `_str_slice` runtime helper |
+| `str_replace_char` | calls `_str_replace_char` runtime helper |
 | `system` | calls `_system` runtime helper |
 | `read_file` | calls `_read_file` runtime helper |
 | `write_file` | calls `_write_file` runtime helper |
-| `str_new` | calls `_str_alloc` runtime helper |
 | `push` | emitted by codegen for dynamic arrays |
+| `extend` | calls `_extend_u8` runtime helper |
 
 ## Status and acceptance
 
@@ -166,12 +175,6 @@ Primary runtime acceptance:
 
 ```text
 python runtests.py --linker py
-```
-
-Current known result:
-
-```text
-41 passed, 0 failed
 ```
 
 Stage-0 checks:
