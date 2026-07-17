@@ -1498,7 +1498,7 @@ fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     return 0
 }
 fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
-    let synth = ast_expr("Subscript")
+    let synth = ast_expr("Subscript", stmt.line)
     synth.base = stmt.base
     synth.index = stmt.index
     let elem_type = expr_type(e, synth)
