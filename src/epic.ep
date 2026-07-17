@@ -8,13 +8,13 @@ fun die_driver(msg: str): i64 {
     os.ExitProcess(1)
     return 0
 }
-fun parse_file(path: str): AstNode {
+fun parse_file(path: str): AstProgram {
     let src = read_file(path)
     let tokens = lex(src)
     let p = make_parser(tokens)
     return parse_program(p)
 }
-fun has_main(ast: AstNode): i64 {
+fun has_main(ast: AstProgram): i64 {
     let i = 0
     while i < ast.funcs.len {
         if ast.funcs.data[i].name == "main" {
@@ -24,7 +24,7 @@ fun has_main(ast: AstNode): i64 {
     }
     return 0
 }
-fun check_duplicate_struct(out: AstNode, name: str): i64 {
+fun check_duplicate_struct(out: AstProgram, name: str): i64 {
     let i = 0
     while i < out.structs.len {
         if out.structs.data[i].name == name {
@@ -34,7 +34,7 @@ fun check_duplicate_struct(out: AstNode, name: str): i64 {
     }
     return 0
 }
-fun check_duplicate_func(out: AstNode, name: str): i64 {
+fun check_duplicate_func(out: AstProgram, name: str): i64 {
     let i = 0
     while i < out.funcs.len {
         if out.funcs.data[i].name == name {
@@ -44,7 +44,7 @@ fun check_duplicate_func(out: AstNode, name: str): i64 {
     }
     return 0
 }
-fun merge_one(out: AstNode, ast: AstNode, is_main_file: i64): i64 {
+fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
     let i = 0
     while i < ast.structs.len {
         let s = ast.structs.data[i]
@@ -65,11 +65,11 @@ fun merge_one(out: AstNode, ast: AstNode, is_main_file: i64): i64 {
     }
     return 0
 }
-fun merge_inputs(): AstNode {
+fun merge_inputs(): AstProgram {
     if argv.len < 2 {
         die_driver("usage: epic <input.ep>...")
     }
-    let out = ast_node("Program")
+    let out = ast_program()
     let main_ast = parse_file(argv.data[1])
     if has_main(main_ast) == 0 {
         die_driver("main file has no main function")

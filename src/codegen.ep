@@ -9,7 +9,7 @@ type Local {
 type FuncInfo {
     name: str
     ret_type: TypeInfo
-    params: AstNode[]
+    params: AstParam[]
 }
 type StringLit {
     text: str
@@ -433,35 +433,70 @@ fun get_string_id(e: EmitterState, text: str): i64 {
     push(e.strings, s)
     return s.id
 }
-fun collect_strings(e: EmitterState, node: AstNode): i64 {
+fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     if node.kind == "" {
         return 0
     }
     if node.kind == "String" {
         get_string_id(e, node.value)
+    } else if node.kind == "Binary" {
+        collect_expr_strings(e, node.left)
+        collect_expr_strings(e, node.right)
+    } else if node.kind == "Call" {
+        let i = 0
+        while i < node.args.len {
+            collect_expr_strings(e, node.args.data[i])
+            i = i + 1
+        }
+    } else if node.kind == "FieldAccess" {
+        collect_expr_strings(e, node.object)
+    } else if node.kind == "Subscript" {
+        collect_expr_strings(e, node.base)
+        collect_expr_strings(e, node.index)
+    } else if node.kind == "NewArray" {
+        collect_expr_strings(e, node.count)
+    }
+    return 0
+}
+fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
+    if node.kind == "Return" || node.kind == "ExprStmt" {
+        collect_expr_strings(e, node.expr)
+    } else if node.kind == "Let" || node.kind == "Assign" {
+        collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "FieldSet" {
+        collect_expr_strings(e, node.object)
+        collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "SubscriptAssign" {
+        collect_expr_strings(e, node.base)
+        collect_expr_strings(e, node.index)
+        collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "If" {
+        collect_expr_strings(e, node.expr)
+        collect_block_strings(e, node.then_block)
+        collect_block_strings(e, node.else_block)
+    } else if node.kind == "While" {
+        collect_expr_strings(e, node.expr)
+        collect_block_strings(e, node.body)
+    }
+    return 0
+}
+fun collect_block_strings(e: EmitterState, block: AstBlock): i64 {
+    if block.present == 0 {
+        return 0
     }
     let i = 0
-    while i < node.funcs.len {
-        collect_strings(e, node.funcs.data[i])
+    while i < block.stmts.len {
+        collect_stmt_strings(e, block.stmts.data[i])
         i = i + 1
     }
-    i = 0
-    while i < node.stmts.len {
-        collect_strings(e, node.stmts.data[i])
+    return 0
+}
+fun collect_program_strings(e: EmitterState, program: AstProgram): i64 {
+    let i = 0
+    while i < program.funcs.len {
+        collect_block_strings(e, program.funcs.data[i].body)
         i = i + 1
     }
-    i = 0
-    while i < node.args.len {
-        collect_strings(e, node.args.data[i])
-        i = i + 1
-    }
-    collect_strings(e, node.body)
-    collect_strings(e, node.then_block)
-    collect_strings(e, node.else_block)
-    collect_strings(e, node.expr)
-    collect_strings(e, node.value_expr)
-    collect_strings(e, node.left)
-    collect_strings(e, node.right)
     return 0
 }
 fun emit_string_bytes(e: EmitterState, s: str): i64 {
@@ -479,7 +514,7 @@ fun emit_string_bytes(e: EmitterState, s: str): i64 {
     out_line(e, "0")
     return 0
 }
-fun add_func_infos(e: EmitterState, ast: AstNode): i64 {
+fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
     let i = 0
     while i < ast.funcs.len {
         let fn = ast.funcs.data[i]
@@ -546,7 +581,7 @@ fun ensure_array_layout(e: EmitterState, elem: str): i64 {
 fun array_layout_name(elem: str): str {
     return "_arr_" + elem
 }
-fun compute_struct_layouts(e: EmitterState, ast: AstNode): i64 {
+fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     e.structs = new StructInfo[64]
     let s = add_struct_info(e, "str", 16)
     add_field(s, "data", type_info("ptr", "u8"), 0)
@@ -640,7 +675,7 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
     }
     return type_i64()
 }
-fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
+fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     if expr.kind == "String" {
         return type_str()
     }
@@ -723,14 +758,14 @@ fun expr_type(e: EmitterState, expr: AstNode): TypeInfo {
     }
     return type_i64()
 }
-fun infer_let_type(e: EmitterState, value: AstNode): TypeInfo {
+fun infer_let_type(e: EmitterState, value: AstExpr): TypeInfo {
     if value.kind == "" {
         return type_i64()
     }
     return expr_type(e, value)
 }
-fun pre_scan_block(e: EmitterState, block: AstNode): i64 {
-    if block.kind == "" {
+fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
+    if block.present == 0 {
         return 0
     }
     let i = 0
@@ -790,7 +825,7 @@ fun emit_epilogue(e: EmitterState): i64 {
     emit_inst(e, "ret")
     return 0
 }
-fun spill_args(e: EmitterState, args: AstNode[]): i64[] {
+fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
     let slots = new i64[4]
     let i = 0
     while i < args.len {
@@ -815,7 +850,7 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     }
     return 0
 }
-fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
+fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
     let sys_symbol = sys_call_symbol(name)
     if sys_symbol == "" {
@@ -1050,7 +1085,7 @@ fun emit_call_expr(e: EmitterState, expr: AstNode): i64 {
     emit_inst(e, "add rsp, 32")
     return 0
 }
-fun emit_binary(e: EmitterState, expr: AstNode): i64 {
+fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     if expr.op == "&&" || expr.op == "||" {
         let end_id = fresh_label(e)
         let true_id = fresh_label(e)
@@ -1180,7 +1215,7 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     die("unknown binary op")
     return 0
 }
-fun emit_comparison_jump(e: EmitterState, expr: AstNode, jump_if_true: i64, label: i64): i64 {
+fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
     emit_expr(e, expr.right)
@@ -1244,7 +1279,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstNode, jump_if_true: i64, labe
     emit_jmp_id(e, op, "L", label)
     return 0
 }
-fun emit_cond_jump(e: EmitterState, expr: AstNode, jump_if_true: i64, label: i64): i64 {
+fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
     if expr.kind == "Binary" {
         if expr.op == "==" || expr.op == "!=" || expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" {
             return emit_comparison_jump(e, expr, jump_if_true, label)
@@ -1283,7 +1318,7 @@ fun emit_cond_jump(e: EmitterState, expr: AstNode, jump_if_true: i64, label: i64
     }
     return 0
 }
-fun emit_new(e: EmitterState, expr: AstNode): i64 {
+fun emit_new(e: EmitterState, expr: AstExpr): i64 {
     let info = find_struct_info(e, expr.name)
     emit_mov(e, "rcx", "[_heap]")
     emit_mov(e, "edx", "8")
@@ -1293,7 +1328,7 @@ fun emit_new(e: EmitterState, expr: AstNode): i64 {
     emit_inst(e, "add rsp, 40")
     return 0
 }
-fun emit_new_array(e: EmitterState, expr: AstNode): i64 {
+fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     let elem = expr.type_name
     let el_size = 8
     if elem == "u8" {
@@ -1353,7 +1388,7 @@ fun field_layout_name(t: TypeInfo): str {
     }
     return ""
 }
-fun emit_field_access(e: EmitterState, expr: AstNode): i64 {
+fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
     let obj_type = expr_type(e, expr.object)
     emit_expr(e, expr.object)
     let field = find_field_info(e, field_layout_name(obj_type), expr.name)
@@ -1368,7 +1403,7 @@ fun emit_field_access(e: EmitterState, expr: AstNode): i64 {
     }
     return 0
 }
-fun emit_subscript(e: EmitterState, expr: AstNode): i64 {
+fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
     let elem_type = expr_type(e, expr)
     emit_expr(e, expr.base)
     let base_slot = temp_save_rax(e)
@@ -1381,7 +1416,7 @@ fun emit_subscript(e: EmitterState, expr: AstNode): i64 {
     }
     return 0
 }
-fun emit_expr(e: EmitterState, expr: AstNode): i64 {
+fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
     if expr.kind == "Literal" {
         emit_mov(e, "rax", expr.value)
         return 0
@@ -1434,7 +1469,7 @@ fun emit_expr(e: EmitterState, expr: AstNode): i64 {
     die("unsupported expr")
     return 0
 }
-fun emit_return(e: EmitterState, stmt: AstNode): i64 {
+fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
     if e.current_fn == "main" {
         if stmt.expr.kind == "" {
             emit_mov(e, "ecx", "0")
@@ -1454,7 +1489,7 @@ fun emit_return(e: EmitterState, stmt: AstNode): i64 {
     }
     return 0
 }
-fun emit_let(e: EmitterState, stmt: AstNode): i64 {
+fun emit_let(e: EmitterState, stmt: AstStmt): i64 {
     if stmt.value_expr.kind == "" {
         return 0
     }
@@ -1466,7 +1501,7 @@ fun emit_let(e: EmitterState, stmt: AstNode): i64 {
     }
     return 0
 }
-fun emit_assign(e: EmitterState, stmt: AstNode): i64 {
+fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.value_expr)
     if type_is_u8(find_local_type(e, stmt.name)) == 1 {
         emit_stack_store(e, find_local_slot(e, stmt.name), "al")
@@ -1475,8 +1510,8 @@ fun emit_assign(e: EmitterState, stmt: AstNode): i64 {
     }
     return 0
 }
-fun emit_subscript_assign(e: EmitterState, stmt: AstNode): i64 {
-    let synth = ast_node("Subscript")
+fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
+    let synth = ast_expr("Subscript")
     synth.base = stmt.base
     synth.index = stmt.index
     let elem_type = expr_type(e, synth)
@@ -1499,7 +1534,7 @@ fun emit_subscript_assign(e: EmitterState, stmt: AstNode): i64 {
     }
     return 0
 }
-fun emit_field_set(e: EmitterState, stmt: AstNode): i64 {
+fun emit_field_set(e: EmitterState, stmt: AstStmt): i64 {
     let obj_type = expr_type(e, stmt.object)
     let field = find_field_info(e, field_layout_name(obj_type), stmt.name)
     emit_expr(e, stmt.value_expr)
@@ -1517,10 +1552,10 @@ fun emit_field_set(e: EmitterState, stmt: AstNode): i64 {
     }
     return 0
 }
-fun emit_if(e: EmitterState, stmt: AstNode): i64 {
+fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
     let else_id = fresh_label(e)
     let end_id = fresh_label(e)
-    if stmt.else_block.kind == "" {
+    if stmt.else_block.present == 0 {
         emit_cond_jump(e, stmt.expr, 0, end_id)
         emit_block(e, stmt.then_block)
     } else {
@@ -1533,7 +1568,7 @@ fun emit_if(e: EmitterState, stmt: AstNode): i64 {
     emit_label_id(e, "L", end_id)
     return 0
 }
-fun emit_while(e: EmitterState, stmt: AstNode): i64 {
+fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     let start_id = fresh_label(e)
     let end_id = fresh_label(e)
     push(e.loop_starts, start_id)
@@ -1547,21 +1582,21 @@ fun emit_while(e: EmitterState, stmt: AstNode): i64 {
     emit_label_id(e, "L", end_id)
     return 0
 }
-fun emit_break(e: EmitterState, stmt: AstNode): i64 {
+fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
     if e.loop_ends.len == 0 {
         die("break outside loop")
     }
     emit_jmp_id(e, "jmp", "L", e.loop_ends.data[e.loop_ends.len - 1])
     return 0
 }
-fun emit_continue(e: EmitterState, stmt: AstNode): i64 {
+fun emit_continue(e: EmitterState, stmt: AstStmt): i64 {
     if e.loop_starts.len == 0 {
         die("continue outside loop")
     }
     emit_jmp_id(e, "jmp", "L", e.loop_starts.data[e.loop_starts.len - 1])
     return 0
 }
-fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
+fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
     temp_reset(e)
     if stmt.kind == "Return" {
         return emit_return(e, stmt)
@@ -1596,8 +1631,8 @@ fun emit_stmt(e: EmitterState, stmt: AstNode): i64 {
     die("unsupported stmt")
     return 0
 }
-fun emit_block(e: EmitterState, block: AstNode): i64 {
-    if block.kind == "" {
+fun emit_block(e: EmitterState, block: AstBlock): i64 {
+    if block.present == 0 {
         return 0
     }
     let i = 0
@@ -1607,7 +1642,7 @@ fun emit_block(e: EmitterState, block: AstNode): i64 {
     }
     return 0
 }
-fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
+fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     reset_locals(e)
     e.current_fn = fn.name
     e.current_ret_type = user_type(fn.type_name)
@@ -1676,10 +1711,10 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
     out_nl(e)
     return 0
 }
-fun emit_program(e: EmitterState, ast: AstNode): i64 {
+fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     compute_struct_layouts(e, ast)
     add_func_infos(e, ast)
-    collect_strings(e, ast)
+    collect_program_strings(e, ast)
     out_line(e, "global _start")
     out_line(e, "extern ExitProcess")
     out_line(e, "extern GetStdHandle")
