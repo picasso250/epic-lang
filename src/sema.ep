@@ -1,5 +1,5 @@
 #
-# Epic v2 semantic analysis.
+# Epic semantic analysis.
 #
 type SemaTypeDecl {
     name: str

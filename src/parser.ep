@@ -1,5 +1,5 @@
 #
-# Epic v0 parser — self-hosting bootstrap
+# Epic parser.
 #
 type AstExpr {
     kind: str

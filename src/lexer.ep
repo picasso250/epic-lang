@@ -1,5 +1,5 @@
 #
-# Epic v0 lexer — self-hosting bootstrap
+# Epic lexer.
 #
 type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | WHILE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
 type Token {

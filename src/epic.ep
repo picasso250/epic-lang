@@ -1,5 +1,5 @@
 #
-# Epic v0 self-hosted compiler driver.
+# Epic self-hosted compiler driver.
 #
 type DriverOptions {
     emit_asm: i64
