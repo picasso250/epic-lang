@@ -6,10 +6,10 @@
 - Source files use the `.ep` extension.
 - Blocks use `{}` and ordinary statements end at newlines. Semicolons are not part of v0 syntax.
 - `if` and `while` conditions do not require parentheses.
-- `let` has no type annotation. Use `let x = expr` or `let x`.
+- `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
-- Memory is not freed in v0; process exit is the reclamation boundary.
+- v2 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
 - The Epic v2 compiler is self-hosted and begins with the v1 language surface.
 - v2 does not preserve forward compatibility.
 
@@ -31,7 +31,7 @@ build\epic-v2.exe main.ep lib.ep
 
 This is whole-program source merging, not a module system.
 
-All top-level product types and functions from input files are merged into one global namespace. Duplicate type or function names are rejected.
+All top-level product types and functions from input files are merged before semantic analysis. Types and functions have separate namespaces; duplicate names within either namespace are rejected.
 
 The first input is the main file. Only its `main` function is used; `main` functions in later files are ignored.
 
@@ -67,6 +67,7 @@ contents. There is no by-value product or array copy semantics in v1.
 | Field or expression | Meaning |
 | --- | --- |
 | `s.data` | low-level address of the first byte |
+| `s[i]` | byte at index `i` |
 | `s.data[i]` | byte at index `i` |
 | `s.len` | number of bytes, excluding the trailing NUL |
 
@@ -82,6 +83,7 @@ contract. Use `new u8[n]` for mutable byte buffers.
 | --- | --- |
 | `new T[]` | empty dynamic array with default capacity |
 | `new T[n]` | empty dynamic array with capacity at least `n` |
+| `a[i]` | element at index `i` |
 | `a.data[i]` | element at index `i` |
 | `a.len` | current element count |
 | `a.cap` | current capacity |
@@ -99,6 +101,13 @@ and `extend` are documented under built-in functions.
 rules needed for bootstrapping: whitespace separates arguments and double
 quotes group one argument.
 
+## Local scope
+
+Locals use lexical block scope and are visible only after their declaration.
+Parameters are visible throughout the function. A parameter or local name may
+not be reused anywhere else in the same function, including a disjoint block.
+`argv` and `os` are reserved names.
+
 ## Functions
 
 Function definitions use explicit parameter and return types:
@@ -109,7 +118,10 @@ fun add(a: i64, b: i64): i64 {
 }
 ```
 
-`void` functions may use `return` or fall off the end. `return expr` is invalid in a `void` function.
+`void` functions may use `return` or fall off the end. `return expr` is invalid
+in a `void` function. A non-`void` function must return a compatible value on
+every path. The v2 analysis recognizes explicit `return` and `if/else` where
+both branches must return; a `while` loop never proves a return.
 
 ## Else-if chains
 
@@ -182,6 +194,11 @@ before participating in `<<`, `>>`, `&`, or `|`.
 
 String lengths and indices count bytes, not Unicode characters.
 
+Arithmetic and bit operators require integer operands, except `str + str`.
+Ordering comparisons require integers. `==` and `!=` accept two integers or
+two strings; products and arrays have no implicit reference equality.
+`if` and `while` conditions require `i64`.
+
 ## System calls
 
 `os.*` names are reserved for selected system/runtime calls exposed by the compiler.
@@ -222,7 +239,7 @@ to declare them.
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
-| `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
+| `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
@@ -240,6 +257,6 @@ A missing or unreadable file is a compile error, while an empty file is valid.
 - General method calls.
 - Payload sums, unit sums, and `match`.
 - By-value product or array semantics.
-- Memory freeing.
+- Explicit memory freeing.
 - Unicode string semantics.
 - Polished diagnostics or error recovery.
