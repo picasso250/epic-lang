@@ -909,6 +909,69 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     emit_inst(e, "add rsp, 32")
     return 0
 }
+fun is_integer_value_op(op: str): i64 {
+    if op == "+" || op == "-" || op == "*" || op == "/" || op == "%" {
+        return 1
+    }
+    if op == "&" || op == "|" || op == "<<" || op == ">>" {
+        return 1
+    }
+    return 0
+}
+fun emit_integer_value_op(e: EmitterState, op: str, right_slot: i64): i64 {
+    emit_stack_load(e, "rcx", right_slot)
+    if op == "+" {
+        emit_inst(e, "add rax, rcx")
+        return 0
+    }
+    if op == "-" {
+        emit_inst(e, "sub rax, rcx")
+        return 0
+    }
+    if op == "*" {
+        emit_inst(e, "imul rax, rcx")
+        return 0
+    }
+    if op == "&" {
+        emit_inst(e, "and rax, rcx")
+        return 0
+    }
+    if op == "|" {
+        emit_inst(e, "or rax, rcx")
+        return 0
+    }
+    if op == "<<" || op == ">>" {
+        let count_ok = fresh_label(e)
+        let count_bad = fresh_label(e)
+        emit_inst(e, "cmp rcx, 0")
+        emit_jmp_id(e, "jl", "L", count_bad)
+        emit_inst(e, "cmp rcx, 64")
+        emit_jmp_id(e, "jl", "L", count_ok)
+        emit_label_id(e, "L", count_bad)
+        emit_mov(e, "ecx", "1")
+        emit_call_inst(e, "ExitProcess")
+        emit_label_id(e, "L", count_ok)
+        if op == "<<" {
+            emit_inst(e, "shl rax, cl")
+        } else {
+            emit_inst(e, "sar rax, cl")
+        }
+        return 0
+    }
+    if op == "/" {
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        return 0
+    }
+    if op == "%" {
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        emit_mov(e, "rax", "rdx")
+        return 0
+    }
+    die("internal: unknown integer value operator")
+    return 0
+}
 fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     if expr.op == "&&" || expr.op == "||" {
         let end_id = fresh_label(e)
@@ -950,56 +1013,10 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "movzx eax, al")
         return 0
     }
+    if is_integer_value_op(expr.op) == 1 {
+        return emit_integer_value_op(e, expr.op, tmp)
+    }
     emit_stack_load(e, "rcx", tmp)
-    if expr.op == "+" {
-        emit_inst(e, "add rax, rcx")
-        return 0
-    }
-    if expr.op == "-" {
-        emit_inst(e, "sub rax, rcx")
-        return 0
-    }
-    if expr.op == "*" {
-        emit_inst(e, "imul rax, rcx")
-        return 0
-    }
-    if expr.op == "&" {
-        emit_inst(e, "and rax, rcx")
-        return 0
-    }
-    if expr.op == "|" {
-        emit_inst(e, "or rax, rcx")
-        return 0
-    }
-    if expr.op == "<<" || expr.op == ">>" {
-        let count_ok = fresh_label(e)
-        let count_bad = fresh_label(e)
-        emit_inst(e, "cmp rcx, 0")
-        emit_jmp_id(e, "jl", "L", count_bad)
-        emit_inst(e, "cmp rcx, 64")
-        emit_jmp_id(e, "jl", "L", count_ok)
-        emit_label_id(e, "L", count_bad)
-        emit_mov(e, "ecx", "1")
-        emit_call_inst(e, "ExitProcess")
-        emit_label_id(e, "L", count_ok)
-        if expr.op == "<<" {
-            emit_inst(e, "shl rax, cl")
-        } else {
-            emit_inst(e, "sar rax, cl")
-        }
-        return 0
-    }
-    if expr.op == "/" {
-        emit_inst(e, "cqo")
-        emit_inst(e, "idiv rcx")
-        return 0
-    }
-    if expr.op == "%" {
-        emit_inst(e, "cqo")
-        emit_inst(e, "idiv rcx")
-        emit_mov(e, "rax", "rdx")
-        return 0
-    }
     if expr.op == "==" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "sete al")
@@ -1207,23 +1224,19 @@ fun field_layout_name(t: TypeInfo): str {
     }
     return ""
 }
-fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
-    let obj_type = expr_type(e, expr.object)
-    emit_expr(e, expr.object)
-    let field = find_field_info(e, field_layout_name(obj_type), expr.name)
-    if type_is_u8(field.typ) == 1 {
-        out_s(e, "    movzx rax, byte [rax+")
+fun emit_field_address(e: EmitterState, object: AstExpr, name: str): TypeInfo {
+    let object_type = expr_type(e, object)
+    let field = find_field_info(e, field_layout_name(object_type), name)
+    emit_expr(e, object)
+    if field.offset != 0 {
+        out_s(e, "    add rax, ")
         out_i(e, field.offset)
-        out_line(e, "]")
-    } else {
-        out_s(e, "    mov rax, [rax+")
-        out_i(e, field.offset)
-        out_line(e, "]")
+        out_nl(e)
     }
-    return 0
+    return field.typ
 }
-fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
-    let base_type = expr_type(e, expr.base)
+fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): TypeInfo {
+    let base_type = expr_type(e, base)
     let elem_type = type_i64()
     if base_type.kind == "str" {
         elem_type = type_u8()
@@ -1232,18 +1245,45 @@ fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
     } else {
         die("internal: checked subscript has invalid base")
     }
-    emit_expr(e, expr.base)
+    emit_expr(e, base)
     let base_slot = temp_save_rax(e)
-    emit_expr(e, expr.index)
+    emit_expr(e, index)
     emit_stack_load(e, "rcx", base_slot)
     if base_type.kind == "str" || base_type.kind == "array" {
         emit_mov(e, "rcx", "[rcx]")
     }
     if type_is_u8(elem_type) == 1 {
-        emit_inst(e, "movzx rax, byte [rcx+rax]")
+        emit_inst(e, "lea rax, [rcx+rax]")
     } else {
-        emit_inst(e, "mov rax, [rcx+rax*8]")
+        emit_inst(e, "lea rax, [rcx+rax*8]")
     }
+    return elem_type
+}
+fun emit_load_address(e: EmitterState, value_type: TypeInfo): i64 {
+    if type_is_u8(value_type) == 1 {
+        emit_inst(e, "movzx rax, byte [rax]")
+    } else {
+        emit_inst(e, "mov rax, [rax]")
+    }
+    return 0
+}
+fun emit_store_address(e: EmitterState, value_type: TypeInfo, address_slot: i64): i64 {
+    emit_stack_load(e, "rcx", address_slot)
+    if type_is_u8(value_type) == 1 {
+        emit_inst(e, "mov [rcx], al")
+    } else {
+        emit_inst(e, "mov [rcx], rax")
+    }
+    return 0
+}
+fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
+    let field_type = emit_field_address(e, expr.object, expr.name)
+    emit_load_address(e, field_type)
+    return 0
+}
+fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
+    let elem_type = emit_subscript_address(e, expr.base, expr.index)
+    emit_load_address(e, elem_type)
     return 0
 }
 fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
@@ -1348,51 +1388,17 @@ fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     return 0
 }
 fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
-    let base_type = expr_type(e, stmt.base)
-    let elem_type = type_i64()
-    if base_type.kind == "array" || base_type.kind == "ptr" {
-        elem_type = user_type(base_type.name)
-    } else {
-        die("internal: checked subscript assignment has invalid base")
-    }
+    let elem_type = emit_subscript_address(e, stmt.base, stmt.index)
+    let address_slot = temp_save_rax(e)
     emit_expr(e, stmt.value_expr)
-    let val_slot = temp_save_rax(e)
-    emit_expr(e, stmt.base)
-    let base_slot = temp_save_rax(e)
-    emit_expr(e, stmt.index)
-    emit_stack_load(e, "rcx", base_slot)
-    if base_type.kind == "array" {
-        emit_mov(e, "rcx", "[rcx]")
-    }
-    if type_is_u8(elem_type) == 1 {
-        emit_inst(e, "lea rcx, [rcx+rax]")
-    } else {
-        emit_inst(e, "lea rcx, [rcx+rax*8]")
-    }
-    emit_stack_load(e, "rax", val_slot)
-    if type_is_u8(elem_type) == 1 {
-        emit_inst(e, "mov [rcx], al")
-    } else {
-        emit_inst(e, "mov [rcx], rax")
-    }
+    emit_store_address(e, elem_type, address_slot)
     return 0
 }
 fun emit_field_set(e: EmitterState, stmt: AstStmt): i64 {
-    let obj_type = expr_type(e, stmt.object)
-    let field = find_field_info(e, field_layout_name(obj_type), stmt.name)
+    let field_type = emit_field_address(e, stmt.object, stmt.name)
+    let address_slot = temp_save_rax(e)
     emit_expr(e, stmt.value_expr)
-    let val_slot = temp_save_rax(e)
-    emit_expr(e, stmt.object)
-    emit_stack_load(e, "rcx", val_slot)
-    if type_is_u8(field.typ) == 1 {
-        out_s(e, "    mov [rax+")
-        out_i(e, field.offset)
-        out_line(e, "], cl")
-    } else {
-        out_s(e, "    mov [rax+")
-        out_i(e, field.offset)
-        out_line(e, "], rcx")
-    }
+    emit_store_address(e, field_type, address_slot)
     return 0
 }
 fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
