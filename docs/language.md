@@ -15,6 +15,28 @@
 
 **Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v3 fixed point.
 
+## Changes introduced in Epic v2
+
+Epic v2 compiles a larger language than Epic v1, while the v2 compiler source
+itself deliberately remains within the Epic v1 language surface. These additions
+are therefore explicit dogfood targets for the next generation:
+
+- a conservative, non-moving mark-and-sweep garbage collector, described in
+  [`gc.md`](gc.md);
+- nominal unit enums and exhaustive statement-form `match`;
+- integer compound assignment: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`,
+  `<<=`, and `>>=`;
+- unary integer negation `-` and logical negation `!`;
+- half-open integer range loops whose bounds are evaluated once;
+- direct string and array subscripting with `value[index]`;
+- checked semantic analysis for declarations, lexical local scope,
+  use-before-declaration, expression and assignment types, call signatures, and
+  required return paths.
+
+Compiler-driver and backend changes such as `-S`, `-o`, embedded runtime text,
+and in-memory assembly are implementation changes rather than language
+features.
+
 ## Program model
 
 A program is a set of top-level product type, unit-enum, and function
