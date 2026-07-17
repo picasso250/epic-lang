@@ -1035,21 +1035,11 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
     if expr.op == "&&" || expr.op == "||" {
         let end_id = fresh_label(e)
         let true_id = fresh_label(e)
-        emit_expr(e, expr.left)
-        if expr.op == "&&" {
-            emit_inst(e, "test rax, rax")
-            emit_jmp_id(e, "jz", "L", end_id)
-        } else {
-            emit_inst(e, "test rax, rax")
-            emit_jmp_id(e, "jnz", "L", true_id)
-        }
-        emit_expr(e, expr.right)
-        if expr.op == "||" {
-            emit_label_id(e, "L", true_id)
-        }
-        emit_inst(e, "test rax, rax")
-        emit_inst(e, "setne al")
-        emit_inst(e, "movzx eax, al")
+        emit_cond_jump(e, expr, 1, true_id)
+        emit_inst(e, "xor eax, eax")
+        emit_jmp_id(e, "jmp", "L", end_id)
+        emit_label_id(e, "L", true_id)
+        emit_mov(e, "eax", "1")
         emit_label_id(e, "L", end_id)
         return 0
     }
@@ -1169,6 +1159,109 @@ fun emit_binary(e: EmitterState, expr: AstNode): i64 {
         return 0
     }
     die("unknown binary op")
+    return 0
+}
+fun emit_comparison_jump(e: EmitterState, expr: AstNode, jump_if_true: i64, label: i64): i64 {
+    let left_type = expr_type(e, expr.left)
+    let right_type = expr_type(e, expr.right)
+    emit_expr(e, expr.right)
+    let tmp = temp_save_rax(e)
+    emit_expr(e, expr.left)
+    if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
+        emit_mov(e, "rcx", "[rax]")
+        emit_stack_load(e, "rax", tmp)
+        emit_mov(e, "rdx", "[rax]")
+        emit_inst(e, "sub rsp, 32")
+        emit_call_inst(e, "lstrcmpA")
+        emit_inst(e, "add rsp, 32")
+        emit_inst(e, "cmp eax, 0")
+    } else {
+        emit_stack_load(e, "rcx", tmp)
+        emit_inst(e, "cmp rax, rcx")
+    }
+    let op = ""
+    if expr.op == "==" {
+        if jump_if_true == 1 {
+            op = "jz"
+        } else {
+            op = "jnz"
+        }
+    }
+    else if expr.op == "!=" {
+        if jump_if_true == 1 {
+            op = "jnz"
+        } else {
+            op = "jz"
+        }
+    }
+    else if expr.op == "<" {
+        if jump_if_true == 1 {
+            op = "jl"
+        } else {
+            op = "jge"
+        }
+    }
+    else if expr.op == ">" {
+        if jump_if_true == 1 {
+            op = "jg"
+        } else {
+            op = "jle"
+        }
+    }
+    else if expr.op == "<=" {
+        if jump_if_true == 1 {
+            op = "jle"
+        } else {
+            op = "jg"
+        }
+    }
+    else {
+        if jump_if_true == 1 {
+            op = "jge"
+        } else {
+            op = "jl"
+        }
+    }
+    emit_jmp_id(e, op, "L", label)
+    return 0
+}
+fun emit_cond_jump(e: EmitterState, expr: AstNode, jump_if_true: i64, label: i64): i64 {
+    if expr.kind == "Binary" {
+        if expr.op == "==" || expr.op == "!=" || expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" {
+            return emit_comparison_jump(e, expr, jump_if_true, label)
+        }
+        if expr.op == "&&" {
+            if jump_if_true == 0 {
+                emit_cond_jump(e, expr.left, 0, label)
+                emit_cond_jump(e, expr.right, 0, label)
+            } else {
+                let skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, 0, skip)
+                emit_cond_jump(e, expr.right, 1, label)
+                emit_label_id(e, "L", skip)
+            }
+            return 0
+        }
+        if expr.op == "||" {
+            if jump_if_true == 1 {
+                emit_cond_jump(e, expr.left, 1, label)
+                emit_cond_jump(e, expr.right, 1, label)
+            } else {
+                let skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, 1, skip)
+                emit_cond_jump(e, expr.right, 0, label)
+                emit_label_id(e, "L", skip)
+            }
+            return 0
+        }
+    }
+    emit_expr(e, expr)
+    emit_inst(e, "test rax, rax")
+    if jump_if_true == 1 {
+        emit_jmp_id(e, "jnz", "L", label)
+    } else {
+        emit_jmp_id(e, "jz", "L", label)
+    }
     return 0
 }
 fun emit_new(e: EmitterState, expr: AstNode): i64 {
@@ -1408,13 +1501,11 @@ fun emit_field_set(e: EmitterState, stmt: AstNode): i64 {
 fun emit_if(e: EmitterState, stmt: AstNode): i64 {
     let else_id = fresh_label(e)
     let end_id = fresh_label(e)
-    emit_expr(e, stmt.expr)
-    emit_inst(e, "test rax, rax")
     if stmt.else_block.kind == "" {
-        emit_jmp_id(e, "jz", "L", end_id)
+        emit_cond_jump(e, stmt.expr, 0, end_id)
         emit_block(e, stmt.then_block)
     } else {
-        emit_jmp_id(e, "jz", "L", else_id)
+        emit_cond_jump(e, stmt.expr, 0, else_id)
         emit_block(e, stmt.then_block)
         emit_jmp_id(e, "jmp", "L", end_id)
         emit_label_id(e, "L", else_id)
@@ -1429,9 +1520,7 @@ fun emit_while(e: EmitterState, stmt: AstNode): i64 {
     push(e.loop_starts, start_id)
     push(e.loop_ends, end_id)
     emit_label_id(e, "L", start_id)
-    emit_expr(e, stmt.expr)
-    emit_inst(e, "test rax, rax")
-    emit_jmp_id(e, "jz", "L", end_id)
+    emit_cond_jump(e, stmt.expr, 0, end_id)
     emit_block(e, stmt.body)
     e.loop_starts.len = e.loop_starts.len - 1
     e.loop_ends.len = e.loop_ends.len - 1
