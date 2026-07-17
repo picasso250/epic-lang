@@ -1,4 +1,4 @@
-# Epic v1 compiler implementation
+# Epic v2 compiler implementation
 
 This document describes the compiler implementation. User-visible semantics
 live in [`language.md`](language.md).
@@ -8,17 +8,18 @@ live in [`language.md`](language.md).
 The bootstrap chain is:
 
 ```text
-Python v0 stage-0 -> Epic v1 seed -> Epic v1 fixed point
+Python v0 stage-0 -> Epic v1 -> Epic v2 seed -> Epic v2 fixed point
 ```
 
-`build_epic.py` resolves the exact commit of the local `v0` branch, creates
-a temporary detached worktree, and uses that Python compiler to build the v1
-seed. `bootstrap_fixed_point.py` then checks that generations 1 and 2 are
-byte-identical.
+`build_epic.py` resolves the exact commit of the local `v1` branch. A cached
+`build/epic-v1-<hash>.exe` is reused when available; otherwise the script
+creates a detached v1 worktree and invokes its `build_epic.py`. That v1
+compiler builds the current v2 sources. `bootstrap_fixed_point.py` then checks
+that generations 1 and 2 are byte-identical.
 
 ## Compiler pipeline
 
-The normal v1 compiler is entirely written in Epic:
+The normal v2 compiler is entirely written in Epic:
 
 ```text
 source -> lexer -> parser -> x64 assembly text -> assembler -> PE writer

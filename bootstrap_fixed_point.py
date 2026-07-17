@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Epic v1 from v0, then verify two self-hosted generations match."""
+"""Build Epic v2 from v1, then verify two self-hosted generations match."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import time
 ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / "build"
 FIXED_POINT = BUILD / "fixed-point"
-SEED = BUILD / "epic-v1.exe"
+SEED = BUILD / "epic-v2.exe"
 SELF_OUTPUT = BUILD / "epic" / "src_epic.ep.exe"
 SOURCES = ("src/epic.ep", "src/lexer.ep", "src/parser.ep", "src/codegen.ep", "src/asm.ep", "src/pe.ep")
 
@@ -53,7 +53,7 @@ def main() -> int:
     print(f"generation 1: {generation_1.stat().st_size} bytes {hash_1} {elapsed_1:.3f} s")
     print(f"generation 2: {generation_2.stat().st_size} bytes {hash_2} {elapsed_2:.3f} s")
     if generation_1.read_bytes() != generation_2.read_bytes():
-        raise RuntimeError("Epic v1 did not reach a byte-identical fixed point")
+        raise RuntimeError("Epic v2 did not reach a byte-identical fixed point")
     print("fixed point: byte-identical")
     return 0
 

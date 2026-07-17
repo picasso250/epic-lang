@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Epic v1 compiler with the Python v0 stage-0 compiler."""
+"""Build the Epic v2 compiler with an exact local v1 compiler."""
 
 from __future__ import annotations
 
@@ -16,11 +16,17 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
-SRC_DIR = ROOT / "src"
 BUILD_DIR = ROOT / "build"
-BOOTSTRAP_DIR = BUILD_DIR / "v1-bootstrap"
-DEFAULT_OUTPUT = BUILD_DIR / "epic-v1.exe"
-SOURCE_NAMES = ("epic.ep", "lexer.ep", "parser.ep", "codegen.ep", "asm.ep", "pe.ep")
+DEFAULT_OUTPUT = BUILD_DIR / "epic-v2.exe"
+SELF_OUTPUT = BUILD_DIR / "epic" / "src_epic.ep.exe"
+SOURCE_PATHS = (
+    "src/epic.ep",
+    "src/lexer.ep",
+    "src/parser.ep",
+    "src/codegen.ep",
+    "src/asm.ep",
+    "src/pe.ep",
+)
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
@@ -38,20 +44,19 @@ def git_output(*args: str) -> str:
     return result.stdout.strip()
 
 
-def v0_seed_commit() -> str:
-    """Return the current local v0 stage-0 commit."""
-    return git_output("rev-parse", "refs/heads/v0")
+def v1_seed_commit() -> str:
+    return git_output("rev-parse", "refs/heads/v1")
 
 
 def temporary_worktree_path() -> Path:
     temp_root = Path(tempfile.gettempdir()).resolve()
-    return temp_root / f"epic-v0-{os.getpid()}-{uuid.uuid4().hex}"
+    return temp_root / f"epic-v1-{os.getpid()}-{uuid.uuid4().hex}"
 
 
 def remove_worktree(path: Path) -> None:
     temp_root = Path(tempfile.gettempdir()).resolve()
     resolved = path.resolve()
-    if resolved.parent != temp_root or not resolved.name.startswith("epic-v0-"):
+    if resolved.parent != temp_root or not resolved.name.startswith("epic-v1-"):
         raise RuntimeError(f"refusing to remove unexpected worktree path: {resolved}")
     subprocess.run(
         ["git", "worktree", "remove", "--force", str(resolved)],
@@ -72,9 +77,39 @@ def sha256(path: Path) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build the Epic v1 compiler")
+    parser = argparse.ArgumentParser(description="Build the Epic v2 compiler")
     parser.add_argument("-o", "--output", type=Path, help="output executable path")
     return parser.parse_args()
+
+
+def ensure_v1_seed(seed: str) -> Path:
+    artifact = BUILD_DIR / f"epic-v1-{seed}.exe"
+    if artifact.is_file():
+        print(f"v1 seed: {seed} (cached)", flush=True)
+        return artifact
+
+    nasm = ROOT / "tools" / "nasm.exe"
+    if not nasm.is_file():
+        raise RuntimeError(f"missing NASM trusted tool: {nasm}")
+
+    worktree = temporary_worktree_path()
+    try:
+        print(f"v1 seed: {seed} (building)", flush=True)
+        run(["git", "worktree", "add", "--detach", str(worktree), seed])
+        worktree_tools = worktree / "tools"
+        worktree_tools.mkdir()
+        shutil.copy2(nasm, worktree_tools / "nasm.exe")
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        run(
+            [sys.executable, str(worktree / "build_epic.py"), "-o", str(artifact)],
+            cwd=worktree,
+        )
+    finally:
+        remove_worktree(worktree)
+
+    if not artifact.is_file():
+        raise RuntimeError(f"v1 did not produce the expected compiler: {artifact}")
+    return artifact
 
 
 def main() -> int:
@@ -82,44 +117,18 @@ def main() -> int:
     output = args.output.resolve() if args.output else DEFAULT_OUTPUT
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    sources = [SRC_DIR / name for name in SOURCE_NAMES]
-    missing = [str(path) for path in sources if not path.is_file()]
+    missing = [str(ROOT / path) for path in SOURCE_PATHS if not (ROOT / path).is_file()]
     if missing:
-        raise RuntimeError(f"missing v1 sources: {', '.join(missing)}")
+        raise RuntimeError(f"missing v2 sources: {', '.join(missing)}")
 
-    nasm = ROOT / "tools" / "nasm.exe"
-    if not nasm.is_file():
-        raise RuntimeError(f"missing NASM trusted tool: {nasm}")
-
-    seed = v0_seed_commit()
-    worktree = temporary_worktree_path()
     start = time.perf_counter()
-    try:
-        print(f"v0 seed: {seed}", flush=True)
-        run(["git", "worktree", "add", "--detach", str(worktree), seed])
-        worktree_tools = worktree / "tools"
-        worktree_tools.mkdir()
-        shutil.copy2(nasm, worktree_tools / "nasm.exe")
-
-        BOOTSTRAP_DIR.mkdir(parents=True, exist_ok=True)
-        command = [
-            sys.executable,
-            str(worktree / "epic.py"),
-            "--main",
-            str(SRC_DIR / "epic.ep"),
-            "--linker",
-            "py",
-            "--out-dir",
-            str(BOOTSTRAP_DIR),
-            *(str(path) for path in sources),
-        ]
-        run(command)
-        built = BOOTSTRAP_DIR / "epic.exe"
-        if not built.is_file():
-            raise RuntimeError(f"v0 did not produce the expected compiler: {built}")
-        shutil.copy2(built, output)
-    finally:
-        remove_worktree(worktree)
+    seed = v1_seed_commit()
+    compiler = ensure_v1_seed(seed)
+    run([str(compiler), *SOURCE_PATHS])
+    if not SELF_OUTPUT.is_file():
+        raise RuntimeError(f"v1 did not produce the expected v2 compiler: {SELF_OUTPUT}")
+    if SELF_OUTPUT.resolve() != output.resolve():
+        shutil.copy2(SELF_OUTPUT, output)
 
     elapsed = time.perf_counter() - start
     print(f"built: {output}")

@@ -1,4 +1,4 @@
-# Epic v1 language reference
+# Epic v2 language reference
 
 ## Core direction
 
@@ -10,10 +10,10 @@
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
 - Memory is not freed in v0; process exit is the reclamation boundary.
-- The Epic v1 compiler is self-hosted, and its source deliberately stays within the v0 language subset documented here.
-- v1 does not preserve forward compatibility.
+- The Epic v2 compiler is self-hosted and begins with the v1 language surface.
+- v2 does not preserve forward compatibility.
 
-**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v1 fixed point.
+**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v2 fixed point.
 
 ## Program model
 
@@ -26,7 +26,7 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-build\epic-v1.exe main.ep lib.ep
+build\epic-v2.exe main.ep lib.ep
 ```
 
 This is whole-program source merging, not a module system.
