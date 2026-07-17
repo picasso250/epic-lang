@@ -56,8 +56,8 @@ fun sema_duplicate(path: str, line: i64, what: str, first: str): i64 {
 }
 fun sema_state(): SemaState {
     let state = new SemaState
-    state.types = new SemaTypeDecl[8]
-    state.funcs = new SemaSignature[16]
+    state.types = new SemaTypeDecl[]
+    state.funcs = new SemaSignature[]
     return state
 }
 fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
@@ -132,7 +132,7 @@ fun sema_signature(name: str, return_type: str): SemaSignature {
     let sig = new SemaSignature
     sig.name = name
     sig.return_type = return_type
-    sig.param_types = new str[4]
+    sig.param_types = new str[]
     sig.source_path = "<builtin>"
     sig.builtin = 1
     return sig
@@ -150,6 +150,9 @@ fun sema_add_builtins(state: SemaState): i64 {
     sema_add_builtin(state, sig)
     sig = sema_signature("bytes", "u8[]")
     push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("len", "i64")
+    push(sig.param_types, "lenable")
     sema_add_builtin(state, sig)
     sig = sema_signature("str_new", "str")
     push(sig.param_types, "ptr")
@@ -644,6 +647,10 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             if sema_assignable(element, actual) == 0 {
                 sema_error(state.source_path, expr.args.data[i].line, "push value type " + actual + " is not assignable to " + element)
             }
+        } else if full_name == "len" && i == 0 {
+            if actual != "str" && sema_is_array(actual) == 0 {
+                sema_error(state.source_path, expr.args.data[i].line, "len expects str or array, got " + actual)
+            }
         } else if sema_assignable(expected, actual) == 0 {
             sema_error(state.source_path, expr.args.data[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
@@ -1009,7 +1016,7 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
         state.source_path = node.source_path
         state.return_type = node.type_name
         state.scope_depth = 0
-        state.locals = new SemaLocal[32]
+        state.locals = new SemaLocal[]
         let j = 0
         while j < node.params.len {
             let param = node.params.data[j]

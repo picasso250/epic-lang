@@ -71,7 +71,7 @@ fun merge_inputs(inputs: str[]): AstProgram {
 fun parse_driver_options(): DriverOptions {
     let options = new DriverOptions
     options.output_path = ""
-    options.inputs = new str[8]
+    options.inputs = new str[]
     let i = 1
     while i < argv.len {
         let arg = argv.data[i]

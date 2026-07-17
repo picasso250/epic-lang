@@ -1,0 +1,23 @@
+# EXIT: 0
+# STDOUT: 3:2
+type LenProbe {
+    calls: i64
+}
+fun make_values(probe: LenProbe): i64[] {
+    probe.calls += 1
+    return new i64[2]
+}
+fun main(): void {
+    let text = "abc"
+    let values = new i64[]
+    push(values, 7)
+    push(values, 9)
+    let probe = new LenProbe
+    if len(make_values(probe)) != 2 || probe.calls != 1 {
+        os.ExitProcess(1)
+    }
+    print(itoa(len(text)))
+    print(":")
+    print(itoa(len(values)))
+    print("\n")
+}

@@ -119,14 +119,14 @@ fun ast_block_empty(): AstBlock {
 fun ast_block(): AstBlock {
     let block = new AstBlock
     block.present = 1
-    block.stmts = new AstStmt[8]
+    block.stmts = new AstStmt[]
     return block
 }
 fun ast_program(): AstProgram {
     let program = new AstProgram
-    program.funcs = new AstFunDef[16]
-    program.structs = new AstStructDef[8]
-    program.enums = new AstEnumDef[8]
+    program.funcs = new AstFunDef[]
+    program.structs = new AstStructDef[]
+    program.enums = new AstEnumDef[]
     return program
 }
 fun make_parser_at(tokens: Token[], source_path: str): Parser {
@@ -229,7 +229,7 @@ fun parse_type(p: Parser): str {
     return typ
 }
 fun parse_params(p: Parser): AstParam[] {
-    let params = new AstParam[4]
+    let params = new AstParam[]
     if peek_kind(p, "ID") == 0 {
         return params
     }
@@ -259,7 +259,7 @@ fun parse_struct_def(p: Parser): AstStructDef {
     node.source_path = p.source_path
     node.line = name.line
     node.name = name.text
-    node.fields = new AstStructField[8]
+    node.fields = new AstStructField[]
     expect(p, "LBRACE")
     skip_newlines(p)
     while peek_kind(p, "RBRACE") == 0 {
@@ -284,7 +284,7 @@ fun parse_enum_def(p: Parser): AstEnumDef {
     node.source_path = p.source_path
     node.line = name.line
     node.name = name.text
-    node.members = new AstEnumMember[8]
+    node.members = new AstEnumMember[]
     let first = expect_enum_member(p)
     let member = new AstEnumMember
     member.name = first.text
@@ -544,7 +544,7 @@ fun parse_match_stmt(p: Parser): AstStmt {
     let keyword = expect(p, "MATCH")
     let node = ast_stmt("Match", keyword.line)
     node.expr = parse_expr(p)
-    node.match_arms = new AstMatchArm[8]
+    node.match_arms = new AstMatchArm[]
     expect(p, "LBRACE")
     skip_newlines(p)
     while peek_kind(p, "RBRACE") == 0 {
@@ -712,7 +712,7 @@ fun op_text(kind: str): str {
     return ""
 }
 fun parse_args(p: Parser): AstExpr[] {
-    let args = new AstExpr[4]
+    let args = new AstExpr[]
     if peek_kind(p, "RPAREN") == 0 {
         push(args, parse_expr(p))
         while check(p, "COMMA") == 1 {

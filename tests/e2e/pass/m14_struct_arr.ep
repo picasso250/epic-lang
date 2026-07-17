@@ -4,7 +4,7 @@ type StructArrayToken {
     value: i64
 }
 fun main(): void {
-    let tokens = new StructArrayToken[1]
+    let tokens = new StructArrayToken[]
     push(tokens, new StructArrayToken)
     tokens.data[0].kind = 100
     tokens.data[0].value = 50

@@ -4,7 +4,7 @@ type GcNode {
 }
 
 fun main(): void {
-    let kept = new GcNode[1]
+    let kept = new GcNode[]
     let head = new GcNode
     head.value = 255
 

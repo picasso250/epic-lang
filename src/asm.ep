@@ -82,7 +82,7 @@ fun asm_find(s: str, ch: i64): i64 {
     return 0 - 1
 }
 fun asm_remove_spaces(s: str): str {
-    let out = new u8[s.len]
+    let out = new u8[]
     let i = 0
     while i < s.len {
         if s.data[i] != 32 && s.data[i] != 9 {

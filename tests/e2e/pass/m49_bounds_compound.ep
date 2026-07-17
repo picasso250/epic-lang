@@ -1,0 +1,7 @@
+# EXIT: 1
+# STDOUT: Epic runtime error: index out of bounds
+fun main(): void {
+    let values = new i64[]
+    push(values, 7)
+    values[1] += 9
+}
