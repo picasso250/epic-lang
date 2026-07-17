@@ -410,6 +410,14 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
         collect_expr_strings(e, node.base)
         collect_expr_strings(e, node.index)
         collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "AssignOp" {
+        if node.target_kind == "Field" {
+            collect_expr_strings(e, node.object)
+        } else if node.target_kind == "Subscript" {
+            collect_expr_strings(e, node.base)
+            collect_expr_strings(e, node.index)
+        }
+        collect_expr_strings(e, node.value_expr)
     } else if node.kind == "If" {
         collect_expr_strings(e, node.expr)
         collect_block_strings(e, node.then_block)
@@ -1276,6 +1284,12 @@ fun emit_store_address(e: EmitterState, value_type: TypeInfo, address_slot: i64)
     }
     return 0
 }
+fun emit_local_address(e: EmitterState, name: str): TypeInfo {
+    out_s(e, "    lea rax, ")
+    emit_slot_ref(e, find_local_slot(e, name))
+    out_nl(e)
+    return find_local_type(e, name)
+}
 fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
     let field_type = emit_field_address(e, expr.object, expr.name)
     emit_load_address(e, field_type)
@@ -1401,6 +1415,31 @@ fun emit_field_set(e: EmitterState, stmt: AstStmt): i64 {
     emit_store_address(e, field_type, address_slot)
     return 0
 }
+fun emit_assign_op_address(e: EmitterState, stmt: AstStmt): TypeInfo {
+    if stmt.target_kind == "Var" {
+        return emit_local_address(e, stmt.name)
+    }
+    if stmt.target_kind == "Field" {
+        return emit_field_address(e, stmt.object, stmt.name)
+    }
+    if stmt.target_kind == "Subscript" {
+        return emit_subscript_address(e, stmt.base, stmt.index)
+    }
+    die("internal: unknown compound assignment target")
+    return type_i64()
+}
+fun emit_assign_op(e: EmitterState, stmt: AstStmt): i64 {
+    let target_type = emit_assign_op_address(e, stmt)
+    let address_slot = temp_save_rax(e)
+    emit_load_address(e, target_type)
+    let old_value_slot = temp_save_rax(e)
+    emit_expr(e, stmt.value_expr)
+    let right_slot = temp_save_rax(e)
+    emit_stack_load(e, "rax", old_value_slot)
+    emit_integer_value_op(e, stmt.op, right_slot)
+    emit_store_address(e, target_type, address_slot)
+    return 0
+}
 fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
     let else_id = fresh_label(e)
     let end_id = fresh_label(e)
@@ -1464,6 +1503,9 @@ fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
     }
     if stmt.kind == "FieldSet" {
         return emit_field_set(e, stmt)
+    }
+    if stmt.kind == "AssignOp" {
+        return emit_assign_op(e, stmt)
     }
     if stmt.kind == "If" {
         return emit_if(e, stmt)

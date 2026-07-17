@@ -1,0 +1,35 @@
+# EXIT: 0
+type CompoundBox {
+    wide: i64
+    byte: u8
+}
+fun compound_u8(value: u8): u8 {
+    value += 10
+    return value
+}
+fun main(): void {
+    let value = 10
+    value += 5
+    value -= 3
+    value *= 4
+    value /= 5
+    value %= 4
+    value |= 8
+    value &= 7
+    value <<= 3
+    value >>= 2
+    let box = new CompoundBox
+    box.wide = value
+    box.wide += 40
+    box.byte = 250
+    box.byte += 10
+    let values = new i64[1]
+    values[0] = 3
+    values[0] += 4
+    let bytes = new u8[1]
+    bytes.data[0] = 250
+    bytes.data[0] += 10
+    if value != 2 || box.wide != 42 || box.byte != 4 || values[0] != 7 || bytes[0] != 4 || compound_u8(250) != 4 {
+        os.ExitProcess(1)
+    }
+}

@@ -681,6 +681,60 @@ fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
     }
     return 0
 }
+fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
+    if stmt.target_kind == "Var" {
+        if stmt.name == "argv" {
+            sema_error(state.source_path, stmt.line, "argv is read-only")
+        }
+        let local = sema_find_local(state, stmt.name)
+        if local.name == "" {
+            sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
+        }
+        return local.type_name
+    }
+    if stmt.target_kind == "Field" {
+        let object_type = sema_check_expr(state, stmt.object)
+        if object_type == "str" {
+            sema_error(state.source_path, stmt.line, "str does not support compound assignment")
+        }
+        let field_type = sema_field_type(state, object_type, stmt.name)
+        if field_type == "" {
+            sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
+        }
+        return field_type
+    }
+    if stmt.target_kind == "Subscript" {
+        let base_type = sema_check_expr(state, stmt.base)
+        sema_check_expr(state, stmt.index)
+        sema_require_i64(state, stmt.index, "subscript")
+        if base_type == "str" {
+            sema_error(state.source_path, stmt.line, "str does not support compound assignment")
+        }
+        if sema_is_array(base_type) == 1 {
+            return sema_array_element(base_type)
+        }
+        if sema_is_pointer(base_type) == 1 {
+            return sema_pointer_element(base_type)
+        }
+        sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
+    }
+    sema_error(state.source_path, stmt.line, "internal: unknown compound assignment target")
+    return ""
+}
+fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
+    let target_type = sema_compound_target_type(state, stmt)
+    if target_type != "i64" && target_type != "u8" {
+        sema_error(state.source_path, stmt.line, "compound assignment requires i64 or u8 target, got " + target_type)
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if actual != "i64" {
+        sema_error(state.source_path, stmt.line, "compound assignment requires i64 right operand, got " + actual)
+    }
+    if stmt.op != "+" && stmt.op != "-" && stmt.op != "*" && stmt.op != "/" && stmt.op != "%" && stmt.op != "&" && stmt.op != "|" && stmt.op != "<<" && stmt.op != ">>" {
+        sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + stmt.op)
+    }
+    return 0
+}
 fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
     if state.return_type == "void" {
         if stmt.expr.kind != "" {
@@ -717,6 +771,8 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
         sema_check_field_set(state, stmt)
     } else if stmt.kind == "SubscriptAssign" {
         sema_check_subscript_set(state, stmt)
+    } else if stmt.kind == "AssignOp" {
+        sema_check_assign_op(state, stmt)
     } else if stmt.kind == "If" {
         sema_check_expr(state, stmt.expr)
         sema_require_i64(state, stmt.expr, "if condition")

@@ -1,0 +1,32 @@
+# EXIT: 0
+type CompoundCounter {
+    calls: i64
+}
+type CompoundItem {
+    value: i64
+}
+fun compound_index(counter: CompoundCounter): i64 {
+    counter.calls = counter.calls + 1
+    return 0
+}
+fun compound_rhs(counter: CompoundCounter): i64 {
+    if counter.calls != 1 {
+        os.ExitProcess(1)
+    }
+    counter.calls = counter.calls + 1
+    return 5
+}
+fun main(): void {
+    let counter = new CompoundCounter
+    let values = new i64[1]
+    values[0] = 1
+    values[compound_index(counter)] += compound_rhs(counter)
+    let item = new CompoundItem
+    item.value = 8
+    let items = new CompoundItem[1]
+    items.data[0] = item
+    items.data[0].value += 1
+    if counter.calls != 2 || values[0] != 6 || item.value != 9 {
+        os.ExitProcess(2)
+    }
+}

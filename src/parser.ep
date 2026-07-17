@@ -29,6 +29,8 @@ type AstStmt {
     else_block: AstBlock
     body: AstBlock
     line: i64
+    op: str
+    target_kind: str
 }
 type AstBlock {
     present: i64
@@ -322,7 +324,7 @@ fun is_assignment(p: Parser): i64 {
         } else if kind == "LBRACKET" {
             i = skip_balanced_brackets(p, i)
         } else {
-            if kind == "ASSIGN" {
+            if kind == "ASSIGN" || kind == "ASSIGN_OP" {
                 return 1
             }
             return 0
@@ -378,9 +380,35 @@ fun parse_assign_stmt(p: Parser): AstStmt {
             done = 1
         }
     }
-    expect(p, "ASSIGN")
+    let assignment = advance(p)
+    if assignment.kind != "ASSIGN" && assignment.kind != "ASSIGN_OP" {
+        parse_error(assignment.line, "Expected assignment operator")
+    }
     let value = parse_expr(p)
     expect_stmt_end(p)
+    if assignment.kind == "ASSIGN_OP" {
+        let compound = ast_stmt("AssignOp", name.line)
+        compound.op = str_new(assignment.text.data, assignment.text.len - 1)
+        compound.value_expr = value
+        if lhs.kind == "Var" {
+            compound.target_kind = "Var"
+            compound.name = lhs.name
+            return compound
+        }
+        if lhs.kind == "FieldAccess" {
+            compound.target_kind = "Field"
+            compound.object = lhs.object
+            compound.name = lhs.name
+            return compound
+        }
+        if lhs.kind == "Subscript" {
+            compound.target_kind = "Subscript"
+            compound.base = lhs.base
+            compound.index = lhs.index
+            return compound
+        }
+        parse_error(name.line, "Invalid compound assignment target")
+    }
     if lhs.kind == "Var" {
         let node = ast_stmt("Assign", name.line)
         node.name = lhs.name
