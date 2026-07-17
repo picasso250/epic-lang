@@ -84,7 +84,7 @@ def main() -> int:
     worktree = temporary_worktree_path()
     start = time.perf_counter()
     try:
-        print(f"v0 seed: {seed}")
+        print(f"v0 seed: {seed}", flush=True)
         run(["git", "worktree", "add", "--detach", str(worktree), seed])
         worktree_tools = worktree / "tools"
         worktree_tools.mkdir()
