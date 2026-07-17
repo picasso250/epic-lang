@@ -43,10 +43,10 @@ fun is_hex_digit(c: i64): i64 {
 }
 fun decimal_literal_fits_i64(text: str): i64 {
     let start = 0
-    while start + 1 < text.len && text.data[start] == 48 {
+    while start + 1 < len(text) && text.data[start] == 48 {
         start += 1
     }
-    let digits = text.len - start
+    let digits = len(text) - start
     if digits < 19 {
         return 1
     }
@@ -68,10 +68,10 @@ fun decimal_literal_fits_i64(text: str): i64 {
 }
 fun hex_literal_fits_i64(text: str): i64 {
     let start = 2
-    while start + 1 < text.len && text.data[start] == 48 {
+    while start + 1 < len(text) && text.data[start] == 48 {
         start += 1
     }
-    let digits = text.len - start
+    let digits = len(text) - start
     if digits < 16 {
         return 1
     }
@@ -94,7 +94,7 @@ fun reject_large_literal(text: str, hex: i64): i64 {
 # ── Lexer ───────────────────────────────────────────────────────────────
 fun lex(src: str): Token[] {
     let tokens = new Token[]
-    let n = src.len
+    let n = len(src)
     let pos = 0
     let line = 1
     let p = src.data
@@ -478,7 +478,7 @@ fun lex(src: str): Token[] {
 }
 # ── Dump ────────────────────────────────────────────────────────────────
 fun dump_tokens(tokens: Token[]): i64 {
-    for i: 0:tokens.len {
+    for i: 0:len(tokens) {
         let t = tokens.data[i]
         print(t.text)
         print(" ")
@@ -489,7 +489,7 @@ fun dump_tokens(tokens: Token[]): i64 {
 }
 # ── Main ────────────────────────────────────────────────────────────────
 fun main(): void {
-    if argv.len < 2 {
+    if len(argv) < 2 {
         print("usage: lexer <file>\n")
         os.ExitProcess(1)
     }

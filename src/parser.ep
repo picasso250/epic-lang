@@ -145,7 +145,7 @@ fun make_parser(tokens: Token[]): Parser {
     return make_parser_at(tokens, "")
 }
 fun peek(p: Parser): Token {
-    if p.pos < p.tokens.len {
+    if p.pos < len(p.tokens) {
         return p.tokens.data[p.pos]
     }
     return p.eof
@@ -239,7 +239,7 @@ fun parse_params(p: Parser): AstParam[] {
         param.name = pname.text
         param.type_name = ptype
         push(params, param)
-        if params.len > 4 {
+        if len(params) > 4 {
             parse_error(pname.line, "functions may have at most 4 parameters in v0")
         }
         if check(p, TokenKind.COMMA) == 0 {
@@ -328,7 +328,7 @@ fun parse_program(p: Parser): AstProgram {
         if peek_kind(p, TokenKind.FUN) == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
-            if p.tokens.data[p.pos + 2].kind == TokenKind.ASSIGN {
+            if p.tokens[p.pos + 2].kind == TokenKind.ASSIGN {
                 push(node.enums, parse_enum_def(p))
             } else {
                 push(node.structs, parse_struct_def(p))
@@ -360,7 +360,7 @@ fun parse_block(p: Parser): AstBlock {
 fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     let depth = 1
     i += 1
-    while i < p.tokens.len && depth > 0 {
+    while i < len(p.tokens) && depth > 0 {
         let kind = p.tokens.data[i].kind
         if kind == TokenKind.LBRACKET {
             depth += 1
@@ -376,10 +376,10 @@ fun is_assignment(p: Parser): i64 {
         return 0
     }
     let i = p.pos + 1
-    while i < p.tokens.len {
+    while i < len(p.tokens) {
         let kind = p.tokens.data[i].kind
         if kind == TokenKind.DOT {
-            if i + 1 >= p.tokens.len || p.tokens.data[i + 1].kind != TokenKind.ID {
+            if i + 1 >= len(p.tokens) || p.tokens.data[i + 1].kind != TokenKind.ID {
                 return 0
             }
             i += 2
@@ -450,7 +450,7 @@ fun parse_assign_stmt(p: Parser): AstStmt {
     expect_stmt_end(p)
     if assignment.kind == TokenKind.ASSIGN_OP {
         let compound = ast_stmt("AssignOp", name.line)
-        compound.op = str_new(assignment.text.data, assignment.text.len - 1)
+        compound.op = str_new(assignment.text.data, len(assignment.text) - 1)
         compound.value_expr = value
         if lhs.kind == "Var" {
             compound.target_kind = "Var"
@@ -758,22 +758,22 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
     return current
 }
 fun embed_path_is_absolute(path: str): i64 {
-    if !path.len {
+    if !len(path) {
         return 0
     }
     if path.data[0] == 47 || path.data[0] == 92 {
         return 1
     }
-    if path.len >= 2 && path.data[1] == 58 {
+    if len(path) >= 2 && path.data[1] == 58 {
         return 1
     }
     return 0
 }
 fun embed_resolve_path(source_path: str, path: str): str {
-    if embed_path_is_absolute(path) == 1 || !source_path.len {
+    if embed_path_is_absolute(path) == 1 || !len(source_path) {
         return path
     }
-    let i = source_path.len
+    let i = len(source_path)
     while i > 0 {
         i -= 1
         if source_path.data[i] == 47 || source_path.data[i] == 92 {
@@ -846,7 +846,7 @@ fun parse_primary(p: Parser): AstExpr {
             node.type_name = ""
             node.args = parse_args(p)
             expect(p, TokenKind.RPAREN)
-            if node.args.len > 4 {
+            if len(node.args) > 4 {
                 parse_error(identifier.line, "function calls may have at most 4 arguments in v0")
             }
             return parse_postfix(p, node)

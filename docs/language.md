@@ -28,8 +28,8 @@ are therefore explicit dogfood targets for the next generation:
   `<<=`, and `>>=`;
 - unary integer negation `-` and logical negation `!`;
 - half-open integer range loops whose bounds are evaluated once;
-- `len(value)` for strings and arrays, plus checked direct string and array
-  subscripting with `value[index]`;
+- `len(value)` for strings and arrays, `pop(array)` for stack-style removal,
+  plus checked direct string and array subscripting with `value[index]`;
 - checked semantic analysis for declarations, lexical local scope,
   use-before-declaration, expression and assignment types, call signatures, and
   required return paths.
@@ -374,12 +374,16 @@ to declare them.
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
+| `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
 
 The byte arguments of `str_replace_char` use their low eight bits.
 
-`len(value)` and checked `value[index]` are the preferred container interfaces.
+`len(value)`, `pop(array)`, and checked `value[index]` are the preferred
+container interfaces. `pop` evaluates its array expression once, preserves
+capacity, and clears the removed slot so stale references do not keep objects
+alive through the conservative collector.
 Direct `.data`, `.len`, and `.cap` access remains available for compatibility
 and deliberate low-level code, but exposes the current runtime layout and may be
 deprecated in a future generation. Pointer subscripting and `.data[index]` are

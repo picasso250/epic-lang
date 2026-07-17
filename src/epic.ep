@@ -20,7 +20,7 @@ fun parse_file(path: str): AstProgram {
     return parse_program(p)
 }
 fun has_main(ast: AstProgram): i64 {
-    for i: 0:ast.funcs.len {
+    for i: 0:len(ast.funcs) {
         if ast.funcs.data[i].name == "main" {
             return 1
         }
@@ -28,14 +28,14 @@ fun has_main(ast: AstProgram): i64 {
     return 0
 }
 fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
-    for struct_i: 0:ast.structs.len {
+    for struct_i: 0:len(ast.structs) {
         let s = ast.structs.data[struct_i]
         push(out.structs, s)
     }
-    for enum_i: 0:ast.enums.len {
+    for enum_i: 0:len(ast.enums) {
         push(out.enums, ast.enums.data[enum_i])
     }
-    for func_i: 0:ast.funcs.len {
+    for func_i: 0:len(ast.funcs) {
         let f = ast.funcs.data[func_i]
         if f.name != "main" || is_main_file {
             push(out.funcs, f)
@@ -50,7 +50,7 @@ fun merge_inputs(inputs: str[]): AstProgram {
         die_driver("main file has no main function")
     }
     merge_one(out, main_ast, 1)
-    for i: 1:inputs.len {
+    for i: 1:len(inputs) {
         let ast = parse_file(inputs.data[i])
         merge_one(out, ast, 0)
     }
@@ -61,25 +61,25 @@ fun parse_driver_options(): DriverOptions {
     options.output_path = ""
     options.inputs = new str[]
     let i = 1
-    while i < argv.len {
+    while i < len(argv) {
         let arg = argv.data[i]
         if arg == "-S" {
             options.emit_asm = 1
         } else if arg == "-o" {
             i += 1
-            if i >= argv.len {
+            if i >= len(argv) {
                 die_driver("-o requires an output path")
             }
             options.output_path = argv.data[i]
         } else {
-            if arg.len > 0 && arg.data[0] == 45 {
+            if len(arg) > 0 && arg.data[0] == 45 {
                 die_driver("unknown option '" + arg + "'")
             }
             push(options.inputs, arg)
         }
         i += 1
     }
-    if !options.inputs.len {
+    if !len(options.inputs) {
         die_driver("usage: epic [-S] [-o path] <main.ep> [other.ep...]")
     }
     return options
@@ -109,7 +109,7 @@ fun main(): void {
     if options.emit_asm == 1 {
         write_file(output_path, e.out_buf)
     } else {
-        let asm_text = str_new(e.out_buf.data, e.out_buf.len)
+        let asm_text = str_new(e.out_buf.data, len(e.out_buf))
         let image = assemble_text(asm_text)
         pe_write_exe(output_path, image)
     }

@@ -49,7 +49,7 @@ fun asm_slice(s: str, start: i64, end: i64): str {
 }
 fun asm_trim(s: str): str {
     let a = 0
-    let b = s.len
+    let b = len(s)
     while a < b && (s.data[a] == 32 || s.data[a] == 9 || s.data[a] == 13) {
         a += 1
     }
@@ -59,10 +59,10 @@ fun asm_trim(s: str): str {
     return asm_slice(s, a, b)
 }
 fun asm_starts(s: str, prefix: str): i64 {
-    if s.len < prefix.len {
+    if len(s) < len(prefix) {
         return 0
     }
-    for i: 0:prefix.len {
+    for i: 0:len(prefix) {
         if s.data[i] != prefix.data[i] {
             return 0
         }
@@ -70,7 +70,7 @@ fun asm_starts(s: str, prefix: str): i64 {
     return 1
 }
 fun asm_find(s: str, ch: i64): i64 {
-    for i: 0:s.len {
+    for i: 0:len(s) {
         if s.data[i] == ch {
             return i
         }
@@ -79,12 +79,12 @@ fun asm_find(s: str, ch: i64): i64 {
 }
 fun asm_remove_spaces(s: str): str {
     let out = new u8[]
-    for i: 0:s.len {
+    for i: 0:len(s) {
         if s.data[i] != 32 && s.data[i] != 9 {
             push(out, s.data[i])
         }
     }
-    return str_new(out.data, out.len)
+    return str_new(out.data, len(out))
 }
 fun asm_digit(c: i64): i64 {
     if c >= 48 && c <= 57 {
@@ -99,7 +99,7 @@ fun asm_digit(c: i64): i64 {
     return -1
 }
 fun asm_is_number(s: str): i64 {
-    if s.len == 0 {
+    if len(s) == 0 {
         return 0
     }
     let i = 0
@@ -107,14 +107,14 @@ fun asm_is_number(s: str): i64 {
         i = 1
     }
     let hex = 0
-    if i + 2 <= s.len && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
+    if i + 2 <= len(s) && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
         hex = 1
         i += 2
     }
-    if i >= s.len {
+    if i >= len(s) {
         return 0
     }
-    while i < s.len {
+    while i < len(s) {
         if hex == 0 && (s.data[i] < 48 || s.data[i] > 57) {
             return 0
         }
@@ -128,17 +128,17 @@ fun asm_is_number(s: str): i64 {
 fun asm_number(s: str): i64 {
     let sign = 1
     let i = 0
-    if s.data[0] == 45 {
+    if s[0] == 45 {
         sign = -1
         i = 1
     }
     let base = 10
-    if i + 2 <= s.len && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
+    if i + 2 <= len(s) && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
         base = 16
         i += 2
     }
     let value = 0
-    while i < s.len {
+    while i < len(s) {
         value = value * base + asm_digit(s.data[i])
         i += 1
     }
@@ -196,7 +196,7 @@ fun asm_reg_width(name: str): i64 {
     return 0
 }
 fun asm_qualify(image: ExeImage, name: str): str {
-    if name.len > 0 && name.data[0] == 46 {
+    if len(name) > 0 && name.data[0] == 46 {
         return image.scope + name
     }
     return name
@@ -224,11 +224,11 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
     }
     let body = asm_slice(s, start + 1, stop)
     if asm_starts(body, "rel") == 1 {
-        body = asm_slice(body, 3, body.len)
+        body = asm_slice(body, 3, len(body))
     }
     let pos = 0
     let sign = 1
-    while pos < body.len {
+    while pos < len(body) {
         if body.data[pos] == 43 {
             sign = 1
             pos += 1
@@ -237,7 +237,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
             pos += 1
         }
         let end = pos
-        while end < body.len && body.data[end] != 43 && body.data[end] != 45 {
+        while end < len(body) && body.data[end] != 43 && body.data[end] != 45 {
             end += 1
         }
         let term = asm_slice(body, pos, end)
@@ -245,7 +245,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
         if star >= 0 {
             let rn = asm_slice(term, 0, star)
             op.index = asm_reg(rn)
-            op.scale = asm_number(asm_slice(term, star + 1, term.len))
+            op.scale = asm_number(asm_slice(term, star + 1, len(term)))
             if op.index < 0 || sign < 0 {
                 asm_die("bad index operand: " + text)
             }
@@ -260,7 +260,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
         } else if asm_is_number(term) == 1 {
             op.disp += sign * asm_number(term)
         } else {
-            if op.symbol.len != 0 {
+            if len(op.symbol) != 0 {
                 asm_die("complex symbol operand: " + text)
             }
             op.symbol = asm_qualify(image, term)
@@ -277,13 +277,13 @@ fun asm_parse_operand(image: ExeImage, raw: str): AsmOperand {
     let width = 0
     if asm_starts(text, "byte ") == 1 {
         width = 8
-        text = asm_trim(asm_slice(text, 5, text.len))
+        text = asm_trim(asm_slice(text, 5, len(text)))
     } else if asm_starts(text, "dword ") == 1 {
         width = 32
-        text = asm_trim(asm_slice(text, 6, text.len))
+        text = asm_trim(asm_slice(text, 6, len(text)))
     } else if asm_starts(text, "qword ") == 1 {
         width = 64
-        text = asm_trim(asm_slice(text, 6, text.len))
+        text = asm_trim(asm_slice(text, 6, len(text)))
     }
     if asm_find(text, 91) >= 0 {
         return asm_parse_mem(image, text, width)
@@ -317,9 +317,9 @@ fun asm_image_new(): ExeImage {
 }
 fun asm_offset(image: ExeImage): i64 {
     if image.section == 1 {
-        return image.text.len
+        return len(image.text)
     }
-    return image.data.len
+    return len(image.data)
 }
 fun asm_byte(image: ExeImage, value: i64): i64 {
     if image.section == 1 {
@@ -347,7 +347,7 @@ fun asm_u64(image: ExeImage, value: i64): i64 {
 }
 fun asm_symbol_find(image: ExeImage, name: str): i64 {
     let i = 0
-    while i < image.symbols.len {
+    while i < len(image.symbols) {
         if image.symbols.data[i].name == name {
             return i
         }
@@ -375,7 +375,7 @@ fun asm_define(image: ExeImage, raw_name: str): i64 {
         old.offset = sym.offset
         old.external = 0
     }
-    if raw_name.len > 0 && raw_name.data[0] != 46 {
+    if len(raw_name) > 0 && raw_name.data[0] != 46 {
         image.scope = raw_name
     }
     if name == "_start" {
@@ -455,7 +455,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     if op.kind != 3 {
         asm_die("expected register or memory operand")
     }
-    if op.symbol.len != 0 {
+    if len(op.symbol) != 0 {
         if op.base >= 0 || op.index >= 0 {
             asm_die("symbol plus register is unsupported")
         }
@@ -570,10 +570,10 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         if width == 8 {
             immediate_opcode = 198
         }
-        let reloc_count = image.relocs.len
+        let reloc_count = len(image.relocs)
         dst.width = width
         asm_emit_opcode_rm(image, immediate_opcode, 0, dst)
-        if image.relocs.len > reloc_count {
+        if len(image.relocs) > reloc_count {
             let reloc = image.relocs.data[reloc_count]
             if width == 8 {
                 reloc.addend -= 1
@@ -976,9 +976,9 @@ fun asm_emit_data_value(image: ExeImage, width: i64, raw: str): i64 {
 }
 fun asm_emit_data_list(image: ExeImage, width: i64, args: str): i64 {
     let start = 0
-    while start < args.len {
+    while start < len(args) {
         let end = start
-        while end < args.len && args.data[end] != 44 {
+        while end < len(args) && args.data[end] != 44 {
             end += 1
         }
         asm_emit_data_value(image, width, asm_slice(args, start, end))
@@ -992,7 +992,7 @@ fun asm_parse_data(image: ExeImage, line: str): i64 {
     let args = ""
     if space >= 0 {
         name = asm_slice(line, 0, space)
-        args = asm_trim(asm_slice(line, space + 1, line.len))
+        args = asm_trim(asm_slice(line, space + 1, len(line)))
     }
     if name == "times" {
         let p = asm_find(args, 32)
@@ -1000,13 +1000,13 @@ fun asm_parse_data(image: ExeImage, line: str): i64 {
             asm_die("bad times directive")
         }
         let count = asm_number(asm_slice(args, 0, p))
-        let rest = asm_trim(asm_slice(args, p + 1, args.len))
+        let rest = asm_trim(asm_slice(args, p + 1, len(args)))
         let q = asm_find(rest, 32)
         if q < 0 {
             asm_die("bad times value")
         }
         let directive = asm_slice(rest, 0, q)
-        let value = asm_trim(asm_slice(rest, q + 1, rest.len))
+        let value = asm_trim(asm_slice(rest, q + 1, len(rest)))
         let width = 1
         if directive == "dd" {
             width = 4
@@ -1046,19 +1046,19 @@ fun asm_parse_inst_line(image: ExeImage, line: str): i64 {
     let args = ""
     if space >= 0 {
         name = asm_slice(line, 0, space)
-        args = asm_trim(asm_slice(line, space + 1, line.len))
+        args = asm_trim(asm_slice(line, space + 1, len(line)))
     }
     let a = asm_operand_empty()
     let b = asm_operand_empty()
     let count = 0
-    if args.len != 0 {
+    if len(args) != 0 {
         let comma = asm_find(args, 44)
         if comma < 0 {
             a = asm_parse_operand(image, args)
             count = 1
         } else {
             a = asm_parse_operand(image, asm_slice(args, 0, comma))
-            b = asm_parse_operand(image, asm_slice(args, comma + 1, args.len))
+            b = asm_parse_operand(image, asm_slice(args, comma + 1, len(args)))
             count = 2
         }
     }
@@ -1072,14 +1072,14 @@ fun asm_process_line(image: ExeImage, raw: str): i64 {
         line = asm_slice(raw, 0, semi)
     }
     line = asm_trim(line)
-    if line.len == 0 {
+    if len(line) == 0 {
         return 0
     }
     if asm_starts(line, "global ") == 1 || line == "default rel" {
         return 0
     }
     if asm_starts(line, "extern ") == 1 {
-        asm_extern(image, asm_trim(asm_slice(line, 7, line.len)))
+        asm_extern(image, asm_trim(asm_slice(line, 7, len(line))))
         return 0
     }
     if line == "section .text" {
@@ -1092,8 +1092,8 @@ fun asm_process_line(image: ExeImage, raw: str): i64 {
         image.scope = ""
         return 0
     }
-    if line.data[line.len - 1] == 58 {
-        asm_define(image, asm_trim(asm_slice(line, 0, line.len - 1)))
+    if line.data[len(line) - 1] == 58 {
+        asm_define(image, asm_trim(asm_slice(line, 0, len(line) - 1)))
         return 0
     }
     if asm_parse_data(image, line) == 1 {
@@ -1107,7 +1107,7 @@ fun asm_process_line(image: ExeImage, raw: str): i64 {
 }
 fun asm_resolve_internal(image: ExeImage): i64 {
     let i = 0
-    while i < image.relocs.len {
+    while i < len(image.relocs) {
         let r = image.relocs.data[i]
         let sym_index = asm_symbol_find(image, r.symbol)
         if sym_index < 0 {
@@ -1121,9 +1121,9 @@ fun asm_resolve_internal(image: ExeImage): i64 {
 fun assemble_text(src: str): ExeImage {
     let image = asm_image_new()
     let start = 0
-    while start < src.len {
+    while start < len(src) {
         let end = start
-        while end < src.len && src.data[end] != 10 {
+        while end < len(src) && src.data[end] != 10 {
             end += 1
         }
         asm_process_line(image, asm_slice(src, start, end))

@@ -1,0 +1,47 @@
+# EXIT: 0
+# STDOUT: 9:255:42
+type PopNode {
+    value: i64
+}
+type PopProbe {
+    calls: i64
+    values: i64[]
+}
+fun probe_values(probe: PopProbe): i64[] {
+    probe.calls += 1
+    return probe.values
+}
+fun main(): void {
+    let values = new i64[2]
+    values[0] = 7
+    values[1] = 9
+    let probe = new PopProbe
+    probe.values = values
+    let last = pop(probe_values(probe))
+    if last != 9 || probe.calls != 1 || len(values) != 1 || values.data[1] != 0 {
+        os.ExitProcess(1)
+    }
+
+    let bytes = new u8[1]
+    bytes[0] = 255
+    let byte = pop(bytes)
+    if byte != 255 || len(bytes) != 0 || bytes.data[0] != 0 {
+        os.ExitProcess(2)
+    }
+
+    let node = new PopNode
+    node.value = 42
+    let nodes = new PopNode[1]
+    nodes[0] = node
+    let popped = pop(nodes)
+    if popped.value != 42 || len(nodes) != 0 {
+        os.ExitProcess(3)
+    }
+
+    print(itoa(last))
+    print(":")
+    print(itoa(byte))
+    print(":")
+    print(itoa(popped.value))
+    print("\n")
+}
