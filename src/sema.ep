@@ -61,24 +61,20 @@ fun sema_state(): SemaState {
     return state
 }
 fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
-    let i = 0
-    while i < state.types.len {
+    for i: 0:state.types.len {
         if state.types.data[i].name == name {
             return state.types.data[i]
         }
-        i += 1
     }
     let missing = new SemaTypeDecl
     missing.name = ""
     return missing
 }
 fun sema_find_func(state: SemaState, name: str): SemaSignature {
-    let i = 0
-    while i < state.funcs.len {
+    for i: 0:state.funcs.len {
         if state.funcs.data[i].name == name {
             return state.funcs.data[i]
         }
-        i += 1
     }
     let missing = new SemaSignature
     missing.name = ""

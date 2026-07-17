@@ -61,33 +61,27 @@ fun asm_starts(s: str, prefix: str): i64 {
     if s.len < prefix.len {
         return 0
     }
-    let i = 0
-    while i < prefix.len {
+    for i: 0:prefix.len {
         if s.data[i] != prefix.data[i] {
             return 0
         }
-        i += 1
     }
     return 1
 }
 fun asm_find(s: str, ch: i64): i64 {
-    let i = 0
-    while i < s.len {
+    for i: 0:s.len {
         if s.data[i] == ch {
             return i
         }
-        i += 1
     }
     return -1
 }
 fun asm_remove_spaces(s: str): str {
     let out = new u8[s.len]
-    let i = 0
-    while i < s.len {
+    for i: 0:s.len {
         if s.data[i] != 32 && s.data[i] != 9 {
             push(out, s.data[i])
         }
-        i += 1
     }
     return str_new(out.data, out.len)
 }

@@ -53,8 +53,7 @@ fun decimal_literal_fits_i64(text: str): i64 {
         return 0
     }
     let limit = "9223372036854775807"
-    let i = 0
-    while i < 19 {
+    for i: 0:19 {
         let value = text.data[start + i]
         let maximum = limit.data[i]
         if value < maximum {
@@ -63,7 +62,6 @@ fun decimal_literal_fits_i64(text: str): i64 {
         if value > maximum {
             return 0
         }
-        i += 1
     }
     return 1
 }
@@ -479,8 +477,7 @@ fun lex(src: str): Token[] {
 }
 # ── Dump ────────────────────────────────────────────────────────────────
 fun dump_tokens(tokens: Token[]): i64 {
-    let i = 0
-    while i < tokens.len {
+    for i: 0:tokens.len {
         let t = tokens.data[i]
         print(t.kind)
         print(" ")
@@ -488,7 +485,6 @@ fun dump_tokens(tokens: Token[]): i64 {
         print(" ")
         print(itoa(t.line))
         print("\n")
-        i += 1
     }
     return 0
 }

@@ -362,22 +362,18 @@ fun emitter_type(e: EmitterState, name: str): TypeInfo {
     if is_array_type_name(name) == 1 {
         return type_array(array_elem_name(name))
     }
-    let i = 0
-    while i < e.enums.len {
+    for i: 0:e.enums.len {
         if e.enums.data[i].name == name {
             return type_info("enum", name)
         }
-        i += 1
     }
     return user_type(name)
 }
 fun get_string_id(e: EmitterState, text: str): i64 {
-    let i = 0
-    while i < e.strings.len {
+    for i: 0:e.strings.len {
         if e.strings.data[i].text == text {
             return e.strings.data[i].id
         }
-        i += 1
     }
     e.string_counter += 1
     let s = new StringLit
@@ -398,10 +394,8 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     } else if node.kind == "Unary" {
         collect_expr_strings(e, node.left)
     } else if node.kind == "Call" {
-        let i = 0
-        while i < node.args.len {
+        for i: 0:node.args.len {
             collect_expr_strings(e, node.args.data[i])
-            i += 1
         }
     } else if node.kind == "FieldAccess" {
         collect_expr_strings(e, node.object)
@@ -446,10 +440,8 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
         collect_block_strings(e, node.body)
     } else if node.kind == "Match" {
         collect_expr_strings(e, node.expr)
-        let i = 0
-        while i < node.match_arms.len {
+        for i: 0:node.match_arms.len {
             collect_block_strings(e, node.match_arms.data[i].body)
-            i += 1
         }
     }
     return 0
@@ -458,29 +450,23 @@ fun collect_block_strings(e: EmitterState, block: AstBlock): i64 {
     if !block.present {
         return 0
     }
-    let i = 0
-    while i < block.stmts.len {
+    for i: 0:block.stmts.len {
         collect_stmt_strings(e, block.stmts.data[i])
-        i += 1
     }
     return 0
 }
 fun collect_program_strings(e: EmitterState, program: AstProgram): i64 {
-    let i = 0
-    while i < program.funcs.len {
+    for i: 0:program.funcs.len {
         collect_block_strings(e, program.funcs.data[i].body)
-        i += 1
     }
     return 0
 }
 fun emit_string_bytes(e: EmitterState, s: str): i64 {
-    let i = 0
-    while i < s.len {
+    for i: 0:s.len {
         if i != 0 {
             out_s(e, ", ")
         }
         out_i(e, s.data[i])
-        i += 1
     }
     if s.len != 0 {
         out_s(e, ", ")
@@ -489,15 +475,13 @@ fun emit_string_bytes(e: EmitterState, s: str): i64 {
     return 0
 }
 fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
-    let i = 0
-    while i < ast.funcs.len {
+    for i: 0:ast.funcs.len {
         let fn = ast.funcs.data[i]
         let f = new FuncInfo
         f.name = fn.name
         f.ret_type = emitter_type(e, fn.type_name)
         f.params = fn.params
         push(e.funcs, f)
-        i += 1
     }
     return 0
 }
@@ -518,24 +502,20 @@ fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     return s
 }
 fun find_struct_info(e: EmitterState, name: str): StructInfo {
-    let i = 0
-    while i < e.structs.len {
+    for i: 0:e.structs.len {
         if e.structs.data[i].name == name {
             return e.structs.data[i]
         }
-        i += 1
     }
     die("unknown struct layout")
     return new StructInfo
 }
 fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldInfo {
     let s = find_struct_info(e, struct_name)
-    let i = 0
-    while i < s.fields.len {
+    for i: 0:s.fields.len {
         if s.fields.data[i].name == field_name {
             return s.fields.data[i]
         }
-        i += 1
     }
     print("Codegen error: unknown field ")
     print(struct_name)
@@ -572,29 +552,23 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     add_field(a, "data", type_info("ptr", "str"), 0)
     add_field(a, "len", type_i64(), 8)
     add_field(a, "cap", type_i64(), 16)
-    let i = 0
-    while i < ast.structs.len {
-        let node = ast.structs.data[i]
+    for struct_i: 0:ast.structs.len {
+        let node = ast.structs.data[struct_i]
         s = add_struct_info(e, node.name, node.fields.len * 8)
-        let j = 0
-        while j < node.fields.len {
+        for j: 0:node.fields.len {
             add_field(s, node.fields.data[j].name, emitter_type(e, node.fields.data[j].type_name), j * 8)
-            j += 1
         }
         a = add_struct_info(e, array_layout_name(node.name), 24)
         add_field(a, "data", type_info("ptr", node.name), 0)
         add_field(a, "len", type_i64(), 8)
         add_field(a, "cap", type_i64(), 16)
-        i += 1
     }
-    i = 0
-    while i < ast.enums.len {
-        let enum_node = ast.enums.data[i]
+    for enum_i: 0:ast.enums.len {
+        let enum_node = ast.enums.data[enum_i]
         a = add_struct_info(e, array_layout_name(enum_node.name), 24)
         add_field(a, "data", type_info("ptr", enum_node.name), 0)
         add_field(a, "len", type_i64(), 8)
         add_field(a, "cap", type_i64(), 16)
-        i += 1
     }
     return 0
 }
@@ -606,12 +580,10 @@ fun reset_locals(e: EmitterState): i64 {
     return 0
 }
 fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
-    let i = 0
-    while i < e.locals.len {
+    for i: 0:e.locals.len {
         if e.locals.data[i].name == name {
             return e.locals.data[i].slot
         }
-        i += 1
     }
     e.local_bytes += 8
     let l = new Local
@@ -625,12 +597,10 @@ fun find_local_slot(e: EmitterState, name: str): i64 {
     if name == "argv" {
         return 0
     }
-    let i = 0
-    while i < e.locals.len {
+    for i: 0:e.locals.len {
         if e.locals.data[i].name == name {
             return e.locals.data[i].slot
         }
-        i += 1
     }
     die("undefined local")
     return 0
@@ -639,12 +609,10 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
     if name == "argv" {
         return type_array("str")
     }
-    let i = 0
-    while i < e.locals.len {
+    for i: 0:e.locals.len {
         if e.locals.data[i].name == name {
             return e.locals.data[i].typ
         }
-        i += 1
     }
     die("internal: checked local has no type")
     return type_i64()
@@ -1575,8 +1543,7 @@ fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.expr)
     let subject_slot = temp_save_rax(e)
     let end_id = fresh_label(e)
-    let i = 0
-    while i < stmt.match_arms.len {
+    for i: 0:stmt.match_arms.len {
         let arm = stmt.match_arms.data[i]
         if arm.is_else == 1 {
             emit_block(e, arm.body)
@@ -1591,7 +1558,6 @@ fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
             emit_jmp_id(e, "jmp", "L", end_id)
             emit_label_id(e, "L", next_id)
         }
-        i += 1
     }
     emit_label_id(e, "L", end_id)
     return 0
