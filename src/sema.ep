@@ -118,12 +118,12 @@ fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: 
         if sema_is_array(element) == 1 {
             sema_error(path, line, "nested arrays are not supported in v2")
         }
-        if sema_type_exists(state, element) == 0 {
+        if !sema_type_exists(state, element) {
             sema_error(path, line, "unknown array element type '" + element + "'")
         }
         return 0
     }
-    if sema_type_exists(state, type_name) == 0 {
+    if !sema_type_exists(state, type_name) {
         sema_error(path, line, "unknown type '" + type_name + "'")
     }
     return 0
@@ -429,7 +429,7 @@ fun sema_enum_member_index(node: AstEnumDef, name: str): i64 {
         }
         i = i + 1
     }
-    return 0 - 1
+    return -1
 }
 fun sema_find_field(state: SemaState, type_name: str, field_name: str): AstStructField {
     let node = sema_find_struct(state, type_name)
@@ -635,16 +635,16 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         let actual = sema_check_expr(state, expr.args.data[i])
         let expected = sig.param_types.data[i]
         if full_name == "push" && i == 0 {
-            if sema_is_array(actual) == 0 {
+            if !sema_is_array(actual) {
                 sema_error(state.source_path, expr.args.data[i].line, "push first argument must be an array")
             }
         } else if full_name == "push" && i == 1 {
             let array_type = expr.args.data[0].resolved_type
             let element = sema_array_element(array_type)
-            if sema_assignable(element, actual) == 0 {
+            if !sema_assignable(element, actual) {
                 sema_error(state.source_path, expr.args.data[i].line, "push value type " + actual + " is not assignable to " + element)
             }
-        } else if sema_assignable(expected, actual) == 0 {
+        } else if !sema_assignable(expected, actual) {
             sema_error(state.source_path, expr.args.data[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
         i = i + 1
@@ -770,7 +770,7 @@ fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
         sema_check_block(state, arm.body)
         i = i + 1
     }
-    if has_else == 0 && explicit_count != enum_node.members.len {
+    if !has_else && explicit_count != enum_node.members.len {
         sema_error(state.source_path, stmt.line, "non-exhaustive match on enum " + subject_type)
     }
     if has_else == 1 && explicit_count == enum_node.members.len {
@@ -790,7 +790,7 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
         sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
     }
     let actual = sema_check_expr(state, stmt.value_expr)
-    if sema_assignable(local.type_name, actual) == 0 {
+    if !sema_assignable(local.type_name, actual) {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
     }
     return 0
@@ -805,7 +805,7 @@ fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
         sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
     }
     let actual = sema_check_expr(state, stmt.value_expr)
-    if sema_assignable(field_type, actual) == 0 {
+    if !sema_assignable(field_type, actual) {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + field_type)
     }
     return 0
@@ -825,7 +825,7 @@ fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
         sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
     }
     let actual = sema_check_expr(state, stmt.value_expr)
-    if sema_assignable(element, actual) == 0 {
+    if !sema_assignable(element, actual) {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + element)
     }
     return 0
@@ -898,7 +898,7 @@ fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
         sema_error(state.source_path, stmt.line, "non-void function must return a value")
     }
     let actual = sema_check_expr(state, stmt.expr)
-    if sema_assignable(state.return_type, actual) == 0 {
+    if !sema_assignable(state.return_type, actual) {
         sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
     }
     return 0
@@ -965,7 +965,7 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
     if stmt.kind == "Match" {
         let i = 0
         while i < stmt.match_arms.len {
-            if sema_block_returns(stmt.match_arms.data[i].body) == 0 {
+            if !sema_block_returns(stmt.match_arms.data[i].body) {
                 return 0
             }
             i = i + 1
@@ -977,7 +977,7 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
     return 0
 }
 fun sema_block_returns(block: AstBlock): i64 {
-    if block.present == 0 {
+    if !block.present {
         return 0
     }
     let i = 0
@@ -990,7 +990,7 @@ fun sema_block_returns(block: AstBlock): i64 {
     return 0
 }
 fun sema_check_block(state: SemaState, block: AstBlock): i64 {
-    if block.present == 0 {
+    if !block.present {
         return 0
     }
     state.scope_depth = state.scope_depth + 1
@@ -1017,7 +1017,7 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
             j = j + 1
         }
         sema_check_block(state, node.body)
-        if node.type_name != "void" && sema_block_returns(node.body) == 0 {
+        if node.type_name != "void" && !sema_block_returns(node.body) {
             sema_error(node.source_path, node.line, "function '" + node.name + "' may not return a value on every path")
         }
         i = i + 1

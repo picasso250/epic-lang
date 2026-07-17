@@ -455,7 +455,7 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
     return 0
 }
 fun collect_block_strings(e: EmitterState, block: AstBlock): i64 {
-    if block.present == 0 {
+    if !block.present {
         return 0
     }
     let i = 0
@@ -617,7 +617,7 @@ fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
     let l = new Local
     l.name = name
     l.typ = typ
-    l.slot = 0 - e.local_bytes
+    l.slot = -e.local_bytes
     push(e.locals, l)
     return l.slot
 }
@@ -659,7 +659,7 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     return emitter_type(e, expr.resolved_type)
 }
 fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
-    if block.present == 0 {
+    if !block.present {
         return 0
     }
     let i = 0
@@ -675,7 +675,7 @@ fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
         } else if stmt.kind == "ForRange" {
             add_local(e, stmt.name, type_i64())
             e.local_bytes = e.local_bytes + 8
-            stmt.range_end_slot = 0 - e.local_bytes
+            stmt.range_end_slot = -e.local_bytes
             pre_scan_block(e, stmt.body)
         } else if stmt.kind == "Match" {
             let j = 0
@@ -698,7 +698,7 @@ fun temp_save_rax(e: EmitterState): i64 {
     if e.temp_count > e.temp_peak {
         e.temp_peak = e.temp_count
     }
-    let slot = 0 - (e.temp_base + (nr + 1) * 8)
+    let slot = -(e.temp_base + (nr + 1) * 8)
     emit_stack_store(e, slot, "rax")
     return slot
 }
@@ -1518,7 +1518,7 @@ fun emit_assign_op(e: EmitterState, stmt: AstStmt): i64 {
 fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
     let else_id = fresh_label(e)
     let end_id = fresh_label(e)
-    if stmt.else_block.present == 0 {
+    if !stmt.else_block.present {
         emit_cond_jump(e, stmt.expr, 0, end_id)
         emit_block(e, stmt.then_block)
     } else {
@@ -1597,14 +1597,14 @@ fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
     return 0
 }
 fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
-    if e.loop_ends.len == 0 {
+    if !e.loop_ends.len {
         die("break outside loop")
     }
     emit_jmp_id(e, "jmp", "L", e.loop_ends.data[e.loop_ends.len - 1])
     return 0
 }
 fun emit_continue(e: EmitterState, stmt: AstStmt): i64 {
-    if e.loop_starts.len == 0 {
+    if !e.loop_starts.len {
         die("continue outside loop")
     }
     emit_jmp_id(e, "jmp", "L", e.loop_starts.data[e.loop_starts.len - 1])
@@ -1655,7 +1655,7 @@ fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
     return 0
 }
 fun emit_block(e: EmitterState, block: AstBlock): i64 {
-    if block.present == 0 {
+    if !block.present {
         return 0
     }
     let i = 0
