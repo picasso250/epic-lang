@@ -32,10 +32,9 @@ _extend_u8_cap_loop:
     jmp _extend_u8_cap_loop
 _extend_u8_cap_ready:
     mov [rbp-56], r8
-    mov rcx, [_heap]
-    mov edx, 8
+    mov rcx, r8
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-64], rax
 

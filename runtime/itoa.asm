@@ -38,23 +38,20 @@ _itoa:
     mov [rbp-24], r11     ; save digit count (volatile)
     mov [rbp-32], r8      ; save sign flag
     ; Allocate header (16 bytes)
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8d, 16
+    mov ecx, 16
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-8], rax      ; save header
     ; Compute total len
     mov r8, [rbp-24]       ; digit count
     add r8, [rbp-32]       ; + sign flag
     ; Allocate data (total len + 1)
-    mov rcx, [_heap]
-    mov edx, 8
     push r8               ; save total len
-    inc r8                ; +1 for null
+    mov rcx, r8
+    inc rcx               ; +1 for null
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     pop rdx               ; rdx = total len
     mov rcx, [rbp-8]

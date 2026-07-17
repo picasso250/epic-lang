@@ -27,13 +27,11 @@ _read_file:
     call GetFileSize
     add rsp, 40
     mov [rbp-24], rax      ; size
-    ; buf = HeapAlloc(heap, zero, size + 1)
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8, rax
-    inc r8
+    ; buf = __ep_alloc(size + 1)
+    mov rcx, rax
+    inc rcx
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-32], rax      ; buf
     ; ReadFile(handle, buf, size, &read, NULL)

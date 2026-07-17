@@ -8,11 +8,9 @@ _embed_bytes:
     mov [rbp-8], rcx
     mov [rbp-16], rdx
 
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8d, 24
+    mov ecx, 24
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-24], rax
 
@@ -21,10 +19,9 @@ _embed_bytes:
     jnz _embed_bytes_have_size
     mov r8, 1
 _embed_bytes_have_size:
-    mov rcx, [_heap]
-    mov edx, 8
+    mov rcx, r8
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-32], rax
 

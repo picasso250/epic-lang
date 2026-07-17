@@ -310,6 +310,7 @@ fun emit_runtime(e: EmitterState, source: u8[]): i64 {
     return 0
 }
 fun emit_runtime_helpers(e: EmitterState): i64 {
+    emit_runtime(e, embed("../runtime/gc.asm"))
     emit_runtime(e, embed("../runtime/str_alloc.asm"))
     emit_runtime(e, embed("../runtime/bytes.asm"))
     emit_runtime(e, embed("../runtime/str_cat.asm"))
@@ -1013,10 +1014,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             out_i(e, el_size)
             out_nl(e)
         }
-        emit_mov(e, "rcx", "[_heap]")
-        emit_mov(e, "edx", "8")
+        emit_mov(e, "rcx", "r8")
         emit_inst(e, "sub rsp, 40")
-        emit_call_inst(e, "HeapAlloc")
+        emit_call_inst(e, "__ep_alloc")
         emit_inst(e, "add rsp, 40")
         emit_stack_store(e, new_data_slot, "rax")
         emit_stack_load(e, "rax", arr_slot)
@@ -1305,11 +1305,9 @@ fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64
 }
 fun emit_new(e: EmitterState, expr: AstExpr): i64 {
     let info = find_struct_info(e, expr.name)
-    emit_mov(e, "rcx", "[_heap]")
-    emit_mov(e, "edx", "8")
-    emit_mov_i(e, "r8d", info.size)
+    emit_mov_i(e, "ecx", info.size)
     emit_inst(e, "sub rsp, 40")
-    emit_call_inst(e, "HeapAlloc")
+    emit_call_inst(e, "__ep_alloc")
     emit_inst(e, "add rsp, 40")
     return 0
 }
@@ -1321,11 +1319,9 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     }
     let header_slot = 0
     let cap_slot = 0
-    emit_mov(e, "rcx", "[_heap]")
-    emit_mov(e, "edx", "8")
-    emit_mov(e, "r8d", "24")
+    emit_mov(e, "ecx", "24")
     emit_inst(e, "sub rsp, 40")
-    emit_call_inst(e, "HeapAlloc")
+    emit_call_inst(e, "__ep_alloc")
     emit_inst(e, "add rsp, 40")
     header_slot = temp_save_rax(e)
     if expr.count.kind == "" {
@@ -1348,10 +1344,9 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
         out_i(e, el_size)
         out_nl(e)
     }
-    emit_mov(e, "rcx", "[_heap]")
-    emit_mov(e, "edx", "8")
+    emit_mov(e, "rcx", "r8")
     emit_inst(e, "sub rsp, 40")
-    emit_call_inst(e, "HeapAlloc")
+    emit_call_inst(e, "__ep_alloc")
     emit_inst(e, "add rsp, 40")
     emit_stack_load(e, "rcx", header_slot)
     emit_mov(e, "[rcx]", "rax")

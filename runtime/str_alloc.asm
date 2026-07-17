@@ -9,20 +9,16 @@ _str_alloc:
     mov [rbp-8], rcx      ; save src
     mov [rbp-16], rdx     ; save len
     ; Allocate header (16 bytes)
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8d, 16
+    mov ecx, 16
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-24], rax     ; save header ptr
     ; Allocate data (len + 1 for null terminator)
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8, [rbp-16]      ; len
-    inc r8                ; +1 for null
+    mov rcx, [rbp-16]     ; len
+    inc rcx               ; +1 for null
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
                           ; rax = data ptr
     ; Store data ptr and len in header

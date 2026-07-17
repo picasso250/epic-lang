@@ -11,20 +11,16 @@ _str_cat:
     add r8, [rdx+8]
     mov [rbp-24], r8
 
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8d, 16
+    mov ecx, 16
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-32], rax
 
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8, [rbp-24]
-    inc r8
+    mov rcx, [rbp-24]
+    inc rcx
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-40], rax
 

@@ -7,11 +7,9 @@ _bytes:
     sub rsp, 40
     mov [rbp-8], rcx       ; save &str
 
-    mov rcx, [_heap]
-    mov edx, 8
-    mov r8d, 24
+    mov ecx, 24
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-16], rax      ; header
 
@@ -25,10 +23,9 @@ _bytes:
 _bytes_have_cap:
     mov [rbp-32], r8       ; alloc cap
 
-    mov rcx, [_heap]
-    mov edx, 8
+    mov rcx, r8
     sub rsp, 40
-    call HeapAlloc
+    call __ep_alloc
     add rsp, 40
     mov [rbp-40], rax      ; data
 
