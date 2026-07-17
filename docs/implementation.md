@@ -174,6 +174,11 @@ Primary runtime acceptance:
 python runtests.py --linker py
 ```
 
+The runner combines examples and end-to-end sources into one generated Epic
+program, compiles it once, and starts the resulting process separately for each
+case. This avoids antivirus false positives on many tiny executables and keeps
+the stage-0 test cycle short.
+
 Stage-0 checks:
 
 ```text
@@ -181,4 +186,4 @@ python test_stage0_surface.py
 pwsh ./testall.ps1
 ```
 
-v0 has no Epic compiler implementation and no v0 fixed-point test. Its eventual bootstrap acceptance is that the Python compiler builds an Epic v1 compiler, after which v1 reaches its own fixed point. The examples remain the current stage-0 behavioral suite, not a complete language specification.
+v0 has no Epic compiler implementation and no v0 fixed-point test. Its eventual bootstrap acceptance is that the Python compiler builds an Epic v1 compiler, after which v1 reaches its own fixed point. The bundled examples and regressions are the current stage-0 behavioral suite, not a complete language specification.

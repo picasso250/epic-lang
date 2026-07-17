@@ -1,11 +1,11 @@
 # Test: dynamic product arrays store object references
-type Point {
+type VectorPoint {
     x: i64
     y: i64
 }
 fun main(): void {
-    let points = new Point[4]
-    let p = new Point
+    let points = new VectorPoint[4]
+    let p = new VectorPoint
     p.x = 42
     p.y = 99
     push(points, p)

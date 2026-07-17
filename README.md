@@ -21,7 +21,7 @@ Product types use `type Name { ... }`. The `struct` keyword and sum declarations
 - [Language reference](docs/language.md), including built-in data structures and functions
 - [Implementation notes](docs/implementation.md)
 
-`examples/` contains five small, ordered learning programs. Broader regression coverage lives under `tests/e2e/pass/`; `runtests.py` executes both suites.
+`examples/` contains five small, ordered learning programs. Broader regression coverage lives under `tests/e2e/pass/`; `runtests.py` combines both suites into one executable and selects each case at process startup.
 
 The intended bootstrap chain is:
 

@@ -1,13 +1,13 @@
 # EXIT: 0
-type Token {
+type DebugToken {
     kind: i64
     value: i64
 }
 fun main(): void {
-    let tokens = new Token[3]
-    push(tokens, new Token)
-    push(tokens, new Token)
-    push(tokens, new Token)
+    let tokens = new DebugToken[3]
+    push(tokens, new DebugToken)
+    push(tokens, new DebugToken)
+    push(tokens, new DebugToken)
     tokens.data[2].kind = 42
     os.ExitProcess(0)
 }

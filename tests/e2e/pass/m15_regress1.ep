@@ -1,11 +1,11 @@
 # EXIT: 18
-type Token {
+type RegressionToken {
     kind: i64
 }
 fun main(): void {
     let a = 5
     let b = 6
     let c = 7
-    let arr = new Token[1]
+    let arr = new RegressionToken[1]
     os.ExitProcess(a + b + c)
 }
