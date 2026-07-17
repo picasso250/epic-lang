@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 
 ROOT = Path(__file__).resolve().parent
@@ -26,28 +27,31 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def compile_self(compiler: Path) -> None:
+def compile_self(compiler: Path) -> float:
+    start = time.perf_counter()
     run([str(compiler), *SOURCES])
+    elapsed = time.perf_counter() - start
     if not SELF_OUTPUT.is_file():
         raise RuntimeError(f"compiler did not produce {SELF_OUTPUT}")
+    return elapsed
 
 
 def main() -> int:
     run([sys.executable, "build_epic_v1.py"])
     FIXED_POINT.mkdir(parents=True, exist_ok=True)
 
-    compile_self(SEED)
+    elapsed_1 = compile_self(SEED)
     generation_1 = FIXED_POINT / "generation-1.exe"
     shutil.copy2(SELF_OUTPUT, generation_1)
 
-    compile_self(generation_1)
+    elapsed_2 = compile_self(generation_1)
     generation_2 = FIXED_POINT / "generation-2.exe"
     shutil.copy2(SELF_OUTPUT, generation_2)
 
     hash_1 = digest(generation_1)
     hash_2 = digest(generation_2)
-    print(f"generation 1: {generation_1.stat().st_size} bytes {hash_1}")
-    print(f"generation 2: {generation_2.stat().st_size} bytes {hash_2}")
+    print(f"generation 1: {generation_1.stat().st_size} bytes {hash_1} {elapsed_1:.3f} s")
+    print(f"generation 2: {generation_2.stat().st_size} bytes {hash_2} {elapsed_2:.3f} s")
     if generation_1.read_bytes() != generation_2.read_bytes():
         raise RuntimeError("Epic v1 did not reach a byte-identical fixed point")
     print("fixed point: byte-identical")
