@@ -46,7 +46,7 @@ fun sema_duplicate(path: str, line: i64, what: str, first: str): i64 {
     print(itoa(line))
     print(": semantic error: duplicate ")
     print(what)
-    print("'; first declared at ")
+    print("; first declared at ")
     print(first)
     print("\n")
     os.ExitProcess(1)
@@ -182,36 +182,79 @@ fun sema_add_builtins(state: SemaState): i64 {
     sema_add_builtin(state, sig)
     return 0
 }
-fun sema_add_os_signature(state: SemaState, name: str, return_type: str, count: i64): i64 {
-    let sig = sema_signature("os." + name, return_type)
-    let i = 0
-    while i < count {
-        push(sig.param_types, "abi")
-        i = i + 1
-    }
-    sema_add_builtin(state, sig)
-    return 0
-}
 fun sema_add_os_signatures(state: SemaState): i64 {
-    sema_add_os_signature(state, "Sleep", "void", 1)
-    sema_add_os_signature(state, "GetTickCount64", "i64", 0)
-    sema_add_os_signature(state, "GetLastError", "i64", 0)
-    sema_add_os_signature(state, "SetLastError", "void", 1)
-    sema_add_os_signature(state, "GetStdHandle", "i64", 1)
-    sema_add_os_signature(state, "CloseHandle", "i64", 1)
-    sema_add_os_signature(state, "lstrlenA", "i64", 1)
-    sema_add_os_signature(state, "lstrcmpA", "i64", 2)
-    sema_add_os_signature(state, "MessageBoxA", "i64", 4)
-    sema_add_os_signature(state, "Beep", "i64", 2)
-    sema_add_os_signature(state, "GetCurrentProcess", "i64", 0)
-    sema_add_os_signature(state, "GetCurrentProcessId", "i64", 0)
-    sema_add_os_signature(state, "GetCurrentThreadId", "i64", 0)
-    sema_add_os_signature(state, "ExitProcess", "void", 1)
-    sema_add_os_signature(state, "GetFileAttributesA", "i64", 1)
-    sema_add_os_signature(state, "CreateDirectoryA", "i64", 2)
-    sema_add_os_signature(state, "CreateFileA", "i64", 7)
-    sema_add_os_signature(state, "ReadFile", "i64", 5)
-    sema_add_os_signature(state, "WriteFile", "i64", 5)
+    let sig = sema_signature("os.Sleep", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetTickCount64", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetLastError", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.SetLastError", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetStdHandle", "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.CloseHandle", "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.lstrlenA", "i64")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.lstrcmpA", "i64")
+    push(sig.param_types, "str")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.MessageBoxA", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "cstr_or_null")
+    push(sig.param_types, "cstr_or_null")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.Beep", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetCurrentProcess", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetCurrentProcessId", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetCurrentThreadId", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.ExitProcess", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetFileAttributesA", "i64")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.CreateDirectoryA", "i64")
+    push(sig.param_types, "str")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.CreateFileA", "i64")
+    push(sig.param_types, "str")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.ReadFile", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "buffer_ptr")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "ptr_or_null")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.WriteFile", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "buffer_ptr")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "ptr_or_null")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
     return 0
 }
 fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
@@ -320,6 +363,7 @@ fun sema_find_struct(state: SemaState, name: str): AstStructDef {
     }
     let missing = new AstStructDef
     missing.name = ""
+    missing.fields = new AstStructField[]
     return missing
 }
 fun sema_find_field(state: SemaState, type_name: str, field_name: str): AstStructField {
@@ -414,15 +458,19 @@ fun sema_assignable(expected: str, actual: str): i64 {
     if expected == "u8" && actual == "i64" {
         return 1
     }
-    if expected == "abi" {
-        if actual == "i64" || actual == "str" || sema_is_pointer(actual) == 1 {
-            return 1
-        }
-    }
     if expected == "ptr" && sema_is_pointer(actual) == 1 {
         return 1
     }
     if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
+        return 1
+    }
+    if expected == "cstr_or_null" && (actual == "str" || actual == "i64") {
+        return 1
+    }
+    if expected == "buffer_ptr" && (actual == "str" || sema_is_pointer(actual) == 1) {
+        return 1
+    }
+    if expected == "ptr_or_null" && (actual == "i64" || sema_is_pointer(actual) == 1) {
         return 1
     }
     return 0
