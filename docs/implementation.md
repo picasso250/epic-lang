@@ -49,9 +49,10 @@ only part of the trusted Python stage-0 route used to create the first seed.
 The lexer and parser dogfood nominal enums directly. `Token.kind` is a
 `TokenKind`; expression and statement nodes use `AstExprKind` and
 `AstStmtKind`; assignment targets use `AssignTargetKind`; and unary and binary
-operators use `OperatorKind`. Complete dispatches in parsing, semantic
-analysis, and code generation use exhaustive `match` statements without an
-`else` arm.
+operators use `OperatorKind`. Dispatches that own the complete domain use
+exhaustive `match` statements without an `else` arm. Helpers that deliberately
+accept only a documented subset, such as unary, comparison, or integer-value
+operator lowering, use `else` to reject violations of that narrower contract.
 
 The parser returns exact records for program structure, including programs,
 product declarations, functions, parameters, fields, and blocks. Every

@@ -680,69 +680,20 @@ fun sema_check_binary(state: SemaState, expr: AstExpr): str {
                 result = "i64"
             }
         }
-        OperatorKind.Negate {
-        }
-        OperatorKind.LogicalNot {
+        else {
+            sema_error(state.source_path, expr.line, "unsupported binary operator " + operator_text(expr.op))
         }
     }
     if result == "" {
         match expr.op {
-            OperatorKind.Add {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.Subtract {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.Multiply {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.Divide {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.Remainder {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.BitAnd {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.BitOr {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.ShiftLeft {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.ShiftRight {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
             OperatorKind.Equal {
                 sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires two integers, two strings, or two values of the same enum type")
             }
             OperatorKind.NotEqual {
                 sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires two integers, two strings, or two values of the same enum type")
             }
-            OperatorKind.Less {
+            else {
                 sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.LessEqual {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.Greater {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.GreaterEqual {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.LogicalAnd {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.LogicalOr {
-                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
-            }
-            OperatorKind.Negate {
-                sema_error(state.source_path, expr.line, "unsupported binary operator " + operator_text(expr.op))
-            }
-            OperatorKind.LogicalNot {
-                sema_error(state.source_path, expr.line, "unsupported binary operator " + operator_text(expr.op))
             }
         }
     }
@@ -754,60 +705,12 @@ fun sema_check_unary(state: SemaState, expr: AstExpr): str {
         sema_error(state.source_path, expr.line, "unary operator " + operator_text(expr.op) + " requires i64 operand, got " + operand)
     }
     match expr.op {
-        OperatorKind.Add {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Subtract {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Multiply {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Divide {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Remainder {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.BitAnd {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.BitOr {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.ShiftLeft {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.ShiftRight {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Equal {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.NotEqual {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Less {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.LessEqual {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.Greater {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.GreaterEqual {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.LogicalAnd {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
-        OperatorKind.LogicalOr {
-            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
-        }
         OperatorKind.Negate {
         }
         OperatorKind.LogicalNot {
+        }
+        else {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
         }
     }
     return "i64"
@@ -1090,34 +993,7 @@ fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
         }
         OperatorKind.ShiftRight {
         }
-        OperatorKind.Equal {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.NotEqual {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.Less {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.LessEqual {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.Greater {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.GreaterEqual {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.LogicalAnd {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.LogicalOr {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.Negate {
-            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
-        }
-        OperatorKind.LogicalNot {
+        else {
             sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
         }
     }

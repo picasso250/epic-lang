@@ -1079,35 +1079,8 @@ fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64): i
             emit_label_id(e, "L", shift_right_ok)
             emit_inst(e, "sar rax, cl")
         }
-        OperatorKind.Equal {
-            die("internal: comparison used as integer value operator")
-        }
-        OperatorKind.NotEqual {
-            die("internal: comparison used as integer value operator")
-        }
-        OperatorKind.Less {
-            die("internal: comparison used as integer value operator")
-        }
-        OperatorKind.LessEqual {
-            die("internal: comparison used as integer value operator")
-        }
-        OperatorKind.Greater {
-            die("internal: comparison used as integer value operator")
-        }
-        OperatorKind.GreaterEqual {
-            die("internal: comparison used as integer value operator")
-        }
-        OperatorKind.LogicalAnd {
-            die("internal: logical operator used as integer value operator")
-        }
-        OperatorKind.LogicalOr {
-            die("internal: logical operator used as integer value operator")
-        }
-        OperatorKind.Negate {
-            die("internal: unary operator used as integer value operator")
-        }
-        OperatorKind.LogicalNot {
-            die("internal: unary operator used as integer value operator")
+        else {
+            die("internal: operator is not an integer value operator")
         }
     }
     return 0
@@ -1217,17 +1190,8 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
             emit_inst(e, "setge al")
             emit_inst(e, "movzx eax, al")
         }
-        OperatorKind.LogicalAnd {
-            die("internal: logical operator reached eager binary lowering")
-        }
-        OperatorKind.LogicalOr {
-            die("internal: logical operator reached eager binary lowering")
-        }
-        OperatorKind.Negate {
-            die("internal: unary operator used by binary expression")
-        }
-        OperatorKind.LogicalNot {
-            die("internal: unary operator used by binary expression")
+        else {
+            die("internal: operator reached eager binary lowering")
         }
     }
     return 0
@@ -1235,57 +1199,6 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
 fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
     emit_expr(e, expr.left)
     match expr.op {
-        OperatorKind.Add {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Subtract {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Multiply {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Divide {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Remainder {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.BitAnd {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.BitOr {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.ShiftLeft {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.ShiftRight {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Equal {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.NotEqual {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Less {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.LessEqual {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Greater {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.GreaterEqual {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.LogicalAnd {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.LogicalOr {
-            die("internal: binary operator used by unary expression")
-        }
         OperatorKind.Negate {
             emit_inst(e, "neg rax")
         }
@@ -1293,6 +1206,9 @@ fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
             emit_inst(e, "test rax, rax")
             emit_inst(e, "sete al")
             emit_inst(e, "movzx eax, al")
+        }
+        else {
+            die("internal: binary operator used by unary expression")
         }
     }
     return 0
@@ -1317,33 +1233,6 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
     }
     let jump = ""
     match expr.op {
-        OperatorKind.Add {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.Subtract {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.Multiply {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.Divide {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.Remainder {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.BitAnd {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.BitOr {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.ShiftLeft {
-            die("internal: non-comparison used by comparison jump")
-        }
-        OperatorKind.ShiftRight {
-            die("internal: non-comparison used by comparison jump")
-        }
         OperatorKind.Equal {
             if jump_if_true == 1 {
                 jump = "jz"
@@ -1386,17 +1275,8 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
                 jump = "jl"
             }
         }
-        OperatorKind.LogicalAnd {
-            die("internal: logical operator used by comparison jump")
-        }
-        OperatorKind.LogicalOr {
-            die("internal: logical operator used by comparison jump")
-        }
-        OperatorKind.Negate {
-            die("internal: unary operator used by comparison jump")
-        }
-        OperatorKind.LogicalNot {
-            die("internal: unary operator used by comparison jump")
+        else {
+            die("internal: non-comparison used by comparison jump")
         }
     }
     emit_jmp_id(e, jump, "L", label)
@@ -1483,10 +1363,7 @@ fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, lab
             }
             return 0
         }
-        OperatorKind.Negate {
-            die("internal: unary operator used by binary expression")
-        }
-        OperatorKind.LogicalNot {
+        else {
             die("internal: unary operator used by binary expression")
         }
     }
@@ -1494,57 +1371,6 @@ fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, lab
 }
 fun emit_unary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
     match expr.op {
-        OperatorKind.Add {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Subtract {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Multiply {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Divide {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Remainder {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.BitAnd {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.BitOr {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.ShiftLeft {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.ShiftRight {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Equal {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.NotEqual {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Less {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.LessEqual {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.Greater {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.GreaterEqual {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.LogicalAnd {
-            die("internal: binary operator used by unary expression")
-        }
-        OperatorKind.LogicalOr {
-            die("internal: binary operator used by unary expression")
-        }
         OperatorKind.Negate {
             return emit_value_jump(e, expr, jump_if_true, label)
         }
@@ -1553,6 +1379,9 @@ fun emit_unary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
                 return emit_cond_jump(e, expr.left, 0, label)
             }
             return emit_cond_jump(e, expr.left, 1, label)
+        }
+        else {
+            die("internal: binary operator used by unary expression")
         }
     }
     return 0
