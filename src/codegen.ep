@@ -257,6 +257,7 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/read_file.asm"))
     emit_runtime(e, embed("../runtime/write_file.asm"))
     emit_runtime(e, embed("../runtime/bounds.asm"))
+    emit_runtime(e, embed("../runtime/pop.asm"))
     return 0
 }
 fun make_emitter(): EmitterState {
@@ -875,6 +876,27 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "sub rsp, 8")
         emit_call_inst(e, "_write_file")
         emit_inst(e, "add rsp, 8")
+        return 0
+    }
+    if name == "pop" {
+        let pop_arr_type = expr_type(e, expr.args.data[0])
+        let pop_elem = pop_arr_type.name
+        emit_expr(e, expr.args.data[0])
+        let pop_arr_slot = temp_save_rax(e)
+        emit_stack_load(e, "rax", pop_arr_slot)
+        emit_mov(e, "rcx", "[rax+8]")
+        emit_inst(e, "test rcx, rcx")
+        emit_inst(e, "jz __ep_pop_fail")
+        emit_inst(e, "dec rcx")
+        emit_mov(e, "[rax+8]", "rcx")
+        emit_mov(e, "rdx", "[rax]")
+        if pop_elem == "u8" {
+            emit_inst(e, "movzx eax, byte [rdx+rcx]")
+            emit_inst(e, "mov byte [rdx+rcx], 0")
+        } else {
+            emit_inst(e, "mov rax, [rdx+rcx*8]")
+            emit_inst(e, "mov qword [rdx+rcx*8], 0")
+        }
         return 0
     }
     if name == "push" {

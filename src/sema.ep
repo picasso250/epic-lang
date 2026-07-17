@@ -179,6 +179,9 @@ fun sema_add_builtins(state: SemaState): i64 {
     push(sig.param_types, "array")
     push(sig.param_types, "element")
     sema_add_builtin(state, sig)
+    sig = sema_signature("pop", "element")
+    push(sig.param_types, "array")
+    sema_add_builtin(state, sig)
     sig = sema_signature("extend", "void")
     push(sig.param_types, "u8[]")
     push(sig.param_types, "u8[]")
@@ -651,10 +654,17 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             if actual != "str" && sema_is_array(actual) == 0 {
                 sema_error(state.source_path, expr.args.data[i].line, "len expects str or array, got " + actual)
             }
+        } else if full_name == "pop" && i == 0 {
+            if sema_is_array(actual) == 0 {
+                sema_error(state.source_path, expr.args.data[i].line, "pop expects an array, got " + actual)
+            }
         } else if sema_assignable(expected, actual) == 0 {
             sema_error(state.source_path, expr.args.data[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
         i = i + 1
+    }
+    if full_name == "pop" {
+        return sema_promote(sema_array_element(expr.args.data[0].resolved_type))
     }
     return sema_promote(sig.return_type)
 }
