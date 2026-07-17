@@ -24,7 +24,7 @@ fun main(): void {
         os.ExitProcess(3)
     }
 
-    let values = new i64[4]
+    let values = new i64[]
     push(values, 1)
     push(values, 2)
     let snapshot = 0

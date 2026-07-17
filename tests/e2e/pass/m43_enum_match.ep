@@ -55,7 +55,7 @@ fun main(): void {
     let other = OtherFlavor.Vanilla
     let box = new FlavorBox
     box.value = flavor
-    let values = new Flavor[2]
+    let values = new Flavor[]
     push(values, Flavor.Mint)
     push(values, Flavor.Vanilla)
     values[0] = Flavor.Mint

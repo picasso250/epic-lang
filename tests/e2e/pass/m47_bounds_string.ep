@@ -1,0 +1,7 @@
+# EXIT: 1
+# STDOUT: Epic runtime error: index out of bounds
+fun main(): void {
+    let text = "abc"
+    let value = text[-1]
+    print(itoa(value))
+}

@@ -1,0 +1,20 @@
+# EXIT: 0
+# STDOUT: 3:0
+type ArrayCountProbe {
+    calls: i64
+}
+fun array_count(probe: ArrayCountProbe): i64 {
+    probe.calls += 1
+    return 3
+}
+fun main(): void {
+    let probe = new ArrayCountProbe
+    let values = new i64[array_count(probe)]
+    if probe.calls != 1 {
+        os.ExitProcess(1)
+    }
+    print(itoa(len(values)))
+    print(":")
+    print(itoa(values[1]))
+    print("\n")
+}

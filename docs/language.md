@@ -28,7 +28,8 @@ are therefore explicit dogfood targets for the next generation:
   `<<=`, and `>>=`;
 - unary integer negation `-` and logical negation `!`;
 - half-open integer range loops whose bounds are evaluated once;
-- direct string and array subscripting with `value[index]`;
+- `len(value)` for strings and arrays, plus checked direct string and array
+  subscripting with `value[index]`;
 - checked semantic analysis for declarations, lexical local scope,
   use-before-declaration, expression and assignment types, call signatures, and
   required return paths.
@@ -96,14 +97,17 @@ contents. There is no by-value product or array copy semantics in v1.
 
 | Field or expression | Meaning |
 | --- | --- |
+| `len(s)` | number of bytes, excluding the trailing NUL |
+| `s[i]` | checked byte access; invalid indices terminate the program |
 | `s.data` | low-level address of the first byte |
-| `s[i]` | byte at index `i` |
-| `s.data[i]` | byte at index `i` |
-| `s.len` | number of bytes, excluding the trailing NUL |
+| `s.data[i]` | unchecked low-level byte access |
+| `s.len` | compatibility access to the internal length field |
 
 The runtime keeps a trailing NUL for Win32 interop, but it is not part of the
-string length. Mutating bytes through `s.data` is outside the language
-contract. Use `new u8[n]` for mutable byte buffers.
+string length. Direct `s[i]` rejects negative indices and indices greater than
+or equal to `len(s)`, printing `Epic runtime error: index out of bounds` before
+terminating. Mutating bytes through `s.data` is outside the language contract.
+Use `new u8[n]` for mutable byte buffers.
 
 ### Dynamic arrays
 
@@ -112,14 +116,18 @@ contract. Use `new u8[n]` for mutable byte buffers.
 | Expression | Meaning |
 | --- | --- |
 | `new T[]` | empty dynamic array with default capacity |
-| `new T[n]` | empty dynamic array with capacity at least `n` |
-| `a[i]` | element at index `i` |
-| `a.data[i]` | element at index `i` |
-| `a.len` | current element count |
-| `a.cap` | current capacity |
+| `new T[n]` | dynamic array of length `n` and capacity at least `n`, with zero-initialized elements |
+| `len(a)` | current element count |
+| `a[i]` | checked element access; invalid indices terminate the program |
+| `a.data[i]` | unchecked low-level element access |
+| `a.len` | compatibility access to the internal length field |
+| `a.cap` | compatibility access to the internal capacity field |
 
-`new T[n]` sets capacity, not length. The initial `len` is always 0. `push`
-and `extend` are documented under built-in functions.
+`new T[]` starts empty. `new T[n]` evaluates `n` once, requires a
+non-negative value, and creates `n` zero-initialized elements with `len(a) == n`.
+Direct `a[i]` rejects negative indices and indices greater than or equal to
+`len(a)`. `push` appends after the initialized elements; `push` and `extend` are
+documented under built-in functions.
 
 ### Built-in global
 
@@ -194,7 +202,7 @@ rejected outside loops.
 An integer range loop traverses a half-open interval:
 
 ```epic
-for i: 0:items.len {
+for i: 0:len(items) {
     use(items[i])
 }
 ```
@@ -207,8 +215,8 @@ such as `for i: -3:2`.
 The iterator is an implicit, read-only `i64` local visible only in the loop
 body. It cannot be assigned or used as a compound-assignment target. `continue`
 advances the iterator before the next condition check, while `break` exits the
-nearest `while` or `for`. v3 has no range step, automatic reverse iteration,
-or `len(x)` builtin; strings and arrays expose `.len`.
+nearest `while` or `for`. v3 has no range step or automatic reverse
+iteration.
 
 ## Product types
 
@@ -360,6 +368,7 @@ to declare them.
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
+| `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
@@ -369,6 +378,12 @@ to declare them.
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
 
 The byte arguments of `str_replace_char` use their low eight bits.
+
+`len(value)` and checked `value[index]` are the preferred container interfaces.
+Direct `.data`, `.len`, and `.cap` access remains available for compatibility
+and deliberate low-level code, but exposes the current runtime layout and may be
+deprecated in a future generation. Pointer subscripting and `.data[index]` are
+unchecked.
 
 `embed` accepts exactly one string literal. Relative paths are resolved against
 the `.ep` file containing the expression; absolute paths are used unchanged.

@@ -3,7 +3,7 @@
 # STDOUT: 1
 # STDOUT: 6
 fun main(): void {
-    let xs = new i64[4]
+    let xs = new i64[]
     push(xs, 1)
     push(xs, 2)
     push(xs, 3)

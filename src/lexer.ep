@@ -93,7 +93,7 @@ fun reject_large_literal(text: str, hex: i64): i64 {
 }
 # ── Lexer ───────────────────────────────────────────────────────────────
 fun lex(src: str): Token[] {
-    let tokens = new Token[4096]
+    let tokens = new Token[]
     let n = src.len
     let pos = 0
     let line = 1
