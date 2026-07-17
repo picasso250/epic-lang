@@ -6,7 +6,7 @@
 # STDOUT: 1
 fun line(value: i64): void {
     putstr(itoa(value))
-    putc(10)
+    putstr("\n")
 }
 fun main(): void {
     line(0xFF)

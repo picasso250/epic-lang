@@ -5,17 +5,17 @@ fun main(): void {
     let x = 10
     if x > 5 {
         putstr(itoa(1))
-        putc(10)
+        putstr("\n")
     }
     if x == 1 {
         putstr(itoa(999))
-        putc(10)
+        putstr("\n")
     } else if x == 10 {
         putstr(itoa(2))
-        putc(10)
+        putstr("\n")
     } else {
         putstr(itoa(999))
-        putc(10)
+        putstr("\n")
     }
     os.ExitProcess(0)
 }

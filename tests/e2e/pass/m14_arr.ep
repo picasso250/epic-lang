@@ -6,6 +6,6 @@ fun main(): void {
     xs.data[1] = 42
     xs.data[2] = 7
     putstr(itoa(xs.data[0]))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }

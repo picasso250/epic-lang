@@ -156,7 +156,6 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 
 | Builtin | Implementation note |
 | --- | --- |
-| `putc` | writes one byte through `WriteFile` |
 | `putstr` | writes `s.data` for `s.len` bytes |
 | `itoa` | calls `_itoa` runtime helper |
 | `str_new` | calls `_str_alloc` runtime helper |

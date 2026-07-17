@@ -14,7 +14,7 @@ from ast_nodes import *
 class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
-        self.builtins = {"putc", "putstr",
+        self.builtins = {"putstr",
                          "itoa", "system",
                          "str_new", "bytes", "read_file", "write_file",
                          "str_slice",
@@ -123,8 +123,6 @@ class Emitter:
             self._collect_strings_from_block(func.body)
 
         self.emit("section .data")
-        self.emit("    _buf times 32 db 0")
-        self.emit("    _buf_end db 0")
         self.emit("    _written dd 0")
         self.emit("    _heap dq 0")
         self.emit("    _argv dq 0")
@@ -624,20 +622,7 @@ class Emitter:
             return
 
         if name in self.builtins:
-            if name == "putc":
-                self.emit_expr(args[0])
-                self.emit_mov("[_buf]", "al")
-                self.emit_mov("ecx", "-11")
-                self.emit_call_inst("GetStdHandle")
-                self.emit_mov("rcx", "rax")
-                self.emit_lea("rdx", "[_buf]")
-                self.emit_mov("r8", "1")
-                self.emit_lea("r9", "[_written]")
-                self._call_prep(1)
-                self.emit_mov("qword [rsp+32]", "0")
-                self.emit_call_inst("WriteFile")
-                self._call_cleanup(1)
-            elif name == "putstr":
+            if name == "putstr":
                 # putstr(s: &str): save &str in temp slot, GetStdHandle, then WriteFile
                 self.emit_expr(args[0])       # rax = &str
                 tmp = self._alloc_temp()
@@ -1185,7 +1170,7 @@ class Emitter:
                 return "&_arr_u8"
             if name in ("system", "write_file"):
                 return "i64"
-            if name in ("putc", "putstr", "extend"):
+            if name in ("putstr", "extend"):
                 return "void"
             # User-defined function
             if name in self.funcs:

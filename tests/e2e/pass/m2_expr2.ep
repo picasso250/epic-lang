@@ -7,16 +7,16 @@
 # STDOUT: 5
 fun main(): void {
     putstr(itoa(10 / 3))
-    putc(10)
+    putstr("\n")
     putstr(itoa(10 % 3))
-    putc(10)
+    putstr("\n")
     putstr(itoa(10 + 20 * 3))
-    putc(10)
+    putstr("\n")
     putstr(itoa((1 + 2) * 3))
-    putc(10)
+    putstr("\n")
     putstr(itoa(0 - 5))
-    putc(10)
+    putstr("\n")
     putstr(itoa(10 - 3 - 2))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }

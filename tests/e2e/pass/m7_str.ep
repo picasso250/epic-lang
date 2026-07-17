@@ -3,8 +3,8 @@
 # STDOUT: 42
 fun main(): void {
     putstr("Hello, Epic!")
-    putc(10)
+    putstr("\n")
     putstr(itoa(42))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }

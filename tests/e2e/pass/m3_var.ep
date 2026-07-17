@@ -4,9 +4,9 @@
 fun main(): void {
     let x = 42
     putstr(itoa(x))
-    putc(10)
+    putstr("\n")
     x = x + 1
     putstr(itoa(x))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }
