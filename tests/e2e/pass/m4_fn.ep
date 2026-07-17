@@ -6,10 +6,10 @@ fun add(a: i64, b: i64): i64 {
 }
 fun main(): void {
     let x = add(40, 2)
-    putstr(itoa(x))
-    putstr("\n")
+    print(itoa(x))
+    print("\n")
     let y = add(x, 1)
-    putstr(itoa(y))
-    putstr("\n")
+    print(itoa(y))
+    print("\n")
     os.ExitProcess(0)
 }

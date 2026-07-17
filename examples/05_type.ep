@@ -9,6 +9,6 @@ fun main(): void {
     let point = new Point
     point.x = 40
     point.y = 2
-    putstr(itoa(point.x + point.y))
-    putstr("\n")
+    print(itoa(point.x + point.y))
+    print("\n")
 }

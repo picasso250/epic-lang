@@ -4,14 +4,14 @@
 # STDOUT: 4
 fun main(): void {
     let x = 40 + 2
-    putstr(itoa(x))
-    putstr("\n")
+    print(itoa(x))
+    print("\n")
 
     x = x + 5
-    putstr(itoa(x))
-    putstr("\n")
+    print(itoa(x))
+    print("\n")
 
     let y = (10 / 3) + (10 % 3)
-    putstr(itoa(y))
-    putstr("\n")
+    print(itoa(y))
+    print("\n")
 }

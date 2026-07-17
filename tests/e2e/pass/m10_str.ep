@@ -2,15 +2,15 @@
 # STDOUT: hellobye!
 fun main(): void {
     let s = "hello"
-    putstr(s)
+    print(s)
     let t = "hello"
     if s == t {
-        putstr("bye")
+        print("bye")
     } else {
-        putstr("no")
+        print("no")
     }
     if s != "world" {
-        putstr("!")
+        print("!")
     }
     os.ExitProcess(0)
 }

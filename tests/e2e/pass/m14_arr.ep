@@ -5,7 +5,7 @@ fun main(): void {
     xs.data[0] = 99
     xs.data[1] = 42
     xs.data[2] = 7
-    putstr(itoa(xs.data[0]))
-    putstr("\n")
+    print(itoa(xs.data[0]))
+    print("\n")
     os.ExitProcess(0)
 }

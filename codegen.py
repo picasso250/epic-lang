@@ -14,7 +14,7 @@ from ast_nodes import *
 class Emitter:
     def __init__(self, out_path):
         self.out = open(out_path, "w")
-        self.builtins = {"putstr",
+        self.builtins = {"print",
                          "itoa", "system",
                          "str_new", "bytes", "read_file", "write_file",
                          "str_slice",
@@ -421,15 +421,15 @@ class Emitter:
                 self._pre_scan_block(stmt.body)
 
     def _pre_scan_temps(self, node):
-        """Count temp slots needed. Covers: binary ops (1), putstr (1), struct new_array (3)."""
+        """Count temp slots needed. Covers: binary ops (1), print (1), struct new_array (3)."""
         if isinstance(node, ASTNode):
             count = 0
             if isinstance(node, BinaryNode):
                 count = 1
             elif isinstance(node, CallNode):
                 count = len(node.args)
-                if node.name == "putstr":
-                    count += 1  # putstr saves &str across GetStdHandle
+                if node.name == "print":
+                    count += 1  # print saves &str across GetStdHandle
                 elif node.name == "push":
                     count += 3
             elif isinstance(node, NewArrayNode):
@@ -622,8 +622,8 @@ class Emitter:
             return
 
         if name in self.builtins:
-            if name == "putstr":
-                # putstr(s: &str): save &str in temp slot, GetStdHandle, then WriteFile
+            if name == "print":
+                # print(s: &str): save &str across GetStdHandle, then call WriteFile
                 self.emit_expr(args[0])       # rax = &str
                 tmp = self._alloc_temp()
                 self.emit_stack_store(tmp, "rax")  # save &str
@@ -1170,7 +1170,7 @@ class Emitter:
                 return "&_arr_u8"
             if name in ("system", "write_file"):
                 return "i64"
-            if name in ("putstr", "extend"):
+            if name in ("print", "extend"):
                 return "void"
             # User-defined function
             if name in self.funcs:

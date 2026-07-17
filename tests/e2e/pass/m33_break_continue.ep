@@ -12,8 +12,8 @@ fun main(): void {
         if i == 5 {
             break
         }
-        putstr(itoa(i))
-        putstr("\n")
+        print(itoa(i))
+        print("\n")
     }
     os.ExitProcess(0)
 }

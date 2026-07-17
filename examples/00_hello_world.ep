@@ -1,5 +1,5 @@
 # EXIT: 0
 # STDOUT: Hello, Epic!
 fun main(): void {
-    putstr("Hello, Epic!\n")
+    print("Hello, Epic!\n")
 }

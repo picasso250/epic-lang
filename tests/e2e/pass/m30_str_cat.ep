@@ -4,6 +4,6 @@ fun main(): void {
     let a = "hello"
     let b = " "
     let c = "world"
-    putstr(a + b + c)
+    print(a + b + c)
     os.ExitProcess(0)
 }

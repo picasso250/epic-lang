@@ -7,6 +7,6 @@ fun main(): void {
         os.ExitProcess(1)
     }
     let s = read_file("test_write_file.txt")
-    putstr(s)
+    print(s)
     os.ExitProcess(0)
 }

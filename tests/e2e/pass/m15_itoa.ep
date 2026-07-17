@@ -2,7 +2,7 @@
 # STDOUT: 42
 fun main(): void {
     let s = itoa(42)
-    putstr(s)
-    putstr("\n")
+    print(s)
+    print("\n")
     os.ExitProcess(0)
 }
