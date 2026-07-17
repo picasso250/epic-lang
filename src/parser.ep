@@ -15,6 +15,7 @@ type AstExpr {
     index: AstExpr
     count: AstExpr
     line: i64
+    resolved_type: str
 }
 type AstStmt {
     kind: str

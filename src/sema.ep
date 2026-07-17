@@ -1,0 +1,6 @@
+#
+# Epic v2 semantic analysis.
+#
+fun sema_check(ast: AstProgram): i64 {
+    return 0
+}

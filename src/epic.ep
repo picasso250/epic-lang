@@ -92,6 +92,7 @@ fun main(): void {
     os.CreateDirectoryA("build", 0)
     os.CreateDirectoryA("build\\epic", 0)
     let ast = merge_inputs()
+    sema_check(ast)
     let base = output_base(argv.data[1])
     let asm_path = base + ".asm"
     let exe_path = base + ".exe"

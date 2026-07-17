@@ -25,6 +25,7 @@ SOURCE_PATHS = (
     "src/epic.ep",
     "src/lexer.ep",
     "src/parser.ep",
+    "src/sema.ep",
     "src/codegen.ep",
     "src/asm.ep",
     "src/pe.ep",
