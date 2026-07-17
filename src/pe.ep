@@ -23,9 +23,9 @@ type PeSection {
 }
 
 fun pe_die(msg: str): i64 {
-    putstr("pe: ")
-    putstr(msg)
-    putstr("\n")
+    print("pe: ")
+    print(msg)
+    print("\n")
     os.ExitProcess(1)
     return 0
 }

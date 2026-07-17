@@ -2,9 +2,9 @@
 # Epic v0 self-hosted compiler driver.
 #
 fun die_driver(msg: str): i64 {
-    putstr("epic: ")
-    putstr(msg)
-    putstr("\n")
+    print("epic: ")
+    print(msg)
+    print("\n")
     os.ExitProcess(1)
     return 0
 }
@@ -99,6 +99,6 @@ fun main(): void {
     emit_program(e, ast)
     let image = assemble_text(read_file(asm_path))
     pe_write_exe(exe_path, image)
-    putstr(exe_path)
-    putstr("\n")
+    print(exe_path)
+    print("\n")
 }

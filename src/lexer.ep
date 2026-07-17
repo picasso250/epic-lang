@@ -87,7 +87,7 @@ fun reject_large_literal(text: str, hex: i64): i64 {
         fits = hex_literal_fits_i64(text)
     }
     if fits == 0 {
-        putstr("integer literal is out of i64 range\n")
+        print("integer literal is out of i64 range\n")
         os.ExitProcess(1)
     }
     return 0
@@ -134,13 +134,13 @@ fun lex(src: str): Token[] {
                 } else {
                     let c = p[pos]
                     if c == 10 || c == 13 {
-                        putstr("unterminated string\n")
+                        print("unterminated string\n")
                         os.ExitProcess(1)
                     }
                     if c == 92 {
                         pos = pos + 1
                         if pos >= n {
-                            putstr("bad escape\n")
+                            print("bad escape\n")
                             os.ExitProcess(1)
                         }
                         let e = p[pos]
@@ -159,7 +159,7 @@ fun lex(src: str): Token[] {
                         } else if e == 48 {
                             c = 0
                         } else {
-                            putstr("bad escape\n")
+                            print("bad escape\n")
                             os.ExitProcess(1)
                         }
                     }
@@ -169,7 +169,7 @@ fun lex(src: str): Token[] {
                 }
             }
             if scanning == 1 {
-                putstr("unterminated string\n")
+                print("unterminated string\n")
                 os.ExitProcess(1)
             }
             let text = str_new(buf.data, out_len)
@@ -200,13 +200,13 @@ fun lex(src: str): Token[] {
                 } else if e == 48 {
                     ch_val = 0
                 } else {
-                    putstr("bad escape\n")
+                    print("bad escape\n")
                     os.ExitProcess(1)
                 }
             }
             pos = pos + 1
             if pos >= n || p[pos] != 39 {
-                putstr("bad char\n")
+                print("bad char\n")
                 os.ExitProcess(1)
             }
             pos = pos + 1
@@ -226,7 +226,7 @@ fun lex(src: str): Token[] {
                     pos = pos + 1
                 }
                 if pos == digit_start {
-                    putstr("hexadecimal literal requires at least one digit\n")
+                    print("hexadecimal literal requires at least one digit\n")
                     os.ExitProcess(1)
                 }
             } else {
@@ -410,7 +410,7 @@ fun lex(src: str): Token[] {
             consumed = 1
         }
         if consumed == 0 && ch == 59 {
-            putstr("unexpected semicolon\n")
+            print("unexpected semicolon\n")
             os.ExitProcess(1)
         }
         if consumed == 0 && ch == 44  {
@@ -435,12 +435,12 @@ fun dump_tokens(tokens: Token[]): i64 {
     let i = 0
     while i < tokens.len {
         let t = tokens.data[i]
-        putstr(t.kind)
-        putstr(" ")
-        putstr(t.text)
-        putstr(" ")
-        putstr(itoa(t.line))
-        putstr("\n")
+        print(t.kind)
+        print(" ")
+        print(t.text)
+        print(" ")
+        print(itoa(t.line))
+        print("\n")
         i = i + 1
     }
     return 0
@@ -448,7 +448,7 @@ fun dump_tokens(tokens: Token[]): i64 {
 # ── Main ────────────────────────────────────────────────────────────────
 fun main(): void {
     if argv.len < 2 {
-        putstr("usage: lexer <file>\n")
+        print("usage: lexer <file>\n")
         os.ExitProcess(1)
     }
     let src = read_file(argv.data[1])

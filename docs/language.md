@@ -117,11 +117,11 @@ fun add(a: i64, b: i64): i64 {
 
 ```epic
 if x == 1 {
-    putstr("one")
+    print("one")
 } else if x == 2 {
-    putstr("two")
+    print("two")
 } else {
-    putstr("many")
+    print("many")
 }
 ```
 
@@ -211,7 +211,7 @@ to declare them.
 
 | Function | Meaning |
 | --- | --- |
-| `putstr(s: str): void` | writes string bytes |
+| `print(s: str): void` | writes string bytes without adding a newline |
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |

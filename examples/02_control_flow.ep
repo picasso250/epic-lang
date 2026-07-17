@@ -5,16 +5,16 @@
 fun main(): void {
     let n = 2
     if n > 1 {
-        putstr("if\n")
+        print("if\n")
     } else {
-        putstr("else\n")
+        print("else\n")
     }
 
     let i = 0
     while i < 2 {
-        putstr("loop ")
-        putstr(itoa(i))
-        putstr("\n")
+        print("loop ")
+        print(itoa(i))
+        print("\n")
         i = i + 1
     }
 }

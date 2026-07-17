@@ -8,10 +8,10 @@ fun main(): void {
     push(xs, 2)
     push(xs, 3)
 
-    putstr(itoa(xs.len))
-    putstr("\n")
-    putstr(itoa(xs.data[0]))
-    putstr("\n")
+    print(itoa(xs.len))
+    print("\n")
+    print(itoa(xs.data[0]))
+    print("\n")
 
     let total = 0
     let i = 0
@@ -19,6 +19,6 @@ fun main(): void {
         total = total + xs.data[i]
         i = i + 1
     }
-    putstr(itoa(total))
-    putstr("\n")
+    print(itoa(total))
+    print("\n")
 }

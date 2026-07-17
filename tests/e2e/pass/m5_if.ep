@@ -4,18 +4,18 @@
 fun main(): void {
     let x = 10
     if x > 5 {
-        putstr(itoa(1))
-        putstr("\n")
+        print(itoa(1))
+        print("\n")
     }
     if x == 1 {
-        putstr(itoa(999))
-        putstr("\n")
+        print(itoa(999))
+        print("\n")
     } else if x == 10 {
-        putstr(itoa(2))
-        putstr("\n")
+        print(itoa(2))
+        print("\n")
     } else {
-        putstr(itoa(999))
-        putstr("\n")
+        print(itoa(999))
+        print("\n")
     }
     os.ExitProcess(0)
 }

@@ -1,5 +1,5 @@
 # EXIT: 0
 fun main(): void {
-    putstr("")
+    print("")
     os.ExitProcess(0)
 }

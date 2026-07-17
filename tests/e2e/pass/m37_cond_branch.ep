@@ -14,7 +14,7 @@ fun main(): void {
     }
     let value = 2 < 3 && 4 >= 4
     if value {
-        putstr("1")
+        print("1")
         os.ExitProcess(0)
     }
     os.ExitProcess(6)

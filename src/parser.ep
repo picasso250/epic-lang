@@ -121,26 +121,26 @@ fun advance(p: Parser): Token {
     return t
 }
 fun parse_error(line: i64, msg: str): i64 {
-    putstr("Parse error line ")
-    putstr(itoa(line))
-    putstr(": ")
-    putstr(msg)
-    putstr("\n")
+    print("Parse error line ")
+    print(itoa(line))
+    print(": ")
+    print(msg)
+    print("\n")
     os.ExitProcess(1)
     return 1
 }
 fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
     if t.kind != kind {
-        putstr("Parse error line ")
-        putstr(itoa(t.line))
-        putstr(": Expected ")
-        putstr(kind)
-        putstr(", got ")
-        putstr(t.kind)
-        putstr("('")
-        putstr(t.text)
-        putstr("')\n")
+        print("Parse error line ")
+        print(itoa(t.line))
+        print(": Expected ")
+        print(kind)
+        print(", got ")
+        print(t.kind)
+        print("('")
+        print(t.text)
+        print("')\n")
         os.ExitProcess(1)
     }
     return t

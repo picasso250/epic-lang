@@ -51,9 +51,9 @@ type EmitterState {
     loop_ends: i64[]
 }
 fun die(msg: str): i64 {
-    putstr("Codegen error: ")
-    putstr(msg)
-    putstr("\n")
+    print("Codegen error: ")
+    print(msg)
+    print("\n")
     os.ExitProcess(1)
     return 0
 }
@@ -563,11 +563,11 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
         }
         i = i + 1
     }
-    putstr("Codegen error: unknown field ")
-    putstr(struct_name)
-    putstr(".")
-    putstr(field_name)
-    putstr("\n")
+    print("Codegen error: unknown field ")
+    print(struct_name)
+    print(".")
+    print(field_name)
+    print("\n")
     os.ExitProcess(1)
     return new FieldInfo
 }
@@ -894,7 +894,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         out_nl(e)
         return 0
     }
-    if name == "putstr" {
+    if name == "print" {
         emit_expr(e, expr.args.data[0])
         let tmp = temp_save_rax(e)
         emit_mov(e, "ecx", "-11")
@@ -1758,7 +1758,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
 }
 fun main(): void {
     if argv.len < 3 {
-        putstr("usage: codegen <input.ep> <output.asm>\n")
+        print("usage: codegen <input.ep> <output.asm>\n")
         os.ExitProcess(1)
     }
     let src = read_file(argv.data[1])

@@ -2,9 +2,9 @@
 # STDOUT: Hello, Epic!
 # STDOUT: 42
 fun main(): void {
-    putstr("Hello, Epic!")
-    putstr("\n")
-    putstr(itoa(42))
-    putstr("\n")
+    print("Hello, Epic!")
+    print("\n")
+    print(itoa(42))
+    print("\n")
     os.ExitProcess(0)
 }

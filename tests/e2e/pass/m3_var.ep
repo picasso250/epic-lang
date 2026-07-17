@@ -3,10 +3,10 @@
 # STDOUT: 43
 fun main(): void {
     let x = 42
-    putstr(itoa(x))
-    putstr("\n")
+    print(itoa(x))
+    print("\n")
     x = x + 1
-    putstr(itoa(x))
-    putstr("\n")
+    print(itoa(x))
+    print("\n")
     os.ExitProcess(0)
 }

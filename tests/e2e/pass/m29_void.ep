@@ -1,12 +1,12 @@
 # EXIT: 0
 # STDOUT: AB
 fun write_a(): void {
-    putstr("A")
+    print("A")
     return
-    putstr("X")
+    print("X")
 }
 fun write_b(): void {
-    putstr("B")
+    print("B")
 }
 fun main(): void {
     write_a()
