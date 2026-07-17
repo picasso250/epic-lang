@@ -59,7 +59,7 @@ local storage and the peak number of compiler temporary slots; there is no
 fixed temporary-slot limit.
 
 Runtime assembly helpers implement strings, dynamic byte arrays, command-line
-arguments, file I/O, and process execution. The compiler appends the required
+arguments, and file I/O. The compiler appends the required
 helpers to its generated assembly.
 
 ## Assembler and PE writer

@@ -188,6 +188,10 @@ String lengths and indices count bytes, not Unicode characters.
 
 In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
 
+`os.CreateDirectoryA(path, 0)` creates a directory and returns nonzero on
+success. It returns zero on failure, including when the directory already
+exists.
+
 General method calls are not supported in v0.
 
 ## Program exit
@@ -217,7 +221,6 @@ to declare them.
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |
-| `system(cmd: str): i64` | runs a command and returns its process exit code, or `-1` on failure |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
