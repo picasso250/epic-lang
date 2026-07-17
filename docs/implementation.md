@@ -66,9 +66,9 @@ repository `runtime` directory.
 
 All managed allocation sites call the conservative, non-moving mark-and-sweep
 collector in `runtime/gc.asm`. It records exact allocation bases in side
-metadata, scans the active stack and managed payloads conservatively, and frees
-unmarked objects through the Win32 process heap. The detailed runtime contract
-is documented in [`gc.md`](gc.md).
+metadata, routes small objects through four slab classes, scans the active stack
+and managed payloads conservatively, and reclaims unreachable objects. The
+detailed runtime contract is documented in [`gc.md`](gc.md).
 
 ## Assembler and PE writer
 

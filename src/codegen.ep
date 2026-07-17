@@ -1653,6 +1653,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     if fn.name == "main" {
         emit_call_inst(e, "GetProcessHeap")
         emit_mov(e, "[_heap]", "rax")
+        emit_call_inst(e, "__ep_gc_small_init")
         emit_call_inst(e, "_argv_init")
         emit_mov(e, "[_argv]", "rax")
     }
@@ -1720,6 +1721,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     out_line(e, "extern HeapAlloc")
     out_line(e, "extern HeapFree")
     out_line(e, "extern GetProcessHeap")
+    out_line(e, "extern VirtualAlloc")
     out_line(e, "extern Beep")
     out_line(e, "extern GetCurrentProcess")
     out_line(e, "extern GetCurrentProcessId")

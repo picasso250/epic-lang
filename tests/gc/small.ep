@@ -1,0 +1,47 @@
+type GcSlot8 {
+    a: i64
+}
+type GcSlot16 {
+    a: i64
+    b: i64
+}
+type GcSlot24 {
+    a: i64
+    b: i64
+    c: i64
+}
+type GcSlot32 {
+    a: i64
+    b: i64
+    c: i64
+    d: i64
+}
+
+fun main(): void {
+    let keep8 = new GcSlot8
+    let keep16 = new GcSlot16
+    let keep24 = new GcSlot24
+    let keep32 = new GcSlot32
+    keep8.a = 8
+    keep16.b = 16
+    keep24.c = 24
+    keep32.d = 32
+
+    let i = 0
+    while i < 500000 {
+        let waste8 = new GcSlot8
+        let waste16 = new GcSlot16
+        let waste24 = new GcSlot24
+        let waste32 = new GcSlot32
+        waste8.a = i
+        waste16.b = i
+        waste24.c = i
+        waste32.d = i
+        i = i + 1
+    }
+
+    if keep8.a != 8 || keep16.b != 16 || keep24.c != 24 || keep32.d != 32 {
+        os.ExitProcess(1)
+    }
+    os.ExitProcess(0)
+}

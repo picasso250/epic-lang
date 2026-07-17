@@ -14,12 +14,12 @@ import ep_runner
 from process_metrics import format_peak_working_set, run_measured
 
 
-SOURCE = ROOT / "tests" / "gc" / "stress.ep"
 PEAK_LIMIT_MIB = 128
 
 
-def main() -> int:
-    relative = SOURCE.relative_to(ROOT)
+def run_case(name: str) -> bool:
+    source = ROOT / "tests" / "gc" / f"{name}.ep"
+    relative = source.relative_to(ROOT)
     compile_result = subprocess.run(
         [str(ep_runner.compiler_path()), str(relative)],
         cwd=ROOT,
@@ -30,14 +30,14 @@ def main() -> int:
     if compile_result.returncode != 0:
         detail = (compile_result.stdout + compile_result.stderr)[-1000:]
         print(f"  FAIL  compile:\n{detail}")
-        return 1
+        return False
 
-    executable = ep_runner.output_path(SOURCE)
+    executable = ep_runner.output_path(source)
     try:
         metrics = run_measured([str(executable)], cwd=ROOT)
     except subprocess.CalledProcessError as error:
-        print(f"  FAIL  stress program exited with {error.returncode}")
-        return 1
+        print(f"  FAIL  GC {name} exited with {error.returncode}")
+        return False
 
     peak_mib = metrics.peak_working_set_bytes / (1024 * 1024)
     if peak_mib > PEAK_LIMIT_MIB:
@@ -45,13 +45,19 @@ def main() -> int:
             f"  FAIL  peak memory {format_peak_working_set(metrics.peak_working_set_bytes)} "
             f"> {PEAK_LIMIT_MIB} MiB"
         )
-        return 1
+        return False
 
     print(
-        "  PASS  retained stack/heap graph survived; "
+        f"  PASS  GC {name}; "
         f"peak memory {format_peak_working_set(metrics.peak_working_set_bytes)}"
     )
-    return 0
+    return True
+
+
+def main() -> int:
+    ok = run_case("stress")
+    ok = run_case("small") and ok
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

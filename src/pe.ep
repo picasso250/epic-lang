@@ -128,7 +128,7 @@ fun pe_dll_for(name: str): str {
     if name == "MessageBoxA" {
         return "USER32.dll"
     }
-    if name == "ExitProcess" || name == "GetStdHandle" || name == "WriteFile" || name == "CreateDirectoryA" || name == "CreateFileA" || name == "ReadFile" || name == "SetFilePointer" || name == "CloseHandle" || name == "GetFileSize" || name == "lstrcmpA" || name == "lstrlenA" || name == "GetCommandLineA" || name == "HeapAlloc" || name == "HeapFree" || name == "GetProcessHeap" || name == "Beep" || name == "GetCurrentProcess" || name == "GetCurrentProcessId" || name == "GetCurrentThreadId" || name == "GetFileAttributesA" || name == "GetLastError" || name == "GetTickCount64" || name == "SetLastError" || name == "Sleep" {
+    if name == "ExitProcess" || name == "GetStdHandle" || name == "WriteFile" || name == "CreateDirectoryA" || name == "CreateFileA" || name == "ReadFile" || name == "SetFilePointer" || name == "CloseHandle" || name == "GetFileSize" || name == "lstrcmpA" || name == "lstrlenA" || name == "GetCommandLineA" || name == "HeapAlloc" || name == "HeapFree" || name == "GetProcessHeap" || name == "VirtualAlloc" || name == "Beep" || name == "GetCurrentProcess" || name == "GetCurrentProcessId" || name == "GetCurrentThreadId" || name == "GetFileAttributesA" || name == "GetLastError" || name == "GetTickCount64" || name == "SetLastError" || name == "Sleep" {
         return "KERNEL32.dll"
     }
     return ""
