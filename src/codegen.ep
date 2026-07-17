@@ -39,8 +39,10 @@ type EmitterState {
     current_ep_id: i64
     local_bytes: i64
     alloc_size: i64
+    alloc_size_patch: i64
     temp_base: i64
     temp_count: i64
+    temp_peak: i64
     locals: Local[]
     funcs: FuncInfo[]
     strings: StringLit[]
@@ -327,8 +329,10 @@ fun make_emitter(out_path: str): EmitterState {
     e.current_ep_id = 0
     e.local_bytes = 0
     e.alloc_size = 0
+    e.alloc_size_patch = 0
     e.temp_base = 0
     e.temp_count = 0
+    e.temp_peak = 0
     e.locals = new Local[128]
     e.funcs = new FuncInfo[64]
     e.strings = new StringLit[256]
@@ -590,6 +594,7 @@ fun reset_locals(e: EmitterState): i64 {
     e.locals = new Local[128]
     e.local_bytes = 0
     e.temp_count = 0
+    e.temp_peak = 0
     return 0
 }
 fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
@@ -749,20 +754,34 @@ fun temp_reset(e: EmitterState): i64 {
 }
 fun temp_save_rax(e: EmitterState): i64 {
     let nr = e.temp_count
-    if nr >= 64 {
-        die("too many compiler temps")
-    }
     e.temp_count = e.temp_count + 1
+    if e.temp_count > e.temp_peak {
+        e.temp_peak = e.temp_count
+    }
     let slot = 0 - (e.temp_base + (nr + 1) * 8)
     emit_stack_store(e, slot, "rax")
     return slot
 }
+fun patch_hex_u32(e: EmitterState, offset: i64, value: i64): i64 {
+    let i = 7
+    while i >= 0 {
+        let digit = value & 15
+        if digit < 10 {
+            e.out_buf.data[offset + i] = 48 + digit
+        } else {
+            e.out_buf.data[offset + i] = 87 + digit
+        }
+        value = value >> 4
+        i = i - 1
+    }
+    return 0
+}
 fun emit_prologue(e: EmitterState): i64 {
     emit_inst(e, "push rbp")
     emit_mov(e, "rbp", "rsp")
-    out_s(e, "    sub rsp, ")
-    out_i(e, e.alloc_size)
-    out_nl(e)
+    out_s(e, "    sub rsp, 0x")
+    e.alloc_size_patch = e.out_buf.len
+    out_line(e, "00000000")
     return 0
 }
 fun emit_epilogue(e: EmitterState): i64 {
@@ -1600,7 +1619,6 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
     }
     pre_scan_block(e, fn.body)
     e.temp_base = e.local_bytes
-    e.alloc_size = align16(e.local_bytes + 512 + 32)
     if fn.name == "main" {
         emit_label(e, "_start")
     } else {
@@ -1653,6 +1671,8 @@ fun emit_fn_def(e: EmitterState, fn: AstNode): i64 {
         emit_label_id(e, "L", e.current_ep_id)
         emit_epilogue(e)
     }
+    e.alloc_size = align16(e.local_bytes + e.temp_peak * 8 + 32)
+    patch_hex_u32(e, e.alloc_size_patch, e.alloc_size)
     out_nl(e)
     return 0
 }
