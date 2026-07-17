@@ -66,7 +66,7 @@ fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
         if state.types.data[i].name == name {
             return state.types.data[i]
         }
-        i = i + 1
+        i += 1
     }
     let missing = new SemaTypeDecl
     missing.name = ""
@@ -78,7 +78,7 @@ fun sema_find_func(state: SemaState, name: str): SemaSignature {
         if state.funcs.data[i].name == name {
             return state.funcs.data[i]
         }
-        i = i + 1
+        i += 1
     }
     let missing = new SemaSignature
     missing.name = ""
@@ -276,7 +276,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
         decl.line = node.line
         decl.kind = "product"
         push(state.types, decl)
-        i = i + 1
+        i += 1
     }
     i = 0
     while i < ast.enums.len {
@@ -294,7 +294,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
         enum_decl.line = enum_node.line
         enum_decl.kind = "enum"
         push(state.types, enum_decl)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -311,11 +311,11 @@ fun sema_validate_enums(state: SemaState, ast: AstProgram): i64 {
                 if first.name == member.name {
                     sema_duplicate(node.source_path, member.line, "enum member '" + member.name + "'", node.source_path + ":" + itoa(first.line))
                 }
-                k = k + 1
+                k += 1
             }
-            j = j + 1
+            j += 1
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -332,12 +332,12 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
                 if first.name == field.name {
                     sema_duplicate(node.source_path, field.line, "field '" + field.name + "'", node.source_path + ":" + itoa(first.line))
                 }
-                k = k + 1
+                k += 1
             }
             sema_validate_value_type(state, node.source_path, field.line, field.type_name)
-            j = j + 1
+            j += 1
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -371,17 +371,17 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
                 if previous.name == param.name {
                     sema_duplicate(node.source_path, param.line, "parameter '" + param.name + "'", node.source_path + ":" + itoa(previous.line))
                 }
-                k = k + 1
+                k += 1
             }
             if param.name == "os" || param.name == "argv" {
                 sema_error(node.source_path, param.line, "reserved parameter name '" + param.name + "'")
             }
             sema_validate_value_type(state, node.source_path, param.line, param.type_name)
             push(sig.param_types, param.type_name)
-            j = j + 1
+            j += 1
         }
         push(state.funcs, sig)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -401,7 +401,7 @@ fun sema_find_struct(state: SemaState, name: str): AstStructDef {
         if state.ast.structs.data[i].name == name {
             return state.ast.structs.data[i]
         }
-        i = i + 1
+        i += 1
     }
     let missing = new AstStructDef
     missing.name = ""
@@ -414,7 +414,7 @@ fun sema_find_enum(state: SemaState, name: str): AstEnumDef {
         if state.ast.enums.data[i].name == name {
             return state.ast.enums.data[i]
         }
-        i = i + 1
+        i += 1
     }
     let missing = new AstEnumDef
     missing.name = ""
@@ -427,7 +427,7 @@ fun sema_enum_member_index(node: AstEnumDef, name: str): i64 {
         if node.members.data[i].name == name {
             return i
         }
-        i = i + 1
+        i += 1
     }
     return -1
 }
@@ -438,7 +438,7 @@ fun sema_find_field(state: SemaState, type_name: str, field_name: str): AstStruc
         if node.fields.data[i].name == field_name {
             return node.fields.data[i]
         }
-        i = i + 1
+        i += 1
     }
     let missing = new AstStructField
     missing.name = ""
@@ -452,7 +452,7 @@ fun sema_find_local(state: SemaState, name: str): SemaLocal {
         if local.name == name && local.active == 1 {
             return local
         }
-        i = i + 1
+        i += 1
     }
     let missing = new SemaLocal
     missing.name = ""
@@ -465,7 +465,7 @@ fun sema_name_was_used(state: SemaState, name: str): SemaLocal {
         if state.locals.data[i].name == name {
             return state.locals.data[i]
         }
-        i = i + 1
+        i += 1
     }
     let missing = new SemaLocal
     missing.name = ""
@@ -494,9 +494,9 @@ fun sema_leave_scope(state: SemaState): i64 {
         if state.locals.data[i].depth == state.scope_depth {
             state.locals.data[i].active = 0
         }
-        i = i + 1
+        i += 1
     }
-    state.scope_depth = state.scope_depth - 1
+    state.scope_depth -= 1
     return 0
 }
 fun sema_is_pointer(type_name: str): i64 {
@@ -647,7 +647,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         } else if !sema_assignable(expected, actual) {
             sema_error(state.source_path, expr.args.data[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
-        i = i + 1
+        i += 1
     }
     return sema_promote(sig.return_type)
 }
@@ -765,10 +765,10 @@ fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
             }
             seen.data[value] = 1
             arm.value = value
-            explicit_count = explicit_count + 1
+            explicit_count += 1
         }
         sema_check_block(state, arm.body)
-        i = i + 1
+        i += 1
     }
     if !has_else && explicit_count != enum_node.members.len {
         sema_error(state.source_path, stmt.line, "non-exhaustive match on enum " + subject_type)
@@ -908,7 +908,7 @@ fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
     sema_require_i64(state, stmt.range_start, "range start")
     sema_check_expr(state, stmt.range_end)
     sema_require_i64(state, stmt.range_end, "range end")
-    state.scope_depth = state.scope_depth + 1
+    state.scope_depth += 1
     sema_add_local(state, stmt.name, "i64", stmt.line)
     state.locals.data[state.locals.len - 1].read_only = 1
     sema_check_block(state, stmt.body)
@@ -968,7 +968,7 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
             if !sema_block_returns(stmt.match_arms.data[i].body) {
                 return 0
             }
-            i = i + 1
+            i += 1
         }
         if stmt.match_arms.len > 0 {
             return 1
@@ -985,7 +985,7 @@ fun sema_block_returns(block: AstBlock): i64 {
         if sema_stmt_returns(block.stmts.data[i]) == 1 {
             return 1
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -993,11 +993,11 @@ fun sema_check_block(state: SemaState, block: AstBlock): i64 {
     if !block.present {
         return 0
     }
-    state.scope_depth = state.scope_depth + 1
+    state.scope_depth += 1
     let i = 0
     while i < block.stmts.len {
         sema_check_stmt_exprs(state, block.stmts.data[i])
-        i = i + 1
+        i += 1
     }
     sema_leave_scope(state)
     return 0
@@ -1014,13 +1014,13 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
         while j < node.params.len {
             let param = node.params.data[j]
             sema_add_local(state, param.name, param.type_name, param.line)
-            j = j + 1
+            j += 1
         }
         sema_check_block(state, node.body)
         if node.type_name != "void" && !sema_block_returns(node.body) {
             sema_error(node.source_path, node.line, "function '" + node.name + "' may not return a value on every path")
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }

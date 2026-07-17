@@ -67,7 +67,7 @@ fun pe_zero(out: u8[], count: i64): i64 {
     let i = 0
     while i < count {
         pe_byte(out, 0)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -81,7 +81,7 @@ fun pe_append(out: u8[], src: u8[]): i64 {
     let i = 0
     while i < src.len {
         pe_byte(out, src.data[i])
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -89,7 +89,7 @@ fun pe_append_str(out: u8[], text: str): i64 {
     let i = 0
     while i < text.len {
         pe_byte(out, text.data[i])
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -110,7 +110,7 @@ fun pe_append_hex(out: u8[], text: str): i64 {
     let i = 0
     while i < text.len {
         pe_byte(out, (pe_hex_digit(text.data[i]) << 4) | pe_hex_digit(text.data[i + 1]))
-        i = i + 2
+        i += 2
     }
     return 0
 }
@@ -120,7 +120,7 @@ fun pe_import_find(items: PeImport[], name: str): i64 {
         if items.data[i].name == name {
             return i
         }
-        i = i + 1
+        i += 1
     }
     return -1
 }
@@ -155,7 +155,7 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
             item.dll = dll
             push(out, item)
         }
-        i = i + 1
+        i += 1
     }
     return out
 }
@@ -169,7 +169,7 @@ fun pe_make_dlls(imports: PeImport[]): PeDll[] {
             if dlls.data[j].name == imports.data[i].dll {
                 dll_index = j
             }
-            j = j + 1
+            j += 1
         }
         if dll_index < 0 {
             let group = new PeDll
@@ -179,7 +179,7 @@ fun pe_make_dlls(imports: PeImport[]): PeDll[] {
             dll_index = dlls.len - 1
         }
         push(dlls.data[dll_index].items, imports.data[i])
-        i = i + 1
+        i += 1
     }
     return dlls
 }
@@ -192,7 +192,7 @@ fun pe_add_thunks(image: ExeImage, imports: PeImport[]): i64 {
         pe_byte(image.text, 37)
         pe_u32(image.text, 0)
         pe_zero(image.text, 10)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -203,7 +203,7 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
     while i < dlls.len {
         dlls.data[i].ilt_offset = out.len
         pe_zero(out, (dlls.data[i].items.len + 1) * 8)
-        i = i + 1
+        i += 1
     }
     let iat_start = out.len
     i = 0
@@ -214,10 +214,10 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         while j < group.items.len {
             group.items.data[j].iat_offset = out.len
             pe_u64(out, 0)
-            j = j + 1
+            j += 1
         }
         pe_u64(out, 0)
-        i = i + 1
+        i += 1
     }
     i = 0
     while i < dlls.len {
@@ -232,12 +232,12 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
             if (out.len & 1) != 0 {
                 pe_byte(out, 0)
             }
-            names_j = names_j + 1
+            names_j += 1
         }
         names_group.name_offset = out.len
         pe_append_str(out, names_group.name)
         pe_byte(out, 0)
-        i = i + 1
+        i += 1
     }
     i = 0
     while i < dlls.len {
@@ -250,9 +250,9 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
             let hint_rva = rva + patch_group.items.data[patch_j].hint_offset
             pe_patch_u64(out, patch_group.ilt_offset + patch_j * 8, hint_rva)
             pe_patch_u64(out, patch_group.iat_offset + patch_j * 8, hint_rva)
-            patch_j = patch_j + 1
+            patch_j += 1
         }
-        i = i + 1
+        i += 1
     }
     return out
 }
@@ -263,7 +263,7 @@ fun pe_patch_thunks(image: ExeImage, imports: PeImport[], rdata_rva: i64): i64 {
         let item = imports.data[i]
         let disp = rdata_rva + item.iat_offset - (4096 + item.thunk_offset + 6)
         pe_patch_u32(image.text, item.thunk_offset + 2, disp)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -315,7 +315,7 @@ fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): i64 {
         } else {
             pe_die("unknown relocation kind")
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -332,7 +332,7 @@ fun pe_append_name8(out: u8[], name: str): i64 {
         else {
             pe_byte(out, 0)
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -433,7 +433,7 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
             pe_u32(out, 0)
             pe_u32(out, 0)
         }
-        i = i + 1
+        i += 1
     }
     pe_section_header(out, text)
     pe_section_header(out, rdata_sec)

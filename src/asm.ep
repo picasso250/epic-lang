@@ -50,10 +50,10 @@ fun asm_trim(s: str): str {
     let a = 0
     let b = s.len
     while a < b && (s.data[a] == 32 || s.data[a] == 9 || s.data[a] == 13) {
-        a = a + 1
+        a += 1
     }
     while b > a && (s.data[b - 1] == 32 || s.data[b - 1] == 9 || s.data[b - 1] == 13) {
-        b = b - 1
+        b -= 1
     }
     return asm_slice(s, a, b)
 }
@@ -66,7 +66,7 @@ fun asm_starts(s: str, prefix: str): i64 {
         if s.data[i] != prefix.data[i] {
             return 0
         }
-        i = i + 1
+        i += 1
     }
     return 1
 }
@@ -76,7 +76,7 @@ fun asm_find(s: str, ch: i64): i64 {
         if s.data[i] == ch {
             return i
         }
-        i = i + 1
+        i += 1
     }
     return -1
 }
@@ -87,7 +87,7 @@ fun asm_remove_spaces(s: str): str {
         if s.data[i] != 32 && s.data[i] != 9 {
             push(out, s.data[i])
         }
-        i = i + 1
+        i += 1
     }
     return str_new(out.data, out.len)
 }
@@ -114,7 +114,7 @@ fun asm_is_number(s: str): i64 {
     let hex = 0
     if i + 2 <= s.len && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
         hex = 1
-        i = i + 2
+        i += 2
     }
     if i >= s.len {
         return 0
@@ -126,7 +126,7 @@ fun asm_is_number(s: str): i64 {
         if hex == 1 && asm_digit(s.data[i]) < 0 {
             return 0
         }
-        i = i + 1
+        i += 1
     }
     return 1
 }
@@ -140,12 +140,12 @@ fun asm_number(s: str): i64 {
     let base = 10
     if i + 2 <= s.len && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
         base = 16
-        i = i + 2
+        i += 2
     }
     let value = 0
     while i < s.len {
         value = value * base + asm_digit(s.data[i])
-        i = i + 1
+        i += 1
     }
     return value * sign
 }
@@ -236,14 +236,14 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
     while pos < body.len {
         if body.data[pos] == 43 {
             sign = 1
-            pos = pos + 1
+            pos += 1
         } else if body.data[pos] == 45 {
             sign = -1
-            pos = pos + 1
+            pos += 1
         }
         let end = pos
         while end < body.len && body.data[end] != 43 && body.data[end] != 45 {
-            end = end + 1
+            end += 1
         }
         let term = asm_slice(body, pos, end)
         let star = asm_find(term, 42)
@@ -263,7 +263,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
                 op.scale = 1
             }
         } else if asm_is_number(term) == 1 {
-            op.disp = op.disp + sign * asm_number(term)
+            op.disp += sign * asm_number(term)
         } else {
             if op.symbol.len != 0 {
                 asm_die("complex symbol operand: " + text)
@@ -356,7 +356,7 @@ fun asm_symbol_find(image: ExeImage, name: str): i64 {
         if image.symbols.data[i].name == name {
             return i
         }
-        i = i + 1
+        i += 1
     }
     return -1
 }
@@ -412,16 +412,16 @@ fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
 fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     let rex = 64
     if width == 64 {
-        rex = rex | 8
+        rex |= 8
     }
     if reg >= 8 {
-        rex = rex | 4
+        rex |= 4
     }
     if index >= 8 {
-        rex = rex | 2
+        rex |= 2
     }
     if base >= 8 {
-        rex = rex | 1
+        rex |= 1
     }
     return rex
 }
@@ -580,9 +580,9 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         if image.relocs.len > reloc_count {
             let reloc = image.relocs.data[reloc_count]
             if width == 8 {
-                reloc.addend = reloc.addend - 1
+                reloc.addend -= 1
             } else {
-                reloc.addend = reloc.addend - 4
+                reloc.addend -= 4
             }
         }
         if width == 8 {
@@ -659,7 +659,7 @@ fun asm_alu_load_opcode(name: str, width: i64): i64 {
         opcode = 59
     }
     if width == 8 {
-        opcode = opcode - 1
+        opcode -= 1
     }
     return opcode
 }
@@ -681,7 +681,7 @@ fun asm_alu_store_opcode(name: str, width: i64): i64 {
         opcode = 57
     }
     if width == 8 {
-        opcode = opcode - 1
+        opcode -= 1
     }
     return opcode
 }
@@ -983,7 +983,7 @@ fun asm_emit_data_list(image: ExeImage, width: i64, args: str): i64 {
     while start < args.len {
         let end = start
         while end < args.len && args.data[end] != 44 {
-            end = end + 1
+            end += 1
         }
         asm_emit_data_value(image, width, asm_slice(args, start, end))
         start = end + 1
@@ -1024,7 +1024,7 @@ fun asm_parse_data(image: ExeImage, line: str): i64 {
         let i = 0
         while i < count {
             asm_emit_data_value(image, width, value)
-            i = i + 1
+            i += 1
         }
         return 1
     }
@@ -1117,7 +1117,7 @@ fun asm_resolve_internal(image: ExeImage): i64 {
         if sym_index < 0 {
             asm_die("undefined symbol: " + r.symbol)
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -1127,7 +1127,7 @@ fun assemble_text(src: str): ExeImage {
     while start < src.len {
         let end = start
         while end < src.len && src.data[end] != 10 {
-            end = end + 1
+            end += 1
         }
         asm_process_line(image, asm_slice(src, start, end))
         start = end + 1

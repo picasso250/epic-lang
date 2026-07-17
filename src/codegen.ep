@@ -232,7 +232,7 @@ fun emit_stack_load(e: EmitterState, dst: str, slot: i64): i64 {
     return 0
 }
 fun fresh_label(e: EmitterState): i64 {
-    e.label_counter = e.label_counter + 1
+    e.label_counter += 1
     return e.label_counter
 }
 fun align16(n: i64): i64 {
@@ -367,7 +367,7 @@ fun emitter_type(e: EmitterState, name: str): TypeInfo {
         if e.enums.data[i].name == name {
             return type_info("enum", name)
         }
-        i = i + 1
+        i += 1
     }
     return user_type(name)
 }
@@ -377,9 +377,9 @@ fun get_string_id(e: EmitterState, text: str): i64 {
         if e.strings.data[i].text == text {
             return e.strings.data[i].id
         }
-        i = i + 1
+        i += 1
     }
-    e.string_counter = e.string_counter + 1
+    e.string_counter += 1
     let s = new StringLit
     s.text = text
     s.id = e.string_counter
@@ -401,7 +401,7 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
         let i = 0
         while i < node.args.len {
             collect_expr_strings(e, node.args.data[i])
-            i = i + 1
+            i += 1
         }
     } else if node.kind == "FieldAccess" {
         collect_expr_strings(e, node.object)
@@ -449,7 +449,7 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
         let i = 0
         while i < node.match_arms.len {
             collect_block_strings(e, node.match_arms.data[i].body)
-            i = i + 1
+            i += 1
         }
     }
     return 0
@@ -461,7 +461,7 @@ fun collect_block_strings(e: EmitterState, block: AstBlock): i64 {
     let i = 0
     while i < block.stmts.len {
         collect_stmt_strings(e, block.stmts.data[i])
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -469,7 +469,7 @@ fun collect_program_strings(e: EmitterState, program: AstProgram): i64 {
     let i = 0
     while i < program.funcs.len {
         collect_block_strings(e, program.funcs.data[i].body)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -480,7 +480,7 @@ fun emit_string_bytes(e: EmitterState, s: str): i64 {
             out_s(e, ", ")
         }
         out_i(e, s.data[i])
-        i = i + 1
+        i += 1
     }
     if s.len != 0 {
         out_s(e, ", ")
@@ -497,7 +497,7 @@ fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
         f.ret_type = emitter_type(e, fn.type_name)
         f.params = fn.params
         push(e.funcs, f)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -523,7 +523,7 @@ fun find_struct_info(e: EmitterState, name: str): StructInfo {
         if e.structs.data[i].name == name {
             return e.structs.data[i]
         }
-        i = i + 1
+        i += 1
     }
     die("unknown struct layout")
     return new StructInfo
@@ -535,7 +535,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
         if s.fields.data[i].name == field_name {
             return s.fields.data[i]
         }
-        i = i + 1
+        i += 1
     }
     print("Codegen error: unknown field ")
     print(struct_name)
@@ -579,13 +579,13 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
         let j = 0
         while j < node.fields.len {
             add_field(s, node.fields.data[j].name, emitter_type(e, node.fields.data[j].type_name), j * 8)
-            j = j + 1
+            j += 1
         }
         a = add_struct_info(e, array_layout_name(node.name), 24)
         add_field(a, "data", type_info("ptr", node.name), 0)
         add_field(a, "len", type_i64(), 8)
         add_field(a, "cap", type_i64(), 16)
-        i = i + 1
+        i += 1
     }
     i = 0
     while i < ast.enums.len {
@@ -594,7 +594,7 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
         add_field(a, "data", type_info("ptr", enum_node.name), 0)
         add_field(a, "len", type_i64(), 8)
         add_field(a, "cap", type_i64(), 16)
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -611,9 +611,9 @@ fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
         if e.locals.data[i].name == name {
             return e.locals.data[i].slot
         }
-        i = i + 1
+        i += 1
     }
-    e.local_bytes = e.local_bytes + 8
+    e.local_bytes += 8
     let l = new Local
     l.name = name
     l.typ = typ
@@ -630,7 +630,7 @@ fun find_local_slot(e: EmitterState, name: str): i64 {
         if e.locals.data[i].name == name {
             return e.locals.data[i].slot
         }
-        i = i + 1
+        i += 1
     }
     die("undefined local")
     return 0
@@ -644,7 +644,7 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
         if e.locals.data[i].name == name {
             return e.locals.data[i].typ
         }
-        i = i + 1
+        i += 1
     }
     die("internal: checked local has no type")
     return type_i64()
@@ -674,17 +674,17 @@ fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
             pre_scan_block(e, stmt.body)
         } else if stmt.kind == "ForRange" {
             add_local(e, stmt.name, type_i64())
-            e.local_bytes = e.local_bytes + 8
+            e.local_bytes += 8
             stmt.range_end_slot = -e.local_bytes
             pre_scan_block(e, stmt.body)
         } else if stmt.kind == "Match" {
             let j = 0
             while j < stmt.match_arms.len {
                 pre_scan_block(e, stmt.match_arms.data[j].body)
-                j = j + 1
+                j += 1
             }
         }
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -694,7 +694,7 @@ fun temp_reset(e: EmitterState): i64 {
 }
 fun temp_save_rax(e: EmitterState): i64 {
     let nr = e.temp_count
-    e.temp_count = e.temp_count + 1
+    e.temp_count += 1
     if e.temp_count > e.temp_peak {
         e.temp_peak = e.temp_count
     }
@@ -711,8 +711,8 @@ fun patch_hex_u32(e: EmitterState, offset: i64, value: i64): i64 {
         } else {
             e.out_buf.data[offset + i] = 87 + digit
         }
-        value = value >> 4
-        i = i - 1
+        value >>= 4
+        i -= 1
     }
     return 0
 }
@@ -736,7 +736,7 @@ fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
     while i < args.len {
         emit_expr(e, args.data[i])
         push(slots, temp_save_rax(e))
-        i = i + 1
+        i += 1
     }
     return slots
 }
@@ -770,7 +770,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             }
             let slot = temp_save_rax(e)
             push(slots, slot)
-            i = i + 1
+            i += 1
         }
         load_spilled_args(e, slots)
         let stack_args = slots.len - 4
@@ -788,7 +788,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             out_s(e, "    mov [rsp+")
             out_i(e, 32 + (i - 4) * 8)
             out_line(e, "], rax")
-            i = i + 1
+            i += 1
         }
         emit_call_inst(e, sys_symbol)
         out_s(e, "    add rsp, ")
@@ -1539,8 +1539,8 @@ fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     emit_label_id(e, "L", start_id)
     emit_cond_jump(e, stmt.expr, 0, end_id)
     emit_block(e, stmt.body)
-    e.loop_starts.len = e.loop_starts.len - 1
-    e.loop_ends.len = e.loop_ends.len - 1
+    e.loop_starts.len -= 1
+    e.loop_ends.len -= 1
     emit_jmp_id(e, "jmp", "L", start_id)
     emit_label_id(e, "L", end_id)
     return 0
@@ -1561,8 +1561,8 @@ fun emit_for_range(e: EmitterState, stmt: AstStmt): i64 {
     emit_inst(e, "cmp rax, rcx")
     emit_jmp_id(e, "jge", "L", end_id)
     emit_block(e, stmt.body)
-    e.loop_starts.len = e.loop_starts.len - 1
-    e.loop_ends.len = e.loop_ends.len - 1
+    e.loop_starts.len -= 1
+    e.loop_ends.len -= 1
     emit_label_id(e, "L", step_id)
     out_s(e, "    inc qword ")
     emit_slot_ref(e, find_local_slot(e, stmt.name))
@@ -1591,7 +1591,7 @@ fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
             emit_jmp_id(e, "jmp", "L", end_id)
             emit_label_id(e, "L", next_id)
         }
-        i = i + 1
+        i += 1
     }
     emit_label_id(e, "L", end_id)
     return 0
@@ -1661,7 +1661,7 @@ fun emit_block(e: EmitterState, block: AstBlock): i64 {
     let i = 0
     while i < block.stmts.len {
         emit_stmt(e, block.stmts.data[i])
-        i = i + 1
+        i += 1
     }
     return 0
 }
@@ -1673,7 +1673,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     let i = 0
     while i < fn.params.len {
         add_local(e, fn.params.data[i].name, emitter_type(e, fn.params.data[i].type_name))
-        i = i + 1
+        i += 1
     }
     pre_scan_block(e, fn.body)
     e.temp_base = e.local_bytes
@@ -1787,7 +1787,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
         emit_label_id(e, "_str_", e.strings.data[i].id)
         out_s(e, "    db ")
         emit_string_bytes(e, e.strings.data[i].text)
-        i = i + 1
+        i += 1
     }
     out_nl(e)
     out_line(e, "section .text")
@@ -1795,7 +1795,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     i = 0
     while i < ast.funcs.len {
         emit_fn_def(e, ast.funcs.data[i])
-        i = i + 1
+        i += 1
     }
     emit_runtime_helpers(e)
     return 0
