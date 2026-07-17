@@ -573,50 +573,242 @@ fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
 fun sema_check_binary(state: SemaState, expr: AstExpr): str {
     let left = sema_check_expr(state, expr.left)
     let right = sema_check_expr(state, expr.right)
-    if expr.op == "+" && left == "str" && right == "str" {
-        return "str"
-    }
-    if expr.op == "+" && sema_is_pointer(left) == 1 && right == "i64" {
-        return left
-    }
-    if expr.op == "+" && left == "i64" && sema_is_pointer(right) == 1 {
-        return right
-    }
-    if expr.op == "==" || expr.op == "!=" {
-        if left == "i64" && right == "i64" {
-            return "i64"
+    let result = ""
+    match expr.op {
+        OperatorKind.Add {
+            if left == "str" && right == "str" {
+                result = "str"
+            } else if sema_is_pointer(left) == 1 && right == "i64" {
+                result = left
+            } else if left == "i64" && sema_is_pointer(right) == 1 {
+                result = right
+            } else if left == "i64" && right == "i64" {
+                result = "i64"
+            }
         }
-        if left == "str" && right == "str" {
-            return "i64"
+        OperatorKind.Subtract {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
         }
-        let decl = sema_find_type(state, left)
-        if left == right && decl.name != "" && decl.kind == "enum" {
-            return "i64"
+        OperatorKind.Multiply {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
         }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires two integers, two strings, or two values of the same enum type")
+        OperatorKind.Divide {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.Remainder {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.BitAnd {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.BitOr {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.ShiftLeft {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.ShiftRight {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.Equal {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            } else if left == "str" && right == "str" {
+                result = "i64"
+            } else {
+                let decl = sema_find_type(state, left)
+                if left == right && decl.name != "" && decl.kind == "enum" {
+                    result = "i64"
+                }
+            }
+        }
+        OperatorKind.NotEqual {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            } else if left == "str" && right == "str" {
+                result = "i64"
+            } else {
+                let not_equal_decl = sema_find_type(state, left)
+                if left == right && not_equal_decl.name != "" && not_equal_decl.kind == "enum" {
+                    result = "i64"
+                }
+            }
+        }
+        OperatorKind.Less {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.LessEqual {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.Greater {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.GreaterEqual {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.LogicalAnd {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.LogicalOr {
+            if left == "i64" && right == "i64" {
+                result = "i64"
+            }
+        }
+        OperatorKind.Negate {
+        }
+        OperatorKind.LogicalNot {
+        }
     }
-    if expr.op == "+" || expr.op == "-" || expr.op == "*" || expr.op == "/" || expr.op == "%" || expr.op == "&" || expr.op == "|" || expr.op == "<<" || expr.op == ">>" {
-        if left == "i64" && right == "i64" {
-            return "i64"
+    if result == "" {
+        match expr.op {
+            OperatorKind.Add {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Subtract {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Multiply {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Divide {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Remainder {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.BitAnd {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.BitOr {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.ShiftLeft {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.ShiftRight {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Equal {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires two integers, two strings, or two values of the same enum type")
+            }
+            OperatorKind.NotEqual {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires two integers, two strings, or two values of the same enum type")
+            }
+            OperatorKind.Less {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.LessEqual {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Greater {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.GreaterEqual {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.LogicalAnd {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.LogicalOr {
+                sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires integer operands")
+            }
+            OperatorKind.Negate {
+                sema_error(state.source_path, expr.line, "unsupported binary operator " + operator_text(expr.op))
+            }
+            OperatorKind.LogicalNot {
+                sema_error(state.source_path, expr.line, "unsupported binary operator " + operator_text(expr.op))
+            }
         }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
     }
-    if expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" || expr.op == "&&" || expr.op == "||" {
-        if left == "i64" && right == "i64" {
-            return "i64"
-        }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
-    }
-    sema_error(state.source_path, expr.line, "unsupported binary operator " + expr.op)
-    return ""
+    return result
 }
 fun sema_check_unary(state: SemaState, expr: AstExpr): str {
     let operand = sema_check_expr(state, expr.left)
     if operand != "i64" {
-        sema_error(state.source_path, expr.line, "unary operator " + expr.op + " requires i64 operand, got " + operand)
+        sema_error(state.source_path, expr.line, "unary operator " + operator_text(expr.op) + " requires i64 operand, got " + operand)
     }
-    if expr.op != "-" && expr.op != "!" {
-        sema_error(state.source_path, expr.line, "unsupported unary operator " + expr.op)
+    match expr.op {
+        OperatorKind.Add {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Subtract {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Multiply {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Divide {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Remainder {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.BitAnd {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.BitOr {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.ShiftLeft {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.ShiftRight {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Equal {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.NotEqual {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Less {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.LessEqual {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Greater {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.GreaterEqual {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.LogicalAnd {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.LogicalOr {
+            sema_error(state.source_path, expr.line, "binary operator used as unary operator")
+        }
+        OperatorKind.Negate {
+        }
+        OperatorKind.LogicalNot {
+        }
     }
     return "i64"
 }
@@ -666,81 +858,92 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
 }
 fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     let result = ""
-    if expr.kind == "Literal" {
-        result = "i64"
-    } else if expr.kind == "EnumMember" {
-        result = expr.type_name
-    } else if expr.kind == "String" {
-        result = "str"
-    } else if expr.kind == "Embed" {
-        result = "u8[]"
-    } else if expr.kind == "Var" {
-        if expr.name == "argv" {
-            result = "str[]"
-        } else {
-            let local = sema_find_local(state, expr.name)
-            if local.name == "" {
-                sema_error(state.source_path, expr.line, "undefined variable '" + expr.name + "'")
-            }
-            result = sema_promote(local.type_name)
-        }
-    } else if expr.kind == "Binary" {
-        result = sema_check_binary(state, expr)
-    } else if expr.kind == "Unary" {
-        result = sema_check_unary(state, expr)
-    } else if expr.kind == "Call" {
-        result = sema_check_call(state, expr)
-    } else if expr.kind == "New" {
-        let decl = sema_find_type(state, expr.name)
-        if decl.name == "" || decl.kind != "product" {
-            sema_error(state.source_path, expr.line, "new requires a product type, got '" + expr.name + "'")
-        }
-        result = expr.name
-    } else if expr.kind == "NewArray" {
-        sema_validate_value_type(state, state.source_path, expr.line, expr.type_name)
-        if expr.count.kind != "" {
-            sema_check_expr(state, expr.count)
-            sema_require_i64(state, expr.count, "array length")
-        }
-        result = expr.type_name + "[]"
-    } else if expr.kind == "FieldAccess" {
-        let enum_node = new AstEnumDef
-        enum_node.name = ""
-        if expr.object.kind == "Var" {
-            enum_node = sema_find_enum(state, expr.object.name)
-        }
-        if enum_node.name != "" {
-            let value = sema_enum_member_index(enum_node, expr.name)
-            if value < 0 {
-                sema_error(state.source_path, expr.line, "enum " + enum_node.name + " has no member '" + expr.name + "'")
-            }
-            expr.kind = "EnumMember"
-            expr.type_name = enum_node.name
-            expr.value = itoa(value)
-            result = enum_node.name
-        } else {
-            let object_type = sema_check_expr(state, expr.object)
-            let field_type = sema_field_type(state, object_type, expr.name)
-            if field_type == "" {
-                sema_error(state.source_path, expr.line, "type " + object_type + " has no field '" + expr.name + "'")
-            }
-            result = sema_promote(field_type)
-        }
-    } else if expr.kind == "Subscript" {
-        let base_type = sema_check_expr(state, expr.base)
-        sema_check_expr(state, expr.index)
-        sema_require_i64(state, expr.index, "subscript")
-        if base_type == "str" {
+    match expr.kind {
+        AstExprKind.Literal {
             result = "i64"
-        } else if sema_is_array(base_type) == 1 {
-            result = sema_promote(sema_array_element(base_type))
-        } else if sema_is_pointer(base_type) == 1 {
-            result = sema_promote(sema_pointer_element(base_type))
-        } else {
-            sema_error(state.source_path, expr.line, "type " + base_type + " is not subscriptable")
         }
-    } else {
-        sema_error(state.source_path, expr.line, "unsupported expression kind '" + expr.kind + "'")
+        AstExprKind.String {
+            result = "str"
+        }
+        AstExprKind.Embed {
+            result = "u8[]"
+        }
+        AstExprKind.Var {
+            if expr.name == "argv" {
+                result = "str[]"
+            } else {
+                let local = sema_find_local(state, expr.name)
+                if local.name == "" {
+                    sema_error(state.source_path, expr.line, "undefined variable '" + expr.name + "'")
+                }
+                result = sema_promote(local.type_name)
+            }
+        }
+        AstExprKind.Binary {
+            result = sema_check_binary(state, expr)
+        }
+        AstExprKind.Unary {
+            result = sema_check_unary(state, expr)
+        }
+        AstExprKind.Call {
+            result = sema_check_call(state, expr)
+        }
+        AstExprKind.NewProduct {
+            let decl = sema_find_type(state, expr.name)
+            if decl.name == "" || decl.kind != "product" {
+                sema_error(state.source_path, expr.line, "new requires a product type, got '" + expr.name + "'")
+            }
+            result = expr.name
+        }
+        AstExprKind.NewArray {
+            sema_validate_value_type(state, state.source_path, expr.line, expr.type_name)
+            match expr.count.kind {
+                AstExprOptionKind.None {
+                }
+                AstExprOptionKind.Some {
+                    sema_check_expr(state, expr.count.value)
+                    sema_require_i64(state, expr.count.value, "array length")
+                }
+            }
+            result = expr.type_name + "[]"
+        }
+        AstExprKind.FieldAccess {
+            let enum_node = new AstEnumDef
+            enum_node.name = ""
+            if expr.object.kind == AstExprKind.Var {
+                enum_node = sema_find_enum(state, expr.object.name)
+            }
+            if enum_node.name != "" {
+                let value = sema_enum_member_index(enum_node, expr.name)
+                if value < 0 {
+                    sema_error(state.source_path, expr.line, "enum " + enum_node.name + " has no member '" + expr.name + "'")
+                }
+                expr.type_name = enum_node.name
+                expr.value = itoa(value)
+                result = enum_node.name
+            } else {
+                let object_type = sema_check_expr(state, expr.object)
+                let field_type = sema_field_type(state, object_type, expr.name)
+                if field_type == "" {
+                    sema_error(state.source_path, expr.line, "type " + object_type + " has no field '" + expr.name + "'")
+                }
+                result = sema_promote(field_type)
+            }
+        }
+        AstExprKind.Subscript {
+            let base_type = sema_check_expr(state, expr.base)
+            sema_check_expr(state, expr.index)
+            sema_require_i64(state, expr.index, "subscript")
+            if base_type == "str" {
+                result = "i64"
+            } else if sema_is_array(base_type) == 1 {
+                result = sema_promote(sema_array_element(base_type))
+            } else if sema_is_pointer(base_type) == 1 {
+                result = sema_promote(sema_pointer_element(base_type))
+            } else {
+                sema_error(state.source_path, expr.line, "type " + base_type + " is not subscriptable")
+            }
+        }
     }
     expr.resolved_type = result
     return result
@@ -791,103 +994,76 @@ fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
     }
     return 0
 }
+fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64, compound: i64): str {
+    match target.kind {
+        AssignTargetKind.Var {
+            if target.name == "argv" {
+                sema_error(state.source_path, line, "argv is read-only")
+            }
+            let local = sema_find_local(state, target.name)
+            if local.name == "" {
+                sema_error(state.source_path, line, "assignment to undefined variable '" + target.name + "'")
+            }
+            if local.read_only == 1 {
+                sema_error(state.source_path, line, "range iterator '" + target.name + "' is read-only")
+            }
+            return local.type_name
+        }
+        AssignTargetKind.Field {
+            let object_type = sema_check_expr(state, target.object)
+            if object_type == "str" {
+                if compound == 1 {
+                    sema_error(state.source_path, line, "str does not support compound assignment")
+                }
+                sema_error(state.source_path, line, "str is read-only")
+            }
+            let field_type = sema_field_type(state, object_type, target.name)
+            if field_type == "" {
+                sema_error(state.source_path, line, "type " + object_type + " has no field '" + target.name + "'")
+            }
+            return field_type
+        }
+        AssignTargetKind.Subscript {
+            let base_type = sema_check_expr(state, target.base)
+            sema_check_expr(state, target.index)
+            sema_require_i64(state, target.index, "subscript")
+            if base_type == "str" {
+                if compound == 1 {
+                    sema_error(state.source_path, line, "str does not support compound assignment")
+                }
+                sema_error(state.source_path, line, "str is read-only")
+            }
+            if sema_is_array(base_type) == 1 {
+                return sema_array_element(base_type)
+            }
+            if sema_is_pointer(base_type) == 1 {
+                return sema_pointer_element(base_type)
+            }
+            sema_error(state.source_path, line, "type " + base_type + " is not subscriptable")
+            return ""
+        }
+    }
+}
 fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
-    if stmt.name == "argv" {
-        sema_error(state.source_path, stmt.line, "argv is read-only")
-    }
-    let local = sema_find_local(state, stmt.name)
-    if local.name == "" {
-        sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
-    }
-    if local.read_only == 1 {
-        sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
-    }
+    let expected = sema_assign_target_type(state, stmt.target, stmt.line, 0)
     let actual = sema_check_expr(state, stmt.value_expr)
-    if !sema_assignable(local.type_name, actual) {
-        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
+    if !sema_assignable(expected, actual) {
+        match stmt.target.kind {
+            AssignTargetKind.Var {
+                sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + expected)
+            }
+            AssignTargetKind.Field {
+                sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + expected)
+            }
+            AssignTargetKind.Subscript {
+                sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + expected)
+            }
+        }
     }
     return 0
-}
-fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
-    let object_type = sema_check_expr(state, stmt.object)
-    if object_type == "str" {
-        sema_error(state.source_path, stmt.line, "str is read-only")
-    }
-    let field_type = sema_field_type(state, object_type, stmt.name)
-    if field_type == "" {
-        sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
-    }
-    let actual = sema_check_expr(state, stmt.value_expr)
-    if !sema_assignable(field_type, actual) {
-        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + field_type)
-    }
-    return 0
-}
-fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
-    let base_type = sema_check_expr(state, stmt.base)
-    sema_check_expr(state, stmt.index)
-    sema_require_i64(state, stmt.index, "subscript")
-    let element = ""
-    if base_type == "str" {
-        sema_error(state.source_path, stmt.line, "str is read-only")
-    } else if sema_is_array(base_type) == 1 {
-        element = sema_array_element(base_type)
-    } else if sema_is_pointer(base_type) == 1 {
-        element = sema_pointer_element(base_type)
-    } else {
-        sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
-    }
-    let actual = sema_check_expr(state, stmt.value_expr)
-    if !sema_assignable(element, actual) {
-        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + element)
-    }
-    return 0
-}
-fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
-    if stmt.target_kind == "Var" {
-        if stmt.name == "argv" {
-            sema_error(state.source_path, stmt.line, "argv is read-only")
-        }
-        let local = sema_find_local(state, stmt.name)
-        if local.name == "" {
-            sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
-        }
-        if local.read_only == 1 {
-            sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
-        }
-        return local.type_name
-    }
-    if stmt.target_kind == "Field" {
-        let object_type = sema_check_expr(state, stmt.object)
-        if object_type == "str" {
-            sema_error(state.source_path, stmt.line, "str does not support compound assignment")
-        }
-        let field_type = sema_field_type(state, object_type, stmt.name)
-        if field_type == "" {
-            sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
-        }
-        return field_type
-    }
-    if stmt.target_kind == "Subscript" {
-        let base_type = sema_check_expr(state, stmt.base)
-        sema_check_expr(state, stmt.index)
-        sema_require_i64(state, stmt.index, "subscript")
-        if base_type == "str" {
-            sema_error(state.source_path, stmt.line, "str does not support compound assignment")
-        }
-        if sema_is_array(base_type) == 1 {
-            return sema_array_element(base_type)
-        }
-        if sema_is_pointer(base_type) == 1 {
-            return sema_pointer_element(base_type)
-        }
-        sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
-    }
-    sema_error(state.source_path, stmt.line, "internal: unknown compound assignment target")
-    return ""
 }
 fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
-    let target_type = sema_compound_target_type(state, stmt)
+    let target_type = sema_assign_target_type(state, stmt.target, stmt.line, 1)
     if target_type != "i64" && target_type != "u8" {
         sema_error(state.source_path, stmt.line, "compound assignment requires i64 or u8 target, got " + target_type)
     }
@@ -895,24 +1071,74 @@ fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
     if actual != "i64" {
         sema_error(state.source_path, stmt.line, "compound assignment requires i64 right operand, got " + actual)
     }
-    if stmt.op != "+" && stmt.op != "-" && stmt.op != "*" && stmt.op != "/" && stmt.op != "%" && stmt.op != "&" && stmt.op != "|" && stmt.op != "<<" && stmt.op != ">>" {
-        sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + stmt.op)
+    match stmt.op {
+        OperatorKind.Add {
+        }
+        OperatorKind.Subtract {
+        }
+        OperatorKind.Multiply {
+        }
+        OperatorKind.Divide {
+        }
+        OperatorKind.Remainder {
+        }
+        OperatorKind.BitAnd {
+        }
+        OperatorKind.BitOr {
+        }
+        OperatorKind.ShiftLeft {
+        }
+        OperatorKind.ShiftRight {
+        }
+        OperatorKind.Equal {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.NotEqual {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.Less {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.LessEqual {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.Greater {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.GreaterEqual {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.LogicalAnd {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.LogicalOr {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.Negate {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
+        OperatorKind.LogicalNot {
+            sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
+        }
     }
     return 0
 }
 fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
-    if state.return_type == "void" {
-        if stmt.expr.kind != "" {
-            sema_error(state.source_path, stmt.line, "void function cannot return a value")
+    match stmt.return_value.kind {
+        AstExprOptionKind.None {
+            if state.return_type != "void" {
+                sema_error(state.source_path, stmt.line, "non-void function must return a value")
+            }
         }
-        return 0
-    }
-    if stmt.expr.kind == "" {
-        sema_error(state.source_path, stmt.line, "non-void function must return a value")
-    }
-    let actual = sema_check_expr(state, stmt.expr)
-    if !sema_assignable(state.return_type, actual) {
-        sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
+        AstExprOptionKind.Some {
+            if state.return_type == "void" {
+                sema_error(state.source_path, stmt.line, "void function cannot return a value")
+            }
+            let actual = sema_check_expr(state, stmt.return_value.value)
+            if !sema_assignable(state.return_type, actual) {
+                sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
+            }
+        }
     }
     return 0
 }
@@ -929,65 +1155,94 @@ fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
     return 0
 }
 fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
-    if stmt.kind == "Return" {
-        sema_check_return(state, stmt)
-    } else if stmt.kind == "ExprStmt" {
-        sema_check_expr(state, stmt.expr)
-    } else if stmt.kind == "Let" {
-        if stmt.value_expr.kind == "" {
-            sema_error(state.source_path, stmt.line, "let requires an initializer")
+    match stmt.kind {
+        AstStmtKind.Return {
+            sema_check_return(state, stmt)
         }
-        let type_name = sema_check_expr(state, stmt.value_expr)
-        if type_name == "void" {
-            sema_error(state.source_path, stmt.line, "cannot bind a void expression")
+        AstStmtKind.Expr {
+            sema_check_expr(state, stmt.expr)
         }
-        sema_add_local(state, stmt.name, type_name, stmt.line)
-    } else if stmt.kind == "Assign" {
-        sema_check_assignment(state, stmt)
-    } else if stmt.kind == "FieldSet" {
-        sema_check_field_set(state, stmt)
-    } else if stmt.kind == "SubscriptAssign" {
-        sema_check_subscript_set(state, stmt)
-    } else if stmt.kind == "AssignOp" {
-        sema_check_assign_op(state, stmt)
-    } else if stmt.kind == "If" {
-        sema_check_expr(state, stmt.expr)
-        sema_require_i64(state, stmt.expr, "if condition")
-        sema_check_block(state, stmt.then_block)
-        sema_check_block(state, stmt.else_block)
-    } else if stmt.kind == "While" {
-        sema_check_expr(state, stmt.expr)
-        sema_require_i64(state, stmt.expr, "while condition")
-        sema_check_block(state, stmt.body)
-    } else if stmt.kind == "ForRange" {
-        sema_check_for_range(state, stmt)
-    } else if stmt.kind == "Match" {
-        sema_check_match(state, stmt)
+        AstStmtKind.Let {
+            let type_name = sema_check_expr(state, stmt.value_expr)
+            if type_name == "void" {
+                sema_error(state.source_path, stmt.line, "cannot bind a void expression")
+            }
+            sema_add_local(state, stmt.name, type_name, stmt.line)
+        }
+        AstStmtKind.Assign {
+            sema_check_assignment(state, stmt)
+        }
+        AstStmtKind.AssignOp {
+            sema_check_assign_op(state, stmt)
+        }
+        AstStmtKind.If {
+            sema_check_expr(state, stmt.expr)
+            sema_require_i64(state, stmt.expr, "if condition")
+            sema_check_block(state, stmt.then_block)
+            sema_check_block(state, stmt.else_block)
+        }
+        AstStmtKind.While {
+            sema_check_expr(state, stmt.expr)
+            sema_require_i64(state, stmt.expr, "while condition")
+            sema_check_block(state, stmt.body)
+        }
+        AstStmtKind.ForRange {
+            sema_check_for_range(state, stmt)
+        }
+        AstStmtKind.Match {
+            sema_check_match(state, stmt)
+        }
+        AstStmtKind.Break {
+        }
+        AstStmtKind.Continue {
+        }
     }
     return 0
 }
 fun sema_stmt_returns(stmt: AstStmt): i64 {
-    if stmt.kind == "Return" {
-        return 1
-    }
-    if stmt.kind == "If" && stmt.else_block.present == 1 {
-        if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
-            return 1
+    let result = 0
+    match stmt.kind {
+        AstStmtKind.Return {
+            result = 1
         }
-    }
-    if stmt.kind == "Match" {
-        let i = 0
-        while i < len(stmt.match_arms) {
-            if !sema_block_returns(stmt.match_arms.data[i].body) {
-                return 0
+        AstStmtKind.Expr {
+        }
+        AstStmtKind.Let {
+        }
+        AstStmtKind.Assign {
+        }
+        AstStmtKind.AssignOp {
+        }
+        AstStmtKind.If {
+            if stmt.else_block.present == 1 {
+                if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
+                    result = 1
+                }
             }
-            i += 1
         }
-        if len(stmt.match_arms) > 0 {
-            return 1
+        AstStmtKind.While {
+        }
+        AstStmtKind.ForRange {
+        }
+        AstStmtKind.Match {
+            let all_return = 1
+            let i = 0
+            while i < len(stmt.match_arms) {
+                if !sema_block_returns(stmt.match_arms.data[i].body) {
+                    all_return = 0
+                }
+                i += 1
+            }
+            if len(stmt.match_arms) > 0 && all_return == 1 {
+                result = 1
+            }
+        }
+        AstStmtKind.Break {
+        }
+        AstStmtKind.Continue {
         }
     }
-    return 0
+    return result
 }
 fun sema_block_returns(block: AstBlock): i64 {
     if !block.present {

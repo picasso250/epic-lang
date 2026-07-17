@@ -1,11 +1,16 @@
 #
 # Epic parser.
 #
+type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | NewProduct | NewArray | FieldAccess | Subscript
+type AstStmtKind = Return | Expr | Let | Assign | AssignOp | If | While | ForRange | Match | Break | Continue
+type AssignTargetKind = Var | Field | Subscript
+type OperatorKind = Add | Subtract | Multiply | Divide | Remainder | BitAnd | BitOr | ShiftLeft | ShiftRight | Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual | LogicalAnd | LogicalOr | Negate | LogicalNot
+type AstExprOptionKind = None | Some
 type AstExpr {
-    kind: str
+    kind: AstExprKind
     name: str
     type_name: str
-    op: str
+    op: OperatorKind
     value: str
     args: AstExpr[]
     left: AstExpr
@@ -13,24 +18,37 @@ type AstExpr {
     object: AstExpr
     base: AstExpr
     index: AstExpr
-    count: AstExpr
+    count: AstExprOption
     line: i64
     resolved_type: str
 }
-type AstStmt {
-    kind: str
+type AstExprOption {
+    kind: AstExprOptionKind
+    value: AstExpr
+}
+type AstAssignTarget {
+    kind: AssignTargetKind
     name: str
-    expr: AstExpr
-    value_expr: AstExpr
     object: AstExpr
     base: AstExpr
     index: AstExpr
+}
+type AstRange {
+    start: AstExpr
+    end: AstExpr
+}
+type AstStmt {
+    kind: AstStmtKind
+    name: str
+    expr: AstExpr
+    return_value: AstExprOption
+    value_expr: AstExpr
+    target: AstAssignTarget
     then_block: AstBlock
     else_block: AstBlock
     body: AstBlock
     line: i64
-    op: str
-    target_kind: str
+    op: OperatorKind
     match_arms: AstMatchArm[]
     range_start: AstExpr
     range_end: AstExpr
@@ -94,22 +112,218 @@ type Parser {
     loop_depth: i64
     source_path: str
 }
-fun ast_expr_empty(): AstExpr {
-    let n = new AstExpr
-    n.kind = ""
-    return n
+fun ast_expr_none(): AstExprOption {
+    let option = new AstExprOption
+    option.kind = AstExprOptionKind.None
+    return option
 }
-fun ast_expr(kind: str, line: i64): AstExpr {
-    let n = new AstExpr
-    n.kind = kind
-    n.line = line
-    return n
+fun ast_expr_some(value: AstExpr): AstExprOption {
+    let option = new AstExprOption
+    option.kind = AstExprOptionKind.Some
+    option.value = value
+    return option
 }
-fun ast_stmt(kind: str, line: i64): AstStmt {
-    let n = new AstStmt
-    n.kind = kind
-    n.line = line
-    return n
+fun ast_literal(value: str, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Literal
+    node.value = value
+    node.line = line
+    return node
+}
+fun ast_string(value: str, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.String
+    node.value = value
+    node.line = line
+    return node
+}
+fun ast_embed(value: str, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Embed
+    node.value = value
+    node.line = line
+    return node
+}
+fun ast_var(name: str, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Var
+    node.name = name
+    node.line = line
+    return node
+}
+fun ast_call(name: str, args: AstExpr[], line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Call
+    node.name = name
+    node.type_name = ""
+    node.args = args
+    node.line = line
+    return node
+}
+fun ast_os_call(name: str, args: AstExpr[], line: i64): AstExpr {
+    let node = ast_call(name, args, line)
+    node.type_name = "os"
+    return node
+}
+fun ast_binary(op: OperatorKind, left: AstExpr, right: AstExpr, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Binary
+    node.op = op
+    node.left = left
+    node.right = right
+    node.line = line
+    return node
+}
+fun ast_unary(op: OperatorKind, operand: AstExpr, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Unary
+    node.op = op
+    node.left = operand
+    node.line = line
+    return node
+}
+fun ast_new_product(name: str, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.NewProduct
+    node.name = name
+    node.line = line
+    return node
+}
+fun ast_new_array(type_name: str, count: AstExprOption, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.NewArray
+    node.type_name = type_name
+    node.count = count
+    node.line = line
+    return node
+}
+fun ast_field_access(object: AstExpr, name: str, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.FieldAccess
+    node.object = object
+    node.name = name
+    node.line = line
+    return node
+}
+fun ast_subscript(base: AstExpr, index: AstExpr, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Subscript
+    node.base = base
+    node.index = index
+    node.line = line
+    return node
+}
+fun ast_var_target(name: str): AstAssignTarget {
+    let target = new AstAssignTarget
+    target.kind = AssignTargetKind.Var
+    target.name = name
+    return target
+}
+fun ast_field_target(object: AstExpr, name: str): AstAssignTarget {
+    let target = new AstAssignTarget
+    target.kind = AssignTargetKind.Field
+    target.object = object
+    target.name = name
+    return target
+}
+fun ast_subscript_target(base: AstExpr, index: AstExpr): AstAssignTarget {
+    let target = new AstAssignTarget
+    target.kind = AssignTargetKind.Subscript
+    target.base = base
+    target.index = index
+    return target
+}
+fun ast_range(start: AstExpr, end: AstExpr): AstRange {
+    let range = new AstRange
+    range.start = start
+    range.end = end
+    return range
+}
+fun ast_return(value: AstExprOption, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Return
+    node.return_value = value
+    node.line = line
+    return node
+}
+fun ast_expr_statement(expr: AstExpr): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Expr
+    node.expr = expr
+    node.line = expr.line
+    return node
+}
+fun ast_let(name: str, value: AstExpr, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Let
+    node.name = name
+    node.value_expr = value
+    node.line = line
+    return node
+}
+fun ast_assign(target: AstAssignTarget, value: AstExpr, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Assign
+    node.target = target
+    node.value_expr = value
+    node.line = line
+    return node
+}
+fun ast_assign_op(target: AstAssignTarget, op: OperatorKind, value: AstExpr, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.AssignOp
+    node.target = target
+    node.op = op
+    node.value_expr = value
+    node.line = line
+    return node
+}
+fun ast_if(condition: AstExpr, then_block: AstBlock, else_block: AstBlock, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.If
+    node.expr = condition
+    node.then_block = then_block
+    node.else_block = else_block
+    node.line = line
+    return node
+}
+fun ast_while(condition: AstExpr, body: AstBlock, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.While
+    node.expr = condition
+    node.body = body
+    node.line = line
+    return node
+}
+fun ast_for_range(name: str, range: AstRange, body: AstBlock, line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.ForRange
+    node.name = name
+    node.range_start = range.start
+    node.range_end = range.end
+    node.body = body
+    node.line = line
+    return node
+}
+fun ast_match(subject: AstExpr, arms: AstMatchArm[], line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Match
+    node.expr = subject
+    node.match_arms = arms
+    node.line = line
+    return node
+}
+fun ast_break(line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Break
+    node.line = line
+    return node
+}
+fun ast_continue(line: i64): AstStmt {
+    let node = new AstStmt
+    node.kind = AstStmtKind.Continue
+    node.line = line
+    return node
 }
 fun ast_block_empty(): AstBlock {
     let block = new AstBlock
@@ -394,50 +608,86 @@ fun is_assignment(p: Parser): i64 {
     }
     return 0
 }
+fun ast_assign_target(lhs: AstExpr, line: i64): AstAssignTarget {
+    match lhs.kind {
+        AstExprKind.Literal {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.String {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.Embed {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.Var {
+            return ast_var_target(lhs.name)
+        }
+        AstExprKind.Binary {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.Unary {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.Call {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.NewProduct {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.NewArray {
+            parse_error(line, "Invalid assignment target")
+            return ast_var_target("")
+        }
+        AstExprKind.FieldAccess {
+            return ast_field_target(lhs.object, lhs.name)
+        }
+        AstExprKind.Subscript {
+            return ast_subscript_target(lhs.base, lhs.index)
+        }
+    }
+}
 fun parse_return_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.RETURN)
-    let node = ast_stmt("Return", keyword.line)
-    node.expr = ast_expr_empty()
+    let value = ast_expr_none()
     if !peek_kind(p, TokenKind.NEWLINE) {
-        node.expr = parse_expr(p)
+        value = ast_expr_some(parse_expr(p))
     }
     expect_stmt_end(p)
-    return node
+    return ast_return(value, keyword.line)
 }
 fun parse_let_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.LET)
     let name = expect(p, TokenKind.ID)
-    let node = ast_stmt("Let", keyword.line)
-    node.name = name.text
-    node.value_expr = ast_expr_empty()
     if peek_kind(p, TokenKind.COLON) == 1 {
         let t = peek(p)
         parse_error(t.line, "let type annotations are not supported in v0")
     }
-    if check(p, TokenKind.ASSIGN) == 1 {
-        node.value_expr = parse_expr(p)
+    if check(p, TokenKind.ASSIGN) == 0 {
+        parse_error(name.line, "let requires an initializer")
     }
+    let value = parse_expr(p)
     expect_stmt_end(p)
-    return node
+    return ast_let(name.text, value, keyword.line)
 }
 fun parse_assign_stmt(p: Parser): AstStmt {
     let name = expect(p, TokenKind.ID)
-    let lhs = ast_expr("Var", name.line)
-    lhs.name = name.text
+    let lhs = ast_var(name.text, name.line)
     let done = 0
     while !done {
         if check(p, TokenKind.DOT) == 1 {
             let field = expect(p, TokenKind.ID)
-            let n = ast_expr("FieldAccess", field.line)
-            n.object = lhs
-            n.name = field.text
-            lhs = n
+            lhs = ast_field_access(lhs, field.text, field.line)
         } else if check(p, TokenKind.LBRACKET) == 1 {
-            let subscript = ast_expr("Subscript", lhs.line)
-            subscript.base = lhs
-            subscript.index = parse_expr(p)
+            let index = parse_expr(p)
             expect(p, TokenKind.RBRACKET)
-            lhs = subscript
+            lhs = ast_subscript(lhs, index, lhs.line)
         } else {
             done = 1
         }
@@ -446,101 +696,55 @@ fun parse_assign_stmt(p: Parser): AstStmt {
     if assignment.kind != TokenKind.ASSIGN && assignment.kind != TokenKind.ASSIGN_OP {
         parse_error(assignment.line, "Expected assignment operator")
     }
+    let target = ast_assign_target(lhs, name.line)
     let value = parse_expr(p)
     expect_stmt_end(p)
     if assignment.kind == TokenKind.ASSIGN_OP {
-        let compound = ast_stmt("AssignOp", name.line)
-        compound.op = str_new(assignment.text.data, len(assignment.text) - 1)
-        compound.value_expr = value
-        if lhs.kind == "Var" {
-            compound.target_kind = "Var"
-            compound.name = lhs.name
-            return compound
-        }
-        if lhs.kind == "FieldAccess" {
-            compound.target_kind = "Field"
-            compound.object = lhs.object
-            compound.name = lhs.name
-            return compound
-        }
-        if lhs.kind == "Subscript" {
-            compound.target_kind = "Subscript"
-            compound.base = lhs.base
-            compound.index = lhs.index
-            return compound
-        }
-        parse_error(name.line, "Invalid compound assignment target")
+        return ast_assign_op(target, compound_operator(assignment), value, name.line)
     }
-    if lhs.kind == "Var" {
-        let node = ast_stmt("Assign", name.line)
-        node.name = lhs.name
-        node.value_expr = value
-        return node
-    }
-    if lhs.kind == "FieldAccess" {
-        let field_set = ast_stmt("FieldSet", name.line)
-        field_set.object = lhs.object
-        field_set.name = lhs.name
-        field_set.value_expr = value
-        return field_set
-    }
-    if lhs.kind == "Subscript" {
-        let subscript_set = ast_stmt("SubscriptAssign", name.line)
-        subscript_set.base = lhs.base
-        subscript_set.index = lhs.index
-        subscript_set.value_expr = value
-        return subscript_set
-    }
-    parse_error(name.line, "Invalid assignment target")
-    return ast_stmt("", name.line)
+    return ast_assign(target, value, name.line)
 }
 fun parse_if_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.IF)
-    let node = ast_stmt("If", keyword.line)
-    node.else_block = ast_block_empty()
-    node.expr = parse_expr(p)
-    node.then_block = parse_block(p)
+    let condition = parse_expr(p)
+    let then_block = parse_block(p)
+    let else_block = ast_block_empty()
     skip_newlines(p)
     if check(p, TokenKind.ELSE) == 1 {
         skip_newlines(p)
         if peek_kind(p, TokenKind.IF) == 1 {
-            let block = ast_block()
-            push(block.stmts, parse_if_stmt(p))
-            node.else_block = block
+            else_block = ast_block()
+            push(else_block.stmts, parse_if_stmt(p))
         } else {
-            node.else_block = parse_block(p)
+            else_block = parse_block(p)
         }
     }
-    return node
+    return ast_if(condition, then_block, else_block, keyword.line)
 }
 fun parse_while_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.WHILE)
-    let node = ast_stmt("While", keyword.line)
-    node.expr = parse_expr(p)
+    let condition = parse_expr(p)
     p.loop_depth += 1
-    node.body = parse_block(p)
+    let body = parse_block(p)
     p.loop_depth -= 1
-    return node
+    return ast_while(condition, body, keyword.line)
 }
 fun parse_for_range_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.FOR)
     let name = expect(p, TokenKind.ID)
-    let node = ast_stmt("ForRange", keyword.line)
-    node.name = name.text
     expect(p, TokenKind.COLON)
-    node.range_start = parse_expr(p)
+    let start = parse_expr(p)
     expect(p, TokenKind.COLON)
-    node.range_end = parse_expr(p)
+    let end = parse_expr(p)
     p.loop_depth += 1
-    node.body = parse_block(p)
+    let body = parse_block(p)
     p.loop_depth -= 1
-    return node
+    return ast_for_range(name.text, ast_range(start, end), body, keyword.line)
 }
 fun parse_match_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.MATCH)
-    let node = ast_stmt("Match", keyword.line)
-    node.expr = parse_expr(p)
-    node.match_arms = new AstMatchArm[]
+    let subject = parse_expr(p)
+    let arms = new AstMatchArm[]
     expect(p, TokenKind.LBRACE)
     skip_newlines(p)
     while !peek_kind(p, TokenKind.RBRACE) {
@@ -558,36 +762,32 @@ fun parse_match_stmt(p: Parser): AstStmt {
             arm.line = member_name.line
         }
         arm.body = parse_block(p)
-        push(node.match_arms, arm)
+        push(arms, arm)
         skip_newlines(p)
     }
     expect(p, TokenKind.RBRACE)
-    return node
+    return ast_match(subject, arms, keyword.line)
 }
 fun parse_break_stmt(p: Parser): AstStmt {
-    let t = expect(p, TokenKind.BREAK)
+    let token = expect(p, TokenKind.BREAK)
     if !p.loop_depth {
-        parse_error(t.line, "break outside loop")
+        parse_error(token.line, "break outside loop")
     }
-    let node = ast_stmt("Break", t.line)
     expect_stmt_end(p)
-    return node
+    return ast_break(token.line)
 }
 fun parse_continue_stmt(p: Parser): AstStmt {
-    let t = expect(p, TokenKind.CONTINUE)
+    let token = expect(p, TokenKind.CONTINUE)
     if !p.loop_depth {
-        parse_error(t.line, "continue outside loop")
+        parse_error(token.line, "continue outside loop")
     }
-    let node = ast_stmt("Continue", t.line)
     expect_stmt_end(p)
-    return node
+    return ast_continue(token.line)
 }
 fun parse_expr_stmt(p: Parser): AstStmt {
     let expr = parse_expr(p)
-    let node = ast_stmt("ExprStmt", expr.line)
-    node.expr = expr
     expect_stmt_end(p)
-    return node
+    return ast_expr_statement(expr)
 }
 fun is_expr_first(kind: TokenKind): i64 {
     if kind == TokenKind.NUMBER {
@@ -653,64 +853,164 @@ fun parse_stmt(p: Parser): AstStmt {
         }
     }
     parse_error(t.line, "Unexpected token in statement")
-    return ast_stmt("", t.line)
+    return ast_break(t.line)
 }
-fun op_text(kind: TokenKind): str {
-    if kind == TokenKind.PLUS {
-        return "+"
+fun operator_text(op: OperatorKind): str {
+    match op {
+        OperatorKind.Add {
+            return "+"
+        }
+        OperatorKind.Subtract {
+            return "-"
+        }
+        OperatorKind.Multiply {
+            return "*"
+        }
+        OperatorKind.Divide {
+            return "/"
+        }
+        OperatorKind.Remainder {
+            return "%"
+        }
+        OperatorKind.BitAnd {
+            return "&"
+        }
+        OperatorKind.BitOr {
+            return "|"
+        }
+        OperatorKind.ShiftLeft {
+            return "<<"
+        }
+        OperatorKind.ShiftRight {
+            return ">>"
+        }
+        OperatorKind.Equal {
+            return "=="
+        }
+        OperatorKind.NotEqual {
+            return "!="
+        }
+        OperatorKind.Less {
+            return "<"
+        }
+        OperatorKind.LessEqual {
+            return "<="
+        }
+        OperatorKind.Greater {
+            return ">"
+        }
+        OperatorKind.GreaterEqual {
+            return ">="
+        }
+        OperatorKind.LogicalAnd {
+            return "&&"
+        }
+        OperatorKind.LogicalOr {
+            return "||"
+        }
+        OperatorKind.Negate {
+            return "-"
+        }
+        OperatorKind.LogicalNot {
+            return "!"
+        }
     }
-    if kind == TokenKind.MINUS {
-        return "-"
+}
+fun binary_operator(token: Token): OperatorKind {
+    if token.kind == TokenKind.PLUS {
+        return OperatorKind.Add
     }
-    if kind == TokenKind.BANG {
-        return "!"
+    if token.kind == TokenKind.MINUS {
+        return OperatorKind.Subtract
     }
-    if kind == TokenKind.STAR {
-        return "*"
+    if token.kind == TokenKind.STAR {
+        return OperatorKind.Multiply
     }
-    if kind == TokenKind.SLASH {
-        return "/"
+    if token.kind == TokenKind.SLASH {
+        return OperatorKind.Divide
     }
-    if kind == TokenKind.PERCENT {
-        return "%"
+    if token.kind == TokenKind.PERCENT {
+        return OperatorKind.Remainder
     }
-    if kind == TokenKind.EQEQ {
-        return "=="
+    if token.kind == TokenKind.AMPERSAND {
+        return OperatorKind.BitAnd
     }
-    if kind == TokenKind.NEQ {
-        return "!="
+    if token.kind == TokenKind.BIT_OR {
+        return OperatorKind.BitOr
     }
-    if kind == TokenKind.LT {
-        return "<"
+    if token.kind == TokenKind.SHL {
+        return OperatorKind.ShiftLeft
     }
-    if kind == TokenKind.GT {
-        return ">"
+    if token.kind == TokenKind.SHR {
+        return OperatorKind.ShiftRight
     }
-    if kind == TokenKind.LTE {
-        return "<="
+    if token.kind == TokenKind.EQEQ {
+        return OperatorKind.Equal
     }
-    if kind == TokenKind.GTE {
-        return ">="
+    if token.kind == TokenKind.NEQ {
+        return OperatorKind.NotEqual
     }
-    if kind == TokenKind.AND {
-        return "&&"
+    if token.kind == TokenKind.LT {
+        return OperatorKind.Less
     }
-    if kind == TokenKind.OR {
-        return "||"
+    if token.kind == TokenKind.LTE {
+        return OperatorKind.LessEqual
     }
-    if kind == TokenKind.BIT_OR {
-        return "|"
+    if token.kind == TokenKind.GT {
+        return OperatorKind.Greater
     }
-    if kind == TokenKind.AMPERSAND {
-        return "&"
+    if token.kind == TokenKind.GTE {
+        return OperatorKind.GreaterEqual
     }
-    if kind == TokenKind.SHL {
-        return "<<"
+    if token.kind == TokenKind.AND {
+        return OperatorKind.LogicalAnd
     }
-    if kind == TokenKind.SHR {
-        return ">>"
+    if token.kind == TokenKind.OR {
+        return OperatorKind.LogicalOr
     }
-    return ""
+    parse_error(token.line, "internal: token is not a binary operator")
+    return OperatorKind.Add
+}
+fun unary_operator(token: Token): OperatorKind {
+    if token.kind == TokenKind.MINUS {
+        return OperatorKind.Negate
+    }
+    if token.kind == TokenKind.BANG {
+        return OperatorKind.LogicalNot
+    }
+    parse_error(token.line, "internal: token is not a unary operator")
+    return OperatorKind.Negate
+}
+fun compound_operator(token: Token): OperatorKind {
+    if token.text == "+=" {
+        return OperatorKind.Add
+    }
+    if token.text == "-=" {
+        return OperatorKind.Subtract
+    }
+    if token.text == "*=" {
+        return OperatorKind.Multiply
+    }
+    if token.text == "/=" {
+        return OperatorKind.Divide
+    }
+    if token.text == "%=" {
+        return OperatorKind.Remainder
+    }
+    if token.text == "&=" {
+        return OperatorKind.BitAnd
+    }
+    if token.text == "|=" {
+        return OperatorKind.BitOr
+    }
+    if token.text == "<<=" {
+        return OperatorKind.ShiftLeft
+    }
+    if token.text == ">>=" {
+        return OperatorKind.ShiftRight
+    }
+    parse_error(token.line, "internal: token is not a compound assignment operator")
+    return OperatorKind.Add
 }
 fun parse_args(p: Parser): AstExpr[] {
     let args = new AstExpr[]
@@ -729,28 +1029,19 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
         if check(p, TokenKind.DOT) == 1 {
             let field = expect_enum_member(p)
             if check(p, TokenKind.LPAREN) == 1 {
-                let n = ast_expr("Call", field.line)
-                if current.kind == "Var" && current.name == "os" {
-                    n.name = field.text
-                    n.type_name = "os"
-                } else {
+                if current.kind != AstExprKind.Var || current.name != "os" {
                     parse_error(field.line, "method calls are only supported for os.* in v0")
                 }
-                n.args = parse_args(p)
+                let args = parse_args(p)
                 expect(p, TokenKind.RPAREN)
-                current = n
+                current = ast_os_call(field.text, args, field.line)
             } else {
-                let field_access = ast_expr("FieldAccess", field.line)
-                field_access.object = current
-                field_access.name = field.text
-                current = field_access
+                current = ast_field_access(current, field.text, field.line)
             }
         } else if check(p, TokenKind.LBRACKET) == 1 {
-            let subscript = ast_expr("Subscript", current.line)
-            subscript.base = current
-            subscript.index = parse_expr(p)
+            let index = parse_expr(p)
             expect(p, TokenKind.RBRACKET)
-            current = subscript
+            current = ast_subscript(current, index, current.line)
         } else {
             done = 1
         }
@@ -797,61 +1088,45 @@ fun read_embed(source_path: str, path: str, line: i64): str {
 fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, TokenKind.NEW) == 1 {
         let keyword = expect(p, TokenKind.NEW)
-        let t = expect(p, TokenKind.ID)
+        let type_name = expect(p, TokenKind.ID)
         if check(p, TokenKind.LBRACKET) == 1 {
-            let n = ast_expr("NewArray", keyword.line)
-            n.type_name = t.text
-            n.count = ast_expr_empty()
+            let count = ast_expr_none()
             if !peek_kind(p, TokenKind.RBRACKET) {
-                n.count = parse_expr(p)
+                count = ast_expr_some(parse_expr(p))
             }
             expect(p, TokenKind.RBRACKET)
-            return n
+            return ast_new_array(type_name.text, count, keyword.line)
         }
-        let new_object = ast_expr("New", keyword.line)
-        new_object.name = t.text
-        return new_object
+        return ast_new_product(type_name.text, keyword.line)
     }
     if peek_kind(p, TokenKind.NUMBER) == 1 {
-        let number = advance(p)
-        let literal = ast_expr("Literal", number.line)
-        literal.value = number.text
-        return literal
+        let number_token = advance(p)
+        return ast_literal(number_token.text, number_token.line)
     }
     if peek_kind(p, TokenKind.CHAR) == 1 {
-        let character = advance(p)
-        let char_literal = ast_expr("Literal", character.line)
-        char_literal.value = character.text
-        return char_literal
+        let char_token = advance(p)
+        return ast_literal(char_token.text, char_token.line)
     }
     if peek_kind(p, TokenKind.STRING) == 1 {
         let string_token = advance(p)
-        let string_literal = ast_expr("String", string_token.line)
-        string_literal.value = string_token.text
-        return string_literal
+        return ast_string(string_token.text, string_token.line)
     }
     if peek_kind(p, TokenKind.ID) == 1 {
         let identifier = advance(p)
-        let node = ast_expr("Var", identifier.line)
-        node.name = identifier.text
         if check(p, TokenKind.LPAREN) == 1 {
             if identifier.text == "embed" {
                 let path = expect(p, TokenKind.STRING)
                 expect(p, TokenKind.RPAREN)
-                node.kind = "Embed"
-                node.value = read_embed(p.source_path, path.text, path.line)
-                return parse_postfix(p, node)
+                return parse_postfix(p, ast_embed(read_embed(p.source_path, path.text, path.line), identifier.line))
             }
-            node.kind = "Call"
-            node.type_name = ""
-            node.args = parse_args(p)
+            let args = parse_args(p)
             expect(p, TokenKind.RPAREN)
-            if len(node.args) > 4 {
+            if len(args) > 4 {
                 parse_error(identifier.line, "function calls may have at most 4 arguments in v0")
             }
-            return parse_postfix(p, node)
+            return parse_postfix(p, ast_call(identifier.text, args, identifier.line))
         }
-        return parse_postfix(p, node)
+        return parse_postfix(p, ast_var(identifier.text, identifier.line))
     }
     if check(p, TokenKind.LPAREN) == 1 {
         let expr = parse_expr(p)
@@ -860,22 +1135,15 @@ fun parse_primary(p: Parser): AstExpr {
     }
     let unexpected = peek(p)
     parse_error(unexpected.line, "Unexpected token in expression")
-    return ast_expr_empty()
+    return ast_literal("0", unexpected.line)
 }
 fun bin_node(op: Token, left: AstExpr, right: AstExpr): AstExpr {
-    let n = ast_expr("Binary", op.line)
-    n.op = op_text(op.kind)
-    n.left = left
-    n.right = right
-    return n
+    return ast_binary(binary_operator(op), left, right, op.line)
 }
 fun parse_unary(p: Parser): AstExpr {
     if peek_kind(p, TokenKind.MINUS) == 1 || peek_kind(p, TokenKind.BANG) == 1 {
         let op = advance(p)
-        let node = ast_expr("Unary", op.line)
-        node.op = op_text(op.kind)
-        node.left = parse_unary(p)
-        return node
+        return ast_unary(unary_operator(op), parse_unary(p), op.line)
     }
     return parse_primary(p)
 }

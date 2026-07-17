@@ -46,15 +46,21 @@ only part of the trusted Python stage-0 route used to create the first seed.
 
 ## Syntax model
 
-The lexer and parser dogfood nominal enums directly: `Token.kind` is a
-`TokenKind`, and the main statement parser dispatches on it with `match`.
-Expression and statement tags remain strings because they deliberately use
-empty sentinels and are consumed by several partial dispatches.
+The lexer and parser dogfood nominal enums directly. `Token.kind` is a
+`TokenKind`; expression and statement nodes use `AstExprKind` and
+`AstStmtKind`; assignment targets use `AssignTargetKind`; and unary and binary
+operators use `OperatorKind`. Complete dispatches in parsing, semantic
+analysis, and code generation use exhaustive `match` statements without an
+`else` arm.
 
 The parser returns exact records for program structure, including programs,
-product declarations, functions, parameters, fields, and blocks. Expressions
-and statements use tagged records because those two categories flow through
-large dispatches in code generation.
+product declarations, functions, parameters, fields, and blocks. Every
+expression and statement is created by a constructor for its exact shape;
+there is no empty or invalid AST kind. Truly optional expressions, currently
+bare `return` values and unsized-array counts, use `AstExprOption` with
+`None | Some`. Assignment statements carry one `AstAssignTarget`, so variable,
+field, and subscript assignment share the same statement kinds and lowering
+path.
 
 Unit-enum declarations and match arms are also exact records. Semantic
 analysis resolves each qualified enum member to its declaration-order value,
