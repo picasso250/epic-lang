@@ -130,66 +130,6 @@ fun emit_call_inst(e: EmitterState, target: str): i64 {
     out_line(e, target)
     return 0
 }
-fun sys_call_symbol(name: str): str {
-    if name == "os.Sleep" {
-        return "Sleep"
-    }
-    if name == "os.GetTickCount64" {
-        return "GetTickCount64"
-    }
-    if name == "os.GetLastError" {
-        return "GetLastError"
-    }
-    if name == "os.SetLastError" {
-        return "SetLastError"
-    }
-    if name == "os.GetStdHandle" {
-        return "GetStdHandle"
-    }
-    if name == "os.CloseHandle" {
-        return "CloseHandle"
-    }
-    if name == "os.lstrlenA" {
-        return "lstrlenA"
-    }
-    if name == "os.lstrcmpA" {
-        return "lstrcmpA"
-    }
-    if name == "os.MessageBoxA" {
-        return "MessageBoxA"
-    }
-    if name == "os.Beep" {
-        return "Beep"
-    }
-    if name == "os.GetCurrentProcess" {
-        return "GetCurrentProcess"
-    }
-    if name == "os.GetCurrentProcessId" {
-        return "GetCurrentProcessId"
-    }
-    if name == "os.GetCurrentThreadId" {
-        return "GetCurrentThreadId"
-    }
-    if name == "os.ExitProcess" {
-        return "ExitProcess"
-    }
-    if name == "os.GetFileAttributesA" {
-        return "GetFileAttributesA"
-    }
-    if name == "os.CreateDirectoryA" {
-        return "CreateDirectoryA"
-    }
-    if name == "os.CreateFileA" {
-        return "CreateFileA"
-    }
-    if name == "os.ReadFile" {
-        return "ReadFile"
-    }
-    if name == "os.WriteFile" {
-        return "WriteFile"
-    }
-    return ""
-}
 fun sys_member_symbol(ns: str, name: str): str {
     if ns != "os" {
         return ""
@@ -252,12 +192,6 @@ fun sys_member_symbol(ns: str, name: str): str {
         return "WriteFile"
     }
     return ""
-}
-fun is_sys_call(name: str): i64 {
-    if sys_call_symbol(name) == "" {
-        return 0
-    }
-    return 1
 }
 fun emit_jmp(e: EmitterState, label: str): i64 {
     out_s(e, "    jmp ")
@@ -621,16 +555,6 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     }
     return 0
 }
-fun find_func_ret(e: EmitterState, name: str): TypeInfo {
-    let i = 0
-    while i < e.funcs.len {
-        if e.funcs.data[i].name == name {
-            return e.funcs.data[i].ret_type
-        }
-        i = i + 1
-    }
-    return type_i64()
-}
 fun reset_locals(e: EmitterState): i64 {
     e.locals = new Local[128]
     e.local_bytes = 0
@@ -679,99 +603,17 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
         }
         i = i + 1
     }
+    die("internal: checked local has no type")
     return type_i64()
 }
 fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
-    if expr.kind == "String" {
-        return type_str()
+    if expr.resolved_type == "" {
+        die("internal: expression has no checked type")
     }
-    if expr.kind == "Embed" {
-        return type_array("u8")
+    if sema_is_pointer(expr.resolved_type) == 1 {
+        return type_info("ptr", sema_pointer_element(expr.resolved_type))
     }
-    if expr.kind == "Literal" {
-        return type_i64()
-    }
-    if expr.kind == "Binary" {
-        if expr.op == "+" {
-            let lt = expr_type(e, expr.left)
-            let rt = expr_type(e, expr.right)
-            if lt.kind == "str" && rt.kind == "str" {
-                return type_str()
-            }
-        }
-        return type_i64()
-    }
-    if expr.kind == "Var" {
-        return find_local_type(e, expr.name)
-    }
-    if expr.kind == "Call" {
-        if is_sys_call(expr.name) == 1 {
-            return type_i64()
-        }
-        if sys_member_symbol(expr.type_name, expr.name) != "" {
-            return type_i64()
-        }
-        if expr.name == "itoa" {
-            return type_str()
-        }
-        if expr.name == "bytes" {
-            return type_array("u8")
-        }
-        if expr.name == "str_new" {
-            return type_str()
-        }
-        if expr.name == "str_slice" {
-            return type_str()
-        }
-        if expr.name == "str_replace_char" {
-            return type_str()
-        }
-        if expr.name == "read_file" {
-            return type_str()
-        }
-        if expr.name == "write_file" {
-            return type_i64()
-        }
-        if expr.name == "extend" {
-            return type_void()
-        }
-        return find_func_ret(e, expr.name)
-    }
-    if expr.kind == "New" {
-        return type_struct(expr.name)
-    }
-    if expr.kind == "NewArray" {
-        return type_array(expr.type_name)
-    }
-    if expr.kind == "FieldAccess" {
-        let base_type = expr_type(e, expr.object)
-        let layout = ""
-        if base_type.kind == "str" {
-            layout = "str"
-        } else if base_type.kind == "array" {
-            layout = array_layout_name(base_type.name)
-        } else {
-            layout = base_type.name
-        }
-        let f = find_field_info(e, layout, expr.name)
-        return f.typ
-    }
-    if expr.kind == "Subscript" {
-        let bt = expr_type(e, expr.base)
-        if bt.kind == "array" {
-            return user_type(bt.name)
-        }
-        if bt.kind == "ptr" {
-            return user_type(bt.name)
-        }
-    }
-    return type_i64()
-}
-fun infer_let_type(e: EmitterState, value: AstExpr): TypeInfo {
-    if value.kind == "" {
-        return type_i64()
-    }
-    return expr_type(e, value)
+    return user_type(expr.resolved_type)
 }
 fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
     if block.present == 0 {
@@ -781,7 +623,7 @@ fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
     while i < block.stmts.len {
         let stmt = block.stmts.data[i]
         if stmt.kind == "Let" {
-            add_local(e, stmt.name, infer_let_type(e, stmt.value_expr))
+            add_local(e, stmt.name, expr_type(e, stmt.value_expr))
         } else if stmt.kind == "If" {
             pre_scan_block(e, stmt.then_block)
             pre_scan_block(e, stmt.else_block)
@@ -861,10 +703,7 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
 }
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
-    let sys_symbol = sys_call_symbol(name)
-    if sys_symbol == "" {
-        sys_symbol = sys_member_symbol(expr.type_name, expr.name)
-    }
+    let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
     if sys_symbol != "" {
         let slots = new i64[4]
         let i = 0
@@ -1384,11 +1223,22 @@ fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
     return 0
 }
 fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
-    let elem_type = expr_type(e, expr)
+    let base_type = expr_type(e, expr.base)
+    let elem_type = type_i64()
+    if base_type.kind == "str" {
+        elem_type = type_u8()
+    } else if base_type.kind == "array" || base_type.kind == "ptr" {
+        elem_type = user_type(base_type.name)
+    } else {
+        die("internal: checked subscript has invalid base")
+    }
     emit_expr(e, expr.base)
     let base_slot = temp_save_rax(e)
     emit_expr(e, expr.index)
     emit_stack_load(e, "rcx", base_slot)
+    if base_type.kind == "str" || base_type.kind == "array" {
+        emit_mov(e, "rcx", "[rcx]")
+    }
     if type_is_u8(elem_type) == 1 {
         emit_inst(e, "movzx rax, byte [rcx+rax]")
     } else {
@@ -1498,16 +1348,22 @@ fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     return 0
 }
 fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
-    let synth = ast_expr("Subscript", stmt.line)
-    synth.base = stmt.base
-    synth.index = stmt.index
-    let elem_type = expr_type(e, synth)
+    let base_type = expr_type(e, stmt.base)
+    let elem_type = type_i64()
+    if base_type.kind == "array" || base_type.kind == "ptr" {
+        elem_type = user_type(base_type.name)
+    } else {
+        die("internal: checked subscript assignment has invalid base")
+    }
     emit_expr(e, stmt.value_expr)
     let val_slot = temp_save_rax(e)
     emit_expr(e, stmt.base)
     let base_slot = temp_save_rax(e)
     emit_expr(e, stmt.index)
     emit_stack_load(e, "rcx", base_slot)
+    if base_type.kind == "array" {
+        emit_mov(e, "rcx", "[rcx]")
+    }
     if type_is_u8(elem_type) == 1 {
         emit_inst(e, "lea rcx, [rcx+rax]")
     } else {
