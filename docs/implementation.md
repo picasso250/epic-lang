@@ -64,6 +64,12 @@ arguments, and file I/O. `embed("path")` stores their raw bytes in the compiler
 image at bootstrap time, so a built `epic.exe` appends them without reading a
 repository `runtime` directory.
 
+All managed allocation sites call the conservative, non-moving mark-and-sweep
+collector in `runtime/gc.asm`. It records exact allocation bases in side
+metadata, scans the active stack and managed payloads conservatively, and frees
+unmarked objects through the Win32 process heap. The detailed runtime contract
+is documented in [`gc.md`](gc.md).
+
 ## Assembler and PE writer
 
 `src/asm.ep` parses the compiler's private assembly subset and encodes AMD64
@@ -90,4 +96,6 @@ directory and verifies that it can compile a program using an embedded byte
 resource. The public examples are compiled and executed individually. End-to-end test
 sources remain independent, but their runner generates one temporary bundle,
 compiles it once, and starts that executable separately for each case. This
-preserves process isolation without producing one tiny PE per regression.
+preserves process isolation without producing one tiny PE per regression. The
+GC suite separately exercises retained stack and heap references under bounded
+memory pressure.

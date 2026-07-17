@@ -1646,6 +1646,9 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     } else {
         emit_label(e, fn.name)
     }
+    if fn.name == "main" {
+        emit_mov(e, "[_gc_stack_high]", "rsp")
+    }
     emit_prologue(e)
     if fn.name == "main" {
         emit_call_inst(e, "GetProcessHeap")
@@ -1715,6 +1718,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     out_line(e, "extern lstrlenA")
     out_line(e, "extern GetCommandLineA")
     out_line(e, "extern HeapAlloc")
+    out_line(e, "extern HeapFree")
     out_line(e, "extern GetProcessHeap")
     out_line(e, "extern Beep")
     out_line(e, "extern GetCurrentProcess")

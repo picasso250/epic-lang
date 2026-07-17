@@ -30,6 +30,7 @@ working directory.
 
 - [Language reference](docs/language.md), including built-in data structures and functions
 - [Compiler implementation](docs/implementation.md)
+- [Garbage collector](docs/gc.md)
 
 Verify the self-hosted fixed point:
 
