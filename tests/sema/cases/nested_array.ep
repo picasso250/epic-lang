@@ -1,0 +1,7 @@
+# ERROR: nested arrays are not supported in v2
+type Bad {
+    values: i64[][]
+}
+fun main(): void {
+    return
+}

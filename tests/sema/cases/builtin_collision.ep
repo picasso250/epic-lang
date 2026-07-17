@@ -1,0 +1,7 @@
+# ERROR: cannot redefine builtin function 'print'
+fun print(value: str): void {
+    return
+}
+fun main(): void {
+    return
+}

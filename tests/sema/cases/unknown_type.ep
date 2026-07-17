@@ -1,0 +1,7 @@
+# ERROR: unknown type 'Missing'
+fun consume(value: Missing): void {
+    return
+}
+fun main(): void {
+    return
+}

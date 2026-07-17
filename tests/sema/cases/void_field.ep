@@ -1,0 +1,7 @@
+# ERROR: void is only valid as a function return type
+type Bad {
+    value: void
+}
+fun main(): void {
+    return
+}

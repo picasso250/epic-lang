@@ -1,0 +1,10 @@
+# ERROR: duplicate type 'Item'
+type Item {
+    value: i64
+}
+type Item {
+    other: i64
+}
+fun main(): void {
+    return
+}

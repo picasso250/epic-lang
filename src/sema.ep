@@ -1,6 +1,310 @@
 #
 # Epic v2 semantic analysis.
 #
+type SemaTypeDecl {
+    name: str
+    source_path: str
+    line: i64
+}
+type SemaSignature {
+    name: str
+    return_type: str
+    param_types: str[]
+    source_path: str
+    line: i64
+    builtin: i64
+}
+type SemaState {
+    types: SemaTypeDecl[]
+    funcs: SemaSignature[]
+}
+fun sema_error(path: str, line: i64, message: str): i64 {
+    print(path)
+    print(":")
+    print(itoa(line))
+    print(": semantic error: ")
+    print(message)
+    print("\n")
+    os.ExitProcess(1)
+    return 0
+}
+fun sema_duplicate(path: str, line: i64, what: str, first: str): i64 {
+    print(path)
+    print(":")
+    print(itoa(line))
+    print(": semantic error: duplicate ")
+    print(what)
+    print("'; first declared at ")
+    print(first)
+    print("\n")
+    os.ExitProcess(1)
+    return 0
+}
+fun sema_state(): SemaState {
+    let state = new SemaState
+    state.types = new SemaTypeDecl[8]
+    state.funcs = new SemaSignature[16]
+    return state
+}
+fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
+    let i = 0
+    while i < state.types.len {
+        if state.types.data[i].name == name {
+            return state.types.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new SemaTypeDecl
+    missing.name = ""
+    return missing
+}
+fun sema_find_func(state: SemaState, name: str): SemaSignature {
+    let i = 0
+    while i < state.funcs.len {
+        if state.funcs.data[i].name == name {
+            return state.funcs.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new SemaSignature
+    missing.name = ""
+    return missing
+}
+fun sema_is_array(type_name: str): i64 {
+    if type_name.len < 2 {
+        return 0
+    }
+    if type_name.data[type_name.len - 2] == 91 && type_name.data[type_name.len - 1] == 93 {
+        return 1
+    }
+    return 0
+}
+fun sema_array_element(type_name: str): str {
+    return str_new(type_name.data, type_name.len - 2)
+}
+fun sema_type_exists(state: SemaState, type_name: str): i64 {
+    if type_name == "i64" || type_name == "u8" || type_name == "str" || type_name == "void" {
+        return 1
+    }
+    if sema_find_type(state, type_name).name != "" {
+        return 1
+    }
+    return 0
+}
+fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: str): i64 {
+    if type_name == "void" {
+        sema_error(path, line, "void is only valid as a function return type")
+        return 0
+    }
+    if sema_is_array(type_name) == 1 {
+        let element = sema_array_element(type_name)
+        if element == "void" {
+            sema_error(path, line, "array element type cannot be void")
+        }
+        if sema_is_array(element) == 1 {
+            sema_error(path, line, "nested arrays are not supported in v2")
+        }
+        if sema_type_exists(state, element) == 0 {
+            sema_error(path, line, "unknown array element type '" + element + "'")
+        }
+        return 0
+    }
+    if sema_type_exists(state, type_name) == 0 {
+        sema_error(path, line, "unknown type '" + type_name + "'")
+    }
+    return 0
+}
+fun sema_signature(name: str, return_type: str): SemaSignature {
+    let sig = new SemaSignature
+    sig.name = name
+    sig.return_type = return_type
+    sig.param_types = new str[4]
+    sig.source_path = "<builtin>"
+    sig.builtin = 1
+    return sig
+}
+fun sema_add_builtin(state: SemaState, sig: SemaSignature): i64 {
+    push(state.funcs, sig)
+    return 0
+}
+fun sema_add_builtins(state: SemaState): i64 {
+    let sig = sema_signature("print", "void")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("itoa", "str")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("bytes", "u8[]")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("str_new", "str")
+    push(sig.param_types, "ptr")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("str_slice", "str")
+    push(sig.param_types, "str")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("str_replace_char", "str")
+    push(sig.param_types, "str")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("read_file", "str")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("write_file", "i64")
+    push(sig.param_types, "str")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("push", "void")
+    push(sig.param_types, "array")
+    push(sig.param_types, "element")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("extend", "void")
+    push(sig.param_types, "u8[]")
+    push(sig.param_types, "u8[]")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("embed", "u8[]")
+    sema_add_builtin(state, sig)
+    return 0
+}
+fun sema_add_os_signature(state: SemaState, name: str, return_type: str, count: i64): i64 {
+    let sig = sema_signature("os." + name, return_type)
+    let i = 0
+    while i < count {
+        push(sig.param_types, "abi")
+        i = i + 1
+    }
+    sema_add_builtin(state, sig)
+    return 0
+}
+fun sema_add_os_signatures(state: SemaState): i64 {
+    sema_add_os_signature(state, "Sleep", "void", 1)
+    sema_add_os_signature(state, "GetTickCount64", "i64", 0)
+    sema_add_os_signature(state, "GetLastError", "i64", 0)
+    sema_add_os_signature(state, "SetLastError", "void", 1)
+    sema_add_os_signature(state, "GetStdHandle", "i64", 1)
+    sema_add_os_signature(state, "CloseHandle", "i64", 1)
+    sema_add_os_signature(state, "lstrlenA", "i64", 1)
+    sema_add_os_signature(state, "lstrcmpA", "i64", 2)
+    sema_add_os_signature(state, "MessageBoxA", "i64", 4)
+    sema_add_os_signature(state, "Beep", "i64", 2)
+    sema_add_os_signature(state, "GetCurrentProcess", "i64", 0)
+    sema_add_os_signature(state, "GetCurrentProcessId", "i64", 0)
+    sema_add_os_signature(state, "GetCurrentThreadId", "i64", 0)
+    sema_add_os_signature(state, "ExitProcess", "void", 1)
+    sema_add_os_signature(state, "GetFileAttributesA", "i64", 1)
+    sema_add_os_signature(state, "CreateDirectoryA", "i64", 2)
+    sema_add_os_signature(state, "CreateFileA", "i64", 7)
+    sema_add_os_signature(state, "ReadFile", "i64", 5)
+    sema_add_os_signature(state, "WriteFile", "i64", 5)
+    return 0
+}
+fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    while i < ast.structs.len {
+        let node = ast.structs.data[i]
+        if node.name == "os" {
+            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
+        }
+        let first = sema_find_type(state, node.name)
+        if first.name != "" {
+            sema_duplicate(node.source_path, node.line, "type '" + node.name + "'", first.source_path + ":" + itoa(first.line))
+        }
+        let decl = new SemaTypeDecl
+        decl.name = node.name
+        decl.source_path = node.source_path
+        decl.line = node.line
+        push(state.types, decl)
+        i = i + 1
+    }
+    return 0
+}
+fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    while i < ast.structs.len {
+        let node = ast.structs.data[i]
+        let j = 0
+        while j < node.fields.len {
+            let field = node.fields.data[j]
+            let k = 0
+            while k < j {
+                let first = node.fields.data[k]
+                if first.name == field.name {
+                    sema_duplicate(node.source_path, field.line, "field '" + field.name + "'", node.source_path + ":" + itoa(first.line))
+                }
+                k = k + 1
+            }
+            sema_validate_value_type(state, node.source_path, field.line, field.type_name)
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return 0
+}
+fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    while i < ast.funcs.len {
+        let node = ast.funcs.data[i]
+        if node.name == "os" {
+            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
+        }
+        let first = sema_find_func(state, node.name)
+        if first.name != "" {
+            if first.builtin == 1 {
+                sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
+            }
+            sema_duplicate(node.source_path, node.line, "function '" + node.name + "'", first.source_path + ":" + itoa(first.line))
+        }
+        if node.type_name != "void" {
+            sema_validate_value_type(state, node.source_path, node.line, node.type_name)
+        }
+        let sig = sema_signature(node.name, node.type_name)
+        sig.source_path = node.source_path
+        sig.line = node.line
+        sig.builtin = 0
+        let j = 0
+        while j < node.params.len {
+            let param = node.params.data[j]
+            let k = 0
+            while k < j {
+                let previous = node.params.data[k]
+                if previous.name == param.name {
+                    sema_duplicate(node.source_path, param.line, "parameter '" + param.name + "'", node.source_path + ":" + itoa(previous.line))
+                }
+                k = k + 1
+            }
+            if param.name == "os" || param.name == "argv" {
+                sema_error(node.source_path, param.line, "reserved parameter name '" + param.name + "'")
+            }
+            sema_validate_value_type(state, node.source_path, param.line, param.type_name)
+            push(sig.param_types, param.type_name)
+            j = j + 1
+        }
+        push(state.funcs, sig)
+        i = i + 1
+    }
+    return 0
+}
+fun sema_validate_main(state: SemaState): i64 {
+    let main_sig = sema_find_func(state, "main")
+    if main_sig.name == "" || main_sig.builtin == 1 {
+        sema_error("<input>", 1, "missing main function")
+    }
+    if main_sig.return_type != "void" || main_sig.param_types.len != 0 {
+        sema_error(main_sig.source_path, main_sig.line, "main must have signature fun main(): void")
+    }
+    return 0
+}
 fun sema_check(ast: AstProgram): i64 {
+    let state = sema_state()
+    sema_add_builtins(state)
+    sema_add_os_signatures(state)
+    sema_collect_type_names(state, ast)
+    sema_validate_structs(state, ast)
+    sema_collect_functions(state, ast)
+    sema_validate_main(state)
     return 0
 }

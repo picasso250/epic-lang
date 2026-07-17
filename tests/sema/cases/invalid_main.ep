@@ -1,0 +1,4 @@
+# ERROR: main must have signature fun main(): void
+fun main(value: i64): void {
+    return
+}

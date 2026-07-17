@@ -1,0 +1,8 @@
+# ERROR: duplicate field 'x'
+type Pair {
+    x: i64
+    x: u8
+}
+fun main(): void {
+    return
+}

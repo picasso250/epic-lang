@@ -1,0 +1,10 @@
+# ERROR: duplicate function 'work'
+fun work(): void {
+    return
+}
+fun work(): void {
+    return
+}
+fun main(): void {
+    return
+}
