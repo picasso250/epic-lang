@@ -1,0 +1,6 @@
+# ERROR: requires two integers, two strings, or two values of the same enum type
+type LeftEnum = Same | Other
+type RightEnum = Same | Other
+fun main(): void {
+    if LeftEnum.Same == RightEnum.Same {}
+}

@@ -5,6 +5,7 @@ type SemaTypeDecl {
     name: str
     source_path: str
     line: i64
+    kind: str
 }
 type SemaSignature {
     name: str
@@ -272,7 +273,47 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
         decl.name = node.name
         decl.source_path = node.source_path
         decl.line = node.line
+        decl.kind = "product"
         push(state.types, decl)
+        i = i + 1
+    }
+    i = 0
+    while i < ast.enums.len {
+        let enum_node = ast.enums.data[i]
+        if enum_node.name == "os" {
+            sema_error(enum_node.source_path, enum_node.line, "'os' is a reserved namespace")
+        }
+        let enum_first = sema_find_type(state, enum_node.name)
+        if enum_first.name != "" {
+            sema_duplicate(enum_node.source_path, enum_node.line, "type '" + enum_node.name + "'", enum_first.source_path + ":" + itoa(enum_first.line))
+        }
+        let enum_decl = new SemaTypeDecl
+        enum_decl.name = enum_node.name
+        enum_decl.source_path = enum_node.source_path
+        enum_decl.line = enum_node.line
+        enum_decl.kind = "enum"
+        push(state.types, enum_decl)
+        i = i + 1
+    }
+    return 0
+}
+fun sema_validate_enums(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    while i < ast.enums.len {
+        let node = ast.enums.data[i]
+        let j = 0
+        while j < node.members.len {
+            let member = node.members.data[j]
+            let k = 0
+            while k < j {
+                let first = node.members.data[k]
+                if first.name == member.name {
+                    sema_duplicate(node.source_path, member.line, "enum member '" + member.name + "'", node.source_path + ":" + itoa(first.line))
+                }
+                k = k + 1
+            }
+            j = j + 1
+        }
         i = i + 1
     }
     return 0
@@ -365,6 +406,29 @@ fun sema_find_struct(state: SemaState, name: str): AstStructDef {
     missing.name = ""
     missing.fields = new AstStructField[]
     return missing
+}
+fun sema_find_enum(state: SemaState, name: str): AstEnumDef {
+    let i = 0
+    while i < state.ast.enums.len {
+        if state.ast.enums.data[i].name == name {
+            return state.ast.enums.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new AstEnumDef
+    missing.name = ""
+    missing.members = new AstEnumMember[]
+    return missing
+}
+fun sema_enum_member_index(node: AstEnumDef, name: str): i64 {
+    let i = 0
+    while i < node.members.len {
+        if node.members.data[i].name == name {
+            return i
+        }
+        i = i + 1
+    }
+    return 0 - 1
 }
 fun sema_find_field(state: SemaState, type_name: str, field_name: str): AstStructField {
     let node = sema_find_struct(state, type_name)
@@ -522,7 +586,11 @@ fun sema_check_binary(state: SemaState, expr: AstExpr): str {
         if left == "str" && right == "str" {
             return "i64"
         }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires two integers or two strings")
+        let decl = sema_find_type(state, left)
+        if left == right && decl.name != "" && decl.kind == "enum" {
+            return "i64"
+        }
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires two integers, two strings, or two values of the same enum type")
     }
     if expr.op == "+" || expr.op == "-" || expr.op == "*" || expr.op == "/" || expr.op == "%" || expr.op == "&" || expr.op == "|" || expr.op == "<<" || expr.op == ">>" {
         if left == "i64" && right == "i64" {
@@ -576,6 +644,8 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     let result = ""
     if expr.kind == "Literal" {
         result = "i64"
+    } else if expr.kind == "EnumMember" {
+        result = expr.type_name
     } else if expr.kind == "String" {
         result = "str"
     } else if expr.kind == "Embed" {
@@ -595,7 +665,8 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     } else if expr.kind == "Call" {
         result = sema_check_call(state, expr)
     } else if expr.kind == "New" {
-        if sema_find_type(state, expr.name).name == "" {
+        let decl = sema_find_type(state, expr.name)
+        if decl.name == "" || decl.kind != "product" {
             sema_error(state.source_path, expr.line, "new requires a product type, got '" + expr.name + "'")
         }
         result = expr.name
@@ -607,12 +678,28 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
         }
         result = expr.type_name + "[]"
     } else if expr.kind == "FieldAccess" {
-        let object_type = sema_check_expr(state, expr.object)
-        let field_type = sema_field_type(state, object_type, expr.name)
-        if field_type == "" {
-            sema_error(state.source_path, expr.line, "type " + object_type + " has no field '" + expr.name + "'")
+        let enum_node = new AstEnumDef
+        enum_node.name = ""
+        if expr.object.kind == "Var" {
+            enum_node = sema_find_enum(state, expr.object.name)
         }
-        result = sema_promote(field_type)
+        if enum_node.name != "" {
+            let value = sema_enum_member_index(enum_node, expr.name)
+            if value < 0 {
+                sema_error(state.source_path, expr.line, "enum " + enum_node.name + " has no member '" + expr.name + "'")
+            }
+            expr.kind = "EnumMember"
+            expr.type_name = enum_node.name
+            expr.value = itoa(value)
+            result = enum_node.name
+        } else {
+            let object_type = sema_check_expr(state, expr.object)
+            let field_type = sema_field_type(state, object_type, expr.name)
+            if field_type == "" {
+                sema_error(state.source_path, expr.line, "type " + object_type + " has no field '" + expr.name + "'")
+            }
+            result = sema_promote(field_type)
+        }
     } else if expr.kind == "Subscript" {
         let base_type = sema_check_expr(state, expr.base)
         sema_check_expr(state, expr.index)
@@ -631,6 +718,52 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     }
     expr.resolved_type = result
     return result
+}
+fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
+    let subject_type = sema_check_expr(state, stmt.expr)
+    let enum_node = sema_find_enum(state, subject_type)
+    if enum_node.name == "" {
+        sema_error(state.source_path, stmt.line, "match subject must have an enum type, got " + subject_type)
+    }
+    let seen = new i64[enum_node.members.len]
+    let explicit_count = 0
+    let has_else = 0
+    let i = 0
+    while i < stmt.match_arms.len {
+        let arm = stmt.match_arms.data[i]
+        if arm.is_else == 1 {
+            if has_else == 1 {
+                sema_error(state.source_path, arm.line, "match has more than one else arm")
+            }
+            if i + 1 != stmt.match_arms.len {
+                sema_error(state.source_path, arm.line, "else must be the final match arm")
+            }
+            has_else = 1
+        } else {
+            if arm.type_name != subject_type {
+                sema_error(state.source_path, arm.line, "match arm belongs to enum " + arm.type_name + ", expected " + subject_type)
+            }
+            let value = sema_enum_member_index(enum_node, arm.member_name)
+            if value < 0 {
+                sema_error(state.source_path, arm.line, "enum " + subject_type + " has no member '" + arm.member_name + "'")
+            }
+            if seen.data[value] == 1 {
+                sema_error(state.source_path, arm.line, "duplicate match arm " + subject_type + "." + arm.member_name)
+            }
+            seen.data[value] = 1
+            arm.value = value
+            explicit_count = explicit_count + 1
+        }
+        sema_check_block(state, arm.body)
+        i = i + 1
+    }
+    if has_else == 0 && explicit_count != enum_node.members.len {
+        sema_error(state.source_path, stmt.line, "non-exhaustive match on enum " + subject_type)
+    }
+    if has_else == 1 && explicit_count == enum_node.members.len {
+        sema_error(state.source_path, stmt.line, "unreachable else arm in exhaustive match")
+    }
+    return 0
 }
 fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
     if stmt.name == "argv" {
@@ -782,6 +915,8 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
         sema_check_expr(state, stmt.expr)
         sema_require_i64(state, stmt.expr, "while condition")
         sema_check_block(state, stmt.body)
+    } else if stmt.kind == "Match" {
+        sema_check_match(state, stmt)
     }
     return 0
 }
@@ -791,6 +926,18 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
     }
     if stmt.kind == "If" && stmt.else_block.present == 1 {
         if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
+            return 1
+        }
+    }
+    if stmt.kind == "Match" {
+        let i = 0
+        while i < stmt.match_arms.len {
+            if sema_block_returns(stmt.match_arms.data[i].body) == 0 {
+                return 0
+            }
+            i = i + 1
+        }
+        if stmt.match_arms.len > 0 {
             return 1
         }
     }
@@ -850,6 +997,7 @@ fun sema_check(ast: AstProgram): i64 {
     sema_add_builtins(state)
     sema_add_os_signatures(state)
     sema_collect_type_names(state, ast)
+    sema_validate_enums(state, ast)
     sema_validate_structs(state, ast)
     sema_collect_functions(state, ast)
     sema_validate_main(state)

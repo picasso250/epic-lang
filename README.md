@@ -1,9 +1,10 @@
 # Epic v2
 
-Epic v2 starts from the completed v1 self-hosted compiler. Its source is still
-written in the v0 language subset and retains v1's internal AMD64 assembler and
-deterministic PE writer. Future v2 commits can now evolve the language without
-changing the frozen stage-0 and v1 milestones.
+Epic v2 starts from the completed v1 self-hosted compiler. Its source remains
+in the v0 language subset and retains v1's internal AMD64 assembler and
+deterministic PE writer. v2 adds conservative garbage collection, semantic
+analysis, integer compound assignment, nominal unit enums, and statement-only
+enum matching without changing the stage-0 or v1 milestones.
 
 The bootstrap chain is:
 

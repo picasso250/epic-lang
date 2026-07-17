@@ -46,6 +46,12 @@ product declarations, functions, parameters, fields, and blocks. Expressions
 and statements use tagged records because those two categories flow through
 large dispatches in code generation.
 
+Unit-enum declarations and match arms are also exact records. Semantic
+analysis resolves each qualified enum member to its declaration-order value,
+checks nominal typing and match exhaustiveness, and records the resolved value
+for code generation. Enums use one 64-bit scalar slot; match evaluates its
+subject once and emits a linear comparison chain.
+
 This keeps deterministic syntax records precise without creating a separate
 wrapper allocation for every expression or statement.
 

@@ -1,0 +1,6 @@
+# ERROR: match subject must have an enum type
+fun main(): void {
+    match 1 {
+        else {}
+    }
+}

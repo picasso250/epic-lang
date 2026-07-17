@@ -1,0 +1,8 @@
+# ERROR: else must be the final match arm
+type ElseOrderEnum = First | Second
+fun main(): void {
+    match ElseOrderEnum.First {
+        else {}
+        ElseOrderEnum.First {}
+    }
+}

@@ -1,0 +1,3 @@
+# ERROR: enum requires at least two members
+type Only = One
+fun main(): void {}

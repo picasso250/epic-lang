@@ -32,6 +32,11 @@ fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
         i = i + 1
     }
     i = 0
+    while i < ast.enums.len {
+        push(out.enums, ast.enums.data[i])
+        i = i + 1
+    }
+    i = 0
     while i < ast.funcs.len {
         let f = ast.funcs.data[i]
         if f.name == "main" && is_main_file == 0 {

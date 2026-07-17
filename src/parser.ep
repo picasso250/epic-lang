@@ -31,6 +31,15 @@ type AstStmt {
     line: i64
     op: str
     target_kind: str
+    match_arms: AstMatchArm[]
+}
+type AstMatchArm {
+    type_name: str
+    member_name: str
+    body: AstBlock
+    line: i64
+    is_else: i64
+    value: i64
 }
 type AstBlock {
     present: i64
@@ -52,6 +61,16 @@ type AstStructDef {
     source_path: str
     line: i64
 }
+type AstEnumMember {
+    name: str
+    line: i64
+}
+type AstEnumDef {
+    name: str
+    members: AstEnumMember[]
+    source_path: str
+    line: i64
+}
 type AstFunDef {
     name: str
     type_name: str
@@ -63,6 +82,7 @@ type AstFunDef {
 type AstProgram {
     funcs: AstFunDef[]
     structs: AstStructDef[]
+    enums: AstEnumDef[]
 }
 type Parser {
     tokens: Token[]
@@ -103,6 +123,7 @@ fun ast_program(): AstProgram {
     let program = new AstProgram
     program.funcs = new AstFunDef[16]
     program.structs = new AstStructDef[8]
+    program.enums = new AstEnumDef[8]
     return program
 }
 fun make_parser_at(tokens: Token[], source_path: str): Parser {
@@ -160,6 +181,13 @@ fun expect(p: Parser, kind: str): Token {
         print(t.text)
         print("')\n")
         os.ExitProcess(1)
+    }
+    return t
+}
+fun expect_enum_member(p: Parser): Token {
+    let t = advance(p)
+    if t.kind != "ID" && t.kind != "FUN" && t.kind != "RETURN" && t.kind != "IF" && t.kind != "ELSE" && t.kind != "WHILE" && t.kind != "BREAK" && t.kind != "CONTINUE" && t.kind != "TYPE" && t.kind != "NEW" && t.kind != "LET" && t.kind != "MATCH" {
+        parse_error(t.line, "Expected enum member")
     }
     return t
 }
@@ -245,6 +273,37 @@ fun parse_struct_def(p: Parser): AstStructDef {
     expect(p, "RBRACE")
     return node
 }
+fun parse_enum_def(p: Parser): AstEnumDef {
+    expect(p, "TYPE")
+    let name = expect(p, "ID")
+    expect(p, "ASSIGN")
+    let node = new AstEnumDef
+    node.source_path = p.source_path
+    node.line = name.line
+    node.name = name.text
+    node.members = new AstEnumMember[8]
+    let first = expect_enum_member(p)
+    let member = new AstEnumMember
+    member.name = first.text
+    member.line = first.line
+    push(node.members, member)
+    if check(p, "BIT_OR") == 0 {
+        parse_error(first.line, "enum requires at least two members")
+    }
+    let done = 0
+    while done == 0 {
+        let item = expect_enum_member(p)
+        let next_member = new AstEnumMember
+        next_member.name = item.text
+        next_member.line = item.line
+        push(node.members, next_member)
+        if check(p, "BIT_OR") == 0 {
+            done = 1
+        }
+    }
+    expect_stmt_end(p)
+    return node
+}
 fun parse_fn_def(p: Parser): AstFunDef {
     expect(p, "FUN")
     let name = expect(p, "ID")
@@ -270,7 +329,11 @@ fun parse_program(p: Parser): AstProgram {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
-            push(node.structs, parse_struct_def(p))
+            if p.tokens.data[p.pos + 2].kind == "ASSIGN" {
+                push(node.enums, parse_enum_def(p))
+            } else {
+                push(node.structs, parse_struct_def(p))
+            }
         }
         skip_newlines(p)
     }
@@ -460,6 +523,34 @@ fun parse_while_stmt(p: Parser): AstStmt {
     p.loop_depth = p.loop_depth - 1
     return node
 }
+fun parse_match_stmt(p: Parser): AstStmt {
+    let keyword = expect(p, "MATCH")
+    let node = ast_stmt("Match", keyword.line)
+    node.expr = parse_expr(p)
+    node.match_arms = new AstMatchArm[8]
+    expect(p, "LBRACE")
+    skip_newlines(p)
+    while peek_kind(p, "RBRACE") == 0 {
+        let arm = new AstMatchArm
+        let arm_start = peek(p)
+        if check(p, "ELSE") == 1 {
+            arm.is_else = 1
+            arm.line = arm_start.line
+        } else {
+            let type_name = expect(p, "ID")
+            expect(p, "DOT")
+            let member_name = expect_enum_member(p)
+            arm.type_name = type_name.text
+            arm.member_name = member_name.text
+            arm.line = member_name.line
+        }
+        arm.body = parse_block(p)
+        push(node.match_arms, arm)
+        skip_newlines(p)
+    }
+    expect(p, "RBRACE")
+    return node
+}
 fun parse_break_stmt(p: Parser): AstStmt {
     let t = expect(p, "BREAK")
     if p.loop_depth == 0 {
@@ -519,6 +610,9 @@ fun parse_stmt(p: Parser): AstStmt {
     }
     if t.kind == "WHILE" {
         return parse_while_stmt(p)
+    }
+    if t.kind == "MATCH" {
+        return parse_match_stmt(p)
     }
     if t.kind == "BREAK" {
         return parse_break_stmt(p)
@@ -606,7 +700,7 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
     let done = 0
     while done == 0 {
         if check(p, "DOT") == 1 {
-            let field = expect(p, "ID")
+            let field = expect_enum_member(p)
             if check(p, "LPAREN") == 1 {
                 let n = ast_expr("Call", field.line)
                 if current.kind == "Var" && current.name == "os" {

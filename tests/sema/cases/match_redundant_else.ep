@@ -1,0 +1,9 @@
+# ERROR: unreachable else arm in exhaustive match
+type RedundantElseEnum = First | Second
+fun main(): void {
+    match RedundantElseEnum.First {
+        RedundantElseEnum.First {}
+        RedundantElseEnum.Second {}
+        else {}
+    }
+}

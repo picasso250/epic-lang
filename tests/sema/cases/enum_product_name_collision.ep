@@ -1,0 +1,6 @@
+# ERROR: duplicate type 'SharedTypeName'
+type SharedTypeName {
+    value: i64
+}
+type SharedTypeName = First | Second
+fun main(): void {}

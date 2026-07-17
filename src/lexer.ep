@@ -278,6 +278,9 @@ fun lex(src: str): Token[] {
             if identifier_text == "let"    {
                 kind = "LET"
             }
+            if identifier_text == "match" {
+                kind = "MATCH"
+            }
             push_token(tokens, kind, identifier_text, identifier_line)
             consumed = 1
         }

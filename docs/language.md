@@ -17,7 +17,8 @@
 
 ## Program model
 
-A program is a set of top-level product type and function definitions.
+A program is a set of top-level product type, unit-enum, and function
+definitions.
 
 There are no imports, packages, visibility rules, or per-file namespaces in v0.
 
@@ -31,7 +32,9 @@ build\epic-v2.exe main.ep lib.ep
 
 This is whole-program source merging, not a module system.
 
-All top-level product types and functions from input files are merged before semantic analysis. Types and functions have separate namespaces; duplicate names within either namespace are rejected.
+All top-level types and functions from input files are merged before semantic
+analysis. Product types and enums share one type namespace; functions use a
+separate namespace. Duplicate names within either namespace are rejected.
 
 The first input is the main file. Only its `main` function is used; `main` functions in later files are ignored.
 
@@ -52,6 +55,7 @@ arrays. The complete set of user-facing types is:
 | `u8` | unsigned byte storage; reads zero-extend to `i64` |
 | `str` | immutable heap string |
 | `Name` | heap-allocated product reference |
+| enum `Name` | nominal unit-enum value stored as a 64-bit scalar |
 | `T[]` | heap-allocated dynamic array |
 | `void` | function return type only; no value is produced |
 
@@ -121,7 +125,8 @@ fun add(a: i64, b: i64): i64 {
 `void` functions may use `return` or fall off the end. `return expr` is invalid
 in a `void` function. A non-`void` function must return a compatible value on
 every path. The v2 analysis recognizes explicit `return` and `if/else` where
-both branches must return; a `while` loop never proves a return.
+both branches must return, and exhaustive `match` statements where every arm
+returns; a `while` loop never proves a return.
 
 ## Else-if chains
 
@@ -171,9 +176,51 @@ type Token {
 
 `new Token` allocates a zero-initialized object and returns a `Token` value at the language level. Product values have reference semantics in v0.
 
-`struct` is not a keyword. `type Name = A | B` payload sums and unit sums are outside the bootstrap subset. v1 may implement them for client programs without using them in its own source.
+`struct` is not a keyword.
 
 Field access uses `obj.field`. Field assignment uses `obj.field = value`.
+
+## Unit enums and match
+
+A unit enum has at least two members:
+
+```epic
+type TokenKind = EOF | ID | FUN
+```
+
+Members are always referenced through their type, such as `TokenKind.ID`.
+Member values are nominal: values from different enums are never compatible,
+even when the member names match. The only enum operators are `==` and `!=`
+between values of the same enum type. An enum cannot be constructed with
+`new`, converted to an integer, used as a condition, or used with arithmetic,
+ordering, bit, or compound-assignment operators.
+
+`match` is a statement over one enum value:
+
+```epic
+match token.kind {
+    TokenKind.EOF {
+        return 0
+    }
+    TokenKind.ID {
+        consume_id()
+    }
+    else {
+        return 1
+    }
+}
+```
+
+The subject is evaluated once. Explicit arms use qualified members, may appear
+only once, and must belong to the subject enum. Without `else`, every member
+must appear exactly once. With `else`, explicit arms may cover a strict subset;
+an `else` after all members is rejected as unreachable and must be the final
+arm. Arms execute in source order and each arm body is a lexical block.
+
+v2 has statement-only matching: there are no match expressions, payloads,
+guards, fallthrough, explicit discriminants, or enum-to-integer conversions.
+Declaration order determines the current internal values starting at zero,
+but those values are not source-visible or a stable ABI.
 
 ## Compound assignment
 
@@ -215,8 +262,9 @@ before participating in `<<`, `>>`, `&`, or `|`.
 String lengths and indices count bytes, not Unicode characters.
 
 Arithmetic and bit operators require integer operands, except `str + str`.
-Ordering comparisons require integers. `==` and `!=` accept two integers or
-two strings; products and arrays have no implicit reference equality.
+Ordering comparisons require integers. `==` and `!=` accept two integers, two
+strings, or two values of the same enum type; products and arrays have no
+implicit reference equality.
 `if` and `while` conditions require `i64`.
 
 ## System calls
@@ -275,7 +323,7 @@ A missing or unreadable file is a compile error, while an empty file is valid.
 - User-written pointer types.
 - General module/import/package system.
 - General method calls.
-- Payload sums, unit sums, and `match`.
+- Payload sums.
 - By-value product or array semantics.
 - Explicit memory freeing.
 - Unicode string semantics.

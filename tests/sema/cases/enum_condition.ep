@@ -1,0 +1,5 @@
+# ERROR: if condition requires i64
+type ConditionEnum = False | True
+fun main(): void {
+    if ConditionEnum.True {}
+}

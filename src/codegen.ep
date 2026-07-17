@@ -47,6 +47,7 @@ type EmitterState {
     funcs: FuncInfo[]
     strings: StringLit[]
     structs: StructInfo[]
+    enums: AstEnumDef[]
     loop_starts: i64[]
     loop_ends: i64[]
 }
@@ -277,6 +278,7 @@ fun make_emitter(out_path: str): EmitterState {
     e.funcs = new FuncInfo[64]
     e.strings = new StringLit[256]
     e.structs = new StructInfo[64]
+    e.enums = new AstEnumDef[8]
     e.loop_starts = new i64[16]
     e.loop_ends = new i64[16]
     return e
@@ -358,6 +360,19 @@ fun user_type(name: str): TypeInfo {
     }
     return type_struct(name)
 }
+fun emitter_type(e: EmitterState, name: str): TypeInfo {
+    if is_array_type_name(name) == 1 {
+        return type_array(array_elem_name(name))
+    }
+    let i = 0
+    while i < e.enums.len {
+        if e.enums.data[i].name == name {
+            return type_info("enum", name)
+        }
+        i = i + 1
+    }
+    return user_type(name)
+}
 fun get_string_id(e: EmitterState, text: str): i64 {
     let i = 0
     while i < e.strings.len {
@@ -425,6 +440,13 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
     } else if node.kind == "While" {
         collect_expr_strings(e, node.expr)
         collect_block_strings(e, node.body)
+    } else if node.kind == "Match" {
+        collect_expr_strings(e, node.expr)
+        let i = 0
+        while i < node.match_arms.len {
+            collect_block_strings(e, node.match_arms.data[i].body)
+            i = i + 1
+        }
     }
     return 0
 }
@@ -468,7 +490,7 @@ fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
         let fn = ast.funcs.data[i]
         let f = new FuncInfo
         f.name = fn.name
-        f.ret_type = user_type(fn.type_name)
+        f.ret_type = emitter_type(e, fn.type_name)
         f.params = fn.params
         push(e.funcs, f)
         i = i + 1
@@ -552,11 +574,20 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
         s = add_struct_info(e, node.name, node.fields.len * 8)
         let j = 0
         while j < node.fields.len {
-            add_field(s, node.fields.data[j].name, user_type(node.fields.data[j].type_name), j * 8)
+            add_field(s, node.fields.data[j].name, emitter_type(e, node.fields.data[j].type_name), j * 8)
             j = j + 1
         }
         a = add_struct_info(e, array_layout_name(node.name), 24)
         add_field(a, "data", type_info("ptr", node.name), 0)
+        add_field(a, "len", type_i64(), 8)
+        add_field(a, "cap", type_i64(), 16)
+        i = i + 1
+    }
+    i = 0
+    while i < ast.enums.len {
+        let enum_node = ast.enums.data[i]
+        a = add_struct_info(e, array_layout_name(enum_node.name), 24)
+        add_field(a, "data", type_info("ptr", enum_node.name), 0)
         add_field(a, "len", type_i64(), 8)
         add_field(a, "cap", type_i64(), 16)
         i = i + 1
@@ -621,7 +652,7 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     if sema_is_pointer(expr.resolved_type) == 1 {
         return type_info("ptr", sema_pointer_element(expr.resolved_type))
     }
-    return user_type(expr.resolved_type)
+    return emitter_type(e, expr.resolved_type)
 }
 fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
     if block.present == 0 {
@@ -637,6 +668,12 @@ fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
             pre_scan_block(e, stmt.else_block)
         } else if stmt.kind == "While" {
             pre_scan_block(e, stmt.body)
+        } else if stmt.kind == "Match" {
+            let j = 0
+            while j < stmt.match_arms.len {
+                pre_scan_block(e, stmt.match_arms.data[j].body)
+                j = j + 1
+            }
         }
         i = i + 1
     }
@@ -1249,7 +1286,7 @@ fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): Type
     if base_type.kind == "str" {
         elem_type = type_u8()
     } else if base_type.kind == "array" || base_type.kind == "ptr" {
-        elem_type = user_type(base_type.name)
+        elem_type = emitter_type(e, base_type.name)
     } else {
         die("internal: checked subscript has invalid base")
     }
@@ -1302,6 +1339,10 @@ fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
 }
 fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
     if expr.kind == "Literal" {
+        emit_mov(e, "rax", expr.value)
+        return 0
+    }
+    if expr.kind == "EnumMember" {
         emit_mov(e, "rax", expr.value)
         return 0
     }
@@ -1470,6 +1511,31 @@ fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     emit_label_id(e, "L", end_id)
     return 0
 }
+fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
+    emit_expr(e, stmt.expr)
+    let subject_slot = temp_save_rax(e)
+    let end_id = fresh_label(e)
+    let i = 0
+    while i < stmt.match_arms.len {
+        let arm = stmt.match_arms.data[i]
+        if arm.is_else == 1 {
+            emit_block(e, arm.body)
+            emit_jmp_id(e, "jmp", "L", end_id)
+        } else {
+            let next_id = fresh_label(e)
+            emit_stack_load(e, "rax", subject_slot)
+            emit_mov_i(e, "rcx", arm.value)
+            emit_inst(e, "cmp rax, rcx")
+            emit_jmp_id(e, "jne", "L", next_id)
+            emit_block(e, arm.body)
+            emit_jmp_id(e, "jmp", "L", end_id)
+            emit_label_id(e, "L", next_id)
+        }
+        i = i + 1
+    }
+    emit_label_id(e, "L", end_id)
+    return 0
+}
 fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
     if e.loop_ends.len == 0 {
         die("break outside loop")
@@ -1513,6 +1579,9 @@ fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
     if stmt.kind == "While" {
         return emit_while(e, stmt)
     }
+    if stmt.kind == "Match" {
+        return emit_match(e, stmt)
+    }
     if stmt.kind == "Break" {
         return emit_break(e, stmt)
     }
@@ -1536,11 +1605,11 @@ fun emit_block(e: EmitterState, block: AstBlock): i64 {
 fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     reset_locals(e)
     e.current_fn = fn.name
-    e.current_ret_type = user_type(fn.type_name)
+    e.current_ret_type = emitter_type(e, fn.type_name)
     e.current_ep_id = fresh_label(e)
     let i = 0
     while i < fn.params.len {
-        add_local(e, fn.params.data[i].name, user_type(fn.params.data[i].type_name))
+        add_local(e, fn.params.data[i].name, emitter_type(e, fn.params.data[i].type_name))
         i = i + 1
     }
     pre_scan_block(e, fn.body)
@@ -1610,6 +1679,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     return 0
 }
 fun emit_program(e: EmitterState, ast: AstProgram): i64 {
+    e.enums = ast.enums
     compute_struct_layouts(e, ast)
     add_func_infos(e, ast)
     collect_program_strings(e, ast)

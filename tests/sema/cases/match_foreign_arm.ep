@@ -1,0 +1,9 @@
+# ERROR: match arm belongs to enum ForeignArmEnum
+type SubjectEnum = First | Second
+type ForeignArmEnum = First | Second
+fun main(): void {
+    match SubjectEnum.First {
+        ForeignArmEnum.First {}
+        else {}
+    }
+}
