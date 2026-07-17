@@ -4,7 +4,7 @@ type VectorPoint {
     y: i64
 }
 fun main(): void {
-    let points = new VectorPoint[4]
+    let points = new VectorPoint[]
     let p = new VectorPoint
     p.x = 42
     p.y = 99

@@ -4,7 +4,7 @@ type DebugToken {
     value: i64
 }
 fun main(): void {
-    let tokens = new DebugToken[3]
+    let tokens = new DebugToken[]
     push(tokens, new DebugToken)
     push(tokens, new DebugToken)
     push(tokens, new DebugToken)

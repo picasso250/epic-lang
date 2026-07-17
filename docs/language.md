@@ -81,13 +81,15 @@ contract. Use `new u8[n]` for mutable byte buffers.
 | Expression | Meaning |
 | --- | --- |
 | `new T[]` | empty dynamic array with default capacity |
-| `new T[n]` | empty dynamic array with capacity at least `n` |
+| `new T[n]` | dynamic array of length and capacity `n`, with zero-initialized elements |
 | `a.data[i]` | element at index `i` |
 | `a.len` | current element count |
 | `a.cap` | current capacity |
 
-`new T[n]` sets capacity, not length. The initial `len` is always 0. `push`
-and `extend` are documented under built-in functions.
+`new T[]` starts empty. `new T[n]` evaluates `n` once, requires a
+non-negative value, and creates `n` zero-initialized elements with `len == n`.
+`push` appends after those elements. `push` and `extend` are documented under
+built-in functions.
 
 ### Built-in global
 

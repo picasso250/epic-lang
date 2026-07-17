@@ -84,12 +84,15 @@ fun ast_block(): AstBlock {
     let block = new AstBlock
     block.present = 1
     block.stmts = new AstStmt[8]
+    block.stmts.len = 0
     return block
 }
 fun ast_program(): AstProgram {
     let program = new AstProgram
     program.funcs = new AstFunDef[16]
+    program.funcs.len = 0
     program.structs = new AstStructDef[8]
+    program.structs.len = 0
     return program
 }
 fun make_parser_at(tokens: Token[], source_path: str): Parser {
@@ -186,6 +189,7 @@ fun parse_type(p: Parser): str {
 }
 fun parse_params(p: Parser): AstParam[] {
     let params = new AstParam[4]
+    params.len = 0
     if peek_kind(p, "ID") == 0 {
         return params
     }
@@ -213,6 +217,7 @@ fun parse_struct_def(p: Parser): AstStructDef {
     let node = new AstStructDef
     node.name = name.text
     node.fields = new AstStructField[8]
+    node.fields.len = 0
     expect(p, "LBRACE")
     skip_newlines(p)
     while peek_kind(p, "RBRACE") == 0 {
@@ -547,6 +552,7 @@ fun op_text(kind: str): str {
 }
 fun parse_args(p: Parser): AstExpr[] {
     let args = new AstExpr[4]
+    args.len = 0
     if peek_kind(p, "RPAREN") == 0 {
         push(args, parse_expr(p))
         while check(p, "COMMA") == 1 {

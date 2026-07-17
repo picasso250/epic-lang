@@ -327,6 +327,7 @@ fun make_emitter(out_path: str): EmitterState {
     let e = new EmitterState
     e.out_path = out_path
     e.out_buf = new u8[65536]
+    e.out_buf.len = 0
     e.label_counter = 0
     e.string_counter = 0
     e.current_fn = ""
@@ -339,11 +340,17 @@ fun make_emitter(out_path: str): EmitterState {
     e.temp_count = 0
     e.temp_peak = 0
     e.locals = new Local[128]
+    e.locals.len = 0
     e.funcs = new FuncInfo[64]
+    e.funcs.len = 0
     e.strings = new StringLit[256]
+    e.strings.len = 0
     e.structs = new StructInfo[64]
+    e.structs.len = 0
     e.loop_starts = new i64[16]
+    e.loop_starts.len = 0
     e.loop_ends = new i64[16]
+    e.loop_ends.len = 0
     return e
 }
 fun type_info(kind: str, name: str): TypeInfo {
@@ -545,6 +552,7 @@ fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     s.name = name
     s.size = size
     s.fields = new FieldInfo[16]
+    s.fields.len = 0
     push(e.structs, s)
     return s
 }
@@ -588,6 +596,7 @@ fun array_layout_name(elem: str): str {
 }
 fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     e.structs = new StructInfo[64]
+    e.structs.len = 0
     let s = add_struct_info(e, "str", 16)
     add_field(s, "data", type_info("ptr", "u8"), 0)
     add_field(s, "len", type_i64(), 8)
@@ -632,6 +641,7 @@ fun find_func_ret(e: EmitterState, name: str): TypeInfo {
 }
 fun reset_locals(e: EmitterState): i64 {
     e.locals = new Local[128]
+    e.locals.len = 0
     e.local_bytes = 0
     e.temp_count = 0
     e.temp_peak = 0
@@ -835,6 +845,7 @@ fun emit_epilogue(e: EmitterState): i64 {
 }
 fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
     let slots = new i64[4]
+    slots.len = 0
     let i = 0
     while i < args.len {
         emit_expr(e, args.data[i])
@@ -866,6 +877,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     }
     if sys_symbol != "" {
         let slots = new i64[4]
+        slots.len = 0
         let i = 0
         while i < expr.args.len {
             let arg = expr.args.data[i]
@@ -1320,7 +1332,6 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
         el_size = 1
     }
     let header_slot = 0
-    let cap_slot = 0
     emit_mov(e, "rcx", "[_heap]")
     emit_mov(e, "edx", "8")
     emit_mov(e, "r8d", "24")
@@ -1329,18 +1340,26 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     emit_inst(e, "add rsp, 40")
     header_slot = temp_save_rax(e)
     if expr.count.kind == "" {
+        emit_stack_load(e, "rcx", header_slot)
+        emit_mov(e, "qword [rcx+8]", "0")
         emit_mov(e, "rax", "4")
     } else {
         emit_expr(e, expr.count)
+        let count_ok = fresh_label(e)
+        emit_inst(e, "test rax, rax")
+        emit_jmp_id(e, "jge", "L", count_ok)
+        emit_mov(e, "ecx", "1")
+        emit_call_inst(e, "ExitProcess")
+        emit_label_id(e, "L", count_ok)
+        emit_stack_load(e, "rcx", header_slot)
+        emit_mov(e, "[rcx+8]", "rax")
     }
     emit_inst(e, "cmp rax, 1")
     let cap_ok = fresh_label(e)
     emit_jmp_id(e, "jge", "L", cap_ok)
     emit_mov(e, "rax", "1")
     emit_label_id(e, "L", cap_ok)
-    cap_slot = temp_save_rax(e)
     emit_stack_load(e, "rcx", header_slot)
-    emit_mov(e, "qword [rcx+8]", "0")
     emit_mov(e, "[rcx+16]", "rax")
     emit_mov(e, "r8", "rax")
     if el_size != 1 {
