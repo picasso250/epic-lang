@@ -27,8 +27,12 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-build\epic-v2.exe main.ep lib.ep
+build\epic-v2.exe [-S] [-o path] main.ep lib.ep
 ```
+
+Normal compilation assembles in memory and writes only the executable. `-S`
+writes the generated assembly and stops before assembly; `-o` selects the
+output path in either mode. Without `-o`, outputs remain under `build/epic/`.
 
 This is whole-program source merging, not a module system.
 

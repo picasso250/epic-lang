@@ -25,6 +25,10 @@ The normal v2 compiler is entirely written in Epic:
 source -> lexer -> parser -> x64 assembly text -> assembler -> PE writer
 ```
 
+The assembly text stays in memory during normal compilation. `-S` writes it
+to disk and stops before the assembler; ordinary executable builds do not
+create an assembly-file intermediate.
+
 The six compiler source files are compiled as one program:
 
 ```text

@@ -30,7 +30,6 @@ type StructInfo {
     fields: FieldInfo[]
 }
 type EmitterState {
-    out_path: str
     out_buf: u8[]
     label_counter: i64
     string_counter: i64
@@ -259,9 +258,8 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/write_file.asm"))
     return 0
 }
-fun make_emitter(out_path: str): EmitterState {
+fun make_emitter(): EmitterState {
     let e = new EmitterState
-    e.out_path = out_path
     e.out_buf = new u8[65536]
     e.label_counter = 0
     e.string_counter = 0
@@ -1735,18 +1733,5 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
         i = i + 1
     }
     emit_runtime_helpers(e)
-    write_file(e.out_path, str_new(e.out_buf.data, e.out_buf.len))
     return 0
-}
-fun main(): void {
-    if argv.len < 3 {
-        print("usage: codegen <input.ep> <output.asm>\n")
-        os.ExitProcess(1)
-    }
-    let src = read_file(argv.data[1])
-    let tokens = lex(src)
-    let p = make_parser(tokens)
-    let ast = parse_program(p)
-    let e = make_emitter(argv.data[2])
-    emit_program(e, ast)
 }

@@ -54,12 +54,47 @@ def main() -> int:
         if not executable.is_file():
             print(f"  FAIL  isolated compiler produced no executable: {executable}")
             return 1
+        assembly = isolated / "build" / "epic" / "src_main.ep.asm"
+        if assembly.exists():
+            print(f"  FAIL  default compilation unexpectedly produced assembly: {assembly}")
+            return 1
         process = subprocess.run([str(executable)], cwd=isolated, timeout=5)
         if process.returncode != 42:
             print(f"  FAIL  embedded byte program returned {process.returncode}, expected 42")
             return 1
 
-    print("  PASS  isolated epic.exe compiled and ran mutable embedded bytes")
+        emitted = isolated / "emitted.asm"
+        result = subprocess.run(
+            [str(compiler), "src/main.ep", "-S", "-o", str(emitted)],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0 or not emitted.is_file():
+            print("  FAIL  -S did not produce the requested assembly file")
+            return 1
+        if not emitted.read_bytes().startswith(b"global _start"):
+            print("  FAIL  -S output is not Epic assembly")
+            return 1
+
+        custom = isolated / "custom.exe"
+        result = subprocess.run(
+            [str(compiler), "-o", str(custom), "src/main.ep"],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0 or not custom.is_file():
+            print("  FAIL  -o did not produce the requested executable")
+            return 1
+        process = subprocess.run([str(custom)], cwd=isolated, timeout=5)
+        if process.returncode != 42:
+            print(f"  FAIL  custom executable returned {process.returncode}, expected 42")
+            return 1
+
+    print("  PASS  isolated compiler, in-memory pipeline, -S, and -o")
     return 0
 
 
