@@ -58,6 +58,7 @@ type Parser {
     pos: i64
     eof: Token
     loop_depth: i64
+    source_path: str
 }
 fun ast_expr_empty(): AstExpr {
     let n = new AstExpr
@@ -91,7 +92,7 @@ fun ast_program(): AstProgram {
     program.structs = new AstStructDef[8]
     return program
 }
-fun make_parser(tokens: Token[]): Parser {
+fun make_parser_at(tokens: Token[], source_path: str): Parser {
     let p = new Parser
     p.tokens = tokens
     p.pos = 0
@@ -100,7 +101,11 @@ fun make_parser(tokens: Token[]): Parser {
     p.eof.text = ""
     p.eof.line = 0
     p.loop_depth = 0
+    p.source_path = source_path
     return p
+}
+fun make_parser(tokens: Token[]): Parser {
+    return make_parser_at(tokens, "")
 }
 fun peek(p: Parser): Token {
     if p.pos < p.tokens.len {
@@ -585,6 +590,43 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
     }
     return current
 }
+fun embed_path_is_absolute(path: str): i64 {
+    if path.len == 0 {
+        return 0
+    }
+    if path.data[0] == 47 || path.data[0] == 92 {
+        return 1
+    }
+    if path.len >= 2 && path.data[1] == 58 {
+        return 1
+    }
+    return 0
+}
+fun embed_resolve_path(source_path: str, path: str): str {
+    if embed_path_is_absolute(path) == 1 || source_path.len == 0 {
+        return path
+    }
+    let i = source_path.len
+    while i > 0 {
+        i = i - 1
+        if source_path.data[i] == 47 || source_path.data[i] == 92 {
+            if i == 0 {
+                return path
+            }
+            return str_new(source_path.data, i) + "/" + path
+        }
+    }
+    return path
+}
+fun read_embed(source_path: str, path: str, line: i64): str {
+    let resolved = embed_resolve_path(source_path, path)
+    let handle = os.CreateFileA(resolved, 2147483648, 1, 0, 3, 128, 0)
+    if handle == 4294967295 {
+        parse_error(line, "embed file not found: " + path)
+    }
+    os.CloseHandle(handle)
+    return read_file(resolved)
+}
 fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, "NEW") == 1 {
         expect(p, "NEW")
@@ -626,6 +668,13 @@ fun parse_primary(p: Parser): AstExpr {
         let node = ast_expr("Var")
         node.name = t.text
         if check(p, "LPAREN") == 1 {
+            if t.text == "embed" {
+                let path = expect(p, "STRING")
+                expect(p, "RPAREN")
+                node.kind = "Embed"
+                node.value = read_embed(p.source_path, path.text, path.line)
+                return parse_postfix(p, node)
+            }
             node.kind = "Call"
             node.type_name = ""
             node.args = parse_args(p)
