@@ -263,6 +263,9 @@ fun lex(src: str): Token[] {
             if identifier_text == "while"  {
                 kind = "WHILE"
             }
+            if identifier_text == "for" {
+                kind = "FOR"
+            }
             if identifier_text == "break"  {
                 kind = "BREAK"
             }

@@ -438,6 +438,10 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
     } else if node.kind == "While" {
         collect_expr_strings(e, node.expr)
         collect_block_strings(e, node.body)
+    } else if node.kind == "ForRange" {
+        collect_expr_strings(e, node.range_start)
+        collect_expr_strings(e, node.range_end)
+        collect_block_strings(e, node.body)
     } else if node.kind == "Match" {
         collect_expr_strings(e, node.expr)
         let i = 0
@@ -665,6 +669,11 @@ fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
             pre_scan_block(e, stmt.then_block)
             pre_scan_block(e, stmt.else_block)
         } else if stmt.kind == "While" {
+            pre_scan_block(e, stmt.body)
+        } else if stmt.kind == "ForRange" {
+            add_local(e, stmt.name, type_i64())
+            e.local_bytes = e.local_bytes + 8
+            stmt.range_end_slot = 0 - e.local_bytes
             pre_scan_block(e, stmt.body)
         } else if stmt.kind == "Match" {
             let j = 0
@@ -1509,6 +1518,32 @@ fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     emit_label_id(e, "L", end_id)
     return 0
 }
+fun emit_for_range(e: EmitterState, stmt: AstStmt): i64 {
+    emit_expr(e, stmt.range_start)
+    emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
+    emit_expr(e, stmt.range_end)
+    emit_stack_store(e, stmt.range_end_slot, "rax")
+    let check_id = fresh_label(e)
+    let step_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    push(e.loop_starts, step_id)
+    push(e.loop_ends, end_id)
+    emit_label_id(e, "L", check_id)
+    emit_stack_load(e, "rax", find_local_slot(e, stmt.name))
+    emit_stack_load(e, "rcx", stmt.range_end_slot)
+    emit_inst(e, "cmp rax, rcx")
+    emit_jmp_id(e, "jge", "L", end_id)
+    emit_block(e, stmt.body)
+    e.loop_starts.len = e.loop_starts.len - 1
+    e.loop_ends.len = e.loop_ends.len - 1
+    emit_label_id(e, "L", step_id)
+    out_s(e, "    inc qword ")
+    emit_slot_ref(e, find_local_slot(e, stmt.name))
+    out_nl(e)
+    emit_jmp_id(e, "jmp", "L", check_id)
+    emit_label_id(e, "L", end_id)
+    return 0
+}
 fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.expr)
     let subject_slot = temp_save_rax(e)
@@ -1576,6 +1611,9 @@ fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
     }
     if stmt.kind == "While" {
         return emit_while(e, stmt)
+    }
+    if stmt.kind == "ForRange" {
+        return emit_for_range(e, stmt)
     }
     if stmt.kind == "Match" {
         return emit_match(e, stmt)

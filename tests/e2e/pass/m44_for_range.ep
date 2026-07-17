@@ -1,0 +1,68 @@
+# EXIT: 0
+fun main(): void {
+    let sum = 0
+    for i: 0:5 {
+        sum += i
+    }
+    if sum != 10 {
+        os.ExitProcess(1)
+    }
+
+    let empty = 0
+    for empty_i: 5:2 {
+        empty += 1
+    }
+    if empty != 0 {
+        os.ExitProcess(2)
+    }
+
+    let negative = 0
+    for negative_i: 0 - 2:2 {
+        negative += negative_i
+    }
+    if negative != 0 - 2 {
+        os.ExitProcess(3)
+    }
+
+    let values = new i64[4]
+    push(values, 1)
+    push(values, 2)
+    let snapshot = 0
+    for value_i: 0:values.len {
+        snapshot += values[value_i]
+        push(values, 10)
+    }
+    if snapshot != 3 || values.len != 4 {
+        os.ExitProcess(4)
+    }
+
+    let flow = 0
+    for flow_i: 0:10 {
+        if flow_i == 2 {
+            continue
+        }
+        if flow_i == 5 {
+            break
+        }
+        flow += flow_i
+    }
+    if flow != 8 {
+        os.ExitProcess(5)
+    }
+
+    let nested = 0
+    for outer_i: 0:3 {
+        for inner_i: 0:3 {
+            if inner_i == 1 {
+                continue
+            }
+            if outer_i == 2 {
+                break
+            }
+            nested += 1
+        }
+    }
+    if nested != 4 {
+        os.ExitProcess(6)
+    }
+}

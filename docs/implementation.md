@@ -56,6 +56,11 @@ checks nominal typing and match exhaustiveness, and records the resolved value
 for code generation. Enums use one 64-bit scalar slot; match evaluates its
 subject once and emits a linear comparison chain.
 
+Integer range loops retain a `ForRange` statement in the AST. Semantic
+analysis checks both bounds before introducing a read-only iterator scope.
+Code generation stores the end bound in a private stack slot, so both bounds
+are evaluated once, and gives `continue` a dedicated iterator-step target.
+
 This keeps deterministic syntax records precise without creating a separate
 wrapper allocation for every expression or statement.
 

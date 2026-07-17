@@ -21,6 +21,7 @@ type SemaLocal {
     line: i64
     depth: i64
     active: i64
+    read_only: i64
 }
 type SemaState {
     ast: AstProgram
@@ -773,6 +774,9 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
     if local.name == "" {
         sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
     }
+    if local.read_only == 1 {
+        sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
+    }
     let actual = sema_check_expr(state, stmt.value_expr)
     if sema_assignable(local.type_name, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
@@ -822,6 +826,9 @@ fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
         let local = sema_find_local(state, stmt.name)
         if local.name == "" {
             sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
+        }
+        if local.read_only == 1 {
+            sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
         }
         return local.type_name
     }
@@ -884,6 +891,18 @@ fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
     }
     return 0
 }
+fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
+    sema_check_expr(state, stmt.range_start)
+    sema_require_i64(state, stmt.range_start, "range start")
+    sema_check_expr(state, stmt.range_end)
+    sema_require_i64(state, stmt.range_end, "range end")
+    state.scope_depth = state.scope_depth + 1
+    sema_add_local(state, stmt.name, "i64", stmt.line)
+    state.locals.data[state.locals.len - 1].read_only = 1
+    sema_check_block(state, stmt.body)
+    sema_leave_scope(state)
+    return 0
+}
 fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
     if stmt.kind == "Return" {
         sema_check_return(state, stmt)
@@ -915,6 +934,8 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
         sema_check_expr(state, stmt.expr)
         sema_require_i64(state, stmt.expr, "while condition")
         sema_check_block(state, stmt.body)
+    } else if stmt.kind == "ForRange" {
+        sema_check_for_range(state, stmt)
     } else if stmt.kind == "Match" {
         sema_check_match(state, stmt)
     }

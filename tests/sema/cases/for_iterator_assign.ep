@@ -1,0 +1,6 @@
+# ERROR: range iterator 'i' is read-only
+fun main(): void {
+    for i: 0:1 {
+        i = 2
+    }
+}

@@ -32,6 +32,9 @@ type AstStmt {
     op: str
     target_kind: str
     match_arms: AstMatchArm[]
+    range_start: AstExpr
+    range_end: AstExpr
+    range_end_slot: i64
 }
 type AstMatchArm {
     type_name: str
@@ -186,7 +189,7 @@ fun expect(p: Parser, kind: str): Token {
 }
 fun expect_enum_member(p: Parser): Token {
     let t = advance(p)
-    if t.kind != "ID" && t.kind != "FUN" && t.kind != "RETURN" && t.kind != "IF" && t.kind != "ELSE" && t.kind != "WHILE" && t.kind != "BREAK" && t.kind != "CONTINUE" && t.kind != "TYPE" && t.kind != "NEW" && t.kind != "LET" && t.kind != "MATCH" {
+    if t.kind != "ID" && t.kind != "FUN" && t.kind != "RETURN" && t.kind != "IF" && t.kind != "ELSE" && t.kind != "WHILE" && t.kind != "FOR" && t.kind != "BREAK" && t.kind != "CONTINUE" && t.kind != "TYPE" && t.kind != "NEW" && t.kind != "LET" && t.kind != "MATCH" {
         parse_error(t.line, "Expected enum member")
     }
     return t
@@ -523,6 +526,20 @@ fun parse_while_stmt(p: Parser): AstStmt {
     p.loop_depth = p.loop_depth - 1
     return node
 }
+fun parse_for_range_stmt(p: Parser): AstStmt {
+    let keyword = expect(p, "FOR")
+    let name = expect(p, "ID")
+    let node = ast_stmt("ForRange", keyword.line)
+    node.name = name.text
+    expect(p, "COLON")
+    node.range_start = parse_expr(p)
+    expect(p, "COLON")
+    node.range_end = parse_expr(p)
+    p.loop_depth = p.loop_depth + 1
+    node.body = parse_block(p)
+    p.loop_depth = p.loop_depth - 1
+    return node
+}
 fun parse_match_stmt(p: Parser): AstStmt {
     let keyword = expect(p, "MATCH")
     let node = ast_stmt("Match", keyword.line)
@@ -610,6 +627,9 @@ fun parse_stmt(p: Parser): AstStmt {
     }
     if t.kind == "WHILE" {
         return parse_while_stmt(p)
+    }
+    if t.kind == "FOR" {
+        return parse_for_range_stmt(p)
     }
     if t.kind == "MATCH" {
         return parse_match_stmt(p)

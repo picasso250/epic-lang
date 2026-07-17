@@ -1,7 +1,7 @@
 # EXIT: 0
 type Flavor = Vanilla | Chocolate | Mint
 type OtherFlavor = Vanilla | Done
-type KeywordKind = EOF | ID | FUN | MATCH
+type KeywordKind = EOF | ID | FUN | MATCH | FOR
 type FlavorBox {
     value: Flavor
 }
@@ -45,6 +45,9 @@ fun keyword_code(value: KeywordKind): i64 {
         KeywordKind.MATCH {
             return 3
         }
+        KeywordKind.FOR {
+            return 4
+        }
     }
 }
 fun main(): void {
@@ -62,7 +65,7 @@ fun main(): void {
     if flavor == Flavor.Mint || flavor != Flavor.Chocolate || other != OtherFlavor.Vanilla {
         os.ExitProcess(2)
     }
-    if keyword_code(KeywordKind.FUN) != 2 || keyword_code(KeywordKind.MATCH) != 3 {
+    if keyword_code(KeywordKind.FUN) != 2 || keyword_code(KeywordKind.MATCH) != 3 || keyword_code(KeywordKind.FOR) != 4 {
         os.ExitProcess(3)
     }
 }

@@ -164,8 +164,29 @@ while cond {
 }
 ```
 
-Both statements bind to the nearest enclosing `while` loop. They are rejected
-outside loops.
+Both statements bind to the nearest enclosing `while` or `for` loop. They are
+rejected outside loops.
+
+## Integer range loops
+
+An integer range loop traverses a half-open interval:
+
+```epic
+for i: 0:items.len {
+    use(items[i])
+}
+```
+
+Both bounds are `i64` expressions. They are evaluated exactly once, from left
+to right, before the first iteration. The loop produces `start` through
+`end - 1`; `start >= end` executes zero iterations. Negative bounds are valid
+when produced by an expression, such as `0 - 3` (v2 has no unary minus).
+
+The iterator is an implicit, read-only `i64` local visible only in the loop
+body. It cannot be assigned or used as a compound-assignment target. `continue`
+advances the iterator before the next condition check, while `break` exits the
+nearest `while` or `for`. v2 has no range step, automatic reverse iteration,
+or `len(x)` builtin; strings and arrays expose `.len`.
 
 ## Product types
 
