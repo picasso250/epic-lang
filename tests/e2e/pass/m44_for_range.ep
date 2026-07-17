@@ -17,7 +17,7 @@ fun main(): void {
     }
 
     let negative = 0
-    for negative_i: 0 - 2:2 {
+    for negative_i: -2:2 {
         negative += negative_i
     }
     if negative != 0 - 2 {

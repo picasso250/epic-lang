@@ -612,6 +612,9 @@ fun is_expr_first(kind: str): i64 {
     if kind == "LPAREN" {
         return 1
     }
+    if kind == "MINUS" || kind == "BANG" {
+        return 1
+    }
     return 0
 }
 fun parse_stmt(p: Parser): AstStmt {
@@ -657,6 +660,9 @@ fun op_text(kind: str): str {
     }
     if kind == "MINUS" {
         return "-"
+    }
+    if kind == "BANG" {
+        return "!"
     }
     if kind == "STAR" {
         return "*"
@@ -862,11 +868,21 @@ fun bin_node(op: Token, left: AstExpr, right: AstExpr): AstExpr {
     n.right = right
     return n
 }
+fun parse_unary(p: Parser): AstExpr {
+    if peek_kind(p, "MINUS") == 1 || peek_kind(p, "BANG") == 1 {
+        let op = advance(p)
+        let node = ast_expr("Unary", op.line)
+        node.op = op_text(op.kind)
+        node.left = parse_unary(p)
+        return node
+    }
+    return parse_primary(p)
+}
 fun parse_factor(p: Parser): AstExpr {
-    let left = parse_primary(p)
+    let left = parse_unary(p)
     while peek_kind(p, "STAR") == 1 || peek_kind(p, "SLASH") == 1 || peek_kind(p, "PERCENT") == 1 {
         let op = advance(p)
-        left = bin_node(op, left, parse_primary(p))
+        left = bin_node(op, left, parse_unary(p))
     }
     return left
 }

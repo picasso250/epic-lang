@@ -608,6 +608,16 @@ fun sema_check_binary(state: SemaState, expr: AstExpr): str {
     sema_error(state.source_path, expr.line, "unsupported binary operator " + expr.op)
     return ""
 }
+fun sema_check_unary(state: SemaState, expr: AstExpr): str {
+    let operand = sema_check_expr(state, expr.left)
+    if operand != "i64" {
+        sema_error(state.source_path, expr.line, "unary operator " + expr.op + " requires i64 operand, got " + operand)
+    }
+    if expr.op != "-" && expr.op != "!" {
+        sema_error(state.source_path, expr.line, "unsupported unary operator " + expr.op)
+    }
+    return "i64"
+}
 fun sema_check_call(state: SemaState, expr: AstExpr): str {
     let full_name = expr.name
     if expr.type_name != "" {
@@ -663,6 +673,8 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
         }
     } else if expr.kind == "Binary" {
         result = sema_check_binary(state, expr)
+    } else if expr.kind == "Unary" {
+        result = sema_check_unary(state, expr)
     } else if expr.kind == "Call" {
         result = sema_check_call(state, expr)
     } else if expr.kind == "New" {

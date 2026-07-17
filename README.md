@@ -5,7 +5,8 @@ in the v0 language subset and retains v1's internal AMD64 assembler and
 deterministic PE writer. v2 adds conservative garbage collection, semantic
 analysis, integer compound assignment, nominal unit enums, and statement-only
 enum matching. Its final language surface also includes snapshot-bound integer
-range loops, without changing the stage-0 or v1 milestones.
+range loops and integer unary `-` / `!`, without changing the stage-0 or v1
+milestones.
 
 The bootstrap chain is:
 

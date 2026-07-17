@@ -179,8 +179,8 @@ for i: 0:items.len {
 
 Both bounds are `i64` expressions. They are evaluated exactly once, from left
 to right, before the first iteration. The loop produces `start` through
-`end - 1`; `start >= end` executes zero iterations. Negative bounds are valid
-when produced by an expression, such as `0 - 3` (v2 has no unary minus).
+`end - 1`; `start >= end` executes zero iterations. Negative bounds are valid,
+such as `for i: -3:2`.
 
 The iterator is an implicit, read-only `i64` local visible only in the loop
 body. It cannot be assigned or used as a compound-assignment target. `continue`
@@ -268,6 +268,15 @@ once, followed by its old value and then the right operand. Compound assignment
 is a statement and does not produce a value.
 
 ## Literals and byte operations
+
+Unary `-` negates an `i64`. Logical `!` also requires `i64`, producing `1` for
+zero and `0` for every nonzero value. Unary operators bind more tightly than
+`*`, `/`, and `%` and may be chained, as in `--x` or `!!x`. Epic does not have
+unary `+` or bitwise `~` in v2.
+
+The lexer accepts only non-negative integer literal magnitudes through
+`9223372036854775807`. The minimum `i64` is therefore written as
+`-9223372036854775807 - 1` rather than as one larger literal magnitude.
 
 Supported escapes in string and character literals:
 

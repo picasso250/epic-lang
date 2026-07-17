@@ -61,6 +61,10 @@ analysis checks both bounds before introducing a read-only iterator scope.
 Code generation stores the end bound in a private stack slot, so both bounds
 are evaluated once, and gives `continue` a dedicated iterator-step target.
 
+Unary expressions are recursive AST nodes checked as `i64`. Negation maps to
+the assembler's existing `neg` instruction. Logical not materializes `0` or
+`1`; conditional branches invert their jump sense directly instead.
+
 This keeps deterministic syntax records precise without creating a separate
 wrapper allocation for every expression or statement.
 

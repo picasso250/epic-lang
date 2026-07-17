@@ -395,6 +395,8 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     } else if node.kind == "Binary" {
         collect_expr_strings(e, node.left)
         collect_expr_strings(e, node.right)
+    } else if node.kind == "Unary" {
+        collect_expr_strings(e, node.left)
     } else if node.kind == "Call" {
         let i = 0
         while i < node.args.len {
@@ -1108,6 +1110,21 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     die("unknown binary op")
     return 0
 }
+fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
+    emit_expr(e, expr.left)
+    if expr.op == "-" {
+        emit_inst(e, "neg rax")
+        return 0
+    }
+    if expr.op == "!" {
+        emit_inst(e, "test rax, rax")
+        emit_inst(e, "sete al")
+        emit_inst(e, "movzx eax, al")
+        return 0
+    }
+    die("internal: unknown unary operator")
+    return 0
+}
 fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
@@ -1173,6 +1190,12 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
     return 0
 }
 fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
+    if expr.kind == "Unary" && expr.op == "!" {
+        if jump_if_true == 1 {
+            return emit_cond_jump(e, expr.left, 0, label)
+        }
+        return emit_cond_jump(e, expr.left, 1, label)
+    }
     if expr.kind == "Binary" {
         if expr.op == "==" || expr.op == "!=" || expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" {
             return emit_comparison_jump(e, expr, jump_if_true, label)
@@ -1387,6 +1410,10 @@ fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
     }
     if expr.kind == "Binary" {
         emit_binary(e, expr)
+        return 0
+    }
+    if expr.kind == "Unary" {
+        emit_unary(e, expr)
         return 0
     }
     if expr.kind == "New" {
