@@ -1698,6 +1698,9 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
         emit_epilogue(e)
     }
     e.alloc_size = align16(e.local_bytes + e.temp_peak * 8 + 32)
+    if e.alloc_size >= 4096 {
+        die("stack frame exceeds v2 limit")
+    }
     patch_hex_u32(e, e.alloc_size_patch, e.alloc_size)
     out_nl(e)
     return 0

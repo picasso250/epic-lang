@@ -15,6 +15,7 @@ import ep_runner
 BUNDLE_SOURCE = ROOT / "build" / "tests" / "e2e_bundle.ep"
 MAIN_PATTERN = re.compile(r"^fun main(?=\s*\()", re.MULTILINE)
 DECL_PATTERN = re.compile(r"^(?:fun|type)\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
+COMPILE_ERROR_PATTERN = re.compile(r"^#\s*COMPILE_ERROR:\s*(.+)$", re.MULTILINE)
 
 
 def case_symbol(source: Path) -> str:
@@ -82,8 +83,31 @@ def compile_bundle(cases: list[Path]) -> Path:
     return executable
 
 
+def run_compile_failure(source: Path) -> tuple[bool, str]:
+    text = source.read_text(encoding="utf-8")
+    match = COMPILE_ERROR_PATTERN.search(text)
+    if match is None:
+        return False, "missing # COMPILE_ERROR annotation"
+    relative = source.relative_to(ROOT)
+    result = subprocess.run(
+        [str(ep_runner.compiler_path()), str(relative)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=30,
+    )
+    if result.returncode == 0:
+        return False, "compilation unexpectedly succeeded"
+    expected = match.group(1).strip()
+    output = result.stdout + result.stderr
+    if expected not in output:
+        return False, f"expected {expected!r}, got {output[:500]!r}"
+    return True, "OK"
+
+
 def main() -> int:
     cases = sorted((Path(__file__).parent / "pass").glob("*.ep"))
+    failures = sorted((Path(__file__).parent / "fail").glob("*.ep"))
     try:
         executable = compile_bundle(cases)
     except Exception as error:
@@ -105,7 +129,12 @@ def main() -> int:
             ok, detail = False, f"exception: {error}"
         print(f"  {'PASS' if ok else 'FAIL':5}  {source.name:32}  {detail}")
         failed += not ok
-    print(f"\n{len(cases) - failed} passed, {failed} failed")
+    for source in failures:
+        ok, detail = run_compile_failure(source)
+        print(f"  {'PASS' if ok else 'FAIL':5}  {source.name:32}  {detail}")
+        failed += not ok
+    total = len(cases) + len(failures)
+    print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 
 
