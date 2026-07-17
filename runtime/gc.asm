@@ -16,6 +16,10 @@ _gc_live_bytes:
     dq 0
 _gc_threshold:
     dq 8388608
+_gc_low_addr:
+    dq 0x7fffffffffffffff
+_gc_high_addr:
+    dq 0
 _gc_table:
     dq 0
 _gc_table_capacity:
@@ -176,6 +180,12 @@ __ep_gc_lookup:
     mov [rbp-8], rcx
     test rcx, rcx
     jz __ep_gc_lookup_miss
+    mov r8, [_gc_low_addr]
+    cmp rcx, r8
+    jl __ep_gc_lookup_miss
+    mov r8, [_gc_high_addr]
+    cmp rcx, r8
+    jg __ep_gc_lookup_miss
     mov rax, rcx
     mov cl, 4
     shr rax, cl
@@ -483,6 +493,16 @@ __ep_alloc_retry:
     mov ecx, 1
     call ExitProcess
 __ep_alloc_record:
+    mov r8, [_gc_low_addr]
+    cmp rax, r8
+    jge __ep_alloc_check_high
+    mov [_gc_low_addr], rax
+__ep_alloc_check_high:
+    mov r8, [_gc_high_addr]
+    cmp rax, r8
+    jle __ep_alloc_bounds_done
+    mov [_gc_high_addr], rax
+__ep_alloc_bounds_done:
     mov r8, [_gc_object_count]
     mov r9, [_gc_objects]
     mov [r9+r8*8], rax

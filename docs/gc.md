@@ -22,7 +22,8 @@ At program entry the runtime records the high end of the active stack. A
 collection conservatively scans aligned words from the current RSP to that
 boundary, plus the explicit `_argv` global root. Candidate words retain an
 object only when they equal its exact allocation base; interior addresses are
-not roots.
+not roots. Monotonic minimum and maximum managed addresses reject candidates
+outside the heap range before probing the allocation hash table.
 
 The collector builds temporary raw metadata for an address hash table, mark
 bytes, and an iterative work stack. Marked payloads are scanned in aligned
