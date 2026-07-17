@@ -4,7 +4,7 @@
 fun die_driver(msg: str): i64 {
     putstr("epic: ")
     putstr(msg)
-    putc(10)
+    putstr("\n")
     os.ExitProcess(1)
     return 0
 }
@@ -100,5 +100,5 @@ fun main(): void {
     let image = assemble_text(read_file(asm_path))
     pe_write_exe(exe_path, image)
     putstr(exe_path)
-    putc(10)
+    putstr("\n")
 }

@@ -10,5 +10,5 @@ fun main(): void {
     point.x = 40
     point.y = 2
     putstr(itoa(point.x + point.y))
-    putc(10)
+    putstr("\n")
 }

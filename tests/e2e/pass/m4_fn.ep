@@ -7,9 +7,9 @@ fun add(a: i64, b: i64): i64 {
 fun main(): void {
     let x = add(40, 2)
     putstr(itoa(x))
-    putc(10)
+    putstr("\n")
     let y = add(x, 1)
     putstr(itoa(y))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }

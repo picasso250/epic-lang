@@ -3,6 +3,6 @@
 fun main(): void {
     let s = "hello"
     putstr(itoa(s.len))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }

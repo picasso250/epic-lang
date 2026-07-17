@@ -13,7 +13,7 @@ fun main(): void {
             break
         }
         putstr(itoa(i))
-        putc(10)
+        putstr("\n")
     }
     os.ExitProcess(0)
 }

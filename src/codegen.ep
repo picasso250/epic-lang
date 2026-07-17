@@ -53,7 +53,7 @@ type EmitterState {
 fun die(msg: str): i64 {
     putstr("Codegen error: ")
     putstr(msg)
-    putc(10)
+    putstr("\n")
     os.ExitProcess(1)
     return 0
 }
@@ -567,7 +567,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
     putstr(struct_name)
     putstr(".")
     putstr(field_name)
-    putc(10)
+    putstr("\n")
     os.ExitProcess(1)
     return new FieldInfo
 }
@@ -892,21 +892,6 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         out_s(e, "    add rsp, ")
         out_i(e, frame)
         out_nl(e)
-        return 0
-    }
-    if name == "putc" {
-        emit_expr(e, expr.args.data[0])
-        emit_mov(e, "[_buf]", "al")
-        emit_mov(e, "ecx", "-11")
-        emit_call_inst(e, "GetStdHandle")
-        emit_mov(e, "rcx", "rax")
-        out_line(e, "    lea rdx, [_buf]")
-        emit_mov(e, "r8", "1")
-        out_line(e, "    lea r9, [_written]")
-        emit_inst(e, "sub rsp, 16")
-        emit_mov(e, "qword [rsp+32]", "0")
-        emit_call_inst(e, "WriteFile")
-        emit_inst(e, "add rsp, 16")
         return 0
     }
     if name == "putstr" {
@@ -1746,10 +1731,6 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     out_line(e, "default rel")
     out_nl(e)
     out_line(e, "section .data")
-    out_line(e, "_buf:")
-    out_line(e, "    times 32 db 0")
-    out_line(e, "_buf_end:")
-    out_line(e, "    db 0")
     out_line(e, "_written:")
     out_line(e, "    dd 0")
     out_line(e, "_heap:")

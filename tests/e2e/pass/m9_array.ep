@@ -1,6 +1,4 @@
 # EXIT: 0
-# STDOUT: Epic
-# STDOUT: 69
 fun main(): void {
     let buf = new u8[10]
     buf.data[0] = 'E'
@@ -10,10 +8,13 @@ fun main(): void {
     buf.data[4] = 10
     let i = 0
     while i < 5 {
-        putc(buf.data[i])
+        if buf.data[i] == 0 {
+            os.ExitProcess(1)
+        }
         i = i + 1
     }
-    putstr(itoa(buf.data[0]))
-    putc(10)
+    if buf.data[0] != 69 || buf.data[1] != 112 || buf.data[2] != 105 || buf.data[3] != 99 || buf.data[4] != 10 {
+        os.ExitProcess(1)
+    }
     os.ExitProcess(0)
 }

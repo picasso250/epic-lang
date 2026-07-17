@@ -12,6 +12,6 @@ fun main(): void {
     p.x = 100
     p.y = 100
     putstr(itoa(sum(p)))
-    putc(10)
+    putstr("\n")
     os.ExitProcess(0)
 }

@@ -5,13 +5,13 @@
 fun main(): void {
     let x = 40 + 2
     putstr(itoa(x))
-    putc(10)
+    putstr("\n")
 
     x = x + 5
     putstr(itoa(x))
-    putc(10)
+    putstr("\n")
 
     let y = (10 / 3) + (10 % 3)
     putstr(itoa(y))
-    putc(10)
+    putstr("\n")
 }

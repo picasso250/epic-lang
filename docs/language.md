@@ -211,7 +211,6 @@ to declare them.
 
 | Function | Meaning |
 | --- | --- |
-| `putc(c: i64): void` | writes one byte |
 | `putstr(s: str): void` | writes string bytes |
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
@@ -224,7 +223,7 @@ to declare them.
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 
-The byte arguments of `putc` and `str_replace_char` use their low eight bits.
+The byte arguments of `str_replace_char` use their low eight bits.
 
 ## Unsupported in v0
 

@@ -131,7 +131,7 @@ fun parse_error(line: i64, msg: str): i64 {
     putstr(itoa(line))
     putstr(": ")
     putstr(msg)
-    putc(10)
+    putstr("\n")
     os.ExitProcess(1)
     return 1
 }
