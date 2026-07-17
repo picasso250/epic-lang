@@ -175,6 +175,26 @@ type Token {
 
 Field access uses `obj.field`. Field assignment uses `obj.field = value`.
 
+## Compound assignment
+
+Epic supports integer compound-assignment statements:
+
+```epic
+count += 1
+flags &= 0xff
+buffer[index] <<= 2
+```
+
+The complete set is `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `<<=`,
+and `>>=`. The target storage type must be `i64` or `u8`. Strings, products,
+arrays, and pointers themselves do not support compound assignment. An integer
+element reached through an array or pointer remains a valid target.
+
+For `u8`, the old value is zero-extended to `i64`, the operation is performed
+as `i64`, and the low eight bits are stored. The left-value address is evaluated
+once, followed by its old value and then the right operand. Compound assignment
+is a statement and does not produce a value.
+
 ## Literals and byte operations
 
 Supported escapes in string and character literals:
