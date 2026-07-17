@@ -13,6 +13,7 @@ type AsmReloc {
     offset: i64
     kind: i64
     symbol: str
+    symbol_index: i64
     addend: i64
 }
 type ExeImage {
@@ -399,6 +400,7 @@ fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
     r.offset = asm_offset(image)
     r.kind = kind
     r.symbol = symbol
+    r.symbol_index = 0 - 1
     r.addend = addend
     push(image.relocs, r)
     return 0
@@ -1111,6 +1113,7 @@ fun asm_resolve_internal(image: ExeImage): i64 {
         if sym_index < 0 {
             asm_die("undefined symbol: " + r.symbol)
         }
+        image.relocs.data[i].symbol_index = sym_index
         i += 1
     }
     return 0
