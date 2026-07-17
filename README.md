@@ -39,7 +39,7 @@ The v0-built seed compiles generation 1, then generation 1 compiles generation
 ## Test
 
 ```powershell
-python runtests.py
+python tests/run.py
 ```
 
 `examples/` contains the small learning sequence. Broader regression coverage
