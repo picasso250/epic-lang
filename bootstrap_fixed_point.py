@@ -37,7 +37,7 @@ def compile_self(compiler: Path) -> float:
 
 
 def main() -> int:
-    run([sys.executable, "build_epic_v1.py"])
+    run([sys.executable, "build_epic.py"])
     FIXED_POINT.mkdir(parents=True, exist_ok=True)
 
     elapsed_1 = compile_self(SEED)

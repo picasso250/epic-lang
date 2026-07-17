@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import os
 from pathlib import Path
@@ -18,7 +19,7 @@ ROOT = Path(__file__).resolve().parent
 SRC_DIR = ROOT / "src"
 BUILD_DIR = ROOT / "build"
 BOOTSTRAP_DIR = BUILD_DIR / "v1-bootstrap"
-OUTPUT = BUILD_DIR / "epic-v1.exe"
+DEFAULT_OUTPUT = BUILD_DIR / "epic-v1.exe"
 SOURCE_NAMES = ("epic.ep", "lexer.ep", "parser.ep", "codegen.ep", "asm.ep", "pe.ep")
 
 
@@ -70,7 +71,17 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Build the Epic v1 compiler")
+    parser.add_argument("-o", "--output", type=Path, help="output executable path")
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
+    output = args.output.resolve() if args.output else DEFAULT_OUTPUT
+    output.parent.mkdir(parents=True, exist_ok=True)
+
     sources = [SRC_DIR / name for name in SOURCE_NAMES]
     missing = [str(path) for path in sources if not path.is_file()]
     if missing:
@@ -106,14 +117,14 @@ def main() -> int:
         built = BOOTSTRAP_DIR / "epic.exe"
         if not built.is_file():
             raise RuntimeError(f"v0 did not produce the expected compiler: {built}")
-        shutil.copy2(built, OUTPUT)
+        shutil.copy2(built, output)
     finally:
         remove_worktree(worktree)
 
     elapsed = time.perf_counter() - start
-    print(f"built: {OUTPUT}")
-    print(f"size: {OUTPUT.stat().st_size} bytes")
-    print(f"sha256: {sha256(OUTPUT)}")
+    print(f"built: {output}")
+    print(f"size: {output.stat().st_size} bytes")
+    print(f"sha256: {sha256(output)}")
     print(f"elapsed: {elapsed:.3f} s")
     return 0
 

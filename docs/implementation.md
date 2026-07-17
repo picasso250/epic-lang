@@ -11,7 +11,7 @@ The bootstrap chain is:
 Python v0 stage-0 -> Epic v1 seed -> Epic v1 fixed point
 ```
 
-`build_epic_v1.py` resolves the exact commit of the local `v0` branch, creates
+`build_epic.py` resolves the exact commit of the local `v0` branch, creates
 a temporary detached worktree, and uses that Python compiler to build the v1
 seed. `bootstrap_fixed_point.py` then checks that generations 1 and 2 are
 byte-identical.

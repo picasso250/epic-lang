@@ -15,7 +15,7 @@ Python v0 stage-0 -> Epic v1 -> Epic v1 fixed point
 ## Build
 
 ```powershell
-python build_epic_v1.py
+python build_epic.py
 ```
 
 The script resolves the current local `v0` branch, creates a temporary detached
@@ -25,7 +25,9 @@ NASM remains only in the trusted stage-0 path that builds the first v1 seed from
 Python v0. Self-hosted generations and programs compiled by v1 use Epic's
 internal assembler and PE writer.
 
-The resulting compiler is `build/epic-v1.exe`.
+The resulting compiler is `build/epic-v1.exe`. Pass `-o PATH` to copy the
+final executable elsewhere; relative paths are resolved from the calling
+working directory.
 
 ## Documentation
 
