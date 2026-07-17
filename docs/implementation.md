@@ -60,8 +60,9 @@ local storage and the peak number of compiler temporary slots; there is no
 fixed temporary-slot limit.
 
 Runtime assembly helpers implement strings, dynamic byte arrays, command-line
-arguments, and file I/O. The compiler appends the required
-helpers to its generated assembly.
+arguments, and file I/O. `embed("path")` stores their raw bytes in the compiler
+image at bootstrap time, so a built `epic.exe` appends them without reading a
+repository `runtime` directory.
 
 ## Assembler and PE writer
 
@@ -84,7 +85,9 @@ python tests/examples/run.py
 python bootstrap_fixed_point.py
 ```
 
-The public examples are compiled and executed individually. End-to-end test
+The self-contained suite first copies only `epic.exe` into an isolated
+directory and verifies that it can compile a program using an embedded byte
+resource. The public examples are compiled and executed individually. End-to-end test
 sources remain independent, but their runner generates one temporary bundle,
 compiles it once, and starts that executable separately for each case. This
 preserves process isolation without producing one tiny PE per regression.

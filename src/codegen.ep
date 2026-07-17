@@ -304,23 +304,23 @@ fun fresh_label(e: EmitterState): i64 {
 fun align16(n: i64): i64 {
     return ((n + 15) / 16) * 16
 }
-fun emit_runtime(e: EmitterState, path: str): i64 {
-    let s = read_file(path)
-    out_s(e, s)
+fun emit_runtime(e: EmitterState, source: u8[]): i64 {
+    extend(e.out_buf, source)
     out_nl(e)
     return 0
 }
 fun emit_runtime_helpers(e: EmitterState): i64 {
-    emit_runtime(e, "runtime/str_alloc.asm")
-    emit_runtime(e, "runtime/bytes.asm")
-    emit_runtime(e, "runtime/str_cat.asm")
-    emit_runtime(e, "runtime/str_slice.asm")
-    emit_runtime(e, "runtime/str_replace_char.asm")
-    emit_runtime(e, "runtime/extend_u8.asm")
-    emit_runtime(e, "runtime/itoa.asm")
-    emit_runtime(e, "runtime/argv.asm")
-    emit_runtime(e, "runtime/read_file.asm")
-    emit_runtime(e, "runtime/write_file.asm")
+    emit_runtime(e, embed("../runtime/str_alloc.asm"))
+    emit_runtime(e, embed("../runtime/bytes.asm"))
+    emit_runtime(e, embed("../runtime/str_cat.asm"))
+    emit_runtime(e, embed("../runtime/str_slice.asm"))
+    emit_runtime(e, embed("../runtime/str_replace_char.asm"))
+    emit_runtime(e, embed("../runtime/embed.asm"))
+    emit_runtime(e, embed("../runtime/extend_u8.asm"))
+    emit_runtime(e, embed("../runtime/itoa.asm"))
+    emit_runtime(e, embed("../runtime/argv.asm"))
+    emit_runtime(e, embed("../runtime/read_file.asm"))
+    emit_runtime(e, embed("../runtime/write_file.asm"))
     return 0
 }
 fun make_emitter(out_path: str): EmitterState {
@@ -442,7 +442,7 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     if node.kind == "" {
         return 0
     }
-    if node.kind == "String" {
+    if node.kind == "String" || node.kind == "Embed" {
         get_string_id(e, node.value)
     } else if node.kind == "Binary" {
         collect_expr_strings(e, node.left)
@@ -683,6 +683,9 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
 fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     if expr.kind == "String" {
         return type_str()
+    }
+    if expr.kind == "Embed" {
+        return type_array("u8")
     }
     if expr.kind == "Literal" {
         return type_i64()
@@ -1408,6 +1411,13 @@ fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_lea_ref_id(e, "rcx", "_str_", id)
         emit_mov_i(e, "rdx", expr.value.len)
         emit_call_inst(e, "_str_alloc")
+        return 0
+    }
+    if expr.kind == "Embed" {
+        let id = get_string_id(e, expr.value)
+        emit_lea_ref_id(e, "rcx", "_str_", id)
+        emit_mov_i(e, "rdx", expr.value.len)
+        emit_call_inst(e, "_embed_bytes")
         return 0
     }
     if expr.kind == "Var" {
