@@ -1,10 +1,10 @@
 # EXIT: 50
-type Point {
+type StructPoint {
     x: i64
     y: i64
 }
 fun main(): void {
-    let p = new Point
+    let p = new StructPoint
     p.x = 30
     p.y = 20
     os.ExitProcess(p.x + p.y)

@@ -1,12 +1,12 @@
 # Test self-referencing product
-type Node {
+type SelfRefNode {
     val: i64
-    next: Node
+    next: SelfRefNode
 }
 fun main(): void {
-    let a = new Node
+    let a = new SelfRefNode
     a.val = 10
-    let b = new Node
+    let b = new SelfRefNode
     b.val = 20
     a.next = b
     # a.next.val should be 20

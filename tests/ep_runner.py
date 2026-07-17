@@ -64,28 +64,20 @@ def output_path(source: Path) -> Path:
     return ROOT / "build" / "epic" / f"{safe}.exe"
 
 
-def run_case(source: Path) -> tuple[bool, str]:
+def run_compiled_case(
+    source: Path,
+    executable: Path,
+    trailing_args: tuple[str, ...] = (),
+) -> tuple[bool, str]:
     annotations = parse_annotations(source.read_text(encoding="utf-8"))
     if annotations["exit_code"] is None and annotations["stdout"] is None:
         return True, "no annotations — skipped"
 
     clean_test_paths(annotations["clean_paths"])
-    relative = source.resolve().relative_to(ROOT)
-    result = subprocess.run(
-        [str(compiler_path()), str(relative)],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        return False, f"compile failed:\n{result.stderr[:500]}"
-
-    executable = output_path(source)
     if not executable.is_file():
         return False, f"no exe produced: {executable}"
     process = subprocess.run(
-        [str(executable), *annotations["argv"]],
+        [str(executable), *annotations["argv"], *trailing_args],
         capture_output=True,
         cwd=ROOT,
         timeout=EXEC_TIMEOUT,
@@ -103,3 +95,22 @@ def run_case(source: Path) -> tuple[bool, str]:
 
     clean_test_paths(annotations["clean_paths"])
     return (False, "; ".join(failures)) if failures else (True, "OK")
+
+
+def run_case(source: Path) -> tuple[bool, str]:
+    annotations = parse_annotations(source.read_text(encoding="utf-8"))
+    if annotations["exit_code"] is None and annotations["stdout"] is None:
+        return True, "no annotations — skipped"
+
+    clean_test_paths(annotations["clean_paths"])
+    relative = source.resolve().relative_to(ROOT)
+    result = subprocess.run(
+        [str(compiler_path()), str(relative)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return False, f"compile failed:\n{result.stderr[:500]}"
+    return run_compiled_case(source, output_path(source))

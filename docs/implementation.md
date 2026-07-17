@@ -82,3 +82,8 @@ python tests/run.py
 python tests/examples/run.py
 python bootstrap_fixed_point.py
 ```
+
+The public examples are compiled and executed individually. End-to-end test
+sources remain independent, but their runner generates one temporary bundle,
+compiles it once, and starts that executable separately for each case. This
+preserves process isolation without producing one tiny PE per regression.

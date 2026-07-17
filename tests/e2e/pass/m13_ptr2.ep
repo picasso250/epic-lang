@@ -1,14 +1,14 @@
 # EXIT: 0
 # STDOUT: 200
-type Point {
+type FunctionPoint {
     x: i64
     y: i64
 }
-fun sum(p: Point): i64 {
+fun sum(p: FunctionPoint): i64 {
     return p.x + p.y
 }
 fun main(): void {
-    let p = new Point
+    let p = new FunctionPoint
     p.x = 100
     p.y = 100
     print(itoa(sum(p)))
