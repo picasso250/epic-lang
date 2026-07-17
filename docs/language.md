@@ -81,7 +81,7 @@ contract. Use `new u8[n]` for mutable byte buffers.
 | Expression | Meaning |
 | --- | --- |
 | `new T[]` | empty dynamic array with default capacity |
-| `new T[n]` | dynamic array of length and capacity `n`, with zero-initialized elements |
+| `new T[n]` | dynamic array of length `n` and capacity at least `n`, with zero-initialized elements |
 | `a.data[i]` | element at index `i` |
 | `a.len` | current element count |
 | `a.cap` | current capacity |
