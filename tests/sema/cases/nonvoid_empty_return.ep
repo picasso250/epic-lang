@@ -1,0 +1,7 @@
+# ERROR: non-void function must return a value
+fun value(): i64 {
+    return
+}
+fun main(): void {
+    return
+}

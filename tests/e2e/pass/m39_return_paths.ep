@@ -1,0 +1,13 @@
+# EXIT: 0
+# STDOUT: 7
+fun choose(flag: i64): i64 {
+    if flag {
+        return 7
+    } else {
+        return 9
+    }
+}
+fun main(): void {
+    print(itoa(choose(1)))
+    print("\n")
+}

@@ -1,0 +1,4 @@
+# ERROR: void function cannot return a value
+fun main(): void {
+    return 1
+}

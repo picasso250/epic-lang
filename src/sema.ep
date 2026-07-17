@@ -584,11 +584,74 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     expr.resolved_type = result
     return result
 }
+fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
+    if stmt.name == "argv" {
+        sema_error(state.source_path, stmt.line, "argv is read-only")
+    }
+    let local = sema_find_local(state, stmt.name)
+    if local.name == "" {
+        sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if sema_assignable(local.type_name, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
+    }
+    return 0
+}
+fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
+    let object_type = sema_check_expr(state, stmt.object)
+    if object_type == "str" {
+        sema_error(state.source_path, stmt.line, "str is read-only")
+    }
+    let field_type = sema_field_type(state, object_type, stmt.name)
+    if field_type == "" {
+        sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if sema_assignable(field_type, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + field_type)
+    }
+    return 0
+}
+fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
+    let base_type = sema_check_expr(state, stmt.base)
+    sema_check_expr(state, stmt.index)
+    sema_require_i64(state, stmt.index, "subscript")
+    let element = ""
+    if base_type == "str" {
+        sema_error(state.source_path, stmt.line, "str is read-only")
+    } else if sema_is_array(base_type) == 1 {
+        element = sema_array_element(base_type)
+    } else if sema_is_pointer(base_type) == 1 {
+        element = sema_pointer_element(base_type)
+    } else {
+        sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if sema_assignable(element, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + element)
+    }
+    return 0
+}
+fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
+    if state.return_type == "void" {
+        if stmt.expr.kind != "" {
+            sema_error(state.source_path, stmt.line, "void function cannot return a value")
+        }
+        return 0
+    }
+    if stmt.expr.kind == "" {
+        sema_error(state.source_path, stmt.line, "non-void function must return a value")
+    }
+    let actual = sema_check_expr(state, stmt.expr)
+    if sema_assignable(state.return_type, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
+    }
+    return 0
+}
 fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
     if stmt.kind == "Return" {
-        if stmt.expr.kind != "" {
-            sema_check_expr(state, stmt.expr)
-        }
+        sema_check_return(state, stmt)
     } else if stmt.kind == "ExprStmt" {
         sema_check_expr(state, stmt.expr)
     } else if stmt.kind == "Let" {
@@ -601,15 +664,11 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
         }
         sema_add_local(state, stmt.name, type_name, stmt.line)
     } else if stmt.kind == "Assign" {
-        sema_check_expr(state, stmt.value_expr)
+        sema_check_assignment(state, stmt)
     } else if stmt.kind == "FieldSet" {
-        sema_check_expr(state, stmt.object)
-        sema_check_expr(state, stmt.value_expr)
+        sema_check_field_set(state, stmt)
     } else if stmt.kind == "SubscriptAssign" {
-        sema_check_expr(state, stmt.base)
-        sema_check_expr(state, stmt.index)
-        sema_require_i64(state, stmt.index, "subscript")
-        sema_check_expr(state, stmt.value_expr)
+        sema_check_subscript_set(state, stmt)
     } else if stmt.kind == "If" {
         sema_check_expr(state, stmt.expr)
         sema_require_i64(state, stmt.expr, "if condition")
@@ -619,6 +678,30 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
         sema_check_expr(state, stmt.expr)
         sema_require_i64(state, stmt.expr, "while condition")
         sema_check_block(state, stmt.body)
+    }
+    return 0
+}
+fun sema_stmt_returns(stmt: AstStmt): i64 {
+    if stmt.kind == "Return" {
+        return 1
+    }
+    if stmt.kind == "If" && stmt.else_block.present == 1 {
+        if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
+            return 1
+        }
+    }
+    return 0
+}
+fun sema_block_returns(block: AstBlock): i64 {
+    if block.present == 0 {
+        return 0
+    }
+    let i = 0
+    while i < block.stmts.len {
+        if sema_stmt_returns(block.stmts.data[i]) == 1 {
+            return 1
+        }
+        i = i + 1
     }
     return 0
 }
@@ -650,6 +733,9 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
             j = j + 1
         }
         sema_check_block(state, node.body)
+        if node.type_name != "void" && sema_block_returns(node.body) == 0 {
+            sema_error(node.source_path, node.line, "function '" + node.name + "' may not return a value on every path")
+        }
         i = i + 1
     }
     return 0
