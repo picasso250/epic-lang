@@ -226,8 +226,13 @@ to declare them.
 | `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
+| `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
 
 The byte arguments of `str_replace_char` use their low eight bits.
+
+`embed` accepts exactly one string literal. Relative paths are resolved against
+the `.ep` file containing the expression; absolute paths are used unchanged.
+A missing or unreadable file is a compile error, while an empty file is valid.
 
 ## Unsupported in v0
 

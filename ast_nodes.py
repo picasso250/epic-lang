@@ -126,6 +126,12 @@ class StringNode(ASTNode):
 
 
 @dataclass
+class EmbedNode(ASTNode):
+    path: str
+    data: bytes
+
+
+@dataclass
 class VarNode(ASTNode):
     name: str
 

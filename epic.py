@@ -33,6 +33,7 @@ RUNTIME_ASM_FILES = [
     "str_cat.asm",
     "str_slice.asm",
     "str_replace_char.asm",
+    "embed.asm",
     "extend_u8.asm",
     "itoa.asm",
     "argv.asm",
@@ -63,7 +64,7 @@ def _parse_file(input_path):
     with open(input_path, "r", encoding="utf-8") as f:
         source = f.read()
     tokens = lex(source)
-    parser = Parser(tokens)
+    parser = Parser(tokens, os.path.abspath(input_path))
     return parser.parse_program()
 
 

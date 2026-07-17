@@ -1,0 +1,10 @@
+# EXIT: 42
+fun main(): void {
+    let data = embed("../../../codegen.py")
+    let other = embed("../../../codegen.py")
+    data.data[0] = 42
+    if other.data[0] == 42 {
+        os.ExitProcess(1)
+    }
+    os.ExitProcess(data.data[0])
+}

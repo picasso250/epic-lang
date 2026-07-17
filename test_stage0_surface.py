@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Intent tests for the frozen Epic v0 declaration surface."""
 
+from pathlib import Path
+import tempfile
+
+from ast_nodes import EmbedNode
 from lexer import LexError, lex
 from parser import ParseError, Parser
 
@@ -24,6 +28,28 @@ def main():
 
     expect_rejected("struct Point {\nx: i64\n}\nfun main(): void {\n}\n")
     expect_rejected("type Expr = Lit | Add\nfun main(): void {\n}\n")
+
+    with tempfile.TemporaryDirectory() as temp:
+        root = Path(temp)
+        source = root / "main.ep"
+        resource = root / "asset.bin"
+        resource.write_bytes(b"A\x00B")
+        program = Parser(
+            lex('fun main(): void {\nlet data = embed("asset.bin")\n}\n'),
+            str(source),
+        ).parse_program()
+        embedded = program.funcs[0].body.stmts[0].value
+        assert isinstance(embedded, EmbedNode)
+        assert embedded.data == b"A\x00B"
+        try:
+            Parser(
+                lex('fun main(): void {\nlet data = embed("missing.bin")\n}\n'),
+                str(source),
+            ).parse_program()
+        except ParseError as error:
+            assert "embed file not found: missing.bin" in str(error)
+        else:
+            raise AssertionError("missing embed file unexpectedly accepted")
     print("stage-0 surface passed")
     return 0
 

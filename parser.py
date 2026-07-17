@@ -4,6 +4,7 @@ Consumes tokens from lexer, produces AST dataclass nodes.
 """
 
 from ast_nodes import *
+from pathlib import Path
 
 
 class ParseError(Exception):
@@ -13,10 +14,23 @@ class ParseError(Exception):
 
 
 class Parser:
-    def __init__(self, tokens):
+    def __init__(self, tokens, source_path=""):
         self.tokens = tokens
         self.pos = 0
         self.loop_depth = 0
+        self.source_path = source_path
+
+    def read_embed(self, path, line):
+        resolved = Path(path)
+        if not resolved.is_absolute():
+            base = Path(self.source_path).resolve().parent if self.source_path else Path.cwd()
+            resolved = base / resolved
+        if not resolved.is_file():
+            raise ParseError(f"embed file not found: {path}", line)
+        try:
+            return resolved.read_bytes()
+        except OSError as error:
+            raise ParseError(f"cannot read embed file {path}: {error}", line) from error
 
     def peek(self):
         if self.pos < len(self.tokens):
@@ -387,11 +401,19 @@ class Parser:
             t = self.advance()
             name = t[1]
             if self.check("LPAREN"):
-                args = self.parse_args()
-                self.expect("RPAREN")
-                if len(args) > 4:
-                    raise ParseError("function calls may have at most 4 arguments in v0", t[2])
-                node = CallNode(name=name, args=args)
+                if name == "embed":
+                    path = self.expect("STRING")
+                    self.expect("RPAREN")
+                    node = EmbedNode(
+                        path=path[1],
+                        data=self.read_embed(path[1], path[2]),
+                    )
+                else:
+                    args = self.parse_args()
+                    self.expect("RPAREN")
+                    if len(args) > 4:
+                        raise ParseError("function calls may have at most 4 arguments in v0", t[2])
+                    node = CallNode(name=name, args=args)
             else:
                 node = VarNode(name=name)
             # Postfix: .field and [index]

@@ -35,6 +35,8 @@ class Emitter:
         self.alloc_size = 0     # bytes allocated after push rbp / mov rbp, rsp
         self.strings = {}       # literal text → label name
         self.string_counter = 0
+        self.embeds = {}        # label name → immutable source bytes
+        self.embed_counter = 0
         self.local_bytes = 0    # track variable allocation in pre-scan
         self.structs = {}       # name → {fields: [{name, type, offset}], size}
         self.funcs = {}         # name → {ret_type, params}
@@ -115,6 +117,8 @@ class Emitter:
         # Collect strings from AST
         self.strings = {}
         self.string_counter = 0
+        self.embeds = {}
+        self.embed_counter = 0
         for func in ast.funcs:
             self._collect_strings_from_block(func.body)
 
@@ -127,6 +131,11 @@ class Emitter:
             bytes_str = ", ".join(str(b) for b in text.encode("ascii"))
             if bytes_str:
                 self.emit(f"{label}: db {bytes_str}, 0")
+            else:
+                self.emit(f"{label}: db 0")
+        for label, data in sorted(self.embeds.items(), key=lambda x: x[0]):
+            if data:
+                self.emit(f"{label}: db {', '.join(str(byte) for byte in data)}")
             else:
                 self.emit(f"{label}: db 0")
         self.emit("")
@@ -151,6 +160,8 @@ class Emitter:
         """Recursively find string literals and register them."""
         if isinstance(node, StringNode):
             self.get_string_label(node.value)
+        if isinstance(node, EmbedNode):
+            self.get_embed_label(node.data)
         if isinstance(node, ASTNode):
             for f in dataclasses.fields(node):
                 self._collect_strings(getattr(node, f.name))
@@ -167,6 +178,15 @@ class Emitter:
         self.string_counter += 1
         label = f"_str_{self.string_counter}"
         self.strings[label] = text
+        return label
+
+    def get_embed_label(self, data):
+        for label, existing in self.embeds.items():
+            if existing == data:
+                return label
+        self.embed_counter += 1
+        label = f"_embed_{self.embed_counter}"
+        self.embeds[label] = data
         return label
 
     # ── function definition ────────────────────────────────────────────
@@ -504,6 +524,9 @@ class Emitter:
                 var_type = "&str"
             elif isinstance(value, StringNode):
                 var_type = "&str"
+            elif isinstance(value, EmbedNode):
+                self._ensure_array_type("u8")
+                var_type = "&_arr_u8"
             else:
                 var_type = self._expr_type(value)
         if var_type is None:
@@ -581,6 +604,11 @@ class Emitter:
             self.emit_lea("rcx", f"[{label}]")
             self.emit_mov("rdx", strlen)
             self.emit_call_inst("_str_alloc")
+        elif isinstance(expr, EmbedNode):
+            label = self.get_embed_label(expr.data)
+            self.emit_lea("rcx", f"[{label}]")
+            self.emit_mov("rdx", len(expr.data))
+            self.emit_call_inst("_embed_bytes")
         elif isinstance(expr, VarNode):
             name = expr.name
             if sym := self._global_symbol(name):
@@ -1144,6 +1172,9 @@ class Emitter:
             return "i64"
         if isinstance(expr, StringNode):
             return "&str"
+        if isinstance(expr, EmbedNode):
+            self._ensure_array_type("u8")
+            return "&_arr_u8"
         if isinstance(expr, VarNode):
             if sym := self._global_symbol(expr.name):
                 return sym["type"]
