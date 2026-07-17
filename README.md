@@ -27,6 +27,11 @@ internal assembler and PE writer.
 
 The resulting compiler is `build/epic-v1.exe`.
 
+## Documentation
+
+- [Language reference](docs/language.md), including built-in data structures and functions
+- [Compiler implementation](docs/implementation.md)
+
 Verify the self-hosted fixed point:
 
 ```powershell

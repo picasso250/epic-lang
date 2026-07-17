@@ -1,4 +1,4 @@
-# Epic v1 bootstrap language design
+# Epic v1 language reference
 
 ## Core direction
 
@@ -10,7 +10,7 @@
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
 - Memory is not freed in v0; process exit is the reclamation boundary.
-- The Epic v1 compiler is self-hosted, but its source deliberately stays within the v0 language subset documented here.
+- The Epic v1 compiler is self-hosted, and its source deliberately stays within the v0 language subset documented here.
 - v1 does not preserve forward compatibility.
 
 **Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v1 fixed point.
@@ -41,9 +41,10 @@ Future module design should use folders as module/package boundaries, similar to
 
 Until that exists, v1 bootstrap source should avoid duplicating shared structures and should not introduce ad hoc compatibility layers.
 
-## Types
+## Built-in data structures
 
-User-facing types:
+Epic has two built-in heap data structures: immutable strings and dynamic
+arrays. The complete set of user-facing types is:
 
 | Type | Meaning |
 | --- | --- |
@@ -54,13 +55,49 @@ User-facing types:
 | `T[]` | heap-allocated dynamic array |
 | `void` | function return type only; no value is produced |
 
-Built-in globals:
+At the language level, `str`, user products, and dynamic arrays have reference
+semantics. Assignment and parameter passing copy references, not object
+contents. There is no by-value product or array copy semantics in v1.
+
+### Strings
+
+`str` is an immutable, heap-allocated byte string. String literals produce
+`str` values.
+
+| Field or expression | Meaning |
+| --- | --- |
+| `s.data` | low-level address of the first byte |
+| `s.data[i]` | byte at index `i` |
+| `s.len` | number of bytes, excluding the trailing NUL |
+
+The runtime keeps a trailing NUL for Win32 interop, but it is not part of the
+string length. Mutating bytes through `s.data` is outside the language
+contract. Use `new u8[n]` for mutable byte buffers.
+
+### Dynamic arrays
+
+`T[]` is a heap-allocated, growable sequence with reference semantics.
+
+| Expression | Meaning |
+| --- | --- |
+| `new T[]` | empty dynamic array with default capacity |
+| `new T[n]` | empty dynamic array with capacity at least `n` |
+| `a.data[i]` | element at index `i` |
+| `a.len` | current element count |
+| `a.cap` | current capacity |
+
+`new T[n]` sets capacity, not length. The initial `len` is always 0. `push`
+and `extend` are documented under built-in functions.
+
+### Built-in global
 
 | Name | Type | Meaning |
 | --- | --- | --- |
 | `argv` | `str[]` | command-line arguments, including `argv.data[0]` as the executable name |
 
-At the language level, `str`, user products, and dynamic arrays have reference semantics in v0. Assignment and parameter passing copy references, not object contents. There is no by-value product or array copy semantics in v0.
+`argv` is initialized before `main`. v1 implements the Windows command-line
+rules needed for bootstrapping: whitespace separates arguments and double
+quotes group one argument.
 
 ## Functions
 
@@ -126,9 +163,7 @@ type Token {
 
 Field access uses `obj.field`. Field assignment uses `obj.field = value`.
 
-## Strings
-
-`str` is immutable and heap allocated. String literals produce `str` values.
+## Literals and byte operations
 
 Supported escapes in string and character literals:
 
@@ -145,26 +180,7 @@ Bit operations use `i64`. `<<` keeps the low 64 bits, `>>` is arithmetic, and
 shift counts outside `0..63` terminate the program. `u8` values are zero-extended
 before participating in `<<`, `>>`, `&`, or `|`.
 
-`len` counts bytes, not characters.
-
-For bootstrapping v1, v0 exposes `s.data` and `s.len` as low-level escape hatches. Mutating string bytes through `s.data[i] = ...` is outside the language contract. Use `new u8[n]` for mutable byte buffers.
-
-## Dynamic arrays
-
-Dynamic arrays are heap-allocated reference values.
-
-| Expression | Meaning |
-| --- | --- |
-| `new T[]` | empty dynamic array with default capacity |
-| `new T[n]` | empty dynamic array with capacity at least `n` |
-| `push(a, x)` | append and grow as needed |
-| `a.data[i]` | low-level element access |
-| `a.len` | current length |
-| `a.cap` | current capacity |
-
-`new T[n]` sets capacity, not length. The initial `len` is always 0.
-
-For bootstrapping v1, v0 exposes `a.data`, `a.len`, and `a.cap` as low-level fields.
+String lengths and indices count bytes, not Unicode characters.
 
 ## System calls
 
@@ -188,20 +204,27 @@ Falling off the end of `main` exits with status `0`. Non-zero process status is 
 
 `main` returning `i64` is not part of the v0 design.
 
-## Builtins
+## Built-in functions
 
-| Builtin | Meaning |
+These names are provided by the compiler and runtime. User code does not need
+to declare them.
+
+| Function | Meaning |
 | --- | --- |
 | `putc(c: i64): void` | writes one byte |
 | `putstr(s: str): void` | writes string bytes |
-| `str_new(bytes, len): str` | creates a string by copying `len` bytes from a low-level byte buffer such as `buf.data` |
 | `itoa(n: i64): str` | converts an integer to a heap string |
+| `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
+| `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
+| `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
+| `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |
 | `system(cmd: str): i64` | runs a command and returns its process exit code, or `-1` on failure |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
+| `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 
-`argv` is initialized by the runtime before `main`. v0 only requires simple Windows command-line splitting for bootstrapping: whitespace separates arguments, and double quotes group an argument.
+The byte arguments of `putc` and `str_replace_char` use their low eight bits.
 
 ## Unsupported in v0
 
