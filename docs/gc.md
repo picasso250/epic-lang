@@ -1,8 +1,10 @@
 # Garbage collector
 
-Epic v2 uses a single-threaded, conservative, non-moving mark-and-sweep
-collector. It is an internal runtime facility: the language has no manual
-`gc()` builtin, finalizers, weak references, or collection diagnostics.
+The collector described here was introduced in Epic v2. Later generations
+inherit this baseline unless a generation-specific section below documents a
+change. It is a single-threaded, conservative, non-moving mark-and-sweep
+collector and an internal runtime facility: the language has no manual `gc()`
+builtin, finalizers, weak references, or collection diagnostics.
 
 ## Allocation
 
@@ -51,3 +53,11 @@ the collector in the compiler workload, and requires byte-identical output.
 The `tests/gc` suite creates a retained stack/heap object graph amid more than
 60 MiB of temporary allocations, separately exercises all four slab classes,
 and checks retention plus a bounded peak working set.
+
+## Generation history
+
+### Epic v2
+
+Epic v2 introduced the collector described above: managed allocation through
+`__ep_alloc`, conservative exact-base stack scanning, non-moving mark-and-sweep,
+8/16/24/32-byte slab classes, and the adaptive 8 MiB minimum threshold.
