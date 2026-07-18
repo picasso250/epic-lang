@@ -86,6 +86,45 @@ fun reject_large_literal(text: str, hex: i64): i64 {
     }
     return 0
 }
+fun identifier_kind(text: str): TokenKind {
+    if text == "fun" {
+        return TokenKind.FUN
+    }
+    if text == "return" {
+        return TokenKind.RETURN
+    }
+    if text == "if" {
+        return TokenKind.IF
+    }
+    if text == "else" {
+        return TokenKind.ELSE
+    }
+    if text == "while" {
+        return TokenKind.WHILE
+    }
+    if text == "for" {
+        return TokenKind.FOR
+    }
+    if text == "break" {
+        return TokenKind.BREAK
+    }
+    if text == "continue" {
+        return TokenKind.CONTINUE
+    }
+    if text == "type" {
+        return TokenKind.TYPE
+    }
+    if text == "new" {
+        return TokenKind.NEW
+    }
+    if text == "let" {
+        return TokenKind.LET
+    }
+    if text == "match" {
+        return TokenKind.MATCH
+    }
+    return TokenKind.ID
+}
 fun lex(src: str): Token[] {
     let tokens = new Token[]
     let n = len(src)
@@ -233,44 +272,7 @@ fun lex(src: str): Token[] {
                 pos += 1
             }
             let identifier_text = str_new(p + identifier_start, pos - identifier_start)
-            let kind = TokenKind.ID
-            if identifier_text == "fun"    {
-                kind = TokenKind.FUN
-            }
-            if identifier_text == "return" {
-                kind = TokenKind.RETURN
-            }
-            if identifier_text == "if"     {
-                kind = TokenKind.IF
-            }
-            if identifier_text == "else"   {
-                kind = TokenKind.ELSE
-            }
-            if identifier_text == "while"  {
-                kind = TokenKind.WHILE
-            }
-            if identifier_text == "for" {
-                kind = TokenKind.FOR
-            }
-            if identifier_text == "break"  {
-                kind = TokenKind.BREAK
-            }
-            if identifier_text == "continue" {
-                kind = TokenKind.CONTINUE
-            }
-            if identifier_text == "type" {
-                kind = TokenKind.TYPE
-            }
-            if identifier_text == "new"    {
-                kind = TokenKind.NEW
-            }
-            if identifier_text == "let"    {
-                kind = TokenKind.LET
-            }
-            if identifier_text == "match" {
-                kind = TokenKind.MATCH
-            }
-            push_token(tokens, kind, identifier_text, identifier_line)
+            push_token(tokens, identifier_kind(identifier_text), identifier_text, identifier_line)
             continue
         }
         if ch == 60 && p[pos + 1] == 60 && p[pos + 2] == 61 {
