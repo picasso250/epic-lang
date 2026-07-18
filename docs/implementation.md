@@ -116,6 +116,11 @@ when forming a 64-bit address, at an approved v3 compatibility boundary, or for
 division lowering. The private assembler encodes 16-bit operands plus `movzx`,
 `movsx`, and `movsxd` for these boundaries.
 
+The polymorphic `is_null` builtin is checked in semantic analysis against the
+reference categories and lowered in value position to `test rax, rax` plus
+`sete al`. Conditional code uses the ordinary bool path; v3 deliberately adds
+no builtin-specific branch optimization or implicit dereference guard.
+
 Runtime assembly helpers implement strings, dynamic byte arrays, command-line
 arguments, file I/O, and allocation-free panic reporting. `embed("path")` stores their raw bytes in the compiler
 image at bootstrap time, so a built `epic.exe` parses them into its existing

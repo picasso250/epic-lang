@@ -855,6 +855,12 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_coerce_rax(e, expr_type(e, expr.args.data[0]), type_integer(name))
         ret 0
     }
+    if expr.type_name == "" && name == "is_null" {
+        emit_expr(e, expr.args.data[0])
+        asm_test(e.program, asm_rax(), asm_rax())
+        asm_sete(e.program, asm_al())
+        ret 0
+    }
     let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
     if sys_symbol != "" {
         let slots = new i64[]

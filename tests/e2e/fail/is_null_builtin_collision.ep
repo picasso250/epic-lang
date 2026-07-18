@@ -1,0 +1,6 @@
+# COMPILE_ERROR: cannot redefine builtin function 'is_null'
+fun is_null(value: i64): bool {
+    false
+}
+fun main(): void {
+}

@@ -1,0 +1,37 @@
+# EXIT: 0
+type NullProbeNode {
+    next: NullProbeNode
+}
+
+type NullProbeHolder {
+    text: str
+    values: u8[]
+    node: NullProbeNode
+}
+
+fun main(): void {
+    let holder = new NullProbeHolder
+    let is_null = 7
+    if is_null != 7 {
+        os.ExitProcess(5)
+    }
+    if !is_null(holder.text) || !is_null(holder.values) || !is_null(holder.node) {
+        os.ExitProcess(1)
+    }
+
+    holder.text = ""
+    holder.values = new u8[]
+    holder.node = new NullProbeNode
+    if is_null(holder.text) || is_null(holder.values) || is_null(holder.node) {
+        os.ExitProcess(2)
+    }
+
+    let data = holder.values.data
+    if is_null(data) {
+        os.ExitProcess(3)
+    }
+    if is_null(new NullProbeNode) {
+        os.ExitProcess(4)
+    }
+    os.ExitProcess(0)
+}

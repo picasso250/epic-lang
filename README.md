@@ -9,6 +9,8 @@ v3 also implements distinct `bool` plus signed and unsigned 8-, 16-, 32-, and
 64-bit integers, typed integer literals, explicit `T(value)` conversions, and
 compact integer storage. The v3 compiler source remains on the previous
 surface; v4 is the dogfood generation for these additions.
+It also provides `is_null(reference)` for explicit zero-address tests without
+inserting implicit dereference checks.
 It retains the self-contained AMD64 assembler,
 deterministic PE writer, and conservative garbage collector.
 

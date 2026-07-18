@@ -500,6 +500,7 @@ to declare them.
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
+| `is_null(value: reference): bool` | tests whether a product, string, array, or low-level pointer reference is the zero address; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
@@ -519,6 +520,12 @@ Direct `.data`, `.len`, and `.cap` access remains available for compatibility
 and deliberate low-level code, but exposes the current runtime layout and may be
 deprecated in a future generation. Pointer subscripting and `.data[index]` are
 unchecked.
+
+`is_null` checks only the outer reference address. An empty string or empty
+array is not null, a nonzero dangling pointer is not null, and no implicit null
+guard is inserted before field access or subscripting. Integer and enum zero
+values are not references and are rejected; test an integer handle with
+`value == 0` instead. `is_null` is a normal builtin name rather than a keyword.
 
 `embed` accepts exactly one string literal. Relative paths are resolved against
 the `.ep` file containing the expression; absolute paths are used unchanged.
