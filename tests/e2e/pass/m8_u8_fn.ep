@@ -6,7 +6,7 @@ fun to_upper(c: u8): i64 {
     ret c
 }
 fun narrow_return(): u8 {
-    ret 300
+    ret u8(300)
 }
 fun main(): void {
     let buf = new u8[]

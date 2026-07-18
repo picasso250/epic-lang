@@ -1,7 +1,7 @@
 # ERROR: cannot join types i64 and str
 type MatchExprKind = Number | Text
 fun main(): void {
-    match MatchExprKind.Number {
+    let value = match MatchExprKind.Number {
         MatchExprKind.Number {
             1
         }

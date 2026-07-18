@@ -25,7 +25,9 @@ type AstExpr {
     subject: AstExpr
     match_arms: AstMatchArm[]
     line: i64
+    resolved: i64
     resolved_type: str
+    resolved_value: i64
 }
 type AstExprOption {
     kind: AstExprOptionKind
@@ -127,10 +129,11 @@ fun ast_expr_some(value: AstExpr): AstExprOption {
     option.value = value
     ret option
 }
-fun ast_literal(value: str, line: i64): AstExpr {
+fun ast_literal(value: str, literal_type: str, line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.Literal
     node.value = value
+    node.type_name = literal_type
     node.line = line
     ret node
 }
@@ -811,6 +814,9 @@ fun parse_expr_stmt(p: Parser): AstStmt {
     ret ast_expr_statement(expr)
 }
 fun is_expr_first(kind: TokenKind): i64 {
+    if kind == TokenKind.TRUE || kind == TokenKind.FALSE {
+        ret 1
+    }
     if kind == TokenKind.NUMBER {
         ret 1
     }
@@ -1130,11 +1136,19 @@ fun parse_primary(p: Parser): AstExpr {
     }
     if peek_kind(p, TokenKind.NUMBER) == 1 {
         let number_token = advance(p)
-        ret ast_literal(number_token.text, number_token.line)
+        ret ast_literal(number_token.text, "", number_token.line)
     }
     if peek_kind(p, TokenKind.CHAR) == 1 {
         let char_token = advance(p)
-        ret ast_literal(char_token.text, char_token.line)
+        ret ast_literal(char_token.text, "i64", char_token.line)
+    }
+    if peek_kind(p, TokenKind.TRUE) == 1 {
+        let true_token = advance(p)
+        ret ast_literal("1", "bool", true_token.line)
+    }
+    if peek_kind(p, TokenKind.FALSE) == 1 {
+        let false_token = advance(p)
+        ret ast_literal("0", "bool", false_token.line)
     }
     if peek_kind(p, TokenKind.STRING) == 1 {
         let string_token = advance(p)
@@ -1164,7 +1178,7 @@ fun parse_primary(p: Parser): AstExpr {
     }
     let unexpected = peek(p)
     parse_error(unexpected.line, "Unexpected token in expression")
-    ret ast_literal("0", unexpected.line)
+    ret ast_literal("0", "i64", unexpected.line)
 }
 fun bin_node(op: Token, left: AstExpr, right: AstExpr): AstExpr {
     ret ast_binary(binary_operator(op), left, right, op.line)

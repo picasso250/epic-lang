@@ -73,8 +73,8 @@ statement kinds and lowering path.
 nodes. Their statement forms are ordinary expression statements whose result is
 discarded. Semantic analysis assigns every block and expression a resolved type,
 using internal `never` as the bottom type when control cannot complete normally.
-Branch and arm types are joined once, independently of whether a parent later
-uses or discards the value.
+Branch and arm types are joined in value context. Statement/`void` context
+checks every branch but discards their tail values.
 
 Unit-enum declarations and match arms are exact records. Semantic analysis
 resolves each qualified enum member to its declaration-order value, checks
@@ -88,9 +88,10 @@ analysis checks both bounds before introducing a read-only iterator scope.
 Code generation stores the end bound in a private stack slot, so both bounds
 are evaluated once, and gives `continue` a dedicated iterator-step target.
 
-Unary expressions are recursive AST nodes checked as `i64`. Negation maps to
-the assembler's existing `neg` instruction. Logical not materializes `0` or
-`1`; conditional branches invert their jump sense directly instead.
+Integer literals stay as raw token text through lexing and parsing. Semantic
+analysis resolves suffixes or contextual types, checks the mathematical range,
+and records the low 64-bit pattern on the AST. Unary negation and integer
+operations retain their operand width; logical results are `bool`.
 
 This keeps deterministic syntax records precise without creating a separate
 wrapper allocation for every expression or statement.
@@ -106,6 +107,14 @@ to four arguments.
 Each function receives a statically sized stack frame. A pre-scan computes
 local storage and the peak number of compiler temporary slots; there is no
 fixed temporary-slot limit.
+
+Integer and bool locals/parameters use 8-byte stack slots, while product fields
+and array elements use their natural 1-, 2-, 4-, or 8-byte size and alignment.
+The low N bits of an integer expression are authoritative; upper register bits
+need not be canonical. Code generation extends only at a widening conversion,
+when forming a 64-bit address, at an approved v3 compatibility boundary, or for
+division lowering. The private assembler encodes 16-bit operands plus `movzx`,
+`movsx`, and `movsxd` for these boundaries.
 
 Runtime assembly helpers implement strings, dynamic byte arrays, command-line
 arguments, file I/O, and allocation-free panic reporting. `embed("path")` stores their raw bytes in the compiler

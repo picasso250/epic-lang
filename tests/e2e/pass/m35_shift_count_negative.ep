@@ -1,4 +1,4 @@
-# EXIT: 1
+# EXIT: 0
 fun main(): void {
     let value = 1 << (0 - 1)
     os.ExitProcess(0)

@@ -1,4 +1,4 @@
-# ERROR: if condition requires i64
+# ERROR: if condition requires bool, got ConditionEnum
 type ConditionEnum = False | True
 fun main(): void {
     if ConditionEnum.True {}

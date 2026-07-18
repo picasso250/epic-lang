@@ -1,4 +1,4 @@
-# ERROR: requires two integers, two strings, or two values of the same enum type
+# ERROR: requires matching integers, two bool values, two strings, or two values of the same enum type
 type CompareEnum = First | Second
 fun main(): void {
     if CompareEnum.First == 0 {}

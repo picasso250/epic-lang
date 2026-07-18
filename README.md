@@ -5,6 +5,10 @@ implemented there: unary operators, compound assignment, integer range loops,
 nominal unit enums, and exhaustive matching. It adds block tail values, implicit
 function tail returns, expression-form `if` and `match`, and an internal `never`
 type for no-return control flow, including allocation-free `panic(message)`.
+v3 also implements distinct `bool` plus signed and unsigned 8-, 16-, 32-, and
+64-bit integers, typed integer literals, explicit `T(value)` conversions, and
+compact integer storage. The v3 compiler source remains on the previous
+surface; v4 is the dogfood generation for these additions.
 It retains the self-contained AMD64 assembler,
 deterministic PE writer, and conservative garbage collector.
 

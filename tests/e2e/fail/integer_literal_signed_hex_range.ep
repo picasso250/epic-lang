@@ -1,0 +1,4 @@
+# COMPILE_ERROR: integer literal is out of range for i8
+fun main(): void {
+    let value = 0xffi8
+}

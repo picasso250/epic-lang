@@ -1,4 +1,4 @@
-# ERROR: operator + requires integer operands
+# ERROR: operator + has incompatible operand types ArithmeticEnum and ArithmeticEnum
 type ArithmeticEnum = First | Second
 fun main(): void {
     let value = ArithmeticEnum.First + ArithmeticEnum.Second

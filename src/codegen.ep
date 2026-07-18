@@ -202,8 +202,14 @@ fun type_info(kind: str, name: str): TypeInfo {
 fun type_i64(): TypeInfo {
     ret type_info("i64", "")
 }
+fun type_integer(name: str): TypeInfo {
+    ret type_info(name, "")
+}
 fun type_u8(): TypeInfo {
     ret type_info("u8", "")
+}
+fun type_bool(): TypeInfo {
+    ret type_info("bool", "")
 }
 fun type_void(): TypeInfo {
     ret type_info("void", "")
@@ -220,14 +226,24 @@ fun type_struct(name: str): TypeInfo {
 fun type_array(elem: str): TypeInfo {
     ret type_info("array", elem)
 }
-fun type_is_u8(t: TypeInfo): i64 {
-    if t.kind == "u8" {
-        ret 1
-    }
-    ret 0
+fun type_is_integer(t: TypeInfo): i64 {
+    ret sema_is_integer(t.kind)
 }
-fun type_is_value_u8(t: TypeInfo): i64 {
-    ret type_is_u8(t)
+fun type_width(t: TypeInfo): i64 {
+    if t.kind == "bool" {
+        ret 8
+    }
+    let bits = sema_integer_bits(t.kind)
+    if bits != 0 {
+        ret bits
+    }
+    ret 64
+}
+fun type_storage_size(t: TypeInfo): i64 {
+    ret type_width(t) / 8
+}
+fun type_is_signed(t: TypeInfo): i64 {
+    ret sema_is_signed_integer(t.kind)
 }
 fun type_is_complex(t: TypeInfo): i64 {
     if t.kind == "str" {
@@ -242,11 +258,11 @@ fun type_is_complex(t: TypeInfo): i64 {
     ret 0
 }
 fun user_type(name: str): TypeInfo {
-    if name == "i64" {
-        ret type_i64()
+    if sema_is_integer(name) == 1 {
+        ret type_integer(name)
     }
-    if name == "u8" {
-        ret type_u8()
+    if name == "bool" {
+        ret type_bool()
     }
     if name == "void" {
         ret type_void()
@@ -492,24 +508,41 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     let s = add_struct_info(e, "str", 16)
     add_field(s, "data", type_info("ptr", "u8"), 0)
     add_field(s, "len", type_i64(), 8)
-    let a = add_struct_info(e, "_arr_u8", 24)
-    add_field(a, "data", type_info("ptr", "u8"), 0)
-    add_field(a, "len", type_i64(), 8)
-    add_field(a, "cap", type_i64(), 16)
-    a = add_struct_info(e, "_arr_i64", 24)
-    add_field(a, "data", type_info("ptr", "i64"), 0)
-    add_field(a, "len", type_i64(), 8)
-    add_field(a, "cap", type_i64(), 16)
-    a = add_struct_info(e, "_arr_str", 24)
-    add_field(a, "data", type_info("ptr", "str"), 0)
-    add_field(a, "len", type_i64(), 8)
-    add_field(a, "cap", type_i64(), 16)
+    let builtin_arrays = new str[]
+    push(builtin_arrays, "bool")
+    push(builtin_arrays, "i8")
+    push(builtin_arrays, "u8")
+    push(builtin_arrays, "i16")
+    push(builtin_arrays, "u16")
+    push(builtin_arrays, "i32")
+    push(builtin_arrays, "u32")
+    push(builtin_arrays, "i64")
+    push(builtin_arrays, "u64")
+    push(builtin_arrays, "str")
+    for builtin_array_i: 0:len(builtin_arrays) {
+        let builtin_element = builtin_arrays.data[builtin_array_i]
+        let builtin_array = add_struct_info(e, array_layout_name(builtin_element), 24)
+        add_field(builtin_array, "data", type_info("ptr", builtin_element), 0)
+        add_field(builtin_array, "len", type_i64(), 8)
+        add_field(builtin_array, "cap", type_i64(), 16)
+    }
+    let a = new StructInfo
     for struct_i: 0:len(ast.structs) {
         let node = ast.structs.data[struct_i]
-        s = add_struct_info(e, node.name, len(node.fields) * 8)
+        let struct_size = 0
+        let struct_align = 1
+        s = add_struct_info(e, node.name, 0)
         for j: 0:len(node.fields) {
-            add_field(s, node.fields.data[j].name, emitter_type(e, node.fields.data[j].type_name), j * 8)
+            let field_type = emitter_type(e, node.fields.data[j].type_name)
+            let field_size = type_storage_size(field_type)
+            if field_size > struct_align {
+                struct_align = field_size
+            }
+            struct_size = align_up(struct_size, field_size)
+            add_field(s, node.fields.data[j].name, field_type, struct_size)
+            struct_size += field_size
         }
+        s.size = align_up(struct_size, struct_align)
         a = add_struct_info(e, array_layout_name(node.name), 24)
         add_field(a, "data", type_info("ptr", node.name), 0)
         add_field(a, "len", type_i64(), 8)
@@ -577,6 +610,68 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
         ret type_info("ptr", sema_pointer_element(expr.resolved_type))
     }
     ret emitter_type(e, expr.resolved_type)
+}
+fun type_register(reg: i64, typ: TypeInfo): AsmOperand {
+    ret asm_register(reg, type_width(typ))
+}
+fun emit_widen_register(e: EmitterState, reg: i64, source: TypeInfo, target: TypeInfo): i64 {
+    let source_width = type_width(source)
+    let target_width = type_width(target)
+    if source_width >= target_width {
+        ret 0
+    }
+    let source_reg = asm_register(reg, source_width)
+    if type_is_signed(source) == 1 {
+        if source_width == 32 && target_width == 64 {
+            asm_movsxd(e.program, asm_register(reg, 64), asm_register(reg, 32))
+        } else {
+            asm_movsx(e.program, asm_register(reg, target_width), source_reg)
+        }
+    } else {
+        if source_width == 32 {
+            asm_mov(e.program, asm_register(reg, 32), asm_register(reg, 32))
+        } else {
+            asm_movzx(e.program, asm_register(reg, 32), source_reg)
+        }
+    }
+    ret 0
+}
+fun find_func_info(e: EmitterState, name: str): FuncInfo {
+    for i: 0:len(e.funcs) {
+        if e.funcs.data[i].name == name {
+            ret e.funcs.data[i]
+        }
+    }
+    die("internal: checked function has no codegen signature")
+    ret new FuncInfo
+}
+fun emit_widen_rax(e: EmitterState, source: TypeInfo, target: TypeInfo): i64 {
+    ret emit_widen_register(e, 0, source, target)
+}
+fun emit_coerce_rax(e: EmitterState, source: TypeInfo, target: TypeInfo): i64 {
+    if (type_is_integer(source) == 1 || source.kind == "bool") && type_is_integer(target) == 1 {
+        emit_widen_rax(e, source, target)
+    }
+    ret 0
+}
+fun emit_test_rax(e: EmitterState, typ: TypeInfo): i64 {
+    let reg = type_register(0, typ)
+    asm_test(e.program, reg, reg)
+    ret 0
+}
+fun emit_expr_as(e: EmitterState, expr: AstExpr, target: TypeInfo): i64 {
+    let source = expr_type(e, expr)
+    emit_expr(e, expr)
+    emit_coerce_rax(e, source, target)
+    ret 0
+}
+fun emit_stack_store_value(e: EmitterState, slot: i64, reg: i64, typ: TypeInfo): i64 {
+    asm_mov(e.program, asm_operand_width(asm_mem_base(0, asm_rbp(), slot), type_width(typ)), type_register(reg, typ))
+    ret 0
+}
+fun emit_stack_load_value(e: EmitterState, reg: i64, slot: i64, typ: TypeInfo): i64 {
+    asm_mov(e.program, type_register(reg, typ), asm_operand_width(asm_mem_base(0, asm_rbp(), slot), type_width(typ)))
+    ret 0
 }
 fun pre_scan_expr(e: EmitterState, expr: AstExpr): void {
     match expr.kind {
@@ -743,8 +838,23 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     }
     ret 0
 }
+fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
+    let slots = new i64[]
+    let i = 0
+    while i < len(args) {
+        emit_expr_as(e, args.data[i], emitter_type(e, info.params.data[i].type_name))
+        push(slots, temp_save_rax(e))
+        i += 1
+    }
+    ret slots
+}
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
+    if expr.type_name == "" && sema_is_integer(name) == 1 {
+        emit_expr(e, expr.args.data[0])
+        emit_coerce_rax(e, expr_type(e, expr.args.data[0]), type_integer(name))
+        ret 0
+    }
     let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
     if sys_symbol != "" {
         let slots = new i64[]
@@ -753,6 +863,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             let arg = expr.args.data[i]
             let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
+            if arg_type.kind == "u8" || arg_type.kind == "bool" {
+                emit_widen_rax(e, arg_type, type_i64())
+            }
             if arg_type.kind == "str" {
                 asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
             }
@@ -779,7 +892,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         ret 0
     }
     if expr.type_name == "" && name == "exit" {
-        emit_expr(e, expr.args.data[0])
+        emit_expr_as(e, expr.args.data[0], type_i64())
         asm_mov(e.program, asm_ecx(), asm_eax())
         emit_call_inst(e, "ExitProcess")
         ret 0
@@ -807,15 +920,18 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         ret 0
     }
     if name == "itoa" {
-        emit_expr(e, expr.args.data[0])
+        emit_expr_as(e, expr.args.data[0], type_i64())
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_call_inst(e, "_itoa")
         ret 0
     }
     if name == "str_new" {
-        let str_new_slots = spill_args(e, expr.args)
-        emit_stack_load(e, asm_rcx(), str_new_slots.data[0])
-        emit_stack_load(e, asm_rdx(), str_new_slots.data[1])
+        emit_expr(e, expr.args.data[0])
+        let str_new_ptr = temp_save_rax(e)
+        emit_expr_as(e, expr.args.data[1], type_i64())
+        let str_new_len = temp_save_rax(e)
+        emit_stack_load(e, asm_rcx(), str_new_ptr)
+        emit_stack_load(e, asm_rdx(), str_new_len)
         emit_call_inst(e, "_str_alloc")
         ret 0
     }
@@ -831,10 +947,15 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         ret 0
     }
     if name == "str_slice" {
-        let slice_slots = spill_args(e, expr.args)
-        emit_stack_load(e, asm_rcx(), slice_slots.data[0])
-        emit_stack_load(e, asm_rdx(), slice_slots.data[1])
-        emit_stack_load(e, asm_r8(), slice_slots.data[2])
+        emit_expr(e, expr.args.data[0])
+        let slice_str = temp_save_rax(e)
+        emit_expr_as(e, expr.args.data[1], type_i64())
+        let slice_start = temp_save_rax(e)
+        emit_expr_as(e, expr.args.data[2], type_i64())
+        let slice_end = temp_save_rax(e)
+        emit_stack_load(e, asm_rcx(), slice_str)
+        emit_stack_load(e, asm_rdx(), slice_start)
+        emit_stack_load(e, asm_r8(), slice_end)
         asm_sub(e.program, asm_rsp(), asm_imm(32))
         emit_call_inst(e, "_str_slice")
         asm_add(e.program, asm_rsp(), asm_imm(32))
@@ -863,6 +984,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     if name == "pop" {
         let pop_arr_type = expr_type(e, expr.args.data[0])
         let pop_elem = pop_arr_type.name
+        let pop_type = emitter_type(e, pop_elem)
+        let pop_size = type_storage_size(pop_type)
+        let pop_width = type_width(pop_type)
         emit_expr(e, expr.args.data[0])
         let pop_arr_slot = temp_save_rax(e)
         emit_stack_load(e, asm_rax(), pop_arr_slot)
@@ -872,22 +996,16 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         asm_dec(e.program, asm_rcx())
         asm_mov(e.program, asm_mem_base(0, asm_rax(), 8), asm_rcx())
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
-        if pop_elem == "u8" {
-            asm_movzx(e.program, asm_eax(), asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), 1, 0), 8))
-            asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), 1, 0), 8), asm_imm(0))
-        } else {
-            asm_mov(e.program, asm_rax(), asm_mem_indexed(asm_rdx(), asm_rcx(), 8, 0))
-            asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), 8, 0), 64), asm_imm(0))
-        }
+        asm_mov(e.program, asm_register(0, pop_width), asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), pop_size, 0), pop_width))
+        asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), pop_size, 0), pop_width), asm_imm(0))
         ret 0
     }
     if name == "push" {
         let arr_type = expr_type(e, expr.args.data[0])
         let elem = arr_type.name
-        let el_size = 8
-        if elem == "u8" {
-            el_size = 1
-        }
+        let elem_type = emitter_type(e, elem)
+        let el_size = type_storage_size(elem_type)
+        let el_width = type_width(elem_type)
         emit_expr(e, expr.args.data[0])
         let arr_slot = temp_save_rax(e)
         emit_expr(e, expr.args.data[1])
@@ -927,15 +1045,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_label_index(e, copy_loop)
         asm_cmp(e.program, asm_r10(), asm_r9())
         asm_jge(e.program, asm_symbol(copy_done))
-        if el_size == 1 {
-            asm_mov(e.program, asm_r11b(), asm_mem_indexed(asm_r8(), asm_r10(), 1, 0))
-            emit_stack_load(e, asm_rax(), new_data_slot)
-            asm_mov(e.program, asm_mem_indexed(asm_rax(), asm_r10(), 1, 0), asm_r11b())
-        } else {
-            asm_mov(e.program, asm_r11(), asm_mem_indexed(asm_r8(), asm_r10(), 8, 0))
-            emit_stack_load(e, asm_rax(), new_data_slot)
-            asm_mov(e.program, asm_mem_indexed(asm_rax(), asm_r10(), 8, 0), asm_r11())
-        }
+        asm_mov(e.program, asm_register(11, el_width), asm_operand_width(asm_mem_indexed(asm_r8(), asm_r10(), el_size, 0), el_width))
+        emit_stack_load(e, asm_rax(), new_data_slot)
+        asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rax(), asm_r10(), el_size, 0), el_width), asm_register(11, el_width))
         asm_inc(e.program, asm_r10())
         asm_jmp(e.program, asm_symbol(copy_loop))
         emit_label_index(e, copy_done)
@@ -947,11 +1059,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 0))
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
         emit_stack_load(e, asm_r8(), val_slot)
-        if el_size == 1 {
-            asm_mov(e.program, asm_mem_indexed(asm_rcx(), asm_rdx(), 1, 0), asm_r8b())
-        } else {
-            asm_mov(e.program, asm_mem_indexed(asm_rcx(), asm_rdx(), 8, 0), asm_r8())
-        }
+        asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rcx(), asm_rdx(), el_size, 0), el_width), asm_register(8, el_width))
         asm_inc(e.program, asm_mem_base(64, asm_rax(), 8))
         asm_xor(e.program, asm_eax(), asm_eax())
         ret 0
@@ -964,65 +1072,105 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         asm_xor(e.program, asm_eax(), asm_eax())
         ret 0
     }
-    let call_slots = spill_args(e, expr.args)
+    let call_slots = spill_typed_args(e, expr.args, find_func_info(e, name))
     load_spilled_args(e, call_slots)
     asm_sub(e.program, asm_rsp(), asm_imm(32))
     emit_call_inst(e, name)
     asm_add(e.program, asm_rsp(), asm_imm(32))
     ret 0
 }
-fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64): i64 {
+fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, typ: TypeInfo): i64 {
     emit_stack_load(e, asm_rcx(), right_slot)
+    let width = type_width(typ)
+    let left_reg = asm_register(0, width)
+    let right_reg = asm_register(1, width)
     match op {
         OperatorKind.Add {
-            asm_add(e.program, asm_rax(), asm_rcx())
+            asm_add(e.program, left_reg, right_reg)
         }
         OperatorKind.Subtract {
-            asm_sub(e.program, asm_rax(), asm_rcx())
+            asm_sub(e.program, left_reg, right_reg)
         }
         OperatorKind.Multiply {
-            asm_imul(e.program, asm_rax(), asm_rcx())
+            if width == 8 {
+                asm_imul(e.program, asm_eax(), asm_ecx())
+            } else {
+                asm_imul(e.program, left_reg, right_reg)
+            }
         }
         OperatorKind.Divide {
-            asm_cqo(e.program)
-            asm_idiv(e.program, asm_rcx())
+            if type_is_signed(typ) == 1 {
+                emit_widen_register(e, 0, typ, type_i64())
+                emit_widen_register(e, 1, typ, type_i64())
+                if width == 64 {
+                    let divide_normal = fresh_label(e)
+                    let divide_done = fresh_label(e)
+                    asm_mov(e.program, asm_rdx(), asm_imm(-9223372036854775807 - 1))
+                    asm_cmp(e.program, asm_rax(), asm_rdx())
+                    asm_jne(e.program, asm_symbol(divide_normal))
+                    asm_cmp(e.program, asm_rcx(), asm_imm(-1))
+                    asm_jne(e.program, asm_symbol(divide_normal))
+                    asm_jmp(e.program, asm_symbol(divide_done))
+                    emit_label_index(e, divide_normal)
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                    emit_label_index(e, divide_done)
+                } else {
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                }
+            } else {
+                emit_widen_register(e, 0, typ, type_integer("u64"))
+                emit_widen_register(e, 1, typ, type_integer("u64"))
+                asm_xor(e.program, asm_edx(), asm_edx())
+                asm_div(e.program, asm_rcx())
+            }
         }
         OperatorKind.Remainder {
-            asm_cqo(e.program)
-            asm_idiv(e.program, asm_rcx())
+            if type_is_signed(typ) == 1 {
+                emit_widen_register(e, 0, typ, type_i64())
+                emit_widen_register(e, 1, typ, type_i64())
+                if width == 64 {
+                    let remainder_normal = fresh_label(e)
+                    let remainder_done = fresh_label(e)
+                    asm_mov(e.program, asm_rdx(), asm_imm(-9223372036854775807 - 1))
+                    asm_cmp(e.program, asm_rax(), asm_rdx())
+                    asm_jne(e.program, asm_symbol(remainder_normal))
+                    asm_cmp(e.program, asm_rcx(), asm_imm(-1))
+                    asm_jne(e.program, asm_symbol(remainder_normal))
+                    asm_xor(e.program, asm_edx(), asm_edx())
+                    asm_jmp(e.program, asm_symbol(remainder_done))
+                    emit_label_index(e, remainder_normal)
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                    emit_label_index(e, remainder_done)
+                } else {
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                }
+            } else {
+                emit_widen_register(e, 0, typ, type_integer("u64"))
+                emit_widen_register(e, 1, typ, type_integer("u64"))
+                asm_xor(e.program, asm_edx(), asm_edx())
+                asm_div(e.program, asm_rcx())
+            }
             asm_mov(e.program, asm_rax(), asm_rdx())
         }
         OperatorKind.BitAnd {
-            asm_and(e.program, asm_rax(), asm_rcx())
+            asm_and(e.program, left_reg, right_reg)
         }
         OperatorKind.BitOr {
-            asm_or(e.program, asm_rax(), asm_rcx())
+            asm_or(e.program, left_reg, right_reg)
         }
         OperatorKind.ShiftLeft {
-            let count_ok = fresh_label(e)
-            let count_bad = fresh_label(e)
-            asm_cmp(e.program, asm_rcx(), asm_imm(0))
-            asm_jl(e.program, asm_symbol(count_bad))
-            asm_cmp(e.program, asm_rcx(), asm_imm(64))
-            asm_jl(e.program, asm_symbol(count_ok))
-            emit_label_index(e, count_bad)
-            asm_mov(e.program, asm_ecx(), asm_imm(1))
-            emit_call_inst(e, "ExitProcess")
-            emit_label_index(e, count_ok)
-            asm_shl(e.program, asm_rax(), asm_cl())
+            asm_shl(e.program, left_reg, asm_cl())
         }
         OperatorKind.ShiftRight {
-            let shift_right_ok = fresh_label(e)
-            let shift_right_bad = fresh_label(e)
-            asm_cmp(e.program, asm_rcx(), asm_imm(0))
-            asm_jl(e.program, asm_symbol(shift_right_bad))
-            asm_cmp(e.program, asm_rcx(), asm_imm(64))
-            asm_jl(e.program, asm_symbol(shift_right_ok))
-            emit_label_index(e, shift_right_bad)
-            asm_mov(e.program, asm_ecx(), asm_imm(1))
-            emit_call_inst(e, "ExitProcess")
-            emit_label_index(e, shift_right_ok)
-            asm_sar(e.program, asm_rax(), asm_cl())
+            if type_is_signed(typ) == 1 {
+                asm_sar(e.program, left_reg, asm_cl())
+            } else {
+                asm_shr(e.program, left_reg, asm_cl())
+            }
         } else {
             die("internal: operator is not an integer value operator")
             ret 0
@@ -1044,9 +1192,22 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     }
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
+    let operand_type = left_type
+    if sema_legacy_i64_pair(left_type.kind, right_type.kind) == 1 {
+        operand_type = type_i64()
+    }
+    if (left_type.kind == "bool" && right_type.kind == "i64") || (left_type.kind == "i64" && right_type.kind == "bool") {
+        operand_type = type_i64()
+    }
     emit_expr(e, expr.right)
+    if type_width(right_type) < type_width(operand_type) {
+        emit_widen_rax(e, right_type, operand_type)
+    }
     let tmp = temp_save_rax(e)
     emit_expr(e, expr.left)
+    if type_width(left_type) < type_width(operand_type) {
+        emit_widen_rax(e, left_type, operand_type)
+    }
     if expr.op == OperatorKind.Add && left_type.kind == "str" && right_type.kind == "str" {
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_stack_load(e, asm_rdx(), tmp)
@@ -1068,72 +1229,83 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         } else {
             asm_setne(e.program, asm_al())
         }
-        asm_movzx(e.program, asm_eax(), asm_al())
         ret 0
     }
     match expr.op {
         OperatorKind.Add {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.Subtract {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.Multiply {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.Divide {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.Remainder {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.BitAnd {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.BitOr {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, operand_type)
         }
         OperatorKind.ShiftLeft {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, left_type)
         }
         OperatorKind.ShiftRight {
-            ret emit_integer_value_op(e, expr.op, tmp)
+            ret emit_integer_value_op(e, expr.op, tmp, left_type)
         }
         OperatorKind.Equal {
             emit_stack_load(e, asm_rcx(), tmp)
-            asm_cmp(e.program, asm_rax(), asm_rcx())
+            let equal_width = type_width(operand_type)
+            asm_cmp(e.program, asm_register(0, equal_width), asm_register(1, equal_width))
             asm_sete(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
         }
         OperatorKind.NotEqual {
             emit_stack_load(e, asm_rcx(), tmp)
-            asm_cmp(e.program, asm_rax(), asm_rcx())
+            let not_equal_width = type_width(operand_type)
+            asm_cmp(e.program, asm_register(0, not_equal_width), asm_register(1, not_equal_width))
             asm_setne(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
         }
         OperatorKind.Less {
             emit_stack_load(e, asm_rcx(), tmp)
-            asm_cmp(e.program, asm_rax(), asm_rcx())
-            asm_setl(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) == 1 {
+                asm_setl(e.program, asm_al())
+            } else {
+                asm_setb(e.program, asm_al())
+            }
         }
         OperatorKind.LessEqual {
             emit_stack_load(e, asm_rcx(), tmp)
-            asm_cmp(e.program, asm_rax(), asm_rcx())
-            asm_setle(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) == 1 {
+                asm_setle(e.program, asm_al())
+            } else {
+                asm_setbe(e.program, asm_al())
+            }
         }
         OperatorKind.Greater {
             emit_stack_load(e, asm_rcx(), tmp)
-            asm_cmp(e.program, asm_rax(), asm_rcx())
-            asm_setg(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) == 1 {
+                asm_setg(e.program, asm_al())
+            } else {
+                asm_seta(e.program, asm_al())
+            }
         }
         OperatorKind.GreaterEqual {
             emit_stack_load(e, asm_rcx(), tmp)
-            asm_cmp(e.program, asm_rax(), asm_rcx())
-            asm_setge(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) == 1 {
+                asm_setge(e.program, asm_al())
+            } else {
+                asm_setae(e.program, asm_al())
+            }
         } else {
             die("internal: operator reached eager binary lowering")
             ret 0
@@ -1143,14 +1315,14 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
 }
 fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
     emit_expr(e, expr.left)
+    let operand_type = expr_type(e, expr.left)
     match expr.op {
         OperatorKind.Negate {
-            asm_neg(e.program, asm_rax())
+            asm_neg(e.program, type_register(0, operand_type))
         }
         OperatorKind.LogicalNot {
-            asm_test(e.program, asm_rax(), asm_rax())
+            emit_test_rax(e, operand_type)
             asm_sete(e.program, asm_al())
-            asm_movzx(e.program, asm_eax(), asm_al())
         } else {
             die("internal: binary operator used by unary expression")
             ret 0
@@ -1161,9 +1333,22 @@ fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
 fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
+    let operand_type = left_type
+    if sema_legacy_i64_pair(left_type.kind, right_type.kind) == 1 {
+        operand_type = type_i64()
+    }
+    if (left_type.kind == "bool" && right_type.kind == "i64") || (left_type.kind == "i64" && right_type.kind == "bool") {
+        operand_type = type_i64()
+    }
     emit_expr(e, expr.right)
+    if type_width(right_type) < type_width(operand_type) {
+        emit_widen_rax(e, right_type, operand_type)
+    }
     let tmp = temp_save_rax(e)
     emit_expr(e, expr.left)
+    if type_width(left_type) < type_width(operand_type) {
+        emit_widen_rax(e, left_type, operand_type)
+    }
     if (expr.op == OperatorKind.Equal || expr.op == OperatorKind.NotEqual) && left_type.kind == "str" && right_type.kind == "str" {
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 0))
         emit_stack_load(e, asm_rax(), tmp)
@@ -1174,7 +1359,8 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         asm_cmp(e.program, asm_eax(), asm_imm(0))
     } else {
         emit_stack_load(e, asm_rcx(), tmp)
-        asm_cmp(e.program, asm_rax(), asm_rcx())
+        let comparison_width = type_width(operand_type)
+        asm_cmp(e.program, asm_register(0, comparison_width), asm_register(1, comparison_width))
     }
     let target = asm_symbol(label)
     match expr.op {
@@ -1193,31 +1379,63 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
             }
         }
         OperatorKind.Less {
-            if jump_if_true == 1 {
-                asm_jl(e.program, target)
+            if type_is_signed(operand_type) == 1 {
+                if jump_if_true == 1 {
+                    asm_jl(e.program, target)
+                } else {
+                    asm_jge(e.program, target)
+                }
             } else {
-                asm_jge(e.program, target)
+                if jump_if_true == 1 {
+                    asm_jb(e.program, target)
+                } else {
+                    asm_jae(e.program, target)
+                }
             }
         }
         OperatorKind.LessEqual {
-            if jump_if_true == 1 {
-                asm_jle(e.program, target)
+            if type_is_signed(operand_type) == 1 {
+                if jump_if_true == 1 {
+                    asm_jle(e.program, target)
+                } else {
+                    asm_jg(e.program, target)
+                }
             } else {
-                asm_jg(e.program, target)
+                if jump_if_true == 1 {
+                    asm_jbe(e.program, target)
+                } else {
+                    asm_ja(e.program, target)
+                }
             }
         }
         OperatorKind.Greater {
-            if jump_if_true == 1 {
-                asm_jg(e.program, target)
+            if type_is_signed(operand_type) == 1 {
+                if jump_if_true == 1 {
+                    asm_jg(e.program, target)
+                } else {
+                    asm_jle(e.program, target)
+                }
             } else {
-                asm_jle(e.program, target)
+                if jump_if_true == 1 {
+                    asm_ja(e.program, target)
+                } else {
+                    asm_jbe(e.program, target)
+                }
             }
         }
         OperatorKind.GreaterEqual {
-            if jump_if_true == 1 {
-                asm_jge(e.program, target)
+            if type_is_signed(operand_type) == 1 {
+                if jump_if_true == 1 {
+                    asm_jge(e.program, target)
+                } else {
+                    asm_jl(e.program, target)
+                }
             } else {
-                asm_jl(e.program, target)
+                if jump_if_true == 1 {
+                    asm_jae(e.program, target)
+                } else {
+                    asm_jb(e.program, target)
+                }
             }
         } else {
             die("internal: non-comparison used by comparison jump")
@@ -1228,7 +1446,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
 }
 fun emit_value_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
     emit_expr(e, expr)
-    asm_test(e.program, asm_rax(), asm_rax())
+    emit_test_rax(e, expr_type(e, expr))
     if jump_if_true == 1 {
         asm_jnz(e.program, asm_symbol(label))
     } else {
@@ -1414,10 +1632,7 @@ fun emit_new(e: EmitterState, expr: AstExpr): i64 {
 }
 fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     let elem = expr.type_name
-    let el_size = 8
-    if elem == "u8" {
-        el_size = 1
-    }
+    let el_size = type_storage_size(emitter_type(e, elem))
     let header_slot = 0
     asm_mov(e.program, asm_ecx(), asm_imm(24))
     asm_sub(e.program, asm_rsp(), asm_imm(40))
@@ -1499,36 +1714,29 @@ fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): Type
     emit_expr(e, base)
     let base_slot = temp_save_rax(e)
     emit_expr(e, index)
+    let index_type = expr_type(e, index)
+    emit_widen_rax(e, index_type, type_integer("u64"))
     emit_stack_load(e, asm_rcx(), base_slot)
     if base_type.kind == "str" || base_type.kind == "array" {
-        asm_test(e.program, asm_rax(), asm_rax())
-        asm_jl(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
+        if type_is_signed(index_type) == 1 {
+            asm_test(e.program, asm_rax(), asm_rax())
+            asm_jl(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
+        }
         asm_cmp(e.program, asm_rax(), asm_mem_base(0, asm_rcx(), 8))
-        asm_jge(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
+        asm_jae(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rcx(), 0))
     }
-    if type_is_u8(elem_type) == 1 {
-        asm_lea(e.program, asm_rax(), asm_mem_indexed(asm_rcx(), asm_rax(), 1, 0))
-    } else {
-        asm_lea(e.program, asm_rax(), asm_mem_indexed(asm_rcx(), asm_rax(), 8, 0))
-    }
+    asm_lea(e.program, asm_rax(), asm_mem_indexed(asm_rcx(), asm_rax(), type_storage_size(elem_type), 0))
     ret elem_type
 }
 fun emit_load_address(e: EmitterState, value_type: TypeInfo): i64 {
-    if type_is_u8(value_type) == 1 {
-        asm_movzx(e.program, asm_rax(), asm_mem_base(8, asm_rax(), 0))
-    } else {
-        asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
-    }
+    let width = type_width(value_type)
+    asm_mov(e.program, type_register(0, value_type), asm_mem_base(width, asm_rax(), 0))
     ret 0
 }
 fun emit_store_address(e: EmitterState, value_type: TypeInfo, address_slot: i64): i64 {
     emit_stack_load(e, asm_rcx(), address_slot)
-    if type_is_u8(value_type) == 1 {
-        asm_mov(e.program, asm_mem_base(0, asm_rcx(), 0), asm_al())
-    } else {
-        asm_mov(e.program, asm_mem_base(0, asm_rcx(), 0), asm_rax())
-    }
+    asm_mov(e.program, asm_mem_base(type_width(value_type), asm_rcx(), 0), type_register(0, value_type))
     ret 0
 }
 fun emit_local_address(e: EmitterState, name: str): TypeInfo {
@@ -1558,12 +1766,13 @@ fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
 fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
     let elem_type = emit_subscript_address(e, expr.base, expr.index)
     emit_load_address(e, elem_type)
+    emit_coerce_rax(e, elem_type, expr_type(e, expr))
     ret 0
 }
 fun emit_expr(e: EmitterState, expr: AstExpr): void {
     match expr.kind {
         AstExprKind.Literal {
-            asm_mov(e.program, asm_rax(), asm_imm(parse_integer(expr.value)))
+            asm_mov(e.program, type_register(0, expr_type(e, expr)), asm_imm(expr.resolved_value))
             ret
         }
         AstExprKind.String {
@@ -1583,10 +1792,9 @@ fun emit_expr(e: EmitterState, expr: AstExpr): void {
         AstExprKind.Var {
             if expr.name == "argv" {
                 asm_mov(e.program, asm_rax(), asm_mem_symbol(0, named_symbol(e, "_argv"), 0))
-            } else if type_is_u8(find_local_type(e, expr.name)) == 1 {
-                asm_movzx(e.program, asm_rax(), asm_mem_base(8, asm_rbp(), find_local_slot(e, expr.name)))
             } else {
-                emit_stack_load(e, asm_rax(), find_local_slot(e, expr.name))
+                let local_type = find_local_type(e, expr.name)
+                emit_stack_load_value(e, 0, find_local_slot(e, expr.name), local_type)
             }
             ret
         }
@@ -1637,6 +1845,7 @@ fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
             }
             AstExprOptionKind.Some {
                 emit_expr(e, stmt.return_value.value)
+                emit_coerce_rax(e, expr_type(e, stmt.return_value.value), type_i64())
                 asm_mov(e.program, asm_ecx(), asm_eax())
             }
         }
@@ -1647,9 +1856,7 @@ fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
             }
             AstExprOptionKind.Some {
                 emit_expr(e, stmt.return_value.value)
-                if type_is_u8(e.current_ret_type) == 1 {
-                    asm_movzx(e.program, asm_eax(), asm_al())
-                }
+                emit_coerce_rax(e, expr_type(e, stmt.return_value.value), e.current_ret_type)
             }
         }
         asm_jmp(e.program, asm_symbol(e.current_ep_id))
@@ -1658,11 +1865,8 @@ fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
 }
 fun emit_let(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.value_expr)
-    if type_is_u8(find_local_type(e, stmt.name)) == 1 {
-        emit_stack_store(e, find_local_slot(e, stmt.name), asm_al())
-    } else {
-        emit_stack_store(e, find_local_slot(e, stmt.name), asm_rax())
-    }
+    let local_type = find_local_type(e, stmt.name)
+    emit_stack_store_value(e, find_local_slot(e, stmt.name), 0, local_type)
     ret 0
 }
 fun emit_assign_target_address(e: EmitterState, target: AstAssignTarget): TypeInfo {
@@ -1682,6 +1886,7 @@ fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     let target_type = emit_assign_target_address(e, stmt.target)
     let address_slot = temp_save_rax(e)
     emit_expr(e, stmt.value_expr)
+    emit_coerce_rax(e, expr_type(e, stmt.value_expr), target_type)
     emit_store_address(e, target_type, address_slot)
     ret 0
 }
@@ -1693,8 +1898,13 @@ fun emit_assign_op(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.value_expr)
     let right_slot = temp_save_rax(e)
     emit_stack_load(e, asm_rax(), old_value_slot)
-    emit_integer_value_op(e, stmt.op, right_slot)
+    emit_integer_value_op(e, stmt.op, right_slot, target_type)
     emit_store_address(e, target_type, address_slot)
+    ret 0
+}
+fun emit_block_as(e: EmitterState, block: AstBlock, target: TypeInfo): i64 {
+    emit_block(e, block)
+    emit_coerce_rax(e, emitter_type(e, block.resolved_type), target)
     ret 0
 }
 fun emit_if(e: EmitterState, expr: AstExpr): i64 {
@@ -1702,13 +1912,13 @@ fun emit_if(e: EmitterState, expr: AstExpr): i64 {
     let end_id = fresh_label(e)
     if !expr.else_block.present {
         emit_cond_jump(e, expr.condition, 0, end_id)
-        emit_block(e, expr.then_block)
+        emit_block_as(e, expr.then_block, expr_type(e, expr))
     } else {
         emit_cond_jump(e, expr.condition, 0, else_id)
-        emit_block(e, expr.then_block)
+        emit_block_as(e, expr.then_block, expr_type(e, expr))
         asm_jmp(e.program, asm_symbol(end_id))
         emit_label_index(e, else_id)
-        emit_block(e, expr.else_block)
+        emit_block_as(e, expr.else_block, expr_type(e, expr))
     }
     emit_label_index(e, end_id)
     ret 0
@@ -1758,7 +1968,7 @@ fun emit_match(e: EmitterState, expr: AstExpr): i64 {
     for i: 0:len(expr.match_arms) {
         let arm = expr.match_arms.data[i]
         if arm.is_else == 1 {
-            emit_block(e, arm.body)
+            emit_block_as(e, arm.body, expr_type(e, expr))
             asm_jmp(e.program, asm_symbol(end_id))
         } else {
             let next_id = fresh_label(e)
@@ -1766,7 +1976,7 @@ fun emit_match(e: EmitterState, expr: AstExpr): i64 {
             asm_mov(e.program, asm_rcx(), asm_imm(arm.value))
             asm_cmp(e.program, asm_rax(), asm_rcx())
             asm_jne(e.program, asm_symbol(next_id))
-            emit_block(e, arm.body)
+            emit_block_as(e, arm.body, expr_type(e, expr))
             asm_jmp(e.program, asm_symbol(end_id))
             emit_label_index(e, next_id)
         }
@@ -1869,34 +2079,25 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
         asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_argv"), 0), asm_rax())
     }
     if len(fn.params) > 0 {
-        if type_is_u8(find_local_type(e, fn.params.data[0].name)) == 1 {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), asm_cl())
-        } else {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), asm_rcx())
-        }
+        let param0_type = find_local_type(e, fn.params.data[0].name)
+        emit_stack_store_value(e, find_local_slot(e, fn.params.data[0].name), 1, param0_type)
     }
     if len(fn.params) > 1 {
-        if type_is_u8(find_local_type(e, fn.params.data[1].name)) == 1 {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), asm_dl())
-        } else {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), asm_rdx())
-        }
+        let param1_type = find_local_type(e, fn.params.data[1].name)
+        emit_stack_store_value(e, find_local_slot(e, fn.params.data[1].name), 2, param1_type)
     }
     if len(fn.params) > 2 {
-        if type_is_u8(find_local_type(e, fn.params.data[2].name)) == 1 {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), asm_r8b())
-        } else {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), asm_r8())
-        }
+        let param2_type = find_local_type(e, fn.params.data[2].name)
+        emit_stack_store_value(e, find_local_slot(e, fn.params.data[2].name), 8, param2_type)
     }
     if len(fn.params) > 3 {
-        if type_is_u8(find_local_type(e, fn.params.data[3].name)) == 1 {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), asm_r9b())
-        } else {
-            emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), asm_r9())
-        }
+        let param3_type = find_local_type(e, fn.params.data[3].name)
+        emit_stack_store_value(e, find_local_slot(e, fn.params.data[3].name), 9, param3_type)
     }
     emit_block(e, fn.body)
+    if fn.name != "main" {
+        emit_coerce_rax(e, emitter_type(e, fn.body.resolved_type), e.current_ret_type)
+    }
     if fn.name == "main" {
         asm_mov(e.program, asm_ecx(), asm_imm(0))
         emit_call_inst(e, "ExitProcess")

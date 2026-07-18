@@ -1,7 +1,7 @@
 #
 # Epic lexer.
 #
-type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | WHILE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
+type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | WHILE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | TRUE | FALSE | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
 type Token {
     kind: TokenKind
     text: str
@@ -35,56 +35,6 @@ fun is_digit(c: i64): i64 {
 }
 fun is_hex_digit(c: i64): i64 {
     ret digit_value(c) >= 0
-}
-fun decimal_literal_fits_i64(text: str): i64 {
-    let start = 0
-    while start + 1 < len(text) && text.data[start] == 48 {
-        start += 1
-    }
-    let digits = len(text) - start
-    if digits < 19 {
-        ret 1
-    }
-    if digits > 19 {
-        ret 0
-    }
-    let limit = "9223372036854775807"
-    for i: 0:19 {
-        let value = text.data[start + i]
-        let maximum = limit.data[i]
-        if value < maximum {
-            ret 1
-        }
-        if value > maximum {
-            ret 0
-        }
-    }
-    ret 1
-}
-fun hex_literal_fits_i64(text: str): i64 {
-    let start = 2
-    while start + 1 < len(text) && text.data[start] == 48 {
-        start += 1
-    }
-    let digits = len(text) - start
-    if digits < 16 {
-        ret 1
-    }
-    if digits > 16 {
-        ret 0
-    }
-    ret text.data[start] <= 55
-}
-fun reject_large_literal(text: str, hex: i64): i64 {
-    let fits = decimal_literal_fits_i64(text)
-    if hex == 1 {
-        fits = hex_literal_fits_i64(text)
-    }
-    if !fits {
-        print("integer literal is out of i64 range\n")
-        os.ExitProcess(1)
-    }
-    ret 0
 }
 fun identifier_kind(text: str): TokenKind {
     if text == "fun" {
@@ -122,6 +72,12 @@ fun identifier_kind(text: str): TokenKind {
     }
     if text == "match" {
         ret TokenKind.MATCH
+    }
+    if text == "true" {
+        ret TokenKind.TRUE
+    }
+    if text == "false" {
+        ret TokenKind.FALSE
     }
     ret TokenKind.ID
 }
@@ -260,8 +216,10 @@ fun lex(src: str): Token[] {
                     pos += 1
                 }
             }
+            while pos < n && is_alnum(p[pos]) == 1 {
+                pos += 1
+            }
             let number_text = str_new(p + number_start, pos - number_start)
-            reject_large_literal(number_text, hex)
             push_token(tokens, TokenKind.NUMBER, number_text, number_line)
             continue
         }

@@ -1,4 +1,4 @@
-# ERROR: unary operator - requires i64 operand, got UnaryMinusKind
+# ERROR: unary operator - requires a signed integer operand, got UnaryMinusKind
 type UnaryMinusKind = First | Second
 fun main(): void {
     let value = -UnaryMinusKind.First

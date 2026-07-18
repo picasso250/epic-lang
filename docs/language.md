@@ -59,6 +59,18 @@ not use. The user-visible language changes introduced in v3 are:
   removed. Code that needs byte replacement must perform it explicitly, for
   example by copying with `bytes`, mutating the byte array, and constructing a
   new string with `str_new`.
+- distinct `bool` values with `true` and `false`, plus `i8`, `u8`, `i16`,
+  `u16`, `i32`, `u32`, `i64`, and `u64` integers;
+- integer suffixes such as `42u32`, contextual unsuffixed literals, explicit
+  integer conversions such as `i64(byte)`, compact fields and arrays, and
+  width- and signedness-correct arithmetic, comparisons, shifts, and loads.
+
+The v3 compiler implementation itself stays within the v2-era integer surface.
+The v4 compiler is the dogfood target for the new bool and integer types. During
+that migration, v3 retains the old `u8`/`i64` assignment and expression bridge,
+and accepts legacy `i64` or `u8` conditions. New code should use matching
+integer operands, explicit conversions, and `bool` conditions; the bridge is
+not a forward-compatibility promise.
 
 The v3 compiler source also dogfoods the v2 foundations: unit enums and
 exhaustive matching, compound assignment, unary operators, integer range loops,
@@ -114,8 +126,9 @@ arrays. The complete set of user-facing types is:
 
 | Type | Meaning |
 | --- | --- |
-| `i64` | signed 64-bit integer |
-| `u8` | unsigned byte storage; reads zero-extend to `i64` |
+| `bool` | distinct truth value, written `true` or `false` |
+| `i8`, `i16`, `i32`, `i64` | signed integers of the stated width |
+| `u8`, `u16`, `u32`, `u64` | unsigned integers of the stated width |
 | `str` | immutable heap string |
 | `Name` | heap-allocated product reference |
 | enum `Name` | nominal unit-enum value stored as a 64-bit scalar |
@@ -125,6 +138,10 @@ arrays. The complete set of user-facing types is:
 At the language level, `str`, user products, and dynamic arrays have reference
 semantics. Assignment and parameter passing copy references, not object
 contents. There is no by-value product or array copy semantics in v1.
+
+Integer and bool product fields use natural alignment and occupy 1, 2, 4, or 8
+bytes. Integer and bool array elements use their exact storage size and stride.
+Locals and parameters remain in 8-byte stack slots as an implementation detail.
 
 ### Strings
 
@@ -199,10 +216,8 @@ let value = if ready {
 ```
 
 The first branch has type `i64`, the second has type `never`, and the complete
-`if` therefore has type `i64`. Expression types do not change merely because a
-result is later discarded. If a final value-producing call is intended only for
-its side effects inside a block whose value matters, bind it to an ignored local
-or otherwise end the block with a compatible value-producing expression.
+`if` therefore has type `i64`. In statement or `void` context, block tail values
+are evaluated and discarded instead of being joined into a result.
 
 ## Functions
 
@@ -366,8 +381,8 @@ must appear exactly once. With `else`, explicit arms may cover a strict subset;
 an `else` after all members is rejected as unreachable and must be the final
 arm. Arms execute in source order, each arm body is a lexical block, and all arm
 block types must join. A `never` arm is compatible with the other arm values.
-The complete expression may also be used in statement position, but discarded
-results do not relax arm type checking.
+The complete expression may also be used in statement position; arm results are
+then discarded and do not need a common value type.
 
 v3 unit enums still have no payloads, guards, fallthrough, explicit
 discriminants, or enum-to-integer conversions. Declaration order determines the
@@ -385,25 +400,23 @@ buffer[index] <<= 2
 ```
 
 The complete set is `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `<<=`,
-and `>>=`. The target storage type must be `i64` or `u8`. Strings, products,
+and `>>=`. The target storage type must be an integer. Strings, products,
 arrays, and pointers themselves do not support compound assignment. An integer
 element reached through an array or pointer remains a valid target.
 
-For `u8`, the old value is zero-extended to `i64`, the operation is performed
-as `i64`, and the low eight bits are stored. The left-value address is evaluated
-once, followed by its old value and then the right operand. Compound assignment
-is a statement and does not produce a value.
+The operation is performed at the target width and wraps modulo that width.
+Except for shifts, the right operand must have the same type as the target; a
+shift count may have any integer type. The left-value address is evaluated once,
+followed by its old value and then the right operand. Compound assignment is a
+statement and does not produce a value.
 
-## Literals and byte operations
+## Literals, conversions, and integer operations
 
-Unary `-` negates an `i64`. Logical `!` also requires `i64`, producing `1` for
-zero and `0` for every nonzero value. Unary operators bind more tightly than
-`*`, `/`, and `%` and may be chained, as in `--x` or `!!x`. Epic does not have
-unary `+` or bitwise `~` in v3.
-
-The lexer accepts only non-negative integer literal magnitudes through
-`9223372036854775807`. The minimum `i64` is therefore written as
-`-9223372036854775807 - 1` rather than as one larger literal magnitude.
+Unary `-` accepts signed integers and operates at their width. A directly
+negated literal may use the signed minimum, such as `-128i8`. Logical `!`
+accepts `bool`; the v3 migration bridge also accepts `i64` and `u8`. It returns
+`bool`. Unary operators bind more tightly than `*`, `/`, and `%` and may be
+chained. Epic has no unary `+` or bitwise `~` in v3.
 
 Supported escapes in string and character literals:
 
@@ -413,20 +426,31 @@ Supported escapes in string and character literals:
 
 String and character literals are ASCII-only in v0. Non-ASCII literals are compile errors.
 
-Integer literals are decimal or hexadecimal (`0x` / `0X`) and must fit the
-non-negative range of `i64`.
+Integer literals are decimal or hexadecimal (`0x` / `0X`). A suffix selects an
+exact type (`1i8`, `1u8`, `1i16`, `1u16`, `1i32`, `1u32`, `1i64`, or `1u64`);
+an unsuffixed literal takes its integer context and otherwise defaults to
+`i64`. Literal magnitudes are range-checked mathematically, so `0xffi8` is an
+error while `-1i8` is valid. The full `u64` literal range is accepted.
 
-Bit operations use `i64`. `<<` keeps the low 64 bits, `>>` is arithmetic, and
-shift counts outside `0..63` terminate the program. `u8` values are zero-extended
-before participating in `<<`, `>>`, `&`, or `|`.
+`T(value)` is the integer-conversion syntax. Widening sign- or zero-extends,
+narrowing keeps the low bits, and a same-width conversion preserves the bit
+pattern. Conversions do not perform runtime range checks: `u8(300)` is `44`,
+while the literal `300u8` is a compile error.
+
+Integer arithmetic and bitwise operators require matching operand types and
+return that type. They wrap at the type width. Comparisons operate at the
+original width and signedness and return `bool`; there is no automatic integer
+promotion. Shifts return the left type, accept any integer count type, use
+arithmetic right shift for signed values and logical right shift for unsigned
+values, and follow native AMD64 count masking without a runtime check (low 6
+bits for 64-bit values, low 5 bits for 8-, 16-, and 32-bit values).
 
 String lengths and indices count bytes, not Unicode characters.
 
-Arithmetic and bit operators require integer operands, except `str + str`.
-Ordering comparisons require integers. `==` and `!=` accept two integers, two
-strings, or two values of the same enum type; products and arrays have no
-implicit reference equality.
-`if` and `while` conditions require `i64`.
+`str + str` remains the non-integer addition case. `==` and `!=` additionally
+accept two bool values, two strings, or two values of the same enum type;
+products and arrays have no implicit reference equality. `if` and `while`
+conditions require `bool`, subject to the documented v3 migration bridge.
 
 ## System calls
 

@@ -1,0 +1,4 @@
+# COMPILE_ERROR: unary - requires a signed integer, got u8
+fun main(): void {
+    let value = -1u8
+}
