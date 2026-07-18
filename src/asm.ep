@@ -782,16 +782,16 @@ fun asm_force_rex8(op: AsmOperand): i64 {
     }
     return 0
 }
-fun asm_emit_opcode_rm(image: ExeImage, opcode: i64, reg: i64, rm: AsmOperand): i64 {
+fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperand): i64 {
     let base = rm.reg
     let index = -1
     if rm.kind == AsmOperandKind.Memory {
         base = rm.base
         index = rm.index
     }
-    asm_rex(image, asm_rex_bits(rm.width, reg, index, base), asm_force_rex8(rm))
+    asm_rex(image, asm_rex_bits(reg.width, reg.reg, index, base), asm_force_rex8(rm))
     asm_byte(image, opcode)
-    asm_emit_rm(image, reg, rm)
+    asm_emit_rm(image, reg.reg, rm)
     return 0
 }
 
@@ -825,8 +825,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         if width == 8 {
             opcode = 138
         }
-        src.width = width
-        asm_emit_opcode_rm(image, opcode, dst.reg, src)
+        asm_emit_reg_rm(image, opcode, dst, src)
         return 0
     }
     if dst.kind == AsmOperandKind.Memory && src.kind == AsmOperandKind.Register {
@@ -847,8 +846,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             immediate_opcode = 198
         }
         let reloc_count = len(image.relocs)
-        dst.width = width
-        asm_emit_opcode_rm(image, immediate_opcode, 0, dst)
+        asm_emit_group_default64(image, immediate_opcode, 0, dst)
         if len(image.relocs) > reloc_count {
             let reloc = image.relocs.data[reloc_count]
             if width == 8 {
@@ -872,8 +870,7 @@ fun asm_emit_lea(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     if dst.kind != AsmOperandKind.Register || src.kind != AsmOperandKind.Memory {
         asm_die("unsupported lea operands")
     }
-    src.width = dst.width
-    asm_emit_opcode_rm(image, 141, dst.reg, src)
+    asm_emit_reg_rm(image, 141, dst, src)
     return 0
 }
 fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
@@ -988,8 +985,7 @@ fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src
         else if src.imm >= -128 && src.imm <= 127 {
             opcode = 131
         }
-        dst.width = width
-        asm_emit_opcode_rm(image, opcode, asm_alu_ext(kind), dst)
+        asm_emit_group_default64(image, opcode, asm_alu_ext(kind), dst)
         if opcode == 128 || opcode == 131 {
             asm_byte(image, src.imm)
         }
@@ -999,8 +995,7 @@ fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src
         return 0
     }
     if dst.kind == AsmOperandKind.Register && (src.kind == AsmOperandKind.Register || src.kind == AsmOperandKind.Memory) {
-        src.width = width
-        asm_emit_opcode_rm(image, asm_alu_load_opcode(kind, width), dst.reg, src)
+        asm_emit_reg_rm(image, asm_alu_load_opcode(kind, width), dst, src)
         return 0
     }
     if dst.kind == AsmOperandKind.Memory && src.kind == AsmOperandKind.Register {
@@ -1064,7 +1059,31 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     return 0
 }
 fun asm_emit_group(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): i64 {
-    asm_emit_opcode_rm(image, opcode, ext, target)
+    let base = target.reg
+    let index = -1
+    if target.kind == AsmOperandKind.Memory {
+        base = target.base
+        index = target.index
+    }
+    asm_rex(image, asm_rex_bits(target.width, ext, index, base), asm_force_rex8(target))
+    asm_byte(image, opcode)
+    asm_emit_rm(image, ext, target)
+    return 0
+}
+fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): i64 {
+    let width = target.width
+    if width == 0 {
+        width = 64
+    }
+    let base = target.reg
+    let index = -1
+    if target.kind == AsmOperandKind.Memory {
+        base = target.base
+        index = target.index
+    }
+    asm_rex(image, asm_rex_bits(width, ext, index, base), asm_force_rex8(target))
+    asm_byte(image, opcode)
+    asm_emit_rm(image, ext, target)
     return 0
 }
 fun asm_jump_code(kind: AsmInstructionKind): i64 {
@@ -1169,12 +1188,7 @@ fun asm_encode_shift(image: ExeImage, target: AsmOperand, count: AsmOperand, ext
     return asm_emit_group(image, 211, ext, target)
 }
 fun asm_encode_inc_dec(image: ExeImage, target: AsmOperand, ext: i64): i64 {
-    let width = target.width
-    if width == 0 {
-        width = 64
-    }
-    target.width = width
-    return asm_emit_group(image, 255, ext, target)
+    return asm_emit_group_default64(image, 255, ext, target)
 }
 fun asm_encode_push_pop(image: ExeImage, target: AsmOperand, opcode: i64): i64 {
     if target.kind != AsmOperandKind.Register {

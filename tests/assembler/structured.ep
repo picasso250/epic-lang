@@ -26,6 +26,12 @@ fun main(): void {
     asm_label(program, "_start")
     asm_mov(program, asm_rax(), asm_imm(7))
     asm_mov(program, asm_mem_symbol(64, "value", 0), asm_imm(0))
+    asm_mov(program, asm_rax(), asm_mem_base(0, asm_rbp(), -8))
+    asm_mov(program, asm_mem_base(0, asm_rbp(), -16), asm_imm(0))
+    asm_lea(program, asm_rax(), asm_mem_base(0, asm_rbp(), -24))
+    asm_add(program, asm_mem_base(0, asm_rbp(), -32), asm_imm(1))
+    asm_cmp(program, asm_rax(), asm_mem_base(0, asm_rbp(), -40))
+    asm_inc(program, asm_mem_base(0, asm_rbp(), -48))
     asm_jmp(program, asm_symbol("done"))
     asm_label(program, "done")
     asm_ret(program)
@@ -41,32 +47,40 @@ fun main(): void {
         os.ExitProcess(1)
     }
 
-    let parsed = asm_parse(str_new(rendered.data, len(rendered)))
     let direct = asm_encode(program)
-    let roundtrip = asm_encode(parsed)
-    if equal_bytes(direct.text, roundtrip.text) == 0 {
+    let rendered_after_encode = asm_render(program)
+    if equal_bytes(rendered, rendered_after_encode) == 0 {
         os.ExitProcess(2)
     }
-    if equal_bytes(direct.data, roundtrip.data) == 0 {
+    let direct_again = asm_encode(program)
+    if equal_bytes(direct.text, direct_again.text) == 0 || equal_bytes(direct.data, direct_again.data) == 0 {
         os.ExitProcess(3)
     }
-    if direct.entry_offset != roundtrip.entry_offset {
+    let parsed = asm_parse(str_new(rendered.data, len(rendered)))
+    let roundtrip = asm_encode(parsed)
+    if equal_bytes(direct.text, roundtrip.text) == 0 {
         os.ExitProcess(4)
     }
-    if len(direct.relocs) != len(roundtrip.relocs) {
+    if equal_bytes(direct.data, roundtrip.data) == 0 {
         os.ExitProcess(5)
+    }
+    if direct.entry_offset != roundtrip.entry_offset {
+        os.ExitProcess(6)
+    }
+    if len(direct.relocs) != len(roundtrip.relocs) {
+        os.ExitProcess(7)
     }
     for reloc_i: 0:len(direct.relocs) {
         let a = direct.relocs.data[reloc_i]
         let b = roundtrip.relocs.data[reloc_i]
         if a.kind != b.kind || a.symbol != b.symbol || a.addend != b.addend {
-            os.ExitProcess(6)
+            os.ExitProcess(8)
         }
     }
 
     let presentation = asm_parse("; ignored\n\nsection .text\nentry: ; ignored\n    ret\n")
     if len(presentation.items) != 3 {
-        os.ExitProcess(7)
+        os.ExitProcess(9)
     }
     os.ExitProcess(0)
 }
