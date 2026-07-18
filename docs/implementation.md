@@ -108,7 +108,7 @@ local storage and the peak number of compiler temporary slots; there is no
 fixed temporary-slot limit.
 
 Runtime assembly helpers implement strings, dynamic byte arrays, command-line
-arguments, and file I/O. `embed("path")` stores their raw bytes in the compiler
+arguments, file I/O, and allocation-free panic reporting. `embed("path")` stores their raw bytes in the compiler
 image at bootstrap time, so a built `epic.exe` parses them into its existing
 `AsmProgram` without reading a repository `runtime` directory.
 

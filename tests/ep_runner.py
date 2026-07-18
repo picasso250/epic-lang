@@ -26,21 +26,26 @@ def parse_annotations(source: str) -> dict:
     annotations = {
         "exit_code": None,
         "stdout": None,
+        "stderr": None,
         "argv": [],
         "clean_paths": [],
     }
     stdout_lines = []
+    stderr_lines = []
     for line in source.splitlines():
         line = line.strip()
         if match := re.match(r"#\s*EXIT:\s*(-?\d+)", line):
             annotations["exit_code"] = int(match.group(1))
         elif match := re.match(r"#\s*STDOUT:\s*(.*)", line):
             stdout_lines.append(match.group(1))
+        elif match := re.match(r"#\s*STDERR:\s*(.*)", line):
+            stderr_lines.append(match.group(1))
         elif match := re.match(r"#\s*ARGV:\s*(.*)$", line):
             annotations["argv"] = shlex.split(match.group(1) or "")
         elif match := re.match(r"#\s*CLEAN:\s*(.+)$", line):
             annotations["clean_paths"].extend(shlex.split(match.group(1)))
     annotations["stdout"] = "\n".join(stdout_lines) if stdout_lines else None
+    annotations["stderr"] = "\n".join(stderr_lines) if stderr_lines else None
     return annotations
 
 
@@ -70,7 +75,11 @@ def run_compiled_case(
     trailing_args: tuple[str, ...] = (),
 ) -> tuple[bool, str]:
     annotations = parse_annotations(source.read_text(encoding="utf-8"))
-    if annotations["exit_code"] is None and annotations["stdout"] is None:
+    if (
+        annotations["exit_code"] is None
+        and annotations["stdout"] is None
+        and annotations["stderr"] is None
+    ):
         return True, "no annotations — skipped"
 
     clean_test_paths(annotations["clean_paths"])
@@ -92,6 +101,11 @@ def run_compiled_case(
         actual = (process.stdout or b"").decode("ascii", errors="replace").strip()
         if actual != expected_stdout.strip():
             failures.append(f"STDOUT: expected {expected_stdout!r}, got {actual!r}")
+    expected_stderr = annotations["stderr"]
+    if expected_stderr is not None:
+        actual = (process.stderr or b"").decode("ascii", errors="replace").strip()
+        if actual != expected_stderr.strip():
+            failures.append(f"STDERR: expected {expected_stderr!r}, got {actual!r}")
 
     clean_test_paths(annotations["clean_paths"])
     return (False, "; ".join(failures)) if failures else (True, "OK")
@@ -99,7 +113,11 @@ def run_compiled_case(
 
 def run_case(source: Path) -> tuple[bool, str]:
     annotations = parse_annotations(source.read_text(encoding="utf-8"))
-    if annotations["exit_code"] is None and annotations["stdout"] is None:
+    if (
+        annotations["exit_code"] is None
+        and annotations["stdout"] is None
+        and annotations["stderr"] is None
+    ):
         return True, "no annotations — skipped"
 
     clean_test_paths(annotations["clean_paths"])

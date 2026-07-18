@@ -4,7 +4,8 @@ Epic v3 starts from the sealed v2 compiler and dogfoods the language surface
 implemented there: unary operators, compound assignment, integer range loops,
 nominal unit enums, and exhaustive matching. It adds block tail values, implicit
 function tail returns, expression-form `if` and `match`, and an internal `never`
-type for no-return control flow. It retains the self-contained AMD64 assembler,
+type for no-return control flow, including allocation-free `panic(message)`.
+It retains the self-contained AMD64 assembler,
 deterministic PE writer, and conservative garbage collector.
 
 The bootstrap chain is:

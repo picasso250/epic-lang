@@ -169,6 +169,7 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/write_file.asm"))
     emit_runtime(e, embed("../runtime/bounds.asm"))
     emit_runtime(e, embed("../runtime/pop.asm"))
+    emit_runtime(e, embed("../runtime/panic.asm"))
     ret 0
 }
 fun make_emitter(): EmitterState {
@@ -781,6 +782,12 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_expr(e, expr.args.data[0])
         asm_mov(e.program, asm_ecx(), asm_eax())
         emit_call_inst(e, "ExitProcess")
+        ret 0
+    }
+    if expr.type_name == "" && name == "panic" {
+        emit_expr(e, expr.args.data[0])
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_call_inst(e, "__ep_panic")
         ret 0
     }
     if name == "print" {

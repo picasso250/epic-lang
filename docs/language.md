@@ -455,6 +455,11 @@ terminates the process with an `i64` status and has the internal result type
 `never`. `os.ExitProcess(code)` remains available as the direct Windows binding,
 but only `exit(code)` carries language-level no-return semantics.
 
+`panic(message)` writes `Epic panic: `, the message bytes, and a newline to
+standard error without allocating, then terminates with status `1`. It also has
+the internal result type `never`. Panic output does not include a source location
+or stack trace.
+
 `main` returning `i64` is not part of the v0 design.
 
 ## Built-in functions
@@ -465,6 +470,7 @@ to declare them.
 | Function | Meaning |
 | --- | --- |
 | `exit(code: i64): never` | terminates the process and never returns; `never` is internal |
+| `panic(message: str): never` | writes an allocation-free diagnostic to standard error, then terminates with status `1` |
 | `print(s: str): void` | writes string bytes without adding a newline |
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
