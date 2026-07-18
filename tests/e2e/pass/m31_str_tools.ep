@@ -1,10 +1,9 @@
 # EXIT: 0
-# STDOUT: epic_lang
+# STDOUT: epic/lang
 fun main(): void {
     let s = "xxepic/langyy"
     let mid = str_slice(s, 2, 11)
-    let out = str_replace_char(mid, '/', '_')
     let empty = str_slice(s, 0, 0)
-    print(out + empty)
+    print(mid + empty)
     os.ExitProcess(0)
 }

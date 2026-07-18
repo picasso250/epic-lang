@@ -17,8 +17,18 @@ CASES = [
 def main() -> int:
     for filename, label in CASES:
         source = ROOT / "tests" / "assembler" / filename
+        stem = filename.removesuffix(".ep")
+        executable = ROOT / "build" / "epic" / f"tests_assembler_{stem}.ep.exe"
+        executable.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
-            [str(COMPILER), str(source.relative_to(ROOT)), "src/utils.ep", "src/asm.ep"],
+            [
+                str(COMPILER),
+                "-o",
+                str(executable),
+                str(source.relative_to(ROOT)),
+                "src/utils.ep",
+                "src/asm.ep",
+            ],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -27,8 +37,6 @@ def main() -> int:
         if result.returncode != 0:
             print(f"  FAIL  {label} compile:\n{(result.stdout + result.stderr)[-1000:]}")
             return 1
-        stem = filename.removesuffix(".ep")
-        executable = ROOT / "build" / "epic" / f"tests_assembler_{stem}.ep.exe"
         run = subprocess.run([str(executable)], cwd=ROOT, timeout=5)
         if run.returncode != 0:
             print(f"  FAIL  {label}, exit {run.returncode}")

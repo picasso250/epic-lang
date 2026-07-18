@@ -50,17 +50,31 @@ def main() -> int:
             print(f"  FAIL  isolated compiler failed:\n{result.stderr[-1000:]}")
             return 1
 
-        executable = isolated / "build" / "epic" / "src_main.ep.exe"
+        executable = isolated / "a.exe"
         if not executable.is_file():
-            print(f"  FAIL  isolated compiler produced no executable: {executable}")
+            print(f"  FAIL  isolated compiler produced no default a.exe: {executable}")
             return 1
-        assembly = isolated / "build" / "epic" / "src_main.ep.asm"
+        assembly = isolated / "a.asm"
         if assembly.exists():
             print(f"  FAIL  default compilation unexpectedly produced assembly: {assembly}")
             return 1
         process = subprocess.run([str(executable)], cwd=isolated, timeout=5)
         if process.returncode != 42:
             print(f"  FAIL  embedded byte program returned {process.returncode}, expected 42")
+            return 1
+
+        result = subprocess.run(
+            [str(compiler), "src/main.ep", "-S"],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0 or not assembly.is_file():
+            print("  FAIL  default -S did not produce a.asm")
+            return 1
+        if not assembly.read_bytes().startswith(b"global _start"):
+            print("  FAIL  default a.asm is not Epic assembly")
             return 1
 
         emitted = isolated / "emitted.asm"

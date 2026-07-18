@@ -20,7 +20,6 @@ from process_metrics import format_peak_working_set, run_measured
 ROOT = Path(__file__).resolve().parent
 BUILD_DIR = ROOT / "build"
 DEFAULT_OUTPUT = BUILD_DIR / "epic-v3.exe"
-SELF_OUTPUT = BUILD_DIR / "epic" / "src_epic.ep.exe"
 SOURCE_PATHS = (
     "src/epic.ep",
     "src/utils.ep",
@@ -125,14 +124,18 @@ def main() -> int:
     if missing:
         raise RuntimeError(f"missing v3 sources: {', '.join(missing)}")
 
+    if output.exists():
+        output.unlink()
+
     start = time.perf_counter()
     seed = v2_seed_commit()
     compiler = ensure_v2_seed(seed)
-    compile_metrics = run_measured([str(compiler), *SOURCE_PATHS], cwd=ROOT)
-    if not SELF_OUTPUT.is_file():
-        raise RuntimeError(f"v2 did not produce the expected v3 compiler: {SELF_OUTPUT}")
-    if SELF_OUTPUT.resolve() != output.resolve():
-        shutil.copy2(SELF_OUTPUT, output)
+    compile_metrics = run_measured(
+        [str(compiler), "-o", str(output), *SOURCE_PATHS],
+        cwd=ROOT,
+    )
+    if not output.is_file():
+        raise RuntimeError(f"v2 did not produce the expected v3 compiler: {output}")
 
     elapsed = time.perf_counter() - start
     print(f"built: {output}")
