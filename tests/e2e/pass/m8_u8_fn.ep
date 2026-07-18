@@ -1,12 +1,12 @@
 # EXIT: 0
 fun to_upper(c: u8): i64 {
     if c >= 'a' && c <= 'z' {
-        return c - 32
+        ret c - 32
     }
-    return c
+    ret c
 }
 fun narrow_return(): u8 {
-    return 300
+    ret 300
 }
 fun main(): void {
     let buf = new u8[]

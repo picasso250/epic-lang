@@ -152,15 +152,17 @@ Function definitions use explicit parameter and return types:
 
 ```epic
 fun add(a: i64, b: i64): i64 {
-    return a + b
+    ret a + b
 }
 ```
 
-`void` functions may use `return` or fall off the end. `return expr` is invalid
-in a `void` function. A non-`void` function must return a compatible value on
-every path. The v3 analysis recognizes explicit `return` and `if/else` where
-both branches must return, and exhaustive `match` statements where every arm
+`void` functions may use `ret` or fall off the end. `ret expr` is invalid in a
+`void` function. A non-`void` function must return a compatible value on every
+path. The v3 analysis recognizes explicit `ret` and `if/else` where both
+branches must return, and exhaustive `match` statements where every arm
 returns; a `while` loop never proves a return.
+
+The v3 statement keyword is `ret`; the legacy `return` spelling is not accepted.
 
 ## Else-if chains
 
@@ -255,13 +257,13 @@ ordering, bit, or compound-assignment operators.
 ```epic
 match token.kind {
     TokenKind.EOF {
-        return 0
+        ret 0
     }
     TokenKind.ID {
         consume_id()
     }
     else {
-        return 1
+        ret 1
     }
 }
 ```

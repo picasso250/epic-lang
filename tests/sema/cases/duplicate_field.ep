@@ -4,5 +4,5 @@ type Pair {
     x: u8
 }
 fun main(): void {
-    return
+    ret
 }

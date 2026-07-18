@@ -9,7 +9,7 @@ type PopProbe {
 }
 fun probe_values(probe: PopProbe): i64[] {
     probe.calls += 1
-    return probe.values
+    ret probe.values
 }
 fun main(): void {
     let values = new i64[2]

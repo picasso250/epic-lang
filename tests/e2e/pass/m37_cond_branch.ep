@@ -2,7 +2,7 @@
 # STDOUT: 1
 fun fail(): i64 {
     os.ExitProcess(9)
-    return 0
+    ret 0
 }
 fun main(): void {
     if 1 == 1 || fail() == 1 {

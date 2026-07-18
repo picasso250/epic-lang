@@ -1,0 +1,6 @@
+# ERROR: Expected end of line
+fun value(): i64 {
+    return 1
+}
+fun main(): void {
+}

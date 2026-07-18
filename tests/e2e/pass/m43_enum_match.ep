@@ -8,45 +8,45 @@ type FlavorBox {
 fun flavor_code(value: Flavor): i64 {
     match value {
         Flavor.Vanilla {
-            return 1
+            ret 1
         }
         Flavor.Chocolate {
-            return 2
+            ret 2
         }
         Flavor.Mint {
-            return 3
+            ret 3
         }
     }
 }
 fun flavor_group(value: Flavor): i64 {
     match value {
         Flavor.Vanilla {
-            return 10
+            ret 10
         }
         else {
-            return 20
+            ret 20
         }
     }
 }
 fun flavor_identity(value: Flavor): Flavor {
-    return value
+    ret value
 }
 fun keyword_code(value: KeywordKind): i64 {
     match value {
         KeywordKind.EOF {
-            return 0
+            ret 0
         }
         KeywordKind.ID {
-            return 1
+            ret 1
         }
         KeywordKind.FUN {
-            return 2
+            ret 2
         }
         KeywordKind.MATCH {
-            return 3
+            ret 3
         }
         KeywordKind.FOR {
-            return 4
+            ret 4
         }
     }
 }

@@ -63,7 +63,7 @@ The parser returns exact records for program structure, including programs,
 product declarations, functions, parameters, fields, and blocks. Every
 expression and statement is created by a constructor for its exact shape;
 there is no empty or invalid AST kind. Truly optional expressions, currently
-bare `return` values and unsized-array counts, use `AstExprOption` with
+bare `ret` values and unsized-array counts, use `AstExprOption` with
 `None | Some`. Assignment statements carry one `AstAssignTarget`, so variable,
 field, and subscript assignment share the same statement kinds and lowering
 path.

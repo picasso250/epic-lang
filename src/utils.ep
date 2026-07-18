@@ -3,28 +3,28 @@
 # Keep module-specific parsing, diagnostics, and output logic in their owners.
 #
 fun align_up(value: i64, alignment: i64): i64 {
-    return ((value + alignment - 1) / alignment) * alignment
+    ret ((value + alignment - 1) / alignment) * alignment
 }
 fun type_is_array(name: str): i64 {
     if len(name) < 2 {
-        return 0
+        ret 0
     }
-    return name.data[len(name) - 2] == 91 && name.data[len(name) - 1] == 93
+    ret name.data[len(name) - 2] == 91 && name.data[len(name) - 1] == 93
 }
 fun array_element_type(name: str): str {
-    return str_new(name.data, len(name) - 2)
+    ret str_new(name.data, len(name) - 2)
 }
 fun digit_value(c: i64): i64 {
     if c >= 48 && c <= 57 {
-        return c - 48
+        ret c - 48
     }
     if c >= 65 && c <= 70 {
-        return c - 55
+        ret c - 55
     }
     if c >= 97 && c <= 102 {
-        return c - 87
+        ret c - 87
     }
-    return -1
+    ret -1
 }
 fun parse_integer(text: str): i64 {
     let sign = 1
@@ -43,5 +43,5 @@ fun parse_integer(text: str): i64 {
         value = value * base + digit_value(text.data[i])
         i += 1
     }
-    return value * sign
+    ret value * sign
 }

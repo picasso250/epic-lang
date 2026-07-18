@@ -13,28 +13,28 @@ fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): i64 {
     t.text = text
     t.line = line
     push(tokens, t)
-    return 0
+    ret 0
 }
 fun is_alpha(c: i64): i64 {
     if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_alnum(c: i64): i64 {
     if is_alpha(c) == 1 || (c >= 48 && c <= 57) {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_digit(c: i64): i64 {
     if c >= 48 && c <= 57 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_hex_digit(c: i64): i64 {
-    return digit_value(c) >= 0
+    ret digit_value(c) >= 0
 }
 fun decimal_literal_fits_i64(text: str): i64 {
     let start = 0
@@ -43,23 +43,23 @@ fun decimal_literal_fits_i64(text: str): i64 {
     }
     let digits = len(text) - start
     if digits < 19 {
-        return 1
+        ret 1
     }
     if digits > 19 {
-        return 0
+        ret 0
     }
     let limit = "9223372036854775807"
     for i: 0:19 {
         let value = text.data[start + i]
         let maximum = limit.data[i]
         if value < maximum {
-            return 1
+            ret 1
         }
         if value > maximum {
-            return 0
+            ret 0
         }
     }
-    return 1
+    ret 1
 }
 fun hex_literal_fits_i64(text: str): i64 {
     let start = 2
@@ -68,12 +68,12 @@ fun hex_literal_fits_i64(text: str): i64 {
     }
     let digits = len(text) - start
     if digits < 16 {
-        return 1
+        ret 1
     }
     if digits > 16 {
-        return 0
+        ret 0
     }
-    return text.data[start] <= 55
+    ret text.data[start] <= 55
 }
 fun reject_large_literal(text: str, hex: i64): i64 {
     let fits = decimal_literal_fits_i64(text)
@@ -84,46 +84,46 @@ fun reject_large_literal(text: str, hex: i64): i64 {
         print("integer literal is out of i64 range\n")
         os.ExitProcess(1)
     }
-    return 0
+    ret 0
 }
 fun identifier_kind(text: str): TokenKind {
     if text == "fun" {
-        return TokenKind.FUN
+        ret TokenKind.FUN
     }
-    if text == "return" {
-        return TokenKind.RETURN
+    if text == "ret" {
+        ret TokenKind.RETURN
     }
     if text == "if" {
-        return TokenKind.IF
+        ret TokenKind.IF
     }
     if text == "else" {
-        return TokenKind.ELSE
+        ret TokenKind.ELSE
     }
     if text == "while" {
-        return TokenKind.WHILE
+        ret TokenKind.WHILE
     }
     if text == "for" {
-        return TokenKind.FOR
+        ret TokenKind.FOR
     }
     if text == "break" {
-        return TokenKind.BREAK
+        ret TokenKind.BREAK
     }
     if text == "continue" {
-        return TokenKind.CONTINUE
+        ret TokenKind.CONTINUE
     }
     if text == "type" {
-        return TokenKind.TYPE
+        ret TokenKind.TYPE
     }
     if text == "new" {
-        return TokenKind.NEW
+        ret TokenKind.NEW
     }
     if text == "let" {
-        return TokenKind.LET
+        ret TokenKind.LET
     }
     if text == "match" {
-        return TokenKind.MATCH
+        ret TokenKind.MATCH
     }
-    return TokenKind.ID
+    ret TokenKind.ID
 }
 fun lex(src: str): Token[] {
     let tokens = new Token[]
@@ -458,7 +458,7 @@ fun lex(src: str): Token[] {
         }
         pos += 1
     }
-    return tokens
+    ret tokens
 }
 fun dump_tokens(tokens: Token[]): i64 {
     for i: 0:len(tokens) {
@@ -468,7 +468,7 @@ fun dump_tokens(tokens: Token[]): i64 {
         print(itoa(t.line))
         print("\n")
     }
-    return 0
+    ret 0
 }
 fun main(): void {
     if len(argv) < 2 {

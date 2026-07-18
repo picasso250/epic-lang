@@ -1,7 +1,7 @@
 # ERROR: cannot redefine builtin function 'print'
 fun print(value: str): void {
-    return
+    ret
 }
 fun main(): void {
-    return
+    ret
 }

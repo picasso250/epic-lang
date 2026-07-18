@@ -1,10 +1,10 @@
 # ERROR: duplicate function 'work'
 fun work(): void {
-    return
+    ret
 }
 fun work(): void {
-    return
+    ret
 }
 fun main(): void {
-    return
+    ret
 }

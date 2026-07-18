@@ -6,5 +6,5 @@ type Item {
     other: i64
 }
 fun main(): void {
-    return
+    ret
 }

@@ -2,9 +2,9 @@
 # STDOUT: 7
 fun choose(flag: i64): i64 {
     if flag {
-        return 7
+        ret 7
     } else {
-        return 9
+        ret 9
     }
 }
 fun main(): void {

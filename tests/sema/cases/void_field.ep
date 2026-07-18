@@ -3,5 +3,5 @@ type Bad {
     value: void
 }
 fun main(): void {
-    return
+    ret
 }
