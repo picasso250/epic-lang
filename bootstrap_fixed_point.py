@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
@@ -16,7 +15,6 @@ ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / "build"
 FIXED_POINT = BUILD / "fixed-point"
 SEED = BUILD / "epic-v3.exe"
-SELF_OUTPUT = BUILD / "epic" / "src_epic.ep.exe"
 SOURCES = ("src/epic.ep", "src/utils.ep", "src/lexer.ep", "src/parser.ep", "src/sema.ep", "src/codegen.ep", "src/asm.ep", "src/pe.ep")
 
 
@@ -28,10 +26,13 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def compile_self(compiler: Path) -> ProcessMetrics:
-    metrics = run_measured([str(compiler), *SOURCES], cwd=ROOT)
-    if not SELF_OUTPUT.is_file():
-        raise RuntimeError(f"compiler did not produce {SELF_OUTPUT}")
+def compile_self(compiler: Path, output: Path) -> ProcessMetrics:
+    if output.exists():
+        output.unlink()
+    output_arg = output.relative_to(ROOT)
+    metrics = run_measured([str(compiler), "-o", str(output_arg), *SOURCES], cwd=ROOT)
+    if not output.is_file():
+        raise RuntimeError(f"compiler did not produce {output}")
     return metrics
 
 
@@ -39,13 +40,11 @@ def main() -> int:
     run([sys.executable, "build_epic.py"])
     FIXED_POINT.mkdir(parents=True, exist_ok=True)
 
-    metrics_1 = compile_self(SEED)
     generation_1 = FIXED_POINT / "generation-1.exe"
-    shutil.copy2(SELF_OUTPUT, generation_1)
+    metrics_1 = compile_self(SEED, generation_1)
 
-    metrics_2 = compile_self(generation_1)
     generation_2 = FIXED_POINT / "generation-2.exe"
-    shutil.copy2(SELF_OUTPUT, generation_2)
+    metrics_2 = compile_self(generation_1, generation_2)
 
     hash_1 = digest(generation_1)
     hash_2 = digest(generation_2)
