@@ -129,6 +129,9 @@ fun sema_add_builtins(state: SemaState): i64 {
     let sig = sema_signature("print", "void")
     push(sig.param_types, "str")
     sema_add_builtin(state, sig)
+    sig = sema_signature("exit", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
     sig = sema_signature("itoa", "str")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
@@ -1058,13 +1061,16 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
     }
     ret 0
 }
-fun sema_stmt_returns(stmt: AstStmt): i64 {
+fun sema_stmt_terminates_function(stmt: AstStmt): i64 {
     let result = 0
     match stmt.kind {
         AstStmtKind.Return {
             result = 1
         }
         AstStmtKind.Expr {
+            if stmt.expr.kind == AstExprKind.Call && stmt.expr.type_name == "" && stmt.expr.name == "exit" {
+                result = 1
+            }
         }
         AstStmtKind.Let {
         }
@@ -1074,7 +1080,7 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
         }
         AstStmtKind.If {
             if stmt.else_block.present == 1 {
-                if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
+                if sema_block_terminates_function(stmt.then_block) == 1 && sema_block_terminates_function(stmt.else_block) == 1 {
                     result = 1
                 }
             }
@@ -1087,7 +1093,7 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
             let all_return = 1
             let i = 0
             while i < len(stmt.match_arms) {
-                if !sema_block_returns(stmt.match_arms.data[i].body) {
+                if !sema_block_terminates_function(stmt.match_arms.data[i].body) {
                     all_return = 0
                 }
                 i += 1
@@ -1103,13 +1109,13 @@ fun sema_stmt_returns(stmt: AstStmt): i64 {
     }
     ret result
 }
-fun sema_block_returns(block: AstBlock): i64 {
+fun sema_block_terminates_function(block: AstBlock): i64 {
     if !block.present {
         ret 0
     }
     let i = 0
     while i < len(block.stmts) {
-        if sema_stmt_returns(block.stmts.data[i]) == 1 {
+        if sema_stmt_terminates_function(block.stmts.data[i]) == 1 {
             ret 1
         }
         i += 1
@@ -1144,7 +1150,7 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
             j += 1
         }
         sema_check_block(state, node.body)
-        if node.type_name != "void" && !sema_block_returns(node.body) {
+        if node.type_name != "void" && !sema_block_terminates_function(node.body) {
             sema_error(node.source_path, node.line, "function '" + node.name + "' may not return a value on every path")
         }
         i += 1

@@ -1,0 +1,17 @@
+# EXIT: 42
+fun stop_now(): i64 {
+    exit(42)
+}
+fun choose_exit(flag: i64): i64 {
+    if flag {
+        ret 7
+    } else {
+        exit(42)
+    }
+}
+fun main(): void {
+    if argv.len == 0 {
+        stop_now()
+    }
+    os.ExitProcess(choose_exit(0))
+}

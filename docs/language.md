@@ -359,7 +359,7 @@ fun main(): void {
 }
 ```
 
-Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
+Falling off the end of `main` exits with status `0`. The built-in `exit(code)` terminates the process with an `i64` status and never returns. `os.ExitProcess(code)` remains available as the direct Windows binding, but only `exit(code)` carries language-level no-return semantics.
 
 `main` returning `i64` is not part of the v0 design.
 
@@ -370,6 +370,7 @@ to declare them.
 
 | Function | Meaning |
 | --- | --- |
+| `exit(code: i64): void` | terminates the process and never returns |
 | `print(s: str): void` | writes string bytes without adding a newline |
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |

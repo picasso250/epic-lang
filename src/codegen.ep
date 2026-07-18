@@ -694,6 +694,12 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         asm_add(e.program, asm_rsp(), asm_imm(frame))
         ret 0
     }
+    if expr.type_name == "" && name == "exit" {
+        emit_expr(e, expr.args.data[0])
+        asm_mov(e.program, asm_ecx(), asm_eax())
+        emit_call_inst(e, "ExitProcess")
+        ret 0
+    }
     if name == "print" {
         emit_expr(e, expr.args.data[0])
         let tmp = temp_save_rax(e)

@@ -1,0 +1,7 @@
+# ERROR: function 'stop' may not return a value on every path
+fun stop(): i64 {
+    os.ExitProcess(1)
+}
+fun main(): void {
+    ret
+}

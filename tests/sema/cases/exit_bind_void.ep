@@ -1,0 +1,4 @@
+# ERROR: cannot bind a void expression
+fun main(): void {
+    let result = exit(1)
+}
