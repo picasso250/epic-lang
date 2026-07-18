@@ -1,7 +1,7 @@
 # ERROR: non-void function must return a value
 fun value(): i64 {
-    return
+    ret
 }
 fun main(): void {
-    return
+    ret
 }

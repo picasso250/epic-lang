@@ -5,7 +5,7 @@ type LenProbe {
 }
 fun make_values(probe: LenProbe): i64[] {
     probe.calls += 1
-    return new i64[2]
+    ret new i64[2]
 }
 fun main(): void {
     let text = "abc"

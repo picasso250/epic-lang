@@ -3,5 +3,5 @@ type Bad {
     values: i64[][]
 }
 fun main(): void {
-    return
+    ret
 }

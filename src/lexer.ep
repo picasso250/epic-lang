@@ -251,7 +251,7 @@ fun lex(src: str): Token[] {
             if identifier_text == "fun"    {
                 kind = "FUN"
             }
-            if identifier_text == "return" {
+            if identifier_text == "return" || identifier_text == "ret" {
                 kind = "RETURN"
             }
             if identifier_text == "if"     {

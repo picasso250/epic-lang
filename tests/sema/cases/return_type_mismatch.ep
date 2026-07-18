@@ -1,7 +1,7 @@
 # ERROR: return type str is not assignable to i64
 fun value(): i64 {
-    return "wrong"
+    ret "wrong"
 }
 fun main(): void {
-    return
+    ret
 }

@@ -5,7 +5,7 @@ type ArrayCountProbe {
 }
 fun array_count(probe: ArrayCountProbe): i64 {
     probe.calls += 1
-    return 3
+    ret 3
 }
 fun main(): void {
     let probe = new ArrayCountProbe
