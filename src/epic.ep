@@ -3,6 +3,7 @@
 #
 type DriverOptions {
     emit_asm: i64
+    verbose: i64
     output_path: str
     inputs: str[]
 }
@@ -11,6 +12,16 @@ fun die_driver(msg: str): i64 {
     print(msg)
     print("\n")
     os.ExitProcess(1)
+    ret 0
+}
+fun print_timing(verbose: i64, label: str, elapsed: i64): i64 {
+    if verbose == 1 {
+        print("epic: ")
+        print(label)
+        print(" ")
+        print(itoa(elapsed))
+        print(" ms\n")
+    }
     ret 0
 }
 fun parse_file(path: str): AstProgram {
@@ -65,6 +76,8 @@ fun parse_driver_options(): DriverOptions {
         let arg = argv.data[i]
         if arg == "-S" {
             options.emit_asm = 1
+        } else if arg == "-v" {
+            options.verbose = 1
         } else if arg == "-o" {
             i += 1
             if i >= len(argv) {
@@ -80,7 +93,10 @@ fun parse_driver_options(): DriverOptions {
         i += 1
     }
     if !len(options.inputs) {
-        die_driver("usage: epic [-S] [-o path] <main.ep> [other.ep...]")
+        die_driver("usage: epic [-v] [-S] [-o path] <main.ep> [other.ep...]")
+    }
+    if options.verbose == 1 && options.emit_asm == 1 {
+        die_driver("-v cannot be used with -S")
     }
     ret options
 }
@@ -93,8 +109,30 @@ fun main(): void {
     os.CreateDirectoryA("build", 0)
     os.CreateDirectoryA("build\\epic", 0)
     let options = parse_driver_options()
+    let total_start = 0
+    let phase_start = 0
+    let now = 0
+    if options.verbose == 1 {
+        total_start = os.GetTickCount64()
+        phase_start = total_start
+    }
+
     let ast = merge_inputs(options.inputs)
+    let parse_ms = 0
+    if options.verbose == 1 {
+        now = os.GetTickCount64()
+        parse_ms = now - phase_start
+        phase_start = now
+    }
+
     sema_check(ast)
+    let sema_ms = 0
+    if options.verbose == 1 {
+        now = os.GetTickCount64()
+        sema_ms = now - phase_start
+        phase_start = now
+    }
+
     let base = output_base(options.inputs.data[0])
     let output_path = options.output_path
     if output_path == "" {
@@ -104,14 +142,44 @@ fun main(): void {
             output_path = base + ".exe"
         }
     }
+
     let e = make_emitter()
     emit_program(e, ast)
+    let codegen_ms = 0
+    if options.verbose == 1 {
+        now = os.GetTickCount64()
+        codegen_ms = now - phase_start
+        phase_start = now
+    }
+
+    let encode_ms = 0
+    let write_ms = 0
     if options.emit_asm == 1 {
         write_file(output_path, asm_render(e.program))
     }
     else {
-        pe_write_exe(output_path, asm_encode(e.program))
+        let image = asm_encode(e.program)
+        if options.verbose == 1 {
+            now = os.GetTickCount64()
+            encode_ms = now - phase_start
+            phase_start = now
+        }
+        pe_write_exe(output_path, image)
+        if options.verbose == 1 {
+            write_ms = os.GetTickCount64() - phase_start
+        }
     }
+
+    let total_ms = 0
+    if options.verbose == 1 {
+        total_ms = os.GetTickCount64() - total_start
+    }
+    print_timing(options.verbose, "parse+merge", parse_ms)
+    print_timing(options.verbose, "sema", sema_ms)
+    print_timing(options.verbose, "codegen", codegen_ms)
+    print_timing(options.verbose, "encode", encode_ms)
+    print_timing(options.verbose, "write", write_ms)
+    print_timing(options.verbose, "total", total_ms)
     print(output_path)
     print("\n")
 }

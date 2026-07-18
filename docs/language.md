@@ -50,12 +50,15 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-build\epic-v3.exe [-S] [-o path] main.ep lib.ep
+build\epic-v3.exe [-v] [-S] [-o path] main.ep lib.ep
 ```
 
-Normal compilation assembles in memory and writes only the executable. `-S`
-writes the generated assembly and stops before assembly; `-o` selects the
-output path in either mode. Without `-o`, outputs remain under `build/epic/`.
+Normal compilation assembles in memory and writes only the executable. `-v`
+prints parse-and-merge, semantic analysis, code generation, encoding, writing,
+and total times in milliseconds. It is available only for executable output
+and cannot be combined with `-S`. `-S` writes the generated assembly and stops
+before assembly; `-o` selects the output path in either mode. Without `-o`,
+outputs remain under `build/epic/`.
 
 This is whole-program source merging, not a module system.
 
