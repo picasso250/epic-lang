@@ -146,8 +146,7 @@ fun align16(n: i64): i64 {
     return ((n + 15) / 16) * 16
 }
 fun emit_runtime(e: EmitterState, source: u8[]): i64 {
-    let text = "section .text\n" + str_new(source.data, len(source))
-    return asm_parse_into(e.program, text)
+    return asm_parse_text_into(e.program, source)
 }
 fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/gc.asm"))

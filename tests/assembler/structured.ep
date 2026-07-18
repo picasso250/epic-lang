@@ -82,5 +82,19 @@ fun main(): void {
     if len(presentation.items) != 3 {
         os.ExitProcess(9)
     }
+
+    let appended = asm_program_new()
+    asm_section_text(appended)
+    let item_count = len(appended.items)
+    asm_parse_text_into(appended, bytes("helper:\n    ret\n"))
+    if len(appended.items) != item_count + 2 {
+        os.ExitProcess(10)
+    }
+    if appended.items.data[item_count].kind != AsmItemKind.Label {
+        os.ExitProcess(11)
+    }
+    if appended.items.data[item_count + 1].kind != AsmItemKind.Instruction {
+        os.ExitProcess(12)
+    }
     os.ExitProcess(0)
 }
