@@ -18,7 +18,7 @@ def main() -> int:
     for filename, label in CASES:
         source = ROOT / "tests" / "assembler" / filename
         result = subprocess.run(
-            [str(COMPILER), str(source.relative_to(ROOT)), "src/asm.ep"],
+            [str(COMPILER), str(source.relative_to(ROOT)), "src/utils.ep", "src/asm.ep"],
             cwd=ROOT,
             capture_output=True,
             text=True,

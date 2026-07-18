@@ -36,10 +36,7 @@ fun is_digit(c: i64): i64 {
     return 0
 }
 fun is_hex_digit(c: i64): i64 {
-    if is_digit(c) == 1 || (c >= 65 && c <= 70) || (c >= 97 && c <= 102) {
-        return 1
-    }
-    return 0
+    return digit_value(c) >= 0
 }
 fun decimal_literal_fits_i64(text: str): i64 {
     let start = 0

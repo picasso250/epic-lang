@@ -80,18 +80,6 @@ fun sema_find_func(state: SemaState, name: str): SemaSignature {
     missing.name = ""
     return missing
 }
-fun sema_is_array(type_name: str): i64 {
-    if len(type_name) < 2 {
-        return 0
-    }
-    if type_name.data[len(type_name) - 2] == 91 && type_name.data[len(type_name) - 1] == 93 {
-        return 1
-    }
-    return 0
-}
-fun sema_array_element(type_name: str): str {
-    return str_new(type_name.data, len(type_name) - 2)
-}
 fun sema_type_exists(state: SemaState, type_name: str): i64 {
     if type_name == "i64" || type_name == "u8" || type_name == "str" || type_name == "void" {
         return 1
@@ -106,12 +94,12 @@ fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: 
         sema_error(path, line, "void is only valid as a function return type")
         return 0
     }
-    if sema_is_array(type_name) == 1 {
-        let element = sema_array_element(type_name)
+    if type_is_array(type_name) == 1 {
+        let element = array_element_type(type_name)
         if element == "void" {
             sema_error(path, line, "array element type cannot be void")
         }
-        if sema_is_array(element) == 1 {
+        if type_is_array(element) == 1 {
             sema_error(path, line, "nested arrays are not supported")
         }
         if !sema_type_exists(state, element) {
@@ -558,9 +546,9 @@ fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
         }
         return ""
     }
-    if sema_is_array(base_type) == 1 {
+    if type_is_array(base_type) == 1 {
         if field_name == "data" {
-            return "ptr:" + sema_array_element(base_type)
+            return "ptr:" + array_element_type(base_type)
         }
         if field_name == "len" || field_name == "cap" {
             return "i64"
@@ -732,21 +720,21 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         let actual = sema_check_expr(state, expr.args.data[i])
         let expected = sig.param_types.data[i]
         if full_name == "push" && i == 0 {
-            if !sema_is_array(actual) {
+            if !type_is_array(actual) {
                 sema_error(state.source_path, expr.args.data[i].line, "push first argument must be an array")
             }
         } else if full_name == "push" && i == 1 {
             let array_type = expr.args.data[0].resolved_type
-            let element = sema_array_element(array_type)
+            let element = array_element_type(array_type)
             if !sema_assignable(element, actual) {
                 sema_error(state.source_path, expr.args.data[i].line, "push value type " + actual + " is not assignable to " + element)
             }
         } else if full_name == "len" && i == 0 {
-            if actual != "str" && !sema_is_array(actual) {
+            if actual != "str" && !type_is_array(actual) {
                 sema_error(state.source_path, expr.args.data[i].line, "len expects str or array, got " + actual)
             }
         } else if full_name == "pop" && i == 0 {
-            if !sema_is_array(actual) {
+            if !type_is_array(actual) {
                 sema_error(state.source_path, expr.args.data[i].line, "pop expects an array, got " + actual)
             }
         } else if !sema_assignable(expected, actual) {
@@ -755,7 +743,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         i += 1
     }
     if full_name == "pop" {
-        return sema_promote(sema_array_element(expr.args.data[0].resolved_type))
+        return sema_promote(array_element_type(expr.args.data[0].resolved_type))
     }
     return sema_promote(sig.return_type)
 }
@@ -839,8 +827,8 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
             sema_require_i64(state, expr.index, "subscript")
             if base_type == "str" {
                 result = "i64"
-            } else if sema_is_array(base_type) == 1 {
-                result = sema_promote(sema_array_element(base_type))
+            } else if type_is_array(base_type) == 1 {
+                result = sema_promote(array_element_type(base_type))
             } else if sema_is_pointer(base_type) == 1 {
                 result = sema_promote(sema_pointer_element(base_type))
             } else {
@@ -936,8 +924,8 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
                 }
                 sema_error(state.source_path, line, "str is read-only")
             }
-            if sema_is_array(base_type) == 1 {
-                return sema_array_element(base_type)
+            if type_is_array(base_type) == 1 {
+                return array_element_type(base_type)
             }
             if sema_is_pointer(base_type) == 1 {
                 return sema_pointer_element(base_type)

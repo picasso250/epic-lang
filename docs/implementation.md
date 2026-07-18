@@ -33,10 +33,11 @@ embedded `runtime/*.asm` sources are the only textual input to the assembler
 parser, which converts them into the same `AsmProgram`. `-S` renders that
 program as canonical private-NASM-subset text with one semantic item per line.
 
-The seven compiler source files are compiled as one program:
+The eight compiler source files are compiled as one program:
 
 ```text
 src/epic.ep
+src/utils.ep
 src/lexer.ep
 src/parser.ep
 src/sema.ep

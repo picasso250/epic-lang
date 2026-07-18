@@ -29,9 +29,6 @@ fun pe_die(msg: str): i64 {
     os.ExitProcess(1)
     return 0
 }
-fun pe_align(value: i64, alignment: i64): i64 {
-    return ((value + alignment - 1) / alignment) * alignment
-}
 fun pe_byte(out: u8[], value: i64): i64 {
     push(out, value)
     return 0
@@ -70,7 +67,7 @@ fun pe_zero(out: u8[], count: i64): i64 {
     return 0
 }
 fun pe_pad(out: u8[], alignment: i64, value: i64): i64 {
-    while len(out) < pe_align(len(out), alignment) {
+    while len(out) < align_up(len(out), alignment) {
         pe_byte(out, value)
     }
     return 0
@@ -88,17 +85,11 @@ fun pe_append_str(out: u8[], text: str): i64 {
     return 0
 }
 fun pe_hex_digit(c: i64): i64 {
-    if c >= 48 && c <= 57 {
-        return c - 48
+    let value = digit_value(c)
+    if value < 0 {
+        pe_die("bad embedded hex")
     }
-    if c >= 97 && c <= 102 {
-        return c - 87
-    }
-    if c >= 65 && c <= 70 {
-        return c - 55
-    }
-    pe_die("bad embedded hex")
-    return 0
+    return value
 }
 fun pe_append_hex(out: u8[], text: str): i64 {
     let i = 0
@@ -344,7 +335,7 @@ fun pe_make_section(name: str, rva: i64, size: i64, raw: i64): PeSection {
     sec.name = name
     sec.rva = rva
     sec.virtual_size = size
-    sec.raw_size = pe_align(size, 512)
+    sec.raw_size = align_up(size, 512)
     sec.raw_offset = raw
     if name == ".text" {
         sec.flags = 1610612768
@@ -359,11 +350,11 @@ fun pe_make_section(name: str, rva: i64, size: i64, raw: i64): PeSection {
 }
 fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64): u8[] {
     let out = new u8[]
-    let rdata_rva = pe_align(4096 + len(image.text), 4096)
+    let rdata_rva = align_up(4096 + len(image.text), 4096)
     let text = pe_make_section(".text", 4096, len(image.text), 1024)
     let rdata_sec = pe_make_section(".rdata", rdata_rva, len(rdata), text.raw_offset + text.raw_size)
     let data_sec = pe_make_section(".data", data_rva, len(image.data), rdata_sec.raw_offset + rdata_sec.raw_size)
-    let image_size = pe_align(data_rva + len(image.data), 4096)
+    let image_size = align_up(data_rva + len(image.data), 4096)
     pe_append_dos_stub(out)
     pe_append_str(out, "PE")
     pe_byte(out, 0)
@@ -437,9 +428,9 @@ fun pe_build_exe(image: ExeImage): u8[] {
     let imports = pe_collect_imports(image)
     let dlls = pe_make_dlls(imports)
     pe_add_thunks(image, imports)
-    let rdata_rva = pe_align(4096 + len(image.text), 4096)
+    let rdata_rva = align_up(4096 + len(image.text), 4096)
     let rdata = pe_build_idata(dlls, rdata_rva)
-    let data_rva = pe_align(rdata_rva + len(rdata), 4096)
+    let data_rva = align_up(rdata_rva + len(rdata), 4096)
     pe_patch_thunks(image, imports, rdata_rva)
     pe_patch_relocs(image, imports, data_rva)
     let out = pe_build_headers(image, rdata, dlls, data_rva)

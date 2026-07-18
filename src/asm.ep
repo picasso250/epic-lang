@@ -113,18 +113,6 @@ fun asm_remove_spaces(s: str): str {
     }
     return str_new(out.data, len(out))
 }
-fun asm_digit(c: i64): i64 {
-    if c >= 48 && c <= 57 {
-        return c - 48
-    }
-    if c >= 65 && c <= 70 {
-        return c - 55
-    }
-    if c >= 97 && c <= 102 {
-        return c - 87
-    }
-    return -1
-}
 fun asm_is_number(s: str): i64 {
     if len(s) == 0 {
         return 0
@@ -145,31 +133,12 @@ fun asm_is_number(s: str): i64 {
         if hex == 0 && (s.data[i] < 48 || s.data[i] > 57) {
             return 0
         }
-        if hex == 1 && asm_digit(s.data[i]) < 0 {
+        if hex == 1 && digit_value(s.data[i]) < 0 {
             return 0
         }
         i += 1
     }
     return 1
-}
-fun asm_number(s: str): i64 {
-    let sign = 1
-    let i = 0
-    if s[0] == 45 {
-        sign = -1
-        i = 1
-    }
-    let base = 10
-    if i + 2 <= len(s) && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
-        base = 16
-        i += 2
-    }
-    let value = 0
-    while i < len(s) {
-        value = value * base + asm_digit(s.data[i])
-        i += 1
-    }
-    return value * sign
 }
 fun asm_reg(name: str): i64 {
     if name == "rax" || name == "eax" || name == "al" {
@@ -1386,7 +1355,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
         if star >= 0 {
             let rn = asm_slice(term, 0, star)
             op.index = asm_reg(rn)
-            op.scale = asm_number(asm_slice(term, star + 1, len(term)))
+            op.scale = parse_integer(asm_slice(term, star + 1, len(term)))
             if op.index < 0 || sign < 0 {
                 asm_die("bad index operand: " + text)
             }
@@ -1401,7 +1370,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
             }
         }
         else if asm_is_number(term) == 1 {
-            op.disp += sign * asm_number(term)
+            op.disp += sign * parse_integer(term)
         }
         else {
             if len(op.symbol) != 0 {
@@ -1439,7 +1408,7 @@ fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
         return asm_register(reg, asm_reg_width(text))
     }
     if asm_is_number(text) == 1 {
-        return asm_imm(asm_number(text))
+        return asm_imm(parse_integer(text))
     }
     return asm_symbol(asm_program_qualify(parser, text))
 }
@@ -1600,7 +1569,7 @@ fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
         if asm_is_number(value_text) == 0 {
             asm_die("db values must be integers")
         }
-        push(values, asm_number(value_text))
+        push(values, parse_integer(value_text))
         value_start = value_end + 1
     }
     return asm_bytes(program, values)
@@ -1620,7 +1589,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
         if asm_find(data_args, 44) >= 0 || asm_is_number(data_args) == 0 {
             asm_die("dd requires one integer")
         }
-        asm_dd(parser.program, asm_number(data_args))
+        asm_dd(parser.program, parse_integer(data_args))
         return 1
     }
     if data_name == "dq" {
@@ -1628,7 +1597,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
             asm_die("dq requires one value")
         }
         if asm_is_number(data_args) == 1 {
-            asm_dq(parser.program, asm_number(data_args))
+            asm_dq(parser.program, parse_integer(data_args))
         }
         else {
             asm_dq_symbol(parser.program, asm_program_qualify(parser, data_args))
@@ -1666,7 +1635,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
     else if times_directive != "db" {
         asm_die("bad times directive: " + times_directive)
     }
-    asm_times(parser.program, asm_number(count_text), times_width, asm_number(times_value))
+    asm_times(parser.program, parse_integer(count_text), times_width, parse_integer(times_value))
     return 1
 }
 fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {

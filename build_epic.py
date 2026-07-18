@@ -23,6 +23,7 @@ DEFAULT_OUTPUT = BUILD_DIR / "epic-v3.exe"
 SELF_OUTPUT = BUILD_DIR / "epic" / "src_epic.ep.exe"
 SOURCE_PATHS = (
     "src/epic.ep",
+    "src/utils.ep",
     "src/lexer.ep",
     "src/parser.ep",
     "src/sema.ep",
