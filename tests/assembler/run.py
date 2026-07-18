@@ -8,26 +8,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPILER = Path(os.environ["EPIC_TEST_COMPILER"])
-SOURCE = ROOT / "tests" / "assembler" / "reloc.ep"
+CASES = [
+    ("reloc.ep", "RIP-relative memory-immediate addends"),
+    ("structured.ep", "structured IR render/parse/encode intent"),
+]
 
 
 def main() -> int:
-    result = subprocess.run(
-        [str(COMPILER), str(SOURCE.relative_to(ROOT)), "src/asm.ep"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        print(f"  FAIL  compile:\n{(result.stdout + result.stderr)[-1000:]}")
-        return 1
-    executable = ROOT / "build" / "epic" / "tests_assembler_reloc.ep.exe"
-    run = subprocess.run([str(executable)], cwd=ROOT, timeout=5)
-    if run.returncode != 0:
-        print(f"  FAIL  relocation addends, exit {run.returncode}")
-        return 1
-    print("  PASS  RIP-relative memory-immediate addends")
+    for filename, label in CASES:
+        source = ROOT / "tests" / "assembler" / filename
+        result = subprocess.run(
+            [str(COMPILER), str(source.relative_to(ROOT)), "src/asm.ep"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            print(f"  FAIL  {label} compile:\n{(result.stdout + result.stderr)[-1000:]}")
+            return 1
+        stem = filename.removesuffix(".ep")
+        executable = ROOT / "build" / "epic" / f"tests_assembler_{stem}.ep.exe"
+        run = subprocess.run([str(executable)], cwd=ROOT, timeout=5)
+        if run.returncode != 0:
+            print(f"  FAIL  {label}, exit {run.returncode}")
+            return 1
+        print(f"  PASS  {label}")
     return 0
 
 

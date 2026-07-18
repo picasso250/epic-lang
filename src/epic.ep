@@ -107,11 +107,10 @@ fun main(): void {
     let e = make_emitter()
     emit_program(e, ast)
     if options.emit_asm == 1 {
-        write_file(output_path, e.out_buf)
-    } else {
-        let asm_text = str_new(e.out_buf.data, len(e.out_buf))
-        let image = assemble_text(asm_text)
-        pe_write_exe(output_path, image)
+        write_file(output_path, asm_render(e.program))
+    }
+    else {
+        pe_write_exe(output_path, asm_encode(e.program))
     }
     print(output_path)
     print("\n")
