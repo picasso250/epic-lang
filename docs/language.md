@@ -38,6 +38,29 @@ Compiler-driver and backend changes such as `-S`, `-o`, embedded runtime text,
 and in-memory assembly are implementation changes rather than language
 features.
 
+## Changes introduced in Epic v3
+
+Epic v3 starts from the complete Epic v2 language surface, and the v3 compiler
+source dogfoods the v2 additions that the previous generation deliberately did
+not use. The user-visible language changes introduced in v3 are intentionally
+small:
+
+- `ret` is the only return-statement keyword; the legacy compatibility spelling
+  `return` is rejected;
+- `exit(code: i64): void` terminates the process and has language-level
+  no-return semantics. A standalone `exit(...)` therefore satisfies required
+  return-path analysis, while the platform binding `os.ExitProcess(...)` does
+  not carry that semantic guarantee.
+
+The v3 compiler source also dogfoods v2 enums and `match`, compound assignment,
+unary operators, integer range loops, loop control, and safe container
+built-ins. That migration validates the previous generation's language work but
+does not introduce those features again in v3.
+
+Compiler-driver and backend changes such as verbose phase timings, `a.exe` as
+the default executable name, structured assembly IR, and fixed-point build
+layout changes are implementation changes rather than language features.
+
 ## Program model
 
 A program is a set of top-level product type, unit-enum, and function
