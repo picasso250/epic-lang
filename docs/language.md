@@ -47,6 +47,10 @@ small:
 
 - `ret` is the only return-statement keyword; the legacy compatibility spelling
   `return` is rejected;
+- the v2 built-in `str_replace_char(s: str, from: u8, to: u8): str` has been
+  removed. Code that needs byte replacement must perform it explicitly, for
+  example by copying with `bytes`, mutating the byte array, and constructing a
+  new string with `str_new`;
 - `exit(code: i64): void` terminates the process and has language-level
   no-return semantics. A standalone `exit(...)` therefore satisfies required
   return-path analysis, while the platform binding `os.ExitProcess(...)` does
