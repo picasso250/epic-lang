@@ -1,4 +1,4 @@
-# ERROR: nested arrays are not supported in v2
+# ERROR: nested arrays are not supported
 type Bad {
     values: i64[][]
 }

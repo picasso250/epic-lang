@@ -112,7 +112,7 @@ fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: 
             sema_error(path, line, "array element type cannot be void")
         }
         if sema_is_array(element) == 1 {
-            sema_error(path, line, "nested arrays are not supported in v2")
+            sema_error(path, line, "nested arrays are not supported")
         }
         if !sema_type_exists(state, element) {
             sema_error(path, line, "unknown array element type '" + element + "'")
