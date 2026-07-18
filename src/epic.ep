@@ -14,6 +14,13 @@ fun die_driver(msg: str): void {
     os.ExitProcess(1)
     ret
 }
+fun write_output(path: str, data: u8[]): void {
+    let written = write_file(path, data)
+    if written != len(data) {
+        die_driver("failed to write output file '" + path + "'")
+    }
+    ret
+}
 fun print_timing(verbose: i64, label: str, elapsed: i64): i64 {
     if verbose == 1 {
         print("epic: ")
@@ -147,7 +154,7 @@ fun main(): void {
     let encode_ms = 0
     let write_ms = 0
     if options.emit_asm == 1 {
-        let ignored_write = write_file(output_path, asm_render(e.program))
+        write_output(output_path, asm_render(e.program))
     } else {
         let image = asm_encode(e.program)
         if options.verbose == 1 {
@@ -155,7 +162,7 @@ fun main(): void {
             encode_ms = now - phase_start
             phase_start = now
         }
-        pe_write_exe(output_path, image)
+        write_output(output_path, pe_build_exe(image))
         if options.verbose == 1 {
             write_ms = os.GetTickCount64() - phase_start
         }

@@ -108,7 +108,31 @@ def main() -> int:
             print(f"  FAIL  custom executable returned {process.returncode}, expected 42")
             return 1
 
-    print("  PASS  isolated compiler, in-memory pipeline, -S, and -o")
+        missing_executable = isolated / "missing" / "failed.exe"
+        result = subprocess.run(
+            [str(compiler), "-o", str(missing_executable), "src/main.ep"],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 or "failed to write output file" not in result.stdout:
+            print("  FAIL  executable write failure was reported as success")
+            return 1
+
+        missing_assembly = isolated / "missing" / "failed.asm"
+        result = subprocess.run(
+            [str(compiler), "src/main.ep", "-S", "-o", str(missing_assembly)],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 or "failed to write output file" not in result.stdout:
+            print("  FAIL  assembly write failure was reported as success")
+            return 1
+
+    print("  PASS  isolated compiler, in-memory pipeline, -S, -o, and write failures")
     return 0
 
 

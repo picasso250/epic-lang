@@ -439,8 +439,3 @@ fun pe_build_exe(image: ExeImage): u8[] {
     pe_pad(out, 512, 0)
     ret out
 }
-fun pe_write_exe(path: str, image: ExeImage): i64 {
-    let out = pe_build_exe(image)
-    write_file(path, out)
-    ret len(out)
-}
