@@ -15,7 +15,13 @@ ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / "build"
 FIXED_POINT = BUILD / "fixed-point"
 SEED = BUILD / "epic-v3.exe"
-SOURCES = ("src/epic.ep", "src/utils.ep", "src/lexer.ep", "src/parser.ep", "src/sema.ep", "src/codegen.ep", "src/asm.ep", "src/pe.ep")
+SOURCES = tuple(
+    path.relative_to(ROOT).as_posix()
+    for path in sorted(
+        (ROOT / "src").glob("*.ep"),
+        key=lambda path: (path.name != "epic.ep", path.name),
+    )
+)
 
 
 def run(command: list[str]) -> None:

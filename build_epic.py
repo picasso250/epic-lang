@@ -20,15 +20,12 @@ from process_metrics import format_peak_working_set, run_measured
 ROOT = Path(__file__).resolve().parent
 BUILD_DIR = ROOT / "build"
 DEFAULT_OUTPUT = BUILD_DIR / "epic-v3.exe"
-SOURCE_PATHS = (
-    "src/epic.ep",
-    "src/utils.ep",
-    "src/lexer.ep",
-    "src/parser.ep",
-    "src/sema.ep",
-    "src/codegen.ep",
-    "src/asm.ep",
-    "src/pe.ep",
+SOURCE_PATHS = tuple(
+    path.relative_to(ROOT).as_posix()
+    for path in sorted(
+        (ROOT / "src").glob("*.ep"),
+        key=lambda path: (path.name != "epic.ep", path.name),
+    )
 )
 
 
