@@ -13,7 +13,7 @@ type FuncInfo {
 }
 type StringLit {
     text: str
-    id: i64
+    symbol_index: i64
 }
 type TypeInfo {
     kind: str
@@ -31,8 +31,6 @@ type StructInfo {
 }
 type EmitterState {
     program: AsmProgram
-    label_counter: i64
-    string_counter: i64
     current_fn: str
     current_ret_type: TypeInfo
     current_ep_id: i64
@@ -57,17 +55,23 @@ fun die(msg: str): i64 {
     os.ExitProcess(1)
     ret 0
 }
+fun named_symbol(e: EmitterState, name: str): i64 {
+    ret asm_symbol_intern(e.program, name)
+}
 fun emit_label(e: EmitterState, name: str): i64 {
-    ret asm_label(e.program, name)
+    ret asm_label(e.program, named_symbol(e, name))
 }
-fun emit_label_id(e: EmitterState, prefix: str, id: i64): i64 {
-    ret asm_label(e.program, prefix + itoa(id))
+fun emit_label_index(e: EmitterState, symbol_index: i64): i64 {
+    ret asm_label(e.program, symbol_index)
 }
-fun emit_lea_ref_id(e: EmitterState, dst: AsmOperand, prefix: str, id: i64): i64 {
-    ret asm_lea(e.program, dst, asm_mem_symbol(0, prefix + itoa(id), 0))
+fun emit_lea_ref(e: EmitterState, dst: AsmOperand, symbol_index: i64): i64 {
+    ret asm_lea(e.program, dst, asm_mem_symbol(0, symbol_index, 0))
 }
 fun emit_call_inst(e: EmitterState, target: str): i64 {
-    ret asm_call(e.program, asm_symbol(target))
+    ret asm_call(e.program, asm_symbol(named_symbol(e, target)))
+}
+fun emit_extern(e: EmitterState, name: str): i64 {
+    ret asm_extern_item(e.program, named_symbol(e, name))
 }
 fun sys_member_symbol(ns: str, name: str): str {
     if ns != "os" {
@@ -139,8 +143,7 @@ fun emit_stack_load(e: EmitterState, dst: AsmOperand, slot: i64): i64 {
     ret asm_mov(e.program, dst, asm_mem_base(0, asm_rbp(), slot))
 }
 fun fresh_label(e: EmitterState): i64 {
-    e.label_counter += 1
-    ret e.label_counter
+    ret asm_symbol_new(e.program, "")
 }
 fun emit_runtime(e: EmitterState, source: u8[]): i64 {
     ret asm_parse_text_into(e.program, source)
@@ -165,8 +168,6 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
 fun make_emitter(): EmitterState {
     let e = new EmitterState
     e.program = asm_program_new()
-    e.label_counter = 0
-    e.string_counter = 0
     e.current_fn = ""
     e.current_ret_type = type_void()
     e.current_ep_id = 0
@@ -262,15 +263,14 @@ fun emitter_type(e: EmitterState, name: str): TypeInfo {
 fun get_string_id(e: EmitterState, text: str): i64 {
     for i: 0:len(e.strings) {
         if e.strings.data[i].text == text {
-            ret e.strings.data[i].id
+            ret e.strings.data[i].symbol_index
         }
     }
-    e.string_counter += 1
     let s = new StringLit
     s.text = text
-    s.id = e.string_counter
+    s.symbol_index = asm_symbol_new(e.program, "")
     push(e.strings, s)
-    ret s.id
+    ret s.symbol_index
 }
 fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     match node.kind {
@@ -704,7 +704,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_stack_load(e, asm_rax(), tmp)
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
         asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 8))
-        asm_lea(e.program, asm_r9(), asm_mem_symbol(0, "_written", 0))
+        asm_lea(e.program, asm_r9(), asm_mem_symbol(0, named_symbol(e, "_written"), 0))
         asm_sub(e.program, asm_rsp(), asm_imm(16))
         asm_mov(e.program, asm_mem_base(64, asm_rsp(), 32), asm_imm(0))
         emit_call_inst(e, "WriteFile")
@@ -783,7 +783,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_stack_load(e, asm_rax(), pop_arr_slot)
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
         asm_test(e.program, asm_rcx(), asm_rcx())
-        asm_jz(e.program, asm_symbol("__ep_pop_fail"))
+        asm_jz(e.program, asm_symbol(named_symbol(e, "__ep_pop_fail")))
         asm_dec(e.program, asm_rcx())
         asm_mov(e.program, asm_mem_base(0, asm_rax(), 8), asm_rcx())
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
@@ -816,14 +816,14 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_stack_load(e, asm_rax(), arr_slot)
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
         asm_cmp(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 16))
-        asm_jge(e.program, asm_symbol("L" + itoa(grow)))
-        asm_jmp(e.program, asm_symbol("L" + itoa(store)))
-        emit_label_id(e, "L", grow)
+        asm_jge(e.program, asm_symbol(grow))
+        asm_jmp(e.program, asm_symbol(store))
+        emit_label_index(e, grow)
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 16))
         asm_test(e.program, asm_rdx(), asm_rdx())
-        asm_jnz(e.program, asm_symbol("L" + itoa(cap_nonzero)))
+        asm_jnz(e.program, asm_symbol(cap_nonzero))
         asm_mov(e.program, asm_rdx(), asm_imm(2))
-        emit_label_id(e, "L", cap_nonzero)
+        emit_label_index(e, cap_nonzero)
         asm_add(e.program, asm_rdx(), asm_rdx())
         asm_mov(e.program, asm_mem_base(0, asm_rax(), 16), asm_rdx())
         asm_mov(e.program, asm_r8(), asm_rdx())
@@ -839,9 +839,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 0))
         asm_mov(e.program, asm_r9(), asm_mem_base(0, asm_rax(), 8))
         asm_xor(e.program, asm_r10(), asm_r10())
-        emit_label_id(e, "L", copy_loop)
+        emit_label_index(e, copy_loop)
         asm_cmp(e.program, asm_r10(), asm_r9())
-        asm_jge(e.program, asm_symbol("L" + itoa(copy_done)))
+        asm_jge(e.program, asm_symbol(copy_done))
         if el_size == 1 {
             asm_mov(e.program, asm_r11b(), asm_mem_indexed(asm_r8(), asm_r10(), 1, 0))
             emit_stack_load(e, asm_rax(), new_data_slot)
@@ -852,12 +852,12 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             asm_mov(e.program, asm_mem_indexed(asm_rax(), asm_r10(), 8, 0), asm_r11())
         }
         asm_inc(e.program, asm_r10())
-        asm_jmp(e.program, asm_symbol("L" + itoa(copy_loop)))
-        emit_label_id(e, "L", copy_done)
+        asm_jmp(e.program, asm_symbol(copy_loop))
+        emit_label_index(e, copy_done)
         emit_stack_load(e, asm_rax(), arr_slot)
         emit_stack_load(e, asm_rcx(), new_data_slot)
         asm_mov(e.program, asm_mem_base(0, asm_rax(), 0), asm_rcx())
-        emit_label_id(e, "L", store)
+        emit_label_index(e, store)
         emit_stack_load(e, asm_rax(), arr_slot)
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 0))
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
@@ -917,26 +917,26 @@ fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64): i
             let count_ok = fresh_label(e)
             let count_bad = fresh_label(e)
             asm_cmp(e.program, asm_rcx(), asm_imm(0))
-            asm_jl(e.program, asm_symbol("L" + itoa(count_bad)))
+            asm_jl(e.program, asm_symbol(count_bad))
             asm_cmp(e.program, asm_rcx(), asm_imm(64))
-            asm_jl(e.program, asm_symbol("L" + itoa(count_ok)))
-            emit_label_id(e, "L", count_bad)
+            asm_jl(e.program, asm_symbol(count_ok))
+            emit_label_index(e, count_bad)
             asm_mov(e.program, asm_ecx(), asm_imm(1))
             emit_call_inst(e, "ExitProcess")
-            emit_label_id(e, "L", count_ok)
+            emit_label_index(e, count_ok)
             asm_shl(e.program, asm_rax(), asm_cl())
         }
         OperatorKind.ShiftRight {
             let shift_right_ok = fresh_label(e)
             let shift_right_bad = fresh_label(e)
             asm_cmp(e.program, asm_rcx(), asm_imm(0))
-            asm_jl(e.program, asm_symbol("L" + itoa(shift_right_bad)))
+            asm_jl(e.program, asm_symbol(shift_right_bad))
             asm_cmp(e.program, asm_rcx(), asm_imm(64))
-            asm_jl(e.program, asm_symbol("L" + itoa(shift_right_ok)))
-            emit_label_id(e, "L", shift_right_bad)
+            asm_jl(e.program, asm_symbol(shift_right_ok))
+            emit_label_index(e, shift_right_bad)
             asm_mov(e.program, asm_ecx(), asm_imm(1))
             emit_call_inst(e, "ExitProcess")
-            emit_label_id(e, "L", shift_right_ok)
+            emit_label_index(e, shift_right_ok)
             asm_sar(e.program, asm_rax(), asm_cl())
         }
         else {
@@ -951,10 +951,10 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         let true_id = fresh_label(e)
         emit_cond_jump(e, expr, 1, true_id)
         asm_xor(e.program, asm_eax(), asm_eax())
-        asm_jmp(e.program, asm_symbol("L" + itoa(end_id)))
-        emit_label_id(e, "L", true_id)
+        asm_jmp(e.program, asm_symbol(end_id))
+        emit_label_index(e, true_id)
         asm_mov(e.program, asm_eax(), asm_imm(1))
-        emit_label_id(e, "L", end_id)
+        emit_label_index(e, end_id)
         ret 0
     }
     let left_type = expr_type(e, expr.left)
@@ -1091,7 +1091,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         emit_stack_load(e, asm_rcx(), tmp)
         asm_cmp(e.program, asm_rax(), asm_rcx())
     }
-    let target = asm_symbol("L" + itoa(label))
+    let target = asm_symbol(label)
     match expr.op {
         OperatorKind.Equal {
             if jump_if_true == 1 {
@@ -1151,9 +1151,9 @@ fun emit_value_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i6
     emit_expr(e, expr)
     asm_test(e.program, asm_rax(), asm_rax())
     if jump_if_true == 1 {
-        asm_jnz(e.program, asm_symbol("L" + itoa(label)))
+        asm_jnz(e.program, asm_symbol(label))
     } else {
-        asm_jz(e.program, asm_symbol("L" + itoa(label)))
+        asm_jz(e.program, asm_symbol(label))
     }
     ret 0
 }
@@ -1212,7 +1212,7 @@ fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, lab
                 let and_skip = fresh_label(e)
                 emit_cond_jump(e, expr.left, 0, and_skip)
                 emit_cond_jump(e, expr.right, 1, label)
-                emit_label_id(e, "L", and_skip)
+                emit_label_index(e, and_skip)
             }
             ret 0
         }
@@ -1224,7 +1224,7 @@ fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, lab
                 let or_skip = fresh_label(e)
                 emit_cond_jump(e, expr.left, 1, or_skip)
                 emit_cond_jump(e, expr.right, 0, label)
-                emit_label_id(e, "L", or_skip)
+                emit_label_index(e, or_skip)
             }
             ret 0
         }
@@ -1318,19 +1318,19 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
             emit_expr(e, expr.count.value)
             let count_ok = fresh_label(e)
             asm_test(e.program, asm_rax(), asm_rax())
-            asm_jge(e.program, asm_symbol("L" + itoa(count_ok)))
+            asm_jge(e.program, asm_symbol(count_ok))
             asm_mov(e.program, asm_ecx(), asm_imm(1))
             emit_call_inst(e, "ExitProcess")
-            emit_label_id(e, "L", count_ok)
+            emit_label_index(e, count_ok)
             emit_stack_load(e, asm_rcx(), header_slot)
             asm_mov(e.program, asm_mem_base(0, asm_rcx(), 8), asm_rax())
         }
     }
     asm_cmp(e.program, asm_rax(), asm_imm(1))
     let cap_ok = fresh_label(e)
-    asm_jge(e.program, asm_symbol("L" + itoa(cap_ok)))
+    asm_jge(e.program, asm_symbol(cap_ok))
     asm_mov(e.program, asm_rax(), asm_imm(1))
-    emit_label_id(e, "L", cap_ok)
+    emit_label_index(e, cap_ok)
     emit_stack_load(e, asm_rcx(), header_slot)
     asm_mov(e.program, asm_mem_base(0, asm_rcx(), 16), asm_rax())
     asm_mov(e.program, asm_r8(), asm_rax())
@@ -1386,9 +1386,9 @@ fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): Type
     emit_stack_load(e, asm_rcx(), base_slot)
     if base_type.kind == "str" || base_type.kind == "array" {
         asm_test(e.program, asm_rax(), asm_rax())
-        asm_jl(e.program, asm_symbol("__ep_bounds_fail"))
+        asm_jl(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
         asm_cmp(e.program, asm_rax(), asm_mem_base(0, asm_rcx(), 8))
-        asm_jge(e.program, asm_symbol("__ep_bounds_fail"))
+        asm_jge(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rcx(), 0))
     }
     if type_is_u8(elem_type) == 1 {
@@ -1451,19 +1451,19 @@ fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
         }
         AstExprKind.String {
             let string_id = get_string_id(e, expr.value)
-            emit_lea_ref_id(e, asm_rcx(), "_str_", string_id)
+            emit_lea_ref(e, asm_rcx(), string_id)
             asm_mov(e.program, asm_rdx(), asm_imm(len(expr.value)))
             emit_call_inst(e, "_str_alloc")
         }
         AstExprKind.Embed {
             let embed_id = get_string_id(e, expr.value)
-            emit_lea_ref_id(e, asm_rcx(), "_str_", embed_id)
+            emit_lea_ref(e, asm_rcx(), embed_id)
             asm_mov(e.program, asm_rdx(), asm_imm(len(expr.value)))
             emit_call_inst(e, "_embed_bytes")
         }
         AstExprKind.Var {
             if expr.name == "argv" {
-                asm_mov(e.program, asm_rax(), asm_mem_symbol(0, "_argv", 0))
+                asm_mov(e.program, asm_rax(), asm_mem_symbol(0, named_symbol(e, "_argv"), 0))
             } else if type_is_u8(find_local_type(e, expr.name)) == 1 {
                 asm_movzx(e.program, asm_rax(), asm_mem_base(8, asm_rbp(), find_local_slot(e, expr.name)))
             } else {
@@ -1517,7 +1517,7 @@ fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
                 }
             }
         }
-        asm_jmp(e.program, asm_symbol("L" + itoa(e.current_ep_id)))
+        asm_jmp(e.program, asm_symbol(e.current_ep_id))
     }
     ret 0
 }
@@ -1571,11 +1571,11 @@ fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
     } else {
         emit_cond_jump(e, stmt.expr, 0, else_id)
         emit_block(e, stmt.then_block)
-        asm_jmp(e.program, asm_symbol("L" + itoa(end_id)))
-        emit_label_id(e, "L", else_id)
+        asm_jmp(e.program, asm_symbol(end_id))
+        emit_label_index(e, else_id)
         emit_block(e, stmt.else_block)
     }
-    emit_label_id(e, "L", end_id)
+    emit_label_index(e, end_id)
     ret 0
 }
 fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
@@ -1583,13 +1583,13 @@ fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     let end_id = fresh_label(e)
     push(e.loop_starts, start_id)
     push(e.loop_ends, end_id)
-    emit_label_id(e, "L", start_id)
+    emit_label_index(e, start_id)
     emit_cond_jump(e, stmt.expr, 0, end_id)
     emit_block(e, stmt.body)
     pop(e.loop_starts)
     pop(e.loop_ends)
-    asm_jmp(e.program, asm_symbol("L" + itoa(start_id)))
-    emit_label_id(e, "L", end_id)
+    asm_jmp(e.program, asm_symbol(start_id))
+    emit_label_index(e, end_id)
     ret 0
 }
 fun emit_for_range(e: EmitterState, stmt: AstStmt): i64 {
@@ -1602,18 +1602,18 @@ fun emit_for_range(e: EmitterState, stmt: AstStmt): i64 {
     let end_id = fresh_label(e)
     push(e.loop_starts, step_id)
     push(e.loop_ends, end_id)
-    emit_label_id(e, "L", check_id)
+    emit_label_index(e, check_id)
     emit_stack_load(e, asm_rax(), find_local_slot(e, stmt.name))
     emit_stack_load(e, asm_rcx(), stmt.range_end_slot)
     asm_cmp(e.program, asm_rax(), asm_rcx())
-    asm_jge(e.program, asm_symbol("L" + itoa(end_id)))
+    asm_jge(e.program, asm_symbol(end_id))
     emit_block(e, stmt.body)
     pop(e.loop_starts)
     pop(e.loop_ends)
-    emit_label_id(e, "L", step_id)
+    emit_label_index(e, step_id)
     asm_inc(e.program, asm_mem_base(64, asm_rbp(), find_local_slot(e, stmt.name)))
-    asm_jmp(e.program, asm_symbol("L" + itoa(check_id)))
-    emit_label_id(e, "L", end_id)
+    asm_jmp(e.program, asm_symbol(check_id))
+    emit_label_index(e, end_id)
     ret 0
 }
 fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
@@ -1624,33 +1624,33 @@ fun emit_match(e: EmitterState, stmt: AstStmt): i64 {
         let arm = stmt.match_arms.data[i]
         if arm.is_else == 1 {
             emit_block(e, arm.body)
-            asm_jmp(e.program, asm_symbol("L" + itoa(end_id)))
+            asm_jmp(e.program, asm_symbol(end_id))
         } else {
             let next_id = fresh_label(e)
             emit_stack_load(e, asm_rax(), subject_slot)
             asm_mov(e.program, asm_rcx(), asm_imm(arm.value))
             asm_cmp(e.program, asm_rax(), asm_rcx())
-            asm_jne(e.program, asm_symbol("L" + itoa(next_id)))
+            asm_jne(e.program, asm_symbol(next_id))
             emit_block(e, arm.body)
-            asm_jmp(e.program, asm_symbol("L" + itoa(end_id)))
-            emit_label_id(e, "L", next_id)
+            asm_jmp(e.program, asm_symbol(end_id))
+            emit_label_index(e, next_id)
         }
     }
-    emit_label_id(e, "L", end_id)
+    emit_label_index(e, end_id)
     ret 0
 }
 fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
     if !len(e.loop_ends) {
         die("break outside loop")
     }
-    asm_jmp(e.program, asm_symbol("L" + itoa(e.loop_ends.data[len(e.loop_ends) - 1])))
+    asm_jmp(e.program, asm_symbol(e.loop_ends.data[len(e.loop_ends) - 1]))
     ret 0
 }
 fun emit_continue(e: EmitterState, stmt: AstStmt): i64 {
     if !len(e.loop_starts) {
         die("continue outside loop")
     }
-    asm_jmp(e.program, asm_symbol("L" + itoa(e.loop_starts.data[len(e.loop_starts) - 1])))
+    asm_jmp(e.program, asm_symbol(e.loop_starts.data[len(e.loop_starts) - 1]))
     ret 0
 }
 fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
@@ -1720,15 +1720,15 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
         emit_label(e, fn.name)
     }
     if fn.name == "main" {
-        asm_mov(e.program, asm_mem_symbol(0, "_gc_stack_high", 0), asm_rsp())
+        asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_gc_stack_high"), 0), asm_rsp())
     }
     emit_prologue(e)
     if fn.name == "main" {
         emit_call_inst(e, "GetProcessHeap")
-        asm_mov(e.program, asm_mem_symbol(0, "_heap", 0), asm_rax())
+        asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_heap"), 0), asm_rax())
         emit_call_inst(e, "__ep_gc_small_init")
         emit_call_inst(e, "_argv_init")
-        asm_mov(e.program, asm_mem_symbol(0, "_argv", 0), asm_rax())
+        asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_argv"), 0), asm_rax())
     }
     if len(fn.params) > 0 {
         if type_is_u8(find_local_type(e, fn.params.data[0].name)) == 1 {
@@ -1767,7 +1767,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
         asm_mov(e.program, asm_ecx(), asm_imm(0))
         emit_call_inst(e, "ExitProcess")
     } else {
-        emit_label_id(e, "L", e.current_ep_id)
+        emit_label_index(e, e.current_ep_id)
         emit_epilogue(e)
     }
     e.alloc_size = align_up(e.local_bytes + e.temp_peak * 8 + 32, 16)
@@ -1782,43 +1782,43 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     compute_struct_layouts(e, ast)
     add_func_infos(e, ast)
     collect_program_strings(e, ast)
-    e.program.entry_symbol = "_start"
-    asm_extern_item(e.program, "ExitProcess")
-    asm_extern_item(e.program, "GetStdHandle")
-    asm_extern_item(e.program, "WriteFile")
-    asm_extern_item(e.program, "CreateFileA")
-    asm_extern_item(e.program, "ReadFile")
-    asm_extern_item(e.program, "SetFilePointer")
-    asm_extern_item(e.program, "CloseHandle")
-    asm_extern_item(e.program, "GetFileSize")
-    asm_extern_item(e.program, "lstrcmpA")
-    asm_extern_item(e.program, "lstrlenA")
-    asm_extern_item(e.program, "GetCommandLineA")
-    asm_extern_item(e.program, "HeapAlloc")
-    asm_extern_item(e.program, "HeapFree")
-    asm_extern_item(e.program, "GetProcessHeap")
-    asm_extern_item(e.program, "VirtualAlloc")
-    asm_extern_item(e.program, "Beep")
-    asm_extern_item(e.program, "GetCurrentProcess")
-    asm_extern_item(e.program, "GetCurrentProcessId")
-    asm_extern_item(e.program, "GetCurrentThreadId")
-    asm_extern_item(e.program, "GetFileAttributesA")
-    asm_extern_item(e.program, "CreateDirectoryA")
-    asm_extern_item(e.program, "GetLastError")
-    asm_extern_item(e.program, "GetTickCount64")
-    asm_extern_item(e.program, "MessageBoxA")
-    asm_extern_item(e.program, "SetLastError")
-    asm_extern_item(e.program, "Sleep")
+    e.program.entry_symbol_index = named_symbol(e, "_start")
+    emit_extern(e, "ExitProcess")
+    emit_extern(e, "GetStdHandle")
+    emit_extern(e, "WriteFile")
+    emit_extern(e, "CreateFileA")
+    emit_extern(e, "ReadFile")
+    emit_extern(e, "SetFilePointer")
+    emit_extern(e, "CloseHandle")
+    emit_extern(e, "GetFileSize")
+    emit_extern(e, "lstrcmpA")
+    emit_extern(e, "lstrlenA")
+    emit_extern(e, "GetCommandLineA")
+    emit_extern(e, "HeapAlloc")
+    emit_extern(e, "HeapFree")
+    emit_extern(e, "GetProcessHeap")
+    emit_extern(e, "VirtualAlloc")
+    emit_extern(e, "Beep")
+    emit_extern(e, "GetCurrentProcess")
+    emit_extern(e, "GetCurrentProcessId")
+    emit_extern(e, "GetCurrentThreadId")
+    emit_extern(e, "GetFileAttributesA")
+    emit_extern(e, "CreateDirectoryA")
+    emit_extern(e, "GetLastError")
+    emit_extern(e, "GetTickCount64")
+    emit_extern(e, "MessageBoxA")
+    emit_extern(e, "SetLastError")
+    emit_extern(e, "Sleep")
     asm_section_data(e.program)
-    asm_label(e.program, "_written")
+    emit_label(e, "_written")
     asm_dd(e.program, 0)
-    asm_label(e.program, "_heap")
+    emit_label(e, "_heap")
     asm_dq(e.program, 0)
-    asm_label(e.program, "_argv")
+    emit_label(e, "_argv")
     asm_dq(e.program, 0)
     let i = 0
     while i < len(e.strings) {
-        emit_label_id(e, "_str_", e.strings.data[i].id)
+        emit_label_index(e, e.strings.data[i].symbol_index)
         asm_bytes(e.program, string_bytes(e.strings.data[i].text))
         i += 1
     }

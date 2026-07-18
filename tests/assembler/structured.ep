@@ -12,28 +12,38 @@ fun equal_bytes(a: u8[], b: u8[]): i64 {
 
 fun main(): void {
     let program = asm_program_new()
-    program.entry_symbol = "_start"
+    let start_symbol = asm_symbol_new(program, "_start")
+    let value_symbol = asm_symbol_new(program, "value")
+    let payload_symbol = asm_symbol_new(program, "payload")
+    let done_symbol = asm_symbol_new(program, "done")
+    let anonymous_symbol = asm_symbol_new(program, "")
+    let collision_symbol = asm_symbol_new(program, "__ep_anon_" + itoa(anonymous_symbol))
+    program.entry_symbol_index = start_symbol
     asm_section_data(program)
-    asm_label(program, "value")
+    asm_label(program, value_symbol)
     asm_dq(program, 0)
     let payload = new u8[]
     push(payload, 1)
     push(payload, 2)
     push(payload, 3)
-    asm_label(program, "payload")
+    asm_label(program, payload_symbol)
     asm_bytes(program, payload)
     asm_section_text(program)
-    asm_label(program, "_start")
+    asm_label(program, start_symbol)
     asm_mov(program, asm_rax(), asm_imm(7))
-    asm_mov(program, asm_mem_symbol(64, "value", 0), asm_imm(0))
+    asm_mov(program, asm_mem_symbol(64, value_symbol, 0), asm_imm(0))
     asm_mov(program, asm_rax(), asm_mem_base(0, asm_rbp(), -8))
     asm_mov(program, asm_mem_base(0, asm_rbp(), -16), asm_imm(0))
     asm_lea(program, asm_rax(), asm_mem_base(0, asm_rbp(), -24))
     asm_add(program, asm_mem_base(0, asm_rbp(), -32), asm_imm(1))
     asm_cmp(program, asm_rax(), asm_mem_base(0, asm_rbp(), -40))
     asm_inc(program, asm_mem_base(0, asm_rbp(), -48))
-    asm_jmp(program, asm_symbol("done"))
-    asm_label(program, "done")
+    asm_jmp(program, asm_symbol(done_symbol))
+    asm_label(program, done_symbol)
+    asm_jmp(program, asm_symbol(anonymous_symbol))
+    asm_label(program, collision_symbol)
+    asm_ret(program)
+    asm_label(program, anonymous_symbol)
     asm_ret(program)
 
     let rendered = asm_render(program)
@@ -73,7 +83,9 @@ fun main(): void {
     for reloc_i: 0:len(direct.relocs) {
         let a = direct.relocs.data[reloc_i]
         let b = roundtrip.relocs.data[reloc_i]
-        if a.kind != b.kind || a.symbol != b.symbol || a.addend != b.addend {
+        let a_name = asm_symbol_name(program, a.symbol_index)
+        let b_name = asm_symbol_name(parsed, b.symbol_index)
+        if a.kind != b.kind || a_name != b_name || a.addend != b.addend {
             os.ExitProcess(8)
         }
     }

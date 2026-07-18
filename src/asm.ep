@@ -12,12 +12,12 @@ type AsmSymbol {
     section: i64
     offset: i64
     external: i64
+    defined: i64
 }
 type AsmReloc {
     section: i64
     offset: i64
     kind: i64
-    symbol: str
     symbol_index: i64
     addend: i64
 }
@@ -34,7 +34,7 @@ type AsmOperand {
     width: i64
     reg: i64
     imm: i64
-    symbol: str
+    symbol_index: i64
     base: i64
     index: i64
     scale: i64
@@ -44,7 +44,7 @@ type AsmOperand {
 type AsmItem {
     kind: AsmItemKind
     section: AsmSectionKind
-    name: str
+    symbol_index: i64
     instruction: AsmInstructionKind
     a: AsmOperand
     b: AsmOperand
@@ -55,13 +55,19 @@ type AsmItem {
 }
 type AsmProgram {
     items: AsmItem[]
-    entry_symbol: str
+    symbols: AsmSymbol[]
+    named_symbols: i64[]
+    entry_symbol_index: i64
 }
 type AsmProgramParser {
     program: AsmProgram
     scope: str
     section: AsmSectionKind
     has_section: i64
+}
+type AsmRenderer {
+    out: u8[]
+    program: AsmProgram
 }
 
 fun asm_die(msg: str): i64 {
@@ -196,10 +202,10 @@ fun asm_operand_new(kind: AsmOperandKind): AsmOperand {
     op.kind = kind
     op.width = 0
     op.reg = -1
+    op.symbol_index = -1
     op.base = -1
     op.index = -1
     op.scale = 1
-    op.symbol = ""
     ret op
 }
 fun asm_register(reg: i64, width: i64): AsmOperand {
@@ -309,9 +315,9 @@ fun asm_imm(value: i64): AsmOperand {
     op.imm = value
     ret op
 }
-fun asm_symbol(name: str): AsmOperand {
+fun asm_symbol(symbol_index: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Symbol)
-    op.symbol = name
+    op.symbol_index = symbol_index
     ret op
 }
 fun asm_mem_base(width: i64, base: AsmOperand, disp: i64): AsmOperand {
@@ -337,22 +343,65 @@ fun asm_operand_width(op: AsmOperand, width: i64): AsmOperand {
     op.width = width
     ret op
 }
-fun asm_mem_symbol(width: i64, symbol: str, disp: i64): AsmOperand {
+fun asm_mem_symbol(width: i64, symbol_index: i64, disp: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Memory)
     op.width = width
-    op.symbol = symbol
+    op.symbol_index = symbol_index
     op.disp = disp
     ret op
 }
 fun asm_program_new(): AsmProgram {
     let program = new AsmProgram
     program.items = new AsmItem[]
-    program.entry_symbol = ""
+    program.symbols = new AsmSymbol[]
+    program.named_symbols = new i64[]
+    program.entry_symbol_index = -1
     ret program
+}
+fun asm_symbol_new(program: AsmProgram, name: str): i64 {
+    let symbol = new AsmSymbol
+    symbol.name = name
+    let symbol_index = len(program.symbols)
+    push(program.symbols, symbol)
+    if len(name) != 0 {
+        push(program.named_symbols, symbol_index)
+    }
+    ret symbol_index
+}
+fun asm_named_symbol_find(program: AsmProgram, name: str): i64 {
+    for named_i: 0:len(program.named_symbols) {
+        let symbol_index = program.named_symbols.data[named_i]
+        if program.symbols.data[symbol_index].name == name {
+            ret symbol_index
+        }
+    }
+    ret -1
+}
+fun asm_symbol_intern(program: AsmProgram, name: str): i64 {
+    let symbol_index = asm_named_symbol_find(program, name)
+    if symbol_index >= 0 {
+        ret symbol_index
+    }
+    ret asm_symbol_new(program, name)
+}
+fun asm_symbol_name(program: AsmProgram, symbol_index: i64): str {
+    if symbol_index < 0 || symbol_index >= len(program.symbols) {
+        asm_die("invalid symbol index")
+    }
+    let name = program.symbols.data[symbol_index].name
+    if len(name) != 0 {
+        ret name
+    }
+    let generated = "__ep_anon_" + itoa(symbol_index)
+    while asm_named_symbol_find(program, generated) >= 0 {
+        generated = generated + "_"
+    }
+    ret generated
 }
 fun asm_item_new(kind: AsmItemKind): AsmItem {
     let item = new AsmItem
     item.kind = kind
+    item.symbol_index = -1
     ret item
 }
 fun asm_section(program: AsmProgram, section: AsmSectionKind): i64 {
@@ -367,15 +416,31 @@ fun asm_section_text(program: AsmProgram): i64 {
 fun asm_section_data(program: AsmProgram): i64 {
     ret asm_section(program, AsmSectionKind.Data)
 }
-fun asm_extern_item(program: AsmProgram, name: str): i64 {
+fun asm_extern_item(program: AsmProgram, symbol_index: i64): i64 {
+    if symbol_index < 0 || symbol_index >= len(program.symbols) {
+        asm_die("invalid extern symbol index")
+    }
+    let symbol = program.symbols.data[symbol_index]
+    if symbol.defined == 0 {
+        symbol.external = 1
+    }
     let item = asm_item_new(AsmItemKind.Extern)
-    item.name = name
+    item.symbol_index = symbol_index
     push(program.items, item)
     ret 0
 }
-fun asm_label(program: AsmProgram, name: str): i64 {
+fun asm_label(program: AsmProgram, symbol_index: i64): i64 {
+    if symbol_index < 0 || symbol_index >= len(program.symbols) {
+        asm_die("invalid label symbol index")
+    }
+    let symbol = program.symbols.data[symbol_index]
+    if symbol.defined == 1 {
+        asm_die("duplicate symbol: " + asm_symbol_name(program, symbol_index))
+    }
+    symbol.defined = 1
+    symbol.external = 0
     let item = asm_item_new(AsmItemKind.Label)
-    item.name = name
+    item.symbol_index = symbol_index
     push(program.items, item)
     ret 0
 }
@@ -399,9 +464,9 @@ fun asm_dq(program: AsmProgram, value: i64): i64 {
     push(program.items, item)
     ret 0
 }
-fun asm_dq_symbol(program: AsmProgram, name: str): i64 {
+fun asm_dq_symbol(program: AsmProgram, symbol_index: i64): i64 {
     let item = asm_item_new(AsmItemKind.DataSymbol)
-    item.name = name
+    item.symbol_index = symbol_index
     push(program.items, item)
     ret 0
 }
@@ -597,55 +662,15 @@ fun asm_u64(image: ExeImage, value: i64): i64 {
     asm_u32(image, value >> 32)
     ret 0
 }
-fun asm_symbol_find(image: ExeImage, name: str): i64 {
-    let i = 0
-    while i < len(image.symbols) {
-        if image.symbols.data[i].name == name {
-            ret i
-        }
-        i += 1
+fun asm_reloc(image: ExeImage, kind: i64, symbol_index: i64, addend: i64): i64 {
+    if symbol_index < 0 || symbol_index >= len(image.symbols) {
+        asm_die("invalid relocation symbol index")
     }
-    ret -1
-}
-fun asm_define(image: ExeImage, name: str): i64 {
-    let old_index = asm_symbol_find(image, name)
-    if old_index >= 0 && image.symbols.data[old_index].external == 0 {
-        asm_die("duplicate symbol: " + name)
-    }
-    let sym = new AsmSymbol
-    sym.name = name
-    sym.section = image.section
-    sym.offset = asm_offset(image)
-    sym.external = 0
-    if old_index < 0 {
-        push(image.symbols, sym)
-    }
-    else {
-        let old = image.symbols.data[old_index]
-        old.section = sym.section
-        old.offset = sym.offset
-        old.external = 0
-    }
-    ret 0
-}
-fun asm_extern(image: ExeImage, name: str): i64 {
-    let old_index = asm_symbol_find(image, name)
-    if old_index >= 0 {
-        ret 0
-    }
-    let sym = new AsmSymbol
-    sym.name = name
-    sym.external = 1
-    push(image.symbols, sym)
-    ret 0
-}
-fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
     let r = new AsmReloc
     r.section = image.section
     r.offset = asm_offset(image)
     r.kind = kind
-    r.symbol = symbol
-    r.symbol_index = 0 - 1
+    r.symbol_index = symbol_index
     r.addend = addend
     push(image.relocs, r)
     ret 0
@@ -700,12 +725,12 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     if op.kind != AsmOperandKind.Memory {
         asm_die("expected register or memory operand")
     }
-    if len(op.symbol) != 0 {
+    if op.symbol_index >= 0 {
         if op.base >= 0 || op.index >= 0 {
             asm_die("symbol plus register is unsupported")
         }
         asm_modrm(image, 0, reg_field, 5)
-        asm_reloc(image, 2, op.symbol, op.disp)
+        asm_reloc(image, 2, op.symbol_index, op.disp)
         asm_u32(image, 0)
         ret 0
     }
@@ -1101,7 +1126,7 @@ fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand)
         asm_byte(image, 15)
         asm_byte(image, asm_jump_code(kind))
     }
-    asm_reloc(image, 1, target.symbol, 0)
+    asm_reloc(image, 1, target.symbol_index, 0)
     asm_u32(image, 0)
     ret 0
 }
@@ -1146,7 +1171,7 @@ fun asm_encode_call(image: ExeImage, target: AsmOperand): i64 {
         asm_die("call target must be a symbol")
     }
     asm_byte(image, 232)
-    asm_reloc(image, 1, target.symbol, 0)
+    asm_reloc(image, 1, target.symbol_index, 0)
     asm_u32(image, 0)
     ret 0
 }
@@ -1303,19 +1328,6 @@ fun asm_encode_instruction_item(image: ExeImage, item: AsmItem): i64 {
     ret 0
 }
 
-fun asm_resolve_internal(image: ExeImage): i64 {
-    let i = 0
-    while i < len(image.relocs) {
-        let r = image.relocs.data[i]
-        let sym_index = asm_symbol_find(image, r.symbol)
-        if sym_index < 0 {
-            asm_die("undefined symbol: " + r.symbol)
-        }
-        image.relocs.data[i].symbol_index = sym_index
-        i += 1
-    }
-    ret 0
-}
 fun asm_program_qualify(parser: AsmProgramParser, name: str): str {
     if len(name) > 0 && name.data[0] == 46 {
         ret parser.scope + name
@@ -1373,10 +1385,10 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
             op.disp += sign * parse_integer(term)
         }
         else {
-            if len(op.symbol) != 0 {
+            if op.symbol_index >= 0 {
                 asm_die("complex symbol operand: " + text)
             }
-            op.symbol = asm_program_qualify(parser, term)
+            op.symbol_index = asm_symbol_intern(parser.program, asm_program_qualify(parser, term))
             if sign < 0 {
                 asm_die("negative symbol operand: " + text)
             }
@@ -1410,7 +1422,7 @@ fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     if asm_is_number(text) == 1 {
         ret asm_imm(parse_integer(text))
     }
-    ret asm_symbol(asm_program_qualify(parser, text))
+    ret asm_symbol(asm_symbol_intern(parser.program, asm_program_qualify(parser, text)))
 }
 fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): i64 {
     let space = asm_find(line, 32)
@@ -1600,7 +1612,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
             asm_dq(parser.program, parse_integer(data_args))
         }
         else {
-            asm_dq_symbol(parser.program, asm_program_qualify(parser, data_args))
+            asm_dq_symbol(parser.program, asm_symbol_intern(parser.program, asm_program_qualify(parser, data_args)))
         }
         ret 1
     }
@@ -1649,14 +1661,15 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
         ret 0
     }
     if asm_starts(line, "global ") == 1 {
-        parser.program.entry_symbol = asm_trim(asm_slice(line, 7, len(line)))
+        parser.program.entry_symbol_index = asm_symbol_intern(parser.program, asm_trim(asm_slice(line, 7, len(line))))
         ret 0
     }
     if line == "default rel" {
         ret 0
     }
     if asm_starts(line, "extern ") == 1 {
-        asm_extern_item(parser.program, asm_trim(asm_slice(line, 7, len(line))))
+        let extern_symbol_index = asm_symbol_intern(parser.program, asm_trim(asm_slice(line, 7, len(line))))
+        asm_extern_item(parser.program, extern_symbol_index)
         ret 0
     }
     if line == "section .text" {
@@ -1676,7 +1689,8 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
     if line.data[len(line) - 1] == 58 {
         let raw_name = asm_trim(asm_slice(line, 0, len(line) - 1))
         let qualified_name = asm_program_qualify(parser, raw_name)
-        asm_label(parser.program, qualified_name)
+        let label_symbol_index = asm_symbol_intern(parser.program, qualified_name)
+        asm_label(parser.program, label_symbol_index)
         if raw_name.data[0] != 46 {
             parser.scope = raw_name
         }
@@ -1725,11 +1739,16 @@ fun asm_parse(source: str): AsmProgram {
 
 fun asm_encode(program: AsmProgram): ExeImage {
     let image = asm_image_new()
+    image.symbols = program.symbols
+    for reset_symbol_i: 0:len(image.symbols) {
+        image.symbols.data[reset_symbol_i].section = 0
+        image.symbols.data[reset_symbol_i].offset = 0
+    }
     for item_i: 0:len(program.items) {
         let item = program.items.data[item_i]
         match item.kind {
             AsmItemKind.Section {
-                            if item.section == AsmSectionKind.Text {
+                if item.section == AsmSectionKind.Text {
                     image.section = 1
                 }
                 else {
@@ -1737,10 +1756,14 @@ fun asm_encode(program: AsmProgram): ExeImage {
                 }
             }
             AsmItemKind.Extern {
-                asm_extern(image, item.name)
             }
             AsmItemKind.Label {
-                asm_define(image, item.name)
+                if item.symbol_index < 0 || item.symbol_index >= len(image.symbols) {
+                    asm_die("invalid label symbol index")
+                }
+                let label_symbol = image.symbols.data[item.symbol_index]
+                label_symbol.section = image.section
+                label_symbol.offset = asm_offset(image)
             }
             AsmItemKind.Instruction {
                 if image.section != 1 {
@@ -1765,7 +1788,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
                 }
             }
             AsmItemKind.DataSymbol {
-                asm_reloc(image, 3, item.name, 0)
+                asm_reloc(image, 3, item.symbol_index, 0)
                 asm_u64(image, 0)
             }
             AsmItemKind.RepeatData {
@@ -1786,18 +1809,26 @@ fun asm_encode(program: AsmProgram): ExeImage {
             }
         }
     }
-    if len(program.entry_symbol) != 0 {
-        let entry_index = asm_symbol_find(image, program.entry_symbol)
-        if entry_index < 0 {
-            asm_die("undefined entry symbol: " + program.entry_symbol)
+    for reloc_i: 0:len(image.relocs) {
+        let reloc = image.relocs.data[reloc_i]
+        let reloc_symbol = image.symbols.data[reloc.symbol_index]
+        if reloc_symbol.defined == 0 && reloc_symbol.external == 0 {
+            asm_die("undefined symbol: " + asm_symbol_name(program, reloc.symbol_index))
         }
-        let entry = image.symbols.data[entry_index]
+    }
+    if program.entry_symbol_index >= 0 {
+        if program.entry_symbol_index >= len(image.symbols) {
+            asm_die("invalid entry symbol index")
+        }
+        let entry = image.symbols.data[program.entry_symbol_index]
+        if entry.defined == 0 {
+            asm_die("undefined entry symbol: " + asm_symbol_name(program, program.entry_symbol_index))
+        }
         if entry.section != 1 {
             asm_die("entry symbol is not in .text")
         }
         image.entry_offset = entry.offset
     }
-    asm_resolve_internal(image)
     ret image
 }
 
@@ -1935,7 +1966,9 @@ fun asm_render_register(out: u8[], op: AsmOperand): i64 {
     }
     ret asm_render_s(out, name)
 }
-fun asm_render_operand(out: u8[], op: AsmOperand): i64 {
+fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): i64 {
+    let out = renderer.out
+    let program = renderer.program
     match op.kind {
         AsmOperandKind.Register {
             ret asm_render_register(out, op)
@@ -1944,7 +1977,7 @@ fun asm_render_operand(out: u8[], op: AsmOperand): i64 {
             ret asm_render_i(out, op.imm)
         }
         AsmOperandKind.Symbol {
-            ret asm_render_s(out, op.symbol)
+            ret asm_render_s(out, asm_symbol_name(program, op.symbol_index))
         }
         AsmOperandKind.Memory {
             if op.width == 8 {
@@ -1958,9 +1991,9 @@ fun asm_render_operand(out: u8[], op: AsmOperand): i64 {
             }
             asm_render_s(out, "[")
             let wrote = 0
-            if len(op.symbol) != 0 {
+            if op.symbol_index >= 0 {
                 asm_render_s(out, "rel ")
-                asm_render_s(out, op.symbol)
+                asm_render_s(out, asm_symbol_name(program, op.symbol_index))
                 wrote = 1
             }
             if op.base >= 0 {
@@ -2000,164 +2033,170 @@ fun asm_render_operand(out: u8[], op: AsmOperand): i64 {
     }
     ret 0
 }
-fun asm_render_inst0(out: u8[], name: str): i64 {
+fun asm_render_inst0(renderer: AsmRenderer, name: str): i64 {
+    let out = renderer.out
     asm_render_s(out, "    ")
     asm_render_s(out, name)
     asm_render_s(out, "\n")
     ret 0
 }
-fun asm_render_inst1(out: u8[], name: str, a: AsmOperand): i64 {
+fun asm_render_inst1(renderer: AsmRenderer, name: str, a: AsmOperand): i64 {
+    let out = renderer.out
     asm_render_s(out, "    ")
     asm_render_s(out, name)
     asm_render_s(out, " ")
-    asm_render_operand(out, a)
+    asm_render_operand(renderer, a)
     asm_render_s(out, "\n")
     ret 0
 }
-fun asm_render_inst2(out: u8[], name: str, a: AsmOperand, b: AsmOperand): i64 {
+fun asm_render_inst2(renderer: AsmRenderer, name: str, a: AsmOperand, b: AsmOperand): i64 {
+    let out = renderer.out
     asm_render_s(out, "    ")
     asm_render_s(out, name)
     asm_render_s(out, " ")
-    asm_render_operand(out, a)
+    asm_render_operand(renderer, a)
     asm_render_s(out, ", ")
-    asm_render_operand(out, b)
+    asm_render_operand(renderer, b)
     asm_render_s(out, "\n")
     ret 0
 }
 
-fun asm_render_instruction(out: u8[], item: AsmItem): i64 {
+fun asm_render_instruction(renderer: AsmRenderer, item: AsmItem): i64 {
     match item.instruction {
         AsmInstructionKind.Mov {
-            ret asm_render_inst2(out, "mov", item.a, item.b)
+            ret asm_render_inst2(renderer, "mov", item.a, item.b)
         }
         AsmInstructionKind.Lea {
-            ret asm_render_inst2(out, "lea", item.a, item.b)
+            ret asm_render_inst2(renderer, "lea", item.a, item.b)
         }
         AsmInstructionKind.Movzx {
-            ret asm_render_inst2(out, "movzx", item.a, item.b)
+            ret asm_render_inst2(renderer, "movzx", item.a, item.b)
         }
         AsmInstructionKind.Add {
-            ret asm_render_inst2(out, "add", item.a, item.b)
+            ret asm_render_inst2(renderer, "add", item.a, item.b)
         }
         AsmInstructionKind.Sub {
-            ret asm_render_inst2(out, "sub", item.a, item.b)
+            ret asm_render_inst2(renderer, "sub", item.a, item.b)
         }
         AsmInstructionKind.And {
-            ret asm_render_inst2(out, "and", item.a, item.b)
+            ret asm_render_inst2(renderer, "and", item.a, item.b)
         }
         AsmInstructionKind.Or {
-            ret asm_render_inst2(out, "or", item.a, item.b)
+            ret asm_render_inst2(renderer, "or", item.a, item.b)
         }
         AsmInstructionKind.Xor {
-            ret asm_render_inst2(out, "xor", item.a, item.b)
+            ret asm_render_inst2(renderer, "xor", item.a, item.b)
         }
         AsmInstructionKind.Cmp {
-            ret asm_render_inst2(out, "cmp", item.a, item.b)
+            ret asm_render_inst2(renderer, "cmp", item.a, item.b)
         }
         AsmInstructionKind.Test {
-            ret asm_render_inst2(out, "test", item.a, item.b)
+            ret asm_render_inst2(renderer, "test", item.a, item.b)
         }
         AsmInstructionKind.Imul {
-            ret asm_render_inst2(out, "imul", item.a, item.b)
+            ret asm_render_inst2(renderer, "imul", item.a, item.b)
         }
         AsmInstructionKind.Shl {
-            ret asm_render_inst2(out, "shl", item.a, item.b)
+            ret asm_render_inst2(renderer, "shl", item.a, item.b)
         }
         AsmInstructionKind.Shr {
-            ret asm_render_inst2(out, "shr", item.a, item.b)
+            ret asm_render_inst2(renderer, "shr", item.a, item.b)
         }
         AsmInstructionKind.Sar {
-            ret asm_render_inst2(out, "sar", item.a, item.b)
+            ret asm_render_inst2(renderer, "sar", item.a, item.b)
         }
         AsmInstructionKind.Call {
-            ret asm_render_inst1(out, "call", item.a)
+            ret asm_render_inst1(renderer, "call", item.a)
         }
         AsmInstructionKind.Jmp {
-            ret asm_render_inst1(out, "jmp", item.a)
+            ret asm_render_inst1(renderer, "jmp", item.a)
         }
         AsmInstructionKind.Je {
-            ret asm_render_inst1(out, "je", item.a)
+            ret asm_render_inst1(renderer, "je", item.a)
         }
         AsmInstructionKind.Jz {
-            ret asm_render_inst1(out, "jz", item.a)
+            ret asm_render_inst1(renderer, "jz", item.a)
         }
         AsmInstructionKind.Jne {
-            ret asm_render_inst1(out, "jne", item.a)
+            ret asm_render_inst1(renderer, "jne", item.a)
         }
         AsmInstructionKind.Jnz {
-            ret asm_render_inst1(out, "jnz", item.a)
+            ret asm_render_inst1(renderer, "jnz", item.a)
         }
         AsmInstructionKind.Jl {
-            ret asm_render_inst1(out, "jl", item.a)
+            ret asm_render_inst1(renderer, "jl", item.a)
         }
         AsmInstructionKind.Jge {
-            ret asm_render_inst1(out, "jge", item.a)
+            ret asm_render_inst1(renderer, "jge", item.a)
         }
         AsmInstructionKind.Jle {
-            ret asm_render_inst1(out, "jle", item.a)
+            ret asm_render_inst1(renderer, "jle", item.a)
         }
         AsmInstructionKind.Jg {
-            ret asm_render_inst1(out, "jg", item.a)
+            ret asm_render_inst1(renderer, "jg", item.a)
         }
         AsmInstructionKind.Jns {
-            ret asm_render_inst1(out, "jns", item.a)
+            ret asm_render_inst1(renderer, "jns", item.a)
         }
         AsmInstructionKind.Sete {
-            ret asm_render_inst1(out, "sete", item.a)
+            ret asm_render_inst1(renderer, "sete", item.a)
         }
         AsmInstructionKind.Setne {
-            ret asm_render_inst1(out, "setne", item.a)
+            ret asm_render_inst1(renderer, "setne", item.a)
         }
         AsmInstructionKind.Setl {
-            ret asm_render_inst1(out, "setl", item.a)
+            ret asm_render_inst1(renderer, "setl", item.a)
         }
         AsmInstructionKind.Setge {
-            ret asm_render_inst1(out, "setge", item.a)
+            ret asm_render_inst1(renderer, "setge", item.a)
         }
         AsmInstructionKind.Setle {
-            ret asm_render_inst1(out, "setle", item.a)
+            ret asm_render_inst1(renderer, "setle", item.a)
         }
         AsmInstructionKind.Setg {
-            ret asm_render_inst1(out, "setg", item.a)
+            ret asm_render_inst1(renderer, "setg", item.a)
         }
         AsmInstructionKind.Inc {
-            ret asm_render_inst1(out, "inc", item.a)
+            ret asm_render_inst1(renderer, "inc", item.a)
         }
         AsmInstructionKind.Dec {
-            ret asm_render_inst1(out, "dec", item.a)
+            ret asm_render_inst1(renderer, "dec", item.a)
         }
         AsmInstructionKind.Div {
-            ret asm_render_inst1(out, "div", item.a)
+            ret asm_render_inst1(renderer, "div", item.a)
         }
         AsmInstructionKind.Idiv {
-            ret asm_render_inst1(out, "idiv", item.a)
+            ret asm_render_inst1(renderer, "idiv", item.a)
         }
         AsmInstructionKind.Neg {
-            ret asm_render_inst1(out, "neg", item.a)
+            ret asm_render_inst1(renderer, "neg", item.a)
         }
         AsmInstructionKind.Push {
-            ret asm_render_inst1(out, "push", item.a)
+            ret asm_render_inst1(renderer, "push", item.a)
         }
         AsmInstructionKind.Pop {
-            ret asm_render_inst1(out, "pop", item.a)
+            ret asm_render_inst1(renderer, "pop", item.a)
         }
         AsmInstructionKind.Ret {
-            ret asm_render_inst0(out, "ret")
+            ret asm_render_inst0(renderer, "ret")
         }
         AsmInstructionKind.Cqo {
-            ret asm_render_inst0(out, "cqo")
+            ret asm_render_inst0(renderer, "cqo")
         }
         AsmInstructionKind.RepStosd {
-            ret asm_render_inst0(out, "rep stosd")
+            ret asm_render_inst0(renderer, "rep stosd")
         }
     }
     ret 0
 }
 fun asm_render(program: AsmProgram): u8[] {
     let out = new u8[]
-    if len(program.entry_symbol) != 0 {
+    let renderer = new AsmRenderer
+    renderer.out = out
+    renderer.program = program
+    if program.entry_symbol_index >= 0 {
         asm_render_s(out, "global ")
-        asm_render_s(out, program.entry_symbol)
+        asm_render_s(out, asm_symbol_name(program, program.entry_symbol_index))
         asm_render_s(out, "\n")
         asm_render_s(out, "default rel\n")
     }
@@ -2174,15 +2213,15 @@ fun asm_render(program: AsmProgram): u8[] {
             }
             AsmItemKind.Extern {
                 asm_render_s(out, "extern ")
-                asm_render_s(out, item.name)
+                asm_render_s(out, asm_symbol_name(program, item.symbol_index))
                 asm_render_s(out, "\n")
             }
             AsmItemKind.Label {
-                asm_render_s(out, item.name)
+                asm_render_s(out, asm_symbol_name(program, item.symbol_index))
                 asm_render_s(out, ":\n")
             }
             AsmItemKind.Instruction {
-                asm_render_instruction(out, item)
+                asm_render_instruction(renderer, item)
             }
             AsmItemKind.Bytes {
                 asm_render_s(out, "    db ")
@@ -2206,7 +2245,7 @@ fun asm_render(program: AsmProgram): u8[] {
             }
             AsmItemKind.DataSymbol {
                 asm_render_s(out, "    dq ")
-                asm_render_s(out, item.name)
+                asm_render_s(out, asm_symbol_name(program, item.symbol_index))
                 asm_render_s(out, "\n")
             }
             AsmItemKind.RepeatData {

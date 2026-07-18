@@ -112,16 +112,24 @@ detailed runtime contract is documented in [`gc.md`](gc.md).
 ## Assembler and PE writer
 
 `src/asm.ep` defines the shared structured assembly representation. An
-`AsmProgram` is one ordered stream of section changes, externs, labels,
-instructions, and the data forms actually used by Epic. `AsmOperand` is a flat
-tagged record for registers, immediates, memory, and symbols; memory addressing
-fields are stored directly without a nested allocation. Entry selection is an
-explicit program field, and local runtime labels are qualified while parsing.
+`AsmProgram` owns one symbol table plus an ordered stream of section changes,
+externs, labels, instructions, and the data forms actually used by Epic.
+`AsmOperand`, symbol-bearing items, entry selection, and relocations carry
+stable symbol indexes rather than repeating symbol-name strings. Memory
+addressing fields are stored directly without a nested allocation.
 
-The encoder consumes only `AsmProgram` and writes AMD64 text/data bytes while
-recording symbols and relocations. The text parser exists only for embedded
-runtime assembly. Comments, blank lines, and original formatting are discarded;
-the renderer produces canonical `-S` text that can be parsed and encoded again.
+Code generation allocates anonymous labels directly by index. The embedded
+runtime text parser interns names when they first appear, so forward references
+receive an index immediately and definitions later complete the same symbol.
+Names remain on symbol-table entries for imports, diagnostics, and canonical
+`-S` rendering; parser output after the text boundary is index-based.
+
+The encoder consumes only `AsmProgram`, fills symbol section/offset data, and
+writes AMD64 text/data bytes while recording already-indexed relocations. It
+validates referenced symbols in one linear pass instead of recovering indexes
+with relocation-by-symbol string searches. Comments, blank lines, and original
+runtime formatting are discarded; the renderer produces canonical `-S` text
+that can be parsed and encoded again.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
 sections, imports, and relocations. Determinism is part of the bootstrap
