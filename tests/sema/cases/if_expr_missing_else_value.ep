@@ -1,0 +1,6 @@
+# ERROR: cannot join types i64 and void
+fun main(): void {
+    let value = if 1 {
+        1
+    }
+}

@@ -22,8 +22,7 @@ fun flavor_group(value: Flavor): i64 {
     match value {
         Flavor.Vanilla {
             ret 10
-        }
-        else {
+        } else {
             ret 20
         }
     }

@@ -42,24 +42,29 @@ features.
 
 Epic v3 starts from the complete Epic v2 language surface, and the v3 compiler
 source dogfoods the v2 additions that the previous generation deliberately did
-not use. The user-visible language changes introduced in v3 are intentionally
-small:
+not use. The user-visible language changes introduced in v3 are:
 
 - `ret` is the only return-statement keyword; the legacy compatibility spelling
   `return` is rejected;
+- the final expression in a block is its tail value. A compatible tail value can
+  implicitly return from a non-`void` function, while explicit `ret` remains
+  available;
+- `if` and exhaustive enum `match` are expressions. Their branch or arm types
+  are joined, so they can be used in bindings, returns, arguments, and other
+  expression positions as well as discarded in statement position;
+- the compiler has an internal bottom type named `never`. `exit(code)` has this
+  type, so a branch that exits is compatible with any normally produced value.
+  User code cannot write `never` in a declaration;
 - the v2 built-in `str_replace_char(s: str, from: u8, to: u8): str` has been
   removed. Code that needs byte replacement must perform it explicitly, for
   example by copying with `bytes`, mutating the byte array, and constructing a
-  new string with `str_new`;
-- `exit(code: i64): void` terminates the process and has language-level
-  no-return semantics. A standalone `exit(...)` therefore satisfies required
-  return-path analysis, while the platform binding `os.ExitProcess(...)` does
-  not carry that semantic guarantee.
+  new string with `str_new`.
 
-The v3 compiler source also dogfoods v2 enums and `match`, compound assignment,
-unary operators, integer range loops, loop control, and safe container
-built-ins. That migration validates the previous generation's language work but
-does not introduce those features again in v3.
+The v3 compiler source also dogfoods the v2 foundations: unit enums and
+exhaustive matching, compound assignment, unary operators, integer range loops,
+loop control, and safe container built-ins. That migration validates the
+previous generation's language work; expression-form `match` is the separate v3
+extension described above.
 
 Compiler-driver and backend changes such as verbose phase timings, `a.exe` as
 the default executable name, structured assembly IR, and fixed-point build
@@ -177,23 +182,78 @@ Parameters are visible throughout the function. A parameter or local name may
 not be reused anywhere else in the same function, including a disjoint block.
 `argv` and `os` are reserved names.
 
+## Block values and tail expressions
+
+Every block has a type. If its final item is an expression, that expression is
+the block tail and supplies the block value. Earlier expression statements are
+evaluated and discarded. A block with no tail value has type `void`; a block
+that cannot complete normally has the internal type `never`.
+
+```epic
+let value = if ready {
+    prepare()
+    42
+} else {
+    exit(1)
+}
+```
+
+The first branch has type `i64`, the second has type `never`, and the complete
+`if` therefore has type `i64`. Expression types do not change merely because a
+result is later discarded. If a final value-producing call is intended only for
+its side effects inside a block whose value matters, bind it to an ignored local
+or otherwise end the block with a compatible value-producing expression.
+
 ## Functions
 
 Function definitions use explicit parameter and return types:
 
 ```epic
 fun add(a: i64, b: i64): i64 {
-    ret a + b
+    a + b
 }
 ```
 
-`void` functions may use `ret` or fall off the end. `ret expr` is invalid in a
-`void` function. A non-`void` function must return a compatible value on every
-path. The v3 analysis recognizes explicit `ret` and `if/else` where both
-branches must return, and exhaustive `match` statements where every arm
-returns; a `while` loop never proves a return.
+A compatible function-body tail is an implicit return. Explicit `ret expr`
+remains valid and can return early. A non-`void` function is valid when every
+normal path produces an assignable value or terminates with `ret` or `never`.
+`while` and `for` remain statements and are not assumed to execute or terminate.
+
+A `void` function may use bare `ret`, fall off the end, or discard any body tail
+value. `ret expr` remains invalid in a `void` function. `void` means normal
+completion without a usable value; `never` means that normal completion is
+impossible. The latter is internal and is not a source-level type name.
 
 The v3 statement keyword is `ret`; the legacy `return` spelling is not accepted.
+
+## If expressions
+
+`if` is an expression. With an `else`, its type is the join of both branch block
+types:
+
+```epic
+let value = if ready {
+    1
+} else {
+    2
+}
+```
+
+Without an `else`, the false path has type `void`. Thus an `if` without `else`
+can be used as a value only when its true branch also joins with `void`. A
+terminating branch has type `never` and does not force the other branch to
+change type:
+
+```epic
+let value = if ready {
+    1
+} else {
+    exit(1)
+}
+```
+
+Branch types must join even when the complete `if` appears in statement position.
+The condition remains an `i64`; zero is false and nonzero is true.
 
 ## Else-if chains
 
@@ -283,18 +343,19 @@ between values of the same enum type. An enum cannot be constructed with
 `new`, converted to an integer, used as a condition, or used with arithmetic,
 ordering, bit, or compound-assignment operators.
 
-`match` is a statement over one enum value:
+`match` is an expression over one enum value:
 
 ```epic
-match token.kind {
+let result = match token.kind {
     TokenKind.EOF {
-        ret 0
+        0
     }
     TokenKind.ID {
         consume_id()
+        1
     }
     else {
-        ret 1
+        exit(1)
     }
 }
 ```
@@ -303,12 +364,15 @@ The subject is evaluated once. Explicit arms use qualified members, may appear
 only once, and must belong to the subject enum. Without `else`, every member
 must appear exactly once. With `else`, explicit arms may cover a strict subset;
 an `else` after all members is rejected as unreachable and must be the final
-arm. Arms execute in source order and each arm body is a lexical block.
+arm. Arms execute in source order, each arm body is a lexical block, and all arm
+block types must join. A `never` arm is compatible with the other arm values.
+The complete expression may also be used in statement position, but discarded
+results do not relax arm type checking.
 
-v3 has statement-only matching: there are no match expressions, payloads,
-guards, fallthrough, explicit discriminants, or enum-to-integer conversions.
-Declaration order determines the current internal values starting at zero,
-but those values are not source-visible or a stable ABI.
+v3 unit enums still have no payloads, guards, fallthrough, explicit
+discriminants, or enum-to-integer conversions. Declaration order determines the
+current internal values starting at zero, but those values are not source-visible
+or a stable ABI.
 
 ## Compound assignment
 
@@ -386,7 +450,10 @@ fun main(): void {
 }
 ```
 
-Falling off the end of `main` exits with status `0`. The built-in `exit(code)` terminates the process with an `i64` status and never returns. `os.ExitProcess(code)` remains available as the direct Windows binding, but only `exit(code)` carries language-level no-return semantics.
+Falling off the end of `main` exits with status `0`. The built-in `exit(code)`
+terminates the process with an `i64` status and has the internal result type
+`never`. `os.ExitProcess(code)` remains available as the direct Windows binding,
+but only `exit(code)` carries language-level no-return semantics.
 
 `main` returning `i64` is not part of the v0 design.
 
@@ -397,7 +464,7 @@ to declare them.
 
 | Function | Meaning |
 | --- | --- |
-| `exit(code: i64): void` | terminates the process and never returns |
+| `exit(code: i64): never` | terminates the process and never returns; `never` is internal |
 | `print(s: str): void` | writes string bytes without adding a newline |
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
@@ -410,6 +477,9 @@ to declare them.
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
+
+`never` appears here to describe the built-in precisely, but it is not accepted
+in user-written parameter, field, local, or function return type declarations.
 
 `len(value)`, `pop(array)`, and checked `value[index]` are the preferred
 container interfaces. `pop` evaluates its array expression once, preserves

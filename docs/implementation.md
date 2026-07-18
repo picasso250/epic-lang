@@ -62,17 +62,26 @@ operator lowering, use `else` to reject violations of that narrower contract.
 The parser returns exact records for program structure, including programs,
 product declarations, functions, parameters, fields, and blocks. Every
 expression and statement is created by a constructor for its exact shape;
-there is no empty or invalid AST kind. Truly optional expressions, currently
-bare `ret` values and unsized-array counts, use `AstExprOption` with
-`None | Some`. Assignment statements carry one `AstAssignTarget`, so variable,
-field, and subscript assignment share the same statement kinds and lowering
-path.
+there is no empty or invalid AST kind. `AstBlock` stores ordinary statements
+separately from an optional tail expression. Truly optional expressions,
+including bare `ret` values, unsized-array counts, and block tails, use
+`AstExprOption` with `None | Some`. Assignment statements carry one
+`AstAssignTarget`, so variable, field, and subscript assignment share the same
+statement kinds and lowering path.
 
-Unit-enum declarations and match arms are also exact records. Semantic
-analysis resolves each qualified enum member to its declaration-order value,
-checks nominal typing and match exhaustiveness, and records the resolved value
-for code generation. Enums use one 64-bit scalar slot; match evaluates its
-subject once and emits a linear comparison chain.
+`if` and `match` live only in `AstExprKind`; there are no parallel statement
+nodes. Their statement forms are ordinary expression statements whose result is
+discarded. Semantic analysis assigns every block and expression a resolved type,
+using internal `never` as the bottom type when control cannot complete normally.
+Branch and arm types are joined once, independently of whether a parent later
+uses or discards the value.
+
+Unit-enum declarations and match arms are exact records. Semantic analysis
+resolves each qualified enum member to its declaration-order value, checks
+nominal typing and match exhaustiveness, records the resolved value for code
+generation, and joins all arm block types. Enums use one 64-bit scalar slot;
+match evaluates its subject once and emits a linear comparison chain whose
+selected arm leaves its value in `rax`.
 
 Integer range loops retain a `ForRange` statement in the AST. Semantic
 analysis checks both bounds before introducing a read-only iterator scope.

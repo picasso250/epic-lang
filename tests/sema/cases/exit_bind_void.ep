@@ -1,4 +1,4 @@
-# ERROR: cannot bind a void expression
+# ERROR: cannot bind a never expression
 fun main(): void {
     let result = exit(1)
 }

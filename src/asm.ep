@@ -70,12 +70,12 @@ type AsmRenderer {
     program: AsmProgram
 }
 
-fun asm_die(msg: str): i64 {
+fun asm_die(msg: str): void {
     print("assembler: ")
     print(msg)
     print("\n")
     os.ExitProcess(1)
-    ret 0
+    ret
 }
 fun asm_slice(s: str, start: i64, end: i64): str {
     ret str_new(s.data + start, end - start)
@@ -478,149 +478,190 @@ fun asm_times(program: AsmProgram, count: i64, width: i64, value: i64): i64 {
     push(program.items, item)
     ret 0
 }
-fun asm_instruction0(program: AsmProgram, kind: AsmInstructionKind): i64 {
+fun asm_instruction0(program: AsmProgram, kind: AsmInstructionKind): void {
     let item = asm_item_new(AsmItemKind.Instruction)
     item.instruction = kind
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_instruction1(program: AsmProgram, kind: AsmInstructionKind, a: AsmOperand): i64 {
+fun asm_instruction1(program: AsmProgram, kind: AsmInstructionKind, a: AsmOperand): void {
     let item = asm_item_new(AsmItemKind.Instruction)
     item.instruction = kind
     item.a = a
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_instruction2(program: AsmProgram, kind: AsmInstructionKind, a: AsmOperand, b: AsmOperand): i64 {
+fun asm_instruction2(program: AsmProgram, kind: AsmInstructionKind, a: AsmOperand, b: AsmOperand): void {
     let item = asm_item_new(AsmItemKind.Instruction)
     item.instruction = kind
     item.a = a
     item.b = b
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_mov(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Mov, a, b)
+fun asm_mov(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Mov, a, b)
+    ret
 }
-fun asm_lea(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Lea, a, b)
+fun asm_lea(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Lea, a, b)
+    ret
 }
-fun asm_movzx(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Movzx, a, b)
+fun asm_movzx(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Movzx, a, b)
+    ret
 }
-fun asm_add(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Add, a, b)
+fun asm_add(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Add, a, b)
+    ret
 }
-fun asm_sub(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Sub, a, b)
+fun asm_sub(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Sub, a, b)
+    ret
 }
-fun asm_and(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.And, a, b)
+fun asm_and(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.And, a, b)
+    ret
 }
-fun asm_or(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Or, a, b)
+fun asm_or(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Or, a, b)
+    ret
 }
-fun asm_xor(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Xor, a, b)
+fun asm_xor(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Xor, a, b)
+    ret
 }
-fun asm_cmp(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Cmp, a, b)
+fun asm_cmp(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Cmp, a, b)
+    ret
 }
-fun asm_test(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Test, a, b)
+fun asm_test(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Test, a, b)
+    ret
 }
-fun asm_imul(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Imul, a, b)
+fun asm_imul(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Imul, a, b)
+    ret
 }
-fun asm_shl(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Shl, a, b)
+fun asm_shl(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Shl, a, b)
+    ret
 }
-fun asm_shr(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Shr, a, b)
+fun asm_shr(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Shr, a, b)
+    ret
 }
-fun asm_sar(program: AsmProgram, a: AsmOperand, b: AsmOperand): i64 {
-    ret asm_instruction2(program, AsmInstructionKind.Sar, a, b)
+fun asm_sar(program: AsmProgram, a: AsmOperand, b: AsmOperand): void {
+    asm_instruction2(program, AsmInstructionKind.Sar, a, b)
+    ret
 }
-fun asm_call(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Call, a)
+fun asm_call(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Call, a)
+    ret
 }
-fun asm_jmp(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jmp, a)
+fun asm_jmp(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jmp, a)
+    ret
 }
-fun asm_je(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Je, a)
+fun asm_je(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Je, a)
+    ret
 }
-fun asm_jz(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jz, a)
+fun asm_jz(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jz, a)
+    ret
 }
-fun asm_jne(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jne, a)
+fun asm_jne(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jne, a)
+    ret
 }
-fun asm_jnz(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jnz, a)
+fun asm_jnz(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jnz, a)
+    ret
 }
-fun asm_jl(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jl, a)
+fun asm_jl(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jl, a)
+    ret
 }
-fun asm_jge(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jge, a)
+fun asm_jge(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jge, a)
+    ret
 }
-fun asm_jle(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jle, a)
+fun asm_jle(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jle, a)
+    ret
 }
-fun asm_jg(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jg, a)
+fun asm_jg(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jg, a)
+    ret
 }
-fun asm_jns(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Jns, a)
+fun asm_jns(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Jns, a)
+    ret
 }
-fun asm_sete(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Sete, a)
+fun asm_sete(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Sete, a)
+    ret
 }
-fun asm_setne(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Setne, a)
+fun asm_setne(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Setne, a)
+    ret
 }
-fun asm_setl(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Setl, a)
+fun asm_setl(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Setl, a)
+    ret
 }
-fun asm_setge(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Setge, a)
+fun asm_setge(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Setge, a)
+    ret
 }
-fun asm_setle(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Setle, a)
+fun asm_setle(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Setle, a)
+    ret
 }
-fun asm_setg(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Setg, a)
+fun asm_setg(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Setg, a)
+    ret
 }
-fun asm_inc(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Inc, a)
+fun asm_inc(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Inc, a)
+    ret
 }
-fun asm_dec(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Dec, a)
+fun asm_dec(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Dec, a)
+    ret
 }
-fun asm_div(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Div, a)
+fun asm_div(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Div, a)
+    ret
 }
-fun asm_idiv(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Idiv, a)
+fun asm_idiv(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Idiv, a)
+    ret
 }
-fun asm_neg(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Neg, a)
+fun asm_neg(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Neg, a)
+    ret
 }
-fun asm_push(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Push, a)
+fun asm_push(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Push, a)
+    ret
 }
-fun asm_pop(program: AsmProgram, a: AsmOperand): i64 {
-    ret asm_instruction1(program, AsmInstructionKind.Pop, a)
+fun asm_pop(program: AsmProgram, a: AsmOperand): void {
+    asm_instruction1(program, AsmInstructionKind.Pop, a)
+    ret
 }
-fun asm_ret(program: AsmProgram): i64 {
-    ret asm_instruction0(program, AsmInstructionKind.Ret)
+fun asm_ret(program: AsmProgram): void {
+    asm_instruction0(program, AsmInstructionKind.Ret)
+    ret
 }
-fun asm_cqo(program: AsmProgram): i64 {
-    ret asm_instruction0(program, AsmInstructionKind.Cqo)
+fun asm_cqo(program: AsmProgram): void {
+    asm_instruction0(program, AsmInstructionKind.Cqo)
+    ret
 }
-fun asm_rep_stosd(program: AsmProgram): i64 {
-    ret asm_instruction0(program, AsmInstructionKind.RepStosd)
+fun asm_rep_stosd(program: AsmProgram): void {
+    asm_instruction0(program, AsmInstructionKind.RepStosd)
+    ret
 }
 
 fun asm_image_new(): ExeImage {
@@ -638,29 +679,27 @@ fun asm_offset(image: ExeImage): i64 {
     }
     ret len(image.data)
 }
-fun asm_byte(image: ExeImage, value: i64): i64 {
+fun asm_byte(image: ExeImage, value: i64): void {
     if image.section == 1 {
         push(image.text, value)
-    }
-    else if image.section == 2 {
+    } else if image.section == 2 {
         push(image.data, value)
-    }
-    else {
+    } else {
         asm_die("bytes outside a section")
     }
-    ret 0
+    ret
 }
-fun asm_u32(image: ExeImage, value: i64): i64 {
+fun asm_u32(image: ExeImage, value: i64): void {
     asm_byte(image, value)
     asm_byte(image, value >> 8)
     asm_byte(image, value >> 16)
     asm_byte(image, value >> 24)
-    ret 0
+    ret
 }
-fun asm_u64(image: ExeImage, value: i64): i64 {
+fun asm_u64(image: ExeImage, value: i64): void {
     asm_u32(image, value)
     asm_u32(image, value >> 32)
-    ret 0
+    ret
 }
 fun asm_reloc(image: ExeImage, kind: i64, symbol_index: i64, addend: i64): i64 {
     if symbol_index < 0 || symbol_index >= len(image.symbols) {
@@ -697,9 +736,9 @@ fun asm_rex(image: ExeImage, rex: i64, force: i64): i64 {
     }
     ret 0
 }
-fun asm_modrm(image: ExeImage, mod: i64, reg: i64, rm: i64): i64 {
+fun asm_modrm(image: ExeImage, mod: i64, reg: i64, rm: i64): void {
     asm_byte(image, (mod << 6) | ((reg & 7) << 3) | (rm & 7))
-    ret 0
+    ret
 }
 fun asm_scale_bits(scale: i64): i64 {
     if scale == 1 {
@@ -745,11 +784,9 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     let mod = 0
     if op.disp == 0 && (base & 7) != 5 {
         mod = 0
-    }
-    else if op.disp >= -128 && op.disp <= 127 {
+    } else if op.disp >= -128 && op.disp <= 127 {
         mod = 1
-    }
-    else {
+    } else {
         mod = 2
     }
     if need_sib == 1 {
@@ -764,8 +801,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     }
     if mod == 1 {
         asm_byte(image, op.disp)
-    }
-    else if mod == 2 || (mod == 0 && (base & 7) == 5) {
+    } else if mod == 2 || (mod == 0 && (base & 7) == 5) {
         asm_u32(image, op.disp)
     }
     ret 0
@@ -851,8 +887,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         }
         if width == 8 {
             asm_byte(image, src.imm)
-        }
-        else {
+        } else {
             asm_u32(image, src.imm)
         }
         ret 0
@@ -902,8 +937,7 @@ fun asm_alu_ext(kind: AsmInstructionKind): i64 {
         }
         AsmInstructionKind.Cmp {
             ret 7
-        }
-        else {
+        } else {
             asm_die("internal: non-ALU instruction")
         }
     }
@@ -929,8 +963,7 @@ fun asm_alu_load_opcode(kind: AsmInstructionKind, width: i64): i64 {
         }
         AsmInstructionKind.Cmp {
             opcode = 59
-        }
-        else {
+        } else {
             asm_die("internal: non-ALU instruction")
         }
     }
@@ -959,8 +992,7 @@ fun asm_alu_store_opcode(kind: AsmInstructionKind, width: i64): i64 {
         }
         AsmInstructionKind.Cmp {
             opcode = 57
-        }
-        else {
+        } else {
             asm_die("internal: non-ALU instruction")
         }
     }
@@ -975,15 +1007,13 @@ fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src
         let opcode = 129
         if width == 8 {
             opcode = 128
-        }
-        else if src.imm >= -128 && src.imm <= 127 {
+        } else if src.imm >= -128 && src.imm <= 127 {
             opcode = 131
         }
         asm_emit_group_default64(image, opcode, asm_alu_ext(kind), dst)
         if opcode == 128 || opcode == 131 {
             asm_byte(image, src.imm)
-        }
-        else {
+        } else {
             asm_u32(image, src.imm)
         }
         ret 0
@@ -1013,8 +1043,7 @@ fun asm_emit_test(image: ExeImage, left: AsmOperand, right: AsmOperand): i64 {
     asm_rex(image, asm_rex_bits(width, right.reg, left.index, base), asm_force_rex8(right))
     if width == 8 {
         asm_byte(image, 132)
-    }
-    else {
+    } else {
         asm_byte(image, 133)
     }
     asm_emit_rm(image, right.reg, left)
@@ -1030,8 +1059,7 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             asm_byte(image, 107)
             asm_modrm(image, 3, dst.reg, dst.reg)
             asm_byte(image, src.imm)
-        }
-        else {
+        } else {
             asm_byte(image, 105)
             asm_modrm(image, 3, dst.reg, dst.reg)
             asm_u32(image, src.imm)
@@ -1108,8 +1136,7 @@ fun asm_jump_code(kind: AsmInstructionKind): i64 {
         }
         AsmInstructionKind.Jns {
             ret 137
-        }
-        else {
+        } else {
             asm_die("internal: non-conditional jump")
         }
     }
@@ -1121,8 +1148,7 @@ fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand)
     }
     if kind == AsmInstructionKind.Jmp {
         asm_byte(image, 233)
-    }
-    else {
+    } else {
         asm_byte(image, 15)
         asm_byte(image, asm_jump_code(kind))
     }
@@ -1149,8 +1175,7 @@ fun asm_setcc_code(kind: AsmInstructionKind): i64 {
         }
         AsmInstructionKind.Setg {
             ret 159
-        }
-        else {
+        } else {
             asm_die("internal: non-setcc instruction")
         }
     }
@@ -1194,138 +1219,176 @@ fun asm_encode_push_pop(image: ExeImage, target: AsmOperand, opcode: i64): i64 {
     asm_byte(image, opcode + (target.reg & 7))
     ret 0
 }
-fun asm_encode_instruction_item(image: ExeImage, item: AsmItem): i64 {
+fun asm_encode_instruction_item(image: ExeImage, item: AsmItem): void {
     match item.instruction {
         AsmInstructionKind.Mov {
-            ret asm_emit_mov(image, item.a, item.b)
+            asm_emit_mov(image, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Lea {
-            ret asm_emit_lea(image, item.a, item.b)
+            asm_emit_lea(image, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Movzx {
-            ret asm_emit_movzx(image, item.a, item.b)
+            asm_emit_movzx(image, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Add {
-            ret asm_emit_alu(image, item.instruction, item.a, item.b)
+            asm_emit_alu(image, item.instruction, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Sub {
-            ret asm_emit_alu(image, item.instruction, item.a, item.b)
+            asm_emit_alu(image, item.instruction, item.a, item.b)
+            ret
         }
         AsmInstructionKind.And {
-            ret asm_emit_alu(image, item.instruction, item.a, item.b)
+            asm_emit_alu(image, item.instruction, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Or {
-            ret asm_emit_alu(image, item.instruction, item.a, item.b)
+            asm_emit_alu(image, item.instruction, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Xor {
-            ret asm_emit_alu(image, item.instruction, item.a, item.b)
+            asm_emit_alu(image, item.instruction, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Cmp {
-            ret asm_emit_alu(image, item.instruction, item.a, item.b)
+            asm_emit_alu(image, item.instruction, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Test {
-            ret asm_emit_test(image, item.a, item.b)
+            asm_emit_test(image, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Imul {
-            ret asm_emit_imul(image, item.a, item.b)
+            asm_emit_imul(image, item.a, item.b)
+            ret
         }
         AsmInstructionKind.Call {
-            ret asm_encode_call(image, item.a)
+            asm_encode_call(image, item.a)
+            ret
         }
         AsmInstructionKind.Jmp {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Je {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jz {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jne {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jnz {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jl {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jge {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jle {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jg {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Jns {
-            ret asm_emit_jump(image, item.instruction, item.a)
+            asm_emit_jump(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Sete {
-            ret asm_emit_setcc(image, item.instruction, item.a)
+            asm_emit_setcc(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Setne {
-            ret asm_emit_setcc(image, item.instruction, item.a)
+            asm_emit_setcc(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Setl {
-            ret asm_emit_setcc(image, item.instruction, item.a)
+            asm_emit_setcc(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Setge {
-            ret asm_emit_setcc(image, item.instruction, item.a)
+            asm_emit_setcc(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Setle {
-            ret asm_emit_setcc(image, item.instruction, item.a)
+            asm_emit_setcc(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Setg {
-            ret asm_emit_setcc(image, item.instruction, item.a)
+            asm_emit_setcc(image, item.instruction, item.a)
+            ret
         }
         AsmInstructionKind.Shl {
-            ret asm_encode_shift(image, item.a, item.b, 4)
+            asm_encode_shift(image, item.a, item.b, 4)
+            ret
         }
         AsmInstructionKind.Shr {
-            ret asm_encode_shift(image, item.a, item.b, 5)
+            asm_encode_shift(image, item.a, item.b, 5)
+            ret
         }
         AsmInstructionKind.Sar {
-            ret asm_encode_shift(image, item.a, item.b, 7)
+            asm_encode_shift(image, item.a, item.b, 7)
+            ret
         }
         AsmInstructionKind.Inc {
-            ret asm_encode_inc_dec(image, item.a, 0)
+            asm_encode_inc_dec(image, item.a, 0)
+            ret
         }
         AsmInstructionKind.Dec {
-            ret asm_encode_inc_dec(image, item.a, 1)
+            asm_encode_inc_dec(image, item.a, 1)
+            ret
         }
         AsmInstructionKind.Div {
-            ret asm_emit_group(image, 247, 6, item.a)
+            asm_emit_group(image, 247, 6, item.a)
+            ret
         }
         AsmInstructionKind.Idiv {
-            ret asm_emit_group(image, 247, 7, item.a)
+            asm_emit_group(image, 247, 7, item.a)
+            ret
         }
         AsmInstructionKind.Neg {
-            ret asm_emit_group(image, 247, 3, item.a)
+            asm_emit_group(image, 247, 3, item.a)
+            ret
         }
         AsmInstructionKind.Push {
-            ret asm_encode_push_pop(image, item.a, 80)
+            asm_encode_push_pop(image, item.a, 80)
+            ret
         }
         AsmInstructionKind.Pop {
-            ret asm_encode_push_pop(image, item.a, 88)
+            asm_encode_push_pop(image, item.a, 88)
+            ret
         }
         AsmInstructionKind.Ret {
             asm_byte(image, 195)
-            ret 0
+            ret
         }
         AsmInstructionKind.Cqo {
             asm_byte(image, 72)
             asm_byte(image, 153)
-            ret 0
+            ret
         }
         AsmInstructionKind.RepStosd {
             asm_byte(image, 243)
             asm_byte(image, 171)
-            ret 0
+            ret
         }
     }
-    ret 0
+    ret
 }
 
 fun asm_program_qualify(parser: AsmProgramParser, name: str): str {
@@ -1353,8 +1416,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
         if body.data[pos] == 43 {
             sign = 1
             pos += 1
-        }
-        else if body.data[pos] == 45 {
+        } else if body.data[pos] == 45 {
             sign = -1
             pos += 1
         }
@@ -1371,20 +1433,16 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
             if op.index < 0 || sign < 0 {
                 asm_die("bad index operand: " + text)
             }
-        }
-        else if asm_reg(term) >= 0 {
+        } else if asm_reg(term) >= 0 {
             if op.base < 0 {
                 op.base = asm_reg(term)
-            }
-            else {
+            } else {
                 op.index = asm_reg(term)
                 op.scale = 1
             }
-        }
-        else if asm_is_number(term) == 1 {
+        } else if asm_is_number(term) == 1 {
             op.disp += sign * parse_integer(term)
-        }
-        else {
+        } else {
             if op.symbol_index >= 0 {
                 asm_die("complex symbol operand: " + text)
             }
@@ -1403,12 +1461,10 @@ fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     if asm_starts(text, "byte ") == 1 {
         width = 8
         text = asm_trim(asm_slice(text, 5, len(text)))
-    }
-    else if asm_starts(text, "dword ") == 1 {
+    } else if asm_starts(text, "dword ") == 1 {
         width = 32
         text = asm_trim(asm_slice(text, 6, len(text)))
-    }
-    else if asm_starts(text, "qword ") == 1 {
+    } else if asm_starts(text, "qword ") == 1 {
         width = 64
         text = asm_trim(asm_slice(text, 6, len(text)))
     }
@@ -1424,7 +1480,7 @@ fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     }
     ret asm_symbol(asm_symbol_intern(parser.program, asm_program_qualify(parser, text)))
 }
-fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): i64 {
+fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): void {
     let space = asm_find(line, 32)
     let name = line
     let args = ""
@@ -1433,13 +1489,16 @@ fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): i64 {
         args = asm_trim(asm_slice(line, space + 1, len(line)))
     }
     if name == "ret" && len(args) == 0 {
-        ret asm_ret(parser.program)
+        asm_ret(parser.program)
+        ret
     }
     if name == "cqo" && len(args) == 0 {
-        ret asm_cqo(parser.program)
+        asm_cqo(parser.program)
+        ret
     }
     if name == "rep" && args == "stosd" {
-        ret asm_rep_stosd(parser.program)
+        asm_rep_stosd(parser.program)
+        ret
     }
     if len(args) == 0 {
         asm_die("missing instruction operand: " + name)
@@ -1448,125 +1507,163 @@ fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): i64 {
     if comma < 0 {
         let operand = asm_program_parse_operand(parser, args)
         if name == "call" {
-            ret asm_call(parser.program, operand)
+            asm_call(parser.program, operand)
+            ret
         }
         if name == "jmp" {
-            ret asm_jmp(parser.program, operand)
+            asm_jmp(parser.program, operand)
+            ret
         }
         if name == "je" {
-            ret asm_je(parser.program, operand)
+            asm_je(parser.program, operand)
+            ret
         }
         if name == "jz" {
-            ret asm_jz(parser.program, operand)
+            asm_jz(parser.program, operand)
+            ret
         }
         if name == "jne" {
-            ret asm_jne(parser.program, operand)
+            asm_jne(parser.program, operand)
+            ret
         }
         if name == "jnz" {
-            ret asm_jnz(parser.program, operand)
+            asm_jnz(parser.program, operand)
+            ret
         }
         if name == "jl" {
-            ret asm_jl(parser.program, operand)
+            asm_jl(parser.program, operand)
+            ret
         }
         if name == "jge" {
-            ret asm_jge(parser.program, operand)
+            asm_jge(parser.program, operand)
+            ret
         }
         if name == "jle" {
-            ret asm_jle(parser.program, operand)
+            asm_jle(parser.program, operand)
+            ret
         }
         if name == "jg" {
-            ret asm_jg(parser.program, operand)
+            asm_jg(parser.program, operand)
+            ret
         }
         if name == "jns" {
-            ret asm_jns(parser.program, operand)
+            asm_jns(parser.program, operand)
+            ret
         }
         if name == "sete" {
-            ret asm_sete(parser.program, operand)
+            asm_sete(parser.program, operand)
+            ret
         }
         if name == "setne" {
-            ret asm_setne(parser.program, operand)
+            asm_setne(parser.program, operand)
+            ret
         }
         if name == "setl" {
-            ret asm_setl(parser.program, operand)
+            asm_setl(parser.program, operand)
+            ret
         }
         if name == "setge" {
-            ret asm_setge(parser.program, operand)
+            asm_setge(parser.program, operand)
+            ret
         }
         if name == "setle" {
-            ret asm_setle(parser.program, operand)
+            asm_setle(parser.program, operand)
+            ret
         }
         if name == "setg" {
-            ret asm_setg(parser.program, operand)
+            asm_setg(parser.program, operand)
+            ret
         }
         if name == "inc" {
-            ret asm_inc(parser.program, operand)
+            asm_inc(parser.program, operand)
+            ret
         }
         if name == "dec" {
-            ret asm_dec(parser.program, operand)
+            asm_dec(parser.program, operand)
+            ret
         }
         if name == "div" {
-            ret asm_div(parser.program, operand)
+            asm_div(parser.program, operand)
+            ret
         }
         if name == "idiv" {
-            ret asm_idiv(parser.program, operand)
+            asm_idiv(parser.program, operand)
+            ret
         }
         if name == "neg" {
-            ret asm_neg(parser.program, operand)
+            asm_neg(parser.program, operand)
+            ret
         }
         if name == "push" {
-            ret asm_push(parser.program, operand)
+            asm_push(parser.program, operand)
+            ret
         }
         if name == "pop" {
-            ret asm_pop(parser.program, operand)
+            asm_pop(parser.program, operand)
+            ret
         }
         asm_die("unsupported one-operand instruction: " + name)
     }
     let a = asm_program_parse_operand(parser, asm_slice(args, 0, comma))
     let b = asm_program_parse_operand(parser, asm_slice(args, comma + 1, len(args)))
     if name == "mov" {
-        ret asm_mov(parser.program, a, b)
+        asm_mov(parser.program, a, b)
+        ret
     }
     if name == "lea" {
-        ret asm_lea(parser.program, a, b)
+        asm_lea(parser.program, a, b)
+        ret
     }
     if name == "movzx" {
-        ret asm_movzx(parser.program, a, b)
+        asm_movzx(parser.program, a, b)
+        ret
     }
     if name == "add" {
-        ret asm_add(parser.program, a, b)
+        asm_add(parser.program, a, b)
+        ret
     }
     if name == "sub" {
-        ret asm_sub(parser.program, a, b)
+        asm_sub(parser.program, a, b)
+        ret
     }
     if name == "and" {
-        ret asm_and(parser.program, a, b)
+        asm_and(parser.program, a, b)
+        ret
     }
     if name == "or" {
-        ret asm_or(parser.program, a, b)
+        asm_or(parser.program, a, b)
+        ret
     }
     if name == "xor" {
-        ret asm_xor(parser.program, a, b)
+        asm_xor(parser.program, a, b)
+        ret
     }
     if name == "cmp" {
-        ret asm_cmp(parser.program, a, b)
+        asm_cmp(parser.program, a, b)
+        ret
     }
     if name == "test" {
-        ret asm_test(parser.program, a, b)
+        asm_test(parser.program, a, b)
+        ret
     }
     if name == "imul" {
-        ret asm_imul(parser.program, a, b)
+        asm_imul(parser.program, a, b)
+        ret
     }
     if name == "shl" {
-        ret asm_shl(parser.program, a, b)
+        asm_shl(parser.program, a, b)
+        ret
     }
     if name == "shr" {
-        ret asm_shr(parser.program, a, b)
+        asm_shr(parser.program, a, b)
+        ret
     }
     if name == "sar" {
-        ret asm_sar(parser.program, a, b)
+        asm_sar(parser.program, a, b)
+        ret
     }
     asm_die("unsupported two-operand instruction: " + name)
-    ret 0
+    ret
 }
 
 fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
@@ -1610,8 +1707,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
         }
         if asm_is_number(data_args) == 1 {
             asm_dq(parser.program, parse_integer(data_args))
-        }
-        else {
+        } else {
             asm_dq_symbol(parser.program, asm_symbol_intern(parser.program, asm_program_qualify(parser, data_args)))
         }
         ret 1
@@ -1640,11 +1736,9 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
     let times_width = 1
     if times_directive == "dd" {
         times_width = 4
-    }
-    else if times_directive == "dq" {
+    } else if times_directive == "dq" {
         times_width = 8
-    }
-    else if times_directive != "db" {
+    } else if times_directive != "db" {
         asm_die("bad times directive: " + times_directive)
     }
     asm_times(parser.program, parse_integer(count_text), times_width, parse_integer(times_value))
@@ -1702,7 +1796,8 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
     if parser.has_section == 0 || parser.section != AsmSectionKind.Text {
         asm_die("instruction outside .text: " + line)
     }
-    ret asm_program_parse_instruction(parser, line)
+    asm_program_parse_instruction(parser, line)
+    ret 0
 }
 fun asm_parse_lines(parser: AsmProgramParser, source: str): i64 {
     let line_start = 0
@@ -1750,8 +1845,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
             AsmItemKind.Section {
                 if item.section == AsmSectionKind.Text {
                     image.section = 1
-                }
-                else {
+                } else {
                     image.section = 2
                 }
             }
@@ -1779,11 +1873,9 @@ fun asm_encode(program: AsmProgram): ExeImage {
             AsmItemKind.DataInteger {
                 if item.width == 4 {
                     asm_u32(image, item.value)
-                }
-                else if item.width == 8 {
+                } else if item.width == 8 {
                     asm_u64(image, item.value)
-                }
-                else {
+                } else {
                     asm_die("unsupported integer data width")
                 }
             }
@@ -1795,14 +1887,11 @@ fun asm_encode(program: AsmProgram): ExeImage {
                 for repeat_i: 0:item.repeat_count {
                     if item.width == 1 {
                         asm_byte(image, item.value)
-                    }
-                    else if item.width == 4 {
+                    } else if item.width == 4 {
                         asm_u32(image, item.value)
-                    }
-                    else if item.width == 8 {
+                    } else if item.width == 8 {
                         asm_u64(image, item.value)
-                    }
-                    else {
+                    } else {
                         asm_die("unsupported repeated data width")
                     }
                 }
@@ -1832,161 +1921,132 @@ fun asm_encode(program: AsmProgram): ExeImage {
     ret image
 }
 
-fun asm_render_s(out: u8[], text: str): i64 {
+fun asm_render_s(out: u8[], text: str): void {
     extend(out, bytes(text))
-    ret 0
+    ret
 }
-fun asm_render_i(out: u8[], value: i64): i64 {
-    ret asm_render_s(out, itoa(value))
+fun asm_render_i(out: u8[], value: i64): void {
+    asm_render_s(out, itoa(value))
+    ret
 }
-fun asm_render_register(out: u8[], op: AsmOperand): i64 {
+fun asm_render_register(out: u8[], op: AsmOperand): void {
     let name = ""
     if op.reg == 0 {
         if op.width == 8 {
             name = "al"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "eax"
-        }
-        else {
+        } else {
             name = "rax"
         }
-    }
-    else if op.reg == 1 {
+    } else if op.reg == 1 {
         if op.width == 8 {
             name = "cl"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "ecx"
-        }
-        else {
+        } else {
             name = "rcx"
         }
-    }
-    else if op.reg == 2 {
+    } else if op.reg == 2 {
         if op.width == 8 {
             name = "dl"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "edx"
-        }
-        else {
+        } else {
             name = "rdx"
         }
-    }
-    else if op.reg == 3 {
+    } else if op.reg == 3 {
         if op.width == 8 {
             name = "bl"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "ebx"
-        }
-        else {
+        } else {
             name = "rbx"
         }
-    }
-    else if op.reg == 4 {
+    } else if op.reg == 4 {
         if op.width == 32 {
             name = "esp"
-        }
-        else {
+        } else {
             name = "rsp"
         }
-    }
-    else if op.reg == 5 {
+    } else if op.reg == 5 {
         if op.width == 32 {
             name = "ebp"
-        }
-        else {
+        } else {
             name = "rbp"
         }
-    }
-    else if op.reg == 6 {
+    } else if op.reg == 6 {
         if op.width == 32 {
             name = "esi"
-        }
-        else {
+        } else {
             name = "rsi"
         }
-    }
-    else if op.reg == 7 {
+    } else if op.reg == 7 {
         if op.width == 32 {
             name = "edi"
-        }
-        else {
+        } else {
             name = "rdi"
         }
-    }
-    else if op.reg == 8 {
+    } else if op.reg == 8 {
         if op.width == 8 {
             name = "r8b"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "r8d"
-        }
-        else {
+        } else {
             name = "r8"
         }
-    }
-    else if op.reg == 9 {
+    } else if op.reg == 9 {
         if op.width == 8 {
             name = "r9b"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "r9d"
-        }
-        else {
+        } else {
             name = "r9"
         }
-    }
-    else if op.reg == 10 {
+    } else if op.reg == 10 {
         if op.width == 8 {
             name = "r10b"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "r10d"
-        }
-        else {
+        } else {
             name = "r10"
         }
-    }
-    else if op.reg == 11 {
+    } else if op.reg == 11 {
         if op.width == 8 {
             name = "r11b"
-        }
-        else if op.width == 32 {
+        } else if op.width == 32 {
             name = "r11d"
-        }
-        else {
+        } else {
             name = "r11"
         }
-    }
-    else {
+    } else {
         asm_die("bad register number")
     }
-    ret asm_render_s(out, name)
+    asm_render_s(out, name)
+    ret
 }
-fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): i64 {
+fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): void {
     let out = renderer.out
     let program = renderer.program
     match op.kind {
         AsmOperandKind.Register {
-            ret asm_render_register(out, op)
+            asm_render_register(out, op)
+            ret
         }
         AsmOperandKind.Immediate {
-            ret asm_render_i(out, op.imm)
+            asm_render_i(out, op.imm)
+            ret
         }
         AsmOperandKind.Symbol {
-            ret asm_render_s(out, asm_symbol_name(program, op.symbol_index))
+            asm_render_s(out, asm_symbol_name(program, op.symbol_index))
+            ret
         }
         AsmOperandKind.Memory {
             if op.width == 8 {
                 asm_render_s(out, "byte ")
-            }
-            else if op.width == 32 {
+            } else if op.width == 32 {
                 asm_render_s(out, "dword ")
-            }
-            else if op.width == 64 {
+            } else if op.width == 64 {
                 asm_render_s(out, "qword ")
             }
             asm_render_s(out, "[")
@@ -2017,8 +2077,7 @@ fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): i64 {
             if op.disp != 0 || wrote == 0 {
                 if wrote == 1 && op.disp >= 0 {
                     asm_render_s(out, " + ")
-                }
-                else if wrote == 1 {
+                } else if wrote == 1 {
                     asm_render_s(out, " - ")
                 }
                 let abs_disp = op.disp
@@ -2028,28 +2087,28 @@ fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): i64 {
                 asm_render_i(out, abs_disp)
             }
             asm_render_s(out, "]")
-            ret 0
+            ret
         }
     }
-    ret 0
+    ret
 }
-fun asm_render_inst0(renderer: AsmRenderer, name: str): i64 {
+fun asm_render_inst0(renderer: AsmRenderer, name: str): void {
     let out = renderer.out
     asm_render_s(out, "    ")
     asm_render_s(out, name)
     asm_render_s(out, "\n")
-    ret 0
+    ret
 }
-fun asm_render_inst1(renderer: AsmRenderer, name: str, a: AsmOperand): i64 {
+fun asm_render_inst1(renderer: AsmRenderer, name: str, a: AsmOperand): void {
     let out = renderer.out
     asm_render_s(out, "    ")
     asm_render_s(out, name)
     asm_render_s(out, " ")
     asm_render_operand(renderer, a)
     asm_render_s(out, "\n")
-    ret 0
+    ret
 }
-fun asm_render_inst2(renderer: AsmRenderer, name: str, a: AsmOperand, b: AsmOperand): i64 {
+fun asm_render_inst2(renderer: AsmRenderer, name: str, a: AsmOperand, b: AsmOperand): void {
     let out = renderer.out
     asm_render_s(out, "    ")
     asm_render_s(out, name)
@@ -2058,136 +2117,177 @@ fun asm_render_inst2(renderer: AsmRenderer, name: str, a: AsmOperand, b: AsmOper
     asm_render_s(out, ", ")
     asm_render_operand(renderer, b)
     asm_render_s(out, "\n")
-    ret 0
+    ret
 }
 
-fun asm_render_instruction(renderer: AsmRenderer, item: AsmItem): i64 {
+fun asm_render_instruction(renderer: AsmRenderer, item: AsmItem): void {
     match item.instruction {
         AsmInstructionKind.Mov {
-            ret asm_render_inst2(renderer, "mov", item.a, item.b)
+            asm_render_inst2(renderer, "mov", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Lea {
-            ret asm_render_inst2(renderer, "lea", item.a, item.b)
+            asm_render_inst2(renderer, "lea", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Movzx {
-            ret asm_render_inst2(renderer, "movzx", item.a, item.b)
+            asm_render_inst2(renderer, "movzx", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Add {
-            ret asm_render_inst2(renderer, "add", item.a, item.b)
+            asm_render_inst2(renderer, "add", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Sub {
-            ret asm_render_inst2(renderer, "sub", item.a, item.b)
+            asm_render_inst2(renderer, "sub", item.a, item.b)
+            ret
         }
         AsmInstructionKind.And {
-            ret asm_render_inst2(renderer, "and", item.a, item.b)
+            asm_render_inst2(renderer, "and", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Or {
-            ret asm_render_inst2(renderer, "or", item.a, item.b)
+            asm_render_inst2(renderer, "or", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Xor {
-            ret asm_render_inst2(renderer, "xor", item.a, item.b)
+            asm_render_inst2(renderer, "xor", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Cmp {
-            ret asm_render_inst2(renderer, "cmp", item.a, item.b)
+            asm_render_inst2(renderer, "cmp", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Test {
-            ret asm_render_inst2(renderer, "test", item.a, item.b)
+            asm_render_inst2(renderer, "test", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Imul {
-            ret asm_render_inst2(renderer, "imul", item.a, item.b)
+            asm_render_inst2(renderer, "imul", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Shl {
-            ret asm_render_inst2(renderer, "shl", item.a, item.b)
+            asm_render_inst2(renderer, "shl", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Shr {
-            ret asm_render_inst2(renderer, "shr", item.a, item.b)
+            asm_render_inst2(renderer, "shr", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Sar {
-            ret asm_render_inst2(renderer, "sar", item.a, item.b)
+            asm_render_inst2(renderer, "sar", item.a, item.b)
+            ret
         }
         AsmInstructionKind.Call {
-            ret asm_render_inst1(renderer, "call", item.a)
+            asm_render_inst1(renderer, "call", item.a)
+            ret
         }
         AsmInstructionKind.Jmp {
-            ret asm_render_inst1(renderer, "jmp", item.a)
+            asm_render_inst1(renderer, "jmp", item.a)
+            ret
         }
         AsmInstructionKind.Je {
-            ret asm_render_inst1(renderer, "je", item.a)
+            asm_render_inst1(renderer, "je", item.a)
+            ret
         }
         AsmInstructionKind.Jz {
-            ret asm_render_inst1(renderer, "jz", item.a)
+            asm_render_inst1(renderer, "jz", item.a)
+            ret
         }
         AsmInstructionKind.Jne {
-            ret asm_render_inst1(renderer, "jne", item.a)
+            asm_render_inst1(renderer, "jne", item.a)
+            ret
         }
         AsmInstructionKind.Jnz {
-            ret asm_render_inst1(renderer, "jnz", item.a)
+            asm_render_inst1(renderer, "jnz", item.a)
+            ret
         }
         AsmInstructionKind.Jl {
-            ret asm_render_inst1(renderer, "jl", item.a)
+            asm_render_inst1(renderer, "jl", item.a)
+            ret
         }
         AsmInstructionKind.Jge {
-            ret asm_render_inst1(renderer, "jge", item.a)
+            asm_render_inst1(renderer, "jge", item.a)
+            ret
         }
         AsmInstructionKind.Jle {
-            ret asm_render_inst1(renderer, "jle", item.a)
+            asm_render_inst1(renderer, "jle", item.a)
+            ret
         }
         AsmInstructionKind.Jg {
-            ret asm_render_inst1(renderer, "jg", item.a)
+            asm_render_inst1(renderer, "jg", item.a)
+            ret
         }
         AsmInstructionKind.Jns {
-            ret asm_render_inst1(renderer, "jns", item.a)
+            asm_render_inst1(renderer, "jns", item.a)
+            ret
         }
         AsmInstructionKind.Sete {
-            ret asm_render_inst1(renderer, "sete", item.a)
+            asm_render_inst1(renderer, "sete", item.a)
+            ret
         }
         AsmInstructionKind.Setne {
-            ret asm_render_inst1(renderer, "setne", item.a)
+            asm_render_inst1(renderer, "setne", item.a)
+            ret
         }
         AsmInstructionKind.Setl {
-            ret asm_render_inst1(renderer, "setl", item.a)
+            asm_render_inst1(renderer, "setl", item.a)
+            ret
         }
         AsmInstructionKind.Setge {
-            ret asm_render_inst1(renderer, "setge", item.a)
+            asm_render_inst1(renderer, "setge", item.a)
+            ret
         }
         AsmInstructionKind.Setle {
-            ret asm_render_inst1(renderer, "setle", item.a)
+            asm_render_inst1(renderer, "setle", item.a)
+            ret
         }
         AsmInstructionKind.Setg {
-            ret asm_render_inst1(renderer, "setg", item.a)
+            asm_render_inst1(renderer, "setg", item.a)
+            ret
         }
         AsmInstructionKind.Inc {
-            ret asm_render_inst1(renderer, "inc", item.a)
+            asm_render_inst1(renderer, "inc", item.a)
+            ret
         }
         AsmInstructionKind.Dec {
-            ret asm_render_inst1(renderer, "dec", item.a)
+            asm_render_inst1(renderer, "dec", item.a)
+            ret
         }
         AsmInstructionKind.Div {
-            ret asm_render_inst1(renderer, "div", item.a)
+            asm_render_inst1(renderer, "div", item.a)
+            ret
         }
         AsmInstructionKind.Idiv {
-            ret asm_render_inst1(renderer, "idiv", item.a)
+            asm_render_inst1(renderer, "idiv", item.a)
+            ret
         }
         AsmInstructionKind.Neg {
-            ret asm_render_inst1(renderer, "neg", item.a)
+            asm_render_inst1(renderer, "neg", item.a)
+            ret
         }
         AsmInstructionKind.Push {
-            ret asm_render_inst1(renderer, "push", item.a)
+            asm_render_inst1(renderer, "push", item.a)
+            ret
         }
         AsmInstructionKind.Pop {
-            ret asm_render_inst1(renderer, "pop", item.a)
+            asm_render_inst1(renderer, "pop", item.a)
+            ret
         }
         AsmInstructionKind.Ret {
-            ret asm_render_inst0(renderer, "ret")
+            asm_render_inst0(renderer, "ret")
+            ret
         }
         AsmInstructionKind.Cqo {
-            ret asm_render_inst0(renderer, "cqo")
+            asm_render_inst0(renderer, "cqo")
+            ret
         }
         AsmInstructionKind.RepStosd {
-            ret asm_render_inst0(renderer, "rep stosd")
+            asm_render_inst0(renderer, "rep stosd")
+            ret
         }
     }
-    ret 0
+    ret
 }
 fun asm_render(program: AsmProgram): u8[] {
     let out = new u8[]
@@ -2206,8 +2306,7 @@ fun asm_render(program: AsmProgram): u8[] {
             AsmItemKind.Section {
                 if item.section == AsmSectionKind.Text {
                     asm_render_s(out, "section .text\n")
-                }
-                else {
+                } else {
                     asm_render_s(out, "section .data\n")
                 }
             }
@@ -2236,8 +2335,7 @@ fun asm_render(program: AsmProgram): u8[] {
             AsmItemKind.DataInteger {
                 if item.width == 4 {
                     asm_render_s(out, "    dd ")
-                }
-                else {
+                } else {
                     asm_render_s(out, "    dq ")
                 }
                 asm_render_i(out, item.value)
@@ -2253,11 +2351,9 @@ fun asm_render(program: AsmProgram): u8[] {
                 asm_render_i(out, item.repeat_count)
                 if item.width == 1 {
                     asm_render_s(out, " db ")
-                }
-                else if item.width == 4 {
+                } else if item.width == 4 {
                     asm_render_s(out, " dd ")
-                }
-                else {
+                } else {
                     asm_render_s(out, " dq ")
                 }
                 asm_render_i(out, item.value)

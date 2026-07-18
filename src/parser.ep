@@ -1,8 +1,8 @@
 #
 # Epic parser.
 #
-type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | NewProduct | NewArray | FieldAccess | Subscript
-type AstStmtKind = Return | Expr | Let | Assign | AssignOp | If | While | ForRange | Match | Break | Continue
+type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | NewProduct | NewArray | FieldAccess | Subscript | If | Match
+type AstStmtKind = Return | Expr | Let | Assign | AssignOp | While | ForRange | Break | Continue
 type AssignTargetKind = Var | Field | Subscript
 type OperatorKind = Add | Subtract | Multiply | Divide | Remainder | BitAnd | BitOr | ShiftLeft | ShiftRight | Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual | LogicalAnd | LogicalOr | Negate | LogicalNot
 type AstExprOptionKind = None | Some
@@ -19,6 +19,11 @@ type AstExpr {
     base: AstExpr
     index: AstExpr
     count: AstExprOption
+    condition: AstExpr
+    then_block: AstBlock
+    else_block: AstBlock
+    subject: AstExpr
+    match_arms: AstMatchArm[]
     line: i64
     resolved_type: str
 }
@@ -44,12 +49,9 @@ type AstStmt {
     return_value: AstExprOption
     value_expr: AstExpr
     target: AstAssignTarget
-    then_block: AstBlock
-    else_block: AstBlock
     body: AstBlock
     line: i64
     op: OperatorKind
-    match_arms: AstMatchArm[]
     range_start: AstExpr
     range_end: AstExpr
     range_end_slot: i64
@@ -65,6 +67,8 @@ type AstMatchArm {
 type AstBlock {
     present: i64
     stmts: AstStmt[]
+    tail: AstExprOption
+    resolved_type: str
 }
 type AstParam {
     name: str
@@ -278,10 +282,10 @@ fun ast_assign_op(target: AstAssignTarget, op: OperatorKind, value: AstExpr, lin
     node.line = line
     ret node
 }
-fun ast_if(condition: AstExpr, then_block: AstBlock, else_block: AstBlock, line: i64): AstStmt {
-    let node = new AstStmt
-    node.kind = AstStmtKind.If
-    node.expr = condition
+fun ast_if(condition: AstExpr, then_block: AstBlock, else_block: AstBlock, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.If
+    node.condition = condition
     node.then_block = then_block
     node.else_block = else_block
     node.line = line
@@ -305,10 +309,10 @@ fun ast_for_range(name: str, range: AstRange, body: AstBlock, line: i64): AstStm
     node.line = line
     ret node
 }
-fun ast_match(subject: AstExpr, arms: AstMatchArm[], line: i64): AstStmt {
-    let node = new AstStmt
-    node.kind = AstStmtKind.Match
-    node.expr = subject
+fun ast_match(subject: AstExpr, arms: AstMatchArm[], line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Match
+    node.subject = subject
     node.match_arms = arms
     node.line = line
     ret node
@@ -328,12 +332,14 @@ fun ast_continue(line: i64): AstStmt {
 fun ast_block_empty(): AstBlock {
     let block = new AstBlock
     block.present = 0
+    block.tail = ast_expr_none()
     ret block
 }
 fun ast_block(): AstBlock {
     let block = new AstBlock
     block.present = 1
     block.stmts = new AstStmt[]
+    block.tail = ast_expr_none()
     ret block
 }
 fun ast_program(): AstProgram {
@@ -376,14 +382,14 @@ fun advance(p: Parser): Token {
     p.pos += 1
     ret t
 }
-fun parse_error(line: i64, msg: str): i64 {
+fun parse_error(line: i64, msg: str): void {
     print("Parse error line ")
     print(itoa(line))
     print(": ")
     print(msg)
     print("\n")
     os.ExitProcess(1)
-    ret 1
+    ret
 }
 fun expect(p: Parser, kind: TokenKind): Token {
     let t = advance(p)
@@ -569,6 +575,10 @@ fun parse_block(p: Parser): AstBlock {
         skip_newlines(p)
     }
     expect(p, TokenKind.RBRACE)
+    if len(node.stmts) > 0 && node.stmts.data[len(node.stmts) - 1].kind == AstStmtKind.Expr {
+        let tail_stmt = pop(node.stmts)
+        node.tail = ast_expr_some(tail_stmt.expr)
+    }
     ret node
 }
 fun skip_balanced_brackets(p: Parser, i: i64): i64 {
@@ -651,6 +661,14 @@ fun ast_assign_target(lhs: AstExpr, line: i64): AstAssignTarget {
         AstExprKind.Subscript {
             ret ast_subscript_target(lhs.base, lhs.index)
         }
+        AstExprKind.If {
+            parse_error(line, "Invalid assignment target")
+            ret ast_var_target("")
+        }
+        AstExprKind.Match {
+            parse_error(line, "Invalid assignment target")
+            ret ast_var_target("")
+        }
     }
 }
 fun parse_return_stmt(p: Parser): AstStmt {
@@ -704,20 +722,23 @@ fun parse_assign_stmt(p: Parser): AstStmt {
     }
     ret ast_assign(target, value, name.line)
 }
-fun parse_if_stmt(p: Parser): AstStmt {
+fun parse_if_expr(p: Parser): AstExpr {
     let keyword = expect(p, TokenKind.IF)
     let condition = parse_expr(p)
     let then_block = parse_block(p)
     let else_block = ast_block_empty()
+    let after_then = p.pos
     skip_newlines(p)
     if check(p, TokenKind.ELSE) == 1 {
         skip_newlines(p)
         if peek_kind(p, TokenKind.IF) == 1 {
             else_block = ast_block()
-            push(else_block.stmts, parse_if_stmt(p))
+            else_block.tail = ast_expr_some(parse_if_expr(p))
         } else {
             else_block = parse_block(p)
         }
+    } else {
+        p.pos = after_then
     }
     ret ast_if(condition, then_block, else_block, keyword.line)
 }
@@ -741,7 +762,7 @@ fun parse_for_range_stmt(p: Parser): AstStmt {
     p.loop_depth -= 1
     ret ast_for_range(name.text, ast_range(start, end), body, keyword.line)
 }
-fun parse_match_stmt(p: Parser): AstStmt {
+fun parse_match_expr(p: Parser): AstExpr {
     let keyword = expect(p, TokenKind.MATCH)
     let subject = parse_expr(p)
     let arms = new AstMatchArm[]
@@ -805,6 +826,9 @@ fun is_expr_first(kind: TokenKind): i64 {
     if kind == TokenKind.NEW {
         ret 1
     }
+    if kind == TokenKind.IF || kind == TokenKind.MATCH {
+        ret 1
+    }
     if kind == TokenKind.LPAREN {
         ret 1
     }
@@ -823,7 +847,7 @@ fun parse_stmt(p: Parser): AstStmt {
             ret parse_let_stmt(p)
         }
         TokenKind.IF {
-            ret parse_if_stmt(p)
+            ret parse_expr_stmt(p)
         }
         TokenKind.WHILE {
             ret parse_while_stmt(p)
@@ -832,7 +856,7 @@ fun parse_stmt(p: Parser): AstStmt {
             ret parse_for_range_stmt(p)
         }
         TokenKind.MATCH {
-            ret parse_match_stmt(p)
+            ret parse_expr_stmt(p)
         }
         TokenKind.BREAK {
             ret parse_break_stmt(p)
@@ -845,8 +869,7 @@ fun parse_stmt(p: Parser): AstStmt {
                 ret parse_assign_stmt(p)
             }
             ret parse_expr_stmt(p)
-        }
-        else {
+        } else {
             if is_expr_first(t.kind) == 1 {
                 ret parse_expr_stmt(p)
             }
@@ -1086,6 +1109,12 @@ fun read_embed(source_path: str, path: str, line: i64): str {
     ret read_file(resolved)
 }
 fun parse_primary(p: Parser): AstExpr {
+    if peek_kind(p, TokenKind.IF) == 1 {
+        ret parse_postfix(p, parse_if_expr(p))
+    }
+    if peek_kind(p, TokenKind.MATCH) == 1 {
+        ret parse_postfix(p, parse_match_expr(p))
+    }
     if peek_kind(p, TokenKind.NEW) == 1 {
         let keyword = expect(p, TokenKind.NEW)
         let type_name = expect(p, TokenKind.ID)

@@ -11,7 +11,7 @@ fun choose_exit(flag: i64): i64 {
 }
 fun main(): void {
     if argv.len == 0 {
-        stop_now()
+        let ignored_stop = stop_now()
     }
     os.ExitProcess(choose_exit(0))
 }
