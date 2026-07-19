@@ -833,6 +833,13 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_call_inst(e, "_bytes")
         return 0
     }
+    if name == "str" {
+        emit_expr(e, expr.args.data[0])
+        emit_mov(e, "rcx", "[rax]")
+        emit_mov(e, "rdx", "[rax+8]")
+        emit_call_inst(e, "_str_alloc")
+        return 0
+    }
     if name == "len" {
         emit_expr(e, expr.args.data[0])
         emit_mov(e, "rax", "[rax+8]")

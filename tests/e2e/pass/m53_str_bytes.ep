@@ -1,0 +1,16 @@
+# EXIT: 0
+# STDOUT: abc
+fun main(): void {
+    let empty = new u8[]
+    if len(str(empty)) != 0 {
+        os.ExitProcess(1)
+    }
+    let data = bytes("abc")
+    let text = str(data)
+    data.data[0] = 'z'
+    if len(text) != 3 || text.data[0] != 'a' || text.data[1] != 'b' || text.data[2] != 'c' {
+        os.ExitProcess(2)
+    }
+    print(text)
+    os.ExitProcess(0)
+}
