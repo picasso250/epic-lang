@@ -93,7 +93,16 @@ detailed runtime contract is documented in [`gc.md`](gc.md).
 
 `src/asm.ep` parses the compiler's private assembly subset and encodes AMD64
 instructions into text and data sections. It records symbols and relocations
-needed by the executable writer.
+needed by the executable writer. Symbol names are interned through a fixed
+hash table on first reference, including forward references. Relocations carry
+the resulting stable symbol index immediately; the final resolution pass only
+checks that every indexed symbol was defined instead of repeating linear
+name searches.
+
+On the v2 fixed-point self-compile benchmark, this changes the median of three
+runs from 4.050 seconds to 1.677 seconds, a 2.42x speedup. The remaining gap to
+v3's structured assembler is the generation and reparsing of the in-memory
+assembly text.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
 sections, imports, and relocations. Determinism is part of the bootstrap

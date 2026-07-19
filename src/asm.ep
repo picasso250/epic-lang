@@ -7,12 +7,13 @@ type AsmSymbol {
     section: i64
     offset: i64
     external: i64
+    defined: i64
+    hash_next: i64
 }
 type AsmReloc {
     section: i64
     offset: i64
     kind: i64
-    symbol: str
     symbol_index: i64
     addend: i64
 }
@@ -20,6 +21,7 @@ type ExeImage {
     text: u8[]
     data: u8[]
     symbols: AsmSymbol[]
+    symbol_buckets: i64[]
     relocs: AsmReloc[]
     entry_offset: i64
     section: i64
@@ -316,6 +318,7 @@ fun asm_image_new(): ExeImage {
     image.text = new u8[]
     image.data = new u8[]
     image.symbols = new AsmSymbol[]
+    image.symbol_buckets = new i64[16384]
     image.relocs = new AsmReloc[]
     image.section = 0
     image.scope = ""
@@ -351,36 +354,50 @@ fun asm_u64(image: ExeImage, value: i64): i64 {
     asm_u32(image, value >> 32)
     return 0
 }
-fun asm_symbol_find(image: ExeImage, name: str): i64 {
+fun asm_symbol_bucket(name: str): i64 {
+    let hash = 0
     let i = 0
-    while i < image.symbols.len {
-        if image.symbols.data[i].name == name {
-            return i
-        }
+    while i < name.len {
+        hash = ((hash << 5) - hash + name.data[i]) & 16383
         i = i + 1
+    }
+    return hash
+}
+fun asm_symbol_find(image: ExeImage, name: str): i64 {
+    let entry = image.symbol_buckets.data[asm_symbol_bucket(name)]
+    while entry != 0 {
+        let index = entry - 1
+        if image.symbols.data[index].name == name {
+            return index
+        }
+        entry = image.symbols.data[index].hash_next
     }
     return 0 - 1
 }
-fun asm_define(image: ExeImage, raw_name: str): i64 {
-    let name = asm_qualify(image, raw_name)
+fun asm_symbol_intern(image: ExeImage, name: str): i64 {
     let old_index = asm_symbol_find(image, name)
-    if old_index >= 0 && image.symbols.data[old_index].external == 0 {
-        asm_die("duplicate symbol: " + name)
+    if old_index >= 0 {
+        return old_index
     }
+    let bucket = asm_symbol_bucket(name)
     let sym = new AsmSymbol
     sym.name = name
+    sym.hash_next = image.symbol_buckets.data[bucket]
+    push(image.symbols, sym)
+    image.symbol_buckets.data[bucket] = image.symbols.len
+    return image.symbols.len - 1
+}
+fun asm_define(image: ExeImage, raw_name: str): i64 {
+    let name = asm_qualify(image, raw_name)
+    let symbol_index = asm_symbol_intern(image, name)
+    let sym = image.symbols.data[symbol_index]
+    if sym.defined == 1 && sym.external == 0 {
+        asm_die("duplicate symbol: " + name)
+    }
     sym.section = image.section
     sym.offset = asm_offset(image)
     sym.external = 0
-    if old_index < 0 {
-        push(image.symbols, sym)
-    }
-    else {
-        let old = image.symbols.data[old_index]
-        old.section = sym.section
-        old.offset = sym.offset
-        old.external = 0
-    }
+    sym.defined = 1
     if raw_name.len > 0 && raw_name.data[0] != 46 {
         image.scope = raw_name
     }
@@ -390,14 +407,13 @@ fun asm_define(image: ExeImage, raw_name: str): i64 {
     return 0
 }
 fun asm_extern(image: ExeImage, name: str): i64 {
-    let old_index = asm_symbol_find(image, name)
-    if old_index >= 0 {
+    let symbol_index = asm_symbol_intern(image, name)
+    let sym = image.symbols.data[symbol_index]
+    if sym.defined == 1 {
         return 0
     }
-    let sym = new AsmSymbol
-    sym.name = name
     sym.external = 1
-    push(image.symbols, sym)
+    sym.defined = 1
     return 0
 }
 fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
@@ -405,8 +421,7 @@ fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
     r.section = image.section
     r.offset = asm_offset(image)
     r.kind = kind
-    r.symbol = symbol
-    r.symbol_index = 0 - 1
+    r.symbol_index = asm_symbol_intern(image, symbol)
     r.addend = addend
     push(image.relocs, r)
     return 0
@@ -1115,11 +1130,13 @@ fun asm_resolve_internal(image: ExeImage): i64 {
     let i = 0
     while i < image.relocs.len {
         let r = image.relocs.data[i]
-        let sym_index = asm_symbol_find(image, r.symbol)
-        if sym_index < 0 {
-            asm_die("undefined symbol: " + r.symbol)
+        let sym_index = r.symbol_index
+        if sym_index < 0 || sym_index >= image.symbols.len {
+            asm_die("invalid relocation symbol index")
         }
-        image.relocs.data[i].symbol_index = sym_index
+        if image.symbols.data[sym_index].defined == 0 {
+            asm_die("undefined symbol: " + image.symbols.data[sym_index].name)
+        }
         i = i + 1
     }
     return 0
