@@ -1,4 +1,4 @@
-- 新 feature / bug fix / refactor 完成之后，git 提交 并 push。
+- 新 feature / bug fix / refactor 完成之后，git 提交（如果是 main/v* 分支，那么也 push）。
 - 马斯克五步工作法。（第一步：质疑需求；第二步：删掉所有可能的部件；第三步：简化与优化；第四步：加速周转；第五步：自动化）
 - v0 是非自举的 Python stage-0，只负责编译使用 v0 子集编写的 Epic v1。
 - 第一次 fixed point 发生在 v0 -> v1。
