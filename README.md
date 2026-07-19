@@ -10,7 +10,9 @@ v3 also implements distinct `bool` plus signed and unsigned 8-, 16-, 32-, and
 compact integer storage. The v3 compiler source remains on the previous
 surface; v4 is the dogfood generation for these additions.
 It also provides `is_null(reference)` for explicit zero-address tests without
-inserting implicit dereference checks.
+inserting implicit dereference checks. Dynamic arrays are opaque and use
+`len`, checked subscripting, `push`, `pop`, and `extend`; `str(byte_array)`
+copies a mutable byte array into an immutable string.
 It retains the self-contained AMD64 assembler,
 deterministic PE writer, and conservative garbage collector.
 

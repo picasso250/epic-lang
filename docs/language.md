@@ -58,12 +58,16 @@ not use. The user-visible language changes introduced in v3 are:
 - the v2 built-in `str_replace_char(s: str, from: u8, to: u8): str` has been
   removed. Code that needs byte replacement must perform it explicitly, for
   example by copying with `bytes`, mutating the byte array, and constructing a
-  new string with `str_new`.
+  new string with `str(array)`;
 - distinct `bool` values with `true` and `false`, plus `i8`, `u8`, `i16`,
   `u16`, `i32`, `u32`, `i64`, and `u64` integers;
 - integer suffixes such as `42u32`, contextual unsuffixed literals, explicit
   integer conversions such as `i64(byte)`, compact fields and arrays, and
-  width- and signedness-correct arithmetic, comparisons, shifts, and loads.
+  width- and signedness-correct arithmetic, comparisons, shifts, and loads;
+- opaque dynamic arrays: source code uses `len`, checked subscripting, `push`,
+  `pop`, and `extend` instead of accessing `.data`, `.len`, or `.cap`; and
+- `str(array: u8[]): str`, which copies all array bytes into a new immutable
+  string without treating embedded NUL bytes as terminators.
 
 The v3 compiler implementation itself stays within the v2-era integer surface.
 The v4 compiler is the dogfood target for the new bool and integer types. During
@@ -172,21 +176,19 @@ Use `new u8[n]` for mutable byte buffers.
 | `new T[n]` | dynamic array of length `n` and capacity at least `n`, with zero-initialized elements |
 | `len(a)` | current element count |
 | `a[i]` | checked element access; invalid indices terminate the program |
-| `a.data[i]` | unchecked low-level element access |
-| `a.len` | compatibility access to the internal length field |
-| `a.cap` | compatibility access to the internal capacity field |
 
 `new T[]` starts empty. `new T[n]` evaluates `n` once, requires a
 non-negative value, and creates `n` zero-initialized elements with `len(a) == n`.
 Direct `a[i]` rejects negative indices and indices greater than or equal to
 `len(a)`. `push` appends after the initialized elements; `push` and `extend` are
-documented under built-in functions.
+documented under built-in functions. Arrays expose no fields: `.data`, `.len`,
+and `.cap` are compile errors rather than a public layout API.
 
 ### Built-in global
 
 | Name | Type | Meaning |
 | --- | --- | --- |
-| `argv` | `str[]` | command-line arguments, including `argv.data[0]` as the executable name |
+| `argv` | `str[]` | command-line arguments, including `argv[0]` as the executable name |
 
 `argv` is initialized before `main`. v1 implements the Windows command-line
 rules needed for bootstrapping: whitespace separates arguments and double
@@ -268,7 +270,9 @@ let value = if ready {
 ```
 
 Branch types must join even when the complete `if` appears in statement position.
-The condition remains an `i64`; zero is false and nonzero is true.
+Conditions require `bool`. The v3 migration bridge also accepts legacy `i64`
+or `u8` conditions, where zero is false and nonzero is true; new code should
+not rely on that bridge.
 
 ## Else-if chains
 
@@ -499,6 +503,7 @@ to declare them.
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
+| `str(array: u8[]): str` | copies every array byte into a new immutable string, preserving embedded NUL bytes |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `is_null(value: reference): bool` | tests whether a product, string, array, or low-level pointer reference is the zero address; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
@@ -512,14 +517,13 @@ to declare them.
 `never` appears here to describe the built-in precisely, but it is not accepted
 in user-written parameter, field, local, or function return type declarations.
 
-`len(value)`, `pop(array)`, and checked `value[index]` are the preferred
-container interfaces. `pop` evaluates its array expression once, preserves
-capacity, and clears the removed slot so stale references do not keep objects
-alive through the conservative collector.
-Direct `.data`, `.len`, and `.cap` access remains available for compatibility
-and deliberate low-level code, but exposes the current runtime layout and may be
-deprecated in a future generation. Pointer subscripting and `.data[index]` are
-unchecked.
+`len(value)`, `pop(array)`, and checked `value[index]` are the array interfaces.
+`pop` evaluates its array expression once, preserves capacity, and clears the
+removed slot so stale references do not keep objects alive through the
+conservative collector. Array `.data`, `.len`, and `.cap` fields are not part
+of the language. Strings still expose compatibility fields `s.data` and
+`s.len` for deliberate low-level interop; pointer subscripting and
+`s.data[index]` are unchecked.
 
 `is_null` checks only the outer reference address. An empty string or empty
 array is not null, a nonzero dangling pointer is not null, and no implicit null
