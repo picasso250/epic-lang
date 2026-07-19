@@ -2,7 +2,7 @@
 # STDOUT: 5
 fun main(): void {
     let s = "hello"
-    print(itoa(s.len))
+    print(itoa(len(s)))
     print("\n")
     os.ExitProcess(0)
 }

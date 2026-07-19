@@ -9,7 +9,7 @@ fun type_is_array(name: str): i64 {
     if len(name) < 2 {
         ret 0
     }
-    ret name.data[len(name) - 2] == 91 && name.data[len(name) - 1] == 93
+    ret name[len(name) - 2] == 91 && name[len(name) - 1] == 93
 }
 fun array_element_type(name: str): str {
     ret str_new(name.data, len(name) - 2)
@@ -29,18 +29,18 @@ fun digit_value(c: i64): i64 {
 fun parse_integer(text: str): i64 {
     let sign = 1
     let i = 0
-    if text.data[0] == 45 {
+    if text[0] == 45 {
         sign = -1
         i = 1
     }
     let base = 10
-    if i + 2 <= len(text) && text.data[i] == 48 && (text.data[i + 1] == 120 || text.data[i + 1] == 88) {
+    if i + 2 <= len(text) && text[i] == 48 && (text[i + 1] == 120 || text[i + 1] == 88) {
         base = 16
         i += 2
     }
     let value = 0
     while i < len(text) {
-        value = value * base + digit_value(text.data[i])
+        value = value * base + digit_value(text[i])
         i += 1
     }
     ret value * sign

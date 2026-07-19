@@ -83,10 +83,10 @@ fun asm_slice(s: str, start: i64, end: i64): str {
 fun asm_trim(s: str): str {
     let a = 0
     let b = len(s)
-    while a < b && (s.data[a] == 32 || s.data[a] == 9 || s.data[a] == 13) {
+    while a < b && (s[a] == 32 || s[a] == 9 || s[a] == 13) {
         a += 1
     }
-    while b > a && (s.data[b - 1] == 32 || s.data[b - 1] == 9 || s.data[b - 1] == 13) {
+    while b > a && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 13) {
         b -= 1
     }
     ret asm_slice(s, a, b)
@@ -96,7 +96,7 @@ fun asm_starts(s: str, prefix: str): i64 {
         ret 0
     }
     for i: 0:len(prefix) {
-        if s.data[i] != prefix.data[i] {
+        if s[i] != prefix[i] {
             ret 0
         }
     }
@@ -104,7 +104,7 @@ fun asm_starts(s: str, prefix: str): i64 {
 }
 fun asm_find(s: str, ch: i64): i64 {
     for i: 0:len(s) {
-        if s.data[i] == ch {
+        if s[i] == ch {
             ret i
         }
     }
@@ -113,22 +113,22 @@ fun asm_find(s: str, ch: i64): i64 {
 fun asm_remove_spaces(s: str): str {
     let out = new u8[]
     for i: 0:len(s) {
-        if s.data[i] != 32 && s.data[i] != 9 {
-            push(out, s.data[i])
+        if s[i] != 32 && s[i] != 9 {
+            push(out, s[i])
         }
     }
-    ret str_new(out.data, len(out))
+    ret str(out)
 }
 fun asm_is_number(s: str): i64 {
     if len(s) == 0 {
         ret 0
     }
     let i = 0
-    if s.data[0] == 45 {
+    if s[0] == 45 {
         i = 1
     }
     let hex = 0
-    if i + 2 <= len(s) && s.data[i] == 48 && (s.data[i + 1] == 120 || s.data[i + 1] == 88) {
+    if i + 2 <= len(s) && s[i] == 48 && (s[i + 1] == 120 || s[i + 1] == 88) {
         hex = 1
         i += 2
     }
@@ -136,10 +136,10 @@ fun asm_is_number(s: str): i64 {
         ret 0
     }
     while i < len(s) {
-        if hex == 0 && (s.data[i] < 48 || s.data[i] > 57) {
+        if hex == 0 && (s[i] < 48 || s[i] > 57) {
             ret 0
         }
-        if hex == 1 && digit_value(s.data[i]) < 0 {
+        if hex == 1 && digit_value(s[i]) < 0 {
             ret 0
         }
         i += 1
@@ -397,8 +397,8 @@ fun asm_symbol_new(program: AsmProgram, name: str): i64 {
 }
 fun asm_named_symbol_find(program: AsmProgram, name: str): i64 {
     for named_i: 0:len(program.named_symbols) {
-        let symbol_index = program.named_symbols.data[named_i]
-        if program.symbols.data[symbol_index].name == name {
+        let symbol_index = program.named_symbols[named_i]
+        if program.symbols[symbol_index].name == name {
             ret symbol_index
         }
     }
@@ -415,7 +415,7 @@ fun asm_symbol_name(program: AsmProgram, symbol_index: i64): str {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
         asm_die("invalid symbol index")
     }
-    let name = program.symbols.data[symbol_index].name
+    let name = program.symbols[symbol_index].name
     if len(name) != 0 {
         ret name
     }
@@ -447,7 +447,7 @@ fun asm_extern_item(program: AsmProgram, symbol_index: i64): i64 {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
         asm_die("invalid extern symbol index")
     }
-    let symbol = program.symbols.data[symbol_index]
+    let symbol = program.symbols[symbol_index]
     if symbol.defined == 0 {
         symbol.external = 1
     }
@@ -460,7 +460,7 @@ fun asm_label(program: AsmProgram, symbol_index: i64): i64 {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
         asm_die("invalid label symbol index")
     }
-    let symbol = program.symbols.data[symbol_index]
+    let symbol = program.symbols[symbol_index]
     if symbol.defined == 1 {
         asm_die("duplicate symbol: " + asm_symbol_name(program, symbol_index))
     }
@@ -962,7 +962,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         let reloc_count = len(image.relocs)
         asm_emit_group_default64(image, immediate_opcode, 0, dst)
         if len(image.relocs) > reloc_count {
-            let reloc = image.relocs.data[reloc_count]
+            let reloc = image.relocs[reloc_count]
             if width == 8 {
                 reloc.addend -= 1
             } else if width == 16 {
@@ -1616,7 +1616,7 @@ fun asm_encode_instruction_item(image: ExeImage, item: AsmItem): void {
 }
 
 fun asm_program_qualify(parser: AsmProgramParser, name: str): str {
-    if len(name) > 0 && name.data[0] == 46 {
+    if len(name) > 0 && name[0] == 46 {
         ret parser.scope + name
     }
     ret name
@@ -1637,15 +1637,15 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
     let pos = 0
     let sign = 1
     while pos < len(body) {
-        if body.data[pos] == 43 {
+        if body[pos] == 43 {
             sign = 1
             pos += 1
-        } else if body.data[pos] == 45 {
+        } else if body[pos] == 45 {
             sign = -1
             pos += 1
         }
         let end = pos
-        while end < len(body) && body.data[end] != 43 && body.data[end] != 45 {
+        while end < len(body) && body[end] != 43 && body[end] != 45 {
             end += 1
         }
         let term = asm_slice(body, pos, end)
@@ -1938,7 +1938,7 @@ fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
     let value_start = 0
     while value_start < len(args) {
         let value_end = value_start
-        while value_end < len(args) && args.data[value_end] != 44 {
+        while value_end < len(args) && args[value_end] != 44 {
             value_end += 1
         }
         let value_text = asm_trim(asm_slice(args, value_start, value_end))
@@ -2047,12 +2047,12 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
         parser.scope = ""
         ret 0
     }
-    if line.data[len(line) - 1] == 58 {
+    if line[len(line) - 1] == 58 {
         let raw_name = asm_trim(asm_slice(line, 0, len(line) - 1))
         let qualified_name = asm_program_qualify(parser, raw_name)
         let label_symbol_index = asm_symbol_intern(parser.program, qualified_name)
         asm_label(parser.program, label_symbol_index)
-        if raw_name.data[0] != 46 {
+        if raw_name[0] != 46 {
             parser.scope = raw_name
         }
         ret 0
@@ -2070,7 +2070,7 @@ fun asm_parse_lines(parser: AsmProgramParser, source: str): i64 {
     let line_start = 0
     while line_start < len(source) {
         let line_end = line_start
-        while line_end < len(source) && source.data[line_end] != 10 {
+        while line_end < len(source) && source[line_end] != 10 {
             line_end += 1
         }
         asm_program_process_line(parser, asm_slice(source, line_start, line_end))
@@ -2091,7 +2091,7 @@ fun asm_parse_text_into(program: AsmProgram, source: u8[]): i64 {
     parser.scope = ""
     parser.section = AsmSectionKind.Text
     parser.has_section = 1
-    ret asm_parse_lines(parser, str_new(source.data, len(source)))
+    ret asm_parse_lines(parser, str(source))
 }
 fun asm_parse(source: str): AsmProgram {
     let program = asm_program_new()
@@ -2103,11 +2103,11 @@ fun asm_encode(program: AsmProgram): ExeImage {
     let image = asm_image_new()
     image.symbols = program.symbols
     for reset_symbol_i: 0:len(image.symbols) {
-        image.symbols.data[reset_symbol_i].section = 0
-        image.symbols.data[reset_symbol_i].offset = 0
+        image.symbols[reset_symbol_i].section = 0
+        image.symbols[reset_symbol_i].offset = 0
     }
     for item_i: 0:len(program.items) {
-        let item = program.items.data[item_i]
+        let item = program.items[item_i]
         match item.kind {
             AsmItemKind.Section {
                 if item.section == AsmSectionKind.Text {
@@ -2122,7 +2122,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
                 if item.symbol_index < 0 || item.symbol_index >= len(image.symbols) {
                     asm_die("invalid label symbol index")
                 }
-                let label_symbol = image.symbols.data[item.symbol_index]
+                let label_symbol = image.symbols[item.symbol_index]
                 label_symbol.section = image.section
                 label_symbol.offset = asm_offset(image)
             }
@@ -2134,7 +2134,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
             }
             AsmItemKind.Bytes {
                 for byte_i: 0:len(item.bytes) {
-                    asm_byte(image, item.bytes.data[byte_i])
+                    asm_byte(image, item.bytes[byte_i])
                 }
             }
             AsmItemKind.DataInteger {
@@ -2166,8 +2166,8 @@ fun asm_encode(program: AsmProgram): ExeImage {
         }
     }
     for reloc_i: 0:len(image.relocs) {
-        let reloc = image.relocs.data[reloc_i]
-        let reloc_symbol = image.symbols.data[reloc.symbol_index]
+        let reloc = image.relocs[reloc_i]
+        let reloc_symbol = image.symbols[reloc.symbol_index]
         if reloc_symbol.defined == 0 && reloc_symbol.external == 0 {
             asm_die("undefined symbol: " + asm_symbol_name(program, reloc.symbol_index))
         }
@@ -2176,7 +2176,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
         if program.entry_symbol_index >= len(image.symbols) {
             asm_die("invalid entry symbol index")
         }
-        let entry = image.symbols.data[program.entry_symbol_index]
+        let entry = image.symbols[program.entry_symbol_index]
         if entry.defined == 0 {
             asm_die("undefined entry symbol: " + asm_symbol_name(program, program.entry_symbol_index))
         }
@@ -2634,7 +2634,7 @@ fun asm_render(program: AsmProgram): u8[] {
         asm_render_s(out, "default rel\n")
     }
     for item_i: 0:len(program.items) {
-        let item = program.items.data[item_i]
+        let item = program.items[item_i]
         match item.kind {
             AsmItemKind.Section {
                 if item.section == AsmSectionKind.Text {
@@ -2661,7 +2661,7 @@ fun asm_render(program: AsmProgram): u8[] {
                     if byte_i != 0 {
                         asm_render_s(out, ", ")
                     }
-                    asm_render_i(out, item.bytes.data[byte_i])
+                    asm_render_i(out, item.bytes[byte_i])
                 }
                 asm_render_s(out, "\n")
             }

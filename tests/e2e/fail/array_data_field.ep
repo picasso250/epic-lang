@@ -1,0 +1,6 @@
+# COMPILE_ERROR: type u8[] has no field 'data'
+fun main(): void {
+    let values = new u8[]
+    let data = values.data
+    os.ExitProcess(is_null(data))
+}

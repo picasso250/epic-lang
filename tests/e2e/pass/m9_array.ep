@@ -1,19 +1,19 @@
 # EXIT: 0
 fun main(): void {
     let buf = new u8[10]
-    buf.data[0] = 'E'
-    buf.data[1] = 'p'
-    buf.data[2] = 'i'
-    buf.data[3] = 'c'
-    buf.data[4] = 10
+    buf[0] = 'E'
+    buf[1] = 'p'
+    buf[2] = 'i'
+    buf[3] = 'c'
+    buf[4] = 10
     let i = 0
     while i < 5 {
-        if buf.data[i] == 0 {
+        if buf[i] == 0 {
             os.ExitProcess(1)
         }
         i = i + 1
     }
-    if buf.data[0] != 69 || buf.data[1] != 112 || buf.data[2] != 105 || buf.data[3] != 99 || buf.data[4] != 10 {
+    if buf[0] != 69 || buf[1] != 112 || buf[2] != 105 || buf[3] != 99 || buf[4] != 10 {
         os.ExitProcess(1)
     }
     os.ExitProcess(0)

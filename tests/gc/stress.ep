@@ -21,11 +21,11 @@ fun main(): void {
     i = 0
     while i < 60000 {
         let waste = new u8[1024]
-        waste.data[0] = i
+        waste[0] = i
         i = i + 1
     }
 
-    let cursor = kept.data[0]
+    let cursor = kept[0]
     i = 0
     while i < 256 {
         if cursor.value != i {

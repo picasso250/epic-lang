@@ -28,11 +28,11 @@ fun main(): void {
     push(values, 1)
     push(values, 2)
     let snapshot = 0
-    for value_i: 0:values.len {
+    for value_i: 0:len(values) {
         snapshot += values[value_i]
         push(values, 10)
     }
-    if snapshot != 3 || values.len != 4 {
+    if snapshot != 3 || len(values) != 4 {
         os.ExitProcess(4)
     }
 

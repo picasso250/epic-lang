@@ -1,0 +1,6 @@
+# COMPILE_ERROR: cannot redefine primitive conversion 'str'
+fun str(value: u8[]): str {
+    ret ""
+}
+fun main(): void {
+}

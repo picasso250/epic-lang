@@ -2,10 +2,10 @@
 # EXIT: 0
 # STDOUT: hello
 fun main(): void {
-    if argv.len < 2 {
+    if len(argv) < 2 {
         print("missing")
         os.ExitProcess(1)
     }
-    print(argv.data[1])
+    print(argv[1])
     os.ExitProcess(0)
 }

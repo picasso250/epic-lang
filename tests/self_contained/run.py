@@ -19,11 +19,11 @@ import ep_runner
 PROGRAM = """fun main(): void {
     let first = embed("asset.bin")
     let second = embed("asset.bin")
-    first.data[0] = 42
-    if second.data[0] == 42 {
+    first[0] = 42
+    if second[0] == 42 {
         os.ExitProcess(1)
     }
-    os.ExitProcess(first.data[0])
+    os.ExitProcess(first[0])
 }
 """
 

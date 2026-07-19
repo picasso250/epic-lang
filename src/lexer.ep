@@ -109,8 +109,7 @@ fun lex(src: str): Token[] {
         if ch == 34 {
             let string_line = line
             pos += 1
-            let buf = new u8[n - pos + 1]
-            let out_len = 0
+            let buf = new u8[]
             let scanning = 1
             while scanning == 1 && pos < n {
                 if p[pos] == 34 {
@@ -147,8 +146,7 @@ fun lex(src: str): Token[] {
                             os.ExitProcess(1)
                         }
                     }
-                    buf.data[out_len] = c
-                    out_len += 1
+                    push(buf, c)
                     pos += 1
                 }
             }
@@ -156,7 +154,7 @@ fun lex(src: str): Token[] {
                 print("unterminated string\n")
                 os.ExitProcess(1)
             }
-            let text = str_new(buf.data, out_len)
+            let text = str(buf)
             pos += 1
             push_token(tokens, TokenKind.STRING, text, string_line)
             continue
@@ -420,7 +418,7 @@ fun lex(src: str): Token[] {
 }
 fun dump_tokens(tokens: Token[]): i64 {
     for i: 0:len(tokens) {
-        let t = tokens.data[i]
+        let t = tokens[i]
         print(t.text)
         print(" ")
         print(itoa(t.line))
@@ -433,7 +431,7 @@ fun main(): void {
         print("usage: lexer <file>\n")
         os.ExitProcess(1)
     }
-    let src = read_file(argv.data[1])
+    let src = read_file(argv[1])
     let tokens = lex(src)
     dump_tokens(tokens)
 }
