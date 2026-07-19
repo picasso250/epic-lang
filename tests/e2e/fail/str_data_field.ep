@@ -1,0 +1,6 @@
+# COMPILE_ERROR: type str has no field 'data'
+fun main(): void {
+    let text = "abc"
+    let value = text.data
+    print(itoa(value[0]))
+}

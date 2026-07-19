@@ -3,12 +3,12 @@
 fun main(): void {
     os.Sleep(1)
     let t = os.GetTickCount64()
-    let n = os.lstrlenA("abc")
-    let c = os.lstrcmpA("same", "same")
-    let made = os.CreateDirectoryA("build", 0)
+    let n = os.lstrlenA(cstr("abc"))
+    let c = os.lstrcmpA(cstr("same"), cstr("same"))
+    let made = os.CreateDirectoryA(cstr("build"), 0)
     let mkdir_error = os.GetLastError()
-    let attrs = os.GetFileAttributesA("build")
-    let h = os.CreateFileA("test_os_create.tmp", 1073741824, 0, 0, 2, 128, 0)
+    let attrs = os.GetFileAttributesA(cstr("build"))
+    let h = os.CreateFileA(cstr("test_os_create.tmp"), 1073741824, 0, 0, 2, 128, 0)
     if t >= 0 && n == 3 && c == 0 && (made != 0 || mkdir_error == 183) && (attrs & 16) != 0 && h + 1 != 0 {
         os.CloseHandle(h)
         os.ExitProcess(0)

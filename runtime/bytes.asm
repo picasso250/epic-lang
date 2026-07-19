@@ -14,7 +14,7 @@ _bytes:
     mov [rbp-16], rax      ; header
 
     mov rcx, [rbp-8]
-    mov rdx, [rcx+8]       ; len
+    mov rdx, [rcx+16]      ; len
     mov [rbp-24], rdx
     mov r8, rdx
     test r8, r8
@@ -39,7 +39,8 @@ _bytes_have_cap:
     test rdx, rdx
     jz _bytes_done
     mov rcx, [rbp-8]
-    mov r8, [rcx]          ; src data
+    mov r8, [rcx]          ; owner
+    add r8, [rcx+8]        ; + offset
     mov r9, [rbp-40]       ; dst data
 _bytes_copy:
     mov al, [r8]

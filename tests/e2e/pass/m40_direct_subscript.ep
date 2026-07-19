@@ -5,7 +5,7 @@ fun main(): void {
     if text[1] != 66 {
         os.ExitProcess(1)
     }
-    print(str_new(text.data + 1, 1))
+    print(text[1:2])
     let values = new i64[1]
     values[0] = 42
     print(itoa(values[0]))

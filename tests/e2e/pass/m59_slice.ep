@@ -1,0 +1,44 @@
+# EXIT: 0
+# STDOUT: bcd||2,9,3|77|bcd|bc
+type SliceBox {
+    value: i64
+}
+
+fun main(): void {
+    if "a\0b" != "a\0b" || "a\0b" == "a\0c" {
+        exit(1)
+    }
+    let text = "abcdef"
+    print(text[1:5][0:3])
+    print("|")
+    print(text[2:2])
+    print("|")
+
+    let values = new i64[4]
+    values[0] = 1
+    values[1] = 2
+    values[2] = 3
+    values[3] = 4
+    let middle = values[1:3]
+    middle[0] = 9
+    print(itoa(values[1]))
+    print(",")
+    print(itoa(middle[0]))
+    print(",")
+    print(itoa(middle[1]))
+    print("|")
+
+    let boxes = new SliceBox[1]
+    boxes[0] = new SliceBox
+    let copied = boxes[0:1]
+    copied[0].value = 77
+    print(itoa(boxes[0].value))
+    print("|")
+
+    let mutable = bytes("abcdef")
+    let snapshot = str(mutable)
+    mutable[1] = 90
+    print(snapshot[1:4])
+    print("|")
+    print(str(bytes("abc")[1:3]))
+}

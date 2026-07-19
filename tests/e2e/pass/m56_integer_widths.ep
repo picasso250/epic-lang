@@ -97,8 +97,8 @@ fun main(): void {
     }
 
     let words = new u16[2]
-    words[0u8] = 0x1234u16
-    words[1u32] = 0xabcdu16
+    words[0] = 0x1234u16
+    words[1] = 0xabcdu16
     push(words, 0xffffu16)
     if words[0] != 0x1234u16 || words[1] != 0xabcdu16 || pop(words) != 0xffffu16 {
         os.ExitProcess(18)

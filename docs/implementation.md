@@ -94,7 +94,9 @@ and records the low 64-bit pattern on the AST. Unary negation and integer
 operations retain their operand width; logical results are `bool`.
 
 This keeps deterministic syntax records precise without creating a separate
-wrapper allocation for every expression or statement.
+wrapper allocation for every expression or statement. `Slice` expressions
+carry an exact base, start, and end. They deliberately have no assignment-target
+counterpart.
 
 ## Code generation
 
@@ -131,6 +133,20 @@ collector in `runtime/gc.asm`. It records exact allocation bases in side
 metadata, routes small objects through four slab classes, scans the active stack
 and managed payloads conservatively, and reclaims unreachable objects. The
 detailed runtime contract is documented in [`gc.md`](gc.md).
+
+The runtime string header is `{owner, offset, len}`. `owner` is always the exact
+base of the managed byte allocation, which matters because the collector does
+not treat interior pointers as roots. String slicing allocates a header, keeps
+the same owner, adds to the offset, and changes the length. `bytes(str)` and
+`str(u8[])` currently copy to preserve snapshot semantics in both directions;
+the opaque array mutation surface leaves room for a later copy-on-write
+implementation without changing observable behavior. `cstr(str)` is separate:
+it allocates a fresh byte region and appends the terminator required by C.
+
+The v3 source still uses private `str_new`, `.data`, and `.len` bridges in the
+files compiled by the v2 seed. Semantic analysis exposes those bridges only to
+the known compiler source paths. They are scheduled to disappear when v4 can
+dogfood slicing and `cstr()` directly.
 
 ## Assembler and PE writer
 

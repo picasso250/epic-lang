@@ -67,7 +67,14 @@ not use. The user-visible language changes introduced in v3 are:
 - opaque dynamic arrays: source code uses `len`, checked subscripting, `push`,
   `pop`, and `extend` instead of accessing `.data`, `.len`, or `.cap`; and
 - `str(array: u8[]): str`, which copies all array bytes into a new immutable
-  string without treating embedded NUL bytes as terminators.
+  string without treating embedded NUL bytes as terminators;
+- half-open `value[start:end]` slicing for strings and arrays. String slices
+  share immutable backing bytes and allocate only a view header; array slices
+  shallow-copy their elements into an independent array;
+- opaque strings with no public fields and no trailing-NUL guarantee, plus
+  `cstr(s)` for an explicit fresh NUL-terminated copy at raw C/Win32 boundaries;
+  and
+- one index type: checked subscripts and both slice bounds require `i64`.
 
 The v3 compiler implementation itself stays within the v2-era integer surface.
 The v4 compiler is the dogfood target for the new bool and integer types. During
@@ -149,22 +156,21 @@ Locals and parameters remain in 8-byte stack slots as an implementation detail.
 
 ### Strings
 
-`str` is an immutable, heap-allocated byte string. String literals produce
-`str` values.
+`str` is an opaque immutable byte view. String literals produce `str` values.
+The runtime representation owns a backing allocation plus an offset and length,
+but none of those fields are source-visible.
 
 | Field or expression | Meaning |
 | --- | --- |
-| `len(s)` | number of bytes, excluding the trailing NUL |
+| `len(s)` | number of bytes |
 | `s[i]` | checked byte access; invalid indices terminate the program |
-| `s.data` | low-level address of the first byte |
-| `s.data[i]` | unchecked low-level byte access |
-| `s.len` | compatibility access to the internal length field |
+| `s[start:end]` | zero-copy half-open immutable view |
 
-The runtime keeps a trailing NUL for Win32 interop, but it is not part of the
-string length. Direct `s[i]` rejects negative indices and indices greater than
-or equal to `len(s)`, printing `Epic runtime error: index out of bounds` before
-terminating. Mutating bytes through `s.data` is outside the language contract.
-Use `new u8[n]` for mutable byte buffers.
+Direct `s[i]` requires an `i64` index and rejects negative indices and indices
+greater than or equal to `len(s)`, printing `Epic runtime error: index out of
+bounds` before terminating. Strings do not promise a byte at `s[len(s)]`.
+Use `cstr(s)` when a raw API requires NUL termination and `bytes(s)` when a
+mutable copy is needed.
 
 ### Dynamic arrays
 
@@ -176,6 +182,7 @@ Use `new u8[n]` for mutable byte buffers.
 | `new T[n]` | dynamic array of length `n` and capacity at least `n`, with zero-initialized elements |
 | `len(a)` | current element count |
 | `a[i]` | checked element access; invalid indices terminate the program |
+| `a[start:end]` | independent array containing a shallow copy of the half-open range |
 
 `new T[]` starts empty. `new T[n]` evaluates `n` once, requires a
 non-negative value, and creates `n` zero-initialized elements with `len(a) == n`.
@@ -183,6 +190,18 @@ Direct `a[i]` rejects negative indices and indices greater than or equal to
 `len(a)`. `push` appends after the initialized elements; `push` and `extend` are
 documented under built-in functions. Arrays expose no fields: `.data`, `.len`,
 and `.cap` are compile errors rather than a public layout API.
+
+Subscripts and slice bounds require `i64`; use an explicit conversion for other
+integer widths. A slice evaluates its base, start, and end once, from left to
+right, and requires `0 <= start <= end <= len(value)`. Empty slices are valid.
+Invalid bounds print `Epic runtime error: slice out of bounds` and terminate.
+Only the complete `value[start:end]` spelling is supported: omitted bounds,
+steps, reverse slicing, and slice assignment are not part of v3.
+
+Array slicing copies scalar values and reference values, without recursively
+cloning referenced products. Replacing elements or structurally changing the
+result does not affect the source array; objects referenced by both arrays
+remain shared.
 
 ### Built-in global
 
@@ -462,9 +481,12 @@ conditions require `bool`, subject to the documented v3 migration bridge.
 
 In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
 
-`os.CreateDirectoryA(path, 0)` creates a directory and returns nonzero on
+`os.CreateDirectoryA(cstr(path), 0)` creates a directory and returns nonzero on
 success. It returns zero on failure, including when the directory already
 exists.
+
+Raw bindings whose Windows signature takes a C string require `cstr`; Epic
+`str` is never converted implicitly at this boundary.
 
 General method calls are not supported in v0.
 
@@ -501,12 +523,11 @@ to declare them.
 | `panic(message: str): never` | writes an allocation-free diagnostic to standard error, then terminates with status `1` |
 | `print(s: str): void` | writes string bytes without adding a newline |
 | `itoa(n: i64): str` | converts an integer to a heap string |
-| `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
 | `str(array: u8[]): str` | copies every array byte into a new immutable string, preserving embedded NUL bytes |
+| `cstr(s: str): cstr` | allocates a fresh `len(s) + 1` byte region, copies all bytes, and appends NUL |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `is_null(value: reference): bool` | tests whether a product, string, array, or low-level pointer reference is the zero address; the argument is evaluated once |
-| `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
@@ -516,14 +537,22 @@ to declare them.
 
 `never` appears here to describe the built-in precisely, but it is not accepted
 in user-written parameter, field, local, or function return type declarations.
+The same applies to the internal `cstr` result type: a local may infer it from
+`cstr(s)`, but source declarations cannot name it.
 
-`len(value)`, `pop(array)`, and checked `value[index]` are the array interfaces.
+`len(value)`, `pop(array)`, checked `value[index]`, and slicing are the container interfaces.
 `pop` evaluates its array expression once, preserves capacity, and clears the
 removed slot so stale references do not keep objects alive through the
 conservative collector. Array `.data`, `.len`, and `.cap` fields are not part
-of the language. Strings still expose compatibility fields `s.data` and
-`s.len` for deliberate low-level interop; pointer subscripting and
-`s.data[index]` are unchecked.
+of the language. Strings likewise expose no fields; `str_new`, `s.data`, and
+`s.len` are private bootstrap bridges rather than language APIs.
+
+`cstr` performs no embedded-NUL validation. It copies every string byte and
+then appends a final NUL, so a C API may observe only a prefix when the source
+contains an earlier zero byte. This low-level interpretation is the caller's
+responsibility. High-level `read_file(path)` and `write_file(path, data)` keep
+accepting `str` paths and perform the conversion internally; raw string-taking
+`os.*` bindings require explicit `cstr(...)`.
 
 `is_null` checks only the outer reference address. An empty string or empty
 array is not null, a nonzero dangling pointer is not null, and no implicit null

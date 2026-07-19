@@ -1,0 +1,17 @@
+fun retained_view(): str {
+    let source = "0123456789"
+    ret source[3:7]
+}
+
+fun main(): void {
+    let view = retained_view()
+    let i = 0
+    while i < 60000 {
+        let waste = new u8[1024]
+        waste[0] = i
+        i += 1
+    }
+    if view != "3456" {
+        exit(1)
+    }
+}

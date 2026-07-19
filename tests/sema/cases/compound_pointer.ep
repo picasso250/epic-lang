@@ -1,4 +1,4 @@
-# ERROR: compound assignment requires an integer target, got ptr:u8
+# ERROR: type str has no field 'data'
 fun main(): void {
     let text = "abc"
     let pointer = text.data

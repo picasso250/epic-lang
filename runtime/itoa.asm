@@ -1,6 +1,6 @@
 ; ── _itoa: convert integer to heap-allocated str ──
 ; rcx = number
-; returns: rax = &str (heap-allocated { data: &u8, len: i64 })
+; returns: rax = &str (heap-allocated { owner: &u8, offset: i64, len: i64 })
 _itoa:
     push rbp
     mov rbp, rsp
@@ -37,8 +37,8 @@ _itoa:
     mov [rbp-16], r10     ; save first digit ptr (volatile)
     mov [rbp-24], r11     ; save digit count (volatile)
     mov [rbp-32], r8      ; save sign flag
-    ; Allocate header (16 bytes)
-    mov ecx, 16
+    ; Allocate header (24 bytes)
+    mov ecx, 24
     sub rsp, 40
     call __ep_alloc
     add rsp, 40
@@ -46,17 +46,17 @@ _itoa:
     ; Compute total len
     mov r8, [rbp-24]       ; digit count
     add r8, [rbp-32]       ; + sign flag
-    ; Allocate data (total len + 1)
+    ; Allocate exactly total len bytes.
     push r8               ; save total len
     mov rcx, r8
-    inc rcx               ; +1 for null
     sub rsp, 40
     call __ep_alloc
     add rsp, 40
     pop rdx               ; rdx = total len
     mov rcx, [rbp-8]
-    mov [rcx], rax        ; header.data = data
-    mov [rcx+8], rdx      ; header.len = total len
+    mov [rcx], rax        ; header.owner = data
+    mov qword [rcx+8], 0  ; header.offset
+    mov [rcx+16], rdx     ; header.len = total len
     ; Restore volatile state
     mov r10, [rbp-16]     ; first digit ptr
     mov r11, [rbp-24]     ; digit count
@@ -70,7 +70,7 @@ _itoa:
 .copy_digits:
     mov rcx, r11
     test rcx, rcx
-    jz .nullterm
+    jz .done
 .copy:
     mov al, [r10]
     mov [r9], al
@@ -78,8 +78,7 @@ _itoa:
     inc r9
     dec rcx
     jnz .copy
-.nullterm:
-    mov byte [r9], 0
+.done:
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp

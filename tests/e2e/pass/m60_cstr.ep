@@ -1,0 +1,7 @@
+# EXIT: 0
+# STDOUT: 3,1
+fun main(): void {
+    print(itoa(os.lstrlenA(cstr("abc"))))
+    print(",")
+    print(itoa(os.lstrlenA(cstr("a\0b"))))
+}

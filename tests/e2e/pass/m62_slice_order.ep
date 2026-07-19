@@ -1,0 +1,31 @@
+# EXIT: 0
+# STDOUT: 123
+type SliceOrder {
+    step: i64
+    values: i64[]
+}
+
+fun slice_base(state: SliceOrder): i64[] {
+    state.step = state.step * 10 + 1
+    ret state.values
+}
+
+fun slice_start(state: SliceOrder): i64 {
+    state.step = state.step * 10 + 2
+    ret 0
+}
+
+fun slice_end(state: SliceOrder): i64 {
+    state.step = state.step * 10 + 3
+    ret 1
+}
+
+fun main(): void {
+    let state = new SliceOrder
+    state.values = new i64[1]
+    let result = slice_base(state)[slice_start(state):slice_end(state)]
+    if len(result) != 1 {
+        exit(1)
+    }
+    print(itoa(state.step))
+}

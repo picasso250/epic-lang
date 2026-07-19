@@ -1,7 +1,7 @@
 #
 # Epic parser.
 #
-type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | NewProduct | NewArray | FieldAccess | Subscript | If | Match
+type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | NewProduct | NewArray | FieldAccess | Subscript | Slice | If | Match
 type AstStmtKind = Return | Expr | Let | Assign | AssignOp | While | ForRange | Break | Continue
 type AssignTargetKind = Var | Field | Subscript
 type OperatorKind = Add | Subtract | Multiply | Divide | Remainder | BitAnd | BitOr | ShiftLeft | ShiftRight | Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual | LogicalAnd | LogicalOr | Negate | LogicalNot
@@ -18,6 +18,8 @@ type AstExpr {
     object: AstExpr
     base: AstExpr
     index: AstExpr
+    slice_start: AstExpr
+    slice_end: AstExpr
     count: AstExprOption
     condition: AstExpr
     then_block: AstBlock
@@ -217,6 +219,15 @@ fun ast_subscript(base: AstExpr, index: AstExpr, line: i64): AstExpr {
     node.kind = AstExprKind.Subscript
     node.base = base
     node.index = index
+    node.line = line
+    ret node
+}
+fun ast_slice(base: AstExpr, start: AstExpr, end: AstExpr, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Slice
+    node.base = base
+    node.slice_start = start
+    node.slice_end = end
     node.line = line
     ret node
 }
@@ -664,6 +675,10 @@ fun ast_assign_target(lhs: AstExpr, line: i64): AstAssignTarget {
         AstExprKind.Subscript {
             ret ast_subscript_target(lhs.base, lhs.index)
         }
+        AstExprKind.Slice {
+            parse_error(line, "Invalid assignment target")
+            ret ast_var_target("")
+        }
         AstExprKind.If {
             parse_error(line, "Invalid assignment target")
             ret ast_var_target("")
@@ -707,8 +722,14 @@ fun parse_assign_stmt(p: Parser): AstStmt {
             lhs = ast_field_access(lhs, field.text, field.line)
         } else if check(p, TokenKind.LBRACKET) == 1 {
             let index = parse_expr(p)
-            expect(p, TokenKind.RBRACKET)
-            lhs = ast_subscript(lhs, index, lhs.line)
+            if check(p, TokenKind.COLON) == 1 {
+                let end = parse_expr(p)
+                expect(p, TokenKind.RBRACKET)
+                lhs = ast_slice(lhs, index, end, lhs.line)
+            } else {
+                expect(p, TokenKind.RBRACKET)
+                lhs = ast_subscript(lhs, index, lhs.line)
+            }
         } else {
             done = 1
         }
@@ -1069,8 +1090,14 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
             }
         } else if check(p, TokenKind.LBRACKET) == 1 {
             let index = parse_expr(p)
-            expect(p, TokenKind.RBRACKET)
-            current = ast_subscript(current, index, current.line)
+            if check(p, TokenKind.COLON) == 1 {
+                let end = parse_expr(p)
+                expect(p, TokenKind.RBRACKET)
+                current = ast_slice(current, index, end, current.line)
+            } else {
+                expect(p, TokenKind.RBRACKET)
+                current = ast_subscript(current, index, current.line)
+            }
         } else {
             done = 1
         }

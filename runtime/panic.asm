@@ -1,10 +1,11 @@
 ; Non-returning panic helper.
-; rcx = &str { data: &u8, len: i64 }
+; rcx = &str { owner: &u8, offset: i64, len: i64 }
 __ep_panic:
     sub rsp, 72
     mov rax, [rcx]
+    add rax, [rcx+8]
     mov [rsp+40], rax
-    mov rax, [rcx+8]
+    mov rax, [rcx+16]
     mov [rsp+48], rax
 
     mov ecx, -12

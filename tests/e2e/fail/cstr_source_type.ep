@@ -1,0 +1,6 @@
+# COMPILE_ERROR: unknown type 'cstr'
+fun expose(value: cstr): void {
+}
+
+fun main(): void {
+}

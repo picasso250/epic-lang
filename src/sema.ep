@@ -177,6 +177,9 @@ fun sema_add_builtins(state: SemaState): i64 {
     sig = sema_signature("str", "str")
     push(sig.param_types, "u8[]")
     sema_add_builtin(state, sig)
+    sig = sema_signature("cstr", "cstr")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
     sig = sema_signature("len", "i64")
     push(sig.param_types, "lenable")
     sema_add_builtin(state, sig)
@@ -185,11 +188,6 @@ fun sema_add_builtins(state: SemaState): i64 {
     sema_add_builtin(state, sig)
     sig = sema_signature("str_new", "str")
     push(sig.param_types, "ptr")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("str_slice", "str")
-    push(sig.param_types, "str")
-    push(sig.param_types, "i64")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("read_file", "str")
@@ -232,11 +230,11 @@ fun sema_add_os_signatures(state: SemaState): i64 {
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.lstrlenA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.lstrcmpA", "i64")
-    push(sig.param_types, "str")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr")
+    push(sig.param_types, "cstr")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.MessageBoxA", "i64")
     push(sig.param_types, "i64")
@@ -258,14 +256,14 @@ fun sema_add_os_signatures(state: SemaState): i64 {
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.GetFileAttributesA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.CreateDirectoryA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.CreateFileA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr")
     push(sig.param_types, "i64")
     push(sig.param_types, "i64")
     push(sig.param_types, "i64")
@@ -275,14 +273,14 @@ fun sema_add_os_signatures(state: SemaState): i64 {
     sema_add_builtin(state, sig)
     sig = sema_signature("os.ReadFile", "i64")
     push(sig.param_types, "i64")
-    push(sig.param_types, "buffer_ptr")
+    push(sig.param_types, "ptr")
     push(sig.param_types, "i64")
     push(sig.param_types, "ptr_or_null")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.WriteFile", "i64")
     push(sig.param_types, "i64")
-    push(sig.param_types, "buffer_ptr")
+    push(sig.param_types, "write_buffer")
     push(sig.param_types, "i64")
     push(sig.param_types, "ptr_or_null")
     push(sig.param_types, "i64")
@@ -293,7 +291,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     while i < len(ast.structs) {
         let node = ast.structs[i]
-        if node.name == "os" || sema_is_primitive_type(node.name) == 1 {
+        if node.name == "os" || node.name == "cstr" || sema_is_primitive_type(node.name) == 1 {
             sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
         }
         let first = sema_find_type(state, node.name)
@@ -311,7 +309,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     i = 0
     while i < len(ast.enums) {
         let enum_node = ast.enums[i]
-        if enum_node.name == "os" || sema_is_primitive_type(enum_node.name) == 1 {
+        if enum_node.name == "os" || enum_node.name == "cstr" || sema_is_primitive_type(enum_node.name) == 1 {
             sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
         }
         let enum_first = sema_find_type(state, enum_node.name)
@@ -544,7 +542,7 @@ fun sema_pointer_element(type_name: str): str {
     ret str_new(type_name.data + 4, len(type_name) - 4)
 }
 fun sema_is_reference_value(state: SemaState, type_name: str): i64 {
-    if type_name == "str" || type_is_array(type_name) == 1 || sema_is_pointer(type_name) == 1 {
+    if type_name == "str" || type_name == "cstr" || type_is_array(type_name) == 1 || sema_is_pointer(type_name) == 1 {
         ret 1
     }
     let decl = sema_find_type(state, type_name)
@@ -762,10 +760,10 @@ fun sema_assignable(expected: str, actual: str): i64 {
     if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
         ret 1
     }
-    if expected == "cstr_or_null" && (actual == "str" || actual == "i64") {
+    if expected == "cstr_or_null" && (actual == "cstr" || actual == "i64") {
         ret 1
     }
-    if expected == "buffer_ptr" && (actual == "str" || sema_is_pointer(actual) == 1) {
+    if expected == "write_buffer" && (actual == "str" || sema_is_pointer(actual) == 1) {
         ret 1
     }
     if expected == "ptr_or_null" && (actual == "i64" || sema_is_pointer(actual) == 1) {
@@ -807,8 +805,17 @@ fun sema_require_integer(state: SemaState, expr: AstExpr, context: str): i64 {
     }
     ret 0
 }
+fun sema_is_bootstrap_source(path: str): i64 {
+    if path == "src/asm.ep" || path == "src/lexer.ep" || path == "src/parser.ep" || path == "src/sema.ep" || path == "src/utils.ep" {
+        ret 1
+    }
+    ret 0
+}
 fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     if base_type == "str" {
+        if sema_is_bootstrap_source(state.source_path) == 0 {
+            ret ""
+        }
         if field_name == "data" {
             ret "ptr:u8"
         }
@@ -1077,6 +1084,9 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         }
         ret expr.name
     }
+    if full_name == "str_new" && sema_is_bootstrap_source(state.source_path) == 0 {
+        sema_error(state.source_path, expr.line, "unknown function 'str_new'")
+    }
     let sig = sema_find_func(state, full_name)
     if sig.name == "" {
         sema_error(state.source_path, expr.line, "unknown function '" + full_name + "'")
@@ -1121,6 +1131,8 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             if !type_is_array(actual) {
                 sema_error(state.source_path, expr.args[i].line, "pop expects an array, got " + actual)
             }
+        } else if expected == "cstr" && actual == "str" && sema_is_bootstrap_source(state.source_path) == 1 {
+            # Bootstrap-only bridge until the v4 compiler source can dogfood cstr().
         } else if !sema_assignable(expected, actual) {
             sema_error(state.source_path, expr.args[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
@@ -1242,8 +1254,8 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
         }
         AstExprKind.Subscript {
             let base_type = sema_check_expr(state, expr.base)
-            let index_type = sema_check_expr(state, expr.index)
-            sema_require_integer(state, expr.index, "subscript")
+            let index_type = sema_check_expr_expected(state, expr.index, "i64")
+            sema_require_i64(state, expr.index, "subscript")
             if base_type == "never" || index_type == "never" {
                 result = "never"
             } else if base_type == "str" {
@@ -1254,6 +1266,20 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
                 result = sema_pointer_element(base_type)
             } else {
                 sema_error(state.source_path, expr.line, "type " + base_type + " is not subscriptable")
+            }
+        }
+        AstExprKind.Slice {
+            let slice_base_type = sema_check_expr(state, expr.base)
+            let slice_start_type = sema_check_expr_expected(state, expr.slice_start, "i64")
+            sema_require_i64(state, expr.slice_start, "slice start")
+            let slice_end_type = sema_check_expr_expected(state, expr.slice_end, "i64")
+            sema_require_i64(state, expr.slice_end, "slice end")
+            if slice_base_type == "never" || slice_start_type == "never" || slice_end_type == "never" {
+                result = "never"
+            } else if slice_base_type == "str" || type_is_array(slice_base_type) == 1 {
+                result = slice_base_type
+            } else {
+                sema_error(state.source_path, expr.line, "type " + slice_base_type + " is not sliceable")
             }
         }
         AstExprKind.If {
@@ -1357,8 +1383,8 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
         }
         AssignTargetKind.Subscript {
             let base_type = sema_check_expr(state, target.base)
-            sema_check_expr(state, target.index)
-            sema_require_integer(state, target.index, "subscript")
+            sema_check_expr_expected(state, target.index, "i64")
+            sema_require_i64(state, target.index, "subscript")
             if base_type == "str" {
                 if compound == 1 {
                     sema_error(state.source_path, line, "str does not support compound assignment")

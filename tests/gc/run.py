@@ -58,6 +58,7 @@ def run_case(name: str) -> bool:
 def main() -> int:
     ok = run_case("stress")
     ok = run_case("small") and ok
+    ok = run_case("views") and ok
     return 0 if ok else 1
 
 
