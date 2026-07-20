@@ -40,7 +40,7 @@ fun sema_error(path: str, line: i64, message: str): i64 {
     print(message)
     print("\n")
     os.ExitProcess(1)
-    return 0
+    ret 0
 }
 fun sema_duplicate(path: str, line: i64, what: str, first: str): i64 {
     print(path)
@@ -52,63 +52,63 @@ fun sema_duplicate(path: str, line: i64, what: str, first: str): i64 {
     print(first)
     print("\n")
     os.ExitProcess(1)
-    return 0
+    ret 0
 }
 fun sema_state(): SemaState {
     let state = new SemaState
     state.types = new SemaTypeDecl[]
     state.funcs = new SemaSignature[]
-    return state
+    ret state
 }
 fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
     let i = 0
-    while i < state.types.len {
+    for i < state.types.len {
         if state.types.data[i].name == name {
-            return state.types.data[i]
+            ret state.types.data[i]
         }
         i = i + 1
     }
     let missing = new SemaTypeDecl
     missing.name = ""
-    return missing
+    ret missing
 }
 fun sema_find_func(state: SemaState, name: str): SemaSignature {
     let i = 0
-    while i < state.funcs.len {
+    for i < state.funcs.len {
         if state.funcs.data[i].name == name {
-            return state.funcs.data[i]
+            ret state.funcs.data[i]
         }
         i = i + 1
     }
     let missing = new SemaSignature
     missing.name = ""
-    return missing
+    ret missing
 }
 fun sema_is_array(type_name: str): i64 {
     if type_name.len < 2 {
-        return 0
+        ret 0
     }
     if type_name.data[type_name.len - 2] == 91 && type_name.data[type_name.len - 1] == 93 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun sema_array_element(type_name: str): str {
-    return str_new(type_name.data, type_name.len - 2)
+    ret str_new(type_name.data, type_name.len - 2)
 }
 fun sema_type_exists(state: SemaState, type_name: str): i64 {
     if type_name == "i64" || type_name == "u8" || type_name == "str" || type_name == "void" {
-        return 1
+        ret 1
     }
     if sema_find_type(state, type_name).name != "" {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: str): i64 {
     if type_name == "void" {
         sema_error(path, line, "void is only valid as a function return type")
-        return 0
+        ret 0
     }
     if sema_is_array(type_name) == 1 {
         let element = sema_array_element(type_name)
@@ -121,12 +121,12 @@ fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: 
         if sema_type_exists(state, element) == 0 {
             sema_error(path, line, "unknown array element type '" + element + "'")
         }
-        return 0
+        ret 0
     }
     if sema_type_exists(state, type_name) == 0 {
         sema_error(path, line, "unknown type '" + type_name + "'")
     }
-    return 0
+    ret 0
 }
 fun sema_signature(name: str, return_type: str): SemaSignature {
     let sig = new SemaSignature
@@ -135,11 +135,11 @@ fun sema_signature(name: str, return_type: str): SemaSignature {
     sig.param_types = new str[]
     sig.source_path = "<builtin>"
     sig.builtin = 1
-    return sig
+    ret sig
 }
 fun sema_add_builtin(state: SemaState, sig: SemaSignature): i64 {
     push(state.funcs, sig)
-    return 0
+    ret 0
 }
 fun sema_add_builtins(state: SemaState): i64 {
     let sig = sema_signature("print", "void")
@@ -194,7 +194,7 @@ fun sema_add_builtins(state: SemaState): i64 {
     sema_add_builtin(state, sig)
     sig = sema_signature("embed", "u8[]")
     sema_add_builtin(state, sig)
-    return 0
+    ret 0
 }
 fun sema_add_os_signatures(state: SemaState): i64 {
     let sig = sema_signature("os.Sleep", "void")
@@ -269,11 +269,11 @@ fun sema_add_os_signatures(state: SemaState): i64 {
     push(sig.param_types, "ptr_or_null")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
-    return 0
+    ret 0
 }
 fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     let i = 0
-    while i < ast.structs.len {
+    for i < ast.structs.len {
         let node = ast.structs.data[i]
         if node.name == "os" || node.name == "ptr" {
             sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
@@ -291,7 +291,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
         i = i + 1
     }
     i = 0
-    while i < ast.enums.len {
+    for i < ast.enums.len {
         let enum_node = ast.enums.data[i]
         if enum_node.name == "os" || enum_node.name == "ptr" {
             sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
@@ -308,17 +308,17 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
         push(state.types, enum_decl)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun sema_validate_enums(state: SemaState, ast: AstProgram): i64 {
     let i = 0
-    while i < ast.enums.len {
+    for i < ast.enums.len {
         let node = ast.enums.data[i]
         let j = 0
-        while j < node.members.len {
+        for j < node.members.len {
             let member = node.members.data[j]
             let k = 0
-            while k < j {
+            for k < j {
                 let first = node.members.data[k]
                 if first.name == member.name {
                     sema_duplicate(node.source_path, member.line, "enum member '" + member.name + "'", node.source_path + ":" + itoa(first.line))
@@ -329,17 +329,17 @@ fun sema_validate_enums(state: SemaState, ast: AstProgram): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
     let i = 0
-    while i < ast.structs.len {
+    for i < ast.structs.len {
         let node = ast.structs.data[i]
         let j = 0
-        while j < node.fields.len {
+        for j < node.fields.len {
             let field = node.fields.data[j]
             let k = 0
-            while k < j {
+            for k < j {
                 let first = node.fields.data[k]
                 if first.name == field.name {
                     sema_duplicate(node.source_path, field.line, "field '" + field.name + "'", node.source_path + ":" + itoa(first.line))
@@ -351,11 +351,11 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
     let i = 0
-    while i < ast.funcs.len {
+    for i < ast.funcs.len {
         let node = ast.funcs.data[i]
         if node.name == "os" {
             sema_error(node.source_path, node.line, "'os' is a reserved namespace")
@@ -375,10 +375,10 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
         sig.line = node.line
         sig.builtin = 0
         let j = 0
-        while j < node.params.len {
+        for j < node.params.len {
             let param = node.params.data[j]
             let k = 0
-            while k < j {
+            for k < j {
                 let previous = node.params.data[k]
                 if previous.name == param.name {
                     sema_duplicate(node.source_path, param.line, "parameter '" + param.name + "'", node.source_path + ":" + itoa(previous.line))
@@ -395,7 +395,7 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
         push(state.funcs, sig)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun sema_validate_main(state: SemaState): i64 {
     let main_sig = sema_find_func(state, "main")
@@ -405,83 +405,83 @@ fun sema_validate_main(state: SemaState): i64 {
     if main_sig.return_type != "void" || main_sig.param_types.len != 0 {
         sema_error(main_sig.source_path, main_sig.line, "main must have signature fun main(): void")
     }
-    return 0
+    ret 0
 }
 fun sema_find_struct(state: SemaState, name: str): AstStructDef {
     let i = 0
-    while i < state.ast.structs.len {
+    for i < state.ast.structs.len {
         if state.ast.structs.data[i].name == name {
-            return state.ast.structs.data[i]
+            ret state.ast.structs.data[i]
         }
         i = i + 1
     }
     let missing = new AstStructDef
     missing.name = ""
     missing.fields = new AstStructField[]
-    return missing
+    ret missing
 }
 fun sema_find_enum(state: SemaState, name: str): AstEnumDef {
     let i = 0
-    while i < state.ast.enums.len {
+    for i < state.ast.enums.len {
         if state.ast.enums.data[i].name == name {
-            return state.ast.enums.data[i]
+            ret state.ast.enums.data[i]
         }
         i = i + 1
     }
     let missing = new AstEnumDef
     missing.name = ""
     missing.members = new AstEnumMember[]
-    return missing
+    ret missing
 }
 fun sema_enum_member_index(node: AstEnumDef, name: str): i64 {
     let i = 0
-    while i < node.members.len {
+    for i < node.members.len {
         if node.members.data[i].name == name {
-            return i
+            ret i
         }
         i = i + 1
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun sema_find_field(state: SemaState, type_name: str, field_name: str): AstStructField {
     let node = sema_find_struct(state, type_name)
     let i = 0
-    while i < node.fields.len {
+    for i < node.fields.len {
         if node.fields.data[i].name == field_name {
-            return node.fields.data[i]
+            ret node.fields.data[i]
         }
         i = i + 1
     }
     let missing = new AstStructField
     missing.name = ""
     missing.type_name = ""
-    return missing
+    ret missing
 }
 fun sema_find_local(state: SemaState, name: str): SemaLocal {
     let i = 0
-    while i < state.locals.len {
+    for i < state.locals.len {
         let local = state.locals.data[i]
         if local.name == name && local.active == 1 {
-            return local
+            ret local
         }
         i = i + 1
     }
     let missing = new SemaLocal
     missing.name = ""
     missing.type_name = ""
-    return missing
+    ret missing
 }
 fun sema_name_was_used(state: SemaState, name: str): SemaLocal {
     let i = 0
-    while i < state.locals.len {
+    for i < state.locals.len {
         if state.locals.data[i].name == name {
-            return state.locals.data[i]
+            ret state.locals.data[i]
         }
         i = i + 1
     }
     let missing = new SemaLocal
     missing.name = ""
-    return missing
+    ret missing
 }
 fun sema_add_local(state: SemaState, name: str, type_name: str, line: i64): i64 {
     if name == "argv" || name == "os" {
@@ -498,130 +498,130 @@ fun sema_add_local(state: SemaState, name: str, type_name: str, line: i64): i64 
     local.depth = state.scope_depth
     local.active = 1
     push(state.locals, local)
-    return 0
+    ret 0
 }
 fun sema_leave_scope(state: SemaState): i64 {
     let i = 0
-    while i < state.locals.len {
+    for i < state.locals.len {
         if state.locals.data[i].depth == state.scope_depth {
             state.locals.data[i].active = 0
         }
         i = i + 1
     }
     state.scope_depth = state.scope_depth - 1
-    return 0
+    ret 0
 }
 fun sema_is_pointer(type_name: str): i64 {
     if type_name.len > 4 {
         if type_name.data[0] == 112 && type_name.data[1] == 116 && type_name.data[2] == 114 && type_name.data[3] == 58 {
-            return 1
+            ret 1
         }
     }
-    return 0
+    ret 0
 }
 fun sema_pointer_element(type_name: str): str {
-    return str_new(type_name.data + 4, type_name.len - 4)
+    ret str_new(type_name.data + 4, type_name.len - 4)
 }
 fun sema_promote(type_name: str): str {
     if type_name == "u8" {
-        return "i64"
+        ret "i64"
     }
-    return type_name
+    ret type_name
 }
 fun sema_assignable(expected: str, actual: str): i64 {
     if expected == actual {
-        return 1
+        ret 1
     }
     if expected == "u8" && actual == "i64" {
-        return 1
+        ret 1
     }
     if expected == "ptr" && sema_is_pointer(actual) == 1 {
-        return 1
+        ret 1
     }
     if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
-        return 1
+        ret 1
     }
     if expected == "cstr_source" && (actual == "str" || actual == "ptr") {
-        return 1
+        ret 1
     }
     if expected == "cstr_or_null" && (actual == "str" || actual == "ptr" || actual == "i64") {
-        return 1
+        ret 1
     }
     if expected == "buffer_ptr" && (actual == "str" || sema_is_pointer(actual) == 1) {
-        return 1
+        ret 1
     }
     if expected == "ptr_or_null" && (actual == "i64" || sema_is_pointer(actual) == 1) {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): i64 {
     if expr.resolved_type != "i64" {
         sema_error(state.source_path, expr.line, context + " requires i64, got " + expr.resolved_type)
     }
-    return 0
+    ret 0
 }
 fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     if base_type == "str" {
         if field_name == "data" {
-            return "ptr:u8"
+            ret "ptr:u8"
         }
         if field_name == "len" {
-            return "i64"
+            ret "i64"
         }
-        return ""
+        ret ""
     }
     if sema_is_array(base_type) == 1 {
         if field_name == "data" {
-            return "ptr:" + sema_array_element(base_type)
+            ret "ptr:" + sema_array_element(base_type)
         }
         if field_name == "len" || field_name == "cap" {
-            return "i64"
+            ret "i64"
         }
-        return ""
+        ret ""
     }
     let field = sema_find_field(state, base_type, field_name)
-    return field.type_name
+    ret field.type_name
 }
 fun sema_check_binary(state: SemaState, expr: AstExpr): str {
     let left = sema_check_expr(state, expr.left)
     let right = sema_check_expr(state, expr.right)
     if expr.op == "+" && left == "str" && right == "str" {
-        return "str"
+        ret "str"
     }
     if expr.op == "+" && sema_is_pointer(left) == 1 && right == "i64" {
-        return left
+        ret left
     }
     if expr.op == "+" && left == "i64" && sema_is_pointer(right) == 1 {
-        return right
+        ret right
     }
     if expr.op == "==" || expr.op == "!=" {
         if left == "i64" && right == "i64" {
-            return "i64"
+            ret "i64"
         }
         if left == "str" && right == "str" {
-            return "i64"
+            ret "i64"
         }
         let decl = sema_find_type(state, left)
         if left == right && decl.name != "" && decl.kind == "enum" {
-            return "i64"
+            ret "i64"
         }
         sema_error(state.source_path, expr.line, "operator " + expr.op + " requires two integers, two strings, or two values of the same enum type")
     }
     if expr.op == "+" || expr.op == "-" || expr.op == "*" || expr.op == "/" || expr.op == "%" || expr.op == "&" || expr.op == "|" || expr.op == "<<" || expr.op == ">>" {
         if left == "i64" && right == "i64" {
-            return "i64"
+            ret "i64"
         }
         sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
     }
     if expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" || expr.op == "&&" || expr.op == "||" {
         if left == "i64" && right == "i64" {
-            return "i64"
+            ret "i64"
         }
         sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
     }
     sema_error(state.source_path, expr.line, "unsupported binary operator " + expr.op)
-    return ""
+    ret ""
 }
 fun sema_check_unary(state: SemaState, expr: AstExpr): str {
     let operand = sema_check_expr(state, expr.left)
@@ -631,7 +631,7 @@ fun sema_check_unary(state: SemaState, expr: AstExpr): str {
     if expr.op != "-" && expr.op != "!" {
         sema_error(state.source_path, expr.line, "unsupported unary operator " + expr.op)
     }
-    return "i64"
+    ret "i64"
 }
 fun sema_check_call(state: SemaState, expr: AstExpr): str {
     let full_name = expr.name
@@ -646,7 +646,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         sema_error(state.source_path, expr.line, "function '" + full_name + "' expects " + itoa(sig.param_types.len) + " argument(s), got " + itoa(expr.args.len))
     }
     let i = 0
-    while i < expr.args.len {
+    for i < expr.args.len {
         let actual = sema_check_expr(state, expr.args.data[i])
         let expected = sig.param_types.data[i]
         if full_name == "push" && i == 0 {
@@ -673,9 +673,9 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         i = i + 1
     }
     if full_name == "pop" {
-        return sema_promote(sema_array_element(expr.args.data[0].resolved_type))
+        ret sema_promote(sema_array_element(expr.args.data[0].resolved_type))
     }
-    return sema_promote(sig.return_type)
+    ret sema_promote(sig.return_type)
 }
 fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     let result = ""
@@ -756,7 +756,7 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
         sema_error(state.source_path, expr.line, "unsupported expression kind '" + expr.kind + "'")
     }
     expr.resolved_type = result
-    return result
+    ret result
 }
 fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
     let subject_type = sema_check_expr(state, stmt.expr)
@@ -768,7 +768,7 @@ fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
     let explicit_count = 0
     let has_else = 0
     let i = 0
-    while i < stmt.match_arms.len {
+    for i < stmt.match_arms.len {
         let arm = stmt.match_arms.data[i]
         if arm.is_else == 1 {
             if has_else == 1 {
@@ -802,7 +802,7 @@ fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
     if has_else == 1 && explicit_count == enum_node.members.len {
         sema_error(state.source_path, stmt.line, "unreachable else arm in exhaustive match")
     }
-    return 0
+    ret 0
 }
 fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
     if stmt.name == "argv" {
@@ -819,7 +819,7 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
     if sema_assignable(local.type_name, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
     }
-    return 0
+    ret 0
 }
 fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
     let object_type = sema_check_expr(state, stmt.object)
@@ -834,7 +834,7 @@ fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
     if sema_assignable(field_type, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + field_type)
     }
-    return 0
+    ret 0
 }
 fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
     let base_type = sema_check_expr(state, stmt.base)
@@ -854,7 +854,7 @@ fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
     if sema_assignable(element, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + element)
     }
-    return 0
+    ret 0
 }
 fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
     if stmt.target_kind == "Var" {
@@ -868,7 +868,7 @@ fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
         if local.read_only == 1 {
             sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
         }
-        return local.type_name
+        ret local.type_name
     }
     if stmt.target_kind == "Field" {
         let object_type = sema_check_expr(state, stmt.object)
@@ -879,7 +879,7 @@ fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
         if field_type == "" {
             sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
         }
-        return field_type
+        ret field_type
     }
     if stmt.target_kind == "Subscript" {
         let base_type = sema_check_expr(state, stmt.base)
@@ -889,15 +889,15 @@ fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
             sema_error(state.source_path, stmt.line, "str does not support compound assignment")
         }
         if sema_is_array(base_type) == 1 {
-            return sema_array_element(base_type)
+            ret sema_array_element(base_type)
         }
         if sema_is_pointer(base_type) == 1 {
-            return sema_pointer_element(base_type)
+            ret sema_pointer_element(base_type)
         }
         sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
     }
     sema_error(state.source_path, stmt.line, "internal: unknown compound assignment target")
-    return ""
+    ret ""
 }
 fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
     let target_type = sema_compound_target_type(state, stmt)
@@ -911,14 +911,14 @@ fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
     if stmt.op != "+" && stmt.op != "-" && stmt.op != "*" && stmt.op != "/" && stmt.op != "%" && stmt.op != "&" && stmt.op != "|" && stmt.op != "<<" && stmt.op != ">>" {
         sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + stmt.op)
     }
-    return 0
+    ret 0
 }
 fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
     if state.return_type == "void" {
         if stmt.expr.kind != "" {
             sema_error(state.source_path, stmt.line, "void function cannot return a value")
         }
-        return 0
+        ret 0
     }
     if stmt.expr.kind == "" {
         sema_error(state.source_path, stmt.line, "non-void function must return a value")
@@ -927,7 +927,7 @@ fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
     if sema_assignable(state.return_type, actual) == 0 {
         sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
     }
-    return 0
+    ret 0
 }
 fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
     sema_check_expr(state, stmt.range_start)
@@ -939,7 +939,7 @@ fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
     state.locals.data[state.locals.len - 1].read_only = 1
     sema_check_block(state, stmt.body)
     sema_leave_scope(state)
-    return 0
+    ret 0
 }
 fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
     if stmt.kind == "Return" {
@@ -977,67 +977,67 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
     } else if stmt.kind == "Match" {
         sema_check_match(state, stmt)
     }
-    return 0
+    ret 0
 }
 fun sema_stmt_returns(stmt: AstStmt): i64 {
     if stmt.kind == "Return" {
-        return 1
+        ret 1
     }
     if stmt.kind == "If" && stmt.else_block.present == 1 {
         if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
-            return 1
+            ret 1
         }
     }
     if stmt.kind == "Match" {
         let i = 0
-        while i < stmt.match_arms.len {
+        for i < stmt.match_arms.len {
             if sema_block_returns(stmt.match_arms.data[i].body) == 0 {
-                return 0
+                ret 0
             }
             i = i + 1
         }
         if stmt.match_arms.len > 0 {
-            return 1
+            ret 1
         }
     }
-    return 0
+    ret 0
 }
 fun sema_block_returns(block: AstBlock): i64 {
     if block.present == 0 {
-        return 0
+        ret 0
     }
     let i = 0
-    while i < block.stmts.len {
+    for i < block.stmts.len {
         if sema_stmt_returns(block.stmts.data[i]) == 1 {
-            return 1
+            ret 1
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun sema_check_block(state: SemaState, block: AstBlock): i64 {
     if block.present == 0 {
-        return 0
+        ret 0
     }
     state.scope_depth = state.scope_depth + 1
     let i = 0
-    while i < block.stmts.len {
+    for i < block.stmts.len {
         sema_check_stmt_exprs(state, block.stmts.data[i])
         i = i + 1
     }
     sema_leave_scope(state)
-    return 0
+    ret 0
 }
 fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
     let i = 0
-    while i < ast.funcs.len {
+    for i < ast.funcs.len {
         let node = ast.funcs.data[i]
         state.source_path = node.source_path
         state.return_type = node.type_name
         state.scope_depth = 0
         state.locals = new SemaLocal[]
         let j = 0
-        while j < node.params.len {
+        for j < node.params.len {
             let param = node.params.data[j]
             sema_add_local(state, param.name, param.type_name, param.line)
             j = j + 1
@@ -1048,7 +1048,7 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun sema_check(ast: AstProgram): i64 {
     let state = sema_state()
@@ -1061,5 +1061,5 @@ fun sema_check(ast: AstProgram): i64 {
     sema_collect_functions(state, ast)
     sema_validate_main(state)
     sema_check_bodies(state, ast)
-    return 0
+    ret 0
 }

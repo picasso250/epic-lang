@@ -5,7 +5,7 @@
 - Epic is a small C-like systems language targeting Windows x64 in v0.
 - Source files use the `.ep` extension.
 - Blocks use `{}` and ordinary statements end at newlines. Semicolons are not part of v0 syntax.
-- `if` and `while` conditions do not require parentheses.
+- `if` and condition-form `for` conditions do not require parentheses.
 - `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
@@ -160,11 +160,7 @@ fun add(a: i64, b: i64): i64 {
 `void` function. A non-`void` function must return a compatible value on every
 path. The v2 analysis recognizes explicit `ret` and `if/else` where both
 branches must return, and exhaustive `match` statements where every arm
-returns; a `while` loop never proves a return.
-
-v2 also accepts the legacy `return` spelling so its v1 seed can compile the v2
-compiler source. New code should use `ret`; v3 removes the compatibility
-spelling.
+returns; a `for` loop never proves a return.
 
 ## Else-if chains
 
@@ -188,7 +184,7 @@ the same AST shape as `else { if ... }`.
 `break` and `continue` are statement-only loop control:
 
 ```epic
-while cond {
+for cond {
     if done {
         break
     }
@@ -198,7 +194,7 @@ while cond {
 }
 ```
 
-Both statements bind to the nearest enclosing `while` or `for` loop. They are
+Both statements bind to the nearest enclosing `for` loop. They are
 rejected outside loops.
 
 ## Integer range loops
@@ -219,7 +215,7 @@ such as `for i: -3:2`.
 The iterator is an implicit, read-only `i64` local visible only in the loop
 body. It cannot be assigned or used as a compound-assignment target. `continue`
 advances the iterator before the next condition check, while `break` exits the
-nearest `while` or `for`. v2 has no range step or automatic reverse
+nearest `for`. v2 has no range step or automatic reverse
 iteration.
 
 ## Product types
@@ -333,7 +329,7 @@ Arithmetic and bit operators require integer operands, except `str + str`.
 Ordering comparisons require integers. `==` and `!=` accept two integers, two
 strings, or two values of the same enum type; products and arrays have no
 implicit reference equality.
-`if` and `while` conditions require `i64`.
+`if` and condition-form `for` conditions require `i64`.
 
 ## System calls
 
