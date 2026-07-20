@@ -5,7 +5,7 @@
 - Epic is a small C-like systems language targeting Windows x64 in v0.
 - Source files use the `.ep` extension.
 - Blocks use `{}` and ordinary statements end at newlines. Semicolons are not part of v0 syntax.
-- `if` and `while` conditions do not require parentheses.
+- `if` and condition-form `for` conditions do not require parentheses.
 - `let` has no type annotation. Use `let x = expr` or `let x`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
@@ -107,11 +107,11 @@ Function definitions use explicit parameter and return types:
 
 ```epic
 fun add(a: i64, b: i64): i64 {
-    return a + b
+    ret a + b
 }
 ```
 
-`void` functions may use `return` or fall off the end. `return expr` is invalid in a `void` function.
+`void` functions may use `ret` or fall off the end. `ret expr` is invalid in a `void` function.
 
 ## Else-if chains
 
@@ -135,7 +135,7 @@ the same AST shape as `else { if ... }`.
 `break` and `continue` are statement-only loop control:
 
 ```epic
-while cond {
+for cond {
     if done {
         break
     }
@@ -145,7 +145,7 @@ while cond {
 }
 ```
 
-Both statements bind to the nearest enclosing `while` loop. They are rejected
+Both statements bind to the nearest enclosing `for` loop. They are rejected
 outside loops.
 
 ## Product types

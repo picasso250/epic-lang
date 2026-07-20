@@ -27,118 +27,118 @@ fun pe_die(msg: str): i64 {
     print(msg)
     print("\n")
     os.ExitProcess(1)
-    return 0
+    ret 0
 }
 fun pe_align(value: i64, alignment: i64): i64 {
-    return ((value + alignment - 1) / alignment) * alignment
+    ret ((value + alignment - 1) / alignment) * alignment
 }
 fun pe_byte(out: u8[], value: i64): i64 {
     push(out, value)
-    return 0
+    ret 0
 }
 fun pe_u16(out: u8[], value: i64): i64 {
     pe_byte(out, value)
     pe_byte(out, value >> 8)
-    return 0
+    ret 0
 }
 fun pe_u32(out: u8[], value: i64): i64 {
     pe_u16(out, value)
     pe_u16(out, value >> 16)
-    return 0
+    ret 0
 }
 fun pe_u64(out: u8[], value: i64): i64 {
     pe_u32(out, value)
     pe_u32(out, value >> 32)
-    return 0
+    ret 0
 }
 fun pe_patch_u32(out: u8[], off: i64, value: i64): i64 {
     out.data[off] = value
     out.data[off + 1] = value >> 8
     out.data[off + 2] = value >> 16
     out.data[off + 3] = value >> 24
-    return 0
+    ret 0
 }
 fun pe_patch_u64(out: u8[], off: i64, value: i64): i64 {
     pe_patch_u32(out, off, value)
     pe_patch_u32(out, off + 4, value >> 32)
-    return 0
+    ret 0
 }
 fun pe_zero(out: u8[], count: i64): i64 {
     let i = 0
-    while i < count {
+    for i < count {
         pe_byte(out, 0)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_pad(out: u8[], alignment: i64, value: i64): i64 {
-    while out.len < pe_align(out.len, alignment) {
+    for out.len < pe_align(out.len, alignment) {
         pe_byte(out, value)
     }
-    return 0
+    ret 0
 }
 fun pe_append(out: u8[], src: u8[]): i64 {
     let i = 0
-    while i < src.len {
+    for i < src.len {
         pe_byte(out, src.data[i])
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_append_str(out: u8[], text: str): i64 {
     let i = 0
-    while i < text.len {
+    for i < text.len {
         pe_byte(out, text.data[i])
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_hex_digit(c: i64): i64 {
     if c >= 48 && c <= 57 {
-        return c - 48
+        ret c - 48
     }
     if c >= 97 && c <= 102 {
-        return c - 87
+        ret c - 87
     }
     if c >= 65 && c <= 70 {
-        return c - 55
+        ret c - 55
     }
     pe_die("bad embedded hex")
-    return 0
+    ret 0
 }
 fun pe_append_hex(out: u8[], text: str): i64 {
     let i = 0
-    while i < text.len {
+    for i < text.len {
         pe_byte(out, (pe_hex_digit(text.data[i]) << 4) | pe_hex_digit(text.data[i + 1]))
         i = i + 2
     }
-    return 0
+    ret 0
 }
 fun pe_import_find(items: PeImport[], name: str): i64 {
     let i = 0
-    while i < items.len {
+    for i < items.len {
         if items.data[i].name == name {
-            return i
+            ret i
         }
         i = i + 1
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun pe_dll_for(name: str): str {
     if name == "MessageBoxA" {
-        return "USER32.dll"
+        ret "USER32.dll"
     }
     if name == "ExitProcess" || name == "GetStdHandle" || name == "WriteFile" || name == "CreateDirectoryA" || name == "CreateFileA" || name == "ReadFile" || name == "SetFilePointer" || name == "CloseHandle" || name == "GetFileSize" || name == "lstrcmpA" || name == "lstrlenA" || name == "GetCommandLineA" || name == "HeapAlloc" || name == "GetProcessHeap" || name == "Beep" || name == "GetCurrentProcess" || name == "GetCurrentProcessId" || name == "GetCurrentThreadId" || name == "GetFileAttributesA" || name == "GetLastError" || name == "GetTickCount64" || name == "SetLastError" || name == "Sleep" {
-        return "KERNEL32.dll"
+        ret "KERNEL32.dll"
     }
-    return ""
+    ret ""
 }
 fun pe_collect_imports(image: ExeImage): PeImport[] {
     # Relocation order is deterministic; preserve it instead of normalizing
     # small programs into the same sorted IAT byte pattern.
     let out = new PeImport[]
     let i = 0
-    while i < image.relocs.len {
+    for i < image.relocs.len {
         let r = image.relocs.data[i]
         if r.symbol_index < 0 || r.symbol_index >= image.symbols.len {
             pe_die("invalid relocation symbol index")
@@ -156,15 +156,15 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
         }
         i = i + 1
     }
-    return out
+    ret out
 }
 fun pe_make_dlls(imports: PeImport[]): PeDll[] {
     let dlls = new PeDll[]
     let i = 0
-    while i < imports.len {
+    for i < imports.len {
         let dll_index = 0 - 1
         let j = 0
-        while j < dlls.len {
+        for j < dlls.len {
             if dlls.data[j].name == imports.data[i].dll {
                 dll_index = j
             }
@@ -180,12 +180,12 @@ fun pe_make_dlls(imports: PeImport[]): PeDll[] {
         push(dlls.data[dll_index].items, imports.data[i])
         i = i + 1
     }
-    return dlls
+    ret dlls
 }
 fun pe_add_thunks(image: ExeImage, imports: PeImport[]): i64 {
     pe_pad(image.text, 16, 204)
     let i = 0
-    while i < imports.len {
+    for i < imports.len {
         imports.data[i].thunk_offset = image.text.len
         pe_byte(image.text, 255)
         pe_byte(image.text, 37)
@@ -193,24 +193,24 @@ fun pe_add_thunks(image: ExeImage, imports: PeImport[]): i64 {
         pe_zero(image.text, 10)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
     let out = new u8[]
     pe_zero(out, (dlls.len + 1) * 20)
     let i = 0
-    while i < dlls.len {
+    for i < dlls.len {
         dlls.data[i].ilt_offset = out.len
         pe_zero(out, (dlls.data[i].items.len + 1) * 8)
         i = i + 1
     }
     let iat_start = out.len
     i = 0
-    while i < dlls.len {
+    for i < dlls.len {
         let group = dlls.data[i]
         group.iat_offset = out.len
         let j = 0
-        while j < group.items.len {
+        for j < group.items.len {
             group.items.data[j].iat_offset = out.len
             pe_u64(out, 0)
             j = j + 1
@@ -219,10 +219,10 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         i = i + 1
     }
     i = 0
-    while i < dlls.len {
+    for i < dlls.len {
         let group = dlls.data[i]
         let j = 0
-        while j < group.items.len {
+        for j < group.items.len {
             let item = group.items.data[j]
             item.hint_offset = out.len
             pe_u16(out, 0)
@@ -239,13 +239,13 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         i = i + 1
     }
     i = 0
-    while i < dlls.len {
+    for i < dlls.len {
         let group = dlls.data[i]
         pe_patch_u32(out, i * 20, rva + group.ilt_offset)
         pe_patch_u32(out, i * 20 + 12, rva + group.name_offset)
         pe_patch_u32(out, i * 20 + 16, rva + group.iat_offset)
         let j = 0
-        while j < group.items.len {
+        for j < group.items.len {
             let hint_rva = rva + group.items.data[j].hint_offset
             pe_patch_u64(out, group.ilt_offset + j * 8, hint_rva)
             pe_patch_u64(out, group.iat_offset + j * 8, hint_rva)
@@ -253,32 +253,32 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         }
         i = i + 1
     }
-    return out
+    ret out
 }
 
 fun pe_patch_thunks(image: ExeImage, imports: PeImport[], rdata_rva: i64): i64 {
     let i = 0
-    while i < imports.len {
+    for i < imports.len {
         let item = imports.data[i]
         let disp = rdata_rva + item.iat_offset - (4096 + item.thunk_offset + 6)
         pe_patch_u32(image.text, item.thunk_offset + 2, disp)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_symbol_rva(sym: AsmSymbol, data_rva: i64): i64 {
     if sym.section == 1 {
-        return 4096 + sym.offset
+        ret 4096 + sym.offset
     }
     if sym.section == 2 {
-        return data_rva + sym.offset
+        ret data_rva + sym.offset
     }
     pe_die("symbol has no section: " + sym.name)
-    return 0
+    ret 0
 }
 fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): i64 {
     let i = 0
-    while i < image.relocs.len {
+    for i < image.relocs.len {
         let r = image.relocs.data[i]
         if r.symbol_index < 0 || r.symbol_index >= image.symbols.len {
             pe_die("invalid relocation symbol index")
@@ -315,15 +315,15 @@ fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_append_dos_stub(out: u8[]): i64 {
     pe_append_hex(out, "4d5a78000100000004000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000780000000e1fba0e00b409cd21b8014ccd21546869732070726f6772616d2063616e6e6f742062652072756e20696e20444f53206d6f64652e240000")
-    return 0
+    ret 0
 }
 fun pe_append_name8(out: u8[], name: str): i64 {
     let i = 0
-    while i < 8 {
+    for i < 8 {
         if i < name.len {
             pe_byte(out, name.data[i])
         }
@@ -332,7 +332,7 @@ fun pe_append_name8(out: u8[], name: str): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun pe_section_header(out: u8[], sec: PeSection): i64 {
     pe_append_name8(out, sec.name)
@@ -345,7 +345,7 @@ fun pe_section_header(out: u8[], sec: PeSection): i64 {
     pe_u16(out, 0)
     pe_u16(out, 0)
     pe_u32(out, sec.flags)
-    return 0
+    ret 0
 }
 fun pe_make_section(name: str, rva: i64, size: i64, raw: i64): PeSection {
     let sec = new PeSection
@@ -363,7 +363,7 @@ fun pe_make_section(name: str, rva: i64, size: i64, raw: i64): PeSection {
     else {
         sec.flags = 3221225536
     }
-    return sec
+    ret sec
 }
 fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64): u8[] {
     let out = new u8[]
@@ -420,7 +420,7 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
         let last = dlls.data[dlls.len - 1]
         iat_end = last.iat_offset + (last.items.len + 1) * 8
     }
-    while i < 16 {
+    for i < 16 {
         if i == 1 {
             pe_u32(out, rdata_rva)
             pe_u32(out, (dlls.len + 1) * 20)
@@ -436,10 +436,10 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
     pe_section_header(out, text)
     pe_section_header(out, rdata_sec)
     pe_section_header(out, data_sec)
-    while out.len < 1024 {
+    for out.len < 1024 {
         pe_byte(out, 0)
     }
-    return out
+    ret out
 }
 fun pe_build_exe(image: ExeImage): u8[] {
     let imports = pe_collect_imports(image)
@@ -457,10 +457,10 @@ fun pe_build_exe(image: ExeImage): u8[] {
     pe_pad(out, 512, 0)
     pe_append(out, image.data)
     pe_pad(out, 512, 0)
-    return out
+    ret out
 }
 fun pe_write_exe(path: str, image: ExeImage): i64 {
     let out = pe_build_exe(image)
     write_file(path, out)
-    return out.len
+    ret out.len
 }

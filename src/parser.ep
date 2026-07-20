@@ -63,34 +63,34 @@ type Parser {
 fun ast_expr_empty(): AstExpr {
     let n = new AstExpr
     n.kind = ""
-    return n
+    ret n
 }
 fun ast_expr(kind: str): AstExpr {
     let n = new AstExpr
     n.kind = kind
-    return n
+    ret n
 }
 fun ast_stmt(kind: str): AstStmt {
     let n = new AstStmt
     n.kind = kind
-    return n
+    ret n
 }
 fun ast_block_empty(): AstBlock {
     let block = new AstBlock
     block.present = 0
-    return block
+    ret block
 }
 fun ast_block(): AstBlock {
     let block = new AstBlock
     block.present = 1
     block.stmts = new AstStmt[]
-    return block
+    ret block
 }
 fun ast_program(): AstProgram {
     let program = new AstProgram
     program.funcs = new AstFunDef[]
     program.structs = new AstStructDef[]
-    return program
+    ret program
 }
 fun make_parser_at(tokens: Token[], source_path: str): Parser {
     let p = new Parser
@@ -102,28 +102,28 @@ fun make_parser_at(tokens: Token[], source_path: str): Parser {
     p.eof.line = 0
     p.loop_depth = 0
     p.source_path = source_path
-    return p
+    ret p
 }
 fun make_parser(tokens: Token[]): Parser {
-    return make_parser_at(tokens, "")
+    ret make_parser_at(tokens, "")
 }
 fun peek(p: Parser): Token {
     if p.pos < p.tokens.len {
-        return p.tokens.data[p.pos]
+        ret p.tokens.data[p.pos]
     }
-    return p.eof
+    ret p.eof
 }
 fun peek_kind(p: Parser, kind: str): i64 {
     let t = peek(p)
     if t.kind == kind {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun advance(p: Parser): Token {
     let t = peek(p)
     p.pos = p.pos + 1
-    return t
+    ret t
 }
 fun parse_error(line: i64, msg: str): i64 {
     print("Parse error line ")
@@ -132,7 +132,7 @@ fun parse_error(line: i64, msg: str): i64 {
     print(msg)
     print("\n")
     os.ExitProcess(1)
-    return 1
+    ret 1
 }
 fun expect(p: Parser, kind: str): Token {
     let t = advance(p)
@@ -148,29 +148,29 @@ fun expect(p: Parser, kind: str): Token {
         print("')\n")
         os.ExitProcess(1)
     }
-    return t
+    ret t
 }
 fun check(p: Parser, kind: str): i64 {
     if peek_kind(p, kind) == 1 {
         advance(p)
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun skip_newlines(p: Parser): i64 {
-    while peek_kind(p, "NEWLINE") == 1 {
+    for peek_kind(p, "NEWLINE") == 1 {
         advance(p)
     }
-    return 0
+    ret 0
 }
 fun expect_stmt_end(p: Parser): i64 {
     if check(p, "NEWLINE") == 1 {
         skip_newlines(p)
-        return 0
+        ret 0
     }
     let t = peek(p)
     parse_error(t.line, "Expected end of line")
-    return 1
+    ret 1
 }
 fun parse_type(p: Parser): str {
     let t = advance(p)
@@ -178,19 +178,19 @@ fun parse_type(p: Parser): str {
         parse_error(t.line, "Expected type")
     }
     let typ = t.text
-    while check(p, "LBRACKET") == 1 {
+    for check(p, "LBRACKET") == 1 {
         expect(p, "RBRACKET")
         typ = typ + "[]"
     }
-    return typ
+    ret typ
 }
 fun parse_params(p: Parser): AstParam[] {
     let params = new AstParam[]
     if peek_kind(p, "ID") == 0 {
-        return params
+        ret params
     }
     let done = 0
-    while done == 0 {
+    for done == 0 {
         let pname = expect(p, "ID")
         expect(p, "COLON")
         let ptype = parse_type(p)
@@ -205,7 +205,7 @@ fun parse_params(p: Parser): AstParam[] {
             done = 1
         }
     }
-    return params
+    ret params
 }
 fun parse_struct_def(p: Parser): AstStructDef {
     expect(p, "TYPE")
@@ -215,7 +215,7 @@ fun parse_struct_def(p: Parser): AstStructDef {
     node.fields = new AstStructField[]
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         let fname = expect(p, "ID")
         expect(p, "COLON")
         let ftype = parse_type(p)
@@ -226,7 +226,7 @@ fun parse_struct_def(p: Parser): AstStructDef {
         push(node.fields, field)
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 fun parse_fn_def(p: Parser): AstFunDef {
     expect(p, "FUN")
@@ -242,12 +242,12 @@ fun parse_fn_def(p: Parser): AstFunDef {
     node.params = params
     node.type_name = ret_type
     node.body = body
-    return node
+    ret node
 }
 fun parse_program(p: Parser): AstProgram {
     let node = ast_program()
     skip_newlines(p)
-    while peek_kind(p, "FUN") == 1 || peek_kind(p, "TYPE") == 1 {
+    for peek_kind(p, "FUN") == 1 || peek_kind(p, "TYPE") == 1 {
         if peek_kind(p, "FUN") == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
@@ -259,13 +259,13 @@ fun parse_program(p: Parser): AstProgram {
         let t = peek(p)
         parse_error(t.line, "Unexpected token at top level")
     }
-    return node
+    ret node
 }
 fun parse_block(p: Parser): AstBlock {
     let node = ast_block()
     expect(p, "LBRACE")
     skip_newlines(p)
-    while peek_kind(p, "RBRACE") == 0 {
+    for peek_kind(p, "RBRACE") == 0 {
         if peek_kind(p, "EOF") == 1 {
             let t = peek(p)
             parse_error(t.line, "Unexpected end of file in block")
@@ -274,12 +274,12 @@ fun parse_block(p: Parser): AstBlock {
         skip_newlines(p)
     }
     expect(p, "RBRACE")
-    return node
+    ret node
 }
 fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     let depth = 1
     i = i + 1
-    while i < p.tokens.len && depth > 0 {
+    for i < p.tokens.len && depth > 0 {
         let kind = p.tokens.data[i].kind
         if kind == "LBRACKET" {
             depth = depth + 1
@@ -288,30 +288,30 @@ fun skip_balanced_brackets(p: Parser, i: i64): i64 {
         }
         i = i + 1
     }
-    return i
+    ret i
 }
 fun is_assignment(p: Parser): i64 {
     if peek_kind(p, "ID") == 0 {
-        return 0
+        ret 0
     }
     let i = p.pos + 1
-    while i < p.tokens.len {
+    for i < p.tokens.len {
         let kind = p.tokens.data[i].kind
         if kind == "DOT" {
             if i + 1 >= p.tokens.len || p.tokens.data[i + 1].kind != "ID" {
-                return 0
+                ret 0
             }
             i = i + 2
         } else if kind == "LBRACKET" {
             i = skip_balanced_brackets(p, i)
         } else {
             if kind == "ASSIGN" {
-                return 1
+                ret 1
             }
-            return 0
+            ret 0
         }
     }
-    return 0
+    ret 0
 }
 fun parse_return_stmt(p: Parser): AstStmt {
     expect(p, "RETURN")
@@ -321,7 +321,7 @@ fun parse_return_stmt(p: Parser): AstStmt {
         node.expr = parse_expr(p)
     }
     expect_stmt_end(p)
-    return node
+    ret node
 }
 fun parse_let_stmt(p: Parser): AstStmt {
     expect(p, "LET")
@@ -337,14 +337,14 @@ fun parse_let_stmt(p: Parser): AstStmt {
         node.value_expr = parse_expr(p)
     }
     expect_stmt_end(p)
-    return node
+    ret node
 }
 fun parse_assign_stmt(p: Parser): AstStmt {
     let name = expect(p, "ID")
     let lhs = ast_expr("Var")
     lhs.name = name.text
     let done = 0
-    while done == 0 {
+    for done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
             let n = ast_expr("FieldAccess")
@@ -368,24 +368,24 @@ fun parse_assign_stmt(p: Parser): AstStmt {
         let node = ast_stmt("Assign")
         node.name = lhs.name
         node.value_expr = value
-        return node
+        ret node
     }
     if lhs.kind == "FieldAccess" {
         let node = ast_stmt("FieldSet")
         node.object = lhs.object
         node.name = lhs.name
         node.value_expr = value
-        return node
+        ret node
     }
     if lhs.kind == "Subscript" {
         let node = ast_stmt("SubscriptAssign")
         node.base = lhs.base
         node.index = lhs.index
         node.value_expr = value
-        return node
+        ret node
     }
     parse_error(name.line, "Invalid assignment target")
-    return ast_stmt("")
+    ret ast_stmt("")
 }
 fun parse_if_stmt(p: Parser): AstStmt {
     expect(p, "IF")
@@ -404,7 +404,7 @@ fun parse_if_stmt(p: Parser): AstStmt {
             node.else_block = parse_block(p)
         }
     }
-    return node
+    ret node
 }
 fun parse_while_stmt(p: Parser): AstStmt {
     expect(p, "WHILE")
@@ -413,7 +413,7 @@ fun parse_while_stmt(p: Parser): AstStmt {
     p.loop_depth = p.loop_depth + 1
     node.body = parse_block(p)
     p.loop_depth = p.loop_depth - 1
-    return node
+    ret node
 }
 fun parse_break_stmt(p: Parser): AstStmt {
     let t = expect(p, "BREAK")
@@ -422,7 +422,7 @@ fun parse_break_stmt(p: Parser): AstStmt {
     }
     let node = ast_stmt("Break")
     expect_stmt_end(p)
-    return node
+    ret node
 }
 fun parse_continue_stmt(p: Parser): AstStmt {
     let t = expect(p, "CONTINUE")
@@ -431,134 +431,134 @@ fun parse_continue_stmt(p: Parser): AstStmt {
     }
     let node = ast_stmt("Continue")
     expect_stmt_end(p)
-    return node
+    ret node
 }
 fun parse_expr_stmt(p: Parser): AstStmt {
     let node = ast_stmt("ExprStmt")
     node.expr = parse_expr(p)
     expect_stmt_end(p)
-    return node
+    ret node
 }
 fun is_expr_first(kind: str): i64 {
     if kind == "NUMBER" {
-        return 1
+        ret 1
     }
     if kind == "CHAR" {
-        return 1
+        ret 1
     }
     if kind == "STRING" {
-        return 1
+        ret 1
     }
     if kind == "ID" {
-        return 1
+        ret 1
     }
     if kind == "NEW" {
-        return 1
+        ret 1
     }
     if kind == "LPAREN" {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun parse_stmt(p: Parser): AstStmt {
     let t = peek(p)
     if t.kind == "RETURN" {
-        return parse_return_stmt(p)
+        ret parse_return_stmt(p)
     }
     if t.kind == "LET" {
-        return parse_let_stmt(p)
+        ret parse_let_stmt(p)
     }
     if t.kind == "IF" {
-        return parse_if_stmt(p)
+        ret parse_if_stmt(p)
     }
     if t.kind == "WHILE" {
-        return parse_while_stmt(p)
+        ret parse_while_stmt(p)
     }
     if t.kind == "BREAK" {
-        return parse_break_stmt(p)
+        ret parse_break_stmt(p)
     }
     if t.kind == "CONTINUE" {
-        return parse_continue_stmt(p)
+        ret parse_continue_stmt(p)
     }
     if t.kind == "ID" {
         if is_assignment(p) == 1 {
-            return parse_assign_stmt(p)
+            ret parse_assign_stmt(p)
         }
     }
     if is_expr_first(t.kind) == 1 {
-        return parse_expr_stmt(p)
+        ret parse_expr_stmt(p)
     }
     parse_error(t.line, "Unexpected token in statement")
-    return ast_stmt("")
+    ret ast_stmt("")
 }
 fun op_text(kind: str): str {
     if kind == "PLUS" {
-        return "+"
+        ret "+"
     }
     if kind == "MINUS" {
-        return "-"
+        ret "-"
     }
     if kind == "STAR" {
-        return "*"
+        ret "*"
     }
     if kind == "SLASH" {
-        return "/"
+        ret "/"
     }
     if kind == "PERCENT" {
-        return "%"
+        ret "%"
     }
     if kind == "EQEQ" {
-        return "=="
+        ret "=="
     }
     if kind == "NEQ" {
-        return "!="
+        ret "!="
     }
     if kind == "LT" {
-        return "<"
+        ret "<"
     }
     if kind == "GT" {
-        return ">"
+        ret ">"
     }
     if kind == "LTE" {
-        return "<="
+        ret "<="
     }
     if kind == "GTE" {
-        return ">="
+        ret ">="
     }
     if kind == "AND" {
-        return "&&"
+        ret "&&"
     }
     if kind == "OR" {
-        return "||"
+        ret "||"
     }
     if kind == "BIT_OR" {
-        return "|"
+        ret "|"
     }
     if kind == "AMPERSAND" {
-        return "&"
+        ret "&"
     }
     if kind == "SHL" {
-        return "<<"
+        ret "<<"
     }
     if kind == "SHR" {
-        return ">>"
+        ret ">>"
     }
-    return ""
+    ret ""
 }
 fun parse_args(p: Parser): AstExpr[] {
     let args = new AstExpr[]
     if peek_kind(p, "RPAREN") == 0 {
         push(args, parse_expr(p))
-        while check(p, "COMMA") == 1 {
+        for check(p, "COMMA") == 1 {
             push(args, parse_expr(p))
         }
     }
-    return args
+    ret args
 }
 fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
     let current = node
     let done = 0
-    while done == 0 {
+    for done == 0 {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
             if check(p, "LPAREN") == 1 {
@@ -588,35 +588,35 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
             done = 1
         }
     }
-    return current
+    ret current
 }
 fun embed_path_is_absolute(path: str): i64 {
     if path.len == 0 {
-        return 0
+        ret 0
     }
     if path.data[0] == 47 || path.data[0] == 92 {
-        return 1
+        ret 1
     }
     if path.len >= 2 && path.data[1] == 58 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun embed_resolve_path(source_path: str, path: str): str {
     if embed_path_is_absolute(path) == 1 || source_path.len == 0 {
-        return path
+        ret path
     }
     let i = source_path.len
-    while i > 0 {
+    for i > 0 {
         i = i - 1
         if source_path.data[i] == 47 || source_path.data[i] == 92 {
             if i == 0 {
-                return path
+                ret path
             }
-            return str_new(source_path.data, i) + "/" + path
+            ret str_new(source_path.data, i) + "/" + path
         }
     }
-    return path
+    ret path
 }
 fun read_embed(source_path: str, path: str, line: i64): str {
     let resolved = embed_resolve_path(source_path, path)
@@ -625,7 +625,7 @@ fun read_embed(source_path: str, path: str, line: i64): str {
         parse_error(line, "embed file not found: " + path)
     }
     os.CloseHandle(handle)
-    return read_file(resolved)
+    ret read_file(resolved)
 }
 fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, "NEW") == 1 {
@@ -639,29 +639,29 @@ fun parse_primary(p: Parser): AstExpr {
                 n.count = parse_expr(p)
             }
             expect(p, "RBRACKET")
-            return n
+            ret n
         }
         let n = ast_expr("New")
         n.name = t.text
-        return n
+        ret n
     }
     if peek_kind(p, "NUMBER") == 1 {
         let t = advance(p)
         let n = ast_expr("Literal")
         n.value = t.text
-        return n
+        ret n
     }
     if peek_kind(p, "CHAR") == 1 {
         let t = advance(p)
         let n = ast_expr("Literal")
         n.value = t.text
-        return n
+        ret n
     }
     if peek_kind(p, "STRING") == 1 {
         let t = advance(p)
         let n = ast_expr("String")
         n.value = t.text
-        return n
+        ret n
     }
     if peek_kind(p, "ID") == 1 {
         let t = advance(p)
@@ -673,7 +673,7 @@ fun parse_primary(p: Parser): AstExpr {
                 expect(p, "RPAREN")
                 node.kind = "Embed"
                 node.value = read_embed(p.source_path, path.text, path.line)
-                return parse_postfix(p, node)
+                ret parse_postfix(p, node)
             }
             node.kind = "Call"
             node.type_name = ""
@@ -682,95 +682,95 @@ fun parse_primary(p: Parser): AstExpr {
             if node.args.len > 4 {
                 parse_error(t.line, "function calls may have at most 4 arguments in v0")
             }
-            return parse_postfix(p, node)
+            ret parse_postfix(p, node)
         }
-        return parse_postfix(p, node)
+        ret parse_postfix(p, node)
     }
     if check(p, "LPAREN") == 1 {
         let expr = parse_expr(p)
         expect(p, "RPAREN")
-        return expr
+        ret expr
     }
     let t = peek(p)
     parse_error(t.line, "Unexpected token in expression")
-    return ast_expr_empty()
+    ret ast_expr_empty()
 }
 fun bin_node(op: str, left: AstExpr, right: AstExpr): AstExpr {
     let n = ast_expr("Binary")
     n.op = op
     n.left = left
     n.right = right
-    return n
+    ret n
 }
 fun parse_factor(p: Parser): AstExpr {
     let left = parse_primary(p)
-    while peek_kind(p, "STAR") == 1 || peek_kind(p, "SLASH") == 1 || peek_kind(p, "PERCENT") == 1 {
+    for peek_kind(p, "STAR") == 1 || peek_kind(p, "SLASH") == 1 || peek_kind(p, "PERCENT") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_primary(p))
     }
-    return left
+    ret left
 }
 fun parse_term(p: Parser): AstExpr {
     let left = parse_factor(p)
-    while peek_kind(p, "PLUS") == 1 || peek_kind(p, "MINUS") == 1 {
+    for peek_kind(p, "PLUS") == 1 || peek_kind(p, "MINUS") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_factor(p))
     }
-    return left
+    ret left
 }
 fun parse_shift(p: Parser): AstExpr {
     let left = parse_term(p)
-    while peek_kind(p, "SHL") == 1 || peek_kind(p, "SHR") == 1 {
+    for peek_kind(p, "SHL") == 1 || peek_kind(p, "SHR") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_term(p))
     }
-    return left
+    ret left
 }
 fun parse_comparison(p: Parser): AstExpr {
     let left = parse_shift(p)
-    while peek_kind(p, "LT") == 1 || peek_kind(p, "GT") == 1 || peek_kind(p, "LTE") == 1 || peek_kind(p, "GTE") == 1 {
+    for peek_kind(p, "LT") == 1 || peek_kind(p, "GT") == 1 || peek_kind(p, "LTE") == 1 || peek_kind(p, "GTE") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_shift(p))
     }
-    return left
+    ret left
 }
 fun parse_equality(p: Parser): AstExpr {
     let left = parse_comparison(p)
-    while peek_kind(p, "EQEQ") == 1 || peek_kind(p, "NEQ") == 1 {
+    for peek_kind(p, "EQEQ") == 1 || peek_kind(p, "NEQ") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_comparison(p))
     }
-    return left
+    ret left
 }
 fun parse_logic_and(p: Parser): AstExpr {
     let left = parse_bit_or(p)
-    while peek_kind(p, "AND") == 1 {
+    for peek_kind(p, "AND") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_bit_or(p))
     }
-    return left
+    ret left
 }
 fun parse_bit_and(p: Parser): AstExpr {
     let left = parse_equality(p)
-    while peek_kind(p, "AMPERSAND") == 1 {
+    for peek_kind(p, "AMPERSAND") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_equality(p))
     }
-    return left
+    ret left
 }
 fun parse_bit_or(p: Parser): AstExpr {
     let left = parse_bit_and(p)
-    while peek_kind(p, "BIT_OR") == 1 {
+    for peek_kind(p, "BIT_OR") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_bit_and(p))
     }
-    return left
+    ret left
 }
 fun parse_expr(p: Parser): AstExpr {
     let left = parse_logic_and(p)
-    while peek_kind(p, "OR") == 1 {
+    for peek_kind(p, "OR") == 1 {
         let op = advance(p)
         left = bin_node(op_text(op.kind), left, parse_logic_and(p))
     }
-    return left
+    ret left
 }

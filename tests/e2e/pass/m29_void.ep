@@ -2,7 +2,7 @@
 # STDOUT: AB
 fun write_a(): void {
     print("A")
-    return
+    ret
     print("X")
 }
 fun write_b(): void {

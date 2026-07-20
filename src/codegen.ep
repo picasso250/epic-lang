@@ -55,59 +55,59 @@ fun die(msg: str): i64 {
     print(msg)
     print("\n")
     os.ExitProcess(1)
-    return 0
+    ret 0
 }
 fun out_s(e: EmitterState, s: str): i64 {
     let bs = bytes(s)
     extend(e.out_buf, bs)
-    return 0
+    ret 0
 }
 fun out_i(e: EmitterState, n: i64): i64 {
     let text = itoa(n)
     let bs = bytes(text)
     extend(e.out_buf, bs)
-    return 0
+    ret 0
 }
 fun out_nl(e: EmitterState): i64 {
     let s = "\n"
     let bs = bytes(s)
     extend(e.out_buf, bs)
-    return 0
+    ret 0
 }
 fun out_line(e: EmitterState, s: str): i64 {
     out_s(e, s)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun emit_inst(e: EmitterState, op: str): i64 {
     out_s(e, "    ")
     out_line(e, op)
-    return 0
+    ret 0
 }
 fun emit_label(e: EmitterState, name: str): i64 {
     out_s(e, name)
     out_line(e, ":")
-    return 0
+    ret 0
 }
 fun emit_label_id(e: EmitterState, prefix: str, id: i64): i64 {
     out_s(e, prefix)
     out_i(e, id)
     out_line(e, ":")
-    return 0
+    ret 0
 }
 fun emit_ref_id(e: EmitterState, prefix: str, id: i64): i64 {
     out_s(e, "[")
     out_s(e, prefix)
     out_i(e, id)
     out_s(e, "]")
-    return 0
+    ret 0
 }
 fun emit_mov(e: EmitterState, dst: str, src: str): i64 {
     out_s(e, "    mov ")
     out_s(e, dst)
     out_s(e, ", ")
     out_line(e, src)
-    return 0
+    ret 0
 }
 fun emit_mov_i(e: EmitterState, dst: str, n: i64): i64 {
     out_s(e, "    mov ")
@@ -115,7 +115,7 @@ fun emit_mov_i(e: EmitterState, dst: str, n: i64): i64 {
     out_s(e, ", ")
     out_i(e, n)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun emit_lea_ref_id(e: EmitterState, dst: str, prefix: str, id: i64): i64 {
     out_s(e, "    lea ")
@@ -123,146 +123,146 @@ fun emit_lea_ref_id(e: EmitterState, dst: str, prefix: str, id: i64): i64 {
     out_s(e, ", ")
     emit_ref_id(e, prefix, id)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun emit_call_inst(e: EmitterState, target: str): i64 {
     out_s(e, "    call ")
     out_line(e, target)
-    return 0
+    ret 0
 }
 fun sys_call_symbol(name: str): str {
     if name == "os.Sleep" {
-        return "Sleep"
+        ret "Sleep"
     }
     if name == "os.GetTickCount64" {
-        return "GetTickCount64"
+        ret "GetTickCount64"
     }
     if name == "os.GetLastError" {
-        return "GetLastError"
+        ret "GetLastError"
     }
     if name == "os.SetLastError" {
-        return "SetLastError"
+        ret "SetLastError"
     }
     if name == "os.GetStdHandle" {
-        return "GetStdHandle"
+        ret "GetStdHandle"
     }
     if name == "os.CloseHandle" {
-        return "CloseHandle"
+        ret "CloseHandle"
     }
     if name == "os.lstrlenA" {
-        return "lstrlenA"
+        ret "lstrlenA"
     }
     if name == "os.lstrcmpA" {
-        return "lstrcmpA"
+        ret "lstrcmpA"
     }
     if name == "os.MessageBoxA" {
-        return "MessageBoxA"
+        ret "MessageBoxA"
     }
     if name == "os.Beep" {
-        return "Beep"
+        ret "Beep"
     }
     if name == "os.GetCurrentProcess" {
-        return "GetCurrentProcess"
+        ret "GetCurrentProcess"
     }
     if name == "os.GetCurrentProcessId" {
-        return "GetCurrentProcessId"
+        ret "GetCurrentProcessId"
     }
     if name == "os.GetCurrentThreadId" {
-        return "GetCurrentThreadId"
+        ret "GetCurrentThreadId"
     }
     if name == "os.ExitProcess" {
-        return "ExitProcess"
+        ret "ExitProcess"
     }
     if name == "os.GetFileAttributesA" {
-        return "GetFileAttributesA"
+        ret "GetFileAttributesA"
     }
     if name == "os.CreateDirectoryA" {
-        return "CreateDirectoryA"
+        ret "CreateDirectoryA"
     }
     if name == "os.CreateFileA" {
-        return "CreateFileA"
+        ret "CreateFileA"
     }
     if name == "os.ReadFile" {
-        return "ReadFile"
+        ret "ReadFile"
     }
     if name == "os.WriteFile" {
-        return "WriteFile"
+        ret "WriteFile"
     }
-    return ""
+    ret ""
 }
 fun sys_member_symbol(ns: str, name: str): str {
     if ns != "os" {
-        return ""
+        ret ""
     }
     if name == "Sleep" {
-        return "Sleep"
+        ret "Sleep"
     }
     if name == "GetTickCount64" {
-        return "GetTickCount64"
+        ret "GetTickCount64"
     }
     if name == "GetLastError" {
-        return "GetLastError"
+        ret "GetLastError"
     }
     if name == "SetLastError" {
-        return "SetLastError"
+        ret "SetLastError"
     }
     if name == "GetStdHandle" {
-        return "GetStdHandle"
+        ret "GetStdHandle"
     }
     if name == "CloseHandle" {
-        return "CloseHandle"
+        ret "CloseHandle"
     }
     if name == "lstrlenA" {
-        return "lstrlenA"
+        ret "lstrlenA"
     }
     if name == "lstrcmpA" {
-        return "lstrcmpA"
+        ret "lstrcmpA"
     }
     if name == "MessageBoxA" {
-        return "MessageBoxA"
+        ret "MessageBoxA"
     }
     if name == "Beep" {
-        return "Beep"
+        ret "Beep"
     }
     if name == "GetCurrentProcess" {
-        return "GetCurrentProcess"
+        ret "GetCurrentProcess"
     }
     if name == "GetCurrentProcessId" {
-        return "GetCurrentProcessId"
+        ret "GetCurrentProcessId"
     }
     if name == "GetCurrentThreadId" {
-        return "GetCurrentThreadId"
+        ret "GetCurrentThreadId"
     }
     if name == "ExitProcess" {
-        return "ExitProcess"
+        ret "ExitProcess"
     }
     if name == "GetFileAttributesA" {
-        return "GetFileAttributesA"
+        ret "GetFileAttributesA"
     }
     if name == "CreateDirectoryA" {
-        return "CreateDirectoryA"
+        ret "CreateDirectoryA"
     }
     if name == "CreateFileA" {
-        return "CreateFileA"
+        ret "CreateFileA"
     }
     if name == "ReadFile" {
-        return "ReadFile"
+        ret "ReadFile"
     }
     if name == "WriteFile" {
-        return "WriteFile"
+        ret "WriteFile"
     }
-    return ""
+    ret ""
 }
 fun is_sys_call(name: str): i64 {
     if sys_call_symbol(name) == "" {
-        return 0
+        ret 0
     }
-    return 1
+    ret 1
 }
 fun emit_jmp(e: EmitterState, label: str): i64 {
     out_s(e, "    jmp ")
     out_line(e, label)
-    return 0
+    ret 0
 }
 fun emit_jmp_id(e: EmitterState, op: str, prefix: str, id: i64): i64 {
     out_s(e, "    ")
@@ -271,7 +271,7 @@ fun emit_jmp_id(e: EmitterState, op: str, prefix: str, id: i64): i64 {
     out_s(e, prefix)
     out_i(e, id)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun emit_slot_ref(e: EmitterState, slot: i64): i64 {
     out_s(e, "[rbp")
@@ -280,14 +280,14 @@ fun emit_slot_ref(e: EmitterState, slot: i64): i64 {
     }
     out_i(e, slot)
     out_s(e, "]")
-    return 0
+    ret 0
 }
 fun emit_stack_store(e: EmitterState, slot: i64, src: str): i64 {
     out_s(e, "    mov ")
     emit_slot_ref(e, slot)
     out_s(e, ", ")
     out_line(e, src)
-    return 0
+    ret 0
 }
 fun emit_stack_load(e: EmitterState, dst: str, slot: i64): i64 {
     out_s(e, "    mov ")
@@ -295,19 +295,19 @@ fun emit_stack_load(e: EmitterState, dst: str, slot: i64): i64 {
     out_s(e, ", ")
     emit_slot_ref(e, slot)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun fresh_label(e: EmitterState): i64 {
     e.label_counter = e.label_counter + 1
-    return e.label_counter
+    ret e.label_counter
 }
 fun align16(n: i64): i64 {
-    return ((n + 15) / 16) * 16
+    ret ((n + 15) / 16) * 16
 }
 fun emit_runtime(e: EmitterState, source: u8[]): i64 {
     extend(e.out_buf, source)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/str_alloc.asm"))
@@ -321,7 +321,7 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/argv.asm"))
     emit_runtime(e, embed("../runtime/read_file.asm"))
     emit_runtime(e, embed("../runtime/write_file.asm"))
-    return 0
+    ret 0
 }
 fun make_emitter(out_path: str): EmitterState {
     let e = new EmitterState
@@ -344,90 +344,90 @@ fun make_emitter(out_path: str): EmitterState {
     e.structs = new StructInfo[]
     e.loop_starts = new i64[]
     e.loop_ends = new i64[]
-    return e
+    ret e
 }
 fun type_info(kind: str, name: str): TypeInfo {
     let t = new TypeInfo
     t.kind = kind
     t.name = name
-    return t
+    ret t
 }
 fun type_i64(): TypeInfo {
-    return type_info("i64", "")
+    ret type_info("i64", "")
 }
 fun type_u8(): TypeInfo {
-    return type_info("u8", "")
+    ret type_info("u8", "")
 }
 fun type_void(): TypeInfo {
-    return type_info("void", "")
+    ret type_info("void", "")
 }
 fun type_str(): TypeInfo {
-    return type_info("str", "")
+    ret type_info("str", "")
 }
 fun type_struct(name: str): TypeInfo {
-    return type_info("struct", name)
+    ret type_info("struct", name)
 }
 fun type_array(elem: str): TypeInfo {
-    return type_info("array", elem)
+    ret type_info("array", elem)
 }
 fun type_is_u8(t: TypeInfo): i64 {
     if t.kind == "u8" {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun type_is_value_u8(t: TypeInfo): i64 {
-    return type_is_u8(t)
+    ret type_is_u8(t)
 }
 fun type_is_complex(t: TypeInfo): i64 {
     if t.kind == "str" {
-        return 1
+        ret 1
     }
     if t.kind == "struct" {
-        return 1
+        ret 1
     }
     if t.kind == "array" {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_array_type_name(name: str): i64 {
     if name.len >= 2 {
         if name.data[name.len - 2] == 91 && name.data[name.len - 1] == 93 {
-            return 1
+            ret 1
         }
     }
-    return 0
+    ret 0
 }
 fun array_elem_name(name: str): str {
     if is_array_type_name(name) == 1 {
-        return str_new(name.data, name.len - 2)
+        ret str_new(name.data, name.len - 2)
     }
-    return name
+    ret name
 }
 fun user_type(name: str): TypeInfo {
     if name == "i64" {
-        return type_i64()
+        ret type_i64()
     }
     if name == "u8" {
-        return type_u8()
+        ret type_u8()
     }
     if name == "void" {
-        return type_void()
+        ret type_void()
     }
     if name == "str" {
-        return type_str()
+        ret type_str()
     }
     if is_array_type_name(name) == 1 {
-        return type_array(array_elem_name(name))
+        ret type_array(array_elem_name(name))
     }
-    return type_struct(name)
+    ret type_struct(name)
 }
 fun get_string_id(e: EmitterState, text: str): i64 {
     let i = 0
-    while i < e.strings.len {
+    for i < e.strings.len {
         if e.strings.data[i].text == text {
-            return e.strings.data[i].id
+            ret e.strings.data[i].id
         }
         i = i + 1
     }
@@ -436,11 +436,11 @@ fun get_string_id(e: EmitterState, text: str): i64 {
     s.text = text
     s.id = e.string_counter
     push(e.strings, s)
-    return s.id
+    ret s.id
 }
 fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     if node.kind == "" {
-        return 0
+        ret 0
     }
     if node.kind == "String" || node.kind == "Embed" {
         get_string_id(e, node.value)
@@ -449,7 +449,7 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
         collect_expr_strings(e, node.right)
     } else if node.kind == "Call" {
         let i = 0
-        while i < node.args.len {
+        for i < node.args.len {
             collect_expr_strings(e, node.args.data[i])
             i = i + 1
         }
@@ -461,7 +461,7 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
     } else if node.kind == "NewArray" {
         collect_expr_strings(e, node.count)
     }
-    return 0
+    ret 0
 }
 fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
     if node.kind == "Return" || node.kind == "ExprStmt" {
@@ -483,30 +483,30 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
         collect_expr_strings(e, node.expr)
         collect_block_strings(e, node.body)
     }
-    return 0
+    ret 0
 }
 fun collect_block_strings(e: EmitterState, block: AstBlock): i64 {
     if block.present == 0 {
-        return 0
+        ret 0
     }
     let i = 0
-    while i < block.stmts.len {
+    for i < block.stmts.len {
         collect_stmt_strings(e, block.stmts.data[i])
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun collect_program_strings(e: EmitterState, program: AstProgram): i64 {
     let i = 0
-    while i < program.funcs.len {
+    for i < program.funcs.len {
         collect_block_strings(e, program.funcs.data[i].body)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun emit_string_bytes(e: EmitterState, s: str): i64 {
     let i = 0
-    while i < s.len {
+    for i < s.len {
         if i != 0 {
             out_s(e, ", ")
         }
@@ -517,11 +517,11 @@ fun emit_string_bytes(e: EmitterState, s: str): i64 {
         out_s(e, ", ")
     }
     out_line(e, "0")
-    return 0
+    ret 0
 }
 fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
     let i = 0
-    while i < ast.funcs.len {
+    for i < ast.funcs.len {
         let fn = ast.funcs.data[i]
         let f = new FuncInfo
         f.name = fn.name
@@ -530,7 +530,7 @@ fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
         push(e.funcs, f)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun add_field(info: StructInfo, name: str, typ: TypeInfo, offset: i64): i64 {
     let f = new FieldInfo
@@ -538,7 +538,7 @@ fun add_field(info: StructInfo, name: str, typ: TypeInfo, offset: i64): i64 {
     f.typ = typ
     f.offset = offset
     push(info.fields, f)
-    return 0
+    ret 0
 }
 fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     let s = new StructInfo
@@ -546,25 +546,25 @@ fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     s.size = size
     s.fields = new FieldInfo[]
     push(e.structs, s)
-    return s
+    ret s
 }
 fun find_struct_info(e: EmitterState, name: str): StructInfo {
     let i = 0
-    while i < e.structs.len {
+    for i < e.structs.len {
         if e.structs.data[i].name == name {
-            return e.structs.data[i]
+            ret e.structs.data[i]
         }
         i = i + 1
     }
     die("unknown struct layout")
-    return new StructInfo
+    ret new StructInfo
 }
 fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldInfo {
     let s = find_struct_info(e, struct_name)
     let i = 0
-    while i < s.fields.len {
+    for i < s.fields.len {
         if s.fields.data[i].name == field_name {
-            return s.fields.data[i]
+            ret s.fields.data[i]
         }
         i = i + 1
     }
@@ -574,17 +574,17 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
     print(field_name)
     print("\n")
     os.ExitProcess(1)
-    return new FieldInfo
+    ret new FieldInfo
 }
 fun ensure_array_layout(e: EmitterState, elem: str): i64 {
     let arr_name = elem
     # StructInfo.name for arrays is the element name with kind array resolved by callers.
     # Builtin array layouts are materialized under a synthetic name: [] + elem is
     # not constructible without string concatenation, so callers use array_layout_name.
-    return 0
+    ret 0
 }
 fun array_layout_name(elem: str): str {
-    return "_arr_" + elem
+    ret "_arr_" + elem
 }
 fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     e.structs = new StructInfo[]
@@ -604,11 +604,11 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     add_field(a, "len", type_i64(), 8)
     add_field(a, "cap", type_i64(), 16)
     let i = 0
-    while i < ast.structs.len {
+    for i < ast.structs.len {
         let node = ast.structs.data[i]
         s = add_struct_info(e, node.name, node.fields.len * 8)
         let j = 0
-        while j < node.fields.len {
+        for j < node.fields.len {
             add_field(s, node.fields.data[j].name, user_type(node.fields.data[j].type_name), j * 8)
             j = j + 1
         }
@@ -618,30 +618,30 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
         add_field(a, "cap", type_i64(), 16)
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun find_func_ret(e: EmitterState, name: str): TypeInfo {
     let i = 0
-    while i < e.funcs.len {
+    for i < e.funcs.len {
         if e.funcs.data[i].name == name {
-            return e.funcs.data[i].ret_type
+            ret e.funcs.data[i].ret_type
         }
         i = i + 1
     }
-    return type_i64()
+    ret type_i64()
 }
 fun reset_locals(e: EmitterState): i64 {
     e.locals = new Local[]
     e.local_bytes = 0
     e.temp_count = 0
     e.temp_peak = 0
-    return 0
+    ret 0
 }
 fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
     let i = 0
-    while i < e.locals.len {
+    for i < e.locals.len {
         if e.locals.data[i].name == name {
-            return e.locals.data[i].slot
+            ret e.locals.data[i].slot
         }
         i = i + 1
     }
@@ -651,96 +651,96 @@ fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
     l.typ = typ
     l.slot = 0 - e.local_bytes
     push(e.locals, l)
-    return l.slot
+    ret l.slot
 }
 fun find_local_slot(e: EmitterState, name: str): i64 {
     if name == "argv" {
-        return 0
+        ret 0
     }
     let i = 0
-    while i < e.locals.len {
+    for i < e.locals.len {
         if e.locals.data[i].name == name {
-            return e.locals.data[i].slot
+            ret e.locals.data[i].slot
         }
         i = i + 1
     }
     die("undefined local")
-    return 0
+    ret 0
 }
 fun find_local_type(e: EmitterState, name: str): TypeInfo {
     if name == "argv" {
-        return type_array("str")
+        ret type_array("str")
     }
     let i = 0
-    while i < e.locals.len {
+    for i < e.locals.len {
         if e.locals.data[i].name == name {
-            return e.locals.data[i].typ
+            ret e.locals.data[i].typ
         }
         i = i + 1
     }
-    return type_i64()
+    ret type_i64()
 }
 fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     if expr.kind == "String" {
-        return type_str()
+        ret type_str()
     }
     if expr.kind == "Embed" {
-        return type_array("u8")
+        ret type_array("u8")
     }
     if expr.kind == "Literal" {
-        return type_i64()
+        ret type_i64()
     }
     if expr.kind == "Binary" {
         if expr.op == "+" {
             let lt = expr_type(e, expr.left)
             let rt = expr_type(e, expr.right)
             if lt.kind == "str" && rt.kind == "str" {
-                return type_str()
+                ret type_str()
             }
         }
-        return type_i64()
+        ret type_i64()
     }
     if expr.kind == "Var" {
-        return find_local_type(e, expr.name)
+        ret find_local_type(e, expr.name)
     }
     if expr.kind == "Call" {
         if is_sys_call(expr.name) == 1 {
-            return type_i64()
+            ret type_i64()
         }
         if sys_member_symbol(expr.type_name, expr.name) != "" {
-            return type_i64()
+            ret type_i64()
         }
         if expr.name == "itoa" {
-            return type_str()
+            ret type_str()
         }
         if expr.name == "bytes" {
-            return type_array("u8")
+            ret type_array("u8")
         }
         if expr.name == "str_new" {
-            return type_str()
+            ret type_str()
         }
         if expr.name == "str_slice" {
-            return type_str()
+            ret type_str()
         }
         if expr.name == "str_replace_char" {
-            return type_str()
+            ret type_str()
         }
         if expr.name == "read_file" {
-            return type_str()
+            ret type_str()
         }
         if expr.name == "write_file" {
-            return type_i64()
+            ret type_i64()
         }
         if expr.name == "extend" {
-            return type_void()
+            ret type_void()
         }
-        return find_func_ret(e, expr.name)
+        ret find_func_ret(e, expr.name)
     }
     if expr.kind == "New" {
-        return type_struct(expr.name)
+        ret type_struct(expr.name)
     }
     if expr.kind == "NewArray" {
-        return type_array(expr.type_name)
+        ret type_array(expr.type_name)
     }
     if expr.kind == "FieldAccess" {
         let base_type = expr_type(e, expr.object)
@@ -753,31 +753,31 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
             layout = base_type.name
         }
         let f = find_field_info(e, layout, expr.name)
-        return f.typ
+        ret f.typ
     }
     if expr.kind == "Subscript" {
         let bt = expr_type(e, expr.base)
         if bt.kind == "array" {
-            return user_type(bt.name)
+            ret user_type(bt.name)
         }
         if bt.kind == "ptr" {
-            return user_type(bt.name)
+            ret user_type(bt.name)
         }
     }
-    return type_i64()
+    ret type_i64()
 }
 fun infer_let_type(e: EmitterState, value: AstExpr): TypeInfo {
     if value.kind == "" {
-        return type_i64()
+        ret type_i64()
     }
-    return expr_type(e, value)
+    ret expr_type(e, value)
 }
 fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
     if block.present == 0 {
-        return 0
+        ret 0
     }
     let i = 0
-    while i < block.stmts.len {
+    for i < block.stmts.len {
         let stmt = block.stmts.data[i]
         if stmt.kind == "Let" {
             add_local(e, stmt.name, infer_let_type(e, stmt.value_expr))
@@ -789,11 +789,11 @@ fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun temp_reset(e: EmitterState): i64 {
     e.temp_count = 0
-    return 0
+    ret 0
 }
 fun temp_save_rax(e: EmitterState): i64 {
     let nr = e.temp_count
@@ -803,11 +803,11 @@ fun temp_save_rax(e: EmitterState): i64 {
     }
     let slot = 0 - (e.temp_base + (nr + 1) * 8)
     emit_stack_store(e, slot, "rax")
-    return slot
+    ret slot
 }
 fun patch_hex_u32(e: EmitterState, offset: i64, value: i64): i64 {
     let i = 7
-    while i >= 0 {
+    for i >= 0 {
         let digit = value & 15
         if digit < 10 {
             e.out_buf.data[offset + i] = 48 + digit
@@ -817,7 +817,7 @@ fun patch_hex_u32(e: EmitterState, offset: i64, value: i64): i64 {
         value = value >> 4
         i = i - 1
     }
-    return 0
+    ret 0
 }
 fun emit_prologue(e: EmitterState): i64 {
     emit_inst(e, "push rbp")
@@ -825,23 +825,23 @@ fun emit_prologue(e: EmitterState): i64 {
     out_s(e, "    sub rsp, 0x")
     e.alloc_size_patch = e.out_buf.len
     out_line(e, "00000000")
-    return 0
+    ret 0
 }
 fun emit_epilogue(e: EmitterState): i64 {
     emit_mov(e, "rsp", "rbp")
     emit_inst(e, "pop rbp")
     emit_inst(e, "ret")
-    return 0
+    ret 0
 }
 fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
     let slots = new i64[]
     let i = 0
-    while i < args.len {
+    for i < args.len {
         emit_expr(e, args.data[i])
         push(slots, temp_save_rax(e))
         i = i + 1
     }
-    return slots
+    ret slots
 }
 fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     if slots.len > 0 {
@@ -856,7 +856,7 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     if slots.len > 3 {
         emit_stack_load(e, "r9", slots.data[3])
     }
-    return 0
+    ret 0
 }
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
@@ -867,7 +867,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
-        while i < expr.args.len {
+        for i < expr.args.len {
             let arg = expr.args.data[i]
             let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
@@ -889,7 +889,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         out_i(e, frame)
         out_nl(e)
         i = 4
-        while i < slots.len {
+        for i < slots.len {
             emit_stack_load(e, "rax", slots.data[i])
             out_s(e, "    mov [rsp+")
             out_i(e, 32 + (i - 4) * 8)
@@ -900,7 +900,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         out_s(e, "    add rsp, ")
         out_i(e, frame)
         out_nl(e)
-        return 0
+        ret 0
     }
     if name == "print" {
         emit_expr(e, expr.args.data[0])
@@ -916,26 +916,26 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_mov(e, "qword [rsp+32]", "0")
         emit_call_inst(e, "WriteFile")
         emit_inst(e, "add rsp, 16")
-        return 0
+        ret 0
     }
     if name == "itoa" {
         emit_expr(e, expr.args.data[0])
         emit_mov(e, "rcx", "rax")
         emit_call_inst(e, "_itoa")
-        return 0
+        ret 0
     }
     if name == "str_new" {
         let slots = spill_args(e, expr.args)
         emit_stack_load(e, "rcx", slots.data[0])
         emit_stack_load(e, "rdx", slots.data[1])
         emit_call_inst(e, "_str_alloc")
-        return 0
+        ret 0
     }
     if name == "bytes" {
         emit_expr(e, expr.args.data[0])
         emit_mov(e, "rcx", "rax")
         emit_call_inst(e, "_bytes")
-        return 0
+        ret 0
     }
     if name == "str_slice" {
         let slots = spill_args(e, expr.args)
@@ -945,7 +945,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "sub rsp, 32")
         emit_call_inst(e, "_str_slice")
         emit_inst(e, "add rsp, 32")
-        return 0
+        ret 0
     }
     if name == "str_replace_char" {
         let slots = spill_args(e, expr.args)
@@ -955,7 +955,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "sub rsp, 32")
         emit_call_inst(e, "_str_replace_char")
         emit_inst(e, "add rsp, 32")
-        return 0
+        ret 0
     }
     if name == "read_file" {
         emit_expr(e, expr.args.data[0])
@@ -963,7 +963,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "sub rsp, 8")
         emit_call_inst(e, "_read_file")
         emit_inst(e, "add rsp, 8")
-        return 0
+        ret 0
     }
     if name == "write_file" {
         let slots = spill_args(e, expr.args)
@@ -975,7 +975,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "sub rsp, 8")
         emit_call_inst(e, "_write_file")
         emit_inst(e, "add rsp, 8")
-        return 0
+        ret 0
     }
     if name == "push" {
         let arr_type = expr_type(e, expr.args.data[0])
@@ -1053,7 +1053,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         }
         emit_inst(e, "inc qword [rax+8]")
         emit_inst(e, "xor eax, eax")
-        return 0
+        ret 0
     }
     if name == "extend" {
         let slots = spill_args(e, expr.args)
@@ -1061,14 +1061,14 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_stack_load(e, "rdx", slots.data[1])
         emit_call_inst(e, "_extend_u8")
         emit_inst(e, "xor eax, eax")
-        return 0
+        ret 0
     }
     let slots = spill_args(e, expr.args)
     load_spilled_args(e, slots)
     emit_inst(e, "sub rsp, 32")
     emit_call_inst(e, name)
     emit_inst(e, "add rsp, 32")
-    return 0
+    ret 0
 }
 fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     if expr.op == "&&" || expr.op == "||" {
@@ -1080,7 +1080,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         emit_label_id(e, "L", true_id)
         emit_mov(e, "eax", "1")
         emit_label_id(e, "L", end_id)
-        return 0
+        ret 0
     }
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
@@ -1093,7 +1093,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "sub rsp, 32")
         emit_call_inst(e, "_str_cat")
         emit_inst(e, "add rsp, 32")
-        return 0
+        ret 0
     }
     if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
         emit_mov(e, "rcx", "[rax]")
@@ -1109,28 +1109,28 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
             emit_inst(e, "setne al")
         }
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     emit_stack_load(e, "rcx", tmp)
     if expr.op == "+" {
         emit_inst(e, "add rax, rcx")
-        return 0
+        ret 0
     }
     if expr.op == "-" {
         emit_inst(e, "sub rax, rcx")
-        return 0
+        ret 0
     }
     if expr.op == "*" {
         emit_inst(e, "imul rax, rcx")
-        return 0
+        ret 0
     }
     if expr.op == "&" {
         emit_inst(e, "and rax, rcx")
-        return 0
+        ret 0
     }
     if expr.op == "|" {
         emit_inst(e, "or rax, rcx")
-        return 0
+        ret 0
     }
     if expr.op == "<<" || expr.op == ">>" {
         let count_ok = fresh_label(e)
@@ -1148,57 +1148,57 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         } else {
             emit_inst(e, "sar rax, cl")
         }
-        return 0
+        ret 0
     }
     if expr.op == "/" {
         emit_inst(e, "cqo")
         emit_inst(e, "idiv rcx")
-        return 0
+        ret 0
     }
     if expr.op == "%" {
         emit_inst(e, "cqo")
         emit_inst(e, "idiv rcx")
         emit_mov(e, "rax", "rdx")
-        return 0
+        ret 0
     }
     if expr.op == "==" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "sete al")
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     if expr.op == "!=" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "setne al")
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     if expr.op == "<" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "setl al")
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     if expr.op == ">" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "setg al")
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     if expr.op == "<=" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "setle al")
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     if expr.op == ">=" {
         emit_inst(e, "cmp rax, rcx")
         emit_inst(e, "setge al")
         emit_inst(e, "movzx eax, al")
-        return 0
+        ret 0
     }
     die("unknown binary op")
-    return 0
+    ret 0
 }
 fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
     let left_type = expr_type(e, expr.left)
@@ -1262,12 +1262,12 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         }
     }
     emit_jmp_id(e, op, "L", label)
-    return 0
+    ret 0
 }
 fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
     if expr.kind == "Binary" {
         if expr.op == "==" || expr.op == "!=" || expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" {
-            return emit_comparison_jump(e, expr, jump_if_true, label)
+            ret emit_comparison_jump(e, expr, jump_if_true, label)
         }
         if expr.op == "&&" {
             if jump_if_true == 0 {
@@ -1279,7 +1279,7 @@ fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64
                 emit_cond_jump(e, expr.right, 1, label)
                 emit_label_id(e, "L", skip)
             }
-            return 0
+            ret 0
         }
         if expr.op == "||" {
             if jump_if_true == 1 {
@@ -1291,7 +1291,7 @@ fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64
                 emit_cond_jump(e, expr.right, 0, label)
                 emit_label_id(e, "L", skip)
             }
-            return 0
+            ret 0
         }
     }
     emit_expr(e, expr)
@@ -1301,7 +1301,7 @@ fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64
     } else {
         emit_jmp_id(e, "jz", "L", label)
     }
-    return 0
+    ret 0
 }
 fun emit_new(e: EmitterState, expr: AstExpr): i64 {
     let info = find_struct_info(e, expr.name)
@@ -1311,7 +1311,7 @@ fun emit_new(e: EmitterState, expr: AstExpr): i64 {
     emit_inst(e, "sub rsp, 40")
     emit_call_inst(e, "HeapAlloc")
     emit_inst(e, "add rsp, 40")
-    return 0
+    ret 0
 }
 fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     let elem = expr.type_name
@@ -1363,22 +1363,22 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     emit_stack_load(e, "rcx", header_slot)
     emit_mov(e, "[rcx]", "rax")
     emit_mov(e, "rax", "rcx")
-    return 0
+    ret 0
 }
 fun field_layout_name(t: TypeInfo): str {
     if t.kind == "str" {
-        return "str"
+        ret "str"
     }
     if t.kind == "array" {
-        return array_layout_name(t.name)
+        ret array_layout_name(t.name)
     }
     if t.kind == "struct" {
-        return t.name
+        ret t.name
     }
     if t.kind == "ptr" {
-        return t.name
+        ret t.name
     }
-    return ""
+    ret ""
 }
 fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
     let obj_type = expr_type(e, expr.object)
@@ -1393,7 +1393,7 @@ fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
         out_i(e, field.offset)
         out_line(e, "]")
     }
-    return 0
+    ret 0
 }
 fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
     let elem_type = expr_type(e, expr)
@@ -1406,31 +1406,31 @@ fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
     } else {
         emit_inst(e, "mov rax, [rcx+rax*8]")
     }
-    return 0
+    ret 0
 }
 fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
     if expr.kind == "Literal" {
         emit_mov(e, "rax", expr.value)
-        return 0
+        ret 0
     }
     if expr.kind == "String" {
         let id = get_string_id(e, expr.value)
         emit_lea_ref_id(e, "rcx", "_str_", id)
         emit_mov_i(e, "rdx", expr.value.len)
         emit_call_inst(e, "_str_alloc")
-        return 0
+        ret 0
     }
     if expr.kind == "Embed" {
         let id = get_string_id(e, expr.value)
         emit_lea_ref_id(e, "rcx", "_str_", id)
         emit_mov_i(e, "rdx", expr.value.len)
         emit_call_inst(e, "_embed_bytes")
-        return 0
+        ret 0
     }
     if expr.kind == "Var" {
         if expr.name == "argv" {
             emit_mov(e, "rax", "[_argv]")
-            return 0
+            ret 0
         }
         if type_is_u8(find_local_type(e, expr.name)) == 1 {
             out_s(e, "    movzx rax, byte ")
@@ -1439,34 +1439,34 @@ fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
         } else {
             emit_stack_load(e, "rax", find_local_slot(e, expr.name))
         }
-        return 0
+        ret 0
     }
     if expr.kind == "Call" {
         emit_call_expr(e, expr)
-        return 0
+        ret 0
     }
     if expr.kind == "Binary" {
         emit_binary(e, expr)
-        return 0
+        ret 0
     }
     if expr.kind == "New" {
         emit_new(e, expr)
-        return 0
+        ret 0
     }
     if expr.kind == "NewArray" {
         emit_new_array(e, expr)
-        return 0
+        ret 0
     }
     if expr.kind == "FieldAccess" {
         emit_field_access(e, expr)
-        return 0
+        ret 0
     }
     if expr.kind == "Subscript" {
         emit_subscript(e, expr)
-        return 0
+        ret 0
     }
     die("unsupported expr")
-    return 0
+    ret 0
 }
 fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
     if e.current_fn == "main" {
@@ -1486,11 +1486,11 @@ fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
         }
         emit_jmp_id(e, "jmp", "L", e.current_ep_id)
     }
-    return 0
+    ret 0
 }
 fun emit_let(e: EmitterState, stmt: AstStmt): i64 {
     if stmt.value_expr.kind == "" {
-        return 0
+        ret 0
     }
     emit_expr(e, stmt.value_expr)
     if type_is_u8(find_local_type(e, stmt.name)) == 1 {
@@ -1498,7 +1498,7 @@ fun emit_let(e: EmitterState, stmt: AstStmt): i64 {
     } else {
         emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
     }
-    return 0
+    ret 0
 }
 fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.value_expr)
@@ -1507,7 +1507,7 @@ fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
     } else {
         emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
     }
-    return 0
+    ret 0
 }
 fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
     let synth = ast_expr("Subscript")
@@ -1531,7 +1531,7 @@ fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
     } else {
         emit_inst(e, "mov [rcx], rax")
     }
-    return 0
+    ret 0
 }
 fun emit_field_set(e: EmitterState, stmt: AstStmt): i64 {
     let obj_type = expr_type(e, stmt.object)
@@ -1549,7 +1549,7 @@ fun emit_field_set(e: EmitterState, stmt: AstStmt): i64 {
         out_i(e, field.offset)
         out_line(e, "], rcx")
     }
-    return 0
+    ret 0
 }
 fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
     let else_id = fresh_label(e)
@@ -1565,7 +1565,7 @@ fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
         emit_block(e, stmt.else_block)
     }
     emit_label_id(e, "L", end_id)
-    return 0
+    ret 0
 }
 fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     let start_id = fresh_label(e)
@@ -1579,67 +1579,67 @@ fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     e.loop_ends.len = e.loop_ends.len - 1
     emit_jmp_id(e, "jmp", "L", start_id)
     emit_label_id(e, "L", end_id)
-    return 0
+    ret 0
 }
 fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
     if e.loop_ends.len == 0 {
         die("break outside loop")
     }
     emit_jmp_id(e, "jmp", "L", e.loop_ends.data[e.loop_ends.len - 1])
-    return 0
+    ret 0
 }
 fun emit_continue(e: EmitterState, stmt: AstStmt): i64 {
     if e.loop_starts.len == 0 {
         die("continue outside loop")
     }
     emit_jmp_id(e, "jmp", "L", e.loop_starts.data[e.loop_starts.len - 1])
-    return 0
+    ret 0
 }
 fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
     temp_reset(e)
     if stmt.kind == "Return" {
-        return emit_return(e, stmt)
+        ret emit_return(e, stmt)
     }
     if stmt.kind == "ExprStmt" {
-        return emit_expr(e, stmt.expr)
+        ret emit_expr(e, stmt.expr)
     }
     if stmt.kind == "Let" {
-        return emit_let(e, stmt)
+        ret emit_let(e, stmt)
     }
     if stmt.kind == "Assign" {
-        return emit_assign(e, stmt)
+        ret emit_assign(e, stmt)
     }
     if stmt.kind == "SubscriptAssign" {
-        return emit_subscript_assign(e, stmt)
+        ret emit_subscript_assign(e, stmt)
     }
     if stmt.kind == "FieldSet" {
-        return emit_field_set(e, stmt)
+        ret emit_field_set(e, stmt)
     }
     if stmt.kind == "If" {
-        return emit_if(e, stmt)
+        ret emit_if(e, stmt)
     }
     if stmt.kind == "While" {
-        return emit_while(e, stmt)
+        ret emit_while(e, stmt)
     }
     if stmt.kind == "Break" {
-        return emit_break(e, stmt)
+        ret emit_break(e, stmt)
     }
     if stmt.kind == "Continue" {
-        return emit_continue(e, stmt)
+        ret emit_continue(e, stmt)
     }
     die("unsupported stmt")
-    return 0
+    ret 0
 }
 fun emit_block(e: EmitterState, block: AstBlock): i64 {
     if block.present == 0 {
-        return 0
+        ret 0
     }
     let i = 0
-    while i < block.stmts.len {
+    for i < block.stmts.len {
         emit_stmt(e, block.stmts.data[i])
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     reset_locals(e)
@@ -1647,7 +1647,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     e.current_ret_type = user_type(fn.type_name)
     e.current_ep_id = fresh_label(e)
     let i = 0
-    while i < fn.params.len {
+    for i < fn.params.len {
         add_local(e, fn.params.data[i].name, user_type(fn.params.data[i].type_name))
         i = i + 1
     }
@@ -1708,7 +1708,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     e.alloc_size = align16(e.local_bytes + e.temp_peak * 8 + 32)
     patch_hex_u32(e, e.alloc_size_patch, e.alloc_size)
     out_nl(e)
-    return 0
+    ret 0
 }
 fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     compute_struct_layouts(e, ast)
@@ -1749,7 +1749,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     out_line(e, "_argv:")
     out_line(e, "    dq 0")
     let i = 0
-    while i < e.strings.len {
+    for i < e.strings.len {
         emit_label_id(e, "_str_", e.strings.data[i].id)
         out_s(e, "    db ")
         emit_string_bytes(e, e.strings.data[i].text)
@@ -1759,13 +1759,13 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     out_line(e, "section .text")
     out_nl(e)
     i = 0
-    while i < ast.funcs.len {
+    for i < ast.funcs.len {
         emit_fn_def(e, ast.funcs.data[i])
         i = i + 1
     }
     emit_runtime_helpers(e)
     write_file(e.out_path, str_new(e.out_buf.data, e.out_buf.len))
-    return 0
+    ret 0
 }
 fun main(): void {
     if argv.len < 3 {

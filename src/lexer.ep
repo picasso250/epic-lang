@@ -13,73 +13,73 @@ fun push_token(tokens: Token[], kind: str, text: str, line: i64): i64 {
     t.text = text
     t.line = line
     push(tokens, t)
-    return 0
+    ret 0
 }
 # ── Char predicates ─────────────────────────────────────────────────────
 fun is_alpha(c: i64): i64 {
     if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_alnum(c: i64): i64 {
     if is_alpha(c) == 1 || (c >= 48 && c <= 57) {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_digit(c: i64): i64 {
     if c >= 48 && c <= 57 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun is_hex_digit(c: i64): i64 {
     if is_digit(c) == 1 || (c >= 65 && c <= 70) || (c >= 97 && c <= 102) {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun decimal_literal_fits_i64(text: str): i64 {
     let start = 0
-    while start + 1 < text.len && text.data[start] == 48 {
+    for start + 1 < text.len && text.data[start] == 48 {
         start = start + 1
     }
     let digits = text.len - start
     if digits < 19 {
-        return 1
+        ret 1
     }
     if digits > 19 {
-        return 0
+        ret 0
     }
     let limit = "9223372036854775807"
     let i = 0
-    while i < 19 {
+    for i < 19 {
         let value = text.data[start + i]
         let maximum = limit.data[i]
         if value < maximum {
-            return 1
+            ret 1
         }
         if value > maximum {
-            return 0
+            ret 0
         }
         i = i + 1
     }
-    return 1
+    ret 1
 }
 fun hex_literal_fits_i64(text: str): i64 {
     let start = 2
-    while start + 1 < text.len && text.data[start] == 48 {
+    for start + 1 < text.len && text.data[start] == 48 {
         start = start + 1
     }
     let digits = text.len - start
     if digits < 16 {
-        return 1
+        ret 1
     }
     if digits > 16 {
-        return 0
+        ret 0
     }
-    return text.data[start] <= 55
+    ret text.data[start] <= 55
 }
 fun reject_large_literal(text: str, hex: i64): i64 {
     let fits = decimal_literal_fits_i64(text)
@@ -90,7 +90,7 @@ fun reject_large_literal(text: str, hex: i64): i64 {
         print("integer literal is out of i64 range\n")
         os.ExitProcess(1)
     }
-    return 0
+    ret 0
 }
 # ── Lexer ───────────────────────────────────────────────────────────────
 fun lex(src: str): Token[] {
@@ -99,7 +99,7 @@ fun lex(src: str): Token[] {
     let pos = 0
     let line = 1
     let p = src.data
-    while pos < n {
+    for pos < n {
         let ch = p[pos]
         let consumed = 0
         # ── whitespace ──
@@ -116,7 +116,7 @@ fun lex(src: str): Token[] {
         # ── comment # ──
         if consumed == 0 && ch == 35 {
             pos = pos + 1
-            while pos < n && p[pos] != 10 {
+            for pos < n && p[pos] != 10 {
                 pos = pos + 1
             }
             consumed = 1
@@ -128,7 +128,7 @@ fun lex(src: str): Token[] {
             let buf = new u8[n - pos + 1]
             let out_len = 0
             let scanning = 1
-            while scanning == 1 && pos < n {
+            for scanning == 1 && pos < n {
                 if p[pos] == 34 {
                     scanning = 0
                 } else {
@@ -222,7 +222,7 @@ fun lex(src: str): Token[] {
                 hex = 1
                 pos = pos + 2
                 let digit_start = pos
-                while pos < n && is_hex_digit(p[pos]) == 1 {
+                for pos < n && is_hex_digit(p[pos]) == 1 {
                     pos = pos + 1
                 }
                 if pos == digit_start {
@@ -230,7 +230,7 @@ fun lex(src: str): Token[] {
                     os.ExitProcess(1)
                 }
             } else {
-                while pos < n && is_digit(p[pos]) == 1 {
+                for pos < n && is_digit(p[pos]) == 1 {
                     pos = pos + 1
                 }
             }
@@ -243,7 +243,7 @@ fun lex(src: str): Token[] {
         if consumed == 0 && is_alpha(ch) == 1 {
             let start_line = line
             let start = pos
-            while pos < n && is_alnum(p[pos]) == 1 {
+            for pos < n && is_alnum(p[pos]) == 1 {
                 pos = pos + 1
             }
             let text = str_new(p + start, pos - start)
@@ -251,8 +251,11 @@ fun lex(src: str): Token[] {
             if text == "fun"    {
                 kind = "FUN"
             }
-            if text == "return" {
+            if text == "ret" {
                 kind = "RETURN"
+            }
+            if text == "return" {
+                kind = "REMOVED_KEYWORD"
             }
             if text == "if"     {
                 kind = "IF"
@@ -260,8 +263,11 @@ fun lex(src: str): Token[] {
             if text == "else"   {
                 kind = "ELSE"
             }
-            if text == "while"  {
+            if text == "for"    {
                 kind = "WHILE"
+            }
+            if text == "while"  {
+                kind = "REMOVED_KEYWORD"
             }
             if text == "break"  {
                 kind = "BREAK"
@@ -428,12 +434,12 @@ fun lex(src: str): Token[] {
             pos = pos + 1
         }
     }
-    return tokens
+    ret tokens
 }
 # ── Dump ────────────────────────────────────────────────────────────────
 fun dump_tokens(tokens: Token[]): i64 {
     let i = 0
-    while i < tokens.len {
+    for i < tokens.len {
         let t = tokens.data[i]
         print(t.kind)
         print(" ")
@@ -443,7 +449,7 @@ fun dump_tokens(tokens: Token[]): i64 {
         print("\n")
         i = i + 1
     }
-    return 0
+    ret 0
 }
 # ── Main ────────────────────────────────────────────────────────────────
 fun main(): void {

@@ -44,71 +44,71 @@ fun asm_die(msg: str): i64 {
     print(msg)
     print("\n")
     os.ExitProcess(1)
-    return 0
+    ret 0
 }
 fun asm_slice(s: str, start: i64, end: i64): str {
-    return str_new(s.data + start, end - start)
+    ret str_new(s.data + start, end - start)
 }
 fun asm_trim(s: str): str {
     let a = 0
     let b = s.len
-    while a < b && (s.data[a] == 32 || s.data[a] == 9 || s.data[a] == 13) {
+    for a < b && (s.data[a] == 32 || s.data[a] == 9 || s.data[a] == 13) {
         a = a + 1
     }
-    while b > a && (s.data[b - 1] == 32 || s.data[b - 1] == 9 || s.data[b - 1] == 13) {
+    for b > a && (s.data[b - 1] == 32 || s.data[b - 1] == 9 || s.data[b - 1] == 13) {
         b = b - 1
     }
-    return asm_slice(s, a, b)
+    ret asm_slice(s, a, b)
 }
 fun asm_starts(s: str, prefix: str): i64 {
     if s.len < prefix.len {
-        return 0
+        ret 0
     }
     let i = 0
-    while i < prefix.len {
+    for i < prefix.len {
         if s.data[i] != prefix.data[i] {
-            return 0
+            ret 0
         }
         i = i + 1
     }
-    return 1
+    ret 1
 }
 fun asm_find(s: str, ch: i64): i64 {
     let i = 0
-    while i < s.len {
+    for i < s.len {
         if s.data[i] == ch {
-            return i
+            ret i
         }
         i = i + 1
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_remove_spaces(s: str): str {
     let out = new u8[]
     let i = 0
-    while i < s.len {
+    for i < s.len {
         if s.data[i] != 32 && s.data[i] != 9 {
             push(out, s.data[i])
         }
         i = i + 1
     }
-    return str_new(out.data, out.len)
+    ret str_new(out.data, out.len)
 }
 fun asm_digit(c: i64): i64 {
     if c >= 48 && c <= 57 {
-        return c - 48
+        ret c - 48
     }
     if c >= 65 && c <= 70 {
-        return c - 55
+        ret c - 55
     }
     if c >= 97 && c <= 102 {
-        return c - 87
+        ret c - 87
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_is_number(s: str): i64 {
     if s.len == 0 {
-        return 0
+        ret 0
     }
     let i = 0
     if s.data[0] == 45 {
@@ -120,18 +120,18 @@ fun asm_is_number(s: str): i64 {
         i = i + 2
     }
     if i >= s.len {
-        return 0
+        ret 0
     }
-    while i < s.len {
+    for i < s.len {
         if hex == 0 && (s.data[i] < 48 || s.data[i] > 57) {
-            return 0
+            ret 0
         }
         if hex == 1 && asm_digit(s.data[i]) < 0 {
-            return 0
+            ret 0
         }
         i = i + 1
     }
-    return 1
+    ret 1
 }
 fun asm_number(s: str): i64 {
     let sign = 1
@@ -146,68 +146,68 @@ fun asm_number(s: str): i64 {
         i = i + 2
     }
     let value = 0
-    while i < s.len {
+    for i < s.len {
         value = value * base + asm_digit(s.data[i])
         i = i + 1
     }
-    return value * sign
+    ret value * sign
 }
 fun asm_reg(name: str): i64 {
     if name == "rax" || name == "eax" || name == "al" {
-        return 0
+        ret 0
     }
     if name == "rcx" || name == "ecx" || name == "cl" {
-        return 1
+        ret 1
     }
     if name == "rdx" || name == "edx" || name == "dl" {
-        return 2
+        ret 2
     }
     if name == "rbx" || name == "ebx" || name == "bl" {
-        return 3
+        ret 3
     }
     if name == "rsp" || name == "esp" {
-        return 4
+        ret 4
     }
     if name == "rbp" || name == "ebp" {
-        return 5
+        ret 5
     }
     if name == "rsi" || name == "esi" {
-        return 6
+        ret 6
     }
     if name == "rdi" || name == "edi" {
-        return 7
+        ret 7
     }
     if name == "r8" || name == "r8d" || name == "r8b" {
-        return 8
+        ret 8
     }
     if name == "r9" || name == "r9d" || name == "r9b" {
-        return 9
+        ret 9
     }
     if name == "r10" || name == "r10d" || name == "r10b" {
-        return 10
+        ret 10
     }
     if name == "r11" || name == "r11d" || name == "r11b" {
-        return 11
+        ret 11
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_reg_width(name: str): i64 {
     if name == "al" || name == "bl" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" {
-        return 8
+        ret 8
     }
     if name == "eax" || name == "ebx" || name == "ecx" || name == "edx" || name == "esp" || name == "ebp" || name == "esi" || name == "edi" || name == "r8d" || name == "r9d" || name == "r10d" || name == "r11d" {
-        return 32
+        ret 32
     }
     if asm_reg(name) >= 0 {
-        return 64
+        ret 64
     }
-    return 0
+    ret 0
 }
 fun asm_qualify(image: ExeImage, name: str): str {
     if name.len > 0 && name.data[0] == 46 {
-        return image.scope + name
+        ret image.scope + name
     }
-    return name
+    ret name
 }
 fun asm_operand_empty(): AsmOperand {
     let op = new AsmOperand
@@ -218,7 +218,7 @@ fun asm_operand_empty(): AsmOperand {
     op.index = 0 - 1
     op.scale = 1
     op.symbol = ""
-    return op
+    ret op
 }
 fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
     let op = asm_operand_empty()
@@ -236,7 +236,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
     }
     let pos = 0
     let sign = 1
-    while pos < body.len {
+    for pos < body.len {
         if body.data[pos] == 43 {
             sign = 1
             pos = pos + 1
@@ -245,7 +245,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
             pos = pos + 1
         }
         let end = pos
-        while end < body.len && body.data[end] != 43 && body.data[end] != 45 {
+        for end < body.len && body.data[end] != 43 && body.data[end] != 45 {
             end = end + 1
         }
         let term = asm_slice(body, pos, end)
@@ -278,7 +278,7 @@ fun asm_parse_mem(image: ExeImage, text: str, width: i64): AsmOperand {
         }
         pos = end
     }
-    return op
+    ret op
 }
 fun asm_parse_operand(image: ExeImage, raw: str): AsmOperand {
     let text = asm_trim(raw)
@@ -294,7 +294,7 @@ fun asm_parse_operand(image: ExeImage, raw: str): AsmOperand {
         text = asm_trim(asm_slice(text, 6, text.len))
     }
     if asm_find(text, 91) >= 0 {
-        return asm_parse_mem(image, text, width)
+        ret asm_parse_mem(image, text, width)
     }
     let op = asm_operand_empty()
     let r = asm_reg(text)
@@ -302,16 +302,16 @@ fun asm_parse_operand(image: ExeImage, raw: str): AsmOperand {
         op.kind = 1
         op.reg = r
         op.width = asm_reg_width(text)
-        return op
+        ret op
     }
     if asm_is_number(text) == 1 {
         op.kind = 2
         op.imm = asm_number(text)
-        return op
+        ret op
     }
     op.kind = 4
     op.symbol = asm_qualify(image, text)
-    return op
+    ret op
 }
 fun asm_image_new(): ExeImage {
     let image = new ExeImage
@@ -322,13 +322,13 @@ fun asm_image_new(): ExeImage {
     image.relocs = new AsmReloc[]
     image.section = 0
     image.scope = ""
-    return image
+    ret image
 }
 fun asm_offset(image: ExeImage): i64 {
     if image.section == 1 {
-        return image.text.len
+        ret image.text.len
     }
-    return image.data.len
+    ret image.data.len
 }
 fun asm_byte(image: ExeImage, value: i64): i64 {
     if image.section == 1 {
@@ -340,44 +340,44 @@ fun asm_byte(image: ExeImage, value: i64): i64 {
     else {
         asm_die("bytes outside a section")
     }
-    return 0
+    ret 0
 }
 fun asm_u32(image: ExeImage, value: i64): i64 {
     asm_byte(image, value)
     asm_byte(image, value >> 8)
     asm_byte(image, value >> 16)
     asm_byte(image, value >> 24)
-    return 0
+    ret 0
 }
 fun asm_u64(image: ExeImage, value: i64): i64 {
     asm_u32(image, value)
     asm_u32(image, value >> 32)
-    return 0
+    ret 0
 }
 fun asm_symbol_bucket(name: str): i64 {
     let hash = 0
     let i = 0
-    while i < name.len {
+    for i < name.len {
         hash = ((hash << 5) - hash + name.data[i]) & 16383
         i = i + 1
     }
-    return hash
+    ret hash
 }
 fun asm_symbol_find(image: ExeImage, name: str): i64 {
     let entry = image.symbol_buckets.data[asm_symbol_bucket(name)]
-    while entry != 0 {
+    for entry != 0 {
         let index = entry - 1
         if image.symbols.data[index].name == name {
-            return index
+            ret index
         }
         entry = image.symbols.data[index].hash_next
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_symbol_intern(image: ExeImage, name: str): i64 {
     let old_index = asm_symbol_find(image, name)
     if old_index >= 0 {
-        return old_index
+        ret old_index
     }
     let bucket = asm_symbol_bucket(name)
     let sym = new AsmSymbol
@@ -385,7 +385,7 @@ fun asm_symbol_intern(image: ExeImage, name: str): i64 {
     sym.hash_next = image.symbol_buckets.data[bucket]
     push(image.symbols, sym)
     image.symbol_buckets.data[bucket] = image.symbols.len
-    return image.symbols.len - 1
+    ret image.symbols.len - 1
 }
 fun asm_define(image: ExeImage, raw_name: str): i64 {
     let name = asm_qualify(image, raw_name)
@@ -404,17 +404,17 @@ fun asm_define(image: ExeImage, raw_name: str): i64 {
     if name == "_start" {
         image.entry_offset = sym.offset
     }
-    return 0
+    ret 0
 }
 fun asm_extern(image: ExeImage, name: str): i64 {
     let symbol_index = asm_symbol_intern(image, name)
     let sym = image.symbols.data[symbol_index]
     if sym.defined == 1 {
-        return 0
+        ret 0
     }
     sym.external = 1
     sym.defined = 1
-    return 0
+    ret 0
 }
 fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
     let r = new AsmReloc
@@ -424,7 +424,7 @@ fun asm_reloc(image: ExeImage, kind: i64, symbol: str, addend: i64): i64 {
     r.symbol_index = asm_symbol_intern(image, symbol)
     r.addend = addend
     push(image.relocs, r)
-    return 0
+    ret 0
 }
 fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     let rex = 64
@@ -440,38 +440,38 @@ fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     if base >= 8 {
         rex = rex | 1
     }
-    return rex
+    ret rex
 }
 fun asm_rex(image: ExeImage, rex: i64, force: i64): i64 {
     if rex != 64 || force == 1 {
         asm_byte(image, rex)
     }
-    return 0
+    ret 0
 }
 fun asm_modrm(image: ExeImage, mod: i64, reg: i64, rm: i64): i64 {
     asm_byte(image, (mod << 6) | ((reg & 7) << 3) | (rm & 7))
-    return 0
+    ret 0
 }
 fun asm_scale_bits(scale: i64): i64 {
     if scale == 1 {
-        return 0
+        ret 0
     }
     if scale == 2 {
-        return 1
+        ret 1
     }
     if scale == 4 {
-        return 2
+        ret 2
     }
     if scale == 8 {
-        return 3
+        ret 3
     }
     asm_die("bad memory scale")
-    return 0
+    ret 0
 }
 fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     if op.kind == 1 {
         asm_modrm(image, 3, reg_field, op.reg)
-        return 0
+        ret 0
     }
     if op.kind != 3 {
         asm_die("expected register or memory operand")
@@ -483,7 +483,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
         asm_modrm(image, 0, reg_field, 5)
         asm_reloc(image, 2, op.symbol, op.disp)
         asm_u32(image, 0)
-        return 0
+        ret 0
     }
     let base = op.base
     if base < 0 {
@@ -519,13 +519,13 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     else if mod == 2 || (mod == 0 && (base & 7) == 5) {
         asm_u32(image, op.disp)
     }
-    return 0
+    ret 0
 }
 fun asm_force_rex8(op: AsmOperand): i64 {
     if op.kind == 1 && op.reg >= 4 {
-        return 1
+        ret 1
     }
-    return 0
+    ret 0
 }
 fun asm_emit_opcode_rm(image: ExeImage, opcode: i64, reg: i64, rm: AsmOperand): i64 {
     let base = rm.reg
@@ -537,17 +537,17 @@ fun asm_emit_opcode_rm(image: ExeImage, opcode: i64, reg: i64, rm: AsmOperand): 
     asm_rex(image, asm_rex_bits(rm.width, reg, index, base), asm_force_rex8(rm))
     asm_byte(image, opcode)
     asm_emit_rm(image, reg, rm)
-    return 0
+    ret 0
 }
 
 fun asm_effective_width(a: AsmOperand, b: AsmOperand): i64 {
     if a.width != 0 {
-        return a.width
+        ret a.width
     }
     if b.width != 0 {
-        return b.width
+        ret b.width
     }
-    return 64
+    ret 64
 }
 fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     let width = asm_effective_width(dst, src)
@@ -563,7 +563,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             asm_byte(image, 184 + (dst.reg & 7))
             asm_u64(image, src.imm)
         }
-        return 0
+        ret 0
     }
     if dst.kind == 1 && (src.kind == 1 || src.kind == 3) {
         let opcode = 139
@@ -572,7 +572,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         }
         src.width = width
         asm_emit_opcode_rm(image, opcode, dst.reg, src)
-        return 0
+        ret 0
     }
     if dst.kind == 3 && src.kind == 1 {
         let opcode = 137
@@ -584,7 +584,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         asm_rex(image, asm_rex_bits(width, src.reg, index, base), asm_force_rex8(src))
         asm_byte(image, opcode)
         asm_emit_rm(image, src.reg, dst)
-        return 0
+        ret 0
     }
     if dst.kind == 3 && src.kind == 2 {
         let opcode = 199
@@ -608,10 +608,10 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         else {
             asm_u32(image, src.imm)
         }
-        return 0
+        ret 0
     }
     asm_die("unsupported mov operands")
-    return 0
+    ret 0
 }
 fun asm_emit_lea(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     if dst.kind != 1 || src.kind != 3 {
@@ -619,7 +619,7 @@ fun asm_emit_lea(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     }
     src.width = dst.width
     asm_emit_opcode_rm(image, 141, dst.reg, src)
-    return 0
+    ret 0
 }
 fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     if dst.kind != 1 || (src.kind != 1 && src.kind != 3) {
@@ -635,28 +635,28 @@ fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     asm_byte(image, 15)
     asm_byte(image, 182)
     asm_emit_rm(image, dst.reg, src)
-    return 0
+    ret 0
 }
 fun asm_alu_ext(name: str): i64 {
     if name == "add" {
-        return 0
+        ret 0
     }
     if name == "or" {
-        return 1
+        ret 1
     }
     if name == "and" {
-        return 4
+        ret 4
     }
     if name == "sub" {
-        return 5
+        ret 5
     }
     if name == "xor" {
-        return 6
+        ret 6
     }
     if name == "cmp" {
-        return 7
+        ret 7
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_alu_load_opcode(name: str, width: i64): i64 {
     let opcode = 3
@@ -678,7 +678,7 @@ fun asm_alu_load_opcode(name: str, width: i64): i64 {
     if width == 8 {
         opcode = opcode - 1
     }
-    return opcode
+    ret opcode
 }
 fun asm_alu_store_opcode(name: str, width: i64): i64 {
     let opcode = 1
@@ -700,7 +700,7 @@ fun asm_alu_store_opcode(name: str, width: i64): i64 {
     if width == 8 {
         opcode = opcode - 1
     }
-    return opcode
+    ret opcode
 }
 fun asm_emit_alu(image: ExeImage, name: str, dst: AsmOperand, src: AsmOperand): i64 {
     let width = asm_effective_width(dst, src)
@@ -720,22 +720,22 @@ fun asm_emit_alu(image: ExeImage, name: str, dst: AsmOperand, src: AsmOperand): 
         else {
             asm_u32(image, src.imm)
         }
-        return 0
+        ret 0
     }
     if dst.kind == 1 && (src.kind == 1 || src.kind == 3) {
         src.width = width
         asm_emit_opcode_rm(image, asm_alu_load_opcode(name, width), dst.reg, src)
-        return 0
+        ret 0
     }
     if dst.kind == 3 && src.kind == 1 {
         let base = dst.base
         asm_rex(image, asm_rex_bits(width, src.reg, dst.index, base), asm_force_rex8(src))
         asm_byte(image, asm_alu_store_opcode(name, width))
         asm_emit_rm(image, src.reg, dst)
-        return 0
+        ret 0
     }
     asm_die("unsupported " + name + " operands")
-    return 0
+    ret 0
 }
 fun asm_emit_test(image: ExeImage, left: AsmOperand, right: AsmOperand): i64 {
     let width = asm_effective_width(left, right)
@@ -753,7 +753,7 @@ fun asm_emit_test(image: ExeImage, left: AsmOperand, right: AsmOperand): i64 {
         asm_byte(image, 133)
     }
     asm_emit_rm(image, right.reg, left)
-    return 0
+    ret 0
 }
 fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     if dst.kind != 1 {
@@ -770,7 +770,7 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             asm_modrm(image, 3, dst.reg, dst.reg)
             asm_u32(image, src.imm)
         }
-        return 0
+        ret 0
     }
     if src.kind == 1 || src.kind == 3 {
         let base = src.reg
@@ -781,38 +781,38 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         asm_byte(image, 15)
         asm_byte(image, 175)
         asm_emit_rm(image, dst.reg, src)
-        return 0
+        ret 0
     }
     asm_die("unsupported imul operands")
-    return 0
+    ret 0
 }
 fun asm_emit_group(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): i64 {
     asm_emit_opcode_rm(image, opcode, ext, target)
-    return 0
+    ret 0
 }
 fun asm_jump_code(name: str): i64 {
     if name == "je" || name == "jz" {
-        return 132
+        ret 132
     }
     if name == "jne" || name == "jnz" {
-        return 133
+        ret 133
     }
     if name == "jl" {
-        return 140
+        ret 140
     }
     if name == "jge" {
-        return 141
+        ret 141
     }
     if name == "jle" {
-        return 142
+        ret 142
     }
     if name == "jg" {
-        return 143
+        ret 143
     }
     if name == "jns" {
-        return 137
+        ret 137
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_emit_jump(image: ExeImage, name: str, target: AsmOperand): i64 {
     if target.kind != 4 {
@@ -831,28 +831,28 @@ fun asm_emit_jump(image: ExeImage, name: str, target: AsmOperand): i64 {
     }
     asm_reloc(image, 1, target.symbol, 0)
     asm_u32(image, 0)
-    return 0
+    ret 0
 }
 fun asm_setcc_code(name: str): i64 {
     if name == "sete" {
-        return 148
+        ret 148
     }
     if name == "setne" {
-        return 149
+        ret 149
     }
     if name == "setl" {
-        return 156
+        ret 156
     }
     if name == "setge" {
-        return 157
+        ret 157
     }
     if name == "setle" {
-        return 158
+        ret 158
     }
     if name == "setg" {
-        return 159
+        ret 159
     }
-    return 0 - 1
+    ret 0 - 1
 }
 fun asm_emit_setcc(image: ExeImage, name: str, target: AsmOperand): i64 {
     let code = asm_setcc_code(name)
@@ -863,7 +863,7 @@ fun asm_emit_setcc(image: ExeImage, name: str, target: AsmOperand): i64 {
     asm_byte(image, 15)
     asm_byte(image, code)
     asm_modrm(image, 3, 0, target.reg)
-    return 0
+    ret 0
 }
 fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperand): i64 {
     let count = 0
@@ -874,22 +874,22 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
         count = 2
     }
     if name == "mov" && count == 2 {
-        return asm_emit_mov(image, a, b)
+        ret asm_emit_mov(image, a, b)
     }
     if name == "lea" && count == 2 {
-        return asm_emit_lea(image, a, b)
+        ret asm_emit_lea(image, a, b)
     }
     if name == "movzx" && count == 2 {
-        return asm_emit_movzx(image, a, b)
+        ret asm_emit_movzx(image, a, b)
     }
     if (name == "add" || name == "sub" || name == "and" || name == "or" || name == "xor" || name == "cmp") && count == 2 {
-        return asm_emit_alu(image, name, a, b)
+        ret asm_emit_alu(image, name, a, b)
     }
     if name == "test" && count == 2 {
-        return asm_emit_test(image, a, b)
+        ret asm_emit_test(image, a, b)
     }
     if name == "imul" && count == 2 {
-        return asm_emit_imul(image, a, b)
+        ret asm_emit_imul(image, a, b)
     }
     if name == "call" && count == 1 {
         if a.kind != 4 {
@@ -898,13 +898,13 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
         asm_byte(image, 232)
         asm_reloc(image, 1, a.symbol, 0)
         asm_u32(image, 0)
-        return 0
+        ret 0
     }
     if name == "jmp" || asm_jump_code(name) >= 0 {
-        return asm_emit_jump(image, name, a)
+        ret asm_emit_jump(image, name, a)
     }
     if asm_setcc_code(name) >= 0 {
-        return asm_emit_setcc(image, name, a)
+        ret asm_emit_setcc(image, name, a)
     }
     if (name == "shl" || name == "shr" || name == "sar") && count == 2 {
         let ext = 4
@@ -918,7 +918,7 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
             asm_die("shift count must be cl")
         }
         asm_emit_group(image, 211, ext, a)
-        return 0
+        ret 0
     }
     if (name == "inc" || name == "dec") && count == 1 {
         let ext = 0
@@ -931,7 +931,7 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
         }
         a.width = width
         asm_emit_group(image, 255, ext, a)
-        return 0
+        ret 0
     }
     if (name == "div" || name == "idiv" || name == "neg") && count == 1 {
         let ext = 6
@@ -942,7 +942,7 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
             ext = 3
         }
         asm_emit_group(image, 247, ext, a)
-        return 0
+        ret 0
     }
     if (name == "push" || name == "pop") && count == 1 && a.kind == 1 {
         if a.reg >= 8 {
@@ -953,24 +953,24 @@ fun asm_emit_instruction(image: ExeImage, name: str, a: AsmOperand, b: AsmOperan
             opcode = 88
         }
         asm_byte(image, opcode + (a.reg & 7))
-        return 0
+        ret 0
     }
     if name == "ret" && count == 0 {
         asm_byte(image, 195)
-        return 0
+        ret 0
     }
     if name == "cqo" && count == 0 {
         asm_byte(image, 72)
         asm_byte(image, 153)
-        return 0
+        ret 0
     }
     if name == "rep" && count == 1 && a.kind == 4 && a.symbol == "stosd" {
         asm_byte(image, 243)
         asm_byte(image, 171)
-        return 0
+        ret 0
     }
     asm_die("unsupported instruction: " + name)
-    return 0
+    ret 0
 }
 
 fun asm_emit_data_value(image: ExeImage, width: i64, raw: str): i64 {
@@ -986,26 +986,26 @@ fun asm_emit_data_value(image: ExeImage, width: i64, raw: str): i64 {
         else {
             asm_u64(image, value)
         }
-        return 0
+        ret 0
     }
     if width != 8 {
         asm_die("symbol data value must be dq")
     }
     asm_reloc(image, 3, asm_qualify(image, text), 0)
     asm_u64(image, 0)
-    return 0
+    ret 0
 }
 fun asm_emit_data_list(image: ExeImage, width: i64, args: str): i64 {
     let start = 0
-    while start < args.len {
+    for start < args.len {
         let end = start
-        while end < args.len && args.data[end] != 44 {
+        for end < args.len && args.data[end] != 44 {
             end = end + 1
         }
         asm_emit_data_value(image, width, asm_slice(args, start, end))
         start = end + 1
     }
-    return 0
+    ret 0
 }
 fun asm_parse_data(image: ExeImage, line: str): i64 {
     let space = asm_find(line, 32)
@@ -1039,11 +1039,11 @@ fun asm_parse_data(image: ExeImage, line: str): i64 {
             asm_die("bad times directive: " + directive)
         }
         let i = 0
-        while i < count {
+        for i < count {
             asm_emit_data_value(image, width, value)
             i = i + 1
         }
-        return 1
+        ret 1
     }
     let width = 0
     if name == "db" {
@@ -1056,10 +1056,10 @@ fun asm_parse_data(image: ExeImage, line: str): i64 {
         width = 8
     }
     if width == 0 {
-        return 0
+        ret 0
     }
     asm_emit_data_list(image, width, args)
-    return 1
+    ret 1
 }
 fun asm_parse_inst_line(image: ExeImage, line: str): i64 {
     let space = asm_find(line, 32)
@@ -1084,7 +1084,7 @@ fun asm_parse_inst_line(image: ExeImage, line: str): i64 {
         }
     }
     asm_emit_instruction(image, name, a, b)
-    return 0
+    ret 0
 }
 fun asm_process_line(image: ExeImage, raw: str): i64 {
     let semi = asm_find(raw, 59)
@@ -1094,41 +1094,41 @@ fun asm_process_line(image: ExeImage, raw: str): i64 {
     }
     line = asm_trim(line)
     if line.len == 0 {
-        return 0
+        ret 0
     }
     if asm_starts(line, "global ") == 1 || line == "default rel" {
-        return 0
+        ret 0
     }
     if asm_starts(line, "extern ") == 1 {
         asm_extern(image, asm_trim(asm_slice(line, 7, line.len)))
-        return 0
+        ret 0
     }
     if line == "section .text" {
         image.section = 1
         image.scope = ""
-        return 0
+        ret 0
     }
     if line == "section .data" {
         image.section = 2
         image.scope = ""
-        return 0
+        ret 0
     }
     if line.data[line.len - 1] == 58 {
         asm_define(image, asm_trim(asm_slice(line, 0, line.len - 1)))
-        return 0
+        ret 0
     }
     if asm_parse_data(image, line) == 1 {
-        return 0
+        ret 0
     }
     if image.section != 1 {
         asm_die("instruction outside .text: " + line)
     }
     asm_parse_inst_line(image, line)
-    return 0
+    ret 0
 }
 fun asm_resolve_internal(image: ExeImage): i64 {
     let i = 0
-    while i < image.relocs.len {
+    for i < image.relocs.len {
         let r = image.relocs.data[i]
         let sym_index = r.symbol_index
         if sym_index < 0 || sym_index >= image.symbols.len {
@@ -1139,19 +1139,19 @@ fun asm_resolve_internal(image: ExeImage): i64 {
         }
         i = i + 1
     }
-    return 0
+    ret 0
 }
 fun assemble_text(src: str): ExeImage {
     let image = asm_image_new()
     let start = 0
-    while start < src.len {
+    for start < src.len {
         let end = start
-        while end < src.len && src.data[end] != 10 {
+        for end < src.len && src.data[end] != 10 {
             end = end + 1
         }
         asm_process_line(image, asm_slice(src, start, end))
         start = end + 1
     }
     asm_resolve_internal(image)
-    return image
+    ret image
 }

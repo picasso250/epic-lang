@@ -7,7 +7,7 @@ fun main(): void {
     buf.data[3] = 'c'
     buf.data[4] = 10
     let i = 0
-    while i < 5 {
+    for i < 5 {
         if buf.data[i] == 0 {
             os.ExitProcess(1)
         }
