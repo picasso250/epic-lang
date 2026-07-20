@@ -1,0 +1,7 @@
+# COMPILE_ERROR: reserved type name 'ptr'
+type ptr {
+    value: i64
+}
+
+fun main(): void {
+}

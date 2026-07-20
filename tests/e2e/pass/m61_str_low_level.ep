@@ -1,0 +1,11 @@
+# EXIT: 0
+fun main(): void {
+    let text = "abcd"
+    let middle = text[1:3]
+    let rebuilt = str_new(middle.data, middle.len)
+    let shifted = str_new(text.data + 1, 2)
+    if middle.len == 2 && rebuilt == "bc" && shifted == "bc" {
+        os.ExitProcess(0)
+    }
+    os.ExitProcess(1)
+}

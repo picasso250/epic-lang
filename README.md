@@ -12,11 +12,13 @@ surface; v4 is the dogfood generation for these additions.
 It also provides `is_null(reference)` for explicit zero-address tests without
 inserting implicit dereference checks. Dynamic arrays are opaque and use
 `len`, checked subscripting, `push`, `pop`, and `extend`; `str(byte_array)`
-copies a mutable byte array into an immutable string. Strings are opaque byte
-views: `s[start:end]` creates a zero-copy view, while array slicing copies the
+copies a mutable byte array into an immutable string. Strings are byte views:
+`s[start:end]` creates a zero-copy view, while array slicing copies the
 selected elements into an independent array. Raw C/Win32 string arguments use
 an explicit allocating `cstr(s)` conversion; Epic strings no longer promise a
-trailing NUL byte.
+trailing NUL byte. During the v3-to-v4 transition, `str.data`, `str.len`, and
+`str_new(ptr, len)` remain available low-level interfaces; v4 will dogfood
+slicing before closing them.
 It retains the self-contained AMD64 assembler,
 deterministic PE writer, and conservative garbage collector.
 

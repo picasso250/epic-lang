@@ -1,0 +1,6 @@
+# COMPILE_ERROR: unknown type 'ptr'
+fun expose(value: ptr): void {
+}
+
+fun main(): void {
+}

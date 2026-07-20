@@ -143,10 +143,12 @@ the opaque array mutation surface leaves room for a later copy-on-write
 implementation without changing observable behavior. `cstr(str)` is separate:
 it allocates a fresh byte region and appends the terminator required by C.
 
-The v3 source still uses private `str_new`, `.data`, and `.len` bridges in the
-files compiled by the v2 seed. Semantic analysis exposes those bridges only to
-the known compiler source paths. They are scheduled to disappear when v4 can
-dogfood slicing and `cstr()` directly.
+v3 keeps `str_new`, `.data`, and `.len` as uniform low-level string interfaces;
+there is no compiler-source path whitelist. Since `.data` is a computed
+`owner + offset` property, it remains correct for sliced strings. They are
+scheduled to disappear when v4 can dogfood slicing directly. Raw C/Win32 calls
+accept the single internal transparent `ptr` type, and `cstr(str)` returns that
+type after allocating and terminating a copy.
 
 ## Assembler and PE writer
 

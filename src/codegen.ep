@@ -222,8 +222,8 @@ fun type_never(): TypeInfo {
 fun type_str(): TypeInfo {
     ret type_info("str", "")
 }
-fun type_cstr(): TypeInfo {
-    ret type_info("cstr", "")
+fun type_ptr(): TypeInfo {
+    ret type_info("ptr", "")
 }
 fun type_struct(name: str): TypeInfo {
     ret type_info("struct", name)
@@ -278,8 +278,8 @@ fun user_type(name: str): TypeInfo {
     if name == "str" {
         ret type_str()
     }
-    if name == "cstr" {
-        ret type_cstr()
+    if name == "ptr" {
+        ret type_ptr()
     }
     if type_is_array(name) == 1 {
         ret type_array(array_element_type(name))
@@ -619,9 +619,6 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     if expr.resolved_type == "" {
         die("internal: expression has no checked type")
     }
-    if sema_is_pointer(expr.resolved_type) == 1 {
-        ret type_info("ptr", sema_pointer_element(expr.resolved_type))
-    }
     ret emitter_type(e, expr.resolved_type)
 }
 fun type_register(reg: i64, typ: TypeInfo): AsmOperand {
@@ -889,16 +886,6 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             emit_expr(e, arg)
             if arg_type.kind == "u8" || arg_type.kind == "bool" {
                 emit_widen_rax(e, arg_type, type_i64())
-            }
-            if arg_type.kind == "str" {
-                if sys_symbol == "WriteFile" && i == 1 {
-                    asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
-                    asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
-                    asm_add(e.program, asm_rax(), asm_rcx())
-                } else {
-                    asm_mov(e.program, asm_rcx(), asm_rax())
-                    emit_call_inst(e, "_cstr")
-                }
             }
             let slot = temp_save_rax(e)
             push(slots, slot)
@@ -1734,9 +1721,6 @@ fun field_layout_name(t: TypeInfo): str {
     if t.kind == "struct" {
         ret t.name
     }
-    if t.kind == "ptr" {
-        ret t.name
-    }
     ret ""
 }
 fun emit_field_address(e: EmitterState, object: AstExpr, name: str): TypeInfo {
@@ -1753,7 +1737,7 @@ fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): Type
     let elem_type = type_i64()
     if base_type.kind == "str" {
         elem_type = type_u8()
-    } else if base_type.kind == "array" || base_type.kind == "ptr" {
+    } else if base_type.kind == "array" {
         elem_type = emitter_type(e, base_type.name)
     } else {
         die("internal: checked subscript has invalid base")
@@ -1807,6 +1791,13 @@ fun is_enum_member_access(e: EmitterState, expr: AstExpr): i64 {
 fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
     if is_enum_member_access(e, expr) == 1 {
         asm_mov(e.program, asm_rax(), asm_imm(parse_integer(expr.value)))
+        ret 0
+    }
+    if expr_type(e, expr.object).kind == "str" && expr.name == "data" {
+        emit_expr(e, expr.object)
+        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
+        asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
+        asm_add(e.program, asm_rax(), asm_rcx())
         ret 0
     }
     let field_type = emit_field_address(e, expr.object, expr.name)

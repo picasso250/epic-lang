@@ -1,4 +1,4 @@
-# COMPILE_ERROR: argument 1 of 'os.lstrlenA' expects cstr, got str
+# COMPILE_ERROR: argument 1 of 'os.lstrlenA' expects ptr, got str
 fun main(): void {
     print(itoa(os.lstrlenA("abc")))
 }

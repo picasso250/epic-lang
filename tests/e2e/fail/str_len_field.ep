@@ -1,5 +1,0 @@
-# COMPILE_ERROR: type str has no field 'len'
-fun main(): void {
-    let text = "abc"
-    print(itoa(text.len))
-}
