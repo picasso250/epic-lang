@@ -13,7 +13,6 @@ fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): void {
     t.text = text
     t.line = line
     push(tokens, t)
-    ret
 }
 fun is_alpha(c: i64): bool {
     (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95
@@ -420,7 +419,6 @@ fun dump_tokens(tokens: Token[]): void {
         print(itoa(t.line))
         print("\n")
     }
-    ret
 }
 fun main(): void {
     if len(argv) < 2 {

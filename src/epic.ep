@@ -12,14 +12,12 @@ fun die_driver(msg: str): void {
     print(msg)
     print("\n")
     exit(1)
-    ret
 }
 fun write_output(path: str, data: u8[]): void {
     let written = write_file(path, data)
     if written != len(data) {
         die_driver("failed to write output file '" + path + "'")
     }
-    ret
 }
 fun print_timing(verbose: bool, label: str, elapsed: i64): void {
     if verbose {
@@ -29,7 +27,6 @@ fun print_timing(verbose: bool, label: str, elapsed: i64): void {
         print(itoa(elapsed))
         print(" ms\n")
     }
-    ret
 }
 fun parse_file(path: str): AstProgram {
     let src = read_file(path)
@@ -59,7 +56,6 @@ fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): void {
             push(out.funcs, f)
         }
     }
-    ret
 }
 fun merge_inputs(inputs: str[]): AstProgram {
     let out = ast_program()

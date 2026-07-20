@@ -40,7 +40,6 @@ fun sema_error(path: str, line: i64, message: str): void {
     print(message)
     print("\n")
     exit(1)
-    ret
 }
 fun sema_duplicate(path: str, line: i64, what: str, first: str): void {
     print(path)
@@ -52,7 +51,6 @@ fun sema_duplicate(path: str, line: i64, what: str, first: str): void {
     print(first)
     print("\n")
     exit(1)
-    ret
 }
 fun sema_state(): SemaState {
     let state = new SemaState
@@ -131,7 +129,6 @@ fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: 
     if !sema_type_exists(state, type_name) {
         sema_error(path, line, "unknown type '" + type_name + "'")
     }
-    ret
 }
 fun sema_signature(name: str, return_type: str): SemaSignature {
     let sig = new SemaSignature
@@ -144,7 +141,6 @@ fun sema_signature(name: str, return_type: str): SemaSignature {
 }
 fun sema_add_builtin(state: SemaState, sig: SemaSignature): void {
     push(state.funcs, sig)
-    ret
 }
 fun sema_add_builtins(state: SemaState): void {
     let sig = sema_signature("print", "void")
@@ -194,7 +190,6 @@ fun sema_add_builtins(state: SemaState): void {
     sema_add_builtin(state, sig)
     sig = sema_signature("embed", "u8[]")
     sema_add_builtin(state, sig)
-    ret
 }
 fun sema_add_os_signatures(state: SemaState): void {
     let sig = sema_signature("os.Sleep", "void")
@@ -269,7 +264,6 @@ fun sema_add_os_signatures(state: SemaState): void {
     push(sig.param_types, "ptr")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
-    ret
 }
 fun sema_collect_type_names(state: SemaState, ast: AstProgram): void {
     let i = 0
@@ -308,7 +302,6 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): void {
         push(state.types, enum_decl)
         i += 1
     }
-    ret
 }
 fun sema_validate_enums(state: SemaState, ast: AstProgram): void {
     let i = 0
@@ -329,7 +322,6 @@ fun sema_validate_enums(state: SemaState, ast: AstProgram): void {
         }
         i += 1
     }
-    ret
 }
 fun sema_validate_structs(state: SemaState, ast: AstProgram): void {
     let i = 0
@@ -351,7 +343,6 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): void {
         }
         i += 1
     }
-    ret
 }
 fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
     let i = 0
@@ -398,7 +389,6 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
         push(state.funcs, sig)
         i += 1
     }
-    ret
 }
 fun sema_validate_main(state: SemaState): void {
     let main_sig = sema_find_func(state, "main")
@@ -408,7 +398,6 @@ fun sema_validate_main(state: SemaState): void {
     if main_sig.return_type != "void" || len(main_sig.param_types) != 0 {
         sema_error(main_sig.source_path, main_sig.line, "main must have signature fun main(): void")
     }
-    ret
 }
 fun sema_find_struct(state: SemaState, name: str): AstStructDef {
     let i = 0
@@ -501,7 +490,6 @@ fun sema_add_local(state: SemaState, name: str, type_name: str, line: i64): void
     local.depth = state.scope_depth
     local.active = true
     push(state.locals, local)
-    ret
 }
 fun sema_leave_scope(state: SemaState): void {
     let i = 0
@@ -512,7 +500,6 @@ fun sema_leave_scope(state: SemaState): void {
         i += 1
     }
     state.scope_depth -= 1
-    ret
 }
 fun sema_is_reference_value(state: SemaState, type_name: str): bool {
     if type_name == "str" || type_name == "ptr" || type_is_array(type_name) {
@@ -755,19 +742,16 @@ fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): void {
     if expr.resolved_type != "i64" && expr.resolved_type != "never" {
         sema_error(state.source_path, expr.line, context + " requires i64, got " + expr.resolved_type)
     }
-    ret
 }
 fun sema_require_condition(state: SemaState, expr: AstExpr, context: str): void {
     if expr.resolved_type != "bool" && expr.resolved_type != "never" {
         sema_error(state.source_path, expr.line, context + " requires bool, got " + expr.resolved_type)
     }
-    ret
 }
 fun sema_require_integer(state: SemaState, expr: AstExpr, context: str): void {
     if !sema_is_integer(expr.resolved_type) && expr.resolved_type != "never" {
         sema_error(state.source_path, expr.line, context + " requires an integer, got " + expr.resolved_type)
     }
-    ret
 }
 fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     if base_type == "str" {
@@ -1347,7 +1331,6 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): void {
             }
         }
     }
-    ret
 }
 fun sema_check_assign_op(state: SemaState, stmt: AstStmt): void {
     let target_type = sema_assign_target_type(state, stmt.target, stmt.line, true)
@@ -1388,7 +1371,6 @@ fun sema_check_assign_op(state: SemaState, stmt: AstStmt): void {
             sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + operator_text(stmt.op))
         }
     }
-    ret
 }
 fun sema_check_return(state: SemaState, stmt: AstStmt): void {
     match stmt.return_value.kind {
@@ -1407,7 +1389,6 @@ fun sema_check_return(state: SemaState, stmt: AstStmt): void {
             }
         }
     }
-    ret
 }
 fun sema_check_for_range(state: SemaState, stmt: AstStmt): void {
     sema_check_expr(state, stmt.range_start)
@@ -1419,7 +1400,6 @@ fun sema_check_for_range(state: SemaState, stmt: AstStmt): void {
     state.locals[len(state.locals) - 1].read_only = true
     sema_check_block(state, stmt.body)
     sema_leave_scope(state)
-    ret
 }
 fun sema_check_stmt(state: SemaState, stmt: AstStmt): str {
     match stmt.kind {
@@ -1537,7 +1517,6 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): void {
         }
         i += 1
     }
-    ret
 }
 fun sema_check(ast: AstProgram): void {
     let state = sema_state()
@@ -1550,5 +1529,4 @@ fun sema_check(ast: AstProgram): void {
     sema_collect_functions(state, ast)
     sema_validate_main(state)
     sema_check_bodies(state, ast)
-    ret
 }

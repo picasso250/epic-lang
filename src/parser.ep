@@ -399,7 +399,6 @@ fun parse_error(line: i64, msg: str): void {
     print(msg)
     print("\n")
     exit(1)
-    ret
 }
 fun expect(p: Parser, kind: TokenKind): Token {
     let t = advance(p)
@@ -431,7 +430,6 @@ fun skip_newlines(p: Parser): void {
     while peek_kind(p, TokenKind.NEWLINE) {
         advance(p)
     }
-    ret
 }
 fun expect_stmt_end(p: Parser): void {
     if check(p, TokenKind.NEWLINE) {
@@ -440,7 +438,6 @@ fun expect_stmt_end(p: Parser): void {
     }
     let t = peek(p)
     parse_error(t.line, "Expected end of line")
-    ret
 }
 fun parse_type(p: Parser): str {
     let t = advance(p)
