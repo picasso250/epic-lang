@@ -248,16 +248,7 @@ fun type_is_signed(t: TypeInfo): bool {
     ret sema_is_signed_integer(t.kind)
 }
 fun type_is_complex(t: TypeInfo): bool {
-    if t.kind == "str" {
-        ret true
-    }
-    if t.kind == "struct" {
-        ret true
-    }
-    if t.kind == "array" {
-        ret true
-    }
-    ret false
+    ret t.kind == "str" || t.kind == "struct" || t.kind == "array"
 }
 fun user_type(name: str): TypeInfo {
     if sema_is_integer(name) {

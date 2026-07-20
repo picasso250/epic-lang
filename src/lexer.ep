@@ -16,22 +16,13 @@ fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): i64 {
     ret 0
 }
 fun is_alpha(c: i64): bool {
-    if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 {
-        ret true
-    }
-    ret false
+    ret (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95
 }
 fun is_alnum(c: i64): bool {
-    if is_alpha(c) || (c >= 48 && c <= 57) {
-        ret true
-    }
-    ret false
+    ret is_alpha(c) || (c >= 48 && c <= 57)
 }
 fun is_digit(c: i64): bool {
-    if c >= 48 && c <= 57 {
-        ret true
-    }
-    ret false
+    ret c >= 48 && c <= 57
 }
 fun is_hex_digit(c: i64): bool {
     ret digit_value(c) >= 0

@@ -385,11 +385,7 @@ fun peek(p: Parser): Token {
     ret p.eof
 }
 fun peek_kind(p: Parser, kind: TokenKind): bool {
-    let t = peek(p)
-    if t.kind == kind {
-        ret true
-    }
-    ret false
+    ret peek(p).kind == kind
 }
 fun advance(p: Parser): Token {
     let t = peek(p)

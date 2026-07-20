@@ -885,10 +885,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     ret 0
 }
 fun asm_force_rex8(op: AsmOperand): bool {
-    if op.kind == AsmOperandKind.Register && op.reg >= 4 {
-        ret true
-    }
-    ret false
+    ret op.kind == AsmOperandKind.Register && op.reg >= 4
 }
 fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperand): i64 {
     let base = rm.reg

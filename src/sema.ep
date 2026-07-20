@@ -87,10 +87,7 @@ fun sema_is_integer(type_name: str): bool {
     ret false
 }
 fun sema_is_signed_integer(type_name: str): bool {
-    if type_name == "i8" || type_name == "i16" || type_name == "i32" || type_name == "i64" {
-        ret true
-    }
-    ret false
+    ret type_name == "i8" || type_name == "i16" || type_name == "i32" || type_name == "i64"
 }
 fun sema_integer_bits(type_name: str): i64 {
     if type_name == "i8" || type_name == "u8" {
@@ -108,19 +105,10 @@ fun sema_integer_bits(type_name: str): i64 {
     ret 0
 }
 fun sema_is_primitive_type(type_name: str): bool {
-    if sema_is_integer(type_name) || type_name == "bool" || type_name == "str" || type_name == "void" {
-        ret true
-    }
-    ret false
+    ret sema_is_integer(type_name) || type_name == "bool" || type_name == "str" || type_name == "void"
 }
 fun sema_type_exists(state: SemaState, type_name: str): bool {
-    if sema_is_primitive_type(type_name) {
-        ret true
-    }
-    if sema_find_type(state, type_name).name != "" {
-        ret true
-    }
-    ret false
+    ret sema_is_primitive_type(type_name) || sema_find_type(state, type_name).name != ""
 }
 fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: str): void {
     if type_name == "void" {
@@ -811,16 +799,10 @@ fun sema_needs_integer_context(expr: AstExpr): bool {
     ret false
 }
 fun sema_legacy_i64_pair(left: str, right: str): bool {
-    if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") {
-        ret true
-    }
-    ret false
+    ret (left == "i64" && right == "u8") || (left == "u8" && right == "i64")
 }
 fun sema_matching_integers(left: str, right: str): bool {
-    if left == right && sema_is_integer(left) {
-        ret true
-    }
-    ret sema_legacy_i64_pair(left, right)
+    ret (left == right && sema_is_integer(left)) || sema_legacy_i64_pair(left, right)
 }
 fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
     let left = ""
