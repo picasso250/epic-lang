@@ -55,10 +55,6 @@ not use. The user-visible language changes introduced in v3 are:
 - the compiler has an internal bottom type named `never`. `exit(code)` has this
   type, so a branch that exits is compatible with any normally produced value.
   User code cannot write `never` in a declaration;
-- the v2 built-in `str_replace_char(s: str, from: u8, to: u8): str` has been
-  removed. Code that needs byte replacement must perform it explicitly, for
-  example by copying with `bytes`, mutating the byte array, and constructing a
-  new string with `str(array)`;
 - distinct `bool` values with `true` and `false`, plus `i8`, `u8`, `i16`,
   `u16`, `i32`, `u32`, `i64`, and `u64` integers;
 - integer suffixes such as `42u32`, contextual unsuffixed literals, explicit
