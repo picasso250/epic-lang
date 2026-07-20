@@ -198,14 +198,14 @@ class Parser:
 
     def parse_stmt(self):
         t = self.peek()
-        if t[0] == "RETURN":
-            return self.parse_return_stmt()
+        if t[0] == "RET":
+            return self.parse_ret_stmt()
         if t[0] == "LET":
             return self.parse_let_stmt()
         if t[0] == "IF":
             return self.parse_if_stmt()
-        if t[0] == "WHILE":
-            return self.parse_while_stmt()
+        if t[0] == "FOR":
+            return self.parse_for_stmt()
         if t[0] == "BREAK":
             return self.parse_break_stmt()
         if t[0] == "CONTINUE":
@@ -217,9 +217,9 @@ class Parser:
             return self.parse_expr_stmt()
         raise ParseError(f"Unexpected token {t[0]} in statement", t[2])
 
-    def parse_return_stmt(self):
+    def parse_ret_stmt(self):
         line = self.peek()[2]
-        self.expect("RETURN")
+        self.expect("RET")
         expr = None
         if not self.peek_kind("NEWLINE"):
             expr = self.parse_expr()
@@ -277,8 +277,8 @@ class Parser:
                 else_block = self.parse_block()
         return IfNode(cond=cond, then_block=then_block, else_block=else_block)
 
-    def parse_while_stmt(self):
-        self.expect("WHILE")
+    def parse_for_stmt(self):
+        self.expect("FOR")
         cond = self.parse_expr()
         self.loop_depth += 1
         body = self.parse_block()

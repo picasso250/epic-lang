@@ -29,6 +29,10 @@ def main():
     expect_rejected("struct Point {\nx: i64\n}\nfun main(): void {\n}\n")
     expect_rejected("type Expr = Lit | Add\nfun main(): void {\n}\n")
 
+    parse("fun choose(x: i64): i64 {\nfor x {\nret x\n}\nret 0\n}\n")
+    expect_rejected("fun main(): void {\nreturn\n}\n")
+    expect_rejected("fun main(): void {\nwhile 1 {\n}\n}\n")
+
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
         source = root / "main.ep"

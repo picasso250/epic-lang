@@ -5,7 +5,7 @@ type FunctionPoint {
     y: i64
 }
 fun sum(p: FunctionPoint): i64 {
-    return p.x + p.y
+    ret p.x + p.y
 }
 fun main(): void {
     let p = new FunctionPoint
