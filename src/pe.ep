@@ -141,7 +141,7 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
     while i < image.relocs.len {
         let r = image.relocs.data[i]
         if r.symbol_index < 0 || r.symbol_index >= image.symbols.len {
-            pe_die("unresolved relocation symbol: " + r.symbol)
+            pe_die("invalid relocation symbol index")
         }
         let sym = image.symbols.data[r.symbol_index]
         if sym.external == 1 && pe_import_find(out, sym.name) < 0 {
@@ -281,7 +281,7 @@ fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): i64 {
     while i < image.relocs.len {
         let r = image.relocs.data[i]
         if r.symbol_index < 0 || r.symbol_index >= image.symbols.len {
-            pe_die("unresolved relocation symbol: " + r.symbol)
+            pe_die("invalid relocation symbol index")
         }
         let sym = image.symbols.data[r.symbol_index]
         let target = 0

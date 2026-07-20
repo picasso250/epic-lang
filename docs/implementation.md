@@ -67,7 +67,15 @@ repository `runtime` directory.
 
 `src/asm.ep` parses the compiler's private assembly subset and encodes AMD64
 instructions into text and data sections. It records symbols and relocations
-needed by the executable writer.
+needed by the executable writer. Symbol names are interned through a fixed
+hash table on first reference, including forward references. Relocations carry
+the resulting stable symbol index immediately; the final resolution pass only
+checks that every indexed symbol was defined instead of repeating linear
+name searches.
+
+This removes repeated linear symbol-name scans from both forward-reference
+handling and relocation resolution. Symbol identity is established once and
+then carried by index through assembly encoding and PE writing.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
 sections, imports, and relocations. Determinism is part of the bootstrap
