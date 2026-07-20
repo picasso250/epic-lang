@@ -345,6 +345,11 @@ In v0, `os` is not a module, package, object, or namespace value. Calls such as 
 success. It returns zero on failure, including when the directory already
 exists.
 
+`cstr(s)` creates a fresh NUL-terminated byte region for explicit C-string
+interop. Its result has the internal `ptr` type; `ptr` cannot be written in
+source declarations. v2 continues accepting `str` directly at legacy Win32
+string parameters so the v1-written compiler source remains bootstrapable.
+
 General method calls are not supported in v0.
 
 ## Program exit
@@ -372,6 +377,7 @@ to declare them.
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
+| `cstr(s: str): ptr` | copies all bytes into a fresh allocation and appends NUL; `ptr` is internal |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |

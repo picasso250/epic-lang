@@ -246,6 +246,7 @@ fun emit_runtime(e: EmitterState, source: u8[]): i64 {
 fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/gc.asm"))
     emit_runtime(e, embed("../runtime/str_alloc.asm"))
+    emit_runtime(e, embed("../runtime/cstr.asm"))
     emit_runtime(e, embed("../runtime/bytes.asm"))
     emit_runtime(e, embed("../runtime/str_cat.asm"))
     emit_runtime(e, embed("../runtime/str_slice.asm"))
@@ -354,6 +355,9 @@ fun user_type(name: str): TypeInfo {
     }
     if name == "str" {
         return type_str()
+    }
+    if name == "ptr" {
+        return type_info("ptr", "")
     }
     if is_array_type_name(name) == 1 {
         return type_array(array_elem_name(name))
@@ -838,6 +842,12 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_mov(e, "rcx", "[rax]")
         emit_mov(e, "rdx", "[rax+8]")
         emit_call_inst(e, "_str_alloc")
+        return 0
+    }
+    if name == "cstr" {
+        emit_expr(e, expr.args.data[0])
+        emit_mov(e, "rcx", "rax")
+        emit_call_inst(e, "_cstr")
         return 0
     }
     if name == "len" {

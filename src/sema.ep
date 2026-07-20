@@ -154,6 +154,9 @@ fun sema_add_builtins(state: SemaState): i64 {
     sig = sema_signature("str", "str")
     push(sig.param_types, "u8[]")
     sema_add_builtin(state, sig)
+    sig = sema_signature("cstr", "ptr")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
     sig = sema_signature("len", "i64")
     push(sig.param_types, "lenable")
     sema_add_builtin(state, sig)
@@ -211,11 +214,11 @@ fun sema_add_os_signatures(state: SemaState): i64 {
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.lstrlenA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr_source")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.lstrcmpA", "i64")
-    push(sig.param_types, "str")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr_source")
+    push(sig.param_types, "cstr_source")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.MessageBoxA", "i64")
     push(sig.param_types, "i64")
@@ -237,14 +240,14 @@ fun sema_add_os_signatures(state: SemaState): i64 {
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.GetFileAttributesA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr_source")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.CreateDirectoryA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr_source")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
     sig = sema_signature("os.CreateFileA", "i64")
-    push(sig.param_types, "str")
+    push(sig.param_types, "cstr_source")
     push(sig.param_types, "i64")
     push(sig.param_types, "i64")
     push(sig.param_types, "i64")
@@ -272,8 +275,8 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     while i < ast.structs.len {
         let node = ast.structs.data[i]
-        if node.name == "os" {
-            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
+        if node.name == "os" || node.name == "ptr" {
+            sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
         }
         let first = sema_find_type(state, node.name)
         if first.name != "" {
@@ -290,8 +293,8 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     i = 0
     while i < ast.enums.len {
         let enum_node = ast.enums.data[i]
-        if enum_node.name == "os" {
-            sema_error(enum_node.source_path, enum_node.line, "'os' is a reserved namespace")
+        if enum_node.name == "os" || enum_node.name == "ptr" {
+            sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
         }
         let enum_first = sema_find_type(state, enum_node.name)
         if enum_first.name != "" {
@@ -538,7 +541,10 @@ fun sema_assignable(expected: str, actual: str): i64 {
     if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
         return 1
     }
-    if expected == "cstr_or_null" && (actual == "str" || actual == "i64") {
+    if expected == "cstr_source" && (actual == "str" || actual == "ptr") {
+        return 1
+    }
+    if expected == "cstr_or_null" && (actual == "str" || actual == "ptr" || actual == "i64") {
         return 1
     }
     if expected == "buffer_ptr" && (actual == "str" || sema_is_pointer(actual) == 1) {
