@@ -1,0 +1,5 @@
+# COMPILE_ERROR: Unexpected token in statement
+fun main(): void {
+    while true {
+    }
+}

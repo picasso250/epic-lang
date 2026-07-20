@@ -79,7 +79,7 @@ fun parse_driver_options(): DriverOptions {
     options.output_path = ""
     options.inputs = new str[]
     let i = 1
-    while i < len(argv) {
+    for i < len(argv) {
         let arg = argv[i]
         if arg == "-S" {
             options.emit_asm = 1

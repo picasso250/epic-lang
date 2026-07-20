@@ -39,7 +39,7 @@ fun parse_integer(text: str): i64 {
         i += 2
     }
     let value = 0
-    while i < len(text) {
+    for i < len(text) {
         value = value * base + digit_value(text[i])
         i += 1
     }

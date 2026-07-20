@@ -419,7 +419,7 @@ fun expect(p: Parser, kind: TokenKind): Token {
 }
 fun expect_enum_member(p: Parser): Token {
     let t = advance(p)
-    if t.kind != TokenKind.ID && t.kind != TokenKind.FUN && t.kind != TokenKind.RETURN && t.kind != TokenKind.IF && t.kind != TokenKind.ELSE && t.kind != TokenKind.WHILE && t.kind != TokenKind.FOR && t.kind != TokenKind.BREAK && t.kind != TokenKind.CONTINUE && t.kind != TokenKind.TYPE && t.kind != TokenKind.NEW && t.kind != TokenKind.LET && t.kind != TokenKind.MATCH {
+    if t.kind != TokenKind.ID && t.kind != TokenKind.FUN && t.kind != TokenKind.RETURN && t.kind != TokenKind.IF && t.kind != TokenKind.ELSE && t.kind != TokenKind.FOR && t.kind != TokenKind.BREAK && t.kind != TokenKind.CONTINUE && t.kind != TokenKind.TYPE && t.kind != TokenKind.NEW && t.kind != TokenKind.LET && t.kind != TokenKind.MATCH {
         parse_error(t.line, "Expected enum member")
     }
     ret t
@@ -432,7 +432,7 @@ fun check(p: Parser, kind: TokenKind): i64 {
     ret 0
 }
 fun skip_newlines(p: Parser): i64 {
-    while peek_kind(p, TokenKind.NEWLINE) == 1 {
+    for peek_kind(p, TokenKind.NEWLINE) == 1 {
         advance(p)
     }
     ret 0
@@ -452,7 +452,7 @@ fun parse_type(p: Parser): str {
         parse_error(t.line, "Expected type")
     }
     let typ = t.text
-    while check(p, TokenKind.LBRACKET) == 1 {
+    for check(p, TokenKind.LBRACKET) == 1 {
         expect(p, TokenKind.RBRACKET)
         typ = typ + "[]"
     }
@@ -464,7 +464,7 @@ fun parse_params(p: Parser): AstParam[] {
         ret params
     }
     let done = 0
-    while !done {
+    for !done {
         let pname = expect(p, TokenKind.ID)
         expect(p, TokenKind.COLON)
         let ptype = parse_type(p)
@@ -492,7 +492,7 @@ fun parse_struct_def(p: Parser): AstStructDef {
     node.fields = new AstStructField[]
     expect(p, TokenKind.LBRACE)
     skip_newlines(p)
-    while !peek_kind(p, TokenKind.RBRACE) {
+    for !peek_kind(p, TokenKind.RBRACE) {
         let fname = expect(p, TokenKind.ID)
         expect(p, TokenKind.COLON)
         let ftype = parse_type(p)
@@ -524,7 +524,7 @@ fun parse_enum_def(p: Parser): AstEnumDef {
         parse_error(first.line, "enum requires at least two members")
     }
     let done = 0
-    while !done {
+    for !done {
         let item = expect_enum_member(p)
         let next_member = new AstEnumMember
         next_member.name = item.text
@@ -558,7 +558,7 @@ fun parse_fn_def(p: Parser): AstFunDef {
 fun parse_program(p: Parser): AstProgram {
     let node = ast_program()
     skip_newlines(p)
-    while peek_kind(p, TokenKind.FUN) == 1 || peek_kind(p, TokenKind.TYPE) == 1 {
+    for peek_kind(p, TokenKind.FUN) == 1 || peek_kind(p, TokenKind.TYPE) == 1 {
         if peek_kind(p, TokenKind.FUN) == 1 {
             push(node.funcs, parse_fn_def(p))
         } else {
@@ -580,7 +580,7 @@ fun parse_block(p: Parser): AstBlock {
     let node = ast_block()
     expect(p, TokenKind.LBRACE)
     skip_newlines(p)
-    while !peek_kind(p, TokenKind.RBRACE) {
+    for !peek_kind(p, TokenKind.RBRACE) {
         if peek_kind(p, TokenKind.EOF) == 1 {
             let t = peek(p)
             parse_error(t.line, "Unexpected end of file in block")
@@ -598,7 +598,7 @@ fun parse_block(p: Parser): AstBlock {
 fun skip_balanced_brackets(p: Parser, i: i64): i64 {
     let depth = 1
     i += 1
-    while i < len(p.tokens) && depth > 0 {
+    for i < len(p.tokens) && depth > 0 {
         let kind = p.tokens[i].kind
         if kind == TokenKind.LBRACKET {
             depth += 1
@@ -614,7 +614,7 @@ fun is_assignment(p: Parser): i64 {
         ret 0
     }
     let i = p.pos + 1
-    while i < len(p.tokens) {
+    for i < len(p.tokens) {
         let kind = p.tokens[i].kind
         if kind == TokenKind.DOT {
             if i + 1 >= len(p.tokens) || p.tokens[i + 1].kind != TokenKind.ID {
@@ -716,7 +716,7 @@ fun parse_assign_stmt(p: Parser): AstStmt {
     let name = expect(p, TokenKind.ID)
     let lhs = ast_var(name.text, name.line)
     let done = 0
-    while !done {
+    for !done {
         if check(p, TokenKind.DOT) == 1 {
             let field = expect(p, TokenKind.ID)
             lhs = ast_field_access(lhs, field.text, field.line)
@@ -766,14 +766,6 @@ fun parse_if_expr(p: Parser): AstExpr {
     }
     ret ast_if(condition, then_block, else_block, keyword.line)
 }
-fun parse_while_stmt(p: Parser): AstStmt {
-    let keyword = expect(p, TokenKind.WHILE)
-    let condition = parse_expr(p)
-    p.loop_depth += 1
-    let body = parse_block(p)
-    p.loop_depth -= 1
-    ret ast_while(condition, body, keyword.line)
-}
 fun parse_for_range_stmt(p: Parser): AstStmt {
     let keyword = expect(p, TokenKind.FOR)
     let name = expect(p, TokenKind.ID)
@@ -803,7 +795,7 @@ fun parse_match_expr(p: Parser): AstExpr {
     let arms = new AstMatchArm[]
     expect(p, TokenKind.LBRACE)
     skip_newlines(p)
-    while !peek_kind(p, TokenKind.RBRACE) {
+    for !peek_kind(p, TokenKind.RBRACE) {
         let arm = new AstMatchArm
         let arm_start = peek(p)
         if check(p, TokenKind.ELSE) == 1 {
@@ -886,9 +878,6 @@ fun parse_stmt(p: Parser): AstStmt {
         }
         TokenKind.IF {
             ret parse_expr_stmt(p)
-        }
-        TokenKind.WHILE {
-            ret parse_while_stmt(p)
         }
         TokenKind.FOR {
             ret parse_for_stmt(p)
@@ -1077,7 +1066,7 @@ fun parse_args(p: Parser): AstExpr[] {
     let args = new AstExpr[]
     if !peek_kind(p, TokenKind.RPAREN) {
         push(args, parse_expr(p))
-        while check(p, TokenKind.COMMA) == 1 {
+        for check(p, TokenKind.COMMA) == 1 {
             push(args, parse_expr(p))
         }
     }
@@ -1086,7 +1075,7 @@ fun parse_args(p: Parser): AstExpr[] {
 fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
     let current = node
     let done = 0
-    while !done {
+    for !done {
         if check(p, TokenKind.DOT) == 1 {
             let field = expect_enum_member(p)
             if check(p, TokenKind.LPAREN) == 1 {
@@ -1132,7 +1121,7 @@ fun embed_resolve_path(source_path: str, path: str): str {
         ret path
     }
     let i = len(source_path)
-    while i > 0 {
+    for i > 0 {
         i -= 1
         if source_path[i] == 47 || source_path[i] == 92 {
             if i == 0 {
@@ -1230,7 +1219,7 @@ fun parse_unary(p: Parser): AstExpr {
 }
 fun parse_factor(p: Parser): AstExpr {
     let left = parse_unary(p)
-    while peek_kind(p, TokenKind.STAR) == 1 || peek_kind(p, TokenKind.SLASH) == 1 || peek_kind(p, TokenKind.PERCENT) == 1 {
+    for peek_kind(p, TokenKind.STAR) == 1 || peek_kind(p, TokenKind.SLASH) == 1 || peek_kind(p, TokenKind.PERCENT) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_unary(p))
     }
@@ -1238,7 +1227,7 @@ fun parse_factor(p: Parser): AstExpr {
 }
 fun parse_term(p: Parser): AstExpr {
     let left = parse_factor(p)
-    while peek_kind(p, TokenKind.PLUS) == 1 || peek_kind(p, TokenKind.MINUS) == 1 {
+    for peek_kind(p, TokenKind.PLUS) == 1 || peek_kind(p, TokenKind.MINUS) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_factor(p))
     }
@@ -1246,7 +1235,7 @@ fun parse_term(p: Parser): AstExpr {
 }
 fun parse_shift(p: Parser): AstExpr {
     let left = parse_term(p)
-    while peek_kind(p, TokenKind.SHL) == 1 || peek_kind(p, TokenKind.SHR) == 1 {
+    for peek_kind(p, TokenKind.SHL) == 1 || peek_kind(p, TokenKind.SHR) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_term(p))
     }
@@ -1254,7 +1243,7 @@ fun parse_shift(p: Parser): AstExpr {
 }
 fun parse_comparison(p: Parser): AstExpr {
     let left = parse_shift(p)
-    while peek_kind(p, TokenKind.LT) == 1 || peek_kind(p, TokenKind.GT) == 1 || peek_kind(p, TokenKind.LTE) == 1 || peek_kind(p, TokenKind.GTE) == 1 {
+    for peek_kind(p, TokenKind.LT) == 1 || peek_kind(p, TokenKind.GT) == 1 || peek_kind(p, TokenKind.LTE) == 1 || peek_kind(p, TokenKind.GTE) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_shift(p))
     }
@@ -1262,7 +1251,7 @@ fun parse_comparison(p: Parser): AstExpr {
 }
 fun parse_equality(p: Parser): AstExpr {
     let left = parse_comparison(p)
-    while peek_kind(p, TokenKind.EQEQ) == 1 || peek_kind(p, TokenKind.NEQ) == 1 {
+    for peek_kind(p, TokenKind.EQEQ) == 1 || peek_kind(p, TokenKind.NEQ) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_comparison(p))
     }
@@ -1270,7 +1259,7 @@ fun parse_equality(p: Parser): AstExpr {
 }
 fun parse_logic_and(p: Parser): AstExpr {
     let left = parse_bit_or(p)
-    while peek_kind(p, TokenKind.AND) == 1 {
+    for peek_kind(p, TokenKind.AND) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_bit_or(p))
     }
@@ -1278,7 +1267,7 @@ fun parse_logic_and(p: Parser): AstExpr {
 }
 fun parse_bit_and(p: Parser): AstExpr {
     let left = parse_equality(p)
-    while peek_kind(p, TokenKind.AMPERSAND) == 1 {
+    for peek_kind(p, TokenKind.AMPERSAND) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_equality(p))
     }
@@ -1286,7 +1275,7 @@ fun parse_bit_and(p: Parser): AstExpr {
 }
 fun parse_bit_or(p: Parser): AstExpr {
     let left = parse_bit_and(p)
-    while peek_kind(p, TokenKind.BIT_OR) == 1 {
+    for peek_kind(p, TokenKind.BIT_OR) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_bit_and(p))
     }
@@ -1294,7 +1283,7 @@ fun parse_bit_or(p: Parser): AstExpr {
 }
 fun parse_expr(p: Parser): AstExpr {
     let left = parse_logic_and(p)
-    while peek_kind(p, TokenKind.OR) == 1 {
+    for peek_kind(p, TokenKind.OR) == 1 {
         let op = advance(p)
         left = bin_node(op, left, parse_logic_and(p))
     }

@@ -831,7 +831,7 @@ fun emit_epilogue(e: EmitterState): void {
 fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
     let slots = new i64[]
     let i = 0
-    while i < len(args) {
+    for i < len(args) {
         emit_expr(e, args[i])
         push(slots, temp_save_rax(e))
         i += 1
@@ -856,7 +856,7 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
 fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
     let slots = new i64[]
     let i = 0
-    while i < len(args) {
+    for i < len(args) {
         emit_expr_as(e, args[i], emitter_type(e, info.params[i].type_name))
         push(slots, temp_save_rax(e))
         i += 1
@@ -880,7 +880,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
-        while i < len(expr.args) {
+        for i < len(expr.args) {
             let arg = expr.args[i]
             let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
@@ -900,7 +900,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         let frame = 32 + extra_frame
         asm_sub(e.program, asm_rsp(), asm_imm(frame))
         i = 4
-        while i < len(slots) {
+        for i < len(slots) {
             emit_stack_load(e, asm_rax(), slots[i])
             asm_mov(e.program, asm_mem_base(0, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
             i += 1
@@ -2168,7 +2168,7 @@ fun emit_block(e: EmitterState, block: AstBlock): i64 {
         ret 0
     }
     let i = 0
-    while i < len(block.stmts) {
+    for i < len(block.stmts) {
         emit_stmt(e, block.stmts[i])
         i += 1
     }
@@ -2188,7 +2188,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     e.current_ret_type = emitter_type(e, fn.type_name)
     e.current_ep_id = fresh_label(e)
     let i = 0
-    while i < len(fn.params) {
+    for i < len(fn.params) {
         add_local(e, fn.params[i].name, emitter_type(e, fn.params[i].type_name))
         i += 1
     }
@@ -2284,14 +2284,14 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     emit_label(e, "_argv")
     asm_dq(e.program, 0)
     let i = 0
-    while i < len(e.strings) {
+    for i < len(e.strings) {
         emit_label_index(e, e.strings[i].symbol_index)
         asm_bytes(e.program, string_bytes(e.strings[i].text))
         i += 1
     }
     asm_section_text(e.program)
     i = 0
-    while i < len(ast.funcs) {
+    for i < len(ast.funcs) {
         emit_fn_def(e, ast.funcs[i])
         i += 1
     }

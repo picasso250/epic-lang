@@ -15,7 +15,7 @@ fun main(): void {
 
     let total = 0
     let i = 0
-    while i < len(xs) {
+    for i < len(xs) {
         total = total + xs[i]
         i = i + 1
     }

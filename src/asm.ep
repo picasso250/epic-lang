@@ -83,10 +83,10 @@ fun asm_slice(s: str, start: i64, end: i64): str {
 fun asm_trim(s: str): str {
     let a = 0
     let b = len(s)
-    while a < b && (s[a] == 32 || s[a] == 9 || s[a] == 13) {
+    for a < b && (s[a] == 32 || s[a] == 9 || s[a] == 13) {
         a += 1
     }
-    while b > a && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 13) {
+    for b > a && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 13) {
         b -= 1
     }
     ret asm_slice(s, a, b)
@@ -135,7 +135,7 @@ fun asm_is_number(s: str): i64 {
     if i >= len(s) {
         ret 0
     }
-    while i < len(s) {
+    for i < len(s) {
         if hex == 0 && (s[i] < 48 || s[i] > 57) {
             ret 0
         }
@@ -420,7 +420,7 @@ fun asm_symbol_name(program: AsmProgram, symbol_index: i64): str {
         ret name
     }
     let generated = "__ep_anon_" + itoa(symbol_index)
-    while asm_named_symbol_find(program, generated) >= 0 {
+    for asm_named_symbol_find(program, generated) >= 0 {
         generated = generated + "_"
     }
     ret generated
@@ -1636,7 +1636,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
     }
     let pos = 0
     let sign = 1
-    while pos < len(body) {
+    for pos < len(body) {
         if body[pos] == 43 {
             sign = 1
             pos += 1
@@ -1645,7 +1645,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
             pos += 1
         }
         let end = pos
-        while end < len(body) && body[end] != 43 && body[end] != 45 {
+        for end < len(body) && body[end] != 43 && body[end] != 45 {
             end += 1
         }
         let term = asm_slice(body, pos, end)
@@ -1936,9 +1936,9 @@ fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): void {
 fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
     let values = new u8[]
     let value_start = 0
-    while value_start < len(args) {
+    for value_start < len(args) {
         let value_end = value_start
-        while value_end < len(args) && args[value_end] != 44 {
+        for value_end < len(args) && args[value_end] != 44 {
             value_end += 1
         }
         let value_text = asm_trim(asm_slice(args, value_start, value_end))
@@ -2068,9 +2068,9 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
 }
 fun asm_parse_lines(parser: AsmProgramParser, source: str): i64 {
     let line_start = 0
-    while line_start < len(source) {
+    for line_start < len(source) {
         let line_end = line_start
-        while line_end < len(source) && source[line_end] != 10 {
+        for line_end < len(source) && source[line_end] != 10 {
             line_end += 1
         }
         asm_program_process_line(parser, asm_slice(source, line_start, line_end))

@@ -86,7 +86,7 @@ fun lex(src: str): Token[] {
     let n = len(src)
     let pos = 0
     let line = 1
-    while pos < n {
+    for pos < n {
         let ch = src[pos]
         if ch == 32 || ch == 9 || ch == 13 {
             pos += 1
@@ -100,7 +100,7 @@ fun lex(src: str): Token[] {
         }
         if ch == 35 {
             pos += 1
-            while pos < n && src[pos] != 10 {
+            for pos < n && src[pos] != 10 {
                 pos += 1
             }
             continue
@@ -110,7 +110,7 @@ fun lex(src: str): Token[] {
             pos += 1
             let buf = new u8[]
             let scanning = 1
-            while scanning == 1 && pos < n {
+            for scanning == 1 && pos < n {
                 if src[pos] == 34 {
                     scanning = 0
                 } else {
@@ -209,7 +209,7 @@ fun lex(src: str): Token[] {
                 hex = 1
                 pos += 2
                 let digit_start = pos
-                while pos < n && is_hex_digit(src[pos]) == 1 {
+                for pos < n && is_hex_digit(src[pos]) == 1 {
                     pos += 1
                 }
                 if pos == digit_start {
@@ -217,11 +217,11 @@ fun lex(src: str): Token[] {
                     os.ExitProcess(1)
                 }
             } else {
-                while pos < n && is_digit(src[pos]) == 1 {
+                for pos < n && is_digit(src[pos]) == 1 {
                     pos += 1
                 }
             }
-            while pos < n && is_alnum(src[pos]) == 1 {
+            for pos < n && is_alnum(src[pos]) == 1 {
                 pos += 1
             }
             let number_text = str_new(src.data + number_start, pos - number_start)
@@ -231,7 +231,7 @@ fun lex(src: str): Token[] {
         if is_alpha(ch) == 1 {
             let identifier_line = line
             let identifier_start = pos
-            while pos < n && is_alnum(src[pos]) == 1 {
+            for pos < n && is_alnum(src[pos]) == 1 {
                 pos += 1
             }
             let identifier_text = str_new(src.data + identifier_start, pos - identifier_start)

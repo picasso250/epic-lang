@@ -6,7 +6,7 @@ fun retained_view(): str {
 fun main(): void {
     let view = retained_view()
     let i = 0
-    while i < 60000 {
+    for i < 60000 {
         let waste = new u8[1024]
         waste[0] = i
         i += 1
