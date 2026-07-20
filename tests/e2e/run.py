@@ -68,8 +68,10 @@ def write_bundle(cases: list[Path]) -> None:
 def compile_bundle(cases: list[Path]) -> Path:
     write_bundle(cases)
     relative = BUNDLE_SOURCE.relative_to(ROOT)
+    executable = ep_runner.output_path(BUNDLE_SOURCE)
+    executable.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [str(ep_runner.compiler_path()), str(relative)],
+        [str(ep_runner.compiler_path()), "-o", str(executable), str(relative)],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -77,7 +79,6 @@ def compile_bundle(cases: list[Path]) -> Path:
     )
     if result.returncode != 0:
         raise RuntimeError(f"bundle compile failed:\n{result.stderr[:1000]}")
-    executable = ep_runner.output_path(BUNDLE_SOURCE)
     if not executable.is_file():
         raise RuntimeError(f"bundle compiler produced no executable: {executable}")
     return executable
@@ -89,8 +90,10 @@ def run_compile_failure(source: Path) -> tuple[bool, str]:
     if match is None:
         return False, "missing # COMPILE_ERROR annotation"
     relative = source.relative_to(ROOT)
+    executable = ep_runner.output_path(source)
+    executable.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [str(ep_runner.compiler_path()), str(relative)],
+        [str(ep_runner.compiler_path()), "-o", str(executable), str(relative)],
         capture_output=True,
         text=True,
         cwd=ROOT,

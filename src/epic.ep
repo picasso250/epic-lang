@@ -96,24 +96,16 @@ fun parse_driver_options(): DriverOptions {
     }
     ret options
 }
-fun output_base(main_path: str): str {
-    let safe1 = str_replace_char(main_path, '/', '_')
-    let safe2 = str_replace_char(safe1, 92, '_')
-    ret "build/epic/" + safe2
-}
 fun main(): void {
-    os.CreateDirectoryA("build", 0)
-    os.CreateDirectoryA("build\\epic", 0)
     let options = parse_driver_options()
     let ast = merge_inputs(options.inputs)
     sema_check(ast)
-    let base = output_base(options.inputs.data[0])
     let output_path = options.output_path
     if output_path == "" {
         if options.emit_asm == 1 {
-            output_path = base + ".asm"
+            output_path = "a.asm"
         } else {
-            output_path = base + ".exe"
+            output_path = "a.exe"
         }
     }
     let e = make_emitter()

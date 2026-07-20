@@ -25,9 +25,9 @@ The script resolves the current local `v1` branch to an exact commit. It reuses
 worktree and calls that generation's `build_epic.py`. The resulting v1 compiler
 then compiles the current v2 working tree.
 
-The default output is `build/epic-v2.exe`. Pass `-o PATH` to copy only the
-final v2 executable elsewhere; relative paths are resolved from the calling
-working directory.
+The build script writes the compiler to `build/epic-v2.exe`. Programs compiled
+without `-o` produce `a.exe`, while `-S` without `-o` produces `a.asm`, in the
+current working directory. `-o PATH` selects the output path in either mode.
 
 ## Documentation
 

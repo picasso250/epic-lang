@@ -20,8 +20,10 @@ PEAK_LIMIT_MIB = 128
 def run_case(name: str) -> bool:
     source = ROOT / "tests" / "gc" / f"{name}.ep"
     relative = source.relative_to(ROOT)
+    executable = ep_runner.output_path(source)
+    executable.parent.mkdir(parents=True, exist_ok=True)
     compile_result = subprocess.run(
-        [str(ep_runner.compiler_path()), str(relative)],
+        [str(ep_runner.compiler_path()), "-o", str(executable), str(relative)],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -32,7 +34,6 @@ def run_case(name: str) -> bool:
         print(f"  FAIL  compile:\n{detail}")
         return False
 
-    executable = ep_runner.output_path(source)
     try:
         metrics = run_measured([str(executable)], cwd=ROOT)
     except subprocess.CalledProcessError as error:

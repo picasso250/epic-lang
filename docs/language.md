@@ -55,7 +55,8 @@ build\epic-v2.exe [-S] [-o path] main.ep lib.ep
 
 Normal compilation assembles in memory and writes only the executable. `-S`
 writes the generated assembly and stops before assembly; `-o` selects the
-output path in either mode. Without `-o`, outputs remain under `build/epic/`.
+output path in either mode. Without `-o`, executable output is `a.exe` and
+`-S` output is `a.asm` in the current working directory.
 
 This is whole-program source merging, not a module system.
 
@@ -376,15 +377,12 @@ to declare them.
 | `cstr(s: str): ptr` | copies all bytes into a fresh allocation and appends NUL; `ptr` is internal |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
-| `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
-
-The byte arguments of `str_replace_char` use their low eight bits.
 
 `len(value)`, `pop(array)`, and checked `value[index]` are the preferred
 container interfaces. `pop` evaluates its array expression once, preserves
