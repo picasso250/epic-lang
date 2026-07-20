@@ -2,7 +2,7 @@
 fun stop_now(): i64 {
     exit(42)
 }
-fun choose_exit(flag: i64): i64 {
+fun choose_exit(flag: bool): i64 {
     if flag {
         ret 7
     } else {
@@ -13,5 +13,5 @@ fun main(): void {
     if len(argv) == 0 {
         let ignored_stop = stop_now()
     }
-    os.ExitProcess(choose_exit(0))
+    os.ExitProcess(choose_exit(false))
 }

@@ -4,14 +4,14 @@ type ExprChoice = Left | Right
 fun expr_tail_value(): i64 {
     40 + 2
 }
-fun expr_if_value(flag: i64): i64 {
+fun expr_if_value(flag: bool): i64 {
     if flag {
         10
     } else {
         exit(90)
     }
 }
-fun expr_guarded(flag: i64): i64 {
+fun expr_guarded(flag: bool): i64 {
     if flag {
         ret 7
     }
@@ -27,7 +27,7 @@ fun expr_match_value(choice: ExprChoice): i64 {
         }
     }
 }
-fun expr_explicit_if(flag: i64): i64 {
+fun expr_explicit_if(flag: bool): i64 {
     ret if flag {
         1
     } else {
@@ -49,12 +49,12 @@ fun expr_void_tail(): void {
 fun main(): void {
     expr_void_tail()
     let a = expr_tail_value()
-    let b = expr_if_value(1)
-    let c = expr_guarded(0)
+    let b = expr_if_value(true)
+    let c = expr_guarded(false)
     let d = expr_match_value(ExprChoice.Left)
-    let e = expr_explicit_if(1)
+    let e = expr_explicit_if(true)
     let f = expr_else_if(2)
-    let nested = itoa(if 1 {
+    let nested = itoa(if true {
         2
     } else {
         3

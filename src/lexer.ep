@@ -15,25 +15,25 @@ fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): i64 {
     push(tokens, t)
     ret 0
 }
-fun is_alpha(c: i64): i64 {
+fun is_alpha(c: i64): bool {
     if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
-fun is_alnum(c: i64): i64 {
-    if is_alpha(c) == 1 || (c >= 48 && c <= 57) {
-        ret 1
+fun is_alnum(c: i64): bool {
+    if is_alpha(c) || (c >= 48 && c <= 57) {
+        ret true
     }
-    ret 0
+    ret false
 }
-fun is_digit(c: i64): i64 {
+fun is_digit(c: i64): bool {
     if c >= 48 && c <= 57 {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
-fun is_hex_digit(c: i64): i64 {
+fun is_hex_digit(c: i64): bool {
     ret digit_value(c) >= 0
 }
 fun identifier_kind(text: str): TokenKind {
@@ -109,10 +109,10 @@ fun lex(src: str): Token[] {
             let string_line = line
             pos += 1
             let buf = new u8[]
-            let scanning = 1
-            while scanning == 1 && pos < n {
+            let scanning = true
+            while scanning && pos < n {
                 if src[pos] == 34 {
-                    scanning = 0
+                    scanning = false
                 } else {
                     let c = src[pos]
                     if c == 10 || c == 13 {
@@ -149,7 +149,7 @@ fun lex(src: str): Token[] {
                     pos += 1
                 }
             }
-            if scanning == 1 {
+            if scanning {
                 print("unterminated string\n")
                 os.ExitProcess(1)
             }
@@ -201,7 +201,7 @@ fun lex(src: str): Token[] {
             push_token(tokens, TokenKind.CHAR, itoa(ch_val), char_line)
             continue
         }
-        if is_digit(ch) == 1 {
+        if is_digit(ch) {
             let number_line = line
             let number_start = pos
             let hex = 0
@@ -209,7 +209,7 @@ fun lex(src: str): Token[] {
                 hex = 1
                 pos += 2
                 let digit_start = pos
-                while pos < n && is_hex_digit(src[pos]) == 1 {
+                while pos < n && is_hex_digit(src[pos]) {
                     pos += 1
                 }
                 if pos == digit_start {
@@ -217,21 +217,21 @@ fun lex(src: str): Token[] {
                     os.ExitProcess(1)
                 }
             } else {
-                while pos < n && is_digit(src[pos]) == 1 {
+                while pos < n && is_digit(src[pos]) {
                     pos += 1
                 }
             }
-            while pos < n && is_alnum(src[pos]) == 1 {
+            while pos < n && is_alnum(src[pos]) {
                 pos += 1
             }
             let number_text = src[number_start:pos]
             push_token(tokens, TokenKind.NUMBER, number_text, number_line)
             continue
         }
-        if is_alpha(ch) == 1 {
+        if is_alpha(ch) {
             let identifier_line = line
             let identifier_start = pos
-            while pos < n && is_alnum(src[pos]) == 1 {
+            while pos < n && is_alnum(src[pos]) {
                 pos += 1
             }
             let identifier_text = src[identifier_start:pos]

@@ -5,7 +5,7 @@ fun panic_message(): str {
     print("evaluated once\n")
     ret "unexpected state"
 }
-fun panic_value(flag: i64): i64 {
+fun panic_value(flag: bool): i64 {
     if flag {
         ret 7
     } else {
@@ -13,5 +13,5 @@ fun panic_value(flag: i64): i64 {
     }
 }
 fun main(): void {
-    os.ExitProcess(panic_value(0))
+    os.ExitProcess(panic_value(false))
 }

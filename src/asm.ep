@@ -11,8 +11,8 @@ type AsmSymbol {
     name: str
     section: i64
     offset: i64
-    external: i64
-    defined: i64
+    external: bool
+    defined: bool
 }
 type AsmReloc {
     section: i64
@@ -63,7 +63,7 @@ type AsmProgramParser {
     program: AsmProgram
     scope: str
     section: AsmSectionKind
-    has_section: i64
+    has_section: bool
 }
 type AsmRenderer {
     out: u8[]
@@ -91,16 +91,16 @@ fun asm_trim(s: str): str {
     }
     ret asm_slice(s, a, b)
 }
-fun asm_starts(s: str, prefix: str): i64 {
+fun asm_starts(s: str, prefix: str): bool {
     if len(s) < len(prefix) {
-        ret 0
+        ret false
     }
     for i: 0:len(prefix) {
         if s[i] != prefix[i] {
-            ret 0
+            ret false
         }
     }
-    ret 1
+    ret true
 }
 fun asm_find(s: str, ch: i64): i64 {
     for i: 0:len(s) {
@@ -119,9 +119,9 @@ fun asm_remove_spaces(s: str): str {
     }
     ret str(out)
 }
-fun asm_is_number(s: str): i64 {
+fun asm_is_number(s: str): bool {
     if len(s) == 0 {
-        ret 0
+        ret false
     }
     let i = 0
     if s[0] == 45 {
@@ -133,18 +133,18 @@ fun asm_is_number(s: str): i64 {
         i += 2
     }
     if i >= len(s) {
-        ret 0
+        ret false
     }
     while i < len(s) {
         if hex == 0 && (s[i] < 48 || s[i] > 57) {
-            ret 0
+            ret false
         }
         if hex == 1 && digit_value(s[i]) < 0 {
-            ret 0
+            ret false
         }
         i += 1
     }
-    ret 1
+    ret true
 }
 fun asm_reg(name: str): i64 {
     if name == "rax" || name == "eax" || name == "ax" || name == "al" {
@@ -448,8 +448,8 @@ fun asm_extern_item(program: AsmProgram, symbol_index: i64): i64 {
         asm_die("invalid extern symbol index")
     }
     let symbol = program.symbols[symbol_index]
-    if symbol.defined == 0 {
-        symbol.external = 1
+    if !symbol.defined {
+        symbol.external = true
     }
     let item = asm_item_new(AsmItemKind.Extern)
     item.symbol_index = symbol_index
@@ -461,11 +461,11 @@ fun asm_label(program: AsmProgram, symbol_index: i64): i64 {
         asm_die("invalid label symbol index")
     }
     let symbol = program.symbols[symbol_index]
-    if symbol.defined == 1 {
+    if symbol.defined {
         asm_die("duplicate symbol: " + asm_symbol_name(program, symbol_index))
     }
-    symbol.defined = 1
-    symbol.external = 0
+    symbol.defined = true
+    symbol.external = false
     let item = asm_item_new(AsmItemKind.Label)
     item.symbol_index = symbol_index
     push(program.items, item)
@@ -802,8 +802,8 @@ fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     }
     ret rex
 }
-fun asm_rex(image: ExeImage, rex: i64, force: i64): i64 {
-    if rex != 64 || force == 1 {
+fun asm_rex(image: ExeImage, rex: i64, force: bool): i64 {
+    if rex != 64 || force {
         asm_byte(image, rex)
     }
     ret 0
@@ -855,9 +855,9 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     if base < 0 {
         asm_die("memory operand has no base")
     }
-    let need_sib = 0
+    let need_sib = false
     if op.index >= 0 || (base & 7) == 4 {
-        need_sib = 1
+        need_sib = true
     }
     let mod = 0
     if op.disp == 0 && (base & 7) != 5 {
@@ -867,7 +867,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     } else {
         mod = 2
     }
-    if need_sib == 1 {
+    if need_sib {
         asm_modrm(image, mod, reg_field, 4)
         let index = 4
         if op.index >= 0 {
@@ -884,11 +884,11 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     }
     ret 0
 }
-fun asm_force_rex8(op: AsmOperand): i64 {
+fun asm_force_rex8(op: AsmOperand): bool {
     if op.kind == AsmOperandKind.Register && op.reg >= 4 {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperand): i64 {
     let base = rm.reg
@@ -1046,7 +1046,7 @@ fun asm_emit_movsxd(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         base = src.base
         index = src.index
     }
-    asm_rex(image, asm_rex_bits(64, dst.reg, index, base), 0)
+    asm_rex(image, asm_rex_bits(64, dst.reg, index, base), false)
     asm_byte(image, 99)
     asm_emit_rm(image, dst.reg, src)
     ret 0
@@ -1192,7 +1192,7 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     }
     if src.kind == AsmOperandKind.Immediate {
         asm_operand_prefix(image, dst.width)
-        asm_rex(image, asm_rex_bits(dst.width, dst.reg, -1, dst.reg), 0)
+        asm_rex(image, asm_rex_bits(dst.width, dst.reg, -1, dst.reg), false)
         if src.imm >= -128 && src.imm <= 127 {
             asm_byte(image, 107)
             asm_modrm(image, 3, dst.reg, dst.reg)
@@ -1214,7 +1214,7 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             base = src.base
         }
         asm_operand_prefix(image, dst.width)
-        asm_rex(image, asm_rex_bits(dst.width, dst.reg, src.index, base), 0)
+        asm_rex(image, asm_rex_bits(dst.width, dst.reg, src.index, base), false)
         asm_byte(image, 15)
         asm_byte(image, 175)
         asm_emit_rm(image, dst.reg, src)
@@ -1631,7 +1631,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
         asm_die("bad memory operand: " + text)
     }
     let body = asm_slice(s, start + 1, stop)
-    if asm_starts(body, "rel") == 1 {
+    if asm_starts(body, "rel") {
         body = asm_slice(body, 3, len(body))
     }
     let pos = 0
@@ -1664,7 +1664,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
                 op.index = asm_reg(term)
                 op.scale = 1
             }
-        } else if asm_is_number(term) == 1 {
+        } else if asm_is_number(term) {
             op.disp += sign * parse_integer(term)
         } else {
             if op.symbol_index >= 0 {
@@ -1682,16 +1682,16 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
 fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     let text = asm_trim(raw)
     let width = 0
-    if asm_starts(text, "byte ") == 1 {
+    if asm_starts(text, "byte ") {
         width = 8
         text = asm_trim(asm_slice(text, 5, len(text)))
-    } else if asm_starts(text, "word ") == 1 {
+    } else if asm_starts(text, "word ") {
         width = 16
         text = asm_trim(asm_slice(text, 5, len(text)))
-    } else if asm_starts(text, "dword ") == 1 {
+    } else if asm_starts(text, "dword ") {
         width = 32
         text = asm_trim(asm_slice(text, 6, len(text)))
-    } else if asm_starts(text, "qword ") == 1 {
+    } else if asm_starts(text, "qword ") {
         width = 64
         text = asm_trim(asm_slice(text, 6, len(text)))
     }
@@ -1702,7 +1702,7 @@ fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     if reg >= 0 {
         ret asm_register(reg, asm_reg_width(text))
     }
-    if asm_is_number(text) == 1 {
+    if asm_is_number(text) {
         ret asm_imm(parse_integer(text))
     }
     ret asm_symbol(asm_symbol_intern(parser.program, asm_program_qualify(parser, text)))
@@ -1942,7 +1942,7 @@ fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
             value_end += 1
         }
         let value_text = asm_trim(asm_slice(args, value_start, value_end))
-        if asm_is_number(value_text) == 0 {
+        if !asm_is_number(value_text) {
             asm_die("db values must be integers")
         }
         push(values, parse_integer(value_text))
@@ -1950,44 +1950,44 @@ fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
     }
     ret asm_bytes(program, values)
 }
-fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
+fun asm_program_parse_data(parser: AsmProgramParser, line: str): bool {
     let data_space = asm_find(line, 32)
     if data_space < 0 {
-        ret 0
+        ret false
     }
     let data_name = asm_slice(line, 0, data_space)
     let data_args = asm_trim(asm_slice(line, data_space + 1, len(line)))
     if data_name == "db" {
         asm_program_parse_db(parser.program, data_args)
-        ret 1
+        ret true
     }
     if data_name == "dd" {
-        if asm_find(data_args, 44) >= 0 || asm_is_number(data_args) == 0 {
+        if asm_find(data_args, 44) >= 0 || !asm_is_number(data_args) {
             asm_die("dd requires one integer")
         }
         asm_dd(parser.program, parse_integer(data_args))
-        ret 1
+        ret true
     }
     if data_name == "dq" {
         if asm_find(data_args, 44) >= 0 {
             asm_die("dq requires one value")
         }
-        if asm_is_number(data_args) == 1 {
+        if asm_is_number(data_args) {
             asm_dq(parser.program, parse_integer(data_args))
         } else {
             asm_dq_symbol(parser.program, asm_symbol_intern(parser.program, asm_program_qualify(parser, data_args)))
         }
-        ret 1
+        ret true
     }
     if data_name != "times" {
-        ret 0
+        ret false
     }
     let count_space = asm_find(data_args, 32)
     if count_space < 0 {
         asm_die("bad times directive")
     }
     let count_text = asm_slice(data_args, 0, count_space)
-    if asm_is_number(count_text) == 0 {
+    if !asm_is_number(count_text) {
         asm_die("bad times count")
     }
     let times_rest = asm_trim(asm_slice(data_args, count_space + 1, len(data_args)))
@@ -1997,7 +1997,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
     }
     let times_directive = asm_slice(times_rest, 0, directive_space)
     let times_value = asm_trim(asm_slice(times_rest, directive_space + 1, len(times_rest)))
-    if asm_is_number(times_value) == 0 || asm_find(times_value, 44) >= 0 {
+    if !asm_is_number(times_value) || asm_find(times_value, 44) >= 0 {
         asm_die("times requires one integer value")
     }
     let times_width = 1
@@ -2009,7 +2009,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): i64 {
         asm_die("bad times directive: " + times_directive)
     }
     asm_times(parser.program, parse_integer(count_text), times_width, parse_integer(times_value))
-    ret 1
+    ret true
 }
 fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
     let semi = asm_find(raw, 59)
@@ -2021,14 +2021,14 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
     if len(line) == 0 {
         ret 0
     }
-    if asm_starts(line, "global ") == 1 {
+    if asm_starts(line, "global ") {
         parser.program.entry_symbol_index = asm_symbol_intern(parser.program, asm_trim(asm_slice(line, 7, len(line))))
         ret 0
     }
     if line == "default rel" {
         ret 0
     }
-    if asm_starts(line, "extern ") == 1 {
+    if asm_starts(line, "extern ") {
         let extern_symbol_index = asm_symbol_intern(parser.program, asm_trim(asm_slice(line, 7, len(line))))
         asm_extern_item(parser.program, extern_symbol_index)
         ret 0
@@ -2036,14 +2036,14 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
     if line == "section .text" {
         asm_section_text(parser.program)
         parser.section = AsmSectionKind.Text
-        parser.has_section = 1
+        parser.has_section = true
         parser.scope = ""
         ret 0
     }
     if line == "section .data" {
         asm_section_data(parser.program)
         parser.section = AsmSectionKind.Data
-        parser.has_section = 1
+        parser.has_section = true
         parser.scope = ""
         ret 0
     }
@@ -2057,10 +2057,10 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
         }
         ret 0
     }
-    if asm_program_parse_data(parser, line) == 1 {
+    if asm_program_parse_data(parser, line) {
         ret 0
     }
-    if parser.has_section == 0 || parser.section != AsmSectionKind.Text {
+    if !parser.has_section || parser.section != AsmSectionKind.Text {
         asm_die("instruction outside .text: " + line)
     }
     asm_program_parse_instruction(parser, line)
@@ -2082,7 +2082,7 @@ fun asm_parse_into(program: AsmProgram, source: str): i64 {
     let parser = new AsmProgramParser
     parser.program = program
     parser.scope = ""
-    parser.has_section = 0
+    parser.has_section = false
     ret asm_parse_lines(parser, source)
 }
 fun asm_parse_text_into(program: AsmProgram, source: u8[]): i64 {
@@ -2090,7 +2090,7 @@ fun asm_parse_text_into(program: AsmProgram, source: u8[]): i64 {
     parser.program = program
     parser.scope = ""
     parser.section = AsmSectionKind.Text
-    parser.has_section = 1
+    parser.has_section = true
     ret asm_parse_lines(parser, str(source))
 }
 fun asm_parse(source: str): AsmProgram {
@@ -2168,7 +2168,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
     for reloc_i: 0:len(image.relocs) {
         let reloc = image.relocs[reloc_i]
         let reloc_symbol = image.symbols[reloc.symbol_index]
-        if reloc_symbol.defined == 0 && reloc_symbol.external == 0 {
+        if !reloc_symbol.defined && !reloc_symbol.external {
             asm_die("undefined symbol: " + asm_symbol_name(program, reloc.symbol_index))
         }
     }
@@ -2177,7 +2177,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
             asm_die("invalid entry symbol index")
         }
         let entry = image.symbols[program.entry_symbol_index]
-        if entry.defined == 0 {
+        if !entry.defined {
             asm_die("undefined entry symbol: " + asm_symbol_name(program, program.entry_symbol_index))
         }
         if entry.section != 1 {
@@ -2343,21 +2343,21 @@ fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): void {
                 asm_render_s(out, "qword ")
             }
             asm_render_s(out, "[")
-            let wrote = 0
+            let wrote = false
             if op.symbol_index >= 0 {
                 asm_render_s(out, "rel ")
                 asm_render_s(out, asm_symbol_name(program, op.symbol_index))
-                wrote = 1
+                wrote = true
             }
             if op.base >= 0 {
-                if wrote == 1 {
+                if wrote {
                     asm_render_s(out, " + ")
                 }
                 asm_render_register(out, asm_register(op.base, 64))
-                wrote = 1
+                wrote = true
             }
             if op.index >= 0 {
-                if wrote == 1 {
+                if wrote {
                     asm_render_s(out, " + ")
                 }
                 asm_render_register(out, asm_register(op.index, 64))
@@ -2365,12 +2365,12 @@ fun asm_render_operand(renderer: AsmRenderer, op: AsmOperand): void {
                     asm_render_s(out, "*")
                     asm_render_i(out, op.scale)
                 }
-                wrote = 1
+                wrote = true
             }
-            if op.disp != 0 || wrote == 0 {
-                if wrote == 1 && op.disp >= 0 {
+            if op.disp != 0 || !wrote {
+                if wrote && op.disp >= 0 {
                     asm_render_s(out, " + ")
-                } else if wrote == 1 {
+                } else if wrote {
                     asm_render_s(out, " - ")
                 }
                 let abs_disp = op.disp

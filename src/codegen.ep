@@ -231,7 +231,7 @@ fun type_struct(name: str): TypeInfo {
 fun type_array(elem: str): TypeInfo {
     ret type_info("array", elem)
 }
-fun type_is_integer(t: TypeInfo): i64 {
+fun type_is_integer(t: TypeInfo): bool {
     ret sema_is_integer(t.kind)
 }
 fun type_width(t: TypeInfo): i64 {
@@ -247,23 +247,23 @@ fun type_width(t: TypeInfo): i64 {
 fun type_storage_size(t: TypeInfo): i64 {
     ret type_width(t) / 8
 }
-fun type_is_signed(t: TypeInfo): i64 {
+fun type_is_signed(t: TypeInfo): bool {
     ret sema_is_signed_integer(t.kind)
 }
-fun type_is_complex(t: TypeInfo): i64 {
+fun type_is_complex(t: TypeInfo): bool {
     if t.kind == "str" {
-        ret 1
+        ret true
     }
     if t.kind == "struct" {
-        ret 1
+        ret true
     }
     if t.kind == "array" {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 fun user_type(name: str): TypeInfo {
-    if sema_is_integer(name) == 1 {
+    if sema_is_integer(name) {
         ret type_integer(name)
     }
     if name == "bool" {
@@ -281,13 +281,13 @@ fun user_type(name: str): TypeInfo {
     if name == "ptr" {
         ret type_ptr()
     }
-    if type_is_array(name) == 1 {
+    if type_is_array(name) {
         ret type_array(array_element_type(name))
     }
     ret type_struct(name)
 }
 fun emitter_type(e: EmitterState, name: str): TypeInfo {
-    if type_is_array(name) == 1 {
+    if type_is_array(name) {
         ret type_array(array_element_type(name))
     }
     for i: 0:len(e.enums) {
@@ -629,7 +629,7 @@ fun emit_widen_register(e: EmitterState, reg: i64, source: TypeInfo, target: Typ
         ret 0
     }
     let source_reg = asm_register(reg, source_width)
-    if type_is_signed(source) == 1 {
+    if type_is_signed(source) {
         if source_width == 32 && target_width == 64 {
             asm_movsxd(e.program, asm_register(reg, 64), asm_register(reg, 32))
         } else {
@@ -657,7 +657,7 @@ fun emit_widen_rax(e: EmitterState, source: TypeInfo, target: TypeInfo): i64 {
     ret emit_widen_register(e, 0, source, target)
 }
 fun emit_coerce_rax(e: EmitterState, source: TypeInfo, target: TypeInfo): i64 {
-    if (type_is_integer(source) == 1 || source.kind == "bool") && type_is_integer(target) == 1 {
+    if (type_is_integer(source) || source.kind == "bool") && type_is_integer(target) {
         emit_widen_rax(e, source, target)
     }
     ret 0
@@ -863,7 +863,7 @@ fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
 }
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
-    if expr.type_name == "" && sema_is_integer(name) == 1 {
+    if expr.type_name == "" && sema_is_integer(name) {
         emit_expr(e, expr.args[0])
         emit_coerce_rax(e, expr_type(e, expr.args[0]), type_integer(name))
         ret 0
@@ -1118,7 +1118,7 @@ fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, ty
             }
         }
         OperatorKind.Divide {
-            if type_is_signed(typ) == 1 {
+            if type_is_signed(typ) {
                 emit_widen_register(e, 0, typ, type_i64())
                 emit_widen_register(e, 1, typ, type_i64())
                 if width == 64 {
@@ -1146,7 +1146,7 @@ fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, ty
             }
         }
         OperatorKind.Remainder {
-            if type_is_signed(typ) == 1 {
+            if type_is_signed(typ) {
                 emit_widen_register(e, 0, typ, type_i64())
                 emit_widen_register(e, 1, typ, type_i64())
                 if width == 64 {
@@ -1185,7 +1185,7 @@ fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, ty
             asm_shl(e.program, left_reg, asm_cl())
         }
         OperatorKind.ShiftRight {
-            if type_is_signed(typ) == 1 {
+            if type_is_signed(typ) {
                 asm_sar(e.program, left_reg, asm_cl())
             } else {
                 asm_shr(e.program, left_reg, asm_cl())
@@ -1212,10 +1212,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
     let operand_type = left_type
-    if sema_legacy_i64_pair(left_type.kind, right_type.kind) == 1 {
-        operand_type = type_i64()
-    }
-    if (left_type.kind == "bool" && right_type.kind == "i64") || (left_type.kind == "i64" && right_type.kind == "bool") {
+    if sema_legacy_i64_pair(left_type.kind, right_type.kind) {
         operand_type = type_i64()
     }
     emit_expr(e, expr.right)
@@ -1292,7 +1289,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         OperatorKind.Less {
             emit_stack_load(e, asm_rcx(), tmp)
             asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 asm_setl(e.program, asm_al())
             } else {
                 asm_setb(e.program, asm_al())
@@ -1301,7 +1298,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         OperatorKind.LessEqual {
             emit_stack_load(e, asm_rcx(), tmp)
             asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 asm_setle(e.program, asm_al())
             } else {
                 asm_setbe(e.program, asm_al())
@@ -1310,7 +1307,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         OperatorKind.Greater {
             emit_stack_load(e, asm_rcx(), tmp)
             asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 asm_setg(e.program, asm_al())
             } else {
                 asm_seta(e.program, asm_al())
@@ -1319,7 +1316,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         OperatorKind.GreaterEqual {
             emit_stack_load(e, asm_rcx(), tmp)
             asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 asm_setge(e.program, asm_al())
             } else {
                 asm_setae(e.program, asm_al())
@@ -1352,10 +1349,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
     let operand_type = left_type
-    if sema_legacy_i64_pair(left_type.kind, right_type.kind) == 1 {
-        operand_type = type_i64()
-    }
-    if (left_type.kind == "bool" && right_type.kind == "i64") || (left_type.kind == "i64" && right_type.kind == "bool") {
+    if sema_legacy_i64_pair(left_type.kind, right_type.kind) {
         operand_type = type_i64()
     }
     emit_expr(e, expr.right)
@@ -1397,7 +1391,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
             }
         }
         OperatorKind.Less {
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 if jump_if_true == 1 {
                     asm_jl(e.program, target)
                 } else {
@@ -1412,7 +1406,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
             }
         }
         OperatorKind.LessEqual {
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 if jump_if_true == 1 {
                     asm_jle(e.program, target)
                 } else {
@@ -1427,7 +1421,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
             }
         }
         OperatorKind.Greater {
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 if jump_if_true == 1 {
                     asm_jg(e.program, target)
                 } else {
@@ -1442,7 +1436,7 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
             }
         }
         OperatorKind.GreaterEqual {
-            if type_is_signed(operand_type) == 1 {
+            if type_is_signed(operand_type) {
                 if jump_if_true == 1 {
                     asm_jge(e.program, target)
                 } else {
@@ -1762,19 +1756,19 @@ fun emit_local_address(e: EmitterState, name: str): TypeInfo {
     asm_lea(e.program, asm_rax(), asm_mem_base(0, asm_rbp(), find_local_slot(e, name)))
     ret find_local_type(e, name)
 }
-fun is_enum_member_access(e: EmitterState, expr: AstExpr): i64 {
+fun is_enum_member_access(e: EmitterState, expr: AstExpr): bool {
     if expr.object.kind != AstExprKind.Var {
-        ret 0
+        ret false
     }
     for i: 0:len(e.enums) {
         if e.enums[i].name == expr.object.name {
-            ret 1
+            ret true
         }
     }
-    ret 0
+    ret false
 }
 fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
-    if is_enum_member_access(e, expr) == 1 {
+    if is_enum_member_access(e, expr) {
         asm_mov(e.program, asm_rax(), asm_imm(parse_integer(expr.value)))
         ret 0
     }
@@ -2077,7 +2071,7 @@ fun emit_match(e: EmitterState, expr: AstExpr): i64 {
     let end_id = fresh_label(e)
     for i: 0:len(expr.match_arms) {
         let arm = expr.match_arms[i]
-        if arm.is_else == 1 {
+        if arm.is_else {
             emit_block_as(e, arm.body, expr_type(e, expr))
             asm_jmp(e.program, asm_symbol(end_id))
         } else {
@@ -2095,14 +2089,14 @@ fun emit_match(e: EmitterState, expr: AstExpr): i64 {
     ret 0
 }
 fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
-    if !len(e.loop_ends) {
+    if len(e.loop_ends) == 0 {
         die("break outside loop")
     }
     asm_jmp(e.program, asm_symbol(e.loop_ends[len(e.loop_ends) - 1]))
     ret 0
 }
 fun emit_continue(e: EmitterState, stmt: AstStmt): i64 {
-    if !len(e.loop_starts) {
+    if len(e.loop_starts) == 0 {
         die("continue outside loop")
     }
     asm_jmp(e.program, asm_symbol(e.loop_starts[len(e.loop_starts) - 1]))

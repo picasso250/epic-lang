@@ -1,6 +1,6 @@
 # ERROR: cannot bind a void expression
 fun main(): void {
-    let value = if 1 {
+    let value = if true {
         1
     }
 }

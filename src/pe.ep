@@ -127,7 +127,7 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
             pe_die("invalid relocation symbol index")
         }
         let sym = image.symbols[r.symbol_index]
-        if sym.external == 1 && pe_import_find(out, sym.name) < 0 {
+        if sym.external && pe_import_find(out, sym.name) < 0 {
             let dll = pe_dll_for(sym.name)
             if len(dll) == 0 {
                 pe_die("unknown external symbol: " + sym.name)
@@ -268,7 +268,7 @@ fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): i64 {
         }
         let sym = image.symbols[r.symbol_index]
         let target = 0
-        if sym.external == 1 {
+        if sym.external {
             let import_index = pe_import_find(imports, sym.name)
             if import_index < 0 {
                 pe_die("missing import: " + sym.name)

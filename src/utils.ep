@@ -5,9 +5,9 @@
 fun align_up(value: i64, alignment: i64): i64 {
     ret ((value + alignment - 1) / alignment) * alignment
 }
-fun type_is_array(name: str): i64 {
+fun type_is_array(name: str): bool {
     if len(name) < 2 {
-        ret 0
+        ret false
     }
     ret name[len(name) - 2] == 91 && name[len(name) - 1] == 93
 }

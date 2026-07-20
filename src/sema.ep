@@ -13,15 +13,15 @@ type SemaSignature {
     param_types: str[]
     source_path: str
     line: i64
-    builtin: i64
+    builtin: bool
 }
 type SemaLocal {
     name: str
     type_name: str
     line: i64
     depth: i64
-    active: i64
-    read_only: i64
+    active: bool
+    read_only: bool
 }
 type SemaState {
     ast: AstProgram
@@ -80,17 +80,17 @@ fun sema_find_func(state: SemaState, name: str): SemaSignature {
     missing.name = ""
     ret missing
 }
-fun sema_is_integer(type_name: str): i64 {
+fun sema_is_integer(type_name: str): bool {
     if type_name == "i8" || type_name == "u8" || type_name == "i16" || type_name == "u16" || type_name == "i32" || type_name == "u32" || type_name == "i64" || type_name == "u64" {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
-fun sema_is_signed_integer(type_name: str): i64 {
+fun sema_is_signed_integer(type_name: str): bool {
     if type_name == "i8" || type_name == "i16" || type_name == "i32" || type_name == "i64" {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 fun sema_integer_bits(type_name: str): i64 {
     if type_name == "i8" || type_name == "u8" {
@@ -107,32 +107,32 @@ fun sema_integer_bits(type_name: str): i64 {
     }
     ret 0
 }
-fun sema_is_primitive_type(type_name: str): i64 {
-    if sema_is_integer(type_name) == 1 || type_name == "bool" || type_name == "str" || type_name == "void" {
-        ret 1
+fun sema_is_primitive_type(type_name: str): bool {
+    if sema_is_integer(type_name) || type_name == "bool" || type_name == "str" || type_name == "void" {
+        ret true
     }
-    ret 0
+    ret false
 }
-fun sema_type_exists(state: SemaState, type_name: str): i64 {
-    if sema_is_primitive_type(type_name) == 1 {
-        ret 1
+fun sema_type_exists(state: SemaState, type_name: str): bool {
+    if sema_is_primitive_type(type_name) {
+        ret true
     }
     if sema_find_type(state, type_name).name != "" {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: str): void {
     if type_name == "void" {
         sema_error(path, line, "void is only valid as a function return type")
         ret
     }
-    if type_is_array(type_name) == 1 {
+    if type_is_array(type_name) {
         let element = array_element_type(type_name)
         if element == "void" {
             sema_error(path, line, "array element type cannot be void")
         }
-        if type_is_array(element) == 1 {
+        if type_is_array(element) {
             sema_error(path, line, "nested arrays are not supported")
         }
         if !sema_type_exists(state, element) {
@@ -151,7 +151,7 @@ fun sema_signature(name: str, return_type: str): SemaSignature {
     sig.return_type = return_type
     sig.param_types = new str[]
     sig.source_path = "<builtin>"
-    sig.builtin = 1
+    sig.builtin = true
     ret sig
 }
 fun sema_add_builtin(state: SemaState, sig: SemaSignature): i64 {
@@ -287,7 +287,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     while i < len(ast.structs) {
         let node = ast.structs[i]
-        if node.name == "os" || node.name == "ptr" || sema_is_primitive_type(node.name) == 1 {
+        if node.name == "os" || node.name == "ptr" || sema_is_primitive_type(node.name) {
             sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
         }
         let first = sema_find_type(state, node.name)
@@ -305,7 +305,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     i = 0
     while i < len(ast.enums) {
         let enum_node = ast.enums[i]
-        if enum_node.name == "os" || enum_node.name == "ptr" || sema_is_primitive_type(enum_node.name) == 1 {
+        if enum_node.name == "os" || enum_node.name == "ptr" || sema_is_primitive_type(enum_node.name) {
             sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
         }
         let enum_first = sema_find_type(state, enum_node.name)
@@ -372,12 +372,12 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
         if node.name == "os" {
             sema_error(node.source_path, node.line, "'os' is a reserved namespace")
         }
-        if sema_is_primitive_type(node.name) == 1 {
+        if sema_is_primitive_type(node.name) {
             sema_error(node.source_path, node.line, "cannot redefine primitive conversion '" + node.name + "'")
         }
         let first = sema_find_func(state, node.name)
         if first.name != "" {
-            if first.builtin == 1 {
+            if first.builtin {
                 sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
             }
             sema_duplicate(node.source_path, node.line, "function '" + node.name + "'", first.source_path + ":" + itoa(first.line))
@@ -388,7 +388,7 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
         let sig = sema_signature(node.name, node.type_name)
         sig.source_path = node.source_path
         sig.line = node.line
-        sig.builtin = 0
+        sig.builtin = false
         let j = 0
         while j < len(node.params) {
             let param = node.params[j]
@@ -414,7 +414,7 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
 }
 fun sema_validate_main(state: SemaState): i64 {
     let main_sig = sema_find_func(state, "main")
-    if main_sig.name == "" || main_sig.builtin == 1 {
+    if main_sig.name == "" || main_sig.builtin {
         sema_error("<input>", 1, "missing main function")
     }
     if main_sig.return_type != "void" || len(main_sig.param_types) != 0 {
@@ -476,7 +476,7 @@ fun sema_find_local(state: SemaState, name: str): SemaLocal {
     let i = 0
     while i < len(state.locals) {
         let local = state.locals[i]
-        if local.name == name && local.active == 1 {
+        if local.name == name && local.active {
             ret local
         }
         i += 1
@@ -511,7 +511,7 @@ fun sema_add_local(state: SemaState, name: str, type_name: str, line: i64): void
     local.type_name = type_name
     local.line = line
     local.depth = state.scope_depth
-    local.active = 1
+    local.active = true
     push(state.locals, local)
     ret
 }
@@ -519,22 +519,22 @@ fun sema_leave_scope(state: SemaState): i64 {
     let i = 0
     while i < len(state.locals) {
         if state.locals[i].depth == state.scope_depth {
-            state.locals[i].active = 0
+            state.locals[i].active = false
         }
         i += 1
     }
     state.scope_depth -= 1
     ret 0
 }
-fun sema_is_reference_value(state: SemaState, type_name: str): i64 {
-    if type_name == "str" || type_name == "ptr" || type_is_array(type_name) == 1 {
-        ret 1
+fun sema_is_reference_value(state: SemaState, type_name: str): bool {
+    if type_name == "str" || type_name == "ptr" || type_is_array(type_name) {
+        ret true
     }
     let decl = sema_find_type(state, type_name)
     if decl.name != "" && decl.kind == "product" {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 fun sema_promote(type_name: str): str {
     ret type_name
@@ -633,7 +633,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
     }
     ret ""
 }
-fun sema_literal_fits(text: str, digit_end: i64, type_name: str, negative: i64): i64 {
+fun sema_literal_fits(text: str, digit_end: i64, type_name: str, negative: i64): bool {
     let start = 0
     let hex = 0
     if digit_end >= 2 && text[0] == 48 && (text[1] == 120 || text[1] == 88) {
@@ -645,26 +645,26 @@ fun sema_literal_fits(text: str, digit_end: i64, type_name: str, negative: i64):
     }
     let limit = sema_literal_limit(type_name, negative, hex)
     if limit == "" {
-        ret 0
+        ret false
     }
     let digits = digit_end - start
     if digits < len(limit) {
-        ret 1
+        ret true
     }
     if digits > len(limit) {
-        ret 0
+        ret false
     }
     for i: 0:digits {
         let value = digit_value(text[start + i])
         let maximum = digit_value(limit[i])
         if value < maximum {
-            ret 1
+            ret true
         }
         if value > maximum {
-            ret 0
+            ret false
         }
     }
-    ret 1
+    ret true
 }
 fun sema_parse_literal_bits(text: str, digit_end: i64): i64 {
     let i = 0
@@ -681,7 +681,7 @@ fun sema_parse_literal_bits(text: str, digit_end: i64): i64 {
     ret value
 }
 fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negative: i64): str {
-    if expr.resolved == 1 {
+    if expr.resolved {
         ret expr.resolved_type
     }
     if expr.type_name == "bool" {
@@ -690,62 +690,62 @@ fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negativ
         }
         expr.resolved_type = "bool"
         expr.resolved_value = parse_integer(expr.value)
-        expr.resolved = 1
+        expr.resolved = true
         ret "bool"
     }
     if expr.type_name == "i64" {
         expr.resolved_type = "i64"
         expr.resolved_value = parse_integer(expr.value)
-        expr.resolved = 1
+        expr.resolved = true
         ret "i64"
     }
     let digit_end = sema_literal_digit_end(expr.value)
     let suffix = ""
     if digit_end < len(expr.value) {
         suffix = expr.value[digit_end:len(expr.value)]
-        if sema_is_integer(suffix) == 0 {
+        if !sema_is_integer(suffix) {
             sema_error(state.source_path, expr.line, "invalid integer literal suffix '" + suffix + "'")
         }
     }
     let result = suffix
     if result == "" {
-        if sema_is_integer(expected) == 1 {
+        if sema_is_integer(expected) {
             result = expected
         } else {
             result = "i64"
         }
     }
-    if negative == 1 && sema_is_signed_integer(result) == 0 {
+    if negative == 1 && !sema_is_signed_integer(result) {
         sema_error(state.source_path, expr.line, "unary - requires a signed integer, got " + result)
     }
-    if sema_literal_fits(expr.value, digit_end, result, negative) == 0 {
+    if !sema_literal_fits(expr.value, digit_end, result, negative) {
         sema_error(state.source_path, expr.line, "integer literal is out of range for " + result)
     }
     expr.resolved_type = result
     expr.resolved_value = sema_parse_literal_bits(expr.value, digit_end)
-    expr.resolved = 1
+    expr.resolved = true
     ret result
 }
-fun sema_assignable(expected: str, actual: str): i64 {
+fun sema_assignable(expected: str, actual: str): bool {
     if actual == "never" {
-        ret 1
+        ret true
     }
     if expected == actual {
-        ret 1
+        ret true
     }
     if expected == "u8" && actual == "i64" {
-        ret 1
+        ret true
     }
-    if expected == "i64" && (actual == "u8" || actual == "bool") {
-        ret 1
+    if expected == "i64" && actual == "u8" {
+        ret true
     }
-    if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual) == 1) {
-        ret 1
+    if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual)) {
+        ret true
     }
     if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
 fun sema_join_types(state: SemaState, left: str, right: str, line: i64): str {
     if left == right {
@@ -757,7 +757,7 @@ fun sema_join_types(state: SemaState, left: str, right: str, line: i64): str {
     if right == "never" {
         ret left
     }
-    if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") || (left == "i64" && right == "bool") || (left == "bool" && right == "i64") {
+    if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") {
         ret "i64"
     }
     sema_error(state.source_path, line, "cannot join types " + left + " and " + right)
@@ -770,13 +770,13 @@ fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): i64 {
     ret 0
 }
 fun sema_require_condition(state: SemaState, expr: AstExpr, context: str): i64 {
-    if expr.resolved_type != "bool" && expr.resolved_type != "i64" && expr.resolved_type != "u8" && expr.resolved_type != "never" {
+    if expr.resolved_type != "bool" && expr.resolved_type != "never" {
         sema_error(state.source_path, expr.line, context + " requires bool, got " + expr.resolved_type)
     }
     ret 0
 }
 fun sema_require_integer(state: SemaState, expr: AstExpr, context: str): i64 {
-    if sema_is_integer(expr.resolved_type) == 0 && expr.resolved_type != "never" {
+    if !sema_is_integer(expr.resolved_type) && expr.resolved_type != "never" {
         sema_error(state.source_path, expr.line, context + " requires an integer, got " + expr.resolved_type)
     }
     ret 0
@@ -785,40 +785,40 @@ fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     if base_type == "str" {
         ret ""
     }
-    if type_is_array(base_type) == 1 {
+    if type_is_array(base_type) {
         ret ""
     }
     let field = sema_find_field(state, base_type, field_name)
     ret field.type_name
 }
-fun sema_needs_integer_context(expr: AstExpr): i64 {
-    if expr.resolved == 1 {
-        ret 0
+fun sema_needs_integer_context(expr: AstExpr): bool {
+    if expr.resolved {
+        ret false
     }
     if expr.kind == AstExprKind.Literal && expr.type_name == "" {
-        ret 1
+        ret true
     }
     if expr.kind == AstExprKind.Unary && expr.op == OperatorKind.Negate {
         ret sema_needs_integer_context(expr.left)
     }
     if expr.kind == AstExprKind.Binary {
         if expr.op == OperatorKind.Add || expr.op == OperatorKind.Subtract || expr.op == OperatorKind.Multiply || expr.op == OperatorKind.Divide || expr.op == OperatorKind.Remainder || expr.op == OperatorKind.BitAnd || expr.op == OperatorKind.BitOr || expr.op == OperatorKind.ShiftLeft || expr.op == OperatorKind.ShiftRight {
-            if sema_needs_integer_context(expr.left) == 1 && sema_needs_integer_context(expr.right) == 1 {
-                ret 1
+            if sema_needs_integer_context(expr.left) && sema_needs_integer_context(expr.right) {
+                ret true
             }
         }
     }
-    ret 0
+    ret false
 }
-fun sema_legacy_i64_pair(left: str, right: str): i64 {
+fun sema_legacy_i64_pair(left: str, right: str): bool {
     if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") {
-        ret 1
+        ret true
     }
-    ret 0
+    ret false
 }
-fun sema_matching_integers(left: str, right: str): i64 {
-    if left == right && sema_is_integer(left) == 1 {
-        ret 1
+fun sema_matching_integers(left: str, right: str): bool {
+    if left == right && sema_is_integer(left) {
+        ret true
     }
     ret sema_legacy_i64_pair(left, right)
 }
@@ -826,19 +826,19 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
     let left = ""
     let right = ""
     let result_expected = ""
-    if sema_is_integer(expected) == 1 {
+    if sema_is_integer(expected) {
         result_expected = expected
     }
     if expr.op == OperatorKind.ShiftLeft || expr.op == OperatorKind.ShiftRight {
         left = sema_check_expr_expected(state, expr.left, result_expected)
         right = sema_check_expr_expected(state, expr.right, "")
-    } else if sema_needs_integer_context(expr.left) == 1 && sema_needs_integer_context(expr.right) == 0 {
+    } else if sema_needs_integer_context(expr.left) && !sema_needs_integer_context(expr.right) {
         right = sema_check_expr_expected(state, expr.right, "")
         left = sema_check_expr_expected(state, expr.left, right)
     } else {
         left = sema_check_expr_expected(state, expr.left, result_expected)
         let right_expected = left
-        if sema_is_integer(left) == 0 {
+        if !sema_is_integer(left) {
             right_expected = ""
         }
         right = sema_check_expr_expected(state, expr.right, right_expected)
@@ -851,83 +851,81 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
         OperatorKind.Add {
             if left == "str" && right == "str" {
                 result = "str"
-            } else if left == "ptr" && sema_is_integer(right) == 1 {
+            } else if left == "ptr" && sema_is_integer(right) {
                 result = "ptr"
-            } else if sema_is_integer(left) == 1 && right == "ptr" {
+            } else if sema_is_integer(left) && right == "ptr" {
                 result = "ptr"
-            } else if sema_matching_integers(left, right) == 1 {
+            } else if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.Subtract {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.Multiply {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.Divide {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.Remainder {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.BitAnd {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.BitOr {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
+                if sema_legacy_i64_pair(left, right) {
                     result = "i64"
                 }
             }
         }
         OperatorKind.ShiftLeft {
-            if sema_is_integer(left) == 1 && sema_is_integer(right) == 1 {
+            if sema_is_integer(left) && sema_is_integer(right) {
                 result = left
             }
         }
         OperatorKind.ShiftRight {
-            if sema_is_integer(left) == 1 && sema_is_integer(right) == 1 {
+            if sema_is_integer(left) && sema_is_integer(right) {
                 result = left
             }
         }
         OperatorKind.Equal {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = "bool"
             } else if left == "str" && right == "str" {
                 result = "bool"
             } else if left == "bool" && right == "bool" {
-                result = "bool"
-            } else if (left == "bool" && right == "i64") || (left == "i64" && right == "bool") {
                 result = "bool"
             } else {
                 let decl = sema_find_type(state, left)
@@ -937,13 +935,11 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
             }
         }
         OperatorKind.NotEqual {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = "bool"
             } else if left == "str" && right == "str" {
                 result = "bool"
             } else if left == "bool" && right == "bool" {
-                result = "bool"
-            } else if (left == "bool" && right == "i64") || (left == "i64" && right == "bool") {
                 result = "bool"
             } else {
                 let not_equal_decl = sema_find_type(state, left)
@@ -953,32 +949,32 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
             }
         }
         OperatorKind.Less {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = "bool"
             }
         }
         OperatorKind.LessEqual {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = "bool"
             }
         }
         OperatorKind.Greater {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = "bool"
             }
         }
         OperatorKind.GreaterEqual {
-            if sema_matching_integers(left, right) == 1 {
+            if sema_matching_integers(left, right) {
                 result = "bool"
             }
         }
         OperatorKind.LogicalAnd {
-            if (left == "bool" || left == "i64" || left == "u8") && (right == "bool" || right == "i64" || right == "u8") {
+            if left == "bool" && right == "bool" {
                 result = "bool"
             }
         }
         OperatorKind.LogicalOr {
-            if (left == "bool" || left == "i64" || left == "u8") && (right == "bool" || right == "i64" || right == "u8") {
+            if left == "bool" && right == "bool" {
                 result = "bool"
             }
         } else {
@@ -1011,13 +1007,13 @@ fun sema_check_unary(state: SemaState, expr: AstExpr, expected: str): str {
     }
     match expr.op {
         OperatorKind.Negate {
-            if sema_is_signed_integer(operand) == 0 {
+            if !sema_is_signed_integer(operand) {
                 sema_error(state.source_path, expr.line, "unary operator - requires a signed integer operand, got " + operand)
             }
             ret operand
         }
         OperatorKind.LogicalNot {
-            if operand != "bool" && operand != "i64" && operand != "u8" {
+            if operand != "bool" {
                 sema_error(state.source_path, expr.line, "unary operator ! requires bool, got " + operand)
             }
             ret "bool"
@@ -1032,7 +1028,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
     if expr.type_name != "" {
         full_name = expr.type_name + "." + expr.name
     }
-    if expr.type_name == "" && sema_is_integer(expr.name) == 1 {
+    if expr.type_name == "" && sema_is_integer(expr.name) {
         if len(expr.args) != 1 {
             sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' expects 1 argument, got " + itoa(len(expr.args)))
         }
@@ -1040,7 +1036,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         if source_type == "never" {
             ret "never"
         }
-        if sema_is_integer(source_type) == 0 {
+        if !sema_is_integer(source_type) {
             sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' requires an integer, got " + source_type)
         }
         ret expr.name
@@ -1052,7 +1048,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
     if len(expr.args) != len(sig.param_types) {
         sema_error(state.source_path, expr.line, "function '" + full_name + "' expects " + itoa(len(sig.param_types)) + " argument(s), got " + itoa(len(expr.args)))
     }
-    let has_never = 0
+    let has_never = false
     let i = 0
     while i < len(expr.args) {
         let expected = sig.param_types[i]
@@ -1064,11 +1060,11 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         }
         let actual = sema_check_expr_expected(state, expr.args[i], expected)
         if full_name == "is_null" {
-            if sema_is_reference_value(state, actual) == 0 {
+            if !sema_is_reference_value(state, actual) {
                 sema_error(state.source_path, expr.args[i].line, "is_null expects a reference, got " + actual)
             }
         } else if actual == "never" {
-            has_never = 1
+            has_never = true
         } else if full_name == "push" && i == 0 {
             if !type_is_array(actual) {
                 sema_error(state.source_path, expr.args[i].line, "push first argument must be an array")
@@ -1094,7 +1090,7 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         }
         i += 1
     }
-    if has_never == 1 {
+    if has_never {
         ret "never"
     }
     if full_name == "pop" {
@@ -1107,7 +1103,7 @@ fun sema_check_if(state: SemaState, expr: AstExpr, expected: str): str {
     sema_require_condition(state, expr.condition, "if condition")
     let then_type = sema_check_block_expected(state, expr.then_block, expected)
     let else_type = "void"
-    if expr.else_block.present == 1 {
+    if expr.else_block.present {
         else_type = sema_check_block_expected(state, expr.else_block, expected)
     } else {
         if condition_type == "never" {
@@ -1216,7 +1212,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
                 result = "never"
             } else if base_type == "str" {
                 result = "i64"
-            } else if type_is_array(base_type) == 1 {
+            } else if type_is_array(base_type) {
                 result = array_element_type(base_type)
             } else {
                 sema_error(state.source_path, expr.line, "type " + base_type + " is not subscriptable")
@@ -1230,7 +1226,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
             sema_require_i64(state, expr.slice_end, "slice end")
             if slice_base_type == "never" || slice_start_type == "never" || slice_end_type == "never" {
                 result = "never"
-            } else if slice_base_type == "str" || type_is_array(slice_base_type) == 1 {
+            } else if slice_base_type == "str" || type_is_array(slice_base_type) {
                 result = slice_base_type
             } else {
                 sema_error(state.source_path, expr.line, "type " + slice_base_type + " is not sliceable")
@@ -1244,7 +1240,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
         }
     }
     expr.resolved_type = result
-    expr.resolved = 1
+    expr.resolved = true
     ret result
 }
 fun sema_check_expr(state: SemaState, expr: AstExpr): str {
@@ -1261,19 +1257,19 @@ fun sema_check_match(state: SemaState, expr: AstExpr, expected: str): str {
         seen = new i64[len(enum_node.members)]
     }
     let explicit_count = 0
-    let has_else = 0
+    let has_else = false
     let result = "never"
     let i = 0
     while i < len(expr.match_arms) {
         let arm = expr.match_arms[i]
-        if arm.is_else == 1 {
-            if has_else == 1 {
+        if arm.is_else {
+            if has_else {
                 sema_error(state.source_path, arm.line, "match has more than one else arm")
             }
             if i + 1 != len(expr.match_arms) {
                 sema_error(state.source_path, arm.line, "else must be the final match arm")
             }
-            has_else = 1
+            has_else = true
         } else if enum_node.name != "" {
             if arm.type_name != subject_type {
                 sema_error(state.source_path, arm.line, "match arm belongs to enum " + arm.type_name + ", expected " + subject_type)
@@ -1297,7 +1293,7 @@ fun sema_check_match(state: SemaState, expr: AstExpr, expected: str): str {
         if !has_else && explicit_count != len(enum_node.members) {
             sema_error(state.source_path, expr.line, "non-exhaustive match on enum " + subject_type)
         }
-        if has_else == 1 && explicit_count == len(enum_node.members) {
+        if has_else && explicit_count == len(enum_node.members) {
             sema_error(state.source_path, expr.line, "unreachable else arm in exhaustive match")
         }
     }
@@ -1316,7 +1312,7 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
             if local.name == "" {
                 sema_error(state.source_path, line, "assignment to undefined variable '" + target.name + "'")
             }
-            if local.read_only == 1 {
+            if local.read_only {
                 sema_error(state.source_path, line, "range iterator '" + target.name + "' is read-only")
             }
             ret local.type_name
@@ -1345,7 +1341,7 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
                 }
                 sema_error(state.source_path, line, "str is read-only")
             }
-            if type_is_array(base_type) == 1 {
+            if type_is_array(base_type) {
                 ret array_element_type(base_type)
             }
             sema_error(state.source_path, line, "type " + base_type + " is not subscriptable")
@@ -1373,7 +1369,7 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
 }
 fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
     let target_type = sema_assign_target_type(state, stmt.target, stmt.line, 1)
-    if sema_is_integer(target_type) == 0 {
+    if !sema_is_integer(target_type) {
         sema_error(state.source_path, stmt.line, "compound assignment requires an integer target, got " + target_type)
     }
     let right_expected = target_type
@@ -1382,7 +1378,7 @@ fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
     }
     let actual = sema_check_expr_expected(state, stmt.value_expr, right_expected)
     if stmt.op == OperatorKind.ShiftLeft || stmt.op == OperatorKind.ShiftRight {
-        if sema_is_integer(actual) == 0 {
+        if !sema_is_integer(actual) {
             sema_error(state.source_path, stmt.line, "shift assignment requires an integer right operand, got " + actual)
         }
     } else if actual != target_type {
@@ -1438,7 +1434,7 @@ fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
     sema_require_i64(state, stmt.range_end, "range end")
     state.scope_depth += 1
     sema_add_local(state, stmt.name, "i64", stmt.line)
-    state.locals[len(state.locals) - 1].read_only = 1
+    state.locals[len(state.locals) - 1].read_only = true
     sema_check_block(state, stmt.body)
     sema_leave_scope(state)
     ret 0
@@ -1504,12 +1500,12 @@ fun sema_check_block_expected(state: SemaState, block: AstBlock, expected: str):
         ret "void"
     }
     state.scope_depth += 1
-    let terminates = 0
+    let terminates = false
     let i = 0
     while i < len(block.stmts) {
         let stmt_type = sema_check_stmt(state, block.stmts[i])
-        if terminates == 0 && stmt_type == "never" {
-            terminates = 1
+        if !terminates && stmt_type == "never" {
+            terminates = true
         }
         i += 1
     }
@@ -1522,7 +1518,7 @@ fun sema_check_block_expected(state: SemaState, block: AstBlock, expected: str):
         }
     }
     sema_leave_scope(state)
-    if terminates == 1 {
+    if terminates {
         block.resolved_type = "never"
     } else if expected == "void" {
         block.resolved_type = "void"

@@ -1,6 +1,6 @@
 # ERROR: cannot join types i64 and str
 fun main(): void {
-    let value = if 1 {
+    let value = if true {
         1
     } else {
         "wrong"

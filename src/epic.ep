@@ -2,8 +2,8 @@
 # Epic self-hosted compiler driver.
 #
 type DriverOptions {
-    emit_asm: i64
-    verbose: i64
+    emit_asm: bool
+    verbose: bool
     output_path: str
     inputs: str[]
 }
@@ -21,8 +21,8 @@ fun write_output(path: str, data: u8[]): void {
     }
     ret
 }
-fun print_timing(verbose: i64, label: str, elapsed: i64): i64 {
-    if verbose == 1 {
+fun print_timing(verbose: bool, label: str, elapsed: i64): i64 {
+    if verbose {
         print("epic: ")
         print(label)
         print(" ")
@@ -37,15 +37,15 @@ fun parse_file(path: str): AstProgram {
     let p = make_parser_at(tokens, path)
     ret parse_program(p)
 }
-fun has_main(ast: AstProgram): i64 {
+fun has_main(ast: AstProgram): bool {
     for i: 0:len(ast.funcs) {
         if ast.funcs[i].name == "main" {
-            ret 1
+            ret true
         }
     }
-    ret 0
+    ret false
 }
-fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
+fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): i64 {
     for struct_i: 0:len(ast.structs) {
         let s = ast.structs[struct_i]
         push(out.structs, s)
@@ -67,10 +67,10 @@ fun merge_inputs(inputs: str[]): AstProgram {
     if !has_main(main_ast) {
         die_driver("main file has no main function")
     }
-    merge_one(out, main_ast, 1)
+    merge_one(out, main_ast, true)
     for i: 1:len(inputs) {
         let ast = parse_file(inputs[i])
-        merge_one(out, ast, 0)
+        merge_one(out, ast, false)
     }
     ret out
 }
@@ -82,9 +82,9 @@ fun parse_driver_options(): DriverOptions {
     while i < len(argv) {
         let arg = argv[i]
         if arg == "-S" {
-            options.emit_asm = 1
+            options.emit_asm = true
         } else if arg == "-v" {
-            options.verbose = 1
+            options.verbose = true
         } else if arg == "-o" {
             i += 1
             if i >= len(argv) {
@@ -99,10 +99,10 @@ fun parse_driver_options(): DriverOptions {
         }
         i += 1
     }
-    if !len(options.inputs) {
+    if len(options.inputs) == 0 {
         die_driver("usage: epic [-v] [-S] [-o path] <main.ep> [other.ep...]")
     }
-    if options.verbose == 1 && options.emit_asm == 1 {
+    if options.verbose && options.emit_asm {
         die_driver("-v cannot be used with -S")
     }
     ret options
@@ -112,14 +112,14 @@ fun main(): void {
     let total_start = 0
     let phase_start = 0
     let now = 0
-    if options.verbose == 1 {
+    if options.verbose {
         total_start = os.GetTickCount64()
         phase_start = total_start
     }
 
     let ast = merge_inputs(options.inputs)
     let parse_ms = 0
-    if options.verbose == 1 {
+    if options.verbose {
         now = os.GetTickCount64()
         parse_ms = now - phase_start
         phase_start = now
@@ -127,7 +127,7 @@ fun main(): void {
 
     sema_check(ast)
     let sema_ms = 0
-    if options.verbose == 1 {
+    if options.verbose {
         now = os.GetTickCount64()
         sema_ms = now - phase_start
         phase_start = now
@@ -135,7 +135,7 @@ fun main(): void {
 
     let output_path = options.output_path
     if output_path == "" {
-        if options.emit_asm == 1 {
+        if options.emit_asm {
             output_path = "a.asm"
         } else {
             output_path = "a.exe"
@@ -145,7 +145,7 @@ fun main(): void {
     let e = make_emitter()
     emit_program(e, ast)
     let codegen_ms = 0
-    if options.verbose == 1 {
+    if options.verbose {
         now = os.GetTickCount64()
         codegen_ms = now - phase_start
         phase_start = now
@@ -153,23 +153,23 @@ fun main(): void {
 
     let encode_ms = 0
     let write_ms = 0
-    if options.emit_asm == 1 {
+    if options.emit_asm {
         write_output(output_path, asm_render(e.program))
     } else {
         let image = asm_encode(e.program)
-        if options.verbose == 1 {
+        if options.verbose {
             now = os.GetTickCount64()
             encode_ms = now - phase_start
             phase_start = now
         }
         write_output(output_path, pe_build_exe(image))
-        if options.verbose == 1 {
+        if options.verbose {
             write_ms = os.GetTickCount64() - phase_start
         }
     }
 
     let total_ms = 0
-    if options.verbose == 1 {
+    if options.verbose {
         total_ms = os.GetTickCount64() - total_start
     }
     print_timing(options.verbose, "parse+merge", parse_ms)

@@ -1,0 +1,4 @@
+# ERROR: unary operator ! requires bool, got i64
+fun main(): void {
+    let value = !1
+}

@@ -1,6 +1,6 @@
 # EXIT: 0
 # STDOUT: 7
-fun choose(flag: i64): i64 {
+fun choose(flag: bool): i64 {
     if flag {
         ret 7
     } else {
@@ -8,6 +8,6 @@ fun choose(flag: i64): i64 {
     }
 }
 fun main(): void {
-    print(itoa(choose(1)))
+    print(itoa(choose(true)))
     print("\n")
 }

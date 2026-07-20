@@ -7,7 +7,7 @@ fun main(): void {
     let d = new Data
     d.flag = 1
     d.value = 65
-    if d.flag {
+    if d.flag != 0 {
         os.ExitProcess(d.value)
     }
     os.ExitProcess(0)

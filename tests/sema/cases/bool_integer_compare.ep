@@ -1,0 +1,4 @@
+# ERROR: operator == requires matching integers, two bool values, two strings, or two values of the same enum type
+fun main(): void {
+    let value = true == 1
+}

@@ -1,0 +1,6 @@
+# ERROR: if condition requires bool, got i64
+fun main(): void {
+    if 1 {
+        ret
+    }
+}

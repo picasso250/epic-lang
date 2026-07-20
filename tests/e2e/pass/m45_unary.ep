@@ -7,21 +7,21 @@ fun main(): void {
     if -2 * 3 != -6 || -(2 + 3) != -5 {
         os.ExitProcess(2)
     }
-    if !0 != 1 || !42 != 0 || !!7 != 1 || !-5 != 0 {
+    if !false != true || !true != false || !!true != true {
         os.ExitProcess(3)
     }
-    if !(1 == 2) != 1 || !("left" == "right") != 1 {
+    if !(1 == 2) != true || !("left" == "right") != true {
         os.ExitProcess(4)
     }
-    if !0 {
-        let reached = 1
+    if !false {
+        let reached = true
         if !reached {
             os.ExitProcess(5)
         }
     } else {
         os.ExitProcess(6)
     }
-    if !1 {
+    if !true {
         os.ExitProcess(7)
     }
     let minimum = -9223372036854775807 - 1

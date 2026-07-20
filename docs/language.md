@@ -78,11 +78,11 @@ not use. The user-visible language changes introduced in v3 are:
 - one index type: checked subscripts and both slice bounds require `i64`.
 
 The v3 compiler implementation itself stays within the v2-era integer surface.
-The v4 compiler is the dogfood target for the new bool and integer types. During
-that migration, v3 retains the old `u8`/`i64` assignment and expression bridge,
-and accepts legacy `i64` or `u8` conditions. New code should use matching
-integer operands, explicit conversions, and `bool` conditions; the bridge is
-not a forward-compatibility promise.
+The v4 compiler is the dogfood target for the new bool and integer types. Its
+source uses distinct `bool` predicates and state flags, and v4 requires `bool`
+for conditions and logical operators. The v3 seed still provides the separate
+`u8`/`i64` integer migration bridge needed to compile this source; that bridge
+is not a forward-compatibility promise.
 
 The v3 compiler source also dogfoods the v2 foundations: unit enums and
 exhaustive matching, compound assignment, unary operators, integer range loops,
@@ -297,9 +297,8 @@ let value = if ready {
 ```
 
 Branch types must join even when the complete `if` appears in statement position.
-Conditions require `bool`. The inherited v3 migration bridge also accepts legacy `i64`
-or `u8` conditions, where zero is false and nonzero is true; new code should
-not rely on that bridge.
+Conditions require `bool`; integers are not truthy values. Compare an integer
+explicitly when testing it, such as `count != 0`.
 
 ## Else-if chains
 
@@ -445,9 +444,8 @@ statement and does not produce a value.
 
 Unary `-` accepts signed integers and operates at their width. A directly
 negated literal may use the signed minimum, such as `-128i8`. Logical `!`
-accepts `bool`; the inherited v3 migration bridge also accepts `i64` and `u8`. It returns
-`bool`. Unary operators bind more tightly than `*`, `/`, and `%` and may be
-chained. Epic currently has no unary `+` or bitwise `~`.
+accepts and returns `bool`. Unary operators bind more tightly than `*`, `/`,
+and `%` and may be chained. Epic currently has no unary `+` or bitwise `~`.
 
 Supported escapes in string and character literals:
 
@@ -481,7 +479,7 @@ String lengths and indices count bytes, not Unicode characters.
 `str + str` remains the non-integer addition case. `==` and `!=` additionally
 accept two bool values, two strings, or two values of the same enum type;
 products and arrays have no implicit reference equality. `if` and `while`
-conditions require `bool`, subject to the documented inherited migration bridge.
+conditions require `bool`.
 
 ## System calls
 
