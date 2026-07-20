@@ -14,6 +14,8 @@ type SemaSignature {
     source_path: str
     line: i64
     builtin: bool
+    external: bool
+    library: str
 }
 type SemaLocal {
     name: str
@@ -103,7 +105,7 @@ fun sema_integer_bits(type_name: str): i64 {
     0
 }
 fun sema_is_primitive_type(type_name: str): bool {
-    sema_is_integer(type_name) || type_name == "bool" || type_name == "str" || type_name == "void"
+    sema_is_integer(type_name) || type_name == "bool" || type_name == "str" || type_name == "ptr" || type_name == "void"
 }
 fun sema_type_exists(state: SemaState, type_name: str): bool {
     sema_is_primitive_type(type_name) || sema_find_type(state, type_name).name != ""
@@ -137,6 +139,8 @@ fun sema_signature(name: str, return_type: str): SemaSignature {
     sig.param_types = new str[]
     sig.source_path = "<builtin>"
     sig.builtin = true
+    sig.external = false
+    sig.library = ""
     sig
 }
 fun sema_add_builtin(state: SemaState, sig: SemaSignature): void {
@@ -343,6 +347,84 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): void {
         }
         i += 1
     }
+}
+fun sema_is_extern_abi_type(type_name: str): bool {
+    sema_is_integer(type_name) || type_name == "ptr"
+}
+fun sema_validate_extern_library(node: AstExternDef): void {
+    if len(node.library) == 0 {
+        sema_error(node.source_path, node.line, "extern '" + node.name + "' requires a non-empty DLL name")
+    }
+    for i: 0:len(node.library) {
+        if node.library[i] == 0 {
+            sema_error(node.source_path, node.line, "extern '" + node.name + "' DLL name contains NUL")
+        }
+    }
+}
+fun sema_extern_signature_matches(sig: SemaSignature, node: AstExternDef): bool {
+    if sig.library != node.library || sig.return_type != node.type_name || len(sig.param_types) != len(node.params) {
+        ret false
+    }
+    for i: 0:len(node.params) {
+        if sig.param_types[i] != node.params[i].type_name {
+            ret false
+        }
+    }
+    true
+}
+fun sema_collect_externs(state: SemaState, ast: AstProgram): void {
+    let kept = new AstExternDef[]
+    for i: 0:len(ast.externs) {
+        let node = ast.externs[i]
+        sema_validate_extern_library(node)
+        if node.name == "os" {
+            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
+        }
+        if sema_is_primitive_type(node.name) {
+            sema_error(node.source_path, node.line, "cannot redefine primitive conversion '" + node.name + "'")
+        }
+        if node.type_name != "void" {
+            sema_validate_value_type(state, node.source_path, node.line, node.type_name)
+            if !sema_is_extern_abi_type(node.type_name) {
+                sema_error(node.source_path, node.line, "extern '" + node.name + "' has unsupported ABI return type " + node.type_name)
+            }
+        }
+        for param_i: 0:len(node.params) {
+            let param = node.params[param_i]
+            for previous_i: 0:param_i {
+                let previous = node.params[previous_i]
+                if previous.name == param.name {
+                    sema_duplicate(node.source_path, param.line, "parameter '" + param.name + "'", node.source_path + ":" + itoa(previous.line))
+                }
+            }
+            sema_validate_value_type(state, node.source_path, param.line, param.type_name)
+            if !sema_is_extern_abi_type(param.type_name) {
+                sema_error(node.source_path, param.line, "extern '" + node.name + "' parameter '" + param.name + "' has unsupported ABI type " + param.type_name)
+            }
+        }
+        let first = sema_find_func(state, node.name)
+        if first.name != "" {
+            if first.builtin {
+                sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
+            }
+            if !first.external || !sema_extern_signature_matches(first, node) {
+                sema_error(node.source_path, node.line, "conflicting extern declaration '" + node.name + "'")
+            }
+        } else {
+            let sig = sema_signature(node.name, node.type_name)
+            sig.source_path = node.source_path
+            sig.line = node.line
+            sig.builtin = false
+            sig.external = true
+            sig.library = node.library
+            for copy_i: 0:len(node.params) {
+                push(sig.param_types, node.params[copy_i].type_name)
+            }
+            push(state.funcs, sig)
+            push(kept, node)
+        }
+    }
+    ast.externs = kept
 }
 fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
     let i = 0
@@ -714,9 +796,6 @@ fun sema_assignable(expected: str, actual: str): bool {
     if expected == actual {
         ret true
     }
-    if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual)) {
-        ret true
-    }
     if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
         ret true
     }
@@ -866,6 +945,8 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
                 result = "bool"
             } else if left == "bool" && right == "bool" {
                 result = "bool"
+            } else if left == "ptr" && right == "ptr" {
+                result = "bool"
             } else {
                 let decl = sema_find_type(state, left)
                 if left == right && decl.name != "" && decl.kind == "enum" {
@@ -879,6 +960,8 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
             } else if left == "str" && right == "str" {
                 result = "bool"
             } else if left == "bool" && right == "bool" {
+                result = "bool"
+            } else if left == "ptr" && right == "ptr" {
                 result = "bool"
             } else {
                 let not_equal_decl = sema_find_type(state, left)
@@ -967,16 +1050,29 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
     if expr.type_name != "" {
         full_name = expr.type_name + "." + expr.name
     }
-    if expr.type_name == "" && sema_is_integer(expr.name) {
+    if expr.type_name == "" && expr.name == "ptr" {
         if len(expr.args) != 1 {
-            sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' expects 1 argument, got " + itoa(len(expr.args)))
+            sema_error(state.source_path, expr.line, "ptr conversion expects 1 argument, got " + itoa(len(expr.args)))
         }
         let source_type = sema_check_expr_expected(state, expr.args[0], "")
         if source_type == "never" {
             ret "never"
         }
-        if !sema_is_integer(source_type) {
-            sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' requires an integer, got " + source_type)
+        if source_type != "i64" && source_type != "u64" && !type_is_array(source_type) && sema_find_struct(state, source_type).name == "" {
+            sema_error(state.source_path, expr.line, "ptr conversion requires i64, u64, array, or product, got " + source_type)
+        }
+        ret "ptr"
+    }
+    if expr.type_name == "" && sema_is_integer(expr.name) {
+        if len(expr.args) != 1 {
+            sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' expects 1 argument, got " + itoa(len(expr.args)))
+        }
+        let integer_source_type = sema_check_expr_expected(state, expr.args[0], "")
+        if integer_source_type == "never" {
+            ret "never"
+        }
+        if !sema_is_integer(integer_source_type) && !((expr.name == "i64" || expr.name == "u64") && integer_source_type == "ptr") {
+            sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' requires an integer, got " + integer_source_type)
         }
         ret expr.name
     }
@@ -1038,6 +1134,8 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             if extend_array_type != "never" && actual != extend_array_type {
                 sema_error(state.source_path, expr.args[i].line, "extend requires matching array types, got " + extend_array_type + " and " + actual)
             }
+        } else if expr.type_name == "os" && expected == "ptr" && sema_is_integer(actual) {
+            # Transitional seed compatibility for the legacy os.* namespace.
         } else if !sema_assignable(expected, actual) {
             sema_error(state.source_path, expr.args[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
@@ -1513,6 +1611,7 @@ fun sema_check(ast: AstProgram): void {
     sema_collect_type_names(state, ast)
     sema_validate_enums(state, ast)
     sema_validate_structs(state, ast)
+    sema_collect_externs(state, ast)
     sema_collect_functions(state, ast)
     sema_validate_main(state)
     sema_check_bodies(state, ast)

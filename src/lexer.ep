@@ -1,7 +1,7 @@
 #
 # Epic lexer.
 #
-type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | TRUE | FALSE | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
+type TokenKind = EOF | ID | FUN | EXTERN | RETURN | IF | ELSE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | TRUE | FALSE | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
 type Token {
     kind: TokenKind
     text: str
@@ -29,6 +29,9 @@ fun is_hex_digit(c: u8): bool {
 fun identifier_kind(text: str): TokenKind {
     if text == "fun" {
         ret TokenKind.FUN
+    }
+    if text == "extern" {
+        ret TokenKind.EXTERN
     }
     if text == "ret" {
         ret TokenKind.RETURN

@@ -1,0 +1,5 @@
+extern "epic_v4_missing_loader_test_7f3a9c.dll" fun MissingDllEntry(): i32
+
+fun main(): void {
+    MissingDllEntry()
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compile the Epic end-to-end tests once, then run each case in isolation."""
 
+import ctypes
 import re
 import subprocess
 import sys
@@ -107,9 +108,43 @@ def run_compile_failure(source: Path) -> tuple[bool, str]:
     return True, "OK"
 
 
+def run_loader_failure(source: Path) -> tuple[bool, str]:
+    relative = source.relative_to(ROOT)
+    executable = ep_runner.output_path(source)
+    executable.parent.mkdir(parents=True, exist_ok=True)
+    compile_result = subprocess.run(
+        [str(ep_runner.compiler_path()), "-o", str(executable), str(relative)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=30,
+    )
+    if compile_result.returncode != 0:
+        output = compile_result.stdout + compile_result.stderr
+        return False, f"compile failed: {output[:500]!r}"
+    if not executable.is_file():
+        return False, "compiler produced no executable"
+
+    error_mode = 0x0001 | 0x0002 | 0x8000
+    previous_mode = ctypes.windll.kernel32.SetErrorMode(error_mode)
+    try:
+        process = subprocess.run(
+            [str(executable)],
+            capture_output=True,
+            cwd=ROOT,
+            timeout=ep_runner.EXEC_TIMEOUT,
+        )
+    finally:
+        ctypes.windll.kernel32.SetErrorMode(previous_mode)
+    if process.returncode == 0:
+        return False, "program unexpectedly started successfully"
+    return True, f"loader rejected image ({process.returncode})"
+
+
 def main() -> int:
     cases = sorted((Path(__file__).parent / "pass").glob("*.ep"))
     failures = sorted((Path(__file__).parent / "fail").glob("*.ep"))
+    loader_failures = sorted((Path(__file__).parent / "loader_fail").glob("*.ep"))
     try:
         executable = compile_bundle(cases)
     except Exception as error:
@@ -135,7 +170,16 @@ def main() -> int:
         ok, detail = run_compile_failure(source)
         print(f"  {'PASS' if ok else 'FAIL':5}  {source.name:32}  {detail}")
         failed += not ok
-    total = len(cases) + len(failures)
+    for source in loader_failures:
+        try:
+            ok, detail = run_loader_failure(source)
+        except subprocess.TimeoutExpired:
+            ok, detail = False, "TIMEOUT"
+        except Exception as error:
+            ok, detail = False, f"exception: {error}"
+        print(f"  {'PASS' if ok else 'FAIL':5}  {source.name:32}  {detail}")
+        failed += not ok
+    total = len(cases) + len(failures) + len(loader_failures)
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

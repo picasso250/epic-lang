@@ -103,8 +103,12 @@ counterpart.
 The backend builds private x64 assembly records for Windows x64. Instructions
 use concrete builders such as `asm_mov`, `asm_call`, and `asm_ret`; registers,
 immediates, symbols, and memory addresses are typed operands rather than text.
-Calls follow the Windows x64 ABI and the v0 language limits calls and functions
-to four arguments.
+Calls follow the Windows x64 ABI. The first four integer, pointer, or reference
+arguments use `RCX`, `RDX`, `R8`, and `R9`; later arguments occupy 8-byte caller
+stack slots after the 32-byte shadow space. One lowering path serves ordinary
+Epic functions, source externs, and the transitional `os.*` bindings. Callees
+copy both register and stack parameters into their statically assigned local
+slots.
 
 Each function receives a statically sized stack frame. A pre-scan computes
 local storage and the peak number of compiler temporary slots; there is no
@@ -146,9 +150,10 @@ it allocates a fresh byte region and appends the terminator required by C.
 v4 dogfoods string slicing for lexer token views, type-name suffix removal,
 integer suffix parsing, assembler substrings, and relative embed paths. The
 transitional v3 `str_new`, `.data`, and `.len` source interfaces are removed;
-there is no compiler-source exception. Raw C/Win32 calls accept the single
-internal transparent `ptr` type, and `cstr(str)` returns that type after
-allocating and terminating a copy.
+there is no compiler-source exception. `ptr` is now the single public opaque
+address type. Integer conversions preserve its 64-bit pattern, array conversion
+loads the backing-data field, product conversion preserves the payload address,
+and `cstr(str)` returns a fresh terminated allocation. `ptr(str)` is rejected.
 
 ## Assembler and PE writer
 
@@ -163,7 +168,12 @@ Code generation allocates anonymous labels directly by index. The embedded
 runtime text parser interns names when they first appear, so forward references
 receive an index immediately and definitions later complete the same symbol.
 Names remain on symbol-table entries for imports, diagnostics, and canonical
-`-S` rendering; parser output after the text boundary is index-based.
+`-S` rendering; parser output after the text boundary is index-based. External
+symbols may additionally carry their exact source DLL and export names. Source
+externs use anonymous internal symbols, so they cannot collide with transitional
+runtime imports that happen to use the same export spelling. Canonical assembly
+renders the DLL and export bytes in an `extern_dll` directive as hexadecimal,
+so `-S` render/parse/encode preserves both names without quoting ambiguity.
 
 The encoder consumes only `AsmProgram`, fills symbol section/offset data, and
 writes AMD64 text/data bytes while recording already-indexed relocations. It
@@ -173,9 +183,12 @@ runtime formatting are discarded; the renderer produces canonical `-S` text
 that can be parsed and encoded again.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
-sections, imports, and relocations. Determinism is part of the bootstrap
-contract: identical compiler sources must produce byte-identical fixed-point
-executables.
+sections, imports, and relocations. Referenced source externs are grouped by DLL
+in deterministic relocation order. The writer emits import descriptors, ILT,
+IAT, hint/name entries, and DLL names, then patches each generated text thunk to
+jump indirectly through its IAT slot. Unreferenced declarations create no PE
+import. Determinism is part of the bootstrap contract: identical compiler
+sources must produce byte-identical fixed-point executables.
 
 ## Acceptance
 

@@ -8,7 +8,7 @@
 - `if` and condition-form `for` conditions do not require parentheses.
 - `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
-- Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
+- Functions and calls may use more than four integer, pointer, or reference arguments; Windows x64 stack arguments are used after the first four registers.
 - v4 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
 - The Epic v4 compiler is self-hosted and begins from the sealed v3 compiler.
 - v4 does not preserve forward compatibility.
@@ -101,10 +101,11 @@ to use string slicing throughout the compiler and remove the transitional
 
 ## Program model
 
-A program is a set of top-level product type, unit-enum, and function
-definitions.
+A program is a set of top-level product type, unit-enum, ordinary function, and
+external DLL function declarations.
 
-There are no imports, packages, visibility rules, or per-file namespaces in v0.
+There are no packages, visibility rules, or per-file namespaces in v0. `extern`
+is a Windows DLL import declaration, not a source-module import.
 
 ## Multi-file compilation
 
@@ -124,9 +125,12 @@ directory.
 
 This is whole-program source merging, not a module system.
 
-All top-level types and functions from input files are merged before semantic
-analysis. Product types and enums share one type namespace; functions use a
-separate namespace. Duplicate names within either namespace are rejected.
+All top-level types, ordinary functions, and extern declarations from input
+files are merged before semantic analysis. Product types and enums share one
+type namespace. Ordinary and extern functions share one function namespace.
+Equivalent repeated extern declarations are folded; a DLL, parameter-type, or
+return-type difference is a conflicting declaration. Parameter names do not
+affect extern equivalence.
 
 The first input is the main file. Only its `main` function is used; `main` functions in later files are ignored.
 
@@ -484,9 +488,78 @@ accept two bool values, two strings, or two values of the same enum type;
 products and arrays have no implicit reference equality. `if` and condition-form `for`
 conditions require `bool`.
 
+## External DLL functions and pointers
+
+Windows x64 DLL imports use a top-level declaration:
+
+```epic
+extern "user32.dll" fun MessageBoxA(
+    hwnd: ptr,
+    text: ptr,
+    caption: ptr,
+    kind: u32,
+): i32
+```
+
+The compiler writes a real PE Import Table. Windows loads each DLL, resolves each
+named export, fills the IAT, and calls go through an IAT-backed thunk. There is
+no `LoadLibrary` or `GetProcAddress` wrapper. DLL and export names are written
+exactly as declared; Epic does not append `.dll`, choose `A`/`W`, change case,
+or decorate names. v4 supports named imports only, not ordinal imports.
+
+Extern parameters may use `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`,
+or `ptr`. Returns may additionally use `void`. `bool`, `str`, arrays, products,
+enums, callbacks, variadic signatures, and floating-point ABI lanes are not
+extern signature types. Win32 `BOOL` is normally `i32`, not Epic's one-byte
+`bool`. Products are passed explicitly through `ptr(product)` rather than being
+written as product parameters, so the declaration cannot be mistaken for a C
+by-value aggregate.
+
+Extern and ordinary Epic calls use the Windows x64 integer/pointer convention.
+The first four arguments use `RCX`, `RDX`, `R8`, and `R9`; later arguments use
+8-byte stack slots after the 32-byte shadow space. Calls preserve 16-byte stack
+alignment. Narrow integer values occupy the low part of their ABI lane, and a
+narrow extern return is consumed at its declared width.
+
+`ptr` is the single public opaque address type. These conversions are explicit:
+
+```epic
+let null = ptr(0)
+let from_signed = ptr(address_i64)
+let from_unsigned = ptr(address_u64)
+let array_data = ptr(values)
+let product_data = ptr(record)
+let signed_bits = i64(product_data)
+let unsigned_bits = u64(product_data)
+```
+
+Only `i64` and `u64` convert directly from integers to `ptr`; conversions in both
+directions preserve the 64-bit pattern without validation. There is no implicit
+integer-to-pointer conversion in ordinary or extern calls. `ptr(T[])` returns
+the first element's backing-data address and returns null for an empty array.
+Array growth can replace that address. `ptr(product)` returns the naturally laid
+out, non-moving product payload address. Neither conversion copies, allocates,
+transfers ownership, nor extends the managed owner's lifetime.
+
+`ptr(str)` is deliberately rejected. Use `cstr(text)` for a copied,
+NUL-terminated C string. For a counted mutable byte buffer, use `bytes(text)`,
+then pass `ptr(buffer)` together with `len(buffer)`.
+
+Pointer addition with an integer is byte-oriented. Pointers support `==`, `!=`,
+and `is_null`, but have no dereference operation, field access, subscript,
+pointee type, or automatic bounds check. External code retaining a borrowed
+array or product address after its owner becomes unreachable, or after an array
+grows, is a caller contract violation.
+
+Epic does not formally implement C struct parameters or returns. When the target
+ABI independently specifies that a 1-, 2-, 4-, or 8-byte POD aggregate travels
+in an ordinary integer lane, advanced code may declare the matching `u8`, `u16`,
+`u32`, or `u64` and pack or unpack the bits manually. Other aggregate returns,
+including hidden return-buffer conventions, are unsupported.
+
 ## System calls
 
-`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
+`os.*` names are reserved for selected legacy system/runtime calls exposed by the compiler.
 
 In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
 
@@ -546,10 +619,9 @@ to declare them.
 
 `never` appears here to describe the built-in precisely, but it is not accepted
 in user-written parameter, field, local, or function return type declarations.
-The same applies to the internal `ptr` type: a local may infer it from
-`cstr(s)`, but source declarations cannot name it. `ptr` is a
-transparent byte address: integer addition is byte-oriented, and it cannot be
-subscripted because it carries no pointee type or stride.
+`ptr`, by contrast, is a public opaque 64-bit address type and may appear in
+functions, products, arrays, locals, and extern signatures. It carries no
+pointee type, stride, ownership, or lifetime information.
 
 `len(value)`, `pop(array)`, checked `value[index]`, and slicing are the container interfaces.
 `pop` evaluates its array expression once, preserves capacity, and clears the
@@ -578,7 +650,7 @@ A missing or unreadable file is a compile error, while an empty file is valid.
 
 ## Unsupported in v0
 
-- User-written pointer types.
+- Typed pointers, pointer dereference, and function pointers.
 - General module/import/package system.
 - General method calls.
 - Payload sums.

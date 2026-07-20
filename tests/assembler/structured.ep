@@ -18,7 +18,9 @@ fun main(): void {
     let done_symbol = asm_symbol_new(program, "done")
     let anonymous_symbol = asm_symbol_new(program, "")
     let collision_symbol = asm_symbol_new(program, "__ep_anon_" + itoa(anonymous_symbol))
+    let imported_symbol = asm_symbol_new(program, "MessageBoxA")
     program.entry_symbol_index = start_symbol
+    asm_extern_library_item(program, imported_symbol, "user32.dll")
     asm_section_data(program)
     asm_label(program, value_symbol)
     asm_dq(program, 0)
@@ -42,6 +44,7 @@ fun main(): void {
     asm_add(program, asm_mem_base(0, asm_rbp(), -32), asm_imm(1))
     asm_cmp(program, asm_rax(), asm_mem_base(0, asm_rbp(), -40))
     asm_inc(program, asm_mem_base(0, asm_rbp(), -48))
+    asm_call(program, asm_symbol(imported_symbol))
     asm_jmp(program, asm_symbol(done_symbol))
     asm_label(program, done_symbol)
     asm_jmp(program, asm_symbol(anonymous_symbol))
@@ -92,6 +95,10 @@ fun main(): void {
         if a.kind != b.kind || a_name != b_name || a.addend != b.addend {
             os.ExitProcess(8)
         }
+    }
+    let parsed_import_index = asm_named_symbol_find(parsed, "MessageBoxA")
+    if parsed_import_index < 0 || parsed.symbols[parsed_import_index].library != "user32.dll" || parsed.symbols[parsed_import_index].import_name != "MessageBoxA" {
+        os.ExitProcess(13)
     }
 
     let presentation = asm_parse("; ignored\n\nsection .text\nentry: ; ignored\n    ret\n")

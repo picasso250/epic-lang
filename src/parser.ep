@@ -100,6 +100,14 @@ type AstEnumDef {
     source_path: str
     line: i64
 }
+type AstExternDef {
+    library: str
+    name: str
+    type_name: str
+    params: AstParam[]
+    source_path: str
+    line: i64
+}
 type AstFunDef {
     name: str
     type_name: str
@@ -110,6 +118,7 @@ type AstFunDef {
 }
 type AstProgram {
     funcs: AstFunDef[]
+    externs: AstExternDef[]
     structs: AstStructDef[]
     enums: AstEnumDef[]
 }
@@ -359,6 +368,7 @@ fun ast_block(): AstBlock {
 fun ast_program(): AstProgram {
     let program = new AstProgram
     program.funcs = new AstFunDef[]
+    program.externs = new AstExternDef[]
     program.structs = new AstStructDef[]
     program.enums = new AstEnumDef[]
     program
@@ -466,9 +476,6 @@ fun parse_params(p: Parser): AstParam[] {
         param.name = pname.text
         param.type_name = ptype
         push(params, param)
-        if len(params) > 4 {
-            parse_error(pname.line, "functions may have at most 4 parameters in v0")
-        }
         if !check(p, TokenKind.COMMA) {
             done = true
         }
@@ -530,6 +537,26 @@ fun parse_enum_def(p: Parser): AstEnumDef {
     expect_stmt_end(p)
     node
 }
+fun parse_extern_def(p: Parser): AstExternDef {
+    let keyword = expect(p, TokenKind.EXTERN)
+    let library = expect(p, TokenKind.STRING)
+    expect(p, TokenKind.FUN)
+    let name = expect(p, TokenKind.ID)
+    expect(p, TokenKind.LPAREN)
+    let params = parse_params(p)
+    expect(p, TokenKind.RPAREN)
+    expect(p, TokenKind.COLON)
+    let ret_type = parse_type(p)
+    expect_stmt_end(p)
+    let node = new AstExternDef
+    node.source_path = p.source_path
+    node.line = keyword.line
+    node.library = library.text
+    node.name = name.text
+    node.params = params
+    node.type_name = ret_type
+    node
+}
 fun parse_fn_def(p: Parser): AstFunDef {
     expect(p, TokenKind.FUN)
     let name = expect(p, TokenKind.ID)
@@ -551,8 +578,10 @@ fun parse_fn_def(p: Parser): AstFunDef {
 fun parse_program(p: Parser): AstProgram {
     let node = ast_program()
     skip_newlines(p)
-    for peek_kind(p, TokenKind.FUN) || peek_kind(p, TokenKind.TYPE) {
-        if peek_kind(p, TokenKind.FUN) {
+    for peek_kind(p, TokenKind.EXTERN) || peek_kind(p, TokenKind.FUN) || peek_kind(p, TokenKind.TYPE) {
+        if peek_kind(p, TokenKind.EXTERN) {
+            push(node.externs, parse_extern_def(p))
+        } else if peek_kind(p, TokenKind.FUN) {
             push(node.funcs, parse_fn_def(p))
         } else {
             if p.tokens[p.pos + 2].kind == TokenKind.ASSIGN {
@@ -1192,9 +1221,6 @@ fun parse_primary(p: Parser): AstExpr {
             }
             let args = parse_args(p)
             expect(p, TokenKind.RPAREN)
-            if len(args) > 4 {
-                parse_error(identifier.line, "function calls may have at most 4 arguments in v0")
-            }
             ret parse_postfix(p, ast_call(identifier.text, args, identifier.line))
         }
         ret parse_postfix(p, ast_var(identifier.text, identifier.line))

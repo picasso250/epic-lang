@@ -9,6 +9,8 @@ type AsmItemKind = Section | Extern | Label | Instruction | Bytes | DataInteger 
 
 type AsmSymbol {
     name: str
+    library: str
+    import_name: str
     section: i64
     offset: i64
     external: bool
@@ -390,6 +392,8 @@ fun asm_program_new(): AsmProgram {
 fun asm_symbol_new(program: AsmProgram, name: str): i64 {
     let symbol = new AsmSymbol
     symbol.name = name
+    symbol.library = ""
+    symbol.import_name = ""
     let symbol_index = len(program.symbols)
     push(program.symbols, symbol)
     if len(name) != 0 {
@@ -444,17 +448,41 @@ fun asm_section_text(program: AsmProgram): void {
 fun asm_section_data(program: AsmProgram): void {
     asm_section(program, AsmSectionKind.Data)
 }
-fun asm_extern_item(program: AsmProgram, symbol_index: i64): void {
+fun asm_extern_import_item(program: AsmProgram, symbol_index: i64, library: str, import_name: str): void {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
         asm_die("invalid extern symbol index")
     }
+    if len(import_name) == 0 {
+        asm_die("extern import name must not be empty")
+    }
     let symbol = program.symbols[symbol_index]
-    if !symbol.defined {
-        symbol.external = true
+    if symbol.defined {
+        asm_die("defined symbol cannot be external: " + asm_symbol_name(program, symbol_index))
+    }
+    if len(symbol.library) != 0 && len(library) != 0 && symbol.library != library {
+        asm_die("conflicting extern library for symbol: " + asm_symbol_name(program, symbol_index))
+    }
+    if len(symbol.import_name) != 0 && symbol.import_name != import_name {
+        asm_die("conflicting extern import name for symbol: " + asm_symbol_name(program, symbol_index))
+    }
+    let already_external = symbol.external
+    symbol.external = true
+    symbol.import_name = import_name
+    if len(library) != 0 {
+        symbol.library = library
+    }
+    if already_external {
+        ret
     }
     let item = asm_item_new(AsmItemKind.Extern)
     item.symbol_index = symbol_index
     push(program.items, item)
+}
+fun asm_extern_library_item(program: AsmProgram, symbol_index: i64, library: str): void {
+    asm_extern_import_item(program, symbol_index, library, asm_symbol_name(program, symbol_index))
+}
+fun asm_extern_item(program: AsmProgram, symbol_index: i64): void {
+    asm_extern_import_item(program, symbol_index, "", asm_symbol_name(program, symbol_index))
 }
 fun asm_label(program: AsmProgram, symbol_index: i64): void {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
@@ -466,6 +494,8 @@ fun asm_label(program: AsmProgram, symbol_index: i64): void {
     }
     symbol.defined = true
     symbol.external = false
+    symbol.library = ""
+    symbol.import_name = ""
     let item = asm_item_new(AsmItemKind.Label)
     item.symbol_index = symbol_index
     push(program.items, item)
@@ -1923,6 +1953,23 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): bool {
     asm_times(parser.program, parse_integer(count_text), times_width, parse_integer(times_value))
     true
 }
+fun asm_decode_hex_text(text: str): str {
+    if len(text) == 0 || (len(text) & 1) != 0 {
+        asm_die("extern DLL hex must contain whole bytes")
+    }
+    let values = new u8[]
+    let i = 0
+    for i < len(text) {
+        let high = digit_value(text[i])
+        let low = digit_value(text[i + 1])
+        if high < 0 || low < 0 {
+            asm_die("extern DLL hex contains a non-hex digit")
+        }
+        push(values, u8((high << 4) | low))
+        i += 2
+    }
+    str(values)
+}
 fun asm_program_process_line(parser: AsmProgramParser, raw: str): void {
     let semi = asm_find(raw, 59)
     let line = raw
@@ -1938,6 +1985,24 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): void {
         ret
     }
     if line == "default rel" {
+        ret
+    }
+    if asm_starts(line, "extern_dll ") {
+        let extern_rest = asm_trim(asm_slice(line, 11, len(line)))
+        let dll_space = asm_find(extern_rest, 32)
+        if dll_space <= 0 || dll_space + 1 >= len(extern_rest) {
+            asm_die("extern_dll requires DLL hex, import-name hex, and symbol")
+        }
+        let extern_after_dll = asm_trim(asm_slice(extern_rest, dll_space + 1, len(extern_rest)))
+        let import_space = asm_find(extern_after_dll, 32)
+        if import_space <= 0 || import_space + 1 >= len(extern_after_dll) {
+            asm_die("extern_dll requires DLL hex, import-name hex, and symbol")
+        }
+        let extern_library = asm_decode_hex_text(asm_slice(extern_rest, 0, dll_space))
+        let extern_import_name = asm_decode_hex_text(asm_slice(extern_after_dll, 0, import_space))
+        let extern_symbol_name = asm_trim(asm_slice(extern_after_dll, import_space + 1, len(extern_after_dll)))
+        let extern_library_symbol_index = asm_symbol_intern(parser.program, extern_symbol_name)
+        asm_extern_import_item(parser.program, extern_library_symbol_index, extern_library, extern_import_name)
         ret
     }
     if asm_starts(line, "extern ") {
@@ -2524,6 +2589,16 @@ fun asm_render_instruction(renderer: AsmRenderer, item: AsmItem): void {
         }
     }
 }
+fun asm_render_hex_text(out: u8[], text: str): void {
+    let digits = "0123456789abcdef"
+    for i: 0:len(text) {
+        let value = i64(text[i])
+        let high = value >> 4
+        let low = value & 15
+        asm_render_s(out, digits[high:high + 1])
+        asm_render_s(out, digits[low:low + 1])
+    }
+}
 fun asm_render(program: AsmProgram): u8[] {
     let out = new u8[]
     let renderer = new AsmRenderer
@@ -2546,7 +2621,16 @@ fun asm_render(program: AsmProgram): u8[] {
                 }
             }
             AsmItemKind.Extern {
-                asm_render_s(out, "extern ")
+                let extern_symbol = program.symbols[item.symbol_index]
+                if len(extern_symbol.library) != 0 {
+                    asm_render_s(out, "extern_dll ")
+                    asm_render_hex_text(out, extern_symbol.library)
+                    asm_render_s(out, " ")
+                    asm_render_hex_text(out, extern_symbol.import_name)
+                    asm_render_s(out, " ")
+                } else {
+                    asm_render_s(out, "extern ")
+                }
                 asm_render_s(out, asm_symbol_name(program, item.symbol_index))
                 asm_render_s(out, "\n")
             }

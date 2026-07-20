@@ -50,6 +50,9 @@ fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): void {
     for enum_i: 0:len(ast.enums) {
         push(out.enums, ast.enums[enum_i])
     }
+    for extern_i: 0:len(ast.externs) {
+        push(out.externs, ast.externs[extern_i])
+    }
     for func_i: 0:len(ast.funcs) {
         let f = ast.funcs[func_i]
         if f.name != "main" || is_main_file {

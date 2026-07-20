@@ -1,0 +1,6 @@
+# COMPILE_ERROR: conflicting extern declaration 'ConflictingExtern'
+extern "first.dll" fun ConflictingExtern(value: u32): i32
+extern "second.dll" fun ConflictingExtern(value: u32): i32
+
+fun main(): void {
+}

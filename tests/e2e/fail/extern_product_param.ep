@@ -1,0 +1,8 @@
+# COMPILE_ERROR: extern 'BadProductExtern' parameter 'value' has unsupported ABI type BadExternProduct
+type BadExternProduct {
+    value: i32
+}
+extern "demo.dll" fun BadProductExtern(value: BadExternProduct): void
+
+fun main(): void {
+}

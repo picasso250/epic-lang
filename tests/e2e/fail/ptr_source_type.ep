@@ -1,6 +1,7 @@
-# COMPILE_ERROR: unknown type 'ptr'
+# COMPILE_ERROR: argument 1 of 'expose' expects ptr, got i64
 fun expose(value: ptr): void {
 }
 
 fun main(): void {
+    expose(0)
 }

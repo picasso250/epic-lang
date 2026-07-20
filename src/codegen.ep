@@ -10,6 +10,7 @@ type FuncInfo {
     name: str
     ret_type: TypeInfo
     params: AstParam[]
+    symbol_index: i64
 }
 type StringLit {
     text: str
@@ -431,7 +432,18 @@ fun add_func_infos(e: EmitterState, ast: AstProgram): void {
         f.name = fn.name
         f.ret_type = emitter_type(e, fn.type_name)
         f.params = fn.params
+        f.symbol_index = named_symbol(e, fn.name)
         push(e.funcs, f)
+    }
+    for extern_i: 0:len(ast.externs) {
+        let ext = ast.externs[extern_i]
+        let info = new FuncInfo
+        info.name = ext.name
+        info.ret_type = emitter_type(e, ext.type_name)
+        info.params = ext.params
+        info.symbol_index = asm_symbol_new(e.program, "")
+        asm_extern_import_item(e.program, info.symbol_index, ext.library, ext.name)
+        push(e.funcs, info)
     }
 }
 fun add_field(info: StructInfo, name: str, typ: TypeInfo, offset: i64): void {
@@ -796,6 +808,23 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): void {
         emit_stack_load(e, asm_r9(), slots[3])
     }
 }
+fun emit_call_slots(e: EmitterState, target_symbol_index: i64, slots: i64[]): void {
+    load_spilled_args(e, slots)
+    let stack_args = len(slots) - 4
+    if stack_args < 0 {
+        stack_args = 0
+    }
+    let frame = 32 + align_up(stack_args * 8, 16)
+    asm_sub(e.program, asm_rsp(), asm_imm(frame))
+    let i = 4
+    for i < len(slots) {
+        emit_stack_load(e, asm_rax(), slots[i])
+        asm_mov(e.program, asm_mem_base(64, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
+        i += 1
+    }
+    asm_call(e.program, asm_symbol(target_symbol_index))
+    asm_add(e.program, asm_rsp(), asm_imm(frame))
+}
 fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
     let slots = new i64[]
     let i = 0
@@ -811,6 +840,22 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
     if expr.type_name == "" && sema_is_integer(name) {
         emit_expr(e, expr.args[0])
         emit_coerce_rax(e, expr_type(e, expr.args[0]), type_integer(name))
+        ret
+    }
+    if expr.type_name == "" && name == "ptr" {
+        let source_type = expr_type(e, expr.args[0])
+        emit_expr(e, expr.args[0])
+        if source_type.kind == "array" {
+            let empty_array = fresh_label(e)
+            let array_done = fresh_label(e)
+            asm_cmp(e.program, asm_mem_base(64, asm_rax(), 8), asm_imm(0))
+            asm_je(e.program, asm_symbol(empty_array))
+            asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
+            asm_jmp(e.program, asm_symbol(array_done))
+            emit_label_index(e, empty_array)
+            asm_xor(e.program, asm_eax(), asm_eax())
+            emit_label_index(e, array_done)
+        }
         ret
     }
     if expr.type_name == "" && name == "is_null" {
@@ -834,22 +879,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
             push(slots, slot)
             i += 1
         }
-        load_spilled_args(e, slots)
-        let stack_args = len(slots) - 4
-        if stack_args < 0 {
-            stack_args = 0
-        }
-        let extra_frame = align_up(stack_args * 8, 16)
-        let frame = 32 + extra_frame
-        asm_sub(e.program, asm_rsp(), asm_imm(frame))
-        i = 4
-        for i < len(slots) {
-            emit_stack_load(e, asm_rax(), slots[i])
-            asm_mov(e.program, asm_mem_base(0, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
-            i += 1
-        }
-        emit_call_inst(e, sys_symbol)
-        asm_add(e.program, asm_rsp(), asm_imm(frame))
+        emit_call_slots(e, named_symbol(e, sys_symbol), slots)
         ret
     }
     if expr.type_name == "" && name == "exit" {
@@ -1039,11 +1069,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_xor(e.program, asm_eax(), asm_eax())
         ret
     }
-    let call_slots = spill_typed_args(e, expr.args, find_func_info(e, name))
-    load_spilled_args(e, call_slots)
-    asm_sub(e.program, asm_rsp(), asm_imm(32))
-    emit_call_inst(e, name)
-    asm_add(e.program, asm_rsp(), asm_imm(32))
+    let call_info = find_func_info(e, name)
+    let call_slots = spill_typed_args(e, expr.args, call_info)
+    emit_call_slots(e, call_info.symbol_index, call_slots)
 }
 fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, typ: TypeInfo): void {
     emit_stack_load(e, asm_rcx(), right_slot)
@@ -2128,6 +2156,13 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): void {
     if len(fn.params) > 3 {
         let param3_type = find_local_type(e, fn.params[3].name)
         emit_stack_store_value(e, find_local_slot(e, fn.params[3].name), 9, param3_type)
+    }
+    i = 4
+    for i < len(fn.params) {
+        let stack_param_type = find_local_type(e, fn.params[i].name)
+        asm_mov(e.program, type_register(0, stack_param_type), asm_operand_width(asm_mem_base(0, asm_rbp(), 48 + (i - 4) * 8), type_width(stack_param_type)))
+        emit_stack_store_value(e, find_local_slot(e, fn.params[i].name), 0, stack_param_type)
+        i += 1
     }
     emit_block(e, fn.body)
     if fn.name != "main" {

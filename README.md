@@ -3,10 +3,11 @@
 Epic v4 starts from the sealed v3 compiler. Its initial seed intentionally has
 the same language semantics and compiler sources as the v3 fixed point; v4 is
 the dogfood generation for v3's expression control flow, fixed-width integers,
-opaque arrays, string and array slicing, explicit C-string conversion, and
-single internal `ptr` model. New v4 language work begins from this fixed point.
-The compiler now dogfoods string slicing, and v4 closes the transitional
-`str.data`, `str.len`, and `str_new` interfaces retained by v3.
+opaque arrays, string and array slicing, explicit C-string conversion, and a
+single pointer model. New v4 language work begins from this fixed point. The
+compiler now dogfoods string slicing, v4 closes the transitional `str.data`,
+`str.len`, and `str_new` interfaces retained by v3, and source programs can
+declare Windows x64 DLL imports with `extern "dll" fun ...`.
 
 It retains the self-contained structured AMD64 assembler, stable symbol indexes,
 deterministic PE writer, and conservative garbage collector.
