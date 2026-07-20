@@ -5,7 +5,8 @@ fun main(): void {
     let c = 'E'
     let d = 'p'
     let e = 'i'
-    if a != 65 || b != 10 || c != 69 || d != 112 || e != 105 || 'c' != 99 {
+    let text = "A"
+    if a != 65 || b != 10 || c != 69 || d != 112 || e != 105 || 'c' != 99 || 'A' + 255u8 != 64u8 || text[0] + 255u8 != 64u8 {
         os.ExitProcess(1)
     }
     os.ExitProcess(0)

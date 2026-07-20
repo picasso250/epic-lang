@@ -703,6 +703,12 @@ fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negativ
         expr.resolved = 1
         ret "i64"
     }
+    if expr.type_name == "u8" {
+        expr.resolved_type = "u8"
+        expr.resolved_value = parse_integer(expr.value)
+        expr.resolved = 1
+        ret "u8"
+    }
     let digit_end = sema_literal_digit_end(expr.value)
     let suffix = ""
     if digit_end < len(expr.value) {
@@ -1225,7 +1231,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
             if base_type == "never" || index_type == "never" {
                 result = "never"
             } else if base_type == "str" {
-                result = "i64"
+                result = "u8"
             } else if type_is_array(base_type) == 1 {
                 result = array_element_type(base_type)
             } else {

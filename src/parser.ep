@@ -1178,7 +1178,7 @@ fun parse_primary(p: Parser): AstExpr {
     }
     if peek_kind(p, TokenKind.CHAR) == 1 {
         let char_token = advance(p)
-        ret ast_literal(char_token.text, "i64", char_token.line)
+        ret ast_literal(char_token.text, "u8", char_token.line)
     }
     if peek_kind(p, TokenKind.TRUE) == 1 {
         let true_token = advance(p)
