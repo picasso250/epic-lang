@@ -1,0 +1,101 @@
+# EXIT: 0
+
+type NaturalWidthBox {
+    value: i64
+}
+
+type NaturalWidthKind = First | Second
+
+fun natural_width_check(ok: bool): void {
+    if !ok {
+        panic("natural-width array check failed")
+    }
+}
+
+fun main(): void {
+    let i8s = new i8[]
+    push(i8s, -128i8)
+    let more_i8s = new i8[]
+    push(more_i8s, 127i8)
+    extend(i8s, more_i8s)
+    natural_width_check(i8s[0] == -128i8 && pop(i8s) == 127i8)
+
+    let u8s = new u8[]
+    push(u8s, 255u8)
+    extend(u8s, u8s)
+    natural_width_check(len(u8s) == 2 && u8s[0] == 255u8 && u8s[1] == 255u8)
+
+    let i16s = new i16[]
+    push(i16s, -32768i16)
+    push(i16s, 7i16)
+    let more_i16s = new i16[]
+    push(more_i16s, 32767i16)
+    extend(i16s, more_i16s)
+    let i16_slice = i16s[1:3]
+    push(i16_slice, -9i16)
+    extend(i16_slice, more_i16s)
+    natural_width_check(i16_slice[0] == 7i16)
+    natural_width_check(i16_slice[1] == 32767i16)
+    natural_width_check(i16_slice[2] == -9i16)
+    natural_width_check(pop(i16_slice) == 32767i16)
+
+    let u16s = new u16[]
+    push(u16s, 65535u16)
+    extend(u16s, u16s)
+    natural_width_check(u16s[1] == 65535u16)
+
+    let i32s = new i32[]
+    push(i32s, -2147483648i32)
+    let more_i32s = new i32[]
+    push(more_i32s, 2147483647i32)
+    extend(i32s, more_i32s)
+    natural_width_check(i32s[0] == -2147483648i32 && i32s[1] == 2147483647i32)
+
+    let u32s = new u32[]
+    push(u32s, 4294967295u32)
+    extend(u32s, u32s)
+    natural_width_check(u32s[1] == 4294967295u32)
+
+    let i64s = new i64[]
+    push(i64s, -9223372036854775808i64)
+    extend(i64s, i64s)
+    natural_width_check(i64s[1] == -9223372036854775808i64)
+
+    let u64s = new u64[]
+    push(u64s, 18446744073709551615u64)
+    extend(u64s, u64s)
+    natural_width_check(u64s[1] == 18446744073709551615u64)
+
+    let flags = new bool[]
+    push(flags, true)
+    let more_flags = new bool[]
+    push(more_flags, false)
+    extend(flags, more_flags)
+    natural_width_check(flags[0] && !flags[1])
+
+    let strings = new str[]
+    push(strings, "a")
+    let more_strings = new str[]
+    push(more_strings, "b")
+    extend(strings, more_strings)
+    natural_width_check(strings[0] == "a" && strings[1] == "b")
+
+    let kinds = new NaturalWidthKind[]
+    push(kinds, NaturalWidthKind.First)
+    let more_kinds = new NaturalWidthKind[]
+    push(more_kinds, NaturalWidthKind.Second)
+    extend(kinds, more_kinds)
+    natural_width_check(kinds[0] == NaturalWidthKind.First)
+    natural_width_check(kinds[1] == NaturalWidthKind.Second)
+
+    let boxes = new NaturalWidthBox[]
+    let first = new NaturalWidthBox
+    first.value = 11
+    push(boxes, first)
+    let more_boxes = new NaturalWidthBox[]
+    let second = new NaturalWidthBox
+    second.value = 22
+    push(more_boxes, second)
+    extend(boxes, more_boxes)
+    natural_width_check(boxes[0].value == 11 && boxes[1].value == 22)
+}

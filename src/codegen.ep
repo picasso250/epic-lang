@@ -153,7 +153,7 @@ fun emit_runtime_helpers(e: EmitterState): void {
     emit_runtime(e, embed("../runtime/str_slice.asm"))
     emit_runtime(e, embed("../runtime/cstr.asm"))
     emit_runtime(e, embed("../runtime/embed.asm"))
-    emit_runtime(e, embed("../runtime/extend_u8.asm"))
+    emit_runtime(e, embed("../runtime/extend.asm"))
     emit_runtime(e, embed("../runtime/itoa.asm"))
     emit_runtime(e, embed("../runtime/argv.asm"))
     emit_runtime(e, embed("../runtime/read_file.asm"))
@@ -1029,10 +1029,13 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         ret
     }
     if name == "extend" {
+        let extend_type = expr_type(e, expr.args[0])
+        let elem_size = type_storage_size(emitter_type(e, extend_type.name))
         let extend_slots = spill_args(e, expr.args)
         emit_stack_load(e, asm_rcx(), extend_slots[0])
         emit_stack_load(e, asm_rdx(), extend_slots[1])
-        emit_call_inst(e, "_extend_u8")
+        asm_mov(e.program, asm_r8(), asm_imm(elem_size))
+        emit_call_inst(e, "_extend")
         asm_xor(e.program, asm_eax(), asm_eax())
         ret
     }

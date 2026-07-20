@@ -1,0 +1,6 @@
+# COMPILE_ERROR: extend requires matching array types, got u16[] and u32[]
+fun main(): void {
+    let dst = new u16[]
+    let src = new u32[]
+    extend(dst, src)
+}

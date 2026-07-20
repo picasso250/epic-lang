@@ -185,8 +185,8 @@ fun sema_add_builtins(state: SemaState): void {
     push(sig.param_types, "array")
     sema_add_builtin(state, sig)
     sig = sema_signature("extend", "void")
-    push(sig.param_types, "u8[]")
-    push(sig.param_types, "u8[]")
+    push(sig.param_types, "array")
+    push(sig.param_types, "array")
     sema_add_builtin(state, sig)
     sig = sema_signature("embed", "u8[]")
     sema_add_builtin(state, sig)
@@ -1023,6 +1023,11 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             if expected_array_type != "never" {
                 expected = array_element_type(expected_array_type)
             }
+        } else if full_name == "extend" && i == 1 {
+            let extend_expected_array_type = expr.args[0].resolved_type
+            if extend_expected_array_type != "never" {
+                expected = extend_expected_array_type
+            }
         }
         let actual = sema_check_expr_expected(state, expr.args[i], expected)
         if full_name == "is_null" {
@@ -1050,6 +1055,15 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         } else if full_name == "pop" && i == 0 {
             if !type_is_array(actual) {
                 sema_error(state.source_path, expr.args[i].line, "pop expects an array, got " + actual)
+            }
+        } else if full_name == "extend" && i == 0 {
+            if !type_is_array(actual) {
+                sema_error(state.source_path, expr.args[i].line, "extend first argument must be an array")
+            }
+        } else if full_name == "extend" && i == 1 {
+            let extend_array_type = expr.args[0].resolved_type
+            if extend_array_type != "never" && actual != extend_array_type {
+                sema_error(state.source_path, expr.args[i].line, "extend requires matching array types, got " + extend_array_type + " and " + actual)
             }
         } else if !sema_assignable(expected, actual) {
             sema_error(state.source_path, expr.args[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)

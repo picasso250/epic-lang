@@ -356,13 +356,16 @@ fun asm_mem_base(width: i64, base: AsmOperand, disp: i64): AsmOperand {
     op.disp = disp
     op
 }
-fun asm_mem_indexed(base: AsmOperand, index: AsmOperand, scale: i64, disp: i64): AsmOperand {
+fun asm_mem_indexed(base: AsmOperand, index: AsmOperand, elem_size: i64, disp: i64): AsmOperand {
     if base.kind != AsmOperandKind.Register || index.kind != AsmOperandKind.Register {
         asm_die("memory address requires registers")
     }
+    if elem_size != 1 && elem_size != 2 && elem_size != 4 && elem_size != 8 {
+        asm_die("indexed memory element size must be 1, 2, 4, or 8")
+    }
     let op = asm_mem_base(0, base, disp)
     op.index = index.reg
-    op.scale = scale
+    op.scale = elem_size
     op
 }
 fun asm_operand_width(op: AsmOperand, width: i64): AsmOperand {
