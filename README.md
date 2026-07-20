@@ -17,6 +17,12 @@ The bootstrap chain is:
 Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v4 -> Epic v4 fixed point
 ```
 
+## Canonical history
+
+> When correcting history, backport a design to the earliest version where it
+> reasonably belongs, not the earliest version where it could technically be
+> implemented.
+
 ## Build
 
 ```powershell
