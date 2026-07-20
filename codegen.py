@@ -17,8 +17,7 @@ class Emitter:
         self.builtins = {"print",
                          "itoa",
                          "str_new", "bytes", "read_file", "write_file",
-                         "str_slice",
-                         "str_replace_char", "push", "extend"}
+                         "str_slice", "push", "extend"}
         self.winapi = {
             "Sleep", "GetTickCount64", "GetLastError", "SetLastError",
             "GetStdHandle", "CloseHandle", "lstrlenA", "lstrcmpA",
@@ -699,12 +698,6 @@ class Emitter:
                 self.emit_stack_load("rdx", slots[1])
                 self.emit_stack_load("r8", slots[2])
                 self._call_with_shadow("_str_slice")
-            elif name == "str_replace_char":
-                slots = self._spill_args(args)
-                self.emit_stack_load("rcx", slots[0])
-                self.emit_stack_load("rdx", slots[1])
-                self.emit_stack_load("r8", slots[2])
-                self._call_with_shadow("_str_replace_char")
             elif name == "push":
                 self.emit_push(args)
             elif name == "extend":
@@ -1184,7 +1177,7 @@ class Emitter:
             if self._syscall_symbol(name, expr.namespace):
                 return "i64"
             # Builtins with known return types
-            if name in ("itoa", "str_new", "read_file", "str_slice", "str_replace_char"):
+            if name in ("itoa", "str_new", "read_file", "str_slice"):
                 return "&str"
             if name == "bytes":
                 return "&_arr_u8"

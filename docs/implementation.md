@@ -65,7 +65,6 @@ runtime/argv.asm
 runtime/read_file.asm
 runtime/write_file.asm
 runtime/str_slice.asm
-runtime/str_replace_char.asm
 runtime/str_cat.asm
 ```
 
@@ -160,7 +159,6 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `str_new` | calls `_str_alloc` runtime helper |
 | `bytes` | calls `_bytes` runtime helper |
 | `str_slice` | calls `_str_slice` runtime helper |
-| `str_replace_char` | calls `_str_replace_char` runtime helper |
 | `read_file` | calls `_read_file` runtime helper |
 | `write_file` | calls `_write_file` runtime helper |
 | `push` | emitted by codegen for dynamic arrays |

@@ -32,7 +32,6 @@ RUNTIME_ASM_FILES = [
     "bytes.asm",
     "str_cat.asm",
     "str_slice.asm",
-    "str_replace_char.asm",
     "embed.asm",
     "extend_u8.asm",
     "itoa.asm",

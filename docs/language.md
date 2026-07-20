@@ -221,14 +221,11 @@ to declare them.
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
-| `str_replace_char(s: str, from: u8, to: u8): str` | returns a copy with matching bytes replaced |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
 | `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
-
-The byte arguments of `str_replace_char` use their low eight bits.
 
 `embed` accepts exactly one string literal. Relative paths are resolved against
 the `.ep` file containing the expression; absolute paths are used unchanged.
