@@ -49,10 +49,7 @@ type EmitterState {
     loop_ends: i64[]
 }
 fun die(msg: str): void {
-    print("Codegen error: ")
-    print(msg)
-    print("\n")
-    os.ExitProcess(1)
+    panic("codegen: " + msg)
     ret
 }
 fun named_symbol(e: EmitterState, name: str): i64 {
@@ -498,12 +495,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
             ret s.fields[i]
         }
     }
-    print("Codegen error: unknown field ")
-    print(struct_name)
-    print(".")
-    print(field_name)
-    print("\n")
-    os.ExitProcess(1)
+    die("unknown field " + struct_name + "." + field_name)
     ret new FieldInfo
 }
 fun ensure_array_layout(e: EmitterState, elem: str): i64 {

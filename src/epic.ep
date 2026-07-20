@@ -11,7 +11,7 @@ fun die_driver(msg: str): void {
     print("epic: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    exit(1)
     ret
 }
 fun write_output(path: str, data: u8[]): void {

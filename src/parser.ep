@@ -402,7 +402,7 @@ fun parse_error(line: i64, msg: str): void {
     print(": ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    exit(1)
     ret
 }
 fun expect(p: Parser, kind: TokenKind): Token {
@@ -413,7 +413,7 @@ fun expect(p: Parser, kind: TokenKind): Token {
         print(": Unexpected token '")
         print(t.text)
         print("'\n")
-        os.ExitProcess(1)
+        exit(1)
     }
     ret t
 }

@@ -39,7 +39,7 @@ fun sema_error(path: str, line: i64, message: str): void {
     print(": semantic error: ")
     print(message)
     print("\n")
-    os.ExitProcess(1)
+    exit(1)
     ret
 }
 fun sema_duplicate(path: str, line: i64, what: str, first: str): void {
@@ -51,7 +51,7 @@ fun sema_duplicate(path: str, line: i64, what: str, first: str): void {
     print("; first declared at ")
     print(first)
     print("\n")
-    os.ExitProcess(1)
+    exit(1)
     ret
 }
 fun sema_state(): SemaState {

@@ -117,13 +117,13 @@ fun lex(src: str): Token[] {
                     let c = src[pos]
                     if c == 10 || c == 13 {
                         print("unterminated string\n")
-                        os.ExitProcess(1)
+                        exit(1)
                     }
                     if c == 92 {
                         pos += 1
                         if pos >= n {
                             print("bad escape\n")
-                            os.ExitProcess(1)
+                            exit(1)
                         }
                         let e = src[pos]
                         if e == 110 {
@@ -142,7 +142,7 @@ fun lex(src: str): Token[] {
                             c = 0
                         } else {
                             print("bad escape\n")
-                            os.ExitProcess(1)
+                            exit(1)
                         }
                     }
                     push(buf, c)
@@ -151,7 +151,7 @@ fun lex(src: str): Token[] {
             }
             if scanning {
                 print("unterminated string\n")
-                os.ExitProcess(1)
+                exit(1)
             }
             let text = str(buf)
             pos += 1
@@ -163,14 +163,14 @@ fun lex(src: str): Token[] {
             pos += 1
             if pos >= n {
                 print("bad char\n")
-                os.ExitProcess(1)
+                exit(1)
             }
             let ch_val = src[pos]
             if ch_val == 92 {
                 pos += 1
                 if pos >= n {
                     print("bad char\n")
-                    os.ExitProcess(1)
+                    exit(1)
                 }
                 let char_escape = src[pos]
                 if char_escape == 110 {
@@ -189,13 +189,13 @@ fun lex(src: str): Token[] {
                     ch_val = 0
                 } else {
                     print("bad escape\n")
-                    os.ExitProcess(1)
+                    exit(1)
                 }
             }
             pos += 1
             if pos >= n || src[pos] != 39 {
                 print("bad char\n")
-                os.ExitProcess(1)
+                exit(1)
             }
             pos += 1
             push_token(tokens, TokenKind.CHAR, itoa(ch_val), char_line)
@@ -214,7 +214,7 @@ fun lex(src: str): Token[] {
                 }
                 if pos == digit_start {
                     print("hexadecimal literal requires at least one digit\n")
-                    os.ExitProcess(1)
+                    exit(1)
                 }
             } else {
                 while pos < n && is_digit(src[pos]) {
@@ -407,7 +407,7 @@ fun lex(src: str): Token[] {
         }
         if ch == 59 {
             print("unexpected semicolon\n")
-            os.ExitProcess(1)
+            exit(1)
         }
         if ch == 44  {
             push_token(tokens, TokenKind.COMMA, ",", line)
@@ -436,7 +436,7 @@ fun dump_tokens(tokens: Token[]): i64 {
 fun main(): void {
     if len(argv) < 2 {
         print("usage: lexer <file>\n")
-        os.ExitProcess(1)
+        exit(1)
     }
     let src = read_file(argv[1])
     let tokens = lex(src)

@@ -23,10 +23,7 @@ type PeSection {
 }
 
 fun pe_die(msg: str): void {
-    print("pe: ")
-    print(msg)
-    print("\n")
-    os.ExitProcess(1)
+    panic("pe: " + msg)
     ret
 }
 fun pe_byte(out: u8[], value: i64): void {

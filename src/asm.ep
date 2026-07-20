@@ -74,7 +74,7 @@ fun asm_die(msg: str): void {
     print("assembler: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    exit(1)
     ret
 }
 fun asm_slice(s: str, start: i64, end: i64): str {
