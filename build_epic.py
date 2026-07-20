@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Epic v3 compiler with an exact local v2 compiler."""
+"""Build the Epic v4 compiler with an exact local v3 compiler."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from process_metrics import format_peak_working_set, run_measured
 
 ROOT = Path(__file__).resolve().parent
 BUILD_DIR = ROOT / "build"
-DEFAULT_OUTPUT = BUILD_DIR / "epic-v3.exe"
+DEFAULT_OUTPUT = BUILD_DIR / "epic-v4.exe"
 SOURCE_PATHS = tuple(
     path.relative_to(ROOT).as_posix()
     for path in sorted(
@@ -44,19 +44,19 @@ def git_output(*args: str) -> str:
     return result.stdout.strip()
 
 
-def v2_seed_commit() -> str:
-    return git_output("rev-parse", "refs/heads/v2")
+def v3_seed_commit() -> str:
+    return git_output("rev-parse", "refs/heads/v3")
 
 
 def temporary_worktree_path() -> Path:
     temp_root = Path(tempfile.gettempdir()).resolve()
-    return temp_root / f"epic-v2-{os.getpid()}-{uuid.uuid4().hex}"
+    return temp_root / f"epic-v3-{os.getpid()}-{uuid.uuid4().hex}"
 
 
 def remove_worktree(path: Path) -> None:
     temp_root = Path(tempfile.gettempdir()).resolve()
     resolved = path.resolve()
-    if resolved.parent != temp_root or not resolved.name.startswith("epic-v2-"):
+    if resolved.parent != temp_root or not resolved.name.startswith("epic-v3-"):
         raise RuntimeError(f"refusing to remove unexpected worktree path: {resolved}")
     subprocess.run(
         ["git", "worktree", "remove", "--force", str(resolved)],
@@ -77,15 +77,15 @@ def sha256(path: Path) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build the Epic v3 compiler")
+    parser = argparse.ArgumentParser(description="Build the Epic v4 compiler")
     parser.add_argument("-o", "--output", type=Path, help="output executable path")
     return parser.parse_args()
 
 
-def ensure_v2_seed(seed: str) -> Path:
-    artifact = BUILD_DIR / f"epic-v2-{seed}.exe"
+def ensure_v3_seed(seed: str) -> Path:
+    artifact = BUILD_DIR / f"epic-v3-{seed}.exe"
     if artifact.is_file():
-        print(f"v2 seed: {seed} (cached)", flush=True)
+        print(f"v3 seed: {seed} (cached)", flush=True)
         return artifact
 
     nasm = ROOT / "tools" / "nasm.exe"
@@ -94,7 +94,7 @@ def ensure_v2_seed(seed: str) -> Path:
 
     worktree = temporary_worktree_path()
     try:
-        print(f"v2 seed: {seed} (building)", flush=True)
+        print(f"v3 seed: {seed} (building)", flush=True)
         run(["git", "worktree", "add", "--detach", str(worktree), seed])
         worktree_tools = worktree / "tools"
         worktree_tools.mkdir()
@@ -108,7 +108,7 @@ def ensure_v2_seed(seed: str) -> Path:
         remove_worktree(worktree)
 
     if not artifact.is_file():
-        raise RuntimeError(f"v2 did not produce the expected compiler: {artifact}")
+        raise RuntimeError(f"v3 did not produce the expected compiler: {artifact}")
     return artifact
 
 
@@ -119,20 +119,20 @@ def main() -> int:
 
     missing = [str(ROOT / path) for path in SOURCE_PATHS if not (ROOT / path).is_file()]
     if missing:
-        raise RuntimeError(f"missing v3 sources: {', '.join(missing)}")
+        raise RuntimeError(f"missing v4 sources: {', '.join(missing)}")
 
     if output.exists():
         output.unlink()
 
     start = time.perf_counter()
-    seed = v2_seed_commit()
-    compiler = ensure_v2_seed(seed)
+    seed = v3_seed_commit()
+    compiler = ensure_v3_seed(seed)
     compile_metrics = run_measured(
         [str(compiler), "-o", str(output), *SOURCE_PATHS],
         cwd=ROOT,
     )
     if not output.is_file():
-        raise RuntimeError(f"v2 did not produce the expected v3 compiler: {output}")
+        raise RuntimeError(f"v3 did not produce the expected v4 compiler: {output}")
 
     elapsed = time.perf_counter() - start
     print(f"built: {output}")

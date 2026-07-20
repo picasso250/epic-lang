@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the self-hosted compiler, then run every v3 test suite."""
+"""Build the self-hosted compiler, then run every v4 test suite."""
 
 import os
 import subprocess

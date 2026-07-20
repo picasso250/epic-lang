@@ -1,4 +1,4 @@
-# Epic v3 compiler implementation
+# Epic v4 compiler implementation
 
 This document describes the compiler implementation. User-visible semantics
 live in [`language.md`](language.md).
@@ -8,18 +8,18 @@ live in [`language.md`](language.md).
 The bootstrap chain is:
 
 ```text
-Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 seed -> Epic v3 fixed point
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v4 seed -> Epic v4 fixed point
 ```
 
-`build_epic.py` resolves the exact commit of the local `v2` branch. A cached
-`build/epic-v2-<hash>.exe` is reused when available; otherwise the script
-creates a detached v2 worktree and invokes its `build_epic.py`. That v2
-compiler builds the current v3 sources. `bootstrap_fixed_point.py` then checks
+`build_epic.py` resolves the exact commit of the sealed local `v3` branch. A
+cached `build/epic-v3-<hash>.exe` is reused when available; otherwise the script
+creates a detached v3 worktree and invokes its `build_epic.py`. That v3 compiler
+builds the current v4 sources. `bootstrap_fixed_point.py` then checks
 that generations 1 and 2 are byte-identical.
 
 ## Compiler pipeline
 
-The normal v3 compiler is entirely written in Epic:
+The normal v4 compiler is entirely written in Epic:
 
 ```text
 source -> lexer -> parser -> semantic analysis -> AsmProgram -> encoder -> PE writer
@@ -114,13 +114,13 @@ Integer and bool locals/parameters use 8-byte stack slots, while product fields
 and array elements use their natural 1-, 2-, 4-, or 8-byte size and alignment.
 The low N bits of an integer expression are authoritative; upper register bits
 need not be canonical. Code generation extends only at a widening conversion,
-when forming a 64-bit address, at an approved v3 compatibility boundary, or for
+when forming a 64-bit address, at an inherited compatibility boundary, or for
 division lowering. The private assembler encodes 16-bit operands plus `movzx`,
 `movsx`, and `movsxd` for these boundaries.
 
 The polymorphic `is_null` builtin is checked in semantic analysis against the
 reference categories and lowered in value position to `test rax, rax` plus
-`sete al`. Conditional code uses the ordinary bool path; v3 deliberately adds
+`sete al`. Conditional code uses the ordinary bool path; the compiler adds
 no builtin-specific branch optimization or implicit dereference guard.
 
 Runtime assembly helpers implement strings, dynamic byte arrays, command-line
@@ -143,10 +143,11 @@ the opaque array mutation surface leaves room for a later copy-on-write
 implementation without changing observable behavior. `cstr(str)` is separate:
 it allocates a fresh byte region and appends the terminator required by C.
 
-v3 keeps `str_new`, `.data`, and `.len` as uniform low-level string interfaces;
+The initial v4 seed inherits v3's uniform low-level `str_new`, `.data`, and
+`.len` string interfaces;
 there is no compiler-source path whitelist. Since `.data` is a computed
 `owner + offset` property, it remains correct for sliced strings. They are
-scheduled to disappear when v4 can dogfood slicing directly. Raw C/Win32 calls
+scheduled to disappear as v4 dogfoods slicing directly. Raw C/Win32 calls
 accept the single internal transparent `ptr` type, and `cstr(str)` returns that
 type after allocating and terminating a copy.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Epic v3 from v2, then verify two self-hosted generations match."""
+"""Build Epic v4 from v3, then verify two self-hosted generations match."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from process_metrics import ProcessMetrics, format_peak_working_set, run_measure
 ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / "build"
 FIXED_POINT = BUILD / "fixed-point"
-SEED = BUILD / "epic-v3.exe"
+SEED = BUILD / "epic-v4.exe"
 SOURCES = tuple(
     path.relative_to(ROOT).as_posix()
     for path in sorted(
@@ -65,7 +65,7 @@ def main() -> int:
         f"peak memory: {format_peak_working_set(metrics_2.peak_working_set_bytes)}"
     )
     if generation_1.read_bytes() != generation_2.read_bytes():
-        raise RuntimeError("Epic v3 did not reach a byte-identical fixed point")
+        raise RuntimeError("Epic v4 did not reach a byte-identical fixed point")
     print("fixed point: byte-identical")
     return 0
 

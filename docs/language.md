@@ -1,4 +1,4 @@
-# Epic v3 language reference
+# Epic v4 language reference
 
 ## Core direction
 
@@ -9,11 +9,11 @@
 - `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
-- v3 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
-- The Epic v3 compiler is self-hosted and begins with the v2 language surface.
-- v3 does not preserve forward compatibility.
+- v4 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
+- The Epic v4 compiler is self-hosted and begins from the sealed v3 compiler.
+- v4 does not preserve forward compatibility.
 
-**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v3 fixed point.
+**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v4 -> Epic v4 fixed point.
 
 ## Changes introduced in Epic v2
 
@@ -94,6 +94,12 @@ Compiler-driver and backend changes such as verbose phase timings, `a.exe` as
 the default executable name, structured assembly IR, and fixed-point build
 layout changes are implementation changes rather than language features.
 
+## Epic v4 development baseline
+
+The initial v4 seed has the same user-visible semantics as sealed v3. v4 is the
+dogfood generation for the features listed above; new v4 language features will
+be recorded here as they are implemented.
+
 ## Program model
 
 A program is a set of top-level product type, unit-enum, and function
@@ -106,7 +112,7 @@ There are no imports, packages, visibility rules, or per-file namespaces in v0.
 The current driver can compile multiple source files as one whole program:
 
 ```text
-build\epic-v3.exe [-v] [-S] [-o path] main.ep lib.ep
+build\epic-v4.exe [-v] [-S] [-o path] main.ep lib.ep
 ```
 
 Normal compilation assembles in memory and writes only the executable. `-v`
@@ -159,13 +165,14 @@ Locals and parameters remain in 8-byte stack slots as an implementation detail.
 
 `str` is an immutable byte view. String literals produce `str` values.
 The runtime representation owns a backing allocation plus an offset and length.
-v3 retains two low-level transition properties: `s.data` computes the address
+The initial v4 surface retains v3's two low-level transition properties:
+`s.data` computes the address
 of the view's first byte (`owner + offset`), and `s.len` returns its byte length.
 
 | Field or expression | Meaning |
 | --- | --- |
 | `len(s)` | number of bytes |
-| `s.len` | low-level v3 transition spelling of the byte length |
+| `s.len` | inherited low-level spelling of the byte length |
 | `s.data` | internal `ptr` to the view's first byte |
 | `s[i]` | checked byte access; invalid indices terminate the program |
 | `s[start:end]` | zero-copy half-open immutable view |
@@ -200,7 +207,7 @@ integer widths. A slice evaluates its base, start, and end once, from left to
 right, and requires `0 <= start <= end <= len(value)`. Empty slices are valid.
 Invalid bounds print `Epic runtime error: slice out of bounds` and terminate.
 Only the complete `value[start:end]` spelling is supported: omitted bounds,
-steps, reverse slicing, and slice assignment are not part of v3.
+steps, reverse slicing, and slice assignment are not part of the current language.
 
 Array slicing copies scalar values and reference values, without recursively
 cloning referenced products. Replacing elements or structurally changing the
@@ -264,7 +271,7 @@ value. `ret expr` remains invalid in a `void` function. `void` means normal
 completion without a usable value; `never` means that normal completion is
 impossible. The latter is internal and is not a source-level type name.
 
-The v3 statement keyword is `ret`; the legacy `return` spelling is not accepted.
+The statement keyword is `ret`; the legacy `return` spelling is not accepted.
 
 ## If expressions
 
@@ -293,7 +300,7 @@ let value = if ready {
 ```
 
 Branch types must join even when the complete `if` appears in statement position.
-Conditions require `bool`. The v3 migration bridge also accepts legacy `i64`
+Conditions require `bool`. The inherited v3 migration bridge also accepts legacy `i64`
 or `u8` conditions, where zero is false and nonzero is true; new code should
 not rely on that bridge.
 
@@ -350,7 +357,7 @@ such as `for i: -3:2`.
 The iterator is an implicit, read-only `i64` local visible only in the loop
 body. It cannot be assigned or used as a compound-assignment target. `continue`
 advances the iterator before the next condition check, while `break` exits the
-nearest `while` or `for`. v3 has no range step or automatic reverse
+nearest `while` or `for`. The current language has no range step or automatic reverse
 iteration.
 
 ## Product types
@@ -411,7 +418,7 @@ block types must join. A `never` arm is compatible with the other arm values.
 The complete expression may also be used in statement position; arm results are
 then discarded and do not need a common value type.
 
-v3 unit enums still have no payloads, guards, fallthrough, explicit
+Unit enums still have no payloads, guards, fallthrough, explicit
 discriminants, or enum-to-integer conversions. Declaration order determines the
 current internal values starting at zero, but those values are not source-visible
 or a stable ABI.
@@ -441,9 +448,9 @@ statement and does not produce a value.
 
 Unary `-` accepts signed integers and operates at their width. A directly
 negated literal may use the signed minimum, such as `-128i8`. Logical `!`
-accepts `bool`; the v3 migration bridge also accepts `i64` and `u8`. It returns
+accepts `bool`; the inherited v3 migration bridge also accepts `i64` and `u8`. It returns
 `bool`. Unary operators bind more tightly than `*`, `/`, and `%` and may be
-chained. Epic has no unary `+` or bitwise `~` in v3.
+chained. Epic currently has no unary `+` or bitwise `~`.
 
 Supported escapes in string and character literals:
 
@@ -477,7 +484,7 @@ String lengths and indices count bytes, not Unicode characters.
 `str + str` remains the non-integer addition case. `==` and `!=` additionally
 accept two bool values, two strings, or two values of the same enum type;
 products and arrays have no implicit reference equality. `if` and `while`
-conditions require `bool`, subject to the documented v3 migration bridge.
+conditions require `bool`, subject to the documented inherited migration bridge.
 
 ## System calls
 
@@ -551,9 +558,9 @@ subscripted because it carries no pointee type or stride.
 `pop` evaluates its array expression once, preserves capacity, and clears the
 removed slot so stale references do not keep objects alive through the
 conservative collector. Array `.data`, `.len`, and `.cap` fields are not part
-of the language. v3 deliberately keeps `str_new`, `s.data`, and `s.len` as a
-uniform low-level transition surface; v4 is the generation that will dogfood
-slicing and close those interfaces.
+of the language. The initial v4 seed inherits v3's `str_new`, `s.data`, and
+`s.len` low-level transition surface; v4 will dogfood slicing before closing
+those interfaces.
 
 `cstr` performs no embedded-NUL validation. It copies every string byte and
 then appends a final NUL, so a C API may observe only a prefix when the source
