@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the compiler carries its runtime and resolves embed per source file."""
+"""Verify the isolated v1 compiler, default outputs, -o, and embedded files."""
 
 import shutil
 import subprocess
@@ -28,6 +28,16 @@ PROGRAM = """fun main(): void {
 """
 
 
+def compile_program(compiler: Path, isolated: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(compiler), *args],
+        cwd=isolated,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as temp:
         isolated = Path(temp)
@@ -39,27 +49,33 @@ def main() -> int:
         (source_dir / "main.ep").write_text(PROGRAM, encoding="utf-8")
         shutil.copy2(ROOT / "src" / "codegen.ep", source_dir / "asset.bin")
 
-        result = subprocess.run(
-            [str(compiler), "src/main.ep"],
-            cwd=isolated,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = compile_program(compiler, isolated, "src/main.ep")
         if result.returncode != 0:
             print(f"  FAIL  isolated compiler failed:\n{result.stderr[-1000:]}")
             return 1
 
-        executable = isolated / "build" / "epic" / "src_main.ep.exe"
-        if not executable.is_file():
-            print(f"  FAIL  isolated compiler produced no executable: {executable}")
+        executable = isolated / "a.exe"
+        assembly = isolated / "a.asm"
+        if not executable.is_file() or not assembly.is_file():
+            print("  FAIL  default compilation did not produce a.asm and a.exe")
             return 1
         process = subprocess.run([str(executable)], cwd=isolated, timeout=5)
         if process.returncode != 42:
             print(f"  FAIL  embedded byte program returned {process.returncode}, expected 42")
             return 1
 
-    print("  PASS  isolated epic.exe compiled and ran mutable embedded bytes")
+        custom = isolated / "custom.exe"
+        result = compile_program(compiler, isolated, "-o", str(custom), "src/main.ep")
+        if result.returncode != 0 or not custom.is_file():
+            print("  FAIL  -o did not produce the requested executable")
+            return 1
+
+        result = compile_program(compiler, isolated, "-o")
+        if result.returncode == 0:
+            print("  FAIL  missing -o path was accepted")
+            return 1
+
+    print("  PASS  isolated compiler, a.exe default, -o, and mutable embedded bytes")
     return 0
 
 

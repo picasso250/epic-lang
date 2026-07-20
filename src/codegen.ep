@@ -314,7 +314,6 @@ fun emit_runtime_helpers(e: EmitterState): i64 {
     emit_runtime(e, embed("../runtime/bytes.asm"))
     emit_runtime(e, embed("../runtime/str_cat.asm"))
     emit_runtime(e, embed("../runtime/str_slice.asm"))
-    emit_runtime(e, embed("../runtime/str_replace_char.asm"))
     emit_runtime(e, embed("../runtime/embed.asm"))
     emit_runtime(e, embed("../runtime/extend_u8.asm"))
     emit_runtime(e, embed("../runtime/itoa.asm"))
@@ -722,9 +721,6 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
         if expr.name == "str_slice" {
             ret type_str()
         }
-        if expr.name == "str_replace_char" {
-            ret type_str()
-        }
         if expr.name == "read_file" {
             ret type_str()
         }
@@ -944,16 +940,6 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_stack_load(e, "r8", slots.data[2])
         emit_inst(e, "sub rsp, 32")
         emit_call_inst(e, "_str_slice")
-        emit_inst(e, "add rsp, 32")
-        ret 0
-    }
-    if name == "str_replace_char" {
-        let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rcx", slots.data[0])
-        emit_stack_load(e, "rdx", slots.data[1])
-        emit_stack_load(e, "r8", slots.data[2])
-        emit_inst(e, "sub rsp, 32")
-        emit_call_inst(e, "_str_replace_char")
         emit_inst(e, "add rsp, 32")
         ret 0
     }

@@ -25,9 +25,10 @@ NASM remains only in the trusted stage-0 path that builds the first v1 seed from
 Python v0. Self-hosted generations and programs compiled by v1 use Epic's
 internal assembler and PE writer.
 
-The resulting compiler is `build/epic-v1.exe`. Pass `-o PATH` to copy the
-final executable elsewhere; relative paths are resolved from the calling
-working directory.
+The resulting compiler is `build/epic-v1.exe`. Programs compiled without an
+output option produce `a.asm` and `a.exe` in the current working directory.
+Pass `-o PATH` to choose the executable path; the private assembly remains
+`a.asm`.
 
 ## Documentation
 

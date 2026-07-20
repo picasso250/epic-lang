@@ -12,8 +12,16 @@ SOURCE = ROOT / "tests" / "assembler" / "reloc.ep"
 
 
 def main() -> int:
+    executable = ROOT / "build" / "epic" / "tests_assembler_reloc.ep.exe"
+    executable.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [str(COMPILER), str(SOURCE.relative_to(ROOT)), "src/asm.ep"],
+        [
+            str(COMPILER),
+            "-o",
+            str(executable),
+            str(SOURCE.relative_to(ROOT)),
+            "src/asm.ep",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -22,7 +30,6 @@ def main() -> int:
     if result.returncode != 0:
         print(f"  FAIL  compile:\n{(result.stdout + result.stderr)[-1000:]}")
         return 1
-    executable = ROOT / "build" / "epic" / "tests_assembler_reloc.ep.exe"
     run = subprocess.run([str(executable)], cwd=ROOT, timeout=5)
     if run.returncode != 0:
         print(f"  FAIL  relocation addends, exit {run.returncode}")

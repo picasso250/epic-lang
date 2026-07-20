@@ -104,8 +104,10 @@ def run_case(source: Path) -> tuple[bool, str]:
 
     clean_test_paths(annotations["clean_paths"])
     relative = source.resolve().relative_to(ROOT)
+    executable = output_path(source)
+    executable.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [str(compiler_path()), str(relative)],
+        [str(compiler_path()), "-o", str(executable), str(relative)],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -113,4 +115,4 @@ def run_case(source: Path) -> tuple[bool, str]:
     )
     if result.returncode != 0:
         return False, f"compile failed:\n{result.stderr[:500]}"
-    return run_compiled_case(source, output_path(source))
+    return run_compiled_case(source, executable)

@@ -65,40 +65,59 @@ fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
     }
     ret 0
 }
-fun merge_inputs(): AstProgram {
-    if argv.len < 2 {
-        die_driver("usage: epic <input.ep>...")
+type DriverOptions {
+    output_path: str
+    inputs: str[]
+}
+fun parse_driver_options(): DriverOptions {
+    let options = new DriverOptions
+    options.output_path = "a.exe"
+    options.inputs = new str[]
+    let i = 1
+    for i < argv.len {
+        let arg = argv.data[i]
+        if arg == "-o" {
+            i = i + 1
+            if i >= argv.len {
+                die_driver("-o requires an output path")
+            }
+            options.output_path = argv.data[i]
+        } else {
+            if arg.len > 0 && arg.data[0] == 45 {
+                die_driver("unknown option")
+            }
+            push(options.inputs, arg)
+        }
+        i = i + 1
     }
+    if options.inputs.len == 0 {
+        die_driver("usage: epic [-o path] <input.ep>...")
+    }
+    ret options
+}
+fun merge_inputs(inputs: str[]): AstProgram {
     let out = ast_program()
-    let main_ast = parse_file(argv.data[1])
+    let main_ast = parse_file(inputs.data[0])
     if has_main(main_ast) == 0 {
         die_driver("main file has no main function")
     }
     merge_one(out, main_ast, 1)
-    let i = 2
-    for i < argv.len {
-        let ast = parse_file(argv.data[i])
+    let i = 1
+    for i < inputs.len {
+        let ast = parse_file(inputs.data[i])
         merge_one(out, ast, 0)
         i = i + 1
     }
     ret out
 }
-fun output_base(main_path: str): str {
-    let safe1 = str_replace_char(main_path, '/', '_')
-    let safe2 = str_replace_char(safe1, 92, '_')
-    ret "build/epic/" + safe2
-}
 fun main(): void {
-    os.CreateDirectoryA("build", 0)
-    os.CreateDirectoryA("build\\epic", 0)
-    let ast = merge_inputs()
-    let base = output_base(argv.data[1])
-    let asm_path = base + ".asm"
-    let exe_path = base + ".exe"
+    let options = parse_driver_options()
+    let ast = merge_inputs(options.inputs)
+    let asm_path = "a.asm"
     let e = make_emitter(asm_path)
     emit_program(e, ast)
     let image = assemble_text(read_file(asm_path))
-    pe_write_exe(exe_path, image)
-    print(exe_path)
+    pe_write_exe(options.output_path, image)
+    print(options.output_path)
     print("\n")
 }
