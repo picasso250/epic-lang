@@ -21,7 +21,7 @@ fun write_output(path: str, data: u8[]): void {
     }
     ret
 }
-fun print_timing(verbose: bool, label: str, elapsed: i64): i64 {
+fun print_timing(verbose: bool, label: str, elapsed: i64): void {
     if verbose {
         print("epic: ")
         print(label)
@@ -29,7 +29,7 @@ fun print_timing(verbose: bool, label: str, elapsed: i64): i64 {
         print(itoa(elapsed))
         print(" ms\n")
     }
-    ret 0
+    ret
 }
 fun parse_file(path: str): AstProgram {
     let src = read_file(path)
@@ -45,7 +45,7 @@ fun has_main(ast: AstProgram): bool {
     }
     ret false
 }
-fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): i64 {
+fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): void {
     for struct_i: 0:len(ast.structs) {
         let s = ast.structs[struct_i]
         push(out.structs, s)
@@ -59,7 +59,7 @@ fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): i64 {
             push(out.funcs, f)
         }
     }
-    ret 0
+    ret
 }
 fun merge_inputs(inputs: str[]): AstProgram {
     let out = ast_program()

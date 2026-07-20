@@ -427,20 +427,20 @@ fun check(p: Parser, kind: TokenKind): bool {
     }
     ret false
 }
-fun skip_newlines(p: Parser): i64 {
+fun skip_newlines(p: Parser): void {
     while peek_kind(p, TokenKind.NEWLINE) {
         advance(p)
     }
-    ret 0
+    ret
 }
-fun expect_stmt_end(p: Parser): i64 {
+fun expect_stmt_end(p: Parser): void {
     if check(p, TokenKind.NEWLINE) {
         skip_newlines(p)
-        ret 0
+        ret
     }
     let t = peek(p)
     parse_error(t.line, "Expected end of line")
-    ret 1
+    ret
 }
 fun parse_type(p: Parser): str {
     let t = advance(p)

@@ -431,19 +431,21 @@ fun asm_item_new(kind: AsmItemKind): AsmItem {
     item.symbol_index = -1
     ret item
 }
-fun asm_section(program: AsmProgram, section: AsmSectionKind): i64 {
+fun asm_section(program: AsmProgram, section: AsmSectionKind): void {
     let item = asm_item_new(AsmItemKind.Section)
     item.section = section
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_section_text(program: AsmProgram): i64 {
-    ret asm_section(program, AsmSectionKind.Text)
+fun asm_section_text(program: AsmProgram): void {
+    asm_section(program, AsmSectionKind.Text)
+    ret
 }
-fun asm_section_data(program: AsmProgram): i64 {
-    ret asm_section(program, AsmSectionKind.Data)
+fun asm_section_data(program: AsmProgram): void {
+    asm_section(program, AsmSectionKind.Data)
+    ret
 }
-fun asm_extern_item(program: AsmProgram, symbol_index: i64): i64 {
+fun asm_extern_item(program: AsmProgram, symbol_index: i64): void {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
         asm_die("invalid extern symbol index")
     }
@@ -454,9 +456,9 @@ fun asm_extern_item(program: AsmProgram, symbol_index: i64): i64 {
     let item = asm_item_new(AsmItemKind.Extern)
     item.symbol_index = symbol_index
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_label(program: AsmProgram, symbol_index: i64): i64 {
+fun asm_label(program: AsmProgram, symbol_index: i64): void {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
         asm_die("invalid label symbol index")
     }
@@ -469,41 +471,41 @@ fun asm_label(program: AsmProgram, symbol_index: i64): i64 {
     let item = asm_item_new(AsmItemKind.Label)
     item.symbol_index = symbol_index
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_bytes(program: AsmProgram, values: u8[]): i64 {
+fun asm_bytes(program: AsmProgram, values: u8[]): void {
     let item = asm_item_new(AsmItemKind.Bytes)
     item.bytes = values
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_dd(program: AsmProgram, value: i64): i64 {
+fun asm_dd(program: AsmProgram, value: i64): void {
     let item = asm_item_new(AsmItemKind.DataInteger)
     item.width = 4
     item.value = value
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_dq(program: AsmProgram, value: i64): i64 {
+fun asm_dq(program: AsmProgram, value: i64): void {
     let item = asm_item_new(AsmItemKind.DataInteger)
     item.width = 8
     item.value = value
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_dq_symbol(program: AsmProgram, symbol_index: i64): i64 {
+fun asm_dq_symbol(program: AsmProgram, symbol_index: i64): void {
     let item = asm_item_new(AsmItemKind.DataSymbol)
     item.symbol_index = symbol_index
     push(program.items, item)
-    ret 0
+    ret
 }
-fun asm_times(program: AsmProgram, count: i64, width: i64, value: i64): i64 {
+fun asm_times(program: AsmProgram, count: i64, width: i64, value: i64): void {
     let item = asm_item_new(AsmItemKind.RepeatData)
     item.repeat_count = count
     item.width = width
     item.value = value
     push(program.items, item)
-    ret 0
+    ret
 }
 fun asm_instruction0(program: AsmProgram, kind: AsmInstructionKind): void {
     let item = asm_item_new(AsmItemKind.Instruction)
@@ -773,7 +775,7 @@ fun asm_u64(image: ExeImage, value: i64): void {
     asm_u32(image, value >> 32)
     ret
 }
-fun asm_reloc(image: ExeImage, kind: i64, symbol_index: i64, addend: i64): i64 {
+fun asm_reloc(image: ExeImage, kind: i64, symbol_index: i64, addend: i64): void {
     if symbol_index < 0 || symbol_index >= len(image.symbols) {
         asm_die("invalid relocation symbol index")
     }
@@ -784,7 +786,7 @@ fun asm_reloc(image: ExeImage, kind: i64, symbol_index: i64, addend: i64): i64 {
     r.symbol_index = symbol_index
     r.addend = addend
     push(image.relocs, r)
-    ret 0
+    ret
 }
 fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     let rex = 64
@@ -802,17 +804,17 @@ fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     }
     ret rex
 }
-fun asm_rex(image: ExeImage, rex: i64, force: bool): i64 {
+fun asm_rex(image: ExeImage, rex: i64, force: bool): void {
     if rex != 64 || force {
         asm_byte(image, rex)
     }
-    ret 0
+    ret
 }
-fun asm_operand_prefix(image: ExeImage, width: i64): i64 {
+fun asm_operand_prefix(image: ExeImage, width: i64): void {
     if width == 16 {
         asm_byte(image, 102)
     }
-    ret 0
+    ret
 }
 fun asm_modrm(image: ExeImage, mod: i64, reg: i64, rm: i64): void {
     asm_byte(image, (mod << 6) | ((reg & 7) << 3) | (rm & 7))
@@ -834,10 +836,10 @@ fun asm_scale_bits(scale: i64): i64 {
     asm_die("bad memory scale")
     ret 0
 }
-fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
+fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): void {
     if op.kind == AsmOperandKind.Register {
         asm_modrm(image, 3, reg_field, op.reg)
-        ret 0
+        ret
     }
     if op.kind != AsmOperandKind.Memory {
         asm_die("expected register or memory operand")
@@ -849,7 +851,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
         asm_modrm(image, 0, reg_field, 5)
         asm_reloc(image, 2, op.symbol_index, op.disp)
         asm_u32(image, 0)
-        ret 0
+        ret
     }
     let base = op.base
     if base < 0 {
@@ -882,12 +884,12 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): i64 {
     } else if mod == 2 || (mod == 0 && (base & 7) == 5) {
         asm_u32(image, op.disp)
     }
-    ret 0
+    ret
 }
 fun asm_force_rex8(op: AsmOperand): bool {
     ret op.kind == AsmOperandKind.Register && op.reg >= 4
 }
-fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperand): i64 {
+fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperand): void {
     let base = rm.reg
     let index = -1
     if rm.kind == AsmOperandKind.Memory {
@@ -898,7 +900,7 @@ fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperan
     asm_rex(image, asm_rex_bits(reg.width, reg.reg, index, base), asm_force_rex8(rm))
     asm_byte(image, opcode)
     asm_emit_rm(image, reg.reg, rm)
-    ret 0
+    ret
 }
 
 fun asm_effective_width(a: AsmOperand, b: AsmOperand): i64 {
@@ -910,7 +912,7 @@ fun asm_effective_width(a: AsmOperand, b: AsmOperand): i64 {
     }
     ret 64
 }
-fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     let width = asm_effective_width(dst, src)
     if dst.kind == AsmOperandKind.Register && src.kind == AsmOperandKind.Immediate {
         asm_operand_prefix(image, width)
@@ -928,7 +930,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             asm_byte(image, 184 + (dst.reg & 7))
             asm_u64(image, src.imm)
         }
-        ret 0
+        ret
     }
     if dst.kind == AsmOperandKind.Register && (src.kind == AsmOperandKind.Register || src.kind == AsmOperandKind.Memory) {
         let opcode = 139
@@ -936,7 +938,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             opcode = 138
         }
         asm_emit_reg_rm(image, opcode, dst, src)
-        ret 0
+        ret
     }
     if dst.kind == AsmOperandKind.Memory && src.kind == AsmOperandKind.Register {
         let store_opcode = 137
@@ -949,7 +951,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         asm_rex(image, asm_rex_bits(width, src.reg, index, base), asm_force_rex8(src))
         asm_byte(image, store_opcode)
         asm_emit_rm(image, src.reg, dst)
-        ret 0
+        ret
     }
     if dst.kind == AsmOperandKind.Memory && src.kind == AsmOperandKind.Immediate {
         let immediate_opcode = 199
@@ -975,19 +977,19 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         } else {
             asm_u32(image, src.imm)
         }
-        ret 0
+        ret
     }
     asm_die("unsupported mov operands")
-    ret 0
+    ret
 }
-fun asm_emit_lea(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_lea(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     if dst.kind != AsmOperandKind.Register || src.kind != AsmOperandKind.Memory {
         asm_die("unsupported lea operands")
     }
     asm_emit_reg_rm(image, 141, dst, src)
-    ret 0
+    ret
 }
-fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     if dst.kind != AsmOperandKind.Register || (src.kind != AsmOperandKind.Register && src.kind != AsmOperandKind.Memory) {
         asm_die("unsupported movzx operands")
     }
@@ -1008,9 +1010,9 @@ fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         asm_die("movzx source must be byte or word")
     }
     asm_emit_rm(image, dst.reg, src)
-    ret 0
+    ret
 }
-fun asm_emit_movsx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_movsx(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     if dst.kind != AsmOperandKind.Register || (src.kind != AsmOperandKind.Register && src.kind != AsmOperandKind.Memory) {
         asm_die("unsupported movsx operands")
     }
@@ -1031,9 +1033,9 @@ fun asm_emit_movsx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         asm_die("movsx source must be byte or word")
     }
     asm_emit_rm(image, dst.reg, src)
-    ret 0
+    ret
 }
-fun asm_emit_movsxd(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_movsxd(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     if dst.kind != AsmOperandKind.Register || dst.width != 64 || src.width != 32 || (src.kind != AsmOperandKind.Register && src.kind != AsmOperandKind.Memory) {
         asm_die("movsxd requires r64 and r/m32")
     }
@@ -1046,7 +1048,7 @@ fun asm_emit_movsxd(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     asm_rex(image, asm_rex_bits(64, dst.reg, index, base), false)
     asm_byte(image, 99)
     asm_emit_rm(image, dst.reg, src)
-    ret 0
+    ret
 }
 fun asm_alu_ext(kind: AsmInstructionKind): i64 {
     match kind {
@@ -1131,7 +1133,7 @@ fun asm_alu_store_opcode(kind: AsmInstructionKind, width: i64): i64 {
     }
     ret opcode
 }
-fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src: AsmOperand): void {
     let width = asm_effective_width(dst, src)
     if src.kind == AsmOperandKind.Immediate && (dst.kind == AsmOperandKind.Register || dst.kind == AsmOperandKind.Memory) {
         let opcode = 129
@@ -1148,23 +1150,23 @@ fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src
         } else {
             asm_u32(image, src.imm)
         }
-        ret 0
+        ret
     }
     if dst.kind == AsmOperandKind.Register && (src.kind == AsmOperandKind.Register || src.kind == AsmOperandKind.Memory) {
         asm_emit_reg_rm(image, asm_alu_load_opcode(kind, width), dst, src)
-        ret 0
+        ret
     }
     if dst.kind == AsmOperandKind.Memory && src.kind == AsmOperandKind.Register {
         asm_operand_prefix(image, width)
         asm_rex(image, asm_rex_bits(width, src.reg, dst.index, dst.base), asm_force_rex8(src))
         asm_byte(image, asm_alu_store_opcode(kind, width))
         asm_emit_rm(image, src.reg, dst)
-        ret 0
+        ret
     }
     asm_die("unsupported ALU operands")
-    ret 0
+    ret
 }
-fun asm_emit_test(image: ExeImage, left: AsmOperand, right: AsmOperand): i64 {
+fun asm_emit_test(image: ExeImage, left: AsmOperand, right: AsmOperand): void {
     let width = asm_effective_width(left, right)
     if (left.kind != AsmOperandKind.Register && left.kind != AsmOperandKind.Memory) || right.kind != AsmOperandKind.Register {
         asm_die("unsupported test operands")
@@ -1181,9 +1183,9 @@ fun asm_emit_test(image: ExeImage, left: AsmOperand, right: AsmOperand): i64 {
         asm_byte(image, 133)
     }
     asm_emit_rm(image, right.reg, left)
-    ret 0
+    ret
 }
-fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
+fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     if dst.kind != AsmOperandKind.Register {
         asm_die("unsupported imul destination")
     }
@@ -1203,7 +1205,7 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
                 asm_u32(image, src.imm)
             }
         }
-        ret 0
+        ret
     }
     if src.kind == AsmOperandKind.Register || src.kind == AsmOperandKind.Memory {
         let base = src.reg
@@ -1215,12 +1217,12 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         asm_byte(image, 15)
         asm_byte(image, 175)
         asm_emit_rm(image, dst.reg, src)
-        ret 0
+        ret
     }
     asm_die("unsupported imul operands")
-    ret 0
+    ret
 }
-fun asm_emit_group(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): i64 {
+fun asm_emit_group(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): void {
     let base = target.reg
     let index = -1
     if target.kind == AsmOperandKind.Memory {
@@ -1231,9 +1233,9 @@ fun asm_emit_group(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): 
     asm_rex(image, asm_rex_bits(target.width, ext, index, base), asm_force_rex8(target))
     asm_byte(image, opcode)
     asm_emit_rm(image, ext, target)
-    ret 0
+    ret
 }
-fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): i64 {
+fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): void {
     let width = target.width
     if width == 0 {
         width = 64
@@ -1248,7 +1250,7 @@ fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: Asm
     asm_rex(image, asm_rex_bits(width, ext, index, base), asm_force_rex8(target))
     asm_byte(image, opcode)
     asm_emit_rm(image, ext, target)
-    ret 0
+    ret
 }
 fun asm_jump_code(kind: AsmInstructionKind): i64 {
     match kind {
@@ -1296,7 +1298,7 @@ fun asm_jump_code(kind: AsmInstructionKind): i64 {
     }
     ret -1
 }
-fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand): i64 {
+fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand): void {
     if target.kind != AsmOperandKind.Symbol {
         asm_die("jump target must be a label")
     }
@@ -1308,7 +1310,7 @@ fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand)
     }
     asm_reloc(image, 1, target.symbol_index, 0)
     asm_u32(image, 0)
-    ret 0
+    ret
 }
 fun asm_setcc_code(kind: AsmInstructionKind): i64 {
     match kind {
@@ -1347,7 +1349,7 @@ fun asm_setcc_code(kind: AsmInstructionKind): i64 {
     }
     ret -1
 }
-fun asm_emit_setcc(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand): i64 {
+fun asm_emit_setcc(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand): void {
     if target.kind != AsmOperandKind.Register || target.width != 8 {
         asm_die("unsupported setcc")
     }
@@ -1355,30 +1357,33 @@ fun asm_emit_setcc(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand
     asm_byte(image, 15)
     asm_byte(image, asm_setcc_code(kind))
     asm_modrm(image, 3, 0, target.reg)
-    ret 0
+    ret
 }
-fun asm_encode_call(image: ExeImage, target: AsmOperand): i64 {
+fun asm_encode_call(image: ExeImage, target: AsmOperand): void {
     if target.kind != AsmOperandKind.Symbol {
         asm_die("call target must be a symbol")
     }
     asm_byte(image, 232)
     asm_reloc(image, 1, target.symbol_index, 0)
     asm_u32(image, 0)
-    ret 0
+    ret
 }
-fun asm_encode_shift(image: ExeImage, target: AsmOperand, count: AsmOperand, ext: i64): i64 {
+fun asm_encode_shift(image: ExeImage, target: AsmOperand, count: AsmOperand, ext: i64): void {
     if count.kind != AsmOperandKind.Register || count.reg != 1 || count.width != 8 {
         asm_die("shift count must be cl")
     }
     if target.width == 8 {
-        ret asm_emit_group(image, 210, ext, target)
+        asm_emit_group(image, 210, ext, target)
+        ret
     }
-    ret asm_emit_group(image, 211, ext, target)
+    asm_emit_group(image, 211, ext, target)
+    ret
 }
-fun asm_encode_inc_dec(image: ExeImage, target: AsmOperand, ext: i64): i64 {
-    ret asm_emit_group_default64(image, 255, ext, target)
+fun asm_encode_inc_dec(image: ExeImage, target: AsmOperand, ext: i64): void {
+    asm_emit_group_default64(image, 255, ext, target)
+    ret
 }
-fun asm_encode_push_pop(image: ExeImage, target: AsmOperand, opcode: i64): i64 {
+fun asm_encode_push_pop(image: ExeImage, target: AsmOperand, opcode: i64): void {
     if target.kind != AsmOperandKind.Register {
         asm_die("push/pop target must be a register")
     }
@@ -1386,7 +1391,7 @@ fun asm_encode_push_pop(image: ExeImage, target: AsmOperand, opcode: i64): i64 {
         asm_byte(image, 65)
     }
     asm_byte(image, opcode + (target.reg & 7))
-    ret 0
+    ret
 }
 fun asm_encode_instruction_item(image: ExeImage, item: AsmItem): void {
     match item.instruction {
@@ -1930,7 +1935,7 @@ fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): void {
     ret
 }
 
-fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
+fun asm_program_parse_db(program: AsmProgram, args: str): void {
     let values = new u8[]
     let value_start = 0
     while value_start < len(args) {
@@ -1945,7 +1950,8 @@ fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
         push(values, parse_integer(value_text))
         value_start = value_end + 1
     }
-    ret asm_bytes(program, values)
+    asm_bytes(program, values)
+    ret
 }
 fun asm_program_parse_data(parser: AsmProgramParser, line: str): bool {
     let data_space = asm_find(line, 32)
@@ -2008,7 +2014,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): bool {
     asm_times(parser.program, parse_integer(count_text), times_width, parse_integer(times_value))
     ret true
 }
-fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
+fun asm_program_process_line(parser: AsmProgramParser, raw: str): void {
     let semi = asm_find(raw, 59)
     let line = raw
     if semi >= 0 {
@@ -2016,33 +2022,33 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
     }
     line = asm_trim(line)
     if len(line) == 0 {
-        ret 0
+        ret
     }
     if asm_starts(line, "global ") {
         parser.program.entry_symbol_index = asm_symbol_intern(parser.program, asm_trim(asm_slice(line, 7, len(line))))
-        ret 0
+        ret
     }
     if line == "default rel" {
-        ret 0
+        ret
     }
     if asm_starts(line, "extern ") {
         let extern_symbol_index = asm_symbol_intern(parser.program, asm_trim(asm_slice(line, 7, len(line))))
         asm_extern_item(parser.program, extern_symbol_index)
-        ret 0
+        ret
     }
     if line == "section .text" {
         asm_section_text(parser.program)
         parser.section = AsmSectionKind.Text
         parser.has_section = true
         parser.scope = ""
-        ret 0
+        ret
     }
     if line == "section .data" {
         asm_section_data(parser.program)
         parser.section = AsmSectionKind.Data
         parser.has_section = true
         parser.scope = ""
-        ret 0
+        ret
     }
     if line[len(line) - 1] == 58 {
         let raw_name = asm_trim(asm_slice(line, 0, len(line) - 1))
@@ -2052,18 +2058,18 @@ fun asm_program_process_line(parser: AsmProgramParser, raw: str): i64 {
         if raw_name[0] != 46 {
             parser.scope = raw_name
         }
-        ret 0
+        ret
     }
     if asm_program_parse_data(parser, line) {
-        ret 0
+        ret
     }
     if !parser.has_section || parser.section != AsmSectionKind.Text {
         asm_die("instruction outside .text: " + line)
     }
     asm_program_parse_instruction(parser, line)
-    ret 0
+    ret
 }
-fun asm_parse_lines(parser: AsmProgramParser, source: str): i64 {
+fun asm_parse_lines(parser: AsmProgramParser, source: str): void {
     let line_start = 0
     while line_start < len(source) {
         let line_end = line_start
@@ -2073,22 +2079,24 @@ fun asm_parse_lines(parser: AsmProgramParser, source: str): i64 {
         asm_program_process_line(parser, asm_slice(source, line_start, line_end))
         line_start = line_end + 1
     }
-    ret 0
+    ret
 }
-fun asm_parse_into(program: AsmProgram, source: str): i64 {
+fun asm_parse_into(program: AsmProgram, source: str): void {
     let parser = new AsmProgramParser
     parser.program = program
     parser.scope = ""
     parser.has_section = false
-    ret asm_parse_lines(parser, source)
+    asm_parse_lines(parser, source)
+    ret
 }
-fun asm_parse_text_into(program: AsmProgram, source: u8[]): i64 {
+fun asm_parse_text_into(program: AsmProgram, source: u8[]): void {
     let parser = new AsmProgramParser
     parser.program = program
     parser.scope = ""
     parser.section = AsmSectionKind.Text
     parser.has_section = true
-    ret asm_parse_lines(parser, str(source))
+    asm_parse_lines(parser, str(source))
+    ret
 }
 fun asm_parse(source: str): AsmProgram {
     let program = asm_program_new()

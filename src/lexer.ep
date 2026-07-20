@@ -7,13 +7,13 @@ type Token {
     text: str
     line: i64
 }
-fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): i64 {
+fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): void {
     let t = new Token
     t.kind = kind
     t.text = text
     t.line = line
     push(tokens, t)
-    ret 0
+    ret
 }
 fun is_alpha(c: i64): bool {
     ret (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95
@@ -412,7 +412,7 @@ fun lex(src: str): Token[] {
     }
     ret tokens
 }
-fun dump_tokens(tokens: Token[]): i64 {
+fun dump_tokens(tokens: Token[]): void {
     for i: 0:len(tokens) {
         let t = tokens[i]
         print(t.text)
@@ -420,7 +420,7 @@ fun dump_tokens(tokens: Token[]): i64 {
         print(itoa(t.line))
         print("\n")
     }
-    ret 0
+    ret
 }
 fun main(): void {
     if len(argv) < 2 {
