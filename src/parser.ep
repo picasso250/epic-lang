@@ -786,6 +786,17 @@ fun parse_for_range_stmt(p: Parser): AstStmt {
     p.loop_depth -= 1
     ret ast_for_range(name.text, ast_range(start, end), body, keyword.line)
 }
+fun parse_for_stmt(p: Parser): AstStmt {
+    if p.pos + 2 < len(p.tokens) && p.tokens[p.pos + 2].kind == TokenKind.COLON {
+        ret parse_for_range_stmt(p)
+    }
+    let keyword = expect(p, TokenKind.FOR)
+    let condition = parse_expr(p)
+    p.loop_depth += 1
+    let body = parse_block(p)
+    p.loop_depth -= 1
+    ret ast_while(condition, body, keyword.line)
+}
 fun parse_match_expr(p: Parser): AstExpr {
     let keyword = expect(p, TokenKind.MATCH)
     let subject = parse_expr(p)
@@ -880,7 +891,7 @@ fun parse_stmt(p: Parser): AstStmt {
             ret parse_while_stmt(p)
         }
         TokenKind.FOR {
-            ret parse_for_range_stmt(p)
+            ret parse_for_stmt(p)
         }
         TokenKind.MATCH {
             ret parse_expr_stmt(p)
