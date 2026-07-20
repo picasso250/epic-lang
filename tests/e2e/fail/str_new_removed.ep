@@ -1,0 +1,4 @@
+# COMPILE_ERROR: unknown function 'str_new'
+fun main(): void {
+    str_new(cstr("abc"), 3)
+}

@@ -143,13 +143,12 @@ the opaque array mutation surface leaves room for a later copy-on-write
 implementation without changing observable behavior. `cstr(str)` is separate:
 it allocates a fresh byte region and appends the terminator required by C.
 
-The initial v4 seed inherits v3's uniform low-level `str_new`, `.data`, and
-`.len` string interfaces;
-there is no compiler-source path whitelist. Since `.data` is a computed
-`owner + offset` property, it remains correct for sliced strings. They are
-scheduled to disappear as v4 dogfoods slicing directly. Raw C/Win32 calls
-accept the single internal transparent `ptr` type, and `cstr(str)` returns that
-type after allocating and terminating a copy.
+v4 dogfoods string slicing for lexer token views, type-name suffix removal,
+integer suffix parsing, assembler substrings, and relative embed paths. The
+transitional v3 `str_new`, `.data`, and `.len` source interfaces are removed;
+there is no compiler-source exception. Raw C/Win32 calls accept the single
+internal transparent `ptr` type, and `cstr(str)` returns that type after
+allocating and terminating a copy.
 
 ## Assembler and PE writer
 

@@ -12,7 +12,7 @@ fun type_is_array(name: str): i64 {
     ret name[len(name) - 2] == 91 && name[len(name) - 1] == 93
 }
 fun array_element_type(name: str): str {
-    ret str_new(name.data, len(name) - 2)
+    ret name[0:len(name) - 2]
 }
 fun digit_value(c: i64): i64 {
     if c >= 48 && c <= 57 {

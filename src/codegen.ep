@@ -518,9 +518,6 @@ fun array_layout_name(elem: str): str {
 }
 fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     e.structs = new StructInfo[]
-    let s = add_struct_info(e, "str", 24)
-    add_field(s, "data", type_info("ptr", "u8"), 0)
-    add_field(s, "len", type_i64(), 16)
     let builtin_arrays = new str[]
     push(builtin_arrays, "bool")
     push(builtin_arrays, "i8")
@@ -539,6 +536,7 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
         add_field(builtin_array, "len", type_i64(), 8)
         add_field(builtin_array, "cap", type_i64(), 16)
     }
+    let s = new StructInfo
     let a = new StructInfo
     for struct_i: 0:len(ast.structs) {
         let node = ast.structs[struct_i]
@@ -942,16 +940,6 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_expr_as(e, expr.args[0], type_i64())
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_call_inst(e, "_itoa")
-        ret 0
-    }
-    if name == "str_new" {
-        emit_expr(e, expr.args[0])
-        let str_new_ptr = temp_save_rax(e)
-        emit_expr_as(e, expr.args[1], type_i64())
-        let str_new_len = temp_save_rax(e)
-        emit_stack_load(e, asm_rcx(), str_new_ptr)
-        emit_stack_load(e, asm_rdx(), str_new_len)
-        emit_call_inst(e, "_str_alloc")
         ret 0
     }
     if name == "bytes" {
@@ -1712,9 +1700,6 @@ fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     ret 0
 }
 fun field_layout_name(t: TypeInfo): str {
-    if t.kind == "str" {
-        ret "str"
-    }
     if t.kind == "array" {
         ret array_layout_name(t.name)
     }
@@ -1791,13 +1776,6 @@ fun is_enum_member_access(e: EmitterState, expr: AstExpr): i64 {
 fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
     if is_enum_member_access(e, expr) == 1 {
         asm_mov(e.program, asm_rax(), asm_imm(parse_integer(expr.value)))
-        ret 0
-    }
-    if expr_type(e, expr.object).kind == "str" && expr.name == "data" {
-        emit_expr(e, expr.object)
-        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
-        asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
-        asm_add(e.program, asm_rax(), asm_rcx())
         ret 0
     }
     let field_type = emit_field_address(e, expr.object, expr.name)

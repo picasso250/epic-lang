@@ -78,7 +78,7 @@ fun asm_die(msg: str): void {
     ret
 }
 fun asm_slice(s: str, start: i64, end: i64): str {
-    ret str_new(s.data + start, end - start)
+    ret s[start:end]
 }
 fun asm_trim(s: str): str {
     let a = 0

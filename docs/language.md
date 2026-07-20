@@ -72,8 +72,8 @@ not use. The user-visible language changes introduced in v3 are:
   share immutable backing bytes and allocate only a view header; array slices
   shallow-copy their elements into an independent array;
 - strings with no trailing-NUL guarantee, plus `cstr(s)` for an explicit fresh
-  NUL-terminated copy at raw C/Win32 boundaries. As a v3 transition surface,
-  `str.data`, `str.len`, and `str_new(ptr, len)` remain available until v4;
+  NUL-terminated copy at raw C/Win32 boundaries. Sealed v3 retained
+  `str.data`, `str.len`, and `str_new(ptr, len)` as a transition surface;
   and
 - one index type: checked subscripts and both slice bounds require `i64`.
 
@@ -96,9 +96,10 @@ layout changes are implementation changes rather than language features.
 
 ## Epic v4 development baseline
 
-The initial v4 seed has the same user-visible semantics as sealed v3. v4 is the
-dogfood generation for the features listed above; new v4 language features will
-be recorded here as they are implemented.
+The initial v4 seed had the same user-visible semantics as sealed v3. v4 is the
+dogfood generation for the features listed above. Its first completed change is
+to use string slicing throughout the compiler and remove the transitional
+`str.data`, `str.len`, and `str_new` source interfaces.
 
 ## Program model
 
@@ -163,17 +164,13 @@ Locals and parameters remain in 8-byte stack slots as an implementation detail.
 
 ### Strings
 
-`str` is an immutable byte view. String literals produce `str` values.
-The runtime representation owns a backing allocation plus an offset and length.
-The initial v4 surface retains v3's two low-level transition properties:
-`s.data` computes the address
-of the view's first byte (`owner + offset`), and `s.len` returns its byte length.
+`str` is an opaque immutable byte view. String literals produce `str` values.
+The runtime representation owns a backing allocation plus an offset and length,
+but those fields are not source-visible.
 
 | Field or expression | Meaning |
 | --- | --- |
 | `len(s)` | number of bytes |
-| `s.len` | inherited low-level spelling of the byte length |
-| `s.data` | internal `ptr` to the view's first byte |
 | `s[i]` | checked byte access; invalid indices terminate the program |
 | `s[start:end]` | zero-copy half-open immutable view |
 
@@ -537,7 +534,6 @@ to declare them.
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
 | `str(array: u8[]): str` | copies every array byte into a new immutable string, preserving embedded NUL bytes |
 | `cstr(s: str): ptr` | allocates a fresh `len(s) + 1` byte region, copies all bytes, and appends NUL |
-| `str_new(data: ptr, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `is_null(value: reference): bool` | tests whether a product, string, array, or low-level pointer reference is the zero address; the argument is evaluated once |
 | `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
@@ -550,7 +546,7 @@ to declare them.
 `never` appears here to describe the built-in precisely, but it is not accepted
 in user-written parameter, field, local, or function return type declarations.
 The same applies to the internal `ptr` type: a local may infer it from
-`cstr(s)` or `s.data`, but source declarations cannot name it. `ptr` is a
+`cstr(s)`, but source declarations cannot name it. `ptr` is a
 transparent byte address: integer addition is byte-oriented, and it cannot be
 subscripted because it carries no pointee type or stride.
 
@@ -558,9 +554,9 @@ subscripted because it carries no pointee type or stride.
 `pop` evaluates its array expression once, preserves capacity, and clears the
 removed slot so stale references do not keep objects alive through the
 conservative collector. Array `.data`, `.len`, and `.cap` fields are not part
-of the language. The initial v4 seed inherits v3's `str_new`, `s.data`, and
-`s.len` low-level transition surface; v4 will dogfood slicing before closing
-those interfaces.
+of the language. Strings likewise expose no fields. v4 removes the transitional
+`str_new`, `s.data`, and `s.len` interfaces after migrating compiler substring
+construction to slicing.
 
 `cstr` performs no embedded-NUL validation. It copies every string byte and
 then appends a final NUL, so a C API may observe only a prefix when the source

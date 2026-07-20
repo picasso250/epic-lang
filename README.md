@@ -5,6 +5,8 @@ the same language semantics and compiler sources as the v3 fixed point; v4 is
 the dogfood generation for v3's expression control flow, fixed-width integers,
 opaque arrays, string and array slicing, explicit C-string conversion, and
 single internal `ptr` model. New v4 language work begins from this fixed point.
+The compiler now dogfoods string slicing, and v4 closes the transitional
+`str.data`, `str.len`, and `str_new` interfaces retained by v3.
 
 It retains the self-contained structured AMD64 assembler, stable symbol indexes,
 deterministic PE writer, and conservative garbage collector.

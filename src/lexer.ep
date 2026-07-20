@@ -224,7 +224,7 @@ fun lex(src: str): Token[] {
             while pos < n && is_alnum(src[pos]) == 1 {
                 pos += 1
             }
-            let number_text = str_new(src.data + number_start, pos - number_start)
+            let number_text = src[number_start:pos]
             push_token(tokens, TokenKind.NUMBER, number_text, number_line)
             continue
         }
@@ -234,7 +234,7 @@ fun lex(src: str): Token[] {
             while pos < n && is_alnum(src[pos]) == 1 {
                 pos += 1
             }
-            let identifier_text = str_new(src.data + identifier_start, pos - identifier_start)
+            let identifier_text = src[identifier_start:pos]
             push_token(tokens, identifier_kind(identifier_text), identifier_text, identifier_line)
             continue
         }

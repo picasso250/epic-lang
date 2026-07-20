@@ -186,10 +186,6 @@ fun sema_add_builtins(state: SemaState): i64 {
     sig = sema_signature("is_null", "bool")
     push(sig.param_types, "reference")
     sema_add_builtin(state, sig)
-    sig = sema_signature("str_new", "str")
-    push(sig.param_types, "ptr")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
     sig = sema_signature("read_file", "str")
     push(sig.param_types, "str")
     sema_add_builtin(state, sig)
@@ -706,7 +702,7 @@ fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negativ
     let digit_end = sema_literal_digit_end(expr.value)
     let suffix = ""
     if digit_end < len(expr.value) {
-        suffix = str_new(expr.value.data + digit_end, len(expr.value) - digit_end)
+        suffix = expr.value[digit_end:len(expr.value)]
         if sema_is_integer(suffix) == 0 {
             sema_error(state.source_path, expr.line, "invalid integer literal suffix '" + suffix + "'")
         }
@@ -787,12 +783,6 @@ fun sema_require_integer(state: SemaState, expr: AstExpr, context: str): i64 {
 }
 fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     if base_type == "str" {
-        if field_name == "data" {
-            ret "ptr"
-        }
-        if field_name == "len" {
-            ret "i64"
-        }
         ret ""
     }
     if type_is_array(base_type) == 1 {

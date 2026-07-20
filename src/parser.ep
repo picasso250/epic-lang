@@ -1127,7 +1127,7 @@ fun embed_resolve_path(source_path: str, path: str): str {
             if i == 0 {
                 ret path
             }
-            ret str_new(source_path.data, i) + "/" + path
+            ret source_path[0:i] + "/" + path
         }
     }
     ret path
