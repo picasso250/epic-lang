@@ -78,7 +78,7 @@ fun asm_die(msg: str): void {
     ret
 }
 fun asm_slice(s: str, start: i64, end: i64): str {
-    ret s[start:end]
+    s[start:end]
 }
 fun asm_trim(s: str): str {
     let a = 0
@@ -89,7 +89,7 @@ fun asm_trim(s: str): str {
     while b > a && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 13) {
         b -= 1
     }
-    ret asm_slice(s, a, b)
+    asm_slice(s, a, b)
 }
 fun asm_starts(s: str, prefix: str): bool {
     if len(s) < len(prefix) {
@@ -100,7 +100,7 @@ fun asm_starts(s: str, prefix: str): bool {
             ret false
         }
     }
-    ret true
+    true
 }
 fun asm_find(s: str, ch: i64): i64 {
     for i: 0:len(s) {
@@ -108,7 +108,7 @@ fun asm_find(s: str, ch: i64): i64 {
             ret i
         }
     }
-    ret -1
+    -1
 }
 fun asm_remove_spaces(s: str): str {
     let out = new u8[]
@@ -117,7 +117,7 @@ fun asm_remove_spaces(s: str): str {
             push(out, s[i])
         }
     }
-    ret str(out)
+    str(out)
 }
 fun asm_is_number(s: str): bool {
     if len(s) == 0 {
@@ -144,7 +144,7 @@ fun asm_is_number(s: str): bool {
         }
         i += 1
     }
-    ret true
+    true
 }
 fun asm_reg(name: str): i64 {
     if name == "rax" || name == "eax" || name == "ax" || name == "al" {
@@ -183,7 +183,7 @@ fun asm_reg(name: str): i64 {
     if name == "r11" || name == "r11d" || name == "r11w" || name == "r11b" {
         ret 11
     }
-    ret -1
+    -1
 }
 fun asm_reg_width(name: str): i64 {
     if name == "al" || name == "bl" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" {
@@ -198,7 +198,7 @@ fun asm_reg_width(name: str): i64 {
     if asm_reg(name) >= 0 {
         ret 64
     }
-    ret 0
+    0
 }
 fun asm_operand_new(kind: AsmOperandKind): AsmOperand {
     let op = new AsmOperand
@@ -209,143 +209,143 @@ fun asm_operand_new(kind: AsmOperandKind): AsmOperand {
     op.base = -1
     op.index = -1
     op.scale = 1
-    ret op
+    op
 }
 fun asm_register(reg: i64, width: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Register)
     op.reg = reg
     op.width = width
-    ret op
+    op
 }
 fun asm_rax(): AsmOperand {
-    ret asm_register(0, 64)
+    asm_register(0, 64)
 }
 fun asm_eax(): AsmOperand {
-    ret asm_register(0, 32)
+    asm_register(0, 32)
 }
 fun asm_ax(): AsmOperand {
-    ret asm_register(0, 16)
+    asm_register(0, 16)
 }
 fun asm_al(): AsmOperand {
-    ret asm_register(0, 8)
+    asm_register(0, 8)
 }
 fun asm_rcx(): AsmOperand {
-    ret asm_register(1, 64)
+    asm_register(1, 64)
 }
 fun asm_ecx(): AsmOperand {
-    ret asm_register(1, 32)
+    asm_register(1, 32)
 }
 fun asm_cx(): AsmOperand {
-    ret asm_register(1, 16)
+    asm_register(1, 16)
 }
 fun asm_cl(): AsmOperand {
-    ret asm_register(1, 8)
+    asm_register(1, 8)
 }
 fun asm_rdx(): AsmOperand {
-    ret asm_register(2, 64)
+    asm_register(2, 64)
 }
 fun asm_edx(): AsmOperand {
-    ret asm_register(2, 32)
+    asm_register(2, 32)
 }
 fun asm_dx(): AsmOperand {
-    ret asm_register(2, 16)
+    asm_register(2, 16)
 }
 fun asm_dl(): AsmOperand {
-    ret asm_register(2, 8)
+    asm_register(2, 8)
 }
 fun asm_rbx(): AsmOperand {
-    ret asm_register(3, 64)
+    asm_register(3, 64)
 }
 fun asm_ebx(): AsmOperand {
-    ret asm_register(3, 32)
+    asm_register(3, 32)
 }
 fun asm_bx(): AsmOperand {
-    ret asm_register(3, 16)
+    asm_register(3, 16)
 }
 fun asm_bl(): AsmOperand {
-    ret asm_register(3, 8)
+    asm_register(3, 8)
 }
 fun asm_rsp(): AsmOperand {
-    ret asm_register(4, 64)
+    asm_register(4, 64)
 }
 fun asm_esp(): AsmOperand {
-    ret asm_register(4, 32)
+    asm_register(4, 32)
 }
 fun asm_rbp(): AsmOperand {
-    ret asm_register(5, 64)
+    asm_register(5, 64)
 }
 fun asm_ebp(): AsmOperand {
-    ret asm_register(5, 32)
+    asm_register(5, 32)
 }
 fun asm_rsi(): AsmOperand {
-    ret asm_register(6, 64)
+    asm_register(6, 64)
 }
 fun asm_esi(): AsmOperand {
-    ret asm_register(6, 32)
+    asm_register(6, 32)
 }
 fun asm_rdi(): AsmOperand {
-    ret asm_register(7, 64)
+    asm_register(7, 64)
 }
 fun asm_edi(): AsmOperand {
-    ret asm_register(7, 32)
+    asm_register(7, 32)
 }
 fun asm_r8(): AsmOperand {
-    ret asm_register(8, 64)
+    asm_register(8, 64)
 }
 fun asm_r8d(): AsmOperand {
-    ret asm_register(8, 32)
+    asm_register(8, 32)
 }
 fun asm_r8w(): AsmOperand {
-    ret asm_register(8, 16)
+    asm_register(8, 16)
 }
 fun asm_r8b(): AsmOperand {
-    ret asm_register(8, 8)
+    asm_register(8, 8)
 }
 fun asm_r9(): AsmOperand {
-    ret asm_register(9, 64)
+    asm_register(9, 64)
 }
 fun asm_r9d(): AsmOperand {
-    ret asm_register(9, 32)
+    asm_register(9, 32)
 }
 fun asm_r9w(): AsmOperand {
-    ret asm_register(9, 16)
+    asm_register(9, 16)
 }
 fun asm_r9b(): AsmOperand {
-    ret asm_register(9, 8)
+    asm_register(9, 8)
 }
 fun asm_r10(): AsmOperand {
-    ret asm_register(10, 64)
+    asm_register(10, 64)
 }
 fun asm_r10d(): AsmOperand {
-    ret asm_register(10, 32)
+    asm_register(10, 32)
 }
 fun asm_r10w(): AsmOperand {
-    ret asm_register(10, 16)
+    asm_register(10, 16)
 }
 fun asm_r10b(): AsmOperand {
-    ret asm_register(10, 8)
+    asm_register(10, 8)
 }
 fun asm_r11(): AsmOperand {
-    ret asm_register(11, 64)
+    asm_register(11, 64)
 }
 fun asm_r11d(): AsmOperand {
-    ret asm_register(11, 32)
+    asm_register(11, 32)
 }
 fun asm_r11w(): AsmOperand {
-    ret asm_register(11, 16)
+    asm_register(11, 16)
 }
 fun asm_r11b(): AsmOperand {
-    ret asm_register(11, 8)
+    asm_register(11, 8)
 }
 fun asm_imm(value: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Immediate)
     op.imm = value
-    ret op
+    op
 }
 fun asm_symbol(symbol_index: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Symbol)
     op.symbol_index = symbol_index
-    ret op
+    op
 }
 fun asm_mem_base(width: i64, base: AsmOperand, disp: i64): AsmOperand {
     if base.kind != AsmOperandKind.Register {
@@ -355,7 +355,7 @@ fun asm_mem_base(width: i64, base: AsmOperand, disp: i64): AsmOperand {
     op.width = width
     op.base = base.reg
     op.disp = disp
-    ret op
+    op
 }
 fun asm_mem_indexed(base: AsmOperand, index: AsmOperand, scale: i64, disp: i64): AsmOperand {
     if base.kind != AsmOperandKind.Register || index.kind != AsmOperandKind.Register {
@@ -364,18 +364,18 @@ fun asm_mem_indexed(base: AsmOperand, index: AsmOperand, scale: i64, disp: i64):
     let op = asm_mem_base(0, base, disp)
     op.index = index.reg
     op.scale = scale
-    ret op
+    op
 }
 fun asm_operand_width(op: AsmOperand, width: i64): AsmOperand {
     op.width = width
-    ret op
+    op
 }
 fun asm_mem_symbol(width: i64, symbol_index: i64, disp: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Memory)
     op.width = width
     op.symbol_index = symbol_index
     op.disp = disp
-    ret op
+    op
 }
 fun asm_program_new(): AsmProgram {
     let program = new AsmProgram
@@ -383,7 +383,7 @@ fun asm_program_new(): AsmProgram {
     program.symbols = new AsmSymbol[]
     program.named_symbols = new i64[]
     program.entry_symbol_index = -1
-    ret program
+    program
 }
 fun asm_symbol_new(program: AsmProgram, name: str): i64 {
     let symbol = new AsmSymbol
@@ -393,7 +393,7 @@ fun asm_symbol_new(program: AsmProgram, name: str): i64 {
     if len(name) != 0 {
         push(program.named_symbols, symbol_index)
     }
-    ret symbol_index
+    symbol_index
 }
 fun asm_named_symbol_find(program: AsmProgram, name: str): i64 {
     for named_i: 0:len(program.named_symbols) {
@@ -402,14 +402,14 @@ fun asm_named_symbol_find(program: AsmProgram, name: str): i64 {
             ret symbol_index
         }
     }
-    ret -1
+    -1
 }
 fun asm_symbol_intern(program: AsmProgram, name: str): i64 {
     let symbol_index = asm_named_symbol_find(program, name)
     if symbol_index >= 0 {
         ret symbol_index
     }
-    ret asm_symbol_new(program, name)
+    asm_symbol_new(program, name)
 }
 fun asm_symbol_name(program: AsmProgram, symbol_index: i64): str {
     if symbol_index < 0 || symbol_index >= len(program.symbols) {
@@ -423,13 +423,13 @@ fun asm_symbol_name(program: AsmProgram, symbol_index: i64): str {
     while asm_named_symbol_find(program, generated) >= 0 {
         generated = generated + "_"
     }
-    ret generated
+    generated
 }
 fun asm_item_new(kind: AsmItemKind): AsmItem {
     let item = new AsmItem
     item.kind = kind
     item.symbol_index = -1
-    ret item
+    item
 }
 fun asm_section(program: AsmProgram, section: AsmSectionKind): void {
     let item = asm_item_new(AsmItemKind.Section)
@@ -740,13 +740,13 @@ fun asm_image_new(): ExeImage {
     image.symbols = new AsmSymbol[]
     image.relocs = new AsmReloc[]
     image.section = 0
-    ret image
+    image
 }
 fun asm_offset(image: ExeImage): i64 {
     if image.section == 1 {
         ret len(image.text)
     }
-    ret len(image.data)
+    len(image.data)
 }
 fun asm_byte(image: ExeImage, value: i64): void {
     if image.section == 1 {
@@ -802,7 +802,7 @@ fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
     if base >= 8 {
         rex |= 1
     }
-    ret rex
+    rex
 }
 fun asm_rex(image: ExeImage, rex: i64, force: bool): void {
     if rex != 64 || force {
@@ -834,7 +834,7 @@ fun asm_scale_bits(scale: i64): i64 {
         ret 3
     }
     asm_die("bad memory scale")
-    ret 0
+    0
 }
 fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): void {
     if op.kind == AsmOperandKind.Register {
@@ -887,7 +887,7 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): void {
     ret
 }
 fun asm_force_rex8(op: AsmOperand): bool {
-    ret op.kind == AsmOperandKind.Register && op.reg >= 4
+    op.kind == AsmOperandKind.Register && op.reg >= 4
 }
 fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperand): void {
     let base = rm.reg
@@ -910,7 +910,7 @@ fun asm_effective_width(a: AsmOperand, b: AsmOperand): i64 {
     if b.width != 0 {
         ret b.width
     }
-    ret 64
+    64
 }
 fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
     let width = asm_effective_width(dst, src)
@@ -1053,85 +1053,85 @@ fun asm_emit_movsxd(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
 fun asm_alu_ext(kind: AsmInstructionKind): i64 {
     match kind {
         AsmInstructionKind.Add {
-            ret 0
+            0
         }
         AsmInstructionKind.Or {
-            ret 1
+            1
         }
         AsmInstructionKind.And {
-            ret 4
+            4
         }
         AsmInstructionKind.Sub {
-            ret 5
+            5
         }
         AsmInstructionKind.Xor {
-            ret 6
+            6
         }
         AsmInstructionKind.Cmp {
-            ret 7
+            7
         } else {
             asm_die("internal: non-ALU instruction")
+            -1
         }
     }
-    ret -1
 }
 fun asm_alu_load_opcode(kind: AsmInstructionKind, width: i64): i64 {
-    let opcode = 3
-    match kind {
+    let opcode = match kind {
         AsmInstructionKind.Add {
-            opcode = 3
+            3
         }
         AsmInstructionKind.Or {
-            opcode = 11
+            11
         }
         AsmInstructionKind.And {
-            opcode = 35
+            35
         }
         AsmInstructionKind.Sub {
-            opcode = 43
+            43
         }
         AsmInstructionKind.Xor {
-            opcode = 51
+            51
         }
         AsmInstructionKind.Cmp {
-            opcode = 59
+            59
         } else {
             asm_die("internal: non-ALU instruction")
+            -1
         }
     }
     if width == 8 {
         opcode -= 1
     }
-    ret opcode
+    opcode
 }
 fun asm_alu_store_opcode(kind: AsmInstructionKind, width: i64): i64 {
-    let opcode = 1
-    match kind {
+    let opcode = match kind {
         AsmInstructionKind.Add {
-            opcode = 1
+            1
         }
         AsmInstructionKind.Or {
-            opcode = 9
+            9
         }
         AsmInstructionKind.And {
-            opcode = 33
+            33
         }
         AsmInstructionKind.Sub {
-            opcode = 41
+            41
         }
         AsmInstructionKind.Xor {
-            opcode = 49
+            49
         }
         AsmInstructionKind.Cmp {
-            opcode = 57
+            57
         } else {
             asm_die("internal: non-ALU instruction")
+            -1
         }
     }
     if width == 8 {
         opcode -= 1
     }
-    ret opcode
+    opcode
 }
 fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src: AsmOperand): void {
     let width = asm_effective_width(dst, src)
@@ -1255,48 +1255,48 @@ fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: Asm
 fun asm_jump_code(kind: AsmInstructionKind): i64 {
     match kind {
         AsmInstructionKind.Je {
-            ret 132
+            132
         }
         AsmInstructionKind.Jz {
-            ret 132
+            132
         }
         AsmInstructionKind.Jne {
-            ret 133
+            133
         }
         AsmInstructionKind.Jnz {
-            ret 133
+            133
         }
         AsmInstructionKind.Jb {
-            ret 130
+            130
         }
         AsmInstructionKind.Jae {
-            ret 131
+            131
         }
         AsmInstructionKind.Jbe {
-            ret 134
+            134
         }
         AsmInstructionKind.Ja {
-            ret 135
+            135
         }
         AsmInstructionKind.Jl {
-            ret 140
+            140
         }
         AsmInstructionKind.Jge {
-            ret 141
+            141
         }
         AsmInstructionKind.Jle {
-            ret 142
+            142
         }
         AsmInstructionKind.Jg {
-            ret 143
+            143
         }
         AsmInstructionKind.Jns {
-            ret 137
+            137
         } else {
             asm_die("internal: non-conditional jump")
+            -1
         }
     }
-    ret -1
 }
 fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand): void {
     if target.kind != AsmOperandKind.Symbol {
@@ -1315,39 +1315,39 @@ fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand)
 fun asm_setcc_code(kind: AsmInstructionKind): i64 {
     match kind {
         AsmInstructionKind.Sete {
-            ret 148
+            148
         }
         AsmInstructionKind.Setne {
-            ret 149
+            149
         }
         AsmInstructionKind.Setb {
-            ret 146
+            146
         }
         AsmInstructionKind.Setae {
-            ret 147
+            147
         }
         AsmInstructionKind.Setbe {
-            ret 150
+            150
         }
         AsmInstructionKind.Seta {
-            ret 151
+            151
         }
         AsmInstructionKind.Setl {
-            ret 156
+            156
         }
         AsmInstructionKind.Setge {
-            ret 157
+            157
         }
         AsmInstructionKind.Setle {
-            ret 158
+            158
         }
         AsmInstructionKind.Setg {
-            ret 159
+            159
         } else {
             asm_die("internal: non-setcc instruction")
+            -1
         }
     }
-    ret -1
 }
 fun asm_emit_setcc(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand): void {
     if target.kind != AsmOperandKind.Register || target.width != 8 {
@@ -1621,7 +1621,7 @@ fun asm_program_qualify(parser: AsmProgramParser, name: str): str {
     if len(name) > 0 && name[0] == 46 {
         ret parser.scope + name
     }
-    ret name
+    name
 }
 fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmOperand {
     let op = asm_operand_new(AsmOperandKind.Memory)
@@ -1679,7 +1679,7 @@ fun asm_program_parse_mem(parser: AsmProgramParser, text: str, width: i64): AsmO
         }
         pos = end
     }
-    ret op
+    op
 }
 fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     let text = asm_trim(raw)
@@ -1707,7 +1707,7 @@ fun asm_program_parse_operand(parser: AsmProgramParser, raw: str): AsmOperand {
     if asm_is_number(text) {
         ret asm_imm(parse_integer(text))
     }
-    ret asm_symbol(asm_symbol_intern(parser.program, asm_program_qualify(parser, text)))
+    asm_symbol(asm_symbol_intern(parser.program, asm_program_qualify(parser, text)))
 }
 fun asm_program_parse_instruction(parser: AsmProgramParser, line: str): void {
     let space = asm_find(line, 32)
@@ -2012,7 +2012,7 @@ fun asm_program_parse_data(parser: AsmProgramParser, line: str): bool {
         asm_die("bad times directive: " + times_directive)
     }
     asm_times(parser.program, parse_integer(count_text), times_width, parse_integer(times_value))
-    ret true
+    true
 }
 fun asm_program_process_line(parser: AsmProgramParser, raw: str): void {
     let semi = asm_find(raw, 59)
@@ -2101,7 +2101,7 @@ fun asm_parse_text_into(program: AsmProgram, source: u8[]): void {
 fun asm_parse(source: str): AsmProgram {
     let program = asm_program_new()
     asm_parse_into(program, source)
-    ret program
+    program
 }
 
 fun asm_encode(program: AsmProgram): ExeImage {
@@ -2190,7 +2190,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
         }
         image.entry_offset = entry.offset
     }
-    ret image
+    image
 }
 
 fun asm_render_s(out: u8[], text: str): void {
@@ -2699,9 +2699,9 @@ fun asm_render(program: AsmProgram): u8[] {
             }
         }
     }
-    ret out
+    out
 }
 
 fun assemble_text(src: str): ExeImage {
-    ret asm_encode(asm_parse(src))
+    asm_encode(asm_parse(src))
 }

@@ -53,7 +53,7 @@ fun die(msg: str): void {
     ret
 }
 fun named_symbol(e: EmitterState, name: str): i64 {
-    ret asm_symbol_intern(e.program, name)
+    asm_symbol_intern(e.program, name)
 }
 fun emit_label(e: EmitterState, name: str): void {
     asm_label(e.program, named_symbol(e, name))
@@ -136,7 +136,7 @@ fun sys_member_symbol(ns: str, name: str): str {
     if name == "WriteFile" {
         ret "WriteFile"
     }
-    ret ""
+    ""
 }
 fun emit_stack_store(e: EmitterState, slot: i64, src: AsmOperand): void {
     asm_mov(e.program, asm_mem_base(0, asm_rbp(), slot), src)
@@ -147,7 +147,7 @@ fun emit_stack_load(e: EmitterState, dst: AsmOperand, slot: i64): void {
     ret
 }
 fun fresh_label(e: EmitterState): i64 {
-    ret asm_symbol_new(e.program, "")
+    asm_symbol_new(e.program, "")
 }
 fun emit_runtime(e: EmitterState, source: u8[]): void {
     asm_parse_text_into(e.program, source)
@@ -191,46 +191,46 @@ fun make_emitter(): EmitterState {
     e.enums = new AstEnumDef[]
     e.loop_starts = new i64[]
     e.loop_ends = new i64[]
-    ret e
+    e
 }
 fun type_info(kind: str, name: str): TypeInfo {
     let t = new TypeInfo
     t.kind = kind
     t.name = name
-    ret t
+    t
 }
 fun type_i64(): TypeInfo {
-    ret type_info("i64", "")
+    type_info("i64", "")
 }
 fun type_integer(name: str): TypeInfo {
-    ret type_info(name, "")
+    type_info(name, "")
 }
 fun type_u8(): TypeInfo {
-    ret type_info("u8", "")
+    type_info("u8", "")
 }
 fun type_bool(): TypeInfo {
-    ret type_info("bool", "")
+    type_info("bool", "")
 }
 fun type_void(): TypeInfo {
-    ret type_info("void", "")
+    type_info("void", "")
 }
 fun type_never(): TypeInfo {
-    ret type_info("never", "")
+    type_info("never", "")
 }
 fun type_str(): TypeInfo {
-    ret type_info("str", "")
+    type_info("str", "")
 }
 fun type_ptr(): TypeInfo {
-    ret type_info("ptr", "")
+    type_info("ptr", "")
 }
 fun type_struct(name: str): TypeInfo {
-    ret type_info("struct", name)
+    type_info("struct", name)
 }
 fun type_array(elem: str): TypeInfo {
-    ret type_info("array", elem)
+    type_info("array", elem)
 }
 fun type_is_integer(t: TypeInfo): bool {
-    ret sema_is_integer(t.kind)
+    sema_is_integer(t.kind)
 }
 fun type_width(t: TypeInfo): i64 {
     if t.kind == "bool" {
@@ -240,40 +240,35 @@ fun type_width(t: TypeInfo): i64 {
     if bits != 0 {
         ret bits
     }
-    ret 64
+    64
 }
 fun type_storage_size(t: TypeInfo): i64 {
-    ret type_width(t) / 8
+    type_width(t) / 8
 }
 fun type_is_signed(t: TypeInfo): bool {
-    ret sema_is_signed_integer(t.kind)
+    sema_is_signed_integer(t.kind)
 }
 fun type_is_complex(t: TypeInfo): bool {
-    ret t.kind == "str" || t.kind == "struct" || t.kind == "array"
+    t.kind == "str" || t.kind == "struct" || t.kind == "array"
 }
 fun user_type(name: str): TypeInfo {
     if sema_is_integer(name) {
-        ret type_integer(name)
+        type_integer(name)
+    } else if name == "bool" {
+        type_bool()
+    } else if name == "void" {
+        type_void()
+    } else if name == "never" {
+        type_never()
+    } else if name == "str" {
+        type_str()
+    } else if name == "ptr" {
+        type_ptr()
+    } else if type_is_array(name) {
+        type_array(array_element_type(name))
+    } else {
+        type_struct(name)
     }
-    if name == "bool" {
-        ret type_bool()
-    }
-    if name == "void" {
-        ret type_void()
-    }
-    if name == "never" {
-        ret type_never()
-    }
-    if name == "str" {
-        ret type_str()
-    }
-    if name == "ptr" {
-        ret type_ptr()
-    }
-    if type_is_array(name) {
-        ret type_array(array_element_type(name))
-    }
-    ret type_struct(name)
 }
 fun emitter_type(e: EmitterState, name: str): TypeInfo {
     if type_is_array(name) {
@@ -284,7 +279,7 @@ fun emitter_type(e: EmitterState, name: str): TypeInfo {
             ret type_info("enum", name)
         }
     }
-    ret user_type(name)
+    user_type(name)
 }
 fun get_string_id(e: EmitterState, text: str): i64 {
     for i: 0:len(e.strings) {
@@ -296,7 +291,7 @@ fun get_string_id(e: EmitterState, text: str): i64 {
     s.text = text
     s.symbol_index = asm_symbol_new(e.program, "")
     push(e.strings, s)
-    ret s.symbol_index
+    s.symbol_index
 }
 fun collect_expr_strings(e: EmitterState, node: AstExpr): void {
     match node.kind {
@@ -442,7 +437,7 @@ fun string_bytes(s: str): u8[] {
         push(values, s[i])
     }
     push(values, 0)
-    ret values
+    values
 }
 fun add_func_infos(e: EmitterState, ast: AstProgram): void {
     for i: 0:len(ast.funcs) {
@@ -469,7 +464,7 @@ fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
     s.size = size
     s.fields = new FieldInfo[]
     push(e.structs, s)
-    ret s
+    s
 }
 fun find_struct_info(e: EmitterState, name: str): StructInfo {
     for i: 0:len(e.structs) {
@@ -478,7 +473,7 @@ fun find_struct_info(e: EmitterState, name: str): StructInfo {
         }
     }
     die("unknown struct layout")
-    ret new StructInfo
+    new StructInfo
 }
 fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldInfo {
     let s = find_struct_info(e, struct_name)
@@ -488,7 +483,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
         }
     }
     die("unknown field " + struct_name + "." + field_name)
-    ret new FieldInfo
+    new FieldInfo
 }
 fun ensure_array_layout(e: EmitterState, elem: str): void {
     let arr_name = elem
@@ -498,7 +493,7 @@ fun ensure_array_layout(e: EmitterState, elem: str): void {
     ret
 }
 fun array_layout_name(elem: str): str {
-    ret "_arr_" + elem
+    "_arr_" + elem
 }
 fun compute_struct_layouts(e: EmitterState, ast: AstProgram): void {
     e.structs = new StructInfo[]
@@ -583,7 +578,7 @@ fun find_local_slot(e: EmitterState, name: str): i64 {
         }
     }
     die("undefined local")
-    ret 0
+    0
 }
 fun find_local_type(e: EmitterState, name: str): TypeInfo {
     if name == "argv" {
@@ -595,16 +590,16 @@ fun find_local_type(e: EmitterState, name: str): TypeInfo {
         }
     }
     die("internal: checked local has no type")
-    ret type_i64()
+    type_i64()
 }
 fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
     if expr.resolved_type == "" {
         die("internal: expression has no checked type")
     }
-    ret emitter_type(e, expr.resolved_type)
+    emitter_type(e, expr.resolved_type)
 }
 fun type_register(reg: i64, typ: TypeInfo): AsmOperand {
-    ret asm_register(reg, type_width(typ))
+    asm_register(reg, type_width(typ))
 }
 fun emit_widen_register(e: EmitterState, reg: i64, source: TypeInfo, target: TypeInfo): void {
     let source_width = type_width(source)
@@ -635,7 +630,7 @@ fun find_func_info(e: EmitterState, name: str): FuncInfo {
         }
     }
     die("internal: checked function has no codegen signature")
-    ret new FuncInfo
+    new FuncInfo
 }
 fun emit_widen_rax(e: EmitterState, source: TypeInfo, target: TypeInfo): void {
     emit_widen_register(e, 0, source, target)
@@ -796,7 +791,7 @@ fun temp_save_rax(e: EmitterState): i64 {
     }
     let slot = -(e.temp_base + (nr + 1) * 8)
     emit_stack_store(e, slot, asm_rax())
-    ret slot
+    slot
 }
 fun emit_prologue(e: EmitterState): void {
     asm_push(e.program, asm_rbp())
@@ -819,7 +814,7 @@ fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
         push(slots, temp_save_rax(e))
         i += 1
     }
-    ret slots
+    slots
 }
 fun load_spilled_args(e: EmitterState, slots: i64[]): void {
     if len(slots) > 0 {
@@ -844,7 +839,7 @@ fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
         push(slots, temp_save_rax(e))
         i += 1
     }
-    ret slots
+    slots
 }
 fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
     let name = expr.name
@@ -1694,7 +1689,7 @@ fun field_layout_name(t: TypeInfo): str {
     if t.kind == "struct" {
         ret t.name
     }
-    ret ""
+    ""
 }
 fun emit_field_address(e: EmitterState, object: AstExpr, name: str): TypeInfo {
     let object_type = expr_type(e, object)
@@ -1703,7 +1698,7 @@ fun emit_field_address(e: EmitterState, object: AstExpr, name: str): TypeInfo {
     if field.offset != 0 {
         asm_add(e.program, asm_rax(), asm_imm(field.offset))
     }
-    ret field.typ
+    field.typ
 }
 fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): TypeInfo {
     let base_type = expr_type(e, base)
@@ -1734,7 +1729,7 @@ fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): Type
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rcx(), 0))
     }
     asm_lea(e.program, asm_rax(), asm_mem_indexed(asm_rcx(), asm_rax(), type_storage_size(elem_type), 0))
-    ret elem_type
+    elem_type
 }
 fun emit_load_address(e: EmitterState, value_type: TypeInfo): void {
     let width = type_width(value_type)
@@ -1748,7 +1743,7 @@ fun emit_store_address(e: EmitterState, value_type: TypeInfo, address_slot: i64)
 }
 fun emit_local_address(e: EmitterState, name: str): TypeInfo {
     asm_lea(e.program, asm_rax(), asm_mem_base(0, asm_rbp(), find_local_slot(e, name)))
-    ret find_local_type(e, name)
+    find_local_type(e, name)
 }
 fun is_enum_member_access(e: EmitterState, expr: AstExpr): bool {
     if expr.object.kind != AstExprKind.Var {
@@ -1759,7 +1754,7 @@ fun is_enum_member_access(e: EmitterState, expr: AstExpr): bool {
             ret true
         }
     }
-    ret false
+    false
 }
 fun emit_field_access(e: EmitterState, expr: AstExpr): void {
     if is_enum_member_access(e, expr) {

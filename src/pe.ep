@@ -86,7 +86,7 @@ fun pe_hex_digit(c: i64): i64 {
     if value < 0 {
         pe_die("bad embedded hex")
     }
-    ret value
+    value
 }
 fun pe_append_hex(out: u8[], text: str): void {
     let i = 0
@@ -102,16 +102,16 @@ fun pe_import_find(items: PeImport[], name: str): i64 {
             ret i
         }
     }
-    ret -1
+    -1
 }
 fun pe_dll_for(name: str): str {
     if name == "MessageBoxA" {
-        ret "USER32.dll"
+        "USER32.dll"
+    } else if name == "ExitProcess" || name == "GetStdHandle" || name == "WriteFile" || name == "CreateDirectoryA" || name == "CreateFileA" || name == "ReadFile" || name == "SetFilePointer" || name == "CloseHandle" || name == "GetFileSize" || name == "lstrcmpA" || name == "lstrlenA" || name == "GetCommandLineA" || name == "HeapAlloc" || name == "HeapFree" || name == "GetProcessHeap" || name == "VirtualAlloc" || name == "Beep" || name == "GetCurrentProcess" || name == "GetCurrentProcessId" || name == "GetCurrentThreadId" || name == "GetFileAttributesA" || name == "GetLastError" || name == "GetTickCount64" || name == "SetLastError" || name == "Sleep" {
+        "KERNEL32.dll"
+    } else {
+        ""
     }
-    if name == "ExitProcess" || name == "GetStdHandle" || name == "WriteFile" || name == "CreateDirectoryA" || name == "CreateFileA" || name == "ReadFile" || name == "SetFilePointer" || name == "CloseHandle" || name == "GetFileSize" || name == "lstrcmpA" || name == "lstrlenA" || name == "GetCommandLineA" || name == "HeapAlloc" || name == "HeapFree" || name == "GetProcessHeap" || name == "VirtualAlloc" || name == "Beep" || name == "GetCurrentProcess" || name == "GetCurrentProcessId" || name == "GetCurrentThreadId" || name == "GetFileAttributesA" || name == "GetLastError" || name == "GetTickCount64" || name == "SetLastError" || name == "Sleep" {
-        ret "KERNEL32.dll"
-    }
-    ret ""
 }
 fun pe_collect_imports(image: ExeImage): PeImport[] {
     # Relocation order is deterministic; preserve it instead of normalizing
@@ -136,7 +136,7 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
         }
         i += 1
     }
-    ret out
+    out
 }
 fun pe_make_dlls(imports: PeImport[]): PeDll[] {
     let dlls = new PeDll[]
@@ -160,7 +160,7 @@ fun pe_make_dlls(imports: PeImport[]): PeDll[] {
         push(dlls[dll_index].items, imports[i])
         i += 1
     }
-    ret dlls
+    dlls
 }
 fun pe_add_thunks(image: ExeImage, imports: PeImport[]): void {
     pe_pad(image.text, 16, 204)
@@ -233,7 +233,7 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         }
         i += 1
     }
-    ret out
+    out
 }
 
 fun pe_patch_thunks(image: ExeImage, imports: PeImport[], rdata_rva: i64): void {
@@ -254,7 +254,7 @@ fun pe_symbol_rva(sym: AsmSymbol, data_rva: i64): i64 {
         ret data_rva + sym.offset
     }
     pe_die("symbol has no section: " + sym.name)
-    ret 0
+    0
 }
 fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): void {
     let i = 0
@@ -340,7 +340,7 @@ fun pe_make_section(name: str, rva: i64, size: i64, raw: i64): PeSection {
     } else {
         sec.flags = 3221225536
     }
-    ret sec
+    sec
 }
 fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64): u8[] {
     let out = new u8[]
@@ -416,7 +416,7 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
     while len(out) < 1024 {
         pe_byte(out, 0)
     }
-    ret out
+    out
 }
 fun pe_build_exe(image: ExeImage): u8[] {
     let imports = pe_collect_imports(image)
@@ -434,5 +434,5 @@ fun pe_build_exe(image: ExeImage): u8[] {
     pe_pad(out, 512, 0)
     pe_append(out, image.data)
     pe_pad(out, 512, 0)
-    ret out
+    out
 }

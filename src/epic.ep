@@ -35,7 +35,7 @@ fun parse_file(path: str): AstProgram {
     let src = read_file(path)
     let tokens = lex(src)
     let p = make_parser_at(tokens, path)
-    ret parse_program(p)
+    parse_program(p)
 }
 fun has_main(ast: AstProgram): bool {
     for i: 0:len(ast.funcs) {
@@ -43,7 +43,7 @@ fun has_main(ast: AstProgram): bool {
             ret true
         }
     }
-    ret false
+    false
 }
 fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: bool): void {
     for struct_i: 0:len(ast.structs) {
@@ -72,7 +72,7 @@ fun merge_inputs(inputs: str[]): AstProgram {
         let ast = parse_file(inputs[i])
         merge_one(out, ast, false)
     }
-    ret out
+    out
 }
 fun parse_driver_options(): DriverOptions {
     let options = new DriverOptions
@@ -105,7 +105,7 @@ fun parse_driver_options(): DriverOptions {
     if options.verbose && options.emit_asm {
         die_driver("-v cannot be used with -S")
     }
-    ret options
+    options
 }
 fun main(): void {
     let options = parse_driver_options()

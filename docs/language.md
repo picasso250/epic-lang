@@ -80,9 +80,10 @@ not use. The user-visible language changes introduced in v3 are:
 The v3 compiler implementation itself stays within the v2-era integer surface.
 The v4 compiler is the dogfood target for the new bool and integer types. Its
 source uses distinct `bool` predicates and state flags, and v4 requires `bool`
-for conditions and logical operators. The v3 seed still provides the separate
-`u8`/`i64` integer migration bridge needed to compile this source; that bridge
-is not a forward-compatibility promise.
+for conditions and logical operators. Natural value-producing compiler paths
+also use block tails and expression-form `if` and `match`. The v3 seed still
+provides the separate `u8`/`i64` integer migration bridge needed to compile
+this source; that bridge is not a forward-compatibility promise.
 
 The v3 compiler source also dogfoods the v2 foundations: unit enums and
 exhaustive matching, compound assignment, unary operators, integer range loops,

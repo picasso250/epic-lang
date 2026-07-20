@@ -16,16 +16,16 @@ fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): void {
     ret
 }
 fun is_alpha(c: i64): bool {
-    ret (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95
+    (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95
 }
 fun is_alnum(c: i64): bool {
-    ret is_alpha(c) || (c >= 48 && c <= 57)
+    is_alpha(c) || (c >= 48 && c <= 57)
 }
 fun is_digit(c: i64): bool {
-    ret c >= 48 && c <= 57
+    c >= 48 && c <= 57
 }
 fun is_hex_digit(c: i64): bool {
-    ret digit_value(c) >= 0
+    digit_value(c) >= 0
 }
 fun identifier_kind(text: str): TokenKind {
     if text == "fun" {
@@ -70,7 +70,7 @@ fun identifier_kind(text: str): TokenKind {
     if text == "false" {
         ret TokenKind.FALSE
     }
-    ret TokenKind.ID
+    TokenKind.ID
 }
 fun lex(src: str): Token[] {
     let tokens = new Token[]
@@ -410,7 +410,7 @@ fun lex(src: str): Token[] {
         }
         pos += 1
     }
-    ret tokens
+    tokens
 }
 fun dump_tokens(tokens: Token[]): void {
     for i: 0:len(tokens) {

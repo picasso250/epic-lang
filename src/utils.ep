@@ -3,16 +3,16 @@
 # Keep module-specific parsing, diagnostics, and output logic in their owners.
 #
 fun align_up(value: i64, alignment: i64): i64 {
-    ret ((value + alignment - 1) / alignment) * alignment
+    ((value + alignment - 1) / alignment) * alignment
 }
 fun type_is_array(name: str): bool {
     if len(name) < 2 {
         ret false
     }
-    ret name[len(name) - 2] == 91 && name[len(name) - 1] == 93
+    name[len(name) - 2] == 91 && name[len(name) - 1] == 93
 }
 fun array_element_type(name: str): str {
-    ret name[0:len(name) - 2]
+    name[0:len(name) - 2]
 }
 fun digit_value(c: i64): i64 {
     if c >= 48 && c <= 57 {
@@ -24,7 +24,7 @@ fun digit_value(c: i64): i64 {
     if c >= 97 && c <= 102 {
         ret c - 87
     }
-    ret -1
+    -1
 }
 fun parse_integer(text: str): i64 {
     let sign = 1
@@ -43,5 +43,5 @@ fun parse_integer(text: str): i64 {
         value = value * base + digit_value(text[i])
         i += 1
     }
-    ret value * sign
+    value * sign
 }
