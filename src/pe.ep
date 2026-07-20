@@ -56,7 +56,7 @@ fun pe_zero(out: u8[], count: i64): void {
     }
 }
 fun pe_pad(out: u8[], alignment: i64, value: i64): void {
-    while len(out) < align_up(len(out), alignment) {
+    for len(out) < align_up(len(out), alignment) {
         pe_byte(out, value)
     }
 }
@@ -79,7 +79,7 @@ fun pe_hex_digit(c: i64): i64 {
 }
 fun pe_append_hex(out: u8[], text: str): void {
     let i = 0
-    while i < len(text) {
+    for i < len(text) {
         pe_byte(out, (pe_hex_digit(text[i]) << 4) | pe_hex_digit(text[i + 1]))
         i += 2
     }
@@ -106,7 +106,7 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
     # small programs into the same sorted IAT byte pattern.
     let out = new PeImport[]
     let i = 0
-    while i < len(image.relocs) {
+    for i < len(image.relocs) {
         let r = image.relocs[i]
         if r.symbol_index < 0 || r.symbol_index >= len(image.symbols) {
             pe_die("invalid relocation symbol index")
@@ -129,10 +129,10 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
 fun pe_make_dlls(imports: PeImport[]): PeDll[] {
     let dlls = new PeDll[]
     let i = 0
-    while i < len(imports) {
+    for i < len(imports) {
         let dll_index = -1
         let j = 0
-        while j < len(dlls) {
+        for j < len(dlls) {
             if dlls[j].name == imports[i].dll {
                 dll_index = j
             }
@@ -153,7 +153,7 @@ fun pe_make_dlls(imports: PeImport[]): PeDll[] {
 fun pe_add_thunks(image: ExeImage, imports: PeImport[]): void {
     pe_pad(image.text, 16, 204)
     let i = 0
-    while i < len(imports) {
+    for i < len(imports) {
         imports[i].thunk_offset = len(image.text)
         pe_byte(image.text, 255)
         pe_byte(image.text, 37)
@@ -166,18 +166,18 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
     let out = new u8[]
     pe_zero(out, (len(dlls) + 1) * 20)
     let i = 0
-    while i < len(dlls) {
+    for i < len(dlls) {
         dlls[i].ilt_offset = len(out)
         pe_zero(out, (len(dlls[i].items) + 1) * 8)
         i += 1
     }
     let iat_start = len(out)
     i = 0
-    while i < len(dlls) {
+    for i < len(dlls) {
         let group = dlls[i]
         group.iat_offset = len(out)
         let j = 0
-        while j < len(group.items) {
+        for j < len(group.items) {
             group.items[j].iat_offset = len(out)
             pe_u64(out, 0)
             j += 1
@@ -186,10 +186,10 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         i += 1
     }
     i = 0
-    while i < len(dlls) {
+    for i < len(dlls) {
         let names_group = dlls[i]
         let names_j = 0
-        while names_j < len(names_group.items) {
+        for names_j < len(names_group.items) {
             let item = names_group.items[names_j]
             item.hint_offset = len(out)
             pe_u16(out, 0)
@@ -206,13 +206,13 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
         i += 1
     }
     i = 0
-    while i < len(dlls) {
+    for i < len(dlls) {
         let patch_group = dlls[i]
         pe_patch_u32(out, i * 20, rva + patch_group.ilt_offset)
         pe_patch_u32(out, i * 20 + 12, rva + patch_group.name_offset)
         pe_patch_u32(out, i * 20 + 16, rva + patch_group.iat_offset)
         let patch_j = 0
-        while patch_j < len(patch_group.items) {
+        for patch_j < len(patch_group.items) {
             let hint_rva = rva + patch_group.items[patch_j].hint_offset
             pe_patch_u64(out, patch_group.ilt_offset + patch_j * 8, hint_rva)
             pe_patch_u64(out, patch_group.iat_offset + patch_j * 8, hint_rva)
@@ -225,7 +225,7 @@ fun pe_build_idata(dlls: PeDll[], rva: i64): u8[] {
 
 fun pe_patch_thunks(image: ExeImage, imports: PeImport[], rdata_rva: i64): void {
     let i = 0
-    while i < len(imports) {
+    for i < len(imports) {
         let item = imports[i]
         let disp = rdata_rva + item.iat_offset - (4096 + item.thunk_offset + 6)
         pe_patch_u32(image.text, item.thunk_offset + 2, disp)
@@ -244,7 +244,7 @@ fun pe_symbol_rva(sym: AsmSymbol, data_rva: i64): i64 {
 }
 fun pe_patch_relocs(image: ExeImage, imports: PeImport[], data_rva: i64): void {
     let i = 0
-    while i < len(image.relocs) {
+    for i < len(image.relocs) {
         let r = image.relocs[i]
         if r.symbol_index < 0 || r.symbol_index >= len(image.symbols) {
             pe_die("invalid relocation symbol index")
@@ -287,7 +287,7 @@ fun pe_append_dos_stub(out: u8[]): void {
 }
 fun pe_append_name8(out: u8[], name: str): void {
     let i = 0
-    while i < 8 {
+    for i < 8 {
         if i < len(name) {
             pe_byte(out, name[i])
         } else {
@@ -379,7 +379,7 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
         let last = dlls[len(dlls) - 1]
         iat_end = last.iat_offset + (len(last.items) + 1) * 8
     }
-    while i < 16 {
+    for i < 16 {
         if i == 1 {
             pe_u32(out, rdata_rva)
             pe_u32(out, (len(dlls) + 1) * 20)
@@ -395,7 +395,7 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
     pe_section_header(out, text)
     pe_section_header(out, rdata_sec)
     pe_section_header(out, data_sec)
-    while len(out) < 1024 {
+    for len(out) < 1024 {
         pe_byte(out, 0)
     }
     out

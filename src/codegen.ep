@@ -381,7 +381,7 @@ fun collect_stmt_strings(e: EmitterState, node: AstStmt): void {
             collect_assign_target_strings(e, node.target)
             collect_expr_strings(e, node.value_expr)
         }
-        AstStmtKind.While {
+        AstStmtKind.ForCondition {
             collect_expr_strings(e, node.expr)
             collect_block_strings(e, node.body)
         }
@@ -715,7 +715,7 @@ fun pre_scan_stmt(e: EmitterState, stmt: AstStmt): void {
         AstStmtKind.AssignOp {
             pre_scan_expr(e, stmt.value_expr)
         }
-        AstStmtKind.While {
+        AstStmtKind.ForCondition {
             pre_scan_expr(e, stmt.expr)
             pre_scan_block(e, stmt.body)
         }
@@ -775,7 +775,7 @@ fun emit_epilogue(e: EmitterState): void {
 fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
     let slots = new i64[]
     let i = 0
-    while i < len(args) {
+    for i < len(args) {
         emit_expr(e, args[i])
         push(slots, temp_save_rax(e))
         i += 1
@@ -799,7 +799,7 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): void {
 fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
     let slots = new i64[]
     let i = 0
-    while i < len(args) {
+    for i < len(args) {
         emit_expr_as(e, args[i], emitter_type(e, info.params[i].type_name))
         push(slots, temp_save_rax(e))
         i += 1
@@ -823,7 +823,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
     if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
-        while i < len(expr.args) {
+        for i < len(expr.args) {
             let arg = expr.args[i]
             let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
@@ -843,7 +843,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         let frame = 32 + extra_frame
         asm_sub(e.program, asm_rsp(), asm_imm(frame))
         i = 4
-        while i < len(slots) {
+        for i < len(slots) {
             emit_stack_load(e, asm_rax(), slots[i])
             asm_mov(e.program, asm_mem_base(0, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
             i += 1
@@ -1959,7 +1959,7 @@ fun emit_if(e: EmitterState, expr: AstExpr): void {
     }
     emit_label_index(e, end_id)
 }
-fun emit_while(e: EmitterState, stmt: AstStmt): void {
+fun emit_for_condition(e: EmitterState, stmt: AstStmt): void {
     let start_id = fresh_label(e)
     let end_id = fresh_label(e)
     push(e.loop_starts, start_id)
@@ -2052,8 +2052,8 @@ fun emit_stmt(e: EmitterState, stmt: AstStmt): void {
             emit_assign_op(e, stmt)
             ret
         }
-        AstStmtKind.While {
-            emit_while(e, stmt)
+        AstStmtKind.ForCondition {
+            emit_for_condition(e, stmt)
             ret
         }
         AstStmtKind.ForRange {
@@ -2075,7 +2075,7 @@ fun emit_block(e: EmitterState, block: AstBlock): void {
         ret
     }
     let i = 0
-    while i < len(block.stmts) {
+    for i < len(block.stmts) {
         emit_stmt(e, block.stmts[i])
         i += 1
     }
@@ -2094,7 +2094,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): void {
     e.current_ret_type = emitter_type(e, fn.type_name)
     e.current_ep_id = fresh_label(e)
     let i = 0
-    while i < len(fn.params) {
+    for i < len(fn.params) {
         add_local(e, fn.params[i].name, emitter_type(e, fn.params[i].type_name))
         i += 1
     }
@@ -2189,14 +2189,14 @@ fun emit_program(e: EmitterState, ast: AstProgram): void {
     emit_label(e, "_argv")
     asm_dq(e.program, 0)
     let i = 0
-    while i < len(e.strings) {
+    for i < len(e.strings) {
         emit_label_index(e, e.strings[i].symbol_index)
         asm_bytes(e.program, string_bytes(e.strings[i].text))
         i += 1
     }
     asm_section_text(e.program)
     i = 0
-    while i < len(ast.funcs) {
+    for i < len(ast.funcs) {
         emit_fn_def(e, ast.funcs[i])
         i += 1
     }

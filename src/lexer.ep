@@ -1,7 +1,7 @@
 #
 # Epic lexer.
 #
-type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | WHILE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | TRUE | FALSE | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
+type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | TRUE | FALSE | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
 type Token {
     kind: TokenKind
     text: str
@@ -39,9 +39,6 @@ fun identifier_kind(text: str): TokenKind {
     if text == "else" {
         ret TokenKind.ELSE
     }
-    if text == "while" {
-        ret TokenKind.WHILE
-    }
     if text == "for" {
         ret TokenKind.FOR
     }
@@ -76,7 +73,7 @@ fun lex(src: str): Token[] {
     let n = len(src)
     let pos = 0
     let line = 1
-    while pos < n {
+    for pos < n {
         let ch = src[pos]
         if ch == 32 || ch == 9 || ch == 13 {
             pos += 1
@@ -90,7 +87,7 @@ fun lex(src: str): Token[] {
         }
         if ch == 35 {
             pos += 1
-            while pos < n && src[pos] != 10 {
+            for pos < n && src[pos] != 10 {
                 pos += 1
             }
             continue
@@ -100,7 +97,7 @@ fun lex(src: str): Token[] {
             pos += 1
             let buf = new u8[]
             let scanning = true
-            while scanning && pos < n {
+            for scanning && pos < n {
                 if src[pos] == 34 {
                     scanning = false
                 } else {
@@ -197,7 +194,7 @@ fun lex(src: str): Token[] {
             if ch == 48 && pos + 1 < n && (src[pos + 1] == 120 || src[pos + 1] == 88) {
                 pos += 2
                 let digit_start = pos
-                while pos < n && is_hex_digit(src[pos]) {
+                for pos < n && is_hex_digit(src[pos]) {
                     pos += 1
                 }
                 if pos == digit_start {
@@ -205,11 +202,11 @@ fun lex(src: str): Token[] {
                     exit(1)
                 }
             } else {
-                while pos < n && is_digit(src[pos]) {
+                for pos < n && is_digit(src[pos]) {
                     pos += 1
                 }
             }
-            while pos < n && is_alnum(src[pos]) {
+            for pos < n && is_alnum(src[pos]) {
                 pos += 1
             }
             let number_text = src[number_start:pos]
@@ -219,7 +216,7 @@ fun lex(src: str): Token[] {
         if is_alpha(ch) {
             let identifier_line = line
             let identifier_start = pos
-            while pos < n && is_alnum(src[pos]) {
+            for pos < n && is_alnum(src[pos]) {
                 pos += 1
             }
             let identifier_text = src[identifier_start:pos]

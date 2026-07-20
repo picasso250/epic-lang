@@ -5,7 +5,7 @@
 - Epic is a small C-like systems language targeting Windows x64 in v0.
 - Source files use the `.ep` extension.
 - Blocks use `{}` and ordinary statements end at newlines. Semicolons are not part of v0 syntax.
-- `if` and `while` conditions do not require parentheses.
+- `if` and condition-form `for` conditions do not require parentheses.
 - `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions have at most 4 parameters in v0. Calls have at most 4 arguments.
@@ -262,7 +262,7 @@ fun add(a: i64, b: i64): i64 {
 A compatible function-body tail is an implicit return. Explicit `ret expr`
 remains valid and can return early. A non-`void` function is valid when every
 normal path produces an assignable value or terminates with `ret` or `never`.
-`while` and `for` remain statements and are not assumed to execute or terminate.
+Both forms of `for` remain statements and are not assumed to execute or terminate.
 
 A `void` function may use bare `ret`, fall off the end, or discard any body tail
 value. `ret expr` remains invalid in a `void` function. `void` means normal
@@ -320,10 +320,13 @@ the same AST shape as `else { if ... }`.
 
 ## Loop control
 
+Condition loops use `for` followed by a boolean expression. Epic does not have
+a separate `while` keyword or a conditionless `for {}` form.
+
 `break` and `continue` are statement-only loop control:
 
 ```epic
-while cond {
+for cond {
     if done {
         break
     }
@@ -333,7 +336,7 @@ while cond {
 }
 ```
 
-Both statements bind to the nearest enclosing `while` or `for` loop. They are
+Both statements bind to the nearest enclosing `for` loop. They are
 rejected outside loops.
 
 ## Integer range loops
@@ -354,7 +357,7 @@ such as `for i: -3:2`.
 The iterator is an implicit, read-only `i64` local visible only in the loop
 body. It cannot be assigned or used as a compound-assignment target. `continue`
 advances the iterator before the next condition check, while `break` exits the
-nearest `while` or `for`. The current language has no range step or automatic reverse
+nearest `for`. The current language has no range step or automatic reverse
 iteration.
 
 ## Product types
@@ -479,7 +482,7 @@ String lengths and indices count bytes, not Unicode characters.
 
 `str + str` remains the non-integer addition case. `==` and `!=` additionally
 accept two bool values, two strings, or two values of the same enum type;
-products and arrays have no implicit reference equality. `if` and `while`
+products and arrays have no implicit reference equality. `if` and condition-form `for`
 conditions require `bool`.
 
 ## System calls
