@@ -543,10 +543,10 @@ fun sema_literal_digit_end(text: str): i64 {
     }
     ret i
 }
-fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
-    if hex == 1 {
+fun sema_literal_limit(type_name: str, negative: bool, hex: bool): str {
+    if hex {
         if type_name == "i8" {
-            if negative == 1 {
+            if negative {
                 ret "80"
             }
             ret "7f"
@@ -555,7 +555,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
             ret "ff"
         }
         if type_name == "i16" {
-            if negative == 1 {
+            if negative {
                 ret "8000"
             }
             ret "7fff"
@@ -564,7 +564,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
             ret "ffff"
         }
         if type_name == "i32" {
-            if negative == 1 {
+            if negative {
                 ret "80000000"
             }
             ret "7fffffff"
@@ -573,7 +573,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
             ret "ffffffff"
         }
         if type_name == "i64" {
-            if negative == 1 {
+            if negative {
                 ret "8000000000000000"
             }
             ret "7fffffffffffffff"
@@ -584,7 +584,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
         ret ""
     }
     if type_name == "i8" {
-        if negative == 1 {
+        if negative {
             ret "128"
         }
         ret "127"
@@ -593,7 +593,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
         ret "255"
     }
     if type_name == "i16" {
-        if negative == 1 {
+        if negative {
             ret "32768"
         }
         ret "32767"
@@ -602,7 +602,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
         ret "65535"
     }
     if type_name == "i32" {
-        if negative == 1 {
+        if negative {
             ret "2147483648"
         }
         ret "2147483647"
@@ -611,7 +611,7 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
         ret "4294967295"
     }
     if type_name == "i64" {
-        if negative == 1 {
+        if negative {
             ret "9223372036854775808"
         }
         ret "9223372036854775807"
@@ -621,12 +621,12 @@ fun sema_literal_limit(type_name: str, negative: i64, hex: i64): str {
     }
     ret ""
 }
-fun sema_literal_fits(text: str, digit_end: i64, type_name: str, negative: i64): bool {
+fun sema_literal_fits(text: str, digit_end: i64, type_name: str, negative: bool): bool {
     let start = 0
-    let hex = 0
+    let hex = false
     if digit_end >= 2 && text[0] == 48 && (text[1] == 120 || text[1] == 88) {
         start = 2
-        hex = 1
+        hex = true
     }
     while start + 1 < digit_end && text[start] == 48 {
         start += 1
@@ -668,12 +668,12 @@ fun sema_parse_literal_bits(text: str, digit_end: i64): i64 {
     }
     ret value
 }
-fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negative: i64): str {
+fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negative: bool): str {
     if expr.resolved {
         ret expr.resolved_type
     }
     if expr.type_name == "bool" {
-        if negative == 1 {
+        if negative {
             sema_error(state.source_path, expr.line, "unary - does not accept bool")
         }
         expr.resolved_type = "bool"
@@ -703,7 +703,7 @@ fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negativ
             result = "i64"
         }
     }
-    if negative == 1 && !sema_is_signed_integer(result) {
+    if negative && !sema_is_signed_integer(result) {
         sema_error(state.source_path, expr.line, "unary - requires a signed integer, got " + result)
     }
     if !sema_literal_fits(expr.value, digit_end, result, negative) {
@@ -980,7 +980,7 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
 fun sema_check_unary(state: SemaState, expr: AstExpr, expected: str): str {
     let operand = ""
     if expr.op == OperatorKind.Negate && expr.left.kind == AstExprKind.Literal {
-        operand = sema_resolve_literal(state, expr.left, expected, 1)
+        operand = sema_resolve_literal(state, expr.left, expected, true)
     } else {
         operand = sema_check_expr_expected(state, expr.left, expected)
     }
@@ -1103,7 +1103,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): st
     let result = ""
     match expr.kind {
         AstExprKind.Literal {
-            result = sema_resolve_literal(state, expr, expected, 0)
+            result = sema_resolve_literal(state, expr, expected, false)
         }
         AstExprKind.String {
             result = "str"
@@ -1234,9 +1234,9 @@ fun sema_check_match(state: SemaState, expr: AstExpr, expected: str): str {
     if subject_type != "never" && enum_node.name == "" {
         sema_error(state.source_path, expr.line, "match subject must have an enum type, got " + subject_type)
     }
-    let seen = new i64[]
+    let seen = new bool[]
     if enum_node.name != "" {
-        seen = new i64[len(enum_node.members)]
+        seen = new bool[len(enum_node.members)]
     }
     let explicit_count = 0
     let has_else = false
@@ -1260,10 +1260,10 @@ fun sema_check_match(state: SemaState, expr: AstExpr, expected: str): str {
             if value < 0 {
                 sema_error(state.source_path, arm.line, "enum " + subject_type + " has no member '" + arm.member_name + "'")
             }
-            if seen[value] == 1 {
+            if seen[value] {
                 sema_error(state.source_path, arm.line, "duplicate match arm " + subject_type + "." + arm.member_name)
             }
-            seen[value] = 1
+            seen[value] = true
             arm.value = value
             explicit_count += 1
         }
@@ -1284,7 +1284,7 @@ fun sema_check_match(state: SemaState, expr: AstExpr, expected: str): str {
     }
     ret result
 }
-fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64, compound: i64): str {
+fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64, compound: bool): str {
     match target.kind {
         AssignTargetKind.Var {
             if target.name == "argv" {
@@ -1302,7 +1302,7 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
         AssignTargetKind.Field {
             let object_type = sema_check_expr(state, target.object)
             if object_type == "str" {
-                if compound == 1 {
+                if compound {
                     sema_error(state.source_path, line, "str does not support compound assignment")
                 }
                 sema_error(state.source_path, line, "str is read-only")
@@ -1318,7 +1318,7 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
             sema_check_expr_expected(state, target.index, "i64")
             sema_require_i64(state, target.index, "subscript")
             if base_type == "str" {
-                if compound == 1 {
+                if compound {
                     sema_error(state.source_path, line, "str does not support compound assignment")
                 }
                 sema_error(state.source_path, line, "str is read-only")
@@ -1332,7 +1332,7 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
     }
 }
 fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
-    let expected = sema_assign_target_type(state, stmt.target, stmt.line, 0)
+    let expected = sema_assign_target_type(state, stmt.target, stmt.line, false)
     let actual = sema_check_expr_expected(state, stmt.value_expr, expected)
     if !sema_assignable(expected, actual) {
         match stmt.target.kind {
@@ -1350,7 +1350,7 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
     ret 0
 }
 fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
-    let target_type = sema_assign_target_type(state, stmt.target, stmt.line, 1)
+    let target_type = sema_assign_target_type(state, stmt.target, stmt.line, true)
     if !sema_is_integer(target_type) {
         sema_error(state.source_path, stmt.line, "compound assignment requires an integer target, got " + target_type)
     }

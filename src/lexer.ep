@@ -195,9 +195,7 @@ fun lex(src: str): Token[] {
         if is_digit(ch) {
             let number_line = line
             let number_start = pos
-            let hex = 0
             if ch == 48 && pos + 1 < n && (src[pos + 1] == 120 || src[pos + 1] == 88) {
-                hex = 1
                 pos += 2
                 let digit_start = pos
                 while pos < n && is_hex_digit(src[pos]) {

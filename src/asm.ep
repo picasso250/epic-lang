@@ -127,19 +127,19 @@ fun asm_is_number(s: str): bool {
     if s[0] == 45 {
         i = 1
     }
-    let hex = 0
+    let hex = false
     if i + 2 <= len(s) && s[i] == 48 && (s[i + 1] == 120 || s[i + 1] == 88) {
-        hex = 1
+        hex = true
         i += 2
     }
     if i >= len(s) {
         ret false
     }
     while i < len(s) {
-        if hex == 0 && (s[i] < 48 || s[i] > 57) {
+        if !hex && (s[i] < 48 || s[i] > 57) {
             ret false
         }
-        if hex == 1 && digit_value(s[i]) < 0 {
+        if hex && digit_value(s[i]) < 0 {
             ret false
         }
         i += 1

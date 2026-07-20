@@ -1184,7 +1184,7 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     if expr.op == OperatorKind.LogicalAnd || expr.op == OperatorKind.LogicalOr {
         let end_id = fresh_label(e)
         let true_id = fresh_label(e)
-        emit_cond_jump(e, expr, 1, true_id)
+        emit_cond_jump(e, expr, true, true_id)
         asm_xor(e.program, asm_eax(), asm_eax())
         asm_jmp(e.program, asm_symbol(end_id))
         emit_label_index(e, true_id)
@@ -1328,7 +1328,7 @@ fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
     }
     ret 0
 }
-fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
+fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
     let left_type = expr_type(e, expr.left)
     let right_type = expr_type(e, expr.right)
     let operand_type = left_type
@@ -1360,14 +1360,14 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
     let target = asm_symbol(label)
     match expr.op {
         OperatorKind.Equal {
-            if jump_if_true == 1 {
+            if jump_if_true {
                 asm_jz(e.program, target)
             } else {
                 asm_jnz(e.program, target)
             }
         }
         OperatorKind.NotEqual {
-            if jump_if_true == 1 {
+            if jump_if_true {
                 asm_jnz(e.program, target)
             } else {
                 asm_jz(e.program, target)
@@ -1375,13 +1375,13 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         }
         OperatorKind.Less {
             if type_is_signed(operand_type) {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jl(e.program, target)
                 } else {
                     asm_jge(e.program, target)
                 }
             } else {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jb(e.program, target)
                 } else {
                     asm_jae(e.program, target)
@@ -1390,13 +1390,13 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         }
         OperatorKind.LessEqual {
             if type_is_signed(operand_type) {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jle(e.program, target)
                 } else {
                     asm_jg(e.program, target)
                 }
             } else {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jbe(e.program, target)
                 } else {
                     asm_ja(e.program, target)
@@ -1405,13 +1405,13 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         }
         OperatorKind.Greater {
             if type_is_signed(operand_type) {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jg(e.program, target)
                 } else {
                     asm_jle(e.program, target)
                 }
             } else {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_ja(e.program, target)
                 } else {
                     asm_jbe(e.program, target)
@@ -1420,13 +1420,13 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
         }
         OperatorKind.GreaterEqual {
             if type_is_signed(operand_type) {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jge(e.program, target)
                 } else {
                     asm_jl(e.program, target)
                 }
             } else {
-                if jump_if_true == 1 {
+                if jump_if_true {
                     asm_jae(e.program, target)
                 } else {
                     asm_jb(e.program, target)
@@ -1439,17 +1439,17 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
     }
     ret
 }
-fun emit_value_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
+fun emit_value_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
     emit_expr(e, expr)
     emit_test_rax(e, expr_type(e, expr))
-    if jump_if_true == 1 {
+    if jump_if_true {
         asm_jnz(e.program, asm_symbol(label))
     } else {
         asm_jz(e.program, asm_symbol(label))
     }
     ret
 }
-fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
+fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
     match expr.op {
         OperatorKind.Add {
             emit_value_jump(e, expr, jump_if_true, label)
@@ -1512,25 +1512,25 @@ fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, lab
             ret
         }
         OperatorKind.LogicalAnd {
-            if jump_if_true == 0 {
-                emit_cond_jump(e, expr.left, 0, label)
-                emit_cond_jump(e, expr.right, 0, label)
+            if !jump_if_true {
+                emit_cond_jump(e, expr.left, false, label)
+                emit_cond_jump(e, expr.right, false, label)
             } else {
                 let and_skip = fresh_label(e)
-                emit_cond_jump(e, expr.left, 0, and_skip)
-                emit_cond_jump(e, expr.right, 1, label)
+                emit_cond_jump(e, expr.left, false, and_skip)
+                emit_cond_jump(e, expr.right, true, label)
                 emit_label_index(e, and_skip)
             }
             ret
         }
         OperatorKind.LogicalOr {
-            if jump_if_true == 1 {
-                emit_cond_jump(e, expr.left, 1, label)
-                emit_cond_jump(e, expr.right, 1, label)
+            if jump_if_true {
+                emit_cond_jump(e, expr.left, true, label)
+                emit_cond_jump(e, expr.right, true, label)
             } else {
                 let or_skip = fresh_label(e)
-                emit_cond_jump(e, expr.left, 1, or_skip)
-                emit_cond_jump(e, expr.right, 0, label)
+                emit_cond_jump(e, expr.left, true, or_skip)
+                emit_cond_jump(e, expr.right, false, label)
                 emit_label_index(e, or_skip)
             }
             ret
@@ -1541,18 +1541,18 @@ fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, lab
     }
     ret
 }
-fun emit_unary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
+fun emit_unary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
     match expr.op {
         OperatorKind.Negate {
             emit_value_jump(e, expr, jump_if_true, label)
             ret
         }
         OperatorKind.LogicalNot {
-            if jump_if_true == 1 {
-                emit_cond_jump(e, expr.left, 0, label)
+            if jump_if_true {
+                emit_cond_jump(e, expr.left, false, label)
                 ret
             }
-            emit_cond_jump(e, expr.left, 1, label)
+            emit_cond_jump(e, expr.left, true, label)
             ret
         } else {
             die("internal: binary operator used by unary expression")
@@ -1561,7 +1561,7 @@ fun emit_unary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
     }
     ret
 }
-fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): void {
+fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
     match expr.kind {
         AstExprKind.Literal {
             emit_value_jump(e, expr, jump_if_true, label)
@@ -1998,10 +1998,10 @@ fun emit_if(e: EmitterState, expr: AstExpr): i64 {
     let else_id = fresh_label(e)
     let end_id = fresh_label(e)
     if !expr.else_block.present {
-        emit_cond_jump(e, expr.condition, 0, end_id)
+        emit_cond_jump(e, expr.condition, false, end_id)
         emit_block_as(e, expr.then_block, expr_type(e, expr))
     } else {
-        emit_cond_jump(e, expr.condition, 0, else_id)
+        emit_cond_jump(e, expr.condition, false, else_id)
         emit_block_as(e, expr.then_block, expr_type(e, expr))
         asm_jmp(e.program, asm_symbol(end_id))
         emit_label_index(e, else_id)
@@ -2016,7 +2016,7 @@ fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
     push(e.loop_starts, start_id)
     push(e.loop_ends, end_id)
     emit_label_index(e, start_id)
-    emit_cond_jump(e, stmt.expr, 0, end_id)
+    emit_cond_jump(e, stmt.expr, false, end_id)
     emit_block(e, stmt.body)
     pop(e.loop_starts)
     pop(e.loop_ends)
