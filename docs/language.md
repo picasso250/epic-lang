@@ -172,7 +172,7 @@ but those fields are not source-visible.
 | Field or expression | Meaning |
 | --- | --- |
 | `len(s)` | number of bytes |
-| `s[i]` | checked byte access; invalid indices terminate the program |
+| `s[i]` | checked `u8` byte access; invalid indices terminate the program |
 | `s[start:end]` | zero-copy half-open immutable view |
 
 Direct `s[i]` requires an `i64` index and rejects negative indices and indices
@@ -458,6 +458,8 @@ Supported escapes in string and character literals:
 ```
 
 String and character literals are ASCII-only in v0. Non-ASCII literals are compile errors.
+Character literals have type `u8`; use an explicit conversion such as
+`i64('A')` when another integer width is required.
 
 Integer literals are decimal or hexadecimal (`0x` / `0X`). A suffix selects an
 exact type (`1i8`, `1u8`, `1i16`, `1u16`, `1i32`, `1u32`, `1i64`, or `1u64`);
