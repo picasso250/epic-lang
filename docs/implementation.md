@@ -113,9 +113,9 @@ fixed temporary-slot limit.
 Integer and bool locals/parameters use 8-byte stack slots, while product fields
 and array elements use their natural 1-, 2-, 4-, or 8-byte size and alignment.
 The low N bits of an integer expression are authoritative; upper register bits
-need not be canonical. Code generation extends only at a widening conversion,
-when forming a 64-bit address, at an inherited compatibility boundary, or for
-division lowering. The private assembler encodes 16-bit operands plus `movzx`,
+need not be canonical. Code generation extends only at an explicit widening
+conversion, when forming a 64-bit address, or for division lowering. The
+private assembler encodes 16-bit operands plus `movzx`,
 `movsx`, and `movsxd` for these boundaries.
 
 The polymorphic `is_null` builtin is checked in semantic analysis against the

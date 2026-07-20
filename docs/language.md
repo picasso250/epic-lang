@@ -81,9 +81,10 @@ The v3 compiler implementation itself stays within the v2-era integer surface.
 The v4 compiler is the dogfood target for the new bool and integer types. Its
 source uses distinct `bool` predicates and state flags, and v4 requires `bool`
 for conditions and logical operators. Natural value-producing compiler paths
-also use block tails and expression-form `if` and `match`. The v3 seed still
-provides the separate `u8`/`i64` integer migration bridge needed to compile
-this source; that bridge is not a forward-compatibility promise.
+also use block tails and expression-form `if` and `match`. Character literals
+and string indexing produce `u8`, and v4 removes the v3 seed's separate
+`u8`/`i64` migration bridge. Assignments, returns, arguments, arithmetic, and
+comparisons require exact integer types; width changes use explicit conversions.
 
 The v3 compiler source also dogfoods the v2 foundations: unit enums and
 exhaustive matching, compound assignment, unary operators, integer range loops,
@@ -544,7 +545,7 @@ to declare them.
 | `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
-| `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
+| `extend(dst: T[], src: T[]): void` | appends matching source elements to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
 
 `never` appears here to describe the built-in precisely, but it is not accepted

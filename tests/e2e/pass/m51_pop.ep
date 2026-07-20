@@ -40,7 +40,7 @@ fun main(): void {
 
     print(itoa(last))
     print(":")
-    print(itoa(byte))
+    print(itoa(i64(byte)))
     print(":")
     print(itoa(popped.value))
     print("\n")

@@ -101,7 +101,7 @@ fun asm_starts(s: str, prefix: str): bool {
     }
     true
 }
-fun asm_find(s: str, ch: i64): i64 {
+fun asm_find(s: str, ch: u8): i64 {
     for i: 0:len(s) {
         if s[i] == ch {
             ret i
@@ -686,7 +686,7 @@ fun asm_offset(image: ExeImage): i64 {
     }
     len(image.data)
 }
-fun asm_byte(image: ExeImage, value: i64): void {
+fun asm_byte(image: ExeImage, value: u8): void {
     if image.section == 1 {
         push(image.text, value)
     } else if image.section == 2 {
@@ -696,14 +696,14 @@ fun asm_byte(image: ExeImage, value: i64): void {
     }
 }
 fun asm_u16(image: ExeImage, value: i64): void {
-    asm_byte(image, value)
-    asm_byte(image, value >> 8)
+    asm_byte(image, u8(value))
+    asm_byte(image, u8(value >> 8))
 }
 fun asm_u32(image: ExeImage, value: i64): void {
-    asm_byte(image, value)
-    asm_byte(image, value >> 8)
-    asm_byte(image, value >> 16)
-    asm_byte(image, value >> 24)
+    asm_byte(image, u8(value))
+    asm_byte(image, u8(value >> 8))
+    asm_byte(image, u8(value >> 16))
+    asm_byte(image, u8(value >> 24))
 }
 fun asm_u64(image: ExeImage, value: i64): void {
     asm_u32(image, value)
@@ -739,7 +739,7 @@ fun asm_rex_bits(width: i64, reg: i64, index: i64, base: i64): i64 {
 }
 fun asm_rex(image: ExeImage, rex: i64, force: bool): void {
     if rex != 64 || force {
-        asm_byte(image, rex)
+        asm_byte(image, u8(rex))
     }
 }
 fun asm_operand_prefix(image: ExeImage, width: i64): void {
@@ -748,7 +748,7 @@ fun asm_operand_prefix(image: ExeImage, width: i64): void {
     }
 }
 fun asm_modrm(image: ExeImage, mod: i64, reg: i64, rm: i64): void {
-    asm_byte(image, (mod << 6) | ((reg & 7) << 3) | (rm & 7))
+    asm_byte(image, u8((mod << 6) | ((reg & 7) << 3) | (rm & 7)))
 }
 fun asm_scale_bits(scale: i64): i64 {
     if scale == 1 {
@@ -805,12 +805,12 @@ fun asm_emit_rm(image: ExeImage, reg_field: i64, op: AsmOperand): void {
         if op.index >= 0 {
             index = op.index
         }
-        asm_byte(image, (asm_scale_bits(op.scale) << 6) | ((index & 7) << 3) | (base & 7))
+        asm_byte(image, u8((asm_scale_bits(op.scale) << 6) | ((index & 7) << 3) | (base & 7)))
     } else {
         asm_modrm(image, mod, reg_field, base)
     }
     if mod == 1 {
-        asm_byte(image, op.disp)
+        asm_byte(image, u8(op.disp))
     } else if mod == 2 || (mod == 0 && (base & 7) == 5) {
         asm_u32(image, op.disp)
     }
@@ -827,7 +827,7 @@ fun asm_emit_reg_rm(image: ExeImage, opcode: i64, reg: AsmOperand, rm: AsmOperan
     }
     asm_operand_prefix(image, reg.width)
     asm_rex(image, asm_rex_bits(reg.width, reg.reg, index, base), asm_force_rex8(rm))
-    asm_byte(image, opcode)
+    asm_byte(image, u8(opcode))
     asm_emit_rm(image, reg.reg, rm)
 }
 
@@ -846,16 +846,16 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
         asm_operand_prefix(image, width)
         asm_rex(image, asm_rex_bits(width, 0, -1, dst.reg), asm_force_rex8(dst))
         if width == 8 {
-            asm_byte(image, 176 + (dst.reg & 7))
-            asm_byte(image, src.imm)
+            asm_byte(image, u8(176 + (dst.reg & 7)))
+            asm_byte(image, u8(src.imm))
         } else if width == 16 {
-            asm_byte(image, 184 + (dst.reg & 7))
+            asm_byte(image, u8(184 + (dst.reg & 7)))
             asm_u16(image, src.imm)
         } else if width == 32 {
-            asm_byte(image, 184 + (dst.reg & 7))
+            asm_byte(image, u8(184 + (dst.reg & 7)))
             asm_u32(image, src.imm)
         } else {
-            asm_byte(image, 184 + (dst.reg & 7))
+            asm_byte(image, u8(184 + (dst.reg & 7)))
             asm_u64(image, src.imm)
         }
         ret
@@ -877,7 +877,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
         let index = dst.index
         asm_operand_prefix(image, width)
         asm_rex(image, asm_rex_bits(width, src.reg, index, base), asm_force_rex8(src))
-        asm_byte(image, store_opcode)
+        asm_byte(image, u8(store_opcode))
         asm_emit_rm(image, src.reg, dst)
         ret
     }
@@ -899,7 +899,7 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
             }
         }
         if width == 8 {
-            asm_byte(image, src.imm)
+            asm_byte(image, u8(src.imm))
         } else if width == 16 {
             asm_u16(image, src.imm)
         } else {
@@ -1067,7 +1067,7 @@ fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src
         }
         asm_emit_group_default64(image, opcode, asm_alu_ext(kind), dst)
         if opcode == 128 || opcode == 131 {
-            asm_byte(image, src.imm)
+            asm_byte(image, u8(src.imm))
         } else if width == 16 {
             asm_u16(image, src.imm)
         } else {
@@ -1082,7 +1082,7 @@ fun asm_emit_alu(image: ExeImage, kind: AsmInstructionKind, dst: AsmOperand, src
     if dst.kind == AsmOperandKind.Memory && src.kind == AsmOperandKind.Register {
         asm_operand_prefix(image, width)
         asm_rex(image, asm_rex_bits(width, src.reg, dst.index, dst.base), asm_force_rex8(src))
-        asm_byte(image, asm_alu_store_opcode(kind, width))
+        asm_byte(image, u8(asm_alu_store_opcode(kind, width)))
         asm_emit_rm(image, src.reg, dst)
         ret
     }
@@ -1116,7 +1116,7 @@ fun asm_emit_imul(image: ExeImage, dst: AsmOperand, src: AsmOperand): void {
         if src.imm >= -128 && src.imm <= 127 {
             asm_byte(image, 107)
             asm_modrm(image, 3, dst.reg, dst.reg)
-            asm_byte(image, src.imm)
+            asm_byte(image, u8(src.imm))
         } else {
             asm_byte(image, 105)
             asm_modrm(image, 3, dst.reg, dst.reg)
@@ -1151,7 +1151,7 @@ fun asm_emit_group(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): 
     }
     asm_operand_prefix(image, target.width)
     asm_rex(image, asm_rex_bits(target.width, ext, index, base), asm_force_rex8(target))
-    asm_byte(image, opcode)
+    asm_byte(image, u8(opcode))
     asm_emit_rm(image, ext, target)
 }
 fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: AsmOperand): void {
@@ -1167,7 +1167,7 @@ fun asm_emit_group_default64(image: ExeImage, opcode: i64, ext: i64, target: Asm
     }
     asm_operand_prefix(image, width)
     asm_rex(image, asm_rex_bits(width, ext, index, base), asm_force_rex8(target))
-    asm_byte(image, opcode)
+    asm_byte(image, u8(opcode))
     asm_emit_rm(image, ext, target)
 }
 fun asm_jump_code(kind: AsmInstructionKind): i64 {
@@ -1224,7 +1224,7 @@ fun asm_emit_jump(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand)
         asm_byte(image, 233)
     } else {
         asm_byte(image, 15)
-        asm_byte(image, asm_jump_code(kind))
+        asm_byte(image, u8(asm_jump_code(kind)))
     }
     asm_reloc(image, 1, target.symbol_index, 0)
     asm_u32(image, 0)
@@ -1272,7 +1272,7 @@ fun asm_emit_setcc(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand
     }
     asm_rex(image, asm_rex_bits(8, 0, -1, target.reg), asm_force_rex8(target))
     asm_byte(image, 15)
-    asm_byte(image, asm_setcc_code(kind))
+    asm_byte(image, u8(asm_setcc_code(kind)))
     asm_modrm(image, 3, 0, target.reg)
 }
 fun asm_encode_call(image: ExeImage, target: AsmOperand): void {
@@ -1303,7 +1303,7 @@ fun asm_encode_push_pop(image: ExeImage, target: AsmOperand, opcode: i64): void 
     if target.reg >= 8 {
         asm_byte(image, 65)
     }
-    asm_byte(image, opcode + (target.reg & 7))
+    asm_byte(image, u8(opcode + (target.reg & 7)))
 }
 fun asm_encode_instruction_item(image: ExeImage, item: AsmItem): void {
     match item.instruction {
@@ -1857,7 +1857,7 @@ fun asm_program_parse_db(program: AsmProgram, args: str): void {
         if !asm_is_number(value_text) {
             asm_die("db values must be integers")
         }
-        push(values, parse_integer(value_text))
+        push(values, u8(parse_integer(value_text)))
         value_start = value_end + 1
     }
     asm_bytes(program, values)
@@ -2063,7 +2063,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
             AsmItemKind.RepeatData {
                 for repeat_i: 0:item.repeat_count {
                     if item.width == 1 {
-                        asm_byte(image, item.value)
+                        asm_byte(image, u8(item.value))
                     } else if item.width == 4 {
                         asm_u32(image, item.value)
                     } else if item.width == 8 {
@@ -2563,7 +2563,7 @@ fun asm_render(program: AsmProgram): u8[] {
                     if byte_i != 0 {
                         asm_render_s(out, ", ")
                     }
-                    asm_render_i(out, item.bytes[byte_i])
+                    asm_render_i(out, i64(item.bytes[byte_i]))
                 }
                 asm_render_s(out, "\n")
             }

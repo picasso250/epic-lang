@@ -25,12 +25,12 @@ type PeSection {
 fun pe_die(msg: str): void {
     panic("pe: " + msg)
 }
-fun pe_byte(out: u8[], value: i64): void {
+fun pe_byte(out: u8[], value: u8): void {
     push(out, value)
 }
 fun pe_u16(out: u8[], value: i64): void {
-    pe_byte(out, value)
-    pe_byte(out, value >> 8)
+    pe_byte(out, u8(value))
+    pe_byte(out, u8(value >> 8))
 }
 fun pe_u32(out: u8[], value: i64): void {
     pe_u16(out, value)
@@ -41,10 +41,10 @@ fun pe_u64(out: u8[], value: i64): void {
     pe_u32(out, value >> 32)
 }
 fun pe_patch_u32(out: u8[], off: i64, value: i64): void {
-    out[off] = value
-    out[off + 1] = value >> 8
-    out[off + 2] = value >> 16
-    out[off + 3] = value >> 24
+    out[off] = u8(value)
+    out[off + 1] = u8(value >> 8)
+    out[off + 2] = u8(value >> 16)
+    out[off + 3] = u8(value >> 24)
 }
 fun pe_patch_u64(out: u8[], off: i64, value: i64): void {
     pe_patch_u32(out, off, value)
@@ -55,7 +55,7 @@ fun pe_zero(out: u8[], count: i64): void {
         pe_byte(out, 0)
     }
 }
-fun pe_pad(out: u8[], alignment: i64, value: i64): void {
+fun pe_pad(out: u8[], alignment: i64, value: u8): void {
     for len(out) < align_up(len(out), alignment) {
         pe_byte(out, value)
     }
@@ -70,7 +70,7 @@ fun pe_append_str(out: u8[], text: str): void {
         pe_byte(out, text[i])
     }
 }
-fun pe_hex_digit(c: i64): i64 {
+fun pe_hex_digit(c: u8): i64 {
     let value = digit_value(c)
     if value < 0 {
         pe_die("bad embedded hex")
@@ -80,7 +80,7 @@ fun pe_hex_digit(c: i64): i64 {
 fun pe_append_hex(out: u8[], text: str): void {
     let i = 0
     for i < len(text) {
-        pe_byte(out, (pe_hex_digit(text[i]) << 4) | pe_hex_digit(text[i + 1]))
+        pe_byte(out, u8((pe_hex_digit(text[i]) << 4) | pe_hex_digit(text[i + 1])))
         i += 2
     }
 }

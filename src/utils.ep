@@ -14,15 +14,15 @@ fun type_is_array(name: str): bool {
 fun array_element_type(name: str): str {
     name[0:len(name) - 2]
 }
-fun digit_value(c: i64): i64 {
-    if c >= 48 && c <= 57 {
-        ret c - 48
+fun digit_value(c: u8): i64 {
+    if c >= '0' && c <= '9' {
+        ret i64(c - '0')
     }
-    if c >= 65 && c <= 70 {
-        ret c - 55
+    if c >= 'A' && c <= 'F' {
+        ret i64(c - 'A') + 10
     }
-    if c >= 97 && c <= 102 {
-        ret c - 87
+    if c >= 'a' && c <= 'f' {
+        ret i64(c - 'a') + 10
     }
     -1
 }

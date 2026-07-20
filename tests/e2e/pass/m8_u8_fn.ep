@@ -1,5 +1,5 @@
 # EXIT: 0
-fun to_upper(c: u8): i64 {
+fun to_upper(c: u8): u8 {
     if c >= 'a' && c <= 'z' {
         ret c - 32
     }

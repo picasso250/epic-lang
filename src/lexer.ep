@@ -14,16 +14,16 @@ fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): void {
     t.line = line
     push(tokens, t)
 }
-fun is_alpha(c: i64): bool {
-    (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95
+fun is_alpha(c: u8): bool {
+    (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
 }
-fun is_alnum(c: i64): bool {
-    is_alpha(c) || (c >= 48 && c <= 57)
+fun is_alnum(c: u8): bool {
+    is_alpha(c) || (c >= '0' && c <= '9')
 }
-fun is_digit(c: i64): bool {
-    c >= 48 && c <= 57
+fun is_digit(c: u8): bool {
+    c >= '0' && c <= '9'
 }
-fun is_hex_digit(c: i64): bool {
+fun is_hex_digit(c: u8): bool {
     digit_value(c) >= 0
 }
 fun identifier_kind(text: str): TokenKind {
@@ -185,7 +185,7 @@ fun lex(src: str): Token[] {
                 exit(1)
             }
             pos += 1
-            push_token(tokens, TokenKind.CHAR, itoa(ch_val), char_line)
+            push_token(tokens, TokenKind.CHAR, itoa(i64(ch_val)), char_line)
             continue
         }
         if is_digit(ch) {

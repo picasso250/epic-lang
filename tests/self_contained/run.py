@@ -23,7 +23,7 @@ PROGRAM = """fun main(): void {
     if second[0] == 42 {
         os.ExitProcess(1)
     }
-    os.ExitProcess(first[0])
+    os.ExitProcess(i64(first[0]))
 }
 """
 

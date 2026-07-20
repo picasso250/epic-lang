@@ -3,5 +3,5 @@
 fun main(): void {
     let text = "abc"
     let value = text[-1]
-    print(itoa(value))
+    print(itoa(i64(value)))
 }

@@ -1,0 +1,6 @@
+# COMPILE_ERROR: operator + has incompatible operand types u8 and i64
+fun main(): void {
+    let byte = 'A'
+    let wide = 1i64
+    os.ExitProcess(i64(byte + wide))
+}

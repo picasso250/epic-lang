@@ -2,5 +2,5 @@
 fun main(): void {
     let s = "ABC"
     let bytes = bytes(s)
-    os.ExitProcess(bytes[1])
+    os.ExitProcess(i64(bytes[1]))
 }

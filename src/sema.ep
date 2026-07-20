@@ -677,7 +677,7 @@ fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: str, negativ
     if expr.type_name == "u8" {
         expr.resolved_type = "u8"
         expr.resolved_value = parse_integer(expr.value)
-        expr.resolved = 1
+        expr.resolved = true
         ret "u8"
     }
     let digit_end = sema_literal_digit_end(expr.value)
@@ -714,12 +714,6 @@ fun sema_assignable(expected: str, actual: str): bool {
     if expected == actual {
         ret true
     }
-    if expected == "u8" && actual == "i64" {
-        ret true
-    }
-    if expected == "i64" && actual == "u8" {
-        ret true
-    }
     if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual)) {
         ret true
     }
@@ -737,9 +731,6 @@ fun sema_join_types(state: SemaState, left: str, right: str, line: i64): str {
     }
     if right == "never" {
         ret left
-    }
-    if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") {
-        ret "i64"
     }
     sema_error(state.source_path, line, "cannot join types " + left + " and " + right)
     ""
@@ -788,11 +779,8 @@ fun sema_needs_integer_context(expr: AstExpr): bool {
     }
     false
 }
-fun sema_legacy_i64_pair(left: str, right: str): bool {
-    (left == "i64" && right == "u8") || (left == "u8" && right == "i64")
-}
 fun sema_matching_integers(left: str, right: str): bool {
-    (left == right && sema_is_integer(left)) || sema_legacy_i64_pair(left, right)
+    left == right && sema_is_integer(left)
 }
 fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
     let left = ""
@@ -829,57 +817,36 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
                 result = "ptr"
             } else if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Subtract {
             if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Multiply {
             if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Divide {
             if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Remainder {
             if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.BitAnd {
             if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.BitOr {
             if sema_matching_integers(left, right) {
                 result = left
-                if sema_legacy_i64_pair(left, right) {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.ShiftLeft {

@@ -1,5 +1,5 @@
 # EXIT: 66
 fun main(): void {
     let s = "ABC"
-    os.ExitProcess(s[1])
+    os.ExitProcess(i64(s[1]))
 }
