@@ -1,0 +1,110 @@
+# COMPILE_ONLY
+# Manual run:
+#   build\epic-v4.exe -o build\win32_gui.exe examples\06_win32_gui.ep
+#   build\win32_gui.exe
+
+# Natural Windows x64 layouts for WNDCLASSA and MSG.
+type WindowClassA {
+    style: u32
+    window_proc: ptr
+    class_extra: i32
+    window_extra: i32
+    instance: ptr
+    icon: ptr
+    cursor: ptr
+    background: ptr
+    menu_name: ptr
+    class_name: ptr
+}
+
+type WinMessage {
+    hwnd: ptr
+    message: u32
+    wparam: u64
+    lparam: i64
+    time: u32
+    point_x: i32
+    point_y: i32
+    private_data: u32
+}
+
+extern "kernel32.dll" fun GetModuleHandleA(module_name: ptr): ptr
+
+extern "user32.dll" fun RegisterClassA(window_class: ptr): u16
+extern "user32.dll" fun LoadIconA(instance: ptr, icon_name: ptr): ptr
+extern "user32.dll" fun LoadCursorA(instance: ptr, cursor_name: ptr): ptr
+extern "user32.dll" fun CreateWindowExA(extended_style: u32, class_name: ptr, window_name: ptr, style: u32, x: i32, y: i32, width: i32, height: i32, parent: ptr, menu: ptr, instance: ptr, parameter: ptr): ptr
+extern "user32.dll" fun DefWindowProcA(hwnd: ptr, message: u32, wparam: u64, lparam: i64): i64
+extern "user32.dll" fun ShowWindow(hwnd: ptr, command: i32): i32
+extern "user32.dll" fun UpdateWindow(hwnd: ptr): i32
+extern "user32.dll" fun GetMessageA(message: ptr, hwnd: ptr, minimum: u32, maximum: u32): i32
+extern "user32.dll" fun TranslateMessage(message: ptr): i32
+extern "user32.dll" fun DispatchMessageA(message: ptr): i64
+extern "user32.dll" fun PostQuitMessage(exit_code: i32): void
+extern "user32.dll" fun MessageBoxA(hwnd: ptr, text: ptr, caption: ptr, kind: u32): i32
+
+fun window_proc(hwnd: ptr, message: u32, wparam: u64, lparam: i64): i64 {
+    # WM_CREATE
+    if message == u32(1) {
+        # WS_CHILD | WS_VISIBLE
+        let button = CreateWindowExA(u32(0), cstr("BUTTON"), cstr("Click me"), 0x50000000u32, i32(24), i32(24), i32(120), i32(36), hwnd, ptr(1001), GetModuleHandleA(ptr(0)), ptr(0))
+        if button == ptr(0) {
+            ret i64(-1)
+        }
+        ret i64(0)
+    }
+
+    # WM_COMMAND: the low word of WPARAM is the control ID.
+    if message == u32(273) && u16(wparam) == u16(1001) {
+        # MB_ICONINFORMATION
+        MessageBoxA(hwnd, cstr("Hello from an Epic window procedure."), cstr("Epic Win32 GUI"), u32(64))
+        ret i64(0)
+    }
+
+    # WM_DESTROY
+    if message == u32(2) {
+        PostQuitMessage(i32(0))
+        ret i64(0)
+    }
+
+    DefWindowProcA(hwnd, message, wparam, lparam)
+}
+
+fun main(): void {
+    let instance = GetModuleHandleA(ptr(0))
+    if instance == ptr(0) {
+        exit(1)
+    }
+
+    let class_name = cstr("EpicWin32Window")
+    let window_class = new WindowClassA
+    window_class.style = u32(3) # CS_HREDRAW | CS_VREDRAW
+    window_class.window_proc = ptr(window_proc)
+    window_class.instance = instance
+    window_class.icon = LoadIconA(ptr(0), ptr(32512)) # IDI_APPLICATION
+    window_class.cursor = LoadCursorA(ptr(0), ptr(32512)) # IDC_ARROW
+    window_class.background = ptr(6) # COLOR_WINDOW + 1
+    window_class.class_name = class_name
+
+    if RegisterClassA(ptr(window_class)) == u16(0) {
+        MessageBoxA(ptr(0), cstr("RegisterClassA failed."), cstr("Epic Win32 GUI"), u32(16))
+        exit(1)
+    }
+
+    let default_position = i32(0x80000000u32) # CW_USEDEFAULT
+    # WS_OVERLAPPEDWINDOW
+    let window = CreateWindowExA(u32(0), class_name, cstr("Epic Win32 GUI example"), 0x00cf0000u32, default_position, default_position, i32(640), i32(420), ptr(0), ptr(0), instance, ptr(0))
+    if window == ptr(0) {
+        MessageBoxA(ptr(0), cstr("CreateWindowExA failed."), cstr("Epic Win32 GUI"), u32(16))
+        exit(1)
+    }
+
+    ShowWindow(window, i32(5)) # SW_SHOW
+    UpdateWindow(window)
+
+    let message = new WinMessage
+    for GetMessageA(ptr(message), ptr(0), u32(0), u32(0)) > i32(0) {
+        TranslateMessage(ptr(message))
+        DispatchMessageA(ptr(message))
+    }
+}

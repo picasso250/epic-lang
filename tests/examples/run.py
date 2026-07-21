@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile and run the public Epic examples."""
+"""Compile public Epic examples and run those without # COMPILE_ONLY."""
 
 import subprocess
 import sys

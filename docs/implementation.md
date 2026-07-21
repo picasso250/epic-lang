@@ -216,7 +216,8 @@ python bootstrap_fixed_point.py
 
 The self-contained suite first copies only `epic.exe` into an isolated
 directory and verifies that it can compile a program using an embedded byte
-resource. The public examples are compiled and executed individually. End-to-end test
+resource. Public examples are compiled individually and normally executed;
+`# COMPILE_ONLY` examples must produce an executable but are not started. End-to-end test
 sources remain independent, but their runner generates one temporary bundle,
 compiles it once, and starts that executable separately for each case. This
 preserves process isolation without producing one tiny PE per regression. The

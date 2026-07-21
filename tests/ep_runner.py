@@ -24,6 +24,7 @@ def compiler_path() -> Path:
 
 def parse_annotations(source: str) -> dict:
     annotations = {
+        "compile_only": False,
         "exit_code": None,
         "stdout": None,
         "stderr": None,
@@ -34,7 +35,9 @@ def parse_annotations(source: str) -> dict:
     stderr_lines = []
     for line in source.splitlines():
         line = line.strip()
-        if match := re.match(r"#\s*EXIT:\s*(-?\d+)", line):
+        if re.fullmatch(r"#\s*COMPILE_ONLY", line):
+            annotations["compile_only"] = True
+        elif match := re.match(r"#\s*EXIT:\s*(-?\d+)", line):
             annotations["exit_code"] = int(match.group(1))
         elif match := re.match(r"#\s*STDOUT:\s*(.*)", line):
             stdout_lines.append(match.group(1))
@@ -76,7 +79,8 @@ def run_compiled_case(
 ) -> tuple[bool, str]:
     annotations = parse_annotations(source.read_text(encoding="utf-8"))
     if (
-        annotations["exit_code"] is None
+        not annotations["compile_only"]
+        and annotations["exit_code"] is None
         and annotations["stdout"] is None
         and annotations["stderr"] is None
     ):
@@ -85,6 +89,8 @@ def run_compiled_case(
     clean_test_paths(annotations["clean_paths"])
     if not executable.is_file():
         return False, f"no exe produced: {executable}"
+    if annotations["compile_only"]:
+        return True, "compile only"
     process = subprocess.run(
         [str(executable), *annotations["argv"], *trailing_args],
         capture_output=True,
@@ -114,7 +120,8 @@ def run_compiled_case(
 def run_case(source: Path) -> tuple[bool, str]:
     annotations = parse_annotations(source.read_text(encoding="utf-8"))
     if (
-        annotations["exit_code"] is None
+        not annotations["compile_only"]
+        and annotations["exit_code"] is None
         and annotations["stdout"] is None
         and annotations["stderr"] is None
     ):

@@ -62,5 +62,7 @@ byte-identical.
 python tests/run.py
 ```
 
-`examples/` contains the small learning sequence. Broader regression coverage
-lives under `tests/e2e/pass/`.
+`examples/` contains the small learning sequence. An example marked
+`# COMPILE_ONLY` must compile successfully but is not started by the test runner;
+`examples/06_win32_gui.ep` uses this for its blocking Win32 message loop. Broader
+regression coverage lives under `tests/e2e/pass/`.
