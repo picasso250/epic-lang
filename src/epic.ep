@@ -4,6 +4,7 @@
 type DriverOptions {
     emit_asm: bool
     verbose: bool
+    windows_gui: bool
     output_path: str
     inputs: str[]
 }
@@ -84,6 +85,8 @@ fun parse_driver_options(): DriverOptions {
             options.emit_asm = true
         } else if arg == "-v" {
             options.verbose = true
+        } else if arg == "--windows-gui" {
+            options.windows_gui = true
         } else if arg == "-o" {
             i += 1
             if i >= len(argv) {
@@ -99,10 +102,13 @@ fun parse_driver_options(): DriverOptions {
         i += 1
     }
     if len(options.inputs) == 0 {
-        die_driver("usage: epic [-v] [-S] [-o path] <main.ep> [other.ep...]")
+        die_driver("usage: epic [-v] [-S] [--windows-gui] [-o path] <main.ep> [other.ep...]")
     }
     if options.verbose && options.emit_asm {
         die_driver("-v cannot be used with -S")
+    }
+    if options.windows_gui && options.emit_asm {
+        die_driver("--windows-gui cannot be used with -S")
     }
     options
 }
@@ -161,7 +167,7 @@ fun main(): void {
             encode_ms = now - phase_start
             phase_start = now
         }
-        write_output(output_path, pe_build_exe(image))
+        write_output(output_path, pe_build_exe(image, options.windows_gui))
         if options.verbose {
             write_ms = os.GetTickCount64() - phase_start
         }

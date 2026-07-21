@@ -22,6 +22,10 @@ type PeSection {
     raw_offset: i64
     flags: i64
 }
+type PeBuildOptions {
+    data_rva: i64
+    windows_gui: bool
+}
 
 fun pe_die(msg: str): void {
     panic("pe: " + msg)
@@ -333,8 +337,9 @@ fun pe_make_section(name: str, rva: i64, size: i64, raw: i64): PeSection {
     }
     sec
 }
-fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64): u8[] {
+fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], options: PeBuildOptions): u8[] {
     let out = new u8[]
+    let data_rva = options.data_rva
     let rdata_rva = align_up(4096 + len(image.text), 4096)
     let text = pe_make_section(".text", 4096, len(image.text), 1024)
     let rdata_sec = pe_make_section(".rdata", rdata_rva, len(rdata), text.raw_offset + text.raw_size)
@@ -372,7 +377,11 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
     pe_u32(out, image_size)
     pe_u32(out, 1024)
     pe_u32(out, 0)
-    pe_u16(out, 3)
+    if options.windows_gui {
+        pe_u16(out, 2)
+    } else {
+        pe_u16(out, 3)
+    }
     pe_u16(out, 256)
     pe_u64(out, 1048576)
     pe_u64(out, 4096)
@@ -409,7 +418,7 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
     }
     out
 }
-fun pe_build_exe(image: ExeImage): u8[] {
+fun pe_build_exe(image: ExeImage, windows_gui: bool): u8[] {
     let imports = pe_collect_imports(image)
     let dlls = pe_make_dlls(imports)
     pe_add_thunks(image, imports)
@@ -418,7 +427,10 @@ fun pe_build_exe(image: ExeImage): u8[] {
     let data_rva = align_up(rdata_rva + len(rdata), 4096)
     pe_patch_thunks(image, imports, rdata_rva)
     pe_patch_relocs(image, imports, data_rva)
-    let out = pe_build_headers(image, rdata, dlls, data_rva)
+    let options = new PeBuildOptions
+    options.data_rva = data_rva
+    options.windows_gui = windows_gui
+    let out = pe_build_headers(image, rdata, dlls, options)
     pe_append(out, image.text)
     pe_pad(out, 512, 204)
     pe_append(out, rdata)

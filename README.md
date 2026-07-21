@@ -40,6 +40,16 @@ The default output is `build/epic-v4.exe`. Pass `-o PATH` to copy only the
 final v4 executable elsewhere; relative paths are resolved from the calling
 working directory.
 
+Compiled Epic programs default to the Windows console subsystem. Pass
+`--windows-gui` when producing a native GUI executable without an attached
+console window:
+
+```powershell
+build\epic-v4.exe --windows-gui -o app.exe main.ep
+```
+
+The option affects PE output only and cannot be combined with `-S`.
+
 ## Documentation
 
 - [Language reference](docs/language.md), including built-in data structures and functions
@@ -63,6 +73,8 @@ python tests/run.py
 ```
 
 `examples/` contains the small learning sequence. An example marked
-`# COMPILE_ONLY` must compile successfully but is not started by the test runner;
-`examples/06_win32_gui.ep` uses this for its blocking Win32 message loop. Broader
-regression coverage lives under `tests/e2e/pass/`.
+`# COMPILE_ONLY` must compile successfully but is not started by the test runner.
+`# COMPILE_ARGS: ...` supplies additional compiler arguments for that example;
+`examples/06_win32_gui.ep` uses both annotations for its GUI subsystem and
+blocking Win32 message loop. Broader regression coverage lives under
+`tests/e2e/pass/`.

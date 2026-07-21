@@ -1,6 +1,7 @@
 # COMPILE_ONLY
+# COMPILE_ARGS: --windows-gui
 # Manual run:
-#   build\epic-v4.exe -o build\win32_gui.exe examples\06_win32_gui.ep
+#   build\epic-v4.exe --windows-gui -o build\win32_gui.exe examples\06_win32_gui.ep
 #   build\win32_gui.exe
 
 # Natural Windows x64 layouts for WNDCLASSA and MSG.

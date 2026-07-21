@@ -28,6 +28,13 @@ PROGRAM = """fun main(): void {
 """
 
 
+def pe_subsystem(path: Path) -> int:
+    data = path.read_bytes()
+    pe_offset = int.from_bytes(data[0x3C:0x40], "little")
+    optional_header = pe_offset + 4 + 20
+    return int.from_bytes(data[optional_header + 68 : optional_header + 70], "little")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as temp:
         isolated = Path(temp)
@@ -107,6 +114,35 @@ def main() -> int:
         if process.returncode != 42:
             print(f"  FAIL  custom executable returned {process.returncode}, expected 42")
             return 1
+        if pe_subsystem(custom) != 3:
+            print("  FAIL  default executable is not IMAGE_SUBSYSTEM_WINDOWS_CUI")
+            return 1
+
+        gui = isolated / "gui.exe"
+        result = subprocess.run(
+            [str(compiler), "--windows-gui", "-o", str(gui), "src/main.ep"],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0 or not gui.is_file():
+            print("  FAIL  --windows-gui did not produce an executable")
+            return 1
+        if pe_subsystem(gui) != 2:
+            print("  FAIL  --windows-gui executable is not IMAGE_SUBSYSTEM_WINDOWS_GUI")
+            return 1
+
+        result = subprocess.run(
+            [str(compiler), "--windows-gui", "-S", "src/main.ep"],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 or "--windows-gui cannot be used with -S" not in result.stdout:
+            print("  FAIL  --windows-gui with -S was not rejected")
+            return 1
 
         missing_executable = isolated / "missing" / "failed.exe"
         result = subprocess.run(
@@ -132,7 +168,7 @@ def main() -> int:
             print("  FAIL  assembly write failure was reported as success")
             return 1
 
-    print("  PASS  isolated compiler, in-memory pipeline, -S, -o, and write failures")
+    print("  PASS  isolated compiler, PE subsystems, in-memory pipeline, -S, -o, and write failures")
     return 0
 
 

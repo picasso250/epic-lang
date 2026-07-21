@@ -25,6 +25,7 @@ def compiler_path() -> Path:
 def parse_annotations(source: str) -> dict:
     annotations = {
         "compile_only": False,
+        "compile_args": [],
         "exit_code": None,
         "stdout": None,
         "stderr": None,
@@ -37,6 +38,8 @@ def parse_annotations(source: str) -> dict:
         line = line.strip()
         if re.fullmatch(r"#\s*COMPILE_ONLY", line):
             annotations["compile_only"] = True
+        elif match := re.match(r"#\s*COMPILE_ARGS:\s*(.*)$", line):
+            annotations["compile_args"] = shlex.split(match.group(1) or "")
         elif match := re.match(r"#\s*EXIT:\s*(-?\d+)", line):
             annotations["exit_code"] = int(match.group(1))
         elif match := re.match(r"#\s*STDOUT:\s*(.*)", line):
@@ -132,7 +135,13 @@ def run_case(source: Path) -> tuple[bool, str]:
     executable = output_path(source)
     executable.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [str(compiler_path()), "-o", str(executable), str(relative)],
+        [
+            str(compiler_path()),
+            *annotations["compile_args"],
+            "-o",
+            str(executable),
+            str(relative),
+        ],
         capture_output=True,
         text=True,
         cwd=ROOT,

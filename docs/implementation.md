@@ -201,8 +201,11 @@ sections, imports, and relocations. Referenced source externs are grouped by DLL
 in deterministic relocation order. The writer emits import descriptors, ILT,
 IAT, hint/name entries, and DLL names, then patches each generated text thunk to
 jump indirectly through its IAT slot. Unreferenced declarations create no PE
-import. Determinism is part of the bootstrap contract: identical compiler
-sources must produce byte-identical fixed-point executables.
+import. The driver emits `IMAGE_SUBSYSTEM_WINDOWS_CUI` by default and switches
+the Optional Header to `IMAGE_SUBSYSTEM_WINDOWS_GUI` only for
+`--windows-gui`; this PE-only option is rejected with `-S`. Determinism is part
+of the bootstrap contract: identical compiler sources must produce
+byte-identical fixed-point executables.
 
 ## Acceptance
 
