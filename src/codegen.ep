@@ -843,8 +843,13 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         ret
     }
     if expr.type_name == "" && name == "ptr" {
-        let source_type = expr_type(e, expr.args[0])
-        emit_expr(e, expr.args[0])
+        let ptr_arg = expr.args[0]
+        if ptr_arg.kind == AstExprKind.Var && ptr_arg.resolved_value == 1 {
+            emit_lea_ref(e, asm_rax(), named_symbol(e, ptr_arg.name))
+            ret
+        }
+        let source_type = expr_type(e, ptr_arg)
+        emit_expr(e, ptr_arg)
         if source_type.kind == "array" {
             let empty_array = fresh_label(e)
             let array_done = fresh_label(e)

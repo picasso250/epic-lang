@@ -351,6 +351,16 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): void {
 fun sema_is_extern_abi_type(type_name: str): bool {
     sema_is_integer(type_name) || type_name == "ptr"
 }
+fun sema_validate_callback_signature(state: SemaState, line: i64, sig: SemaSignature): void {
+    if sig.return_type != "void" && !sema_is_extern_abi_type(sig.return_type) {
+        sema_error(state.source_path, line, "cannot take address of function '" + sig.name + "': unsupported callback ABI return type " + sig.return_type)
+    }
+    for i: 0:len(sig.param_types) {
+        if !sema_is_extern_abi_type(sig.param_types[i]) {
+            sema_error(state.source_path, line, "cannot take address of function '" + sig.name + "': parameter " + itoa(i + 1) + " has unsupported callback ABI type " + sig.param_types[i])
+        }
+    }
+}
 fun sema_validate_extern_library(node: AstExternDef): void {
     if len(node.library) == 0 {
         sema_error(node.source_path, node.line, "extern '" + node.name + "' requires a non-empty DLL name")
@@ -1054,7 +1064,34 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         if len(expr.args) != 1 {
             sema_error(state.source_path, expr.line, "ptr conversion expects 1 argument, got " + itoa(len(expr.args)))
         }
-        let source_type = sema_check_expr_expected(state, expr.args[0], "")
+        let ptr_arg = expr.args[0]
+        if ptr_arg.kind == AstExprKind.FieldAccess && ptr_arg.object.kind == AstExprKind.Var && ptr_arg.object.name == "os" {
+            sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of os binding '" + ptr_arg.name + "'")
+        }
+        if ptr_arg.kind == AstExprKind.Var {
+            let ptr_local = sema_find_local(state, ptr_arg.name)
+            if ptr_local.name == "" && ptr_arg.name != "argv" {
+                if ptr_arg.name == "main" {
+                    sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of main")
+                }
+                let ptr_function = sema_find_func(state, ptr_arg.name)
+                if ptr_function.name == "" {
+                    sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of unknown function '" + ptr_arg.name + "'")
+                }
+                if ptr_function.external {
+                    sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of extern '" + ptr_arg.name + "'")
+                }
+                if ptr_function.builtin {
+                    sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of builtin '" + ptr_arg.name + "'")
+                }
+                sema_validate_callback_signature(state, ptr_arg.line, ptr_function)
+                ptr_arg.resolved_value = 1
+                ptr_arg.resolved_type = "ptr"
+                ptr_arg.resolved = true
+                ret "ptr"
+            }
+        }
+        let source_type = sema_check_expr_expected(state, ptr_arg, "")
         if source_type == "never" {
             ret "never"
         }

@@ -509,11 +509,11 @@ or decorate names. v4 supports named imports only, not ordinal imports.
 
 Extern parameters may use `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`,
 or `ptr`. Returns may additionally use `void`. `bool`, `str`, arrays, products,
-enums, callbacks, variadic signatures, and floating-point ABI lanes are not
-extern signature types. Win32 `BOOL` is normally `i32`, not Epic's one-byte
-`bool`. Products are passed explicitly through `ptr(product)` rather than being
-written as product parameters, so the declaration cannot be mistaken for a C
-by-value aggregate.
+enums, variadic signatures, and floating-point ABI lanes are not extern
+signature types. Win32 `BOOL` is normally `i32`, not Epic's one-byte `bool`.
+Callback parameters are declared as opaque `ptr` values. Products are passed
+explicitly through `ptr(product)` rather than being written as product
+parameters, so the declaration cannot be mistaken for a C by-value aggregate.
 
 Extern and ordinary Epic calls use the Windows x64 integer/pointer convention.
 The first four arguments use `RCX`, `RDX`, `R8`, and `R9`; later arguments use
@@ -550,6 +550,51 @@ and `is_null`, but have no dereference operation, field access, subscript,
 pointee type, or automatic bounds check. External code retaining a borrowed
 array or product address after its owner becomes unreachable, or after an array
 grows, is a caller contract violation.
+
+### Windows callbacks
+
+`ptr(function_name)` returns the real `.text` entry address of an ordinary
+top-level Epic function. The function must use only extern-ABI-safe parameter
+and return types; this restriction is checked only when its address is taken.
+`main`, extern declarations, builtins, `os.*` bindings, and unknown names cannot
+be addressed. A lexical local with the same name wins and keeps the ordinary
+`ptr(i64/u64/ptr/array/product)` conversion meaning.
+
+```epic
+extern "kernel32.dll" fun EnumSystemLocalesEx(
+    callback: ptr,
+    flags: u32,
+    context: i64,
+    reserved: ptr,
+): i32
+
+fun visit(locale: ptr, flags: u32, context: i64): i32 {
+    i32(0)
+}
+
+fun main(): void {
+    EnumSystemLocalesEx(ptr(visit), u32(0), i64(0), ptr(0))
+}
+```
+
+No trampoline or callback object is generated. Direct Epic calls and foreign
+callbacks enter the same Windows x64 function entry. The raw address erases the
+signature, so matching the callback parameter count and exact ABI types required
+by a particular API remains the caller's responsibility. Epic does not support
+calling through a `ptr` value.
+
+The first callback model supports owner-thread reentry only. An external system
+may retain a function address for the process lifetime, as Windows does for a
+window procedure, but every invocation must synchronously enter Epic on the OS
+thread that started the program. Foreign-thread, thread-pool, concurrent, and
+asynchronous completion callbacks are unsupported. The runtime supplies no
+thread registration or guard.
+
+Function addresses do not capture locals and are not closures. A raw context
+pointer remains opaque: Epic provides no `ptr`-to-product recovery, managed root
+handle, or automatic lifetime extension for callback state. Callback code may
+call ordinary Epic functions and allocate managed objects when the owner-thread
+contract is satisfied.
 
 Epic does not formally implement C struct parameters or returns. When the target
 ABI independently specifies that a 1-, 2-, 4-, or 8-byte POD aggregate travels
@@ -650,7 +695,7 @@ A missing or unreadable file is a compile error, while an empty file is valid.
 
 ## Unsupported in v0
 
-- Typed pointers, pointer dereference, and function pointers.
+- Typed pointers, pointer dereference, indirect calls through `ptr`, closures, and typed callback values.
 - General module/import/package system.
 - General method calls.
 - Payload sums.

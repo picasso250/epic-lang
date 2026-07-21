@@ -110,6 +110,13 @@ Epic functions, source externs, and the transitional `os.*` bindings. Callees
 copy both register and stack parameters into their statically assigned local
 slots.
 
+Address-taking is resolved in semantic analysis only for `ptr(top_level_fun)`.
+The checker rejects `main`, externs, builtins, unknown names, and signatures that
+use non-extern ABI types. Code generation lowers the marked function operand to
+`lea rax, [function_symbol]`; it emits no trampoline. Direct calls and Windows
+callbacks therefore share the same entry, prologue, parameter-copy logic, and
+return-width behavior.
+
 Each function receives a statically sized stack frame. A pre-scan computes
 local storage and the peak number of compiler temporary slots; there is no
 fixed temporary-slot limit.
@@ -137,6 +144,13 @@ collector in `runtime/gc.asm`. It records exact allocation bases in side
 metadata, routes small objects through four slab classes, scans the active stack
 and managed payloads conservatively, and reclaims unreachable objects. The
 detailed runtime contract is documented in [`gc.md`](gc.md).
+
+Raw callback entries rely on the same single active-stack boundary initialized
+by `main`. They are therefore supported only for synchronous reentry on the
+owner OS thread. That stack remains below `_gc_stack_high`, so callback code may
+allocate and trigger collection. The runtime does not register foreign threads,
+scan multiple stacks, serialize concurrent callbacks, or validate the calling
+thread.
 
 The runtime string header is `{owner, offset, len}`. `owner` is always the exact
 base of the managed byte allocation, which matters because the collector does

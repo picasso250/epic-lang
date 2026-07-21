@@ -44,7 +44,9 @@ selects reusable active pages. Objects never move.
 
 The runtime has no generational policy. Raw collector metadata is outside the
 managed heap and is never scanned. The runtime supports one Epic thread; it
-does not enumerate roots from other or externally created threads.
+does not enumerate roots from other or externally created threads. A Windows
+callback may allocate only when it synchronously reenters on that owner thread,
+whose active stack remains within the original `_gc_stack_high` boundary.
 
 ## Verification
 

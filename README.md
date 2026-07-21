@@ -6,8 +6,9 @@ the dogfood generation for v3's expression control flow, fixed-width integers,
 opaque arrays, string and array slicing, explicit C-string conversion, and a
 single pointer model. New v4 language work begins from this fixed point. The
 compiler now dogfoods string slicing, v4 closes the transitional `str.data`,
-`str.len`, and `str_new` interfaces retained by v3, and source programs can
-declare Windows x64 DLL imports with `extern "dll" fun ...`.
+`str.len`, and `str_new` interfaces retained by v3, source programs can declare
+Windows x64 DLL imports with `extern "dll" fun ...`, and `ptr(top_level_fun)`
+exposes owner-thread callback entries without generating trampolines.
 
 It retains the self-contained structured AMD64 assembler, stable symbol indexes,
 deterministic PE writer, and conservative garbage collector.
