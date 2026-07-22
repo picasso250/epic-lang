@@ -48,7 +48,9 @@ _gc_small_page_alloc_maps:
     dq 0
 _gc_small_page_mark_maps:
     dq 0
-_gc_small_active_pages:
+_gc_small_available_heads:
+    dq 0
+_gc_small_page_next:
     dq 0
 _gc_small_page_count:
     dq 0
@@ -134,7 +136,10 @@ __ep_gc_small_init_metadata:
     mov [_gc_small_page_mark_maps], rax
     mov rcx, 32
     call __ep_gc_raw_alloc
-    mov [_gc_small_active_pages], rax
+    mov [_gc_small_available_heads], rax
+    mov rcx, 131072
+    call __ep_gc_raw_alloc
+    mov [_gc_small_page_next], rax
     mov rsp, rbp
     pop rbp
     ret
@@ -186,56 +191,15 @@ __ep_gc_small_acquire_maps:
     mov r8, [_gc_small_page_mark_maps]
     mov r9, [rbp-48]
     mov [r8+rax*8], r9
+    mov r8, [_gc_small_page_next]
+    mov r9, [_gc_small_available_heads]
+    mov rcx, [rbp-8]
+    dec rcx
+    mov r10, [r9+rcx*8]
+    mov [r8+rax*8], r10
     inc rax
     mov [_gc_small_page_count], rax
-    mov r8, [_gc_small_active_pages]
-    mov rcx, [rbp-8]
-    dec rcx
-    mov [r8+rcx*8], rax
-    mov rsp, rbp
-    pop rbp
-    ret
-
-; Find reusable committed storage for class rcx. Returns page index + 1 or 0.
-__ep_gc_small_find_page:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 48
-    mov [rbp-8], rcx
-    mov rax, 8192
-    cqo
-    idiv rcx
-    mov [rbp-16], rax
-    mov qword [rbp-24], 0
-__ep_gc_small_find_page_loop:
-    mov rax, [rbp-24]
-    cmp rax, [_gc_small_page_count]
-    jge __ep_gc_small_find_page_miss
-    mov r8, [_gc_small_page_classes]
-    movzx ecx, byte [r8+rax]
-    cmp rcx, [rbp-8]
-    jne __ep_gc_small_find_page_next
-    mov r8, [_gc_small_page_free_heads]
-    cmp qword [r8+rax*8], 0
-    jne __ep_gc_small_find_page_hit
-    mov r8, [_gc_small_page_bumps]
-    mov r9, [r8+rax*8]
-    cmp r9, [rbp-16]
-    jl __ep_gc_small_find_page_hit
-__ep_gc_small_find_page_next:
-    inc qword [rbp-24]
-    jmp __ep_gc_small_find_page_loop
-__ep_gc_small_find_page_hit:
-    inc rax
-    mov r8, [_gc_small_active_pages]
-    mov rcx, [rbp-8]
-    dec rcx
-    mov [r8+rcx*8], rax
-    mov rsp, rbp
-    pop rbp
-    ret
-__ep_gc_small_find_page_miss:
-    xor eax, eax
+    mov [r9+rcx*8], rax
     mov rsp, rbp
     pop rbp
     ret
@@ -255,14 +219,10 @@ __ep_gc_small_alloc:
 __ep_gc_small_alloc_class_ready:
     mov [rbp-8], rax
 __ep_gc_small_alloc_select:
-    mov r8, [_gc_small_active_pages]
+    mov r8, [_gc_small_available_heads]
     mov rcx, [rbp-8]
     dec rcx
     mov rax, [r8+rcx*8]
-    test rax, rax
-    jnz __ep_gc_small_alloc_page_ready
-    mov rcx, [rbp-8]
-    call __ep_gc_small_find_page
     test rax, rax
     jnz __ep_gc_small_alloc_page_ready
     mov rcx, [rbp-8]
@@ -297,10 +257,14 @@ __ep_gc_small_alloc_bump:
     idiv rcx
     cmp r9, rax
     jl __ep_gc_small_alloc_use_bump
-    mov r8, [_gc_small_active_pages]
+    mov r8, [_gc_small_available_heads]
     mov rcx, [rbp-8]
     dec rcx
-    mov qword [r8+rcx*8], 0
+    mov r9, [_gc_small_page_next]
+    mov r10, [rbp-16]
+    mov r11, [r9+r10*8]
+    mov [r8+rcx*8], r11
+    mov qword [r9+r10*8], 0
     jmp __ep_gc_small_alloc_select
 __ep_gc_small_alloc_use_bump:
     mov rax, [rbp-16]
@@ -780,12 +744,12 @@ __ep_gc_sweep_done:
     pop rbp
     ret
 
-; Sweep small slots, rebuild free lists, and select active pages.
+; Sweep small slots and rebuild per-class available-page chains.
 __ep_gc_sweep_small:
     push rbp
     mov rbp, rsp
     sub rsp, 96
-    mov r8, [_gc_small_active_pages]
+    mov r8, [_gc_small_available_heads]
     mov qword [r8], 0
     mov qword [r8+8], 0
     mov qword [r8+16], 0
@@ -847,20 +811,24 @@ __ep_gc_sweep_small_next_slot:
     inc qword [rbp-16]
     jmp __ep_gc_sweep_small_slot
 __ep_gc_sweep_small_page_done:
-    mov rcx, [rbp-40]
-    dec rcx
-    mov r8, [_gc_small_active_pages]
-    cmp qword [r8+rcx*8], 0
-    jne __ep_gc_sweep_small_next_page
+    mov rax, [rbp-8]
+    mov r8, [_gc_small_page_next]
+    mov qword [r8+rax*8], 0
     mov rax, [rbp-8]
     mov r9, [_gc_small_page_free_heads]
     cmp qword [r9+rax*8], 0
-    jne __ep_gc_sweep_small_select_page
+    jne __ep_gc_sweep_small_link_page
     mov r9, [_gc_small_page_bumps]
     mov r10, [r9+rax*8]
     cmp r10, [rbp-56]
     jge __ep_gc_sweep_small_next_page
-__ep_gc_sweep_small_select_page:
+__ep_gc_sweep_small_link_page:
+    mov rcx, [rbp-40]
+    dec rcx
+    mov r8, [_gc_small_available_heads]
+    mov r9, [r8+rcx*8]
+    mov r10, [_gc_small_page_next]
+    mov [r10+rax*8], r9
     inc rax
     mov [r8+rcx*8], rax
 __ep_gc_sweep_small_next_page:
