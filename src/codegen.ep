@@ -985,8 +985,6 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     if name == "read_file" {
         emit_expr(e, expr.args[0])
         asm_mov(e.program, asm_rcx(), asm_rax())
-        emit_call_inst(e, "_cstr")
-        asm_mov(e.program, asm_rcx(), asm_rax())
         asm_sub(e.program, asm_rsp(), asm_imm(8))
         emit_call_inst(e, "_read_file")
         asm_add(e.program, asm_rsp(), asm_imm(8))
@@ -994,19 +992,10 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     }
     if name == "write_file" {
         let write_slots = spill_args(e, expr.args)
-        emit_stack_load(e, asm_rax(), write_slots[0])
-        asm_mov(e.program, asm_rcx(), asm_rax())
-        emit_call_inst(e, "_cstr")
-        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_stack_load(e, asm_rcx(), write_slots[0])
         emit_stack_load(e, asm_rax(), write_slots[1])
-        let write_value_type = expr_type(e, expr.args[1])
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
-        if write_value_type.kind == "str" {
-            asm_add(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
-            asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 16))
-        } else {
-            asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 8))
-        }
+        asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 8))
         asm_sub(e.program, asm_rsp(), asm_imm(8))
         emit_call_inst(e, "_write_file")
         asm_add(e.program, asm_rsp(), asm_imm(8))

@@ -531,8 +531,8 @@ to declare them.
 | `str_new(data: ptr, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `is_null(value: reference): bool` | tests whether a product, string, array, or low-level pointer reference is the zero address; the argument is evaluated once |
-| `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
-| `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
+| `read_file(path: str): u8[]` | reads a whole file into a fresh mutable array, or returns an empty array on failure |
+| `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `data.len`, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
@@ -557,8 +557,14 @@ slicing and close those interfaces.
 then appends a final NUL, so a C API may observe only a prefix when the source
 contains an earlier zero byte. This low-level interpretation is the caller's
 responsibility. High-level `read_file(path)` and `write_file(path, data)` keep
-accepting `str` paths and perform the conversion internally; raw string-taking
+accepting `str` paths, reject interior NUL, and perform the conversion
+internally; raw string-taking
 `os.*` bindings require explicit `cstr(...)`.
+
+File contents are always bytes. Convert explicitly with `str(data)` when text
+is required, and with `bytes(text)` when writing a string. `write_file`
+preserves interior NUL bytes in its data, and an empty array successfully
+creates or truncates a file.
 
 `is_null` checks only the outer reference address. An empty string or empty
 array is not null, a nonzero dangling pointer is not null, and no implicit null

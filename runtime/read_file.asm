@@ -1,13 +1,31 @@
-; ── _read_file: read whole file into heap-allocated str ──
-; rcx = path (C string)
-; returns: rax = &str
+; ── _read_file: read a whole file into a fresh mutable u8[] ──
+; rcx = &path str
+; returns: rax = &u8[] { data, len, cap }; empty on failure
 _read_file:
     push rbp
     mov rbp, rsp
     sub rsp, 64
-    mov [rbp-8], rcx       ; path
-    ; CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+    mov [rbp-8], rcx       ; &path
+    ; Reject interior NUL bytes before crossing the C-string boundary.
+    mov rdx, [rcx]
+    add rdx, [rcx+8]       ; path bytes
+    mov r8, [rcx+16]       ; path len
+    xor r9, r9
+_read_file_path_scan:
+    cmp r9, r8
+    jge _read_file_path_ok
+    cmp byte [rdx+r9], 0
+    je _read_file_empty
+    inc r9
+    jmp _read_file_path_scan
+_read_file_path_ok:
     mov rcx, [rbp-8]
+    sub rsp, 40
+    call _cstr
+    add rsp, 40
+    mov [rbp-56], rax      ; NUL-terminated path
+    ; CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+    mov rcx, [rbp-56]
     mov edx, 0x80000000
     mov r8d, 1
     xor r9d, r9d
@@ -43,20 +61,23 @@ _read_file:
     mov qword [rsp+32], 0
     call ReadFile
     add rsp, 40
+    mov [rbp-48], rax      ; ReadFile result
     ; CloseHandle(handle)
     mov rcx, [rbp-16]
     sub rsp, 40
     call CloseHandle
     add rsp, 40
-    ; Deep-copy exactly the bytes read into str.
+    cmp qword [rbp-48], 0
+    je _read_file_empty
+    ; Copy exactly the bytes read into an independent mutable array.
     mov rcx, [rbp-32]
     mov edx, [rbp-40]
-    call _str_alloc
+    call _embed_bytes
     jmp _read_file_done
 _read_file_empty:
     lea rcx, [_read_file_empty_data]
     xor edx, edx
-    call _str_alloc
+    call _embed_bytes
 _read_file_done:
     mov rsp, rbp
     pop rbp

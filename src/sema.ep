@@ -190,12 +190,12 @@ fun sema_add_builtins(state: SemaState): i64 {
     push(sig.param_types, "ptr")
     push(sig.param_types, "i64")
     sema_add_builtin(state, sig)
-    sig = sema_signature("read_file", "str")
+    sig = sema_signature("read_file", "u8[]")
     push(sig.param_types, "str")
     sema_add_builtin(state, sig)
     sig = sema_signature("write_file", "i64")
     push(sig.param_types, "str")
-    push(sig.param_types, "byteslike")
+    push(sig.param_types, "u8[]")
     sema_add_builtin(state, sig)
     sig = sema_signature("push", "void")
     push(sig.param_types, "array")
@@ -750,9 +750,6 @@ fun sema_assignable(expected: str, actual: str): i64 {
         ret 1
     }
     if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual) == 1) {
-        ret 1
-    }
-    if expected == "byteslike" && (actual == "str" || actual == "u8[]") {
         ret 1
     }
     ret 0
