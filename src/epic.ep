@@ -14,7 +14,8 @@ fun die_driver(msg: str): i64 {
     ret 0
 }
 fun parse_file(path: str): AstProgram {
-    let src = read_file(path)
+    let source_bytes = read_file(path)
+    let src = str_new(source_bytes.data, source_bytes.len)
     let tokens = lex(src)
     let p = make_parser_at(tokens, path)
     ret parse_program(p)

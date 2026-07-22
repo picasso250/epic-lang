@@ -866,7 +866,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     }
     if name == "read_file" {
         emit_expr(e, expr.args.data[0])
-        emit_mov(e, "rcx", "[rax]")
+        emit_mov(e, "rcx", "rax")
         emit_inst(e, "sub rsp, 8")
         emit_call_inst(e, "_read_file")
         emit_inst(e, "add rsp, 8")
@@ -874,8 +874,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     }
     if name == "write_file" {
         let write_slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rax", write_slots.data[0])
-        emit_mov(e, "rcx", "[rax]")
+        emit_stack_load(e, "rcx", write_slots.data[0])
         emit_stack_load(e, "rax", write_slots.data[1])
         emit_mov(e, "rdx", "[rax]")
         emit_mov(e, "r8", "[rax+8]")

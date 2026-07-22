@@ -374,15 +374,22 @@ to declare them.
 | `itoa(n: i64): str` | converts an integer to a heap string |
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
+| `str(array: u8[]): str` | copies every array byte into a new immutable string, preserving embedded NUL bytes |
 | `cstr(s: str): ptr` | copies all bytes into a fresh allocation and appends NUL; `ptr` is internal |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
-| `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
-| `write_file(path: str, data: str | u8[]): i64` | writes a whole string or byte array and returns bytes written, or `-1` on failure |
+| `read_file(path: str): u8[]` | reads a whole file into a fresh mutable array, or returns an empty array on failure |
+| `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `data.len`, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
+
+File contents are always bytes. Convert explicitly with
+`str_new(data.data, data.len)` when text is required, and with `bytes(text)`
+when writing a string. File paths remain `str`; an interior NUL makes the
+operation fail. `write_file` preserves interior NUL bytes in its data and an
+empty array successfully creates or truncates a file.
 
 `len(value)`, `pop(array)`, and checked `value[index]` are the preferred
 container interfaces. `pop` evaluates its array expression once, preserves

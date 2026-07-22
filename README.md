@@ -4,7 +4,8 @@ Epic v2 starts from the completed v1 self-hosted compiler. Its source remains
 in the v0 language subset and retains v1's internal AMD64 assembler and
 deterministic PE writer. v2 adds conservative garbage collection, semantic
 analysis, integer compound assignment, nominal unit enums, and statement-only
-enum matching. Its final language surface also includes snapshot-bound integer
+enum matching. It also introduces the safe `str(u8[])` snapshot conversion
+that v3 compiler sources dogfood. Its final language surface includes snapshot-bound integer
 range loops and integer unary `-` / `!`, without changing the stage-0 or v1
 milestones.
 
