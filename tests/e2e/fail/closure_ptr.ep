@@ -1,0 +1,8 @@
+# COMPILE_ERROR: ptr conversion requires i64, u64, array, or product
+fun main(): void {
+    let callback = fun(): i64 {
+        1
+    }
+    let address = ptr(callback)
+    print(itoa(i64(address)))
+}

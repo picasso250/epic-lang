@@ -1306,12 +1306,16 @@ fun asm_emit_setcc(image: ExeImage, kind: AsmInstructionKind, target: AsmOperand
     asm_modrm(image, 3, 0, target.reg)
 }
 fun asm_encode_call(image: ExeImage, target: AsmOperand): void {
-    if target.kind != AsmOperandKind.Symbol {
-        asm_die("call target must be a symbol")
+    if target.kind == AsmOperandKind.Symbol {
+        asm_byte(image, 232)
+        asm_reloc(image, 1, target.symbol_index, 0)
+        asm_u32(image, 0)
+        ret
     }
-    asm_byte(image, 232)
-    asm_reloc(image, 1, target.symbol_index, 0)
-    asm_u32(image, 0)
+    if target.kind != AsmOperandKind.Register && target.kind != AsmOperandKind.Memory {
+        asm_die("call target must be a symbol, register, or memory operand")
+    }
+    asm_emit_group_default64(image, 255, 2, target)
 }
 fun asm_encode_shift(image: ExeImage, target: AsmOperand, count: AsmOperand, ext: i64): void {
     if count.kind != AsmOperandKind.Register || count.reg != 1 || count.width != 8 {

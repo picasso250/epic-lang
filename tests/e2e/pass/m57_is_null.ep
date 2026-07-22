@@ -11,8 +11,8 @@ type NullProbeHolder {
 
 fun main(): void {
     let holder = new NullProbeHolder
-    let is_null = 7
-    if is_null != 7 {
+    let shadow_check = 7
+    if shadow_check != 7 {
         os.ExitProcess(5)
     }
     if !is_null(holder.text) || !is_null(holder.values) || !is_null(holder.node) {

@@ -1,11 +1,12 @@
 #
 # Epic parser.
 #
-type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | NewProduct | NewArray | FieldAccess | Subscript | Slice | If | Match
+type AstExprKind = Literal | String | Embed | Var | Binary | Unary | Call | Closure | NewProduct | NewArray | FieldAccess | Subscript | Slice | If | Match
 type AstStmtKind = Return | Expr | Let | Assign | AssignOp | ForCondition | ForRange | Break | Continue
 type AssignTargetKind = Var | Field | Subscript
 type OperatorKind = Add | Subtract | Multiply | Divide | Remainder | BitAnd | BitOr | ShiftLeft | ShiftRight | Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual | LogicalAnd | LogicalOr | Negate | LogicalNot
 type AstExprOptionKind = None | Some
+type AstValueKind = Unresolved | Local | Capture | Function | Extern | Builtin | Argv
 type AstExpr {
     kind: AstExprKind
     name: str
@@ -14,6 +15,12 @@ type AstExpr {
     op: OperatorKind
     value: str
     args: AstExpr[]
+    callee: AstExpr
+    closure_params: AstParam[]
+    closure_return_type: TypeRef
+    closure_body: AstBlock
+    captures: AstCapture[]
+    closure_id: i64
     left: AstExpr
     right: AstExpr
     object: AstExpr
@@ -30,6 +37,7 @@ type AstExpr {
     line: i64
     resolved_type: TypeRef
     resolved_value: i64
+    resolved_kind: AstValueKind
 }
 type AstExprOption {
     kind: AstExprOptionKind
@@ -41,6 +49,8 @@ type AstAssignTarget {
     object: AstExpr
     base: AstExpr
     index: AstExpr
+    resolved_value: i64
+    resolved_kind: AstValueKind
 }
 type AstRange {
     start: AstExpr
@@ -59,6 +69,7 @@ type AstStmt {
     range_start: AstExpr
     range_end: AstExpr
     range_end_slot: i64
+    symbol_id: i64
 }
 type AstMatchArm {
     enum_name: str
@@ -78,6 +89,12 @@ type AstParam {
     name: str
     typ: TypeRef
     line: i64
+    symbol_id: i64
+}
+type AstCapture {
+    name: str
+    typ: TypeRef
+    symbol_id: i64
 }
 type AstStructField {
     name: str
@@ -173,18 +190,25 @@ fun ast_var(name: str, line: i64): AstExpr {
     node.line = line
     node
 }
-fun ast_call(name: str, args: AstExpr[], line: i64): AstExpr {
+fun ast_call(callee: AstExpr, args: AstExpr[], line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.Call
-    node.name = name
+    node.name = ""
     node.namespace = ""
+    node.callee = callee
     node.args = args
     node.line = line
     node
 }
-fun ast_os_call(name: str, args: AstExpr[], line: i64): AstExpr {
-    let node = ast_call(name, args, line)
-    node.namespace = "os"
+fun ast_closure(params: AstParam[], return_type: TypeRef, body: AstBlock, line: i64): AstExpr {
+    let node = new AstExpr
+    node.kind = AstExprKind.Closure
+    node.closure_params = params
+    node.closure_return_type = return_type
+    node.closure_body = body
+    node.captures = new AstCapture[]
+    node.closure_id = -1
+    node.line = line
     node
 }
 fun ast_binary(op: OperatorKind, left: AstExpr, right: AstExpr, line: i64): AstExpr {
@@ -453,13 +477,35 @@ fun expect_stmt_end(p: Parser): void {
     let t = peek(p)
     parse_error(t.line, "Expected end of line")
 }
-fun parse_type(p: Parser): TypeRef {
+fun parse_type_atom(p: Parser): TypeRef {
+    if check(p, TokenKind.FUN) {
+        expect(p, TokenKind.LPAREN)
+        let params = new TypeRef[]
+        if !peek_kind(p, TokenKind.RPAREN) {
+            push(params, parse_type(p))
+            for check(p, TokenKind.COMMA) {
+                push(params, parse_type(p))
+            }
+        }
+        expect(p, TokenKind.RPAREN)
+        expect(p, TokenKind.COLON)
+        ret type_function(params, parse_type(p))
+    }
+    if check(p, TokenKind.LPAREN) {
+        let grouped = parse_type(p)
+        expect(p, TokenKind.RPAREN)
+        ret grouped
+    }
     let t = advance(p)
     if t.kind != TokenKind.ID {
         parse_error(t.line, "Expected type")
     }
-    let typ = type_from_source_name(t.text)
-    for check(p, TokenKind.LBRACKET) {
+    type_from_source_name(t.text)
+}
+fun parse_type(p: Parser): TypeRef {
+    let typ = parse_type_atom(p)
+    for peek_kind(p, TokenKind.LBRACKET) && p.tokens[p.pos + 1].kind == TokenKind.RBRACKET {
+        expect(p, TokenKind.LBRACKET)
         expect(p, TokenKind.RBRACKET)
         typ = type_array(typ)
     }
@@ -687,6 +733,10 @@ fun ast_assign_target(lhs: AstExpr, line: i64): AstAssignTarget {
             parse_error(line, "Invalid assignment target")
             ret ast_var_target("")
         }
+        AstExprKind.Closure {
+            parse_error(line, "Invalid assignment target")
+            ret ast_var_target("")
+        }
         AstExprKind.NewProduct {
             parse_error(line, "Invalid assignment target")
             ret ast_var_target("")
@@ -882,7 +932,7 @@ fun is_expr_first(kind: TokenKind): bool {
     if kind == TokenKind.NEW {
         ret true
     }
-    if kind == TokenKind.IF || kind == TokenKind.MATCH {
+    if kind == TokenKind.IF || kind == TokenKind.MATCH || kind == TokenKind.FUN {
         ret true
     }
     if kind == TokenKind.LPAREN {
@@ -1110,18 +1160,13 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
     let current = node
     let done = false
     for !done {
-        if check(p, TokenKind.DOT) {
+        if check(p, TokenKind.LPAREN) {
+            let args = parse_args(p)
+            expect(p, TokenKind.RPAREN)
+            current = ast_call(current, args, current.line)
+        } else if check(p, TokenKind.DOT) {
             let field = expect_enum_member(p)
-            if check(p, TokenKind.LPAREN) {
-                if current.kind != AstExprKind.Var || current.name != "os" {
-                    parse_error(field.line, "method calls are only supported for os.* in v0")
-                }
-                let args = parse_args(p)
-                expect(p, TokenKind.RPAREN)
-                current = ast_os_call(field.text, args, field.line)
-            } else {
-                current = ast_field_access(current, field.text, field.line)
-            }
+            current = ast_field_access(current, field.text, field.line)
         } else if check(p, TokenKind.LBRACKET) {
             let index = parse_expr(p)
             if check(p, TokenKind.COLON) {
@@ -1182,10 +1227,19 @@ fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, TokenKind.MATCH) {
         ret parse_postfix(p, parse_match_expr(p))
     }
+    if peek_kind(p, TokenKind.FUN) {
+        let closure_keyword = expect(p, TokenKind.FUN)
+        expect(p, TokenKind.LPAREN)
+        let params = parse_params(p)
+        expect(p, TokenKind.RPAREN)
+        expect(p, TokenKind.COLON)
+        let return_type = parse_type(p)
+        let body = parse_block(p)
+        ret parse_postfix(p, ast_closure(params, return_type, body, closure_keyword.line))
+    }
     if peek_kind(p, TokenKind.NEW) {
-        let keyword = expect(p, TokenKind.NEW)
-        let type_token = expect(p, TokenKind.ID)
-        let base_type = type_from_source_name(type_token.text)
+        let new_keyword = expect(p, TokenKind.NEW)
+        let base_type = parse_type_atom(p)
         if peek_kind(p, TokenKind.LBRACKET) {
             let count = ast_expr_none()
             let empty_brackets = 0
@@ -1209,9 +1263,9 @@ fun parse_primary(p: Parser): AstExpr {
             for depth_i: 0:element_depth {
                 element_type = type_array(element_type)
             }
-            ret ast_new_array(element_type, count, keyword.line)
+            ret ast_new_array(element_type, count, new_keyword.line)
         }
-        ret ast_new_product(base_type, keyword.line)
+        ret ast_new_product(base_type, new_keyword.line)
     }
     if peek_kind(p, TokenKind.NUMBER) {
         let number_token = advance(p)
@@ -1235,22 +1289,12 @@ fun parse_primary(p: Parser): AstExpr {
     }
     if peek_kind(p, TokenKind.ID) {
         let identifier = advance(p)
-        if check(p, TokenKind.LPAREN) {
-            if identifier.text == "embed" {
-                let path = expect(p, TokenKind.STRING)
-                expect(p, TokenKind.RPAREN)
-                ret parse_postfix(p, ast_embed(read_embed(p.source_path, path.text, path.line), identifier.line))
-            }
-            let args = parse_args(p)
-            expect(p, TokenKind.RPAREN)
-            ret parse_postfix(p, ast_call(identifier.text, args, identifier.line))
-        }
         ret parse_postfix(p, ast_var(identifier.text, identifier.line))
     }
     if check(p, TokenKind.LPAREN) {
         let expr = parse_expr(p)
         expect(p, TokenKind.RPAREN)
-        ret expr
+        ret parse_postfix(p, expr)
     }
     let unexpected = peek(p)
     parse_error(unexpected.line, "Unexpected token in expression")

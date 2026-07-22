@@ -1,7 +1,0 @@
-# ERROR: cannot redefine builtin function 'panic'
-fun panic(message: str): void {
-    ret
-}
-fun main(): void {
-    ret
-}

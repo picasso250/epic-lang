@@ -1,5 +1,0 @@
-# ERROR: duplicate local 'i'
-fun main(): void {
-    let i = 0
-    for i: 0:1 {}
-}

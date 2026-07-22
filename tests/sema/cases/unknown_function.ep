@@ -1,4 +1,4 @@
-# ERROR: unknown function 'missing'
+# ERROR: undefined value 'missing'
 fun main(): void {
     missing()
 }

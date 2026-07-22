@@ -5,12 +5,14 @@ type Local {
     name: str
     typ: TypeRef
     slot: i64
+    symbol_id: i64
 }
 type FuncInfo {
     name: str
     ret_type: TypeRef
     params: AstParam[]
     symbol_index: i64
+    descriptor_symbol_index: i64
 }
 type StringLit {
     text: str
@@ -44,6 +46,9 @@ type EmitterState {
     enums: AstEnumDef[]
     loop_starts: i64[]
     loop_ends: i64[]
+    closures: AstExpr[]
+    current_captures: AstCapture[]
+    context_slot: i64
 }
 fun die(msg: str): void {
     panic("codegen: " + msg)
@@ -158,6 +163,7 @@ fun emit_runtime_helpers(e: EmitterState): void {
     emit_runtime(e, embed("../runtime/bounds.asm"))
     emit_runtime(e, embed("../runtime/pop.asm"))
     emit_runtime(e, embed("../runtime/panic.asm"))
+    emit_runtime(e, embed("../runtime/callable.asm"))
 }
 fun make_emitter(): EmitterState {
     let e = new EmitterState
@@ -178,6 +184,9 @@ fun make_emitter(): EmitterState {
     e.enums = new AstEnumDef[]
     e.loop_starts = new i64[]
     e.loop_ends = new i64[]
+    e.closures = new AstExpr[]
+    e.current_captures = new AstCapture[]
+    e.context_slot = 0
     e
 }
 fun get_string_id(e: EmitterState, text: str): i64 {
@@ -212,9 +221,14 @@ fun collect_expr_strings(e: EmitterState, node: AstExpr): void {
             collect_expr_strings(e, node.left)
         }
         AstExprKind.Call {
+            collect_expr_strings(e, node.callee)
             for arg_i: 0:len(node.args) {
                 collect_expr_strings(e, node.args[arg_i])
             }
+        }
+        AstExprKind.Closure {
+            push(e.closures, node)
+            collect_block_strings(e, node.closure_body)
         }
         AstExprKind.NewProduct {
         }
@@ -321,6 +335,7 @@ fun collect_block_strings(e: EmitterState, block: AstBlock): void {
     }
 }
 fun collect_program_strings(e: EmitterState, program: AstProgram): void {
+    e.closures = new AstExpr[]
     for i: 0:len(program.funcs) {
         collect_block_strings(e, program.funcs[i].body)
     }
@@ -341,6 +356,7 @@ fun add_func_infos(e: EmitterState, ast: AstProgram): void {
         f.ret_type = fn.return_type
         f.params = fn.params
         f.symbol_index = named_symbol(e, fn.name)
+        f.descriptor_symbol_index = named_symbol(e, "__ep_callable_" + fn.name)
         push(e.funcs, f)
     }
     for extern_i: 0:len(ast.externs) {
@@ -350,6 +366,7 @@ fun add_func_infos(e: EmitterState, ast: AstProgram): void {
         info.ret_type = ext.return_type
         info.params = ext.params
         info.symbol_index = asm_symbol_new(e.program, "")
+        info.descriptor_symbol_index = -1
         asm_extern_import_item(e.program, info.symbol_index, ext.library, ext.name)
         push(e.funcs, info)
     }
@@ -415,9 +432,9 @@ fun reset_locals(e: EmitterState): void {
     e.temp_count = 0
     e.temp_peak = 0
 }
-fun add_local(e: EmitterState, name: str, typ: TypeRef): void {
+fun add_local(e: EmitterState, name: str, typ: TypeRef, symbol_id: i64): void {
     for i: 0:len(e.locals) {
-        if e.locals[i].name == name {
+        if e.locals[i].symbol_id == symbol_id {
             ret
         }
     }
@@ -425,31 +442,77 @@ fun add_local(e: EmitterState, name: str, typ: TypeRef): void {
     let l = new Local
     l.name = name
     l.typ = typ
+    l.symbol_id = symbol_id
     l.slot = -e.local_bytes
     push(e.locals, l)
 }
-fun find_local_slot(e: EmitterState, name: str): i64 {
-    if name == "argv" {
-        ret 0
-    }
+fun find_local_slot(e: EmitterState, symbol_id: i64): i64 {
     for i: 0:len(e.locals) {
-        if e.locals[i].name == name {
+        if e.locals[i].symbol_id == symbol_id {
             ret e.locals[i].slot
         }
     }
     die("undefined local")
     0
 }
-fun find_local_type(e: EmitterState, name: str): TypeRef {
-    if name == "argv" {
-        ret type_array(type_str())
-    }
+fun find_local_type(e: EmitterState, symbol_id: i64): TypeRef {
     for i: 0:len(e.locals) {
-        if e.locals[i].name == name {
+        if e.locals[i].symbol_id == symbol_id {
             ret e.locals[i].typ
         }
     }
     die("internal: checked local has no type")
+    type_i64()
+}
+fun has_local(e: EmitterState, symbol_id: i64): bool {
+    for i: 0:len(e.locals) {
+        if e.locals[i].symbol_id == symbol_id {
+            ret true
+        }
+    }
+    false
+}
+fun find_capture_index(e: EmitterState, symbol_id: i64): i64 {
+    for i: 0:len(e.current_captures) {
+        if e.current_captures[i].symbol_id == symbol_id {
+            ret i
+        }
+    }
+    die("internal: checked capture has no layout entry")
+    0
+}
+fun find_capture_type(e: EmitterState, symbol_id: i64): TypeRef {
+    e.current_captures[find_capture_index(e, symbol_id)].typ
+}
+fun capture_offset(e: EmitterState, symbol_id: i64): i64 {
+    8 + find_capture_index(e, symbol_id) * 8
+}
+fun closure_symbol(e: EmitterState, closure_id: i64): i64 {
+    named_symbol(e, "__ep_closure_" + itoa(closure_id))
+}
+fun emit_load_resolved_value(e: EmitterState, kind: AstValueKind, symbol_id: i64, typ: TypeRef): void {
+    if kind == AstValueKind.Local {
+        emit_stack_load_value(e, 0, find_local_slot(e, symbol_id), typ)
+        ret
+    }
+    if kind == AstValueKind.Capture {
+        emit_stack_load(e, asm_rax(), e.context_slot)
+        asm_mov(e.program, type_register(0, typ), asm_operand_width(asm_mem_base(0, asm_rax(), capture_offset(e, symbol_id)), type_width(typ)))
+        ret
+    }
+    die("internal: value is not a local or capture")
+}
+fun emit_resolved_value_address(e: EmitterState, kind: AstValueKind, symbol_id: i64): TypeRef {
+    if kind == AstValueKind.Local {
+        asm_lea(e.program, asm_rax(), asm_mem_base(0, asm_rbp(), find_local_slot(e, symbol_id)))
+        ret find_local_type(e, symbol_id)
+    }
+    if kind == AstValueKind.Capture {
+        emit_stack_load(e, asm_rax(), e.context_slot)
+        asm_add(e.program, asm_rax(), asm_imm(capture_offset(e, symbol_id)))
+        ret find_capture_type(e, symbol_id)
+    }
+    die("internal: assignment target is not a local or capture")
     type_i64()
 }
 fun expr_type(e: EmitterState, expr: AstExpr): TypeRef {
@@ -532,9 +595,12 @@ fun pre_scan_expr(e: EmitterState, expr: AstExpr): void {
             pre_scan_expr(e, expr.left)
         }
         AstExprKind.Call {
+            pre_scan_expr(e, expr.callee)
             for arg_i: 0:len(expr.args) {
                 pre_scan_expr(e, expr.args[arg_i])
             }
+        }
+        AstExprKind.Closure {
         }
         AstExprKind.NewProduct {
         }
@@ -588,7 +654,7 @@ fun pre_scan_stmt(e: EmitterState, stmt: AstStmt): void {
         }
         AstStmtKind.Let {
             pre_scan_expr(e, stmt.value_expr)
-            add_local(e, stmt.name, expr_type(e, stmt.value_expr))
+            add_local(e, stmt.name, expr_type(e, stmt.value_expr), stmt.symbol_id)
         }
         AstStmtKind.Assign {
             pre_scan_expr(e, stmt.value_expr)
@@ -603,7 +669,7 @@ fun pre_scan_stmt(e: EmitterState, stmt: AstStmt): void {
         AstStmtKind.ForRange {
             pre_scan_expr(e, stmt.range_start)
             pre_scan_expr(e, stmt.range_end)
-            add_local(e, stmt.name, type_i64())
+            add_local(e, stmt.name, type_i64(), stmt.symbol_id)
             e.local_bytes += 8
             stmt.range_end_slot = -e.local_bytes
             pre_scan_block(e, stmt.body)
@@ -704,17 +770,44 @@ fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
     }
     slots
 }
+fun spill_callable_args(e: EmitterState, args: AstExpr[], callable: TypeRef): i64[] {
+    let slots = new i64[]
+    for i: 0:len(args) {
+        emit_expr_as(e, args[i], callable.params[i])
+        push(slots, temp_save_rax(e))
+    }
+    slots
+}
+fun emit_indirect_call_slots(e: EmitterState, callable_slot: i64, slots: i64[]): void {
+    load_spilled_args(e, slots)
+    emit_stack_load(e, asm_r10(), callable_slot)
+    asm_test(e.program, asm_r10(), asm_r10())
+    asm_jz(e.program, asm_symbol(named_symbol(e, "__ep_null_callable")))
+    asm_mov(e.program, asm_r11(), asm_mem_base(0, asm_r10(), 0))
+    let stack_args = len(slots) - 4
+    if stack_args < 0 {
+        stack_args = 0
+    }
+    let frame = 32 + align_up(stack_args * 8, 16)
+    asm_sub(e.program, asm_rsp(), asm_imm(frame))
+    for i: 4:len(slots) {
+        emit_stack_load(e, asm_rax(), slots[i])
+        asm_mov(e.program, asm_mem_base(64, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
+    }
+    asm_call(e.program, asm_r11())
+    asm_add(e.program, asm_rsp(), asm_imm(frame))
+}
 fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
     let name = expr.name
-    let conversion_type = type_from_source_name(name)
-    if expr.namespace == "" && type_is_integer(conversion_type) {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && type_source_name_is_integer(name) {
+        let conversion_type = type_from_source_name(name)
         emit_expr(e, expr.args[0])
         emit_coerce_rax(e, expr_type(e, expr.args[0]), conversion_type)
         ret
     }
-    if expr.namespace == "" && name == "ptr" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "ptr" {
         let ptr_arg = expr.args[0]
-        if ptr_arg.kind == AstExprKind.Var && ptr_arg.resolved_value == 1 {
+        if ptr_arg.kind == AstExprKind.Var && ptr_arg.resolved_kind == AstValueKind.Function {
             emit_lea_ref(e, asm_rax(), named_symbol(e, ptr_arg.name))
             ret
         }
@@ -733,7 +826,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         }
         ret
     }
-    if expr.namespace == "" && name == "is_null" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "is_null" {
         emit_expr(e, expr.args[0])
         asm_test(e.program, asm_rax(), asm_rax())
         asm_sete(e.program, asm_al())
@@ -757,19 +850,19 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         emit_call_slots(e, named_symbol(e, sys_symbol), slots)
         ret
     }
-    if expr.namespace == "" && name == "exit" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "exit" {
         emit_expr_as(e, expr.args[0], type_i64())
         asm_mov(e.program, asm_ecx(), asm_eax())
         emit_call_inst(e, "ExitProcess")
         ret
     }
-    if expr.namespace == "" && name == "panic" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "panic" {
         emit_expr(e, expr.args[0])
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_call_inst(e, "__ep_panic")
         ret
     }
-    if name == "print" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "print" {
         emit_expr(e, expr.args[0])
         let tmp = temp_save_rax(e)
         asm_mov(e.program, asm_ecx(), asm_imm(-11))
@@ -786,32 +879,32 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_add(e.program, asm_rsp(), asm_imm(16))
         ret
     }
-    if name == "itoa" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "itoa" {
         emit_expr_as(e, expr.args[0], type_i64())
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_call_inst(e, "_itoa")
         ret
     }
-    if name == "bytes" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "bytes" {
         emit_expr(e, expr.args[0])
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_call_inst(e, "_bytes")
         ret
     }
-    if name == "str" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "str" {
         emit_expr(e, expr.args[0])
         asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 0))
         asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
         emit_call_inst(e, "_str_alloc")
         ret
     }
-    if name == "cstr" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "cstr" {
         emit_expr(e, expr.args[0])
         asm_mov(e.program, asm_rcx(), asm_rax())
         emit_call_inst(e, "_cstr")
         ret
     }
-    if name == "len" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "len" {
         emit_expr(e, expr.args[0])
         if expr_type(e, expr.args[0]).kind == TypeRefKind.Str {
             asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 16))
@@ -820,7 +913,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         }
         ret
     }
-    if name == "read_file" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "read_file" {
         emit_expr(e, expr.args[0])
         asm_mov(e.program, asm_rcx(), asm_rax())
         asm_sub(e.program, asm_rsp(), asm_imm(8))
@@ -828,7 +921,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_add(e.program, asm_rsp(), asm_imm(8))
         ret
     }
-    if name == "write_file" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "write_file" {
         let write_slots = spill_args(e, expr.args)
         emit_stack_load(e, asm_rcx(), write_slots[0])
         emit_stack_load(e, asm_rax(), write_slots[1])
@@ -839,7 +932,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_add(e.program, asm_rsp(), asm_imm(8))
         ret
     }
-    if name == "pop" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "pop" {
         let pop_arr_type = expr_type(e, expr.args[0])
         let pop_type = pop_arr_type.element
         let pop_size = type_storage_size(pop_type)
@@ -857,7 +950,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), pop_size, 0), pop_width), asm_imm(0))
         ret
     }
-    if name == "push" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "push" {
         let arr_type = expr_type(e, expr.args[0])
         let elem_type = arr_type.element
         let el_size = type_storage_size(elem_type)
@@ -920,7 +1013,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_xor(e.program, asm_eax(), asm_eax())
         ret
     }
-    if name == "extend" {
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "extend" {
         let extend_type = expr_type(e, expr.args[0])
         let elem_size = type_storage_size(extend_type.element)
         let extend_slots = spill_args(e, expr.args)
@@ -931,9 +1024,16 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
         asm_xor(e.program, asm_eax(), asm_eax())
         ret
     }
-    let call_info = find_func_info(e, name)
-    let call_slots = spill_typed_args(e, expr.args, call_info)
-    emit_call_slots(e, call_info.symbol_index, call_slots)
+    if expr.callee.resolved_kind == AstValueKind.Function || expr.callee.resolved_kind == AstValueKind.Extern {
+        let call_info = find_func_info(e, name)
+        let call_slots = spill_typed_args(e, expr.args, call_info)
+        emit_call_slots(e, call_info.symbol_index, call_slots)
+        ret
+    }
+    emit_expr(e, expr.callee)
+    let callable_slot = temp_save_rax(e)
+    let indirect_slots = spill_callable_args(e, expr.args, expr_type(e, expr.callee))
+    emit_indirect_call_slots(e, callable_slot, indirect_slots)
 }
 fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, typ: TypeRef): void {
     emit_stack_load(e, asm_rcx(), right_slot)
@@ -1441,6 +1541,10 @@ fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i6
             emit_value_jump(e, expr, jump_if_true, label)
             ret
         }
+        AstExprKind.Closure {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
         AstExprKind.NewProduct {
             emit_value_jump(e, expr, jump_if_true, label)
             ret
@@ -1477,6 +1581,27 @@ fun emit_new(e: EmitterState, expr: AstExpr): void {
     asm_sub(e.program, asm_rsp(), asm_imm(40))
     emit_call_inst(e, "__ep_alloc")
     asm_add(e.program, asm_rsp(), asm_imm(40))
+}
+fun emit_closure(e: EmitterState, expr: AstExpr): void {
+    asm_mov(e.program, asm_ecx(), asm_imm((len(expr.captures) + 1) * 8))
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+    let object_slot = temp_save_rax(e)
+    emit_stack_load(e, asm_rcx(), object_slot)
+    emit_lea_ref(e, asm_rdx(), closure_symbol(e, expr.closure_id))
+    asm_mov(e.program, asm_mem_base(0, asm_rcx(), 0), asm_rdx())
+    for capture_i: 0:len(expr.captures) {
+        let capture = expr.captures[capture_i]
+        let source_kind = AstValueKind.Capture
+        if has_local(e, capture.symbol_id) {
+            source_kind = AstValueKind.Local
+        }
+        emit_load_resolved_value(e, source_kind, capture.symbol_id, capture.typ)
+        emit_stack_load(e, asm_rcx(), object_slot)
+        asm_mov(e.program, asm_operand_width(asm_mem_base(0, asm_rcx(), 8 + capture_i * 8), type_width(capture.typ)), type_register(0, capture.typ))
+    }
+    emit_stack_load(e, asm_rax(), object_slot)
 }
 fun emit_new_array(e: EmitterState, expr: AstExpr): void {
     let el_size = type_storage_size(expr.source_type)
@@ -1576,10 +1701,6 @@ fun emit_load_address(e: EmitterState, value_type: TypeRef): void {
 fun emit_store_address(e: EmitterState, value_type: TypeRef, address_slot: i64): void {
     emit_stack_load(e, asm_rcx(), address_slot)
     asm_mov(e.program, asm_mem_base(type_width(value_type), asm_rcx(), 0), type_register(0, value_type))
-}
-fun emit_local_address(e: EmitterState, name: str): TypeRef {
-    asm_lea(e.program, asm_rax(), asm_mem_base(0, asm_rbp(), find_local_slot(e, name)))
-    find_local_type(e, name)
 }
 fun is_enum_member_access(e: EmitterState, expr: AstExpr): bool {
     if expr.object.kind != AstExprKind.Var {
@@ -1712,11 +1833,14 @@ fun emit_expr(e: EmitterState, expr: AstExpr): void {
             ret
         }
         AstExprKind.Var {
-            if expr.name == "argv" {
+            if expr.resolved_kind == AstValueKind.Argv {
                 asm_mov(e.program, asm_rax(), asm_mem_symbol(0, named_symbol(e, "_argv"), 0))
+            } else if expr.resolved_kind == AstValueKind.Function {
+                emit_lea_ref(e, asm_rax(), find_func_info(e, expr.name).descriptor_symbol_index)
+            } else if expr.resolved_kind == AstValueKind.Local || expr.resolved_kind == AstValueKind.Capture {
+                emit_load_resolved_value(e, expr.resolved_kind, expr.resolved_value, expr_type(e, expr))
             } else {
-                let local_type = find_local_type(e, expr.name)
-                emit_stack_load_value(e, 0, find_local_slot(e, expr.name), local_type)
+                die("internal: unresolved value expression")
             }
             ret
         }
@@ -1730,6 +1854,10 @@ fun emit_expr(e: EmitterState, expr: AstExpr): void {
         }
         AstExprKind.Call {
             emit_call_expr(e, expr)
+            ret
+        }
+        AstExprKind.Closure {
+            emit_closure(e, expr)
             ret
         }
         AstExprKind.NewProduct {
@@ -1789,13 +1917,13 @@ fun emit_return(e: EmitterState, stmt: AstStmt): void {
 }
 fun emit_let(e: EmitterState, stmt: AstStmt): void {
     emit_expr(e, stmt.value_expr)
-    let local_type = find_local_type(e, stmt.name)
-    emit_stack_store_value(e, find_local_slot(e, stmt.name), 0, local_type)
+    let local_type = find_local_type(e, stmt.symbol_id)
+    emit_stack_store_value(e, find_local_slot(e, stmt.symbol_id), 0, local_type)
 }
 fun emit_assign_target_address(e: EmitterState, target: AstAssignTarget): TypeRef {
     match target.kind {
         AssignTargetKind.Var {
-            ret emit_local_address(e, target.name)
+            ret emit_resolved_value_address(e, target.resolved_kind, target.resolved_value)
         }
         AssignTargetKind.Field {
             ret emit_field_address(e, target.object, target.name)
@@ -1857,7 +1985,7 @@ fun emit_for_condition(e: EmitterState, stmt: AstStmt): void {
 }
 fun emit_for_range(e: EmitterState, stmt: AstStmt): void {
     emit_expr(e, stmt.range_start)
-    emit_stack_store(e, find_local_slot(e, stmt.name), asm_rax())
+    emit_stack_store(e, find_local_slot(e, stmt.symbol_id), asm_rax())
     emit_expr(e, stmt.range_end)
     emit_stack_store(e, stmt.range_end_slot, asm_rax())
     let check_id = fresh_label(e)
@@ -1866,7 +1994,7 @@ fun emit_for_range(e: EmitterState, stmt: AstStmt): void {
     push(e.loop_starts, step_id)
     push(e.loop_ends, end_id)
     emit_label_index(e, check_id)
-    emit_stack_load(e, asm_rax(), find_local_slot(e, stmt.name))
+    emit_stack_load(e, asm_rax(), find_local_slot(e, stmt.symbol_id))
     emit_stack_load(e, asm_rcx(), stmt.range_end_slot)
     asm_cmp(e.program, asm_rax(), asm_rcx())
     asm_jge(e.program, asm_symbol(end_id))
@@ -1874,7 +2002,7 @@ fun emit_for_range(e: EmitterState, stmt: AstStmt): void {
     pop(e.loop_starts)
     pop(e.loop_ends)
     emit_label_index(e, step_id)
-    asm_inc(e.program, asm_mem_base(64, asm_rbp(), find_local_slot(e, stmt.name)))
+    asm_inc(e.program, asm_mem_base(64, asm_rbp(), find_local_slot(e, stmt.symbol_id)))
     asm_jmp(e.program, asm_symbol(check_id))
     emit_label_index(e, end_id)
 }
@@ -1973,12 +2101,14 @@ fun emit_block(e: EmitterState, block: AstBlock): void {
 }
 fun emit_fn_def(e: EmitterState, fn: AstFunDef): void {
     reset_locals(e)
+    e.current_captures = new AstCapture[]
+    e.context_slot = 0
     e.current_fn = fn.name
     e.current_ret_type = fn.return_type
     e.current_ep_id = fresh_label(e)
     let i = 0
     for i < len(fn.params) {
-        add_local(e, fn.params[i].name, fn.params[i].typ)
+        add_local(e, fn.params[i].name, fn.params[i].typ, fn.params[i].symbol_id)
         i += 1
     }
     pre_scan_block(e, fn.body)
@@ -2000,26 +2130,26 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): void {
         asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_argv"), 0), asm_rax())
     }
     if len(fn.params) > 0 {
-        let param0_type = find_local_type(e, fn.params[0].name)
-        emit_stack_store_value(e, find_local_slot(e, fn.params[0].name), 1, param0_type)
+        let param0_type = find_local_type(e, fn.params[0].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[0].symbol_id), 1, param0_type)
     }
     if len(fn.params) > 1 {
-        let param1_type = find_local_type(e, fn.params[1].name)
-        emit_stack_store_value(e, find_local_slot(e, fn.params[1].name), 2, param1_type)
+        let param1_type = find_local_type(e, fn.params[1].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[1].symbol_id), 2, param1_type)
     }
     if len(fn.params) > 2 {
-        let param2_type = find_local_type(e, fn.params[2].name)
-        emit_stack_store_value(e, find_local_slot(e, fn.params[2].name), 8, param2_type)
+        let param2_type = find_local_type(e, fn.params[2].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[2].symbol_id), 8, param2_type)
     }
     if len(fn.params) > 3 {
-        let param3_type = find_local_type(e, fn.params[3].name)
-        emit_stack_store_value(e, find_local_slot(e, fn.params[3].name), 9, param3_type)
+        let param3_type = find_local_type(e, fn.params[3].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[3].symbol_id), 9, param3_type)
     }
     i = 4
     for i < len(fn.params) {
-        let stack_param_type = find_local_type(e, fn.params[i].name)
+        let stack_param_type = find_local_type(e, fn.params[i].symbol_id)
         asm_mov(e.program, type_register(0, stack_param_type), asm_operand_width(asm_mem_base(0, asm_rbp(), 48 + (i - 4) * 8), type_width(stack_param_type)))
-        emit_stack_store_value(e, find_local_slot(e, fn.params[i].name), 0, stack_param_type)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[i].symbol_id), 0, stack_param_type)
         i += 1
     }
     emit_block(e, fn.body)
@@ -2033,6 +2163,54 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): void {
         emit_label_index(e, e.current_ep_id)
         emit_epilogue(e)
     }
+    e.alloc_size = align_up(e.local_bytes + e.temp_peak * 8 + 32, 16)
+    if e.alloc_size >= 4096 {
+        die("stack frame exceeds v2 limit")
+    }
+    e.program.items[e.alloc_size_item].b.imm = e.alloc_size
+}
+fun emit_closure_def(e: EmitterState, closure: AstExpr): void {
+    reset_locals(e)
+    e.current_fn = "__ep_closure_" + itoa(closure.closure_id)
+    e.current_ret_type = closure.closure_return_type
+    e.current_ep_id = fresh_label(e)
+    e.current_captures = closure.captures
+    e.local_bytes = 8
+    e.context_slot = -8
+    for i: 0:len(closure.closure_params) {
+        let param = closure.closure_params[i]
+        add_local(e, param.name, param.typ, param.symbol_id)
+    }
+    pre_scan_block(e, closure.closure_body)
+    e.temp_base = e.local_bytes
+    emit_label_index(e, closure_symbol(e, closure.closure_id))
+    emit_prologue(e)
+    emit_stack_store(e, e.context_slot, asm_r10())
+    if len(closure.closure_params) > 0 {
+        let param0 = closure.closure_params[0]
+        emit_stack_store_value(e, find_local_slot(e, param0.symbol_id), 1, param0.typ)
+    }
+    if len(closure.closure_params) > 1 {
+        let param1 = closure.closure_params[1]
+        emit_stack_store_value(e, find_local_slot(e, param1.symbol_id), 2, param1.typ)
+    }
+    if len(closure.closure_params) > 2 {
+        let param2 = closure.closure_params[2]
+        emit_stack_store_value(e, find_local_slot(e, param2.symbol_id), 8, param2.typ)
+    }
+    if len(closure.closure_params) > 3 {
+        let param3 = closure.closure_params[3]
+        emit_stack_store_value(e, find_local_slot(e, param3.symbol_id), 9, param3.typ)
+    }
+    for stack_i: 4:len(closure.closure_params) {
+        let stack_param = closure.closure_params[stack_i]
+        asm_mov(e.program, type_register(0, stack_param.typ), asm_operand_width(asm_mem_base(0, asm_rbp(), 48 + (stack_i - 4) * 8), type_width(stack_param.typ)))
+        emit_stack_store_value(e, find_local_slot(e, stack_param.symbol_id), 0, stack_param.typ)
+    }
+    emit_block(e, closure.closure_body)
+    emit_coerce_rax(e, closure.closure_body.resolved_type, closure.closure_return_type)
+    emit_label_index(e, e.current_ep_id)
+    emit_epilogue(e)
     e.alloc_size = align_up(e.local_bytes + e.temp_peak * 8 + 32, 16)
     if e.alloc_size >= 4096 {
         die("stack frame exceeds v2 limit")
@@ -2078,6 +2256,14 @@ fun emit_program(e: EmitterState, ast: AstProgram): void {
     asm_dq(e.program, 0)
     emit_label(e, "_argv")
     asm_dq(e.program, 0)
+    for descriptor_i: 0:len(ast.funcs) {
+        let descriptor_fn = ast.funcs[descriptor_i]
+        if descriptor_fn.name != "main" {
+            let descriptor_info = find_func_info(e, descriptor_fn.name)
+            emit_label_index(e, descriptor_info.descriptor_symbol_index)
+            asm_dq_symbol(e.program, descriptor_info.symbol_index)
+        }
+    }
     let i = 0
     for i < len(e.strings) {
         emit_label_index(e, e.strings[i].symbol_index)
@@ -2089,6 +2275,9 @@ fun emit_program(e: EmitterState, ast: AstProgram): void {
     for i < len(ast.funcs) {
         emit_fn_def(e, ast.funcs[i])
         i += 1
+    }
+    for closure_i: 0:len(e.closures) {
+        emit_closure_def(e, e.closures[closure_i])
     }
     emit_runtime_helpers(e)
 }

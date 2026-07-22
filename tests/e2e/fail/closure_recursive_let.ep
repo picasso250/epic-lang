@@ -1,0 +1,11 @@
+# COMPILE_ERROR: undefined value 'factorial'
+fun main(): void {
+    let factorial = fun(value: i64): i64 {
+        if value == 0 {
+            1
+        } else {
+            value * factorial(value - 1)
+        }
+    }
+    print(itoa(factorial(5)))
+}

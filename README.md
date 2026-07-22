@@ -8,7 +8,9 @@ single pointer model. New v4 language work begins from this fixed point. The
 compiler now dogfoods string slicing, v4 closes the transitional `str.data`,
 `str.len`, and `str_new` interfaces retained by v3, source programs can declare
 Windows x64 DLL imports with `extern "dll" fun ...`, and `ptr(top_level_fun)`
-exposes owner-thread callback entries without generating trampolines.
+exposes owner-thread callback entries without generating trampolines. v4 also
+adds structural function types, first-class top-level function values, and
+escaping value-capturing closures with GC-managed environments.
 
 It retains the self-contained structured AMD64 assembler, stable symbol indexes,
 deterministic PE writer, and conservative garbage collector.

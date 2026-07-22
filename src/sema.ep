@@ -21,8 +21,10 @@ type SemaSignature {
 type SemaLocal {
     name: str
     typ: TypeRef
+    symbol_id: i64
     line: i64
     depth: i64
+    function_depth: i64
     active: bool
     read_only: bool
 }
@@ -34,6 +36,10 @@ type SemaState {
     source_path: str
     return_type: TypeRef
     scope_depth: i64
+    function_depth: i64
+    next_symbol_id: i64
+    next_closure_id: i64
+    closures: AstExpr[]
 }
 fun sema_error(path: str, line: i64, message: str): void {
     print(path)
@@ -59,6 +65,7 @@ fun sema_state(): SemaState {
     let state = new SemaState
     state.types = new SemaTypeDecl[]
     state.funcs = new SemaSignature[]
+    state.closures = new AstExpr[]
     state
 }
 fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
@@ -72,7 +79,9 @@ fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
     missing
 }
 fun sema_find_func(state: SemaState, name: str): SemaSignature {
-    for i: 0:len(state.funcs) {
+    let i = len(state.funcs)
+    for i > 0 {
+        i -= 1
         if state.funcs[i].name == name {
             ret state.funcs[i]
         }
@@ -84,6 +93,14 @@ fun sema_find_func(state: SemaState, name: str): SemaSignature {
 fun sema_type_exists(state: SemaState, typ: TypeRef): bool {
     if typ.kind == TypeRefKind.Array {
         ret sema_type_exists(state, typ.element)
+    }
+    if typ.kind == TypeRefKind.Function {
+        for i: 0:len(typ.params) {
+            if !sema_type_exists(state, typ.params[i]) {
+                ret false
+            }
+        }
+        ret sema_type_exists(state, typ.result)
     }
     type_is_primitive(typ) || (typ.kind == TypeRefKind.Named && sema_find_type(state, typ.name).name != "")
 }
@@ -100,8 +117,17 @@ fun sema_validate_value_type(state: SemaState, path: str, line: i64, typ: TypeRe
         if !sema_type_exists(state, element) {
             sema_error(path, line, "unknown array element type '" + type_text(element) + "'")
         }
-        if element.kind == TypeRefKind.Array {
+        if element.kind == TypeRefKind.Array || element.kind == TypeRefKind.Function {
             sema_validate_value_type(state, path, line, element)
+        }
+        ret
+    }
+    if typ.kind == TypeRefKind.Function {
+        for param_i: 0:len(typ.params) {
+            sema_validate_value_type(state, path, line, typ.params[param_i])
+        }
+        if typ.result.kind != TypeRefKind.Void {
+            sema_validate_value_type(state, path, line, typ.result)
         }
         ret
     }
@@ -348,12 +374,6 @@ fun sema_collect_externs(state: SemaState, ast: AstProgram): void {
         if node.name == "os" {
             sema_error(node.source_path, node.line, "'os' is a reserved namespace")
         }
-        if type_is_primitive(type_from_source_name(node.name)) {
-            sema_error(node.source_path, node.line, "cannot redefine primitive conversion '" + node.name + "'")
-        }
-        if sema_is_special_builtin_name(node.name) {
-            sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
-        }
         if node.return_type.kind != TypeRefKind.Void {
             sema_validate_value_type(state, node.source_path, node.line, node.return_type)
             if !sema_is_extern_abi_type(node.return_type) {
@@ -375,13 +395,11 @@ fun sema_collect_externs(state: SemaState, ast: AstProgram): void {
         }
         let first = sema_find_func(state, node.name)
         if first.name != "" {
-            if first.builtin {
-                sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
-            }
-            if !first.external || !sema_extern_signature_matches(first, node) {
+            if !first.builtin && (!first.external || !sema_extern_signature_matches(first, node)) {
                 sema_error(node.source_path, node.line, "conflicting extern declaration '" + node.name + "'")
             }
-        } else {
+        }
+        if first.name == "" || first.builtin {
             let sig = sema_signature(node.name, node.return_type)
             sig.source_path = node.source_path
             sig.line = node.line
@@ -404,17 +422,8 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
         if node.name == "os" {
             sema_error(node.source_path, node.line, "'os' is a reserved namespace")
         }
-        if type_is_primitive(type_from_source_name(node.name)) {
-            sema_error(node.source_path, node.line, "cannot redefine primitive conversion '" + node.name + "'")
-        }
-        if sema_is_special_builtin_name(node.name) {
-            sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
-        }
         let first = sema_find_func(state, node.name)
-        if first.name != "" {
-            if first.builtin {
-                sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
-            }
+        if first.name != "" && !first.builtin {
             sema_duplicate(node.source_path, node.line, "function '" + node.name + "'", first.source_path + ":" + itoa(first.line))
         }
         if node.return_type.kind != TypeRefKind.Void {
@@ -435,7 +444,7 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
                 }
                 k += 1
             }
-            if param.name == "os" || param.name == "argv" {
+            if param.name == "os" {
                 sema_error(node.source_path, param.line, "reserved parameter name '" + param.name + "'")
             }
             sema_validate_value_type(state, node.source_path, param.line, param.typ)
@@ -510,45 +519,80 @@ fun sema_find_field(state: SemaState, typ: TypeRef, field_name: str): AstStructF
     missing
 }
 fun sema_find_local(state: SemaState, name: str): SemaLocal {
-    let i = 0
-    for i < len(state.locals) {
+    let i = len(state.locals)
+    for i > 0 {
+        i -= 1
         let local = state.locals[i]
         if local.name == name && local.active {
             ret local
         }
-        i += 1
     }
     let missing = new SemaLocal
     missing.name = ""
     missing
 }
-fun sema_name_was_used(state: SemaState, name: str): SemaLocal {
-    let i = 0
-    for i < len(state.locals) {
-        if state.locals[i].name == name {
+fun sema_find_local_in_current_scope(state: SemaState, name: str): SemaLocal {
+    let i = len(state.locals)
+    for i > 0 {
+        i -= 1
+        if state.locals[i].name == name && state.locals[i].active && state.locals[i].depth == state.scope_depth && state.locals[i].function_depth == state.function_depth {
             ret state.locals[i]
         }
-        i += 1
     }
     let missing = new SemaLocal
     missing.name = ""
     missing
 }
 fun sema_add_local(state: SemaState, name: str, typ: TypeRef, line: i64): void {
-    if name == "argv" || name == "os" {
+    if name == "os" {
         sema_error(state.source_path, line, "reserved local name '" + name + "'")
     }
-    let first = sema_name_was_used(state, name)
+    let first = sema_find_local_in_current_scope(state, name)
     if first.name != "" {
         sema_duplicate(state.source_path, line, "local '" + name + "'", state.source_path + ":" + itoa(first.line))
     }
     let local = new SemaLocal
     local.name = name
     local.typ = typ
+    local.symbol_id = state.next_symbol_id
+    state.next_symbol_id += 1
     local.line = line
     local.depth = state.scope_depth
+    local.function_depth = state.function_depth
     local.active = true
     push(state.locals, local)
+}
+fun sema_signature_type(sig: SemaSignature): TypeRef {
+    type_function(sig.param_types, sig.return_type)
+}
+fun sema_add_capture(closure: AstExpr, local: SemaLocal): void {
+    for i: 0:len(closure.captures) {
+        if closure.captures[i].symbol_id == local.symbol_id {
+            ret
+        }
+    }
+    let capture = new AstCapture
+    capture.name = local.name
+    capture.typ = local.typ
+    capture.symbol_id = local.symbol_id
+    push(closure.captures, capture)
+}
+fun sema_capture_local(state: SemaState, local: SemaLocal): void {
+    let depth = local.function_depth + 1
+    for depth <= state.function_depth {
+        sema_add_capture(state.closures[depth - 1], local)
+        depth += 1
+    }
+}
+fun sema_resolve_local_expr(state: SemaState, expr: AstExpr, local: SemaLocal): TypeRef {
+    expr.resolved_value = local.symbol_id
+    if local.function_depth == state.function_depth {
+        expr.resolved_kind = AstValueKind.Local
+    } else {
+        sema_capture_local(state, local)
+        expr.resolved_kind = AstValueKind.Capture
+    }
+    local.typ
 }
 fun sema_leave_scope(state: SemaState): void {
     let i = 0
@@ -561,7 +605,7 @@ fun sema_leave_scope(state: SemaState): void {
     state.scope_depth -= 1
 }
 fun sema_is_reference_value(state: SemaState, typ: TypeRef): bool {
-    if typ.kind == TypeRefKind.Str || typ.kind == TypeRefKind.Ptr || typ.kind == TypeRefKind.Array {
+    if typ.kind == TypeRefKind.Str || typ.kind == TypeRefKind.Ptr || typ.kind == TypeRefKind.Array || typ.kind == TypeRefKind.Function {
         ret true
     }
     if typ.kind != TypeRefKind.Named {
@@ -1020,6 +1064,15 @@ fun sema_special_arity(state: SemaState, expr: AstExpr, expected: i64): void {
     }
 }
 fun sema_check_special_call(state: SemaState, expr: AstExpr): TypeRef {
+    if expr.name == "embed" {
+        sema_special_arity(state, expr, 1)
+        if expr.args[0].kind != AstExprKind.String {
+            sema_error(state.source_path, expr.args[0].line, "embed expects a string literal path")
+        }
+        expr.kind = AstExprKind.Embed
+        expr.value = read_embed(state.source_path, expr.args[0].value, expr.args[0].line)
+        ret type_array(type_u8())
+    }
     if expr.name == "len" {
         sema_special_arity(state, expr, 1)
         let len_actual = sema_check_expr(state, expr.args[0])
@@ -1091,15 +1144,7 @@ fun sema_check_special_call(state: SemaState, expr: AstExpr): TypeRef {
     sema_error(state.source_path, expr.line, "unknown function '" + expr.name + "'")
     type_none()
 }
-fun sema_check_call(state: SemaState, expr: AstExpr): TypeRef {
-    let full_name = expr.name
-    if expr.namespace != "" {
-        full_name = expr.namespace + "." + expr.name
-    }
-    if expr.namespace == "" && sema_is_special_builtin_name(expr.name) {
-        ret sema_check_special_call(state, expr)
-    }
-    if expr.namespace == "" && expr.name == "ptr" {
+fun sema_check_ptr_call(state: SemaState, expr: AstExpr): TypeRef {
         if len(expr.args) != 1 {
             sema_error(state.source_path, expr.line, "ptr conversion expects 1 argument, got " + itoa(len(expr.args)))
         }
@@ -1124,8 +1169,8 @@ fun sema_check_call(state: SemaState, expr: AstExpr): TypeRef {
                     sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of builtin '" + ptr_arg.name + "'")
                 }
                 sema_validate_callback_signature(state, ptr_arg.line, ptr_function)
-                ptr_arg.resolved_value = 1
-                ptr_arg.resolved_type = type_ptr()
+                ptr_arg.resolved_kind = AstValueKind.Function
+                ptr_arg.resolved_type = sema_signature_type(ptr_function)
                 ret type_ptr()
             }
         }
@@ -1141,42 +1186,105 @@ fun sema_check_call(state: SemaState, expr: AstExpr): TypeRef {
             sema_error(state.source_path, expr.line, "ptr conversion requires i64, u64, array, or product, got " + type_text(source_type))
         }
         ret type_ptr()
+}
+fun sema_check_integer_conversion(state: SemaState, expr: AstExpr, conversion_type: TypeRef): TypeRef {
+    if len(expr.args) != 1 {
+        sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' expects 1 argument, got " + itoa(len(expr.args)))
     }
-    let conversion_type = type_from_source_name(expr.name)
-    if expr.namespace == "" && type_is_integer(conversion_type) {
-        if len(expr.args) != 1 {
-            sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' expects 1 argument, got " + itoa(len(expr.args)))
-        }
-        let integer_source_type = sema_check_expr(state, expr.args[0])
-        if integer_source_type.kind == TypeRefKind.Never {
-            ret type_never()
-        }
-        if !type_is_integer(integer_source_type) && !((conversion_type.kind == TypeRefKind.I64 || conversion_type.kind == TypeRefKind.U64) && integer_source_type.kind == TypeRefKind.Ptr) {
-            sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' requires an integer, got " + type_text(integer_source_type))
-        }
-        ret conversion_type
+    let integer_source_type = sema_check_expr(state, expr.args[0])
+    if integer_source_type.kind == TypeRefKind.Never {
+        ret type_never()
     }
-    let sig = sema_find_func(state, full_name)
-    if sig.name == "" {
-        sema_error(state.source_path, expr.line, "unknown function '" + full_name + "'")
+    if !type_is_integer(integer_source_type) && !((conversion_type.kind == TypeRefKind.I64 || conversion_type.kind == TypeRefKind.U64) && integer_source_type.kind == TypeRefKind.Ptr) {
+        sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' requires an integer, got " + type_text(integer_source_type))
     }
-    if len(expr.args) != len(sig.param_types) {
-        sema_error(state.source_path, expr.line, "function '" + full_name + "' expects " + itoa(len(sig.param_types)) + " argument(s), got " + itoa(len(expr.args)))
+    conversion_type
+}
+fun sema_check_callable_args(state: SemaState, expr: AstExpr, callable: TypeRef, display_name: str): TypeRef {
+    if len(expr.args) != len(callable.params) {
+        if display_name == "callable" {
+            sema_error(state.source_path, expr.line, "callable expects " + itoa(len(callable.params)) + " argument(s), got " + itoa(len(expr.args)))
+        }
+        sema_error(state.source_path, expr.line, "function " + display_name + " expects " + itoa(len(callable.params)) + " argument(s), got " + itoa(len(expr.args)))
     }
     let has_never = false
     for i: 0:len(expr.args) {
-        let expected = sig.param_types[i]
+        let expected = callable.params[i]
         let actual = sema_check_expr_expected(state, expr.args[i], expected)
         if actual.kind == TypeRefKind.Never {
             has_never = true
         } else if !sema_assignable(expected, actual) {
-            sema_error(state.source_path, expr.args[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + type_text(expected) + ", got " + type_text(actual))
+            sema_error(state.source_path, expr.args[i].line, "argument " + itoa(i + 1) + " of " + display_name + " expects " + type_text(expected) + ", got " + type_text(actual))
         }
     }
     if has_never {
         ret type_never()
     }
-    sig.return_type
+    callable.result
+}
+fun sema_is_os_call(expr: AstExpr): bool {
+    expr.callee.kind == AstExprKind.FieldAccess && expr.callee.object.kind == AstExprKind.Var && expr.callee.object.name == "os"
+}
+fun sema_check_call(state: SemaState, expr: AstExpr): TypeRef {
+    if sema_is_os_call(expr) {
+        expr.namespace = "os"
+        expr.name = expr.callee.name
+        let os_name = "os." + expr.name
+        let os_sig = sema_find_func(state, os_name)
+        if os_sig.name == "" {
+            sema_error(state.source_path, expr.line, "unknown os binding '" + expr.name + "'")
+        }
+        expr.callee.resolved_kind = AstValueKind.Builtin
+        expr.callee.resolved_type = sema_signature_type(os_sig)
+        ret sema_check_callable_args(state, expr, expr.callee.resolved_type, "'" + os_name + "'")
+    }
+    if expr.callee.kind == AstExprKind.Var {
+        let direct_name = expr.callee.name
+        let direct_local = sema_find_local(state, direct_name)
+        if direct_local.name == "" {
+            let direct_sig = sema_find_func(state, direct_name)
+            if direct_sig.name != "" && !direct_sig.builtin {
+                if direct_name == "main" {
+                    sema_error(state.source_path, expr.line, "main is an entry point and cannot be called")
+                }
+                expr.name = direct_name
+                expr.callee.resolved_type = sema_signature_type(direct_sig)
+                if direct_sig.external {
+                    expr.callee.resolved_kind = AstValueKind.Extern
+                } else {
+                    expr.callee.resolved_kind = AstValueKind.Function
+                }
+                ret sema_check_callable_args(state, expr, expr.callee.resolved_type, "'" + direct_name + "'")
+            }
+            if sema_is_special_builtin_name(direct_name) {
+                expr.name = direct_name
+                expr.callee.resolved_kind = AstValueKind.Builtin
+                ret sema_check_special_call(state, expr)
+            }
+            if direct_name == "ptr" {
+                expr.name = direct_name
+                expr.callee.resolved_kind = AstValueKind.Builtin
+                ret sema_check_ptr_call(state, expr)
+            }
+            let conversion_type = type_from_source_name(direct_name)
+            if type_is_integer(conversion_type) {
+                expr.name = direct_name
+                expr.callee.resolved_kind = AstValueKind.Builtin
+                ret sema_check_integer_conversion(state, expr, conversion_type)
+            }
+            if direct_sig.name != "" && direct_sig.builtin {
+                expr.name = direct_name
+                expr.callee.resolved_kind = AstValueKind.Builtin
+                expr.callee.resolved_type = sema_signature_type(direct_sig)
+                ret sema_check_callable_args(state, expr, expr.callee.resolved_type, "'" + direct_name + "'")
+            }
+        }
+    }
+    let callee_type = sema_check_expr(state, expr.callee)
+    if callee_type.kind != TypeRefKind.Function {
+        sema_error(state.source_path, expr.callee.line, "called expression has non-callable type " + type_text(callee_type))
+    }
+    sema_check_callable_args(state, expr, callee_type, "callable")
 }
 fun sema_check_if(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRef {
     let condition_type = sema_check_expr_expected(state, expr.condition, type_bool())
@@ -1197,6 +1305,45 @@ fun sema_check_if(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRef {
     }
     result
 }
+fun sema_check_closure(state: SemaState, expr: AstExpr): TypeRef {
+    expr.closure_id = state.next_closure_id
+    state.next_closure_id += 1
+    expr.captures = new AstCapture[]
+    if expr.closure_return_type.kind != TypeRefKind.Void {
+        sema_validate_value_type(state, state.source_path, expr.line, expr.closure_return_type)
+    }
+    let param_types = new TypeRef[]
+    for param_i: 0:len(expr.closure_params) {
+        sema_validate_value_type(state, state.source_path, expr.closure_params[param_i].line, expr.closure_params[param_i].typ)
+        push(param_types, expr.closure_params[param_i].typ)
+    }
+    let previous_return_type = state.return_type
+    let previous_scope_depth = state.scope_depth
+    state.return_type = expr.closure_return_type
+    state.function_depth += 1
+    push(state.closures, expr)
+    state.scope_depth += 1
+    for add_param_i: 0:len(expr.closure_params) {
+        let closure_param = expr.closure_params[add_param_i]
+        sema_add_local(state, closure_param.name, closure_param.typ, closure_param.line)
+        closure_param.symbol_id = state.locals[len(state.locals) - 1].symbol_id
+    }
+    let body_type = sema_check_block_expected(state, expr.closure_body, expr.closure_return_type)
+    if expr.closure_return_type.kind != TypeRefKind.Void && body_type.kind != TypeRefKind.Never {
+        if body_type.kind == TypeRefKind.Void {
+            sema_error(state.source_path, expr.line, "closure may not return a value on every path")
+        }
+        if !sema_assignable(expr.closure_return_type, body_type) {
+            sema_error(state.source_path, expr.line, "closure result type " + type_text(body_type) + " is not assignable to " + type_text(expr.closure_return_type))
+        }
+    }
+    sema_leave_scope(state)
+    pop(state.closures)
+    state.function_depth -= 1
+    state.scope_depth = previous_scope_depth
+    state.return_type = previous_return_type
+    type_function(param_types, expr.closure_return_type)
+}
 fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRef {
     if !is_null(expr.resolved_type) {
         ret expr.resolved_type
@@ -1213,14 +1360,28 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: TypeRef)
             result = type_array(type_u8())
         }
         AstExprKind.Var {
-            if expr.name == "argv" {
-                result = type_array(type_str())
+            let local = sema_find_local(state, expr.name)
+            if local.name != "" {
+                result = sema_resolve_local_expr(state, expr, local)
             } else {
-                let local = sema_find_local(state, expr.name)
-                if local.name == "" {
-                    sema_error(state.source_path, expr.line, "undefined variable '" + expr.name + "'")
+                let value_func = sema_find_func(state, expr.name)
+                if value_func.name != "" && !value_func.builtin {
+                    if value_func.external {
+                        sema_error(state.source_path, expr.line, "extern function '" + expr.name + "' is not an Epic callable value")
+                    }
+                    if expr.name == "main" {
+                        sema_error(state.source_path, expr.line, "main is an entry point and not a callable value")
+                    }
+                    expr.resolved_kind = AstValueKind.Function
+                    result = sema_signature_type(value_func)
+                } else if expr.name == "argv" {
+                    expr.resolved_kind = AstValueKind.Argv
+                    result = type_array(type_str())
+                } else if value_func.name != "" || sema_is_special_builtin_name(expr.name) || expr.name == "ptr" || type_is_integer(type_from_source_name(expr.name)) {
+                    sema_error(state.source_path, expr.line, "builtin '" + expr.name + "' may only be used as a direct call")
+                } else {
+                    sema_error(state.source_path, expr.line, "undefined value '" + expr.name + "'")
                 }
-                result = local.typ
             }
         }
         AstExprKind.Binary {
@@ -1231,6 +1392,9 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: TypeRef)
         }
         AstExprKind.Call {
             result = sema_check_call(state, expr)
+        }
+        AstExprKind.Closure {
+            result = sema_check_closure(state, expr)
         }
         AstExprKind.NewProduct {
             let decl = new SemaTypeDecl
@@ -1395,15 +1559,22 @@ fun sema_check_match(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRe
 fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64, compound: bool): TypeRef {
     match target.kind {
         AssignTargetKind.Var {
-            if target.name == "argv" {
-                sema_error(state.source_path, line, "argv is read-only")
-            }
             let local = sema_find_local(state, target.name)
             if local.name == "" {
+                if target.name == "argv" {
+                    sema_error(state.source_path, line, "argv is read-only")
+                }
                 sema_error(state.source_path, line, "assignment to undefined variable '" + target.name + "'")
             }
             if local.read_only {
                 sema_error(state.source_path, line, "range iterator '" + target.name + "' is read-only")
+            }
+            target.resolved_value = local.symbol_id
+            if local.function_depth == state.function_depth {
+                target.resolved_kind = AstValueKind.Local
+            } else {
+                sema_capture_local(state, local)
+                target.resolved_kind = AstValueKind.Capture
             }
             ret local.typ
         }
@@ -1522,6 +1693,7 @@ fun sema_check_for_range(state: SemaState, stmt: AstStmt): void {
     state.scope_depth += 1
     sema_add_local(state, stmt.name, type_i64(), stmt.line)
     state.locals[len(state.locals) - 1].read_only = true
+    stmt.symbol_id = state.locals[len(state.locals) - 1].symbol_id
     sema_check_block(state, stmt.body)
     sema_leave_scope(state)
 }
@@ -1546,6 +1718,7 @@ fun sema_check_stmt(state: SemaState, stmt: AstStmt): TypeRef {
                 sema_error(state.source_path, stmt.line, "cannot bind a never expression")
             }
             sema_add_local(state, stmt.name, let_type, stmt.line)
+            stmt.symbol_id = state.locals[len(state.locals) - 1].symbol_id
         }
         AstStmtKind.Assign {
             sema_check_assignment(state, stmt)
@@ -1623,11 +1796,14 @@ fun sema_check_bodies(state: SemaState, ast: AstProgram): void {
         state.source_path = node.source_path
         state.return_type = node.return_type
         state.scope_depth = 0
+        state.function_depth = 0
         state.locals = new SemaLocal[]
+        state.closures = new AstExpr[]
         let j = 0
         for j < len(node.params) {
             let param = node.params[j]
             sema_add_local(state, param.name, param.typ, param.line)
+            param.symbol_id = state.locals[len(state.locals) - 1].symbol_id
             j += 1
         }
         let body_type = sema_check_block_expected(state, node.body, node.return_type)

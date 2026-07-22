@@ -58,7 +58,9 @@ code generation share one structural `TypeRef` representation from
 distinct enum kinds. User products and enums are both nominal `Named(name)`
 leaves; semantic declaration tables determine which declaration kind a name
 denotes. Arrays recursively contain their element `TypeRef`, so equality walks
-the structure and never depends on allocation identity.
+the structure and never depends on allocation identity. `Function(params,
+result)` is likewise recursive and structural; hidden closure capture layouts
+do not participate in public function type identity.
 
 `TypeRef` values are immutable by convention and are not interned. Equal types
 may therefore be separate allocations. `type_equal` is the semantic equality
@@ -92,6 +94,13 @@ including bare `ret` values, unsized-array counts, and block tails, use
 `AstExprOption` with `None | Some`. Assignment statements carry one
 `AstAssignTarget`, so variable, field, and subscript assignment share the same
 statement kinds and lowering path.
+
+`Call` stores an arbitrary callee expression plus its argument list. Named
+calls are not a separate AST or semantic path. `Closure` stores explicit
+parameter/result types and its body; semantic analysis assigns a stable closure
+ID and a first-lexical-use capture list. Resolved variable and assignment nodes
+carry value-symbol IDs, allowing code generation to distinguish shadowed locals
+and captured storage without redoing name lookup.
 
 `if` and `match` live only in `AstExprKind`; there are no parallel statement
 nodes. Their statement forms are ordinary expression statements whose result is
@@ -134,12 +143,35 @@ Epic functions, source externs, and the transitional `os.*` bindings. Callees
 copy both register and stack parameters into their statically assigned local
 slots.
 
+Every Epic callable value is one word pointing at an entry-first descriptor.
+Top-level functions use static `[entry]` descriptors. Evaluating a closure
+allocates `[entry, capture 0, capture 1, ...]` in managed storage and copies the
+current values into fixed eight-byte capture slots. Closure entries receive
+the descriptor/context pointer in volatile `R10`, save it in their stack frame,
+and use ordinary Windows x64 lanes for source parameters. Nested calls may
+therefore clobber `R10` without losing access to captures.
+
+Known top-level and extern calls remain direct. General calls evaluate and spill
+the callee first, evaluate arguments left-to-right, null-check the descriptor,
+load its entry into `R11`, and use an indirect register call. A null descriptor
+jumps to the allocation-free diagnostic in `runtime/callable.asm`. The private
+assembler encodes both relative-symbol calls and AMD64 `call r/m64`.
+
+Semantic value lookup is one lexical chain: current locals and captures, module
+functions, then the builtin prelude. Block bindings are assigned stable IDs
+after their initializer is checked, while module functions are collected before
+bodies. An inner closure that reaches through multiple closure levels causes
+each intermediate environment to capture the original symbol ID, so every
+runtime construction copies from its immediate enclosing frame or context.
+
 Address-taking is resolved in semantic analysis only for `ptr(top_level_fun)`.
 The checker rejects `main`, externs, builtins, unknown names, and signatures that
 use non-extern ABI types. Code generation lowers the marked function operand to
 `lea rax, [function_symbol]`; it emits no trampoline. Direct calls and Windows
 callbacks therefore share the same entry, prologue, parameter-copy logic, and
-return-width behavior.
+return-width behavior. Internal callable descriptors, indirect function values,
+and closures never cross the extern ABI; semantic analysis accepts the callback
+special case only when the operand directly resolves to a top-level function.
 
 Each function receives a statically sized stack frame. A pre-scan computes
 local storage and the peak number of compiler temporary slots; there is no
@@ -154,7 +186,7 @@ private assembler encodes 16-bit operands plus `movzx`,
 `movsx`, and `movsxd` for these boundaries.
 
 The polymorphic `is_null` builtin is checked in semantic analysis against the
-reference categories and lowered in value position to `test rax, rax` plus
+product, string, array, callable, and raw-pointer reference categories and lowered in value position to `test rax, rax` plus
 `sete al`. Conditional code uses the ordinary bool path; the compiler adds
 no builtin-specific branch optimization or implicit dereference guard.
 
@@ -166,7 +198,10 @@ image at bootstrap time, so a built `epic.exe` parses them into its existing
 All managed allocation sites call the conservative, non-moving mark-and-sweep
 collector in `runtime/gc.asm`. It records exact allocation bases in side
 metadata, routes small objects through four slab classes, scans the active stack
-and managed payloads conservatively, and reclaims unreachable objects. The
+and managed payloads conservatively, and reclaims unreachable objects. Closure
+environments are ordinary managed payloads, so captured arrays, products,
+strings, and nested closures remain reachable without a separate descriptor or
+capture-count table. The
 detailed runtime contract is documented in [`gc.md`](gc.md).
 
 Raw callback entries rely on the same single active-stack boundary initialized

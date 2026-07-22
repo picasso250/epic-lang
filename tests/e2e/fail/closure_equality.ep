@@ -1,0 +1,10 @@
+# COMPILE_ERROR: operator == requires
+fun main(): void {
+    let first = fun(): i64 {
+        1
+    }
+    let second = first
+    if first == second {
+        print("equal")
+    }
+}

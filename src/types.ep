@@ -1,11 +1,13 @@
 #
 # Shared structural type model.
 #
-type TypeRefKind = I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Bool | Str | Ptr | Void | Never | Named | Array
+type TypeRefKind = I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Bool | Str | Ptr | Void | Never | Named | Array | Function
 type TypeRef {
     kind: TypeRefKind
     name: str
     element: TypeRef
+    params: TypeRef[]
+    result: TypeRef
 }
 fun type_none(): TypeRef {
     let holder = new TypeRef
@@ -65,6 +67,12 @@ fun type_array(element: TypeRef): TypeRef {
     typ.element = element
     typ
 }
+fun type_function(params: TypeRef[], result: TypeRef): TypeRef {
+    let typ = type_ref(TypeRefKind.Function)
+    typ.params = params
+    typ.result = result
+    typ
+}
 fun type_from_source_name(name: str): TypeRef {
     if name == "i8" {
         ret type_i8()
@@ -114,7 +122,20 @@ fun type_equal(left: TypeRef, right: TypeRef): bool {
     if left.kind == TypeRefKind.Array {
         ret type_equal(left.element, right.element)
     }
+    if left.kind == TypeRefKind.Function {
+        if len(left.params) != len(right.params) || !type_equal(left.result, right.result) {
+            ret false
+        }
+        for i: 0:len(left.params) {
+            if !type_equal(left.params[i], right.params[i]) {
+                ret false
+            }
+        }
+    }
     true
+}
+fun type_source_name_is_integer(name: str): bool {
+    name == "i8" || name == "u8" || name == "i16" || name == "u16" || name == "i32" || name == "u32" || name == "i64" || name == "u64"
 }
 fun type_text(typ: TypeRef): str {
     match typ.kind {
@@ -161,7 +182,20 @@ fun type_text(typ: TypeRef): str {
             ret typ.name
         }
         TypeRefKind.Array {
+            if typ.element.kind == TypeRefKind.Function {
+                ret "(" + type_text(typ.element) + ")[]"
+            }
             ret type_text(typ.element) + "[]"
+        }
+        TypeRefKind.Function {
+            let text = "fun("
+            for i: 0:len(typ.params) {
+                if i != 0 {
+                    text = text + ", "
+                }
+                text = text + type_text(typ.params[i])
+            }
+            ret text + "): " + type_text(typ.result)
         }
     }
     ""

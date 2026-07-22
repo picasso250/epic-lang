@@ -1,4 +1,4 @@
-# ERROR: undefined variable 'missing'
+# ERROR: undefined value 'missing'
 fun main(): void {
     print(itoa(missing))
 }

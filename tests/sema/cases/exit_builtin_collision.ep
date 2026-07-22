@@ -1,7 +1,0 @@
-# ERROR: cannot redefine builtin function 'exit'
-fun exit(code: i64): void {
-    ret
-}
-fun main(): void {
-    ret
-}

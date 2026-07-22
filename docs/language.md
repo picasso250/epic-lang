@@ -9,6 +9,7 @@
 - `let` has no type annotation and always requires an initializer: `let x = expr`.
 - Function parameters, return types, and product fields keep explicit user-facing types.
 - Functions and calls may use more than four integer, pointer, or reference arguments; Windows x64 stack arguments are used after the first four registers.
+- Top-level functions and escaping closures are first-class values with structural `fun(...)` types.
 - v4 uses a conservative, non-moving mark-and-sweep garbage collector. There is no explicit `free`.
 - The Epic v4 compiler is self-hosted and begins from the sealed v3 compiler.
 - v4 does not preserve forward compatibility.
@@ -97,7 +98,8 @@ layout changes are implementation changes rather than language features.
 The initial v4 seed had the same user-visible semantics as sealed v3. v4 is the
 dogfood generation for the features listed above. Its first completed change is
 to use string slicing throughout the compiler and remove the transitional
-`str.data`, `str.len`, and `str_new` source interfaces.
+`str.data`, `str.len`, and `str_new` source interfaces. v4 subsequently adds a
+shared structural type model and first-class closures.
 
 ## Program model
 
@@ -127,10 +129,12 @@ This is whole-program source merging, not a module system.
 
 All top-level types, ordinary functions, and extern declarations from input
 files are merged before semantic analysis. Product types and enums share one
-type namespace. Ordinary and extern functions share one function namespace.
-Equivalent repeated extern declarations are folded; a DLL, parameter-type, or
-return-type difference is a conflicting declaration. Parameter names do not
-affect extern equivalence.
+type namespace. Lexical values, ordinary functions, extern declarations, and
+the builtin prelude use one value namespace with the lookup and shadowing rules
+described below; extern declarations remain direct-call-only rather than
+first-class values. Equivalent repeated extern declarations are folded; a DLL,
+parameter-type, or return-type difference is a conflicting declaration.
+Parameter names do not affect extern equivalence.
 
 The first input is the main file. Only its `main` function is used; `main` functions in later files are ignored.
 
@@ -154,15 +158,89 @@ arrays. The complete set of user-facing types is:
 | `Name` | heap-allocated product reference |
 | enum `Name` | nominal unit-enum value stored as a 64-bit scalar |
 | `T[]` | heap-allocated dynamic array |
+| `fun(T, ...): R` | callable reference with structural parameter and result types |
 | `void` | function return type only; no value is produced |
 
-At the language level, `str`, user products, and dynamic arrays have reference
+At the language level, `str`, user products, dynamic arrays, and callable values have reference
 semantics. Assignment and parameter passing copy references, not object
 contents. There is no by-value product or array copy semantics in v1.
 
 Integer and bool product fields use natural alignment and occupy 1, 2, 4, or 8
 bytes. Integer and bool array elements use their exact storage size and stride.
 Locals and parameters remain in 8-byte stack slots as an implementation detail.
+
+### Function values and closures
+
+A top-level function name is a first-class callable value. A closure literal
+uses `fun` without a name and requires explicit parameter and result types:
+
+```epic
+fun add_one(value: i64): i64 {
+    value + 1
+}
+
+fun make_adder(offset: i64): fun(i64): i64 {
+    fun(value: i64): i64 {
+        value + offset
+    }
+}
+
+fun main(): void {
+    let plain = add_one
+    let add_two = make_adder(2)
+    print(itoa(plain(40)))
+    print(itoa(add_two(40)))
+}
+```
+
+Function types are structural: parameter counts, parameter types, and result
+types must match exactly. They may appear in parameters, results, product
+fields, array elements, captures, and nested signatures. Parentheses separate
+an array of callables from a callable returning an array:
+
+```epic
+let handlers = new (fun(i64): void)[]
+```
+
+Calls are postfix operations on arbitrary expressions. The callee is evaluated
+first, arguments are then evaluated from left to right, and the call happens
+last. Chained returns, product fields, array elements, and parenthesized
+expressions are therefore callable:
+
+```epic
+make_adder(2)(40)
+record.handler(event)
+handlers[index](event)
+(if ready { add } else { subtract })(4, 1)
+```
+
+A closure literal copies each referenced outer local when that literal is
+evaluated. Scalar rebinding outside the closure is not observed. Copying an
+array, product, string, or closure copies its reference, so normal reference
+aliasing remains observable. A mutable captured copy keeps its new value across
+calls to that closure instance without changing the outer local. Copying the
+closure value aliases the same environment; evaluating the literal again
+creates a fresh environment.
+
+The same rule applies inside loops. Every evaluation creates a new environment
+and copies that iteration's current values, so closures created for range values
+`0`, `1`, and `2` retain `0`, `1`, and `2` respectively. No loop-specific
+capture rule is needed.
+
+Module-level `fun` declarations are available throughout the program and may
+call one another before their textual definitions. Block `let` bindings become
+visible only after their initializer. Consequently, a closure initializer
+cannot refer to the binding being declared; v4 has no local recursive-closure
+syntax. Parameters, locals, captured locals, top-level functions, and builtins
+share one value namespace. Lexical values shadow module declarations, and
+module declarations shadow the builtin prelude. Types and `os.*` use separate
+namespaces.
+
+Callable values support `is_null`, but not `==` or `!=`. A normally created
+closure or top-level function value is non-null; zero-initialized callable
+product fields and array elements are null. Calling one still evaluates the
+arguments and then prints `Epic runtime error: call of null callable` before
+terminating with status `1`.
 
 ### Strings
 
@@ -490,7 +568,7 @@ String lengths and indices count bytes, not Unicode characters.
 
 `str + str` remains the non-integer addition case. `==` and `!=` additionally
 accept two bool values, two strings, or two values of the same enum type;
-products and arrays have no implicit reference equality. `if` and condition-form `for`
+products, arrays, and callable values have no implicit reference equality. `if` and condition-form `for`
 conditions require `bool`.
 
 ## External DLL functions and pointers
@@ -515,7 +593,8 @@ or decorate names. v4 supports named imports only, not ordinal imports.
 Extern parameters may use `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`,
 or `ptr`. Returns may additionally use `void`. `bool`, `str`, arrays, products,
 enums, variadic signatures, and floating-point ABI lanes are not extern
-signature types. Win32 `BOOL` is normally `i32`, not Epic's one-byte `bool`.
+signature types. Epic `fun(...)` values are internal callable descriptors and
+are also excluded from extern parameters and results. Win32 `BOOL` is normally `i32`, not Epic's one-byte `bool`.
 Callback parameters are declared as opaque `ptr` values. Products are passed
 explicitly through `ptr(product)` rather than being written as product
 parameters, so the declaration cannot be mistaken for a C by-value aggregate.
@@ -562,8 +641,8 @@ grows, is a caller contract violation.
 top-level Epic function. The function must use only extern-ABI-safe parameter
 and return types; this restriction is checked only when its address is taken.
 `main`, extern declarations, builtins, `os.*` bindings, and unknown names cannot
-be addressed. A lexical local with the same name wins and keeps the ordinary
-`ptr(i64/u64/ptr/array/product)` conversion meaning.
+be addressed. A lexical local with the same name wins; it can use the ordinary
+`ptr(i64/u64/array/product)` conversions only when its own type qualifies.
 
 ```epic
 extern "kernel32.dll" fun EnumSystemLocalesEx(
@@ -587,6 +666,12 @@ callbacks enter the same Windows x64 function entry. The raw address erases the
 signature, so matching the callback parameter count and exact ABI types required
 by a particular API remains the caller's responsibility. Epic does not support
 calling through a `ptr` value.
+
+`ptr` accepts a function only when its operand resolves directly to a top-level
+Epic function declaration. A closure or local function value cannot be
+converted even when it currently contains a top-level function descriptor.
+Captured callbacks would require an explicit foreign code trampoline and
+context-pointer contract, which v4 does not provide.
 
 The first callback model supports owner-thread reentry only. An external system
 may retain a function address for the process lifetime, as Windows does for a
@@ -620,7 +705,9 @@ exists.
 Raw bindings whose Windows signature takes a C string require `cstr`; Epic
 `str` is never converted implicitly at this boundary.
 
-General method calls are not supported in v0.
+Callable product fields may be invoked with `value.field(args)`. General method
+lookup remains unsupported; this syntax calls the field value rather than
+resolving a method declaration.
 
 ## Program exit
 
@@ -659,13 +746,18 @@ to declare them.
 | `str(array: u8[]): str` | copies every array byte into a new immutable string, preserving embedded NUL bytes |
 | `cstr(s: str): ptr` | allocates a fresh `len(s) + 1` byte region, copies all bytes, and appends NUL |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
-| `is_null(value): bool` | tests whether a product, string, array, or low-level pointer value is the zero address; other types are rejected; the argument is evaluated once |
+| `is_null(value): bool` | tests whether a product, string, array, callable, or low-level pointer value is the zero address; other types are rejected; the argument is evaluated once |
 | `read_file(path: str): u8[]` | reads a whole file into a fresh mutable array, or returns an empty array on failure |
 | `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `data.len`, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: T[], src: T[]): void` | appends matching source elements to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
+
+Builtins occupy the outermost value scope. A lexical binding or module function
+with the same name shadows the builtin. Polymorphic builtins and conversions
+are not first-class callable values; they are available only when that builtin
+name is the directly resolved callee.
 
 `never` appears here to describe the built-in precisely, but it is not accepted
 in user-written parameter, field, local, or function return type declarations.
@@ -706,7 +798,7 @@ A missing or unreadable file is a compile error, while an empty file is valid.
 
 ## Unsupported in v0
 
-- Typed pointers, pointer dereference, indirect calls through `ptr`, closures, and typed callback values.
+- Typed pointers, pointer dereference, indirect calls through `ptr`, and closure-to-FFI callback trampolines.
 - General module/import/package system.
 - General method calls.
 - Payload sums.

@@ -1,4 +1,4 @@
-# ERROR: undefined variable 'i'
+# ERROR: undefined value 'i'
 fun main(): void {
     for i: 0:1 {}
     print(itoa(i))
