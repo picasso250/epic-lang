@@ -457,7 +457,8 @@ fun main(): void {
         print("usage: lexer <file>\n")
         os.ExitProcess(1)
     }
-    let src = read_file(argv.data[1])
+    let source_bytes = read_file(argv.data[1])
+    let src = str_new(source_bytes.data, source_bytes.len)
     let tokens = lex(src)
     dump_tokens(tokens)
 }

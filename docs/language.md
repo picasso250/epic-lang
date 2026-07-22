@@ -226,8 +226,8 @@ to declare them.
 | `str_new(data, len: i64): str` | copies `len` bytes from a low-level address into a new string |
 | `bytes(s: str): u8[]` | copies a string into a new mutable byte array |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
-| `read_file(path: str): str` | reads a whole file, or returns empty string on failure |
-| `write_file(path: str, data: str): i64` | writes a whole file and returns bytes written, or `-1` on failure |
+| `read_file(path: str): u8[]` | reads a whole file into a fresh mutable array, or returns an empty array on failure |
+| `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `data.len`, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
@@ -235,6 +235,11 @@ to declare them.
 `embed` accepts exactly one string literal. Relative paths are resolved against
 the `.ep` file containing the expression; absolute paths are used unchanged.
 A missing or unreadable file is a compile error, while an empty file is valid.
+File contents are always bytes. Convert explicitly with
+`str_new(data.data, data.len)` when text is required, and with `bytes(text)`
+when writing a string. File paths remain `str`; an interior NUL makes the
+operation fail. `write_file` preserves interior NUL bytes in its data and an
+empty array successfully creates or truncates a file.
 
 ## Unsupported in v0
 

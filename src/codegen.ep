@@ -422,6 +422,13 @@ fun user_type(name: str): TypeInfo {
     }
     ret type_struct(name)
 }
+fun codegen_error(message: str): i64 {
+    print("codegen: ")
+    print(message)
+    print("\n")
+    os.ExitProcess(1)
+    ret 0
+}
 fun get_string_id(e: EmitterState, text: str): i64 {
     let i = 0
     for i < e.strings.len {
@@ -722,7 +729,7 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
             ret type_str()
         }
         if expr.name == "read_file" {
-            ret type_str()
+            ret type_array("u8")
         }
         if expr.name == "write_file" {
             ret type_i64()
@@ -944,17 +951,31 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         ret 0
     }
     if name == "read_file" {
+        if expr.args.len != 1 {
+            codegen_error("read_file expects (str)")
+        }
+        let path_type = expr_type(e, expr.args.data[0])
+        if path_type.kind != "str" {
+            codegen_error("read_file expects (str)")
+        }
         emit_expr(e, expr.args.data[0])
-        emit_mov(e, "rcx", "[rax]")
+        emit_mov(e, "rcx", "rax")
         emit_inst(e, "sub rsp, 8")
         emit_call_inst(e, "_read_file")
         emit_inst(e, "add rsp, 8")
         ret 0
     }
     if name == "write_file" {
+        if expr.args.len != 2 {
+            codegen_error("write_file expects (str, u8[])")
+        }
+        let path_type = expr_type(e, expr.args.data[0])
+        let data_type = expr_type(e, expr.args.data[1])
+        if path_type.kind != "str" || data_type.kind != "array" || data_type.name != "u8" {
+            codegen_error("write_file expects (str, u8[])")
+        }
         let slots = spill_args(e, expr.args)
-        emit_stack_load(e, "rax", slots.data[0])
-        emit_mov(e, "rcx", "[rax]")
+        emit_stack_load(e, "rcx", slots.data[0])
         emit_stack_load(e, "rax", slots.data[1])
         emit_mov(e, "rdx", "[rax]")
         emit_mov(e, "r8", "[rax+8]")
@@ -1750,7 +1771,7 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
         i = i + 1
     }
     emit_runtime_helpers(e)
-    write_file(e.out_path, str_new(e.out_buf.data, e.out_buf.len))
+    write_file(e.out_path, e.out_buf)
     ret 0
 }
 fun main(): void {
@@ -1758,7 +1779,8 @@ fun main(): void {
         print("usage: codegen <input.ep> <output.asm>\n")
         os.ExitProcess(1)
     }
-    let src = read_file(argv.data[1])
+    let source_bytes = read_file(argv.data[1])
+    let src = str_new(source_bytes.data, source_bytes.len)
     let tokens = lex(src)
     let p = make_parser(tokens)
     let ast = parse_program(p)

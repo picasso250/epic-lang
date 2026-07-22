@@ -625,7 +625,8 @@ fun read_embed(source_path: str, path: str, line: i64): str {
         parse_error(line, "embed file not found: " + path)
     }
     os.CloseHandle(handle)
-    ret read_file(resolved)
+    let data = read_file(resolved)
+    ret str_new(data.data, data.len)
 }
 fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, "NEW") == 1 {

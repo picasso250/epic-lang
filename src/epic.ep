@@ -9,7 +9,8 @@ fun die_driver(msg: str): i64 {
     ret 0
 }
 fun parse_file(path: str): AstProgram {
-    let src = read_file(path)
+    let source_bytes = read_file(path)
+    let src = str_new(source_bytes.data, source_bytes.len)
     let tokens = lex(src)
     let p = make_parser_at(tokens, path)
     ret parse_program(p)
@@ -116,7 +117,8 @@ fun main(): void {
     let asm_path = "a.asm"
     let e = make_emitter(asm_path)
     emit_program(e, ast)
-    let image = assemble_text(read_file(asm_path))
+    let asm_bytes = read_file(asm_path)
+    let image = assemble_text(str_new(asm_bytes.data, asm_bytes.len))
     pe_write_exe(options.output_path, image)
     print(options.output_path)
     print("\n")
