@@ -30,7 +30,7 @@ fun print_timing(verbose: bool, label: str, elapsed: i64): void {
     }
 }
 fun parse_file(path: str): AstProgram {
-    let src = read_file(path)
+    let src = str(read_file(path))
     let tokens = lex(src)
     let p = make_parser_at(tokens, path)
     parse_program(p)

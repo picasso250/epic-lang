@@ -1169,7 +1169,7 @@ fun read_embed(source_path: str, path: str, line: i64): str {
         parse_error(line, "embed file not found: " + path)
     }
     os.CloseHandle(handle)
-    read_file(resolved)
+    str(read_file(resolved))
 }
 fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, TokenKind.IF) {
