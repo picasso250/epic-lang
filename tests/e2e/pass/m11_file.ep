@@ -2,9 +2,9 @@
 # CLEAN: test_out.txt
 fun main(): void {
     let s = "42"
-    let n = write_file("test_out.txt", s)
+    let n = write_file("test_out.txt", bytes(s))
     let inp = read_file("test_out.txt")
-    if n != 2 || inp.len != 2 || inp.data[0] != '4' || inp.data[1] != '2' {
+    if n != 2 || inp.len != 2 || inp[0] != '4' || inp[1] != '2' {
         os.ExitProcess(1)
     }
     os.ExitProcess(0)

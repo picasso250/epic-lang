@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 
 from ast_nodes import EmbedNode
+from codegen import Emitter
 from lexer import LexError, lex
 from parser import ParseError, Parser
 
@@ -19,6 +20,18 @@ def expect_rejected(source):
     except (LexError, ParseError):
         return
     raise AssertionError(f"source unexpectedly accepted:\n{source}")
+
+
+def expect_codegen_rejected(source, message, output):
+    emitter = Emitter(output)
+    try:
+        emitter.emit_program(parse(source))
+    except RuntimeError as error:
+        assert message in str(error)
+    else:
+        raise AssertionError(f"source unexpectedly compiled:\n{source}")
+    finally:
+        emitter.close()
 
 
 def main():
@@ -54,6 +67,11 @@ def main():
             assert "embed file not found: missing.bin" in str(error)
         else:
             raise AssertionError("missing embed file unexpectedly accepted")
+        expect_codegen_rejected(
+            'fun main(): void {\nwrite_file("out", "text")\n}\n',
+            "write_file expects (str, u8[])",
+            root / "invalid-write.asm",
+        )
     print("stage-0 surface passed")
     return 0
 

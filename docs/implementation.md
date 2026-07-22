@@ -159,8 +159,8 @@ Current builtins are handled directly by codegen or runtime assembly helpers:
 | `str_new` | calls `_str_alloc` runtime helper |
 | `bytes` | calls `_bytes` runtime helper |
 | `str_slice` | calls `_str_slice` runtime helper |
-| `read_file` | calls `_read_file` runtime helper |
-| `write_file` | calls `_write_file` runtime helper |
+| `read_file` | calls `_read_file`, which returns a fresh mutable `u8[]` |
+| `write_file` | accepts only `u8[]` data and loops until all bytes are written |
 | `push` | emitted by codegen for dynamic arrays |
 | `extend` | calls `_extend_u8` runtime helper |
 

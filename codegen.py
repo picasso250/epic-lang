@@ -667,15 +667,19 @@ class Emitter:
                 self.emit_mov("rcx", "rax")  # rcx = n
                 self.emit_call_inst("_itoa")
             elif name == "read_file":
+                if len(args) != 1 or self._expr_type(args[0]) != "&str":
+                    raise RuntimeError("read_file expects (str)")
                 self.emit_expr(args[0])
-                self.emit_mov("rcx", "[rax]")
+                self.emit_mov("rcx", "rax")
                 self.emit("    sub rsp, 8")
                 self.emit_call_inst("_read_file")
                 self.emit("    add rsp, 8")
             elif name == "write_file":
+                if (len(args) != 2 or self._expr_type(args[0]) != "&str"
+                        or self._expr_type(args[1]) != "&_arr_u8"):
+                    raise RuntimeError("write_file expects (str, u8[])")
                 slots = self._spill_args(args)
-                self.emit_stack_load("rax", slots[0])
-                self.emit_mov("rcx", "[rax]")      # path.data
+                self.emit_stack_load("rcx", slots[0])  # &path
                 self.emit_stack_load("rax", slots[1])
                 self.emit_mov("rdx", "[rax]")      # data.data
                 self.emit_mov("r8", "[rax+8]")     # data.len
@@ -1177,9 +1181,10 @@ class Emitter:
             if self._syscall_symbol(name, expr.namespace):
                 return "i64"
             # Builtins with known return types
-            if name in ("itoa", "str_new", "read_file", "str_slice"):
+            if name in ("itoa", "str_new", "str_slice"):
                 return "&str"
-            if name == "bytes":
+            if name in ("bytes", "read_file"):
+                self._ensure_array_type("u8")
                 return "&_arr_u8"
             if name == "write_file":
                 return "i64"
