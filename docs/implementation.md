@@ -33,21 +33,45 @@ embedded `runtime/*.asm` sources are the only textual input to the assembler
 parser, which converts them into the same `AsmProgram`. `-S` renders that
 program as canonical private-NASM-subset text with one semantic item per line.
 
-The eight compiler source files are compiled as one program:
+The nine compiler source files are compiled as one program:
 
 ```text
 src/epic.ep
-src/utils.ep
+src/asm.ep
+src/codegen.ep
 src/lexer.ep
 src/parser.ep
-src/sema.ep
-src/codegen.ep
-src/asm.ep
 src/pe.ep
+src/sema.ep
+src/types.ep
+src/utils.ep
 ```
 
 The self-hosted generations do not invoke NASM or an external linker. NASM is
 only part of the trusted Python stage-0 route used to create the first seed.
+
+## Type model
+
+Parser annotations, semantic signatures and locals, resolved AST values, and
+code generation share one structural `TypeRef` representation from
+`src/types.ep`. Builtin scalar, string, pointer, control, and `never` types have
+distinct enum kinds. User products and enums are both nominal `Named(name)`
+leaves; semantic declaration tables determine which declaration kind a name
+denotes. Arrays recursively contain their element `TypeRef`, so equality walks
+the structure and never depends on allocation identity.
+
+`TypeRef` values are immutable by convention and are not interned. Equal types
+may therefore be separate allocations. `type_equal` is the semantic equality
+operation, while `type_text` is used only at diagnostics and other text
+boundaries. A null AST `resolved_type` means semantic analysis has not checked
+that node; every real type, including internal `never`, is represented by a
+non-null `TypeRef`.
+
+Polymorphic builtins such as `len`, `is_null`, `push`, `pop`, and `extend` are
+checked explicitly rather than encoding fake signature types. Backend layout
+metadata remains separate: `StructInfo` owns product sizes, alignments, field
+offsets, and field `TypeRef` values, while scalar and array element sizes are
+derived from their structural kinds.
 
 ## Syntax model
 

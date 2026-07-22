@@ -196,6 +196,11 @@ mutable copy is needed.
 
 `new T[]` starts empty. `new T[n]` evaluates `n` once, requires a
 non-negative value, and creates `n` zero-initialized elements with `len(a) == n`.
+Arrays may be nested structurally. For example, `new i64[][n]` initializes only
+the outer array: it has length `n`, and each inner `i64[]` reference starts
+null. User code must assign each inner array explicitly, such as
+`matrix[i] = new i64[m]`, before indexing it. `new i64[][]` creates an empty
+outer array to which initialized `i64[]` values may be pushed.
 Direct `a[i]` rejects negative indices and indices greater than or equal to
 `len(a)`. `push` appends after the initialized elements; `push` and `extend` are
 documented under built-in functions. Arrays expose no fields: `.data`, `.len`,
@@ -654,7 +659,7 @@ to declare them.
 | `str(array: u8[]): str` | copies every array byte into a new immutable string, preserving embedded NUL bytes |
 | `cstr(s: str): ptr` | allocates a fresh `len(s) + 1` byte region, copies all bytes, and appends NUL |
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
-| `is_null(value: reference): bool` | tests whether a product, string, array, or low-level pointer reference is the zero address; the argument is evaluated once |
+| `is_null(value): bool` | tests whether a product, string, array, or low-level pointer value is the zero address; other types are rejected; the argument is evaluated once |
 | `read_file(path: str): u8[]` | reads a whole file into a fresh mutable array, or returns an empty array on failure |
 | `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `data.len`, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |

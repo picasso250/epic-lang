@@ -9,7 +9,8 @@ type AstExprOptionKind = None | Some
 type AstExpr {
     kind: AstExprKind
     name: str
-    type_name: str
+    namespace: str
+    source_type: TypeRef
     op: OperatorKind
     value: str
     args: AstExpr[]
@@ -27,8 +28,7 @@ type AstExpr {
     subject: AstExpr
     match_arms: AstMatchArm[]
     line: i64
-    resolved: bool
-    resolved_type: str
+    resolved_type: TypeRef
     resolved_value: i64
 }
 type AstExprOption {
@@ -61,7 +61,7 @@ type AstStmt {
     range_end_slot: i64
 }
 type AstMatchArm {
-    type_name: str
+    enum_name: str
     member_name: str
     body: AstBlock
     line: i64
@@ -72,16 +72,16 @@ type AstBlock {
     present: bool
     stmts: AstStmt[]
     tail: AstExprOption
-    resolved_type: str
+    resolved_type: TypeRef
 }
 type AstParam {
     name: str
-    type_name: str
+    typ: TypeRef
     line: i64
 }
 type AstStructField {
     name: str
-    type_name: str
+    typ: TypeRef
     line: i64
 }
 type AstStructDef {
@@ -103,14 +103,14 @@ type AstEnumDef {
 type AstExternDef {
     library: str
     name: str
-    type_name: str
+    return_type: TypeRef
     params: AstParam[]
     source_path: str
     line: i64
 }
 type AstFunDef {
     name: str
-    type_name: str
+    return_type: TypeRef
     params: AstParam[]
     body: AstBlock
     source_path: str
@@ -140,12 +140,16 @@ fun ast_expr_some(value: AstExpr): AstExprOption {
     option.value = value
     option
 }
-fun ast_literal(value: str, literal_type: str, line: i64): AstExpr {
+fun ast_literal(value: str, line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.Literal
     node.value = value
-    node.type_name = literal_type
     node.line = line
+    node
+}
+fun ast_typed_literal(value: str, typ: TypeRef, line: i64): AstExpr {
+    let node = ast_literal(value, line)
+    node.source_type = typ
     node
 }
 fun ast_string(value: str, line: i64): AstExpr {
@@ -173,14 +177,14 @@ fun ast_call(name: str, args: AstExpr[], line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.Call
     node.name = name
-    node.type_name = ""
+    node.namespace = ""
     node.args = args
     node.line = line
     node
 }
 fun ast_os_call(name: str, args: AstExpr[], line: i64): AstExpr {
     let node = ast_call(name, args, line)
-    node.type_name = "os"
+    node.namespace = "os"
     node
 }
 fun ast_binary(op: OperatorKind, left: AstExpr, right: AstExpr, line: i64): AstExpr {
@@ -200,17 +204,17 @@ fun ast_unary(op: OperatorKind, operand: AstExpr, line: i64): AstExpr {
     node.line = line
     node
 }
-fun ast_new_product(name: str, line: i64): AstExpr {
+fun ast_new_product(typ: TypeRef, line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.NewProduct
-    node.name = name
+    node.source_type = typ
     node.line = line
     node
 }
-fun ast_new_array(type_name: str, count: AstExprOption, line: i64): AstExpr {
+fun ast_new_array(element_type: TypeRef, count: AstExprOption, line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.NewArray
-    node.type_name = type_name
+    node.source_type = element_type
     node.count = count
     node.line = line
     node
@@ -449,15 +453,15 @@ fun expect_stmt_end(p: Parser): void {
     let t = peek(p)
     parse_error(t.line, "Expected end of line")
 }
-fun parse_type(p: Parser): str {
+fun parse_type(p: Parser): TypeRef {
     let t = advance(p)
     if t.kind != TokenKind.ID {
         parse_error(t.line, "Expected type")
     }
-    let typ = t.text
+    let typ = type_from_source_name(t.text)
     for check(p, TokenKind.LBRACKET) {
         expect(p, TokenKind.RBRACKET)
-        typ = typ + "[]"
+        typ = type_array(typ)
     }
     typ
 }
@@ -474,7 +478,7 @@ fun parse_params(p: Parser): AstParam[] {
         let param = new AstParam
         param.line = pname.line
         param.name = pname.text
-        param.type_name = ptype
+        param.typ = ptype
         push(params, param)
         if !check(p, TokenKind.COMMA) {
             done = true
@@ -500,7 +504,7 @@ fun parse_struct_def(p: Parser): AstStructDef {
         let field = new AstStructField
         field.line = fname.line
         field.name = fname.text
-        field.type_name = ftype
+        field.typ = ftype
         push(node.fields, field)
     }
     expect(p, TokenKind.RBRACE)
@@ -554,7 +558,7 @@ fun parse_extern_def(p: Parser): AstExternDef {
     node.library = library.text
     node.name = name.text
     node.params = params
-    node.type_name = ret_type
+    node.return_type = ret_type
     node
 }
 fun parse_fn_def(p: Parser): AstFunDef {
@@ -571,7 +575,7 @@ fun parse_fn_def(p: Parser): AstFunDef {
     node.line = name.line
     node.name = name.text
     node.params = params
-    node.type_name = ret_type
+    node.return_type = ret_type
     node.body = body
     node
 }
@@ -827,7 +831,7 @@ fun parse_match_expr(p: Parser): AstExpr {
             let type_name = expect(p, TokenKind.ID)
             expect(p, TokenKind.DOT)
             let member_name = expect_enum_member(p)
-            arm.type_name = type_name.text
+            arm.enum_name = type_name.text
             arm.member_name = member_name.text
             arm.line = member_name.line
         }
@@ -1180,32 +1184,50 @@ fun parse_primary(p: Parser): AstExpr {
     }
     if peek_kind(p, TokenKind.NEW) {
         let keyword = expect(p, TokenKind.NEW)
-        let type_name = expect(p, TokenKind.ID)
-        if check(p, TokenKind.LBRACKET) {
+        let type_token = expect(p, TokenKind.ID)
+        let base_type = type_from_source_name(type_token.text)
+        if peek_kind(p, TokenKind.LBRACKET) {
             let count = ast_expr_none()
-            if !peek_kind(p, TokenKind.RBRACKET) {
-                count = ast_expr_some(parse_expr(p))
+            let empty_brackets = 0
+            let has_count = false
+            for peek_kind(p, TokenKind.LBRACKET) && !has_count {
+                expect(p, TokenKind.LBRACKET)
+                if peek_kind(p, TokenKind.RBRACKET) {
+                    expect(p, TokenKind.RBRACKET)
+                    empty_brackets += 1
+                } else {
+                    count = ast_expr_some(parse_expr(p))
+                    expect(p, TokenKind.RBRACKET)
+                    has_count = true
+                }
             }
-            expect(p, TokenKind.RBRACKET)
-            ret ast_new_array(type_name.text, count, keyword.line)
+            let element_depth = empty_brackets
+            if !has_count {
+                element_depth -= 1
+            }
+            let element_type = base_type
+            for depth_i: 0:element_depth {
+                element_type = type_array(element_type)
+            }
+            ret ast_new_array(element_type, count, keyword.line)
         }
-        ret ast_new_product(type_name.text, keyword.line)
+        ret ast_new_product(base_type, keyword.line)
     }
     if peek_kind(p, TokenKind.NUMBER) {
         let number_token = advance(p)
-        ret ast_literal(number_token.text, "", number_token.line)
+        ret ast_literal(number_token.text, number_token.line)
     }
     if peek_kind(p, TokenKind.CHAR) {
         let char_token = advance(p)
-        ret ast_literal(char_token.text, "u8", char_token.line)
+        ret ast_typed_literal(char_token.text, type_u8(), char_token.line)
     }
     if peek_kind(p, TokenKind.TRUE) {
         let true_token = advance(p)
-        ret ast_literal("1", "bool", true_token.line)
+        ret ast_typed_literal("1", type_bool(), true_token.line)
     }
     if peek_kind(p, TokenKind.FALSE) {
         let false_token = advance(p)
-        ret ast_literal("0", "bool", false_token.line)
+        ret ast_typed_literal("0", type_bool(), false_token.line)
     }
     if peek_kind(p, TokenKind.STRING) {
         let string_token = advance(p)
@@ -1232,7 +1254,7 @@ fun parse_primary(p: Parser): AstExpr {
     }
     let unexpected = peek(p)
     parse_error(unexpected.line, "Unexpected token in expression")
-    ast_literal("0", "i64", unexpected.line)
+    ast_typed_literal("0", type_i64(), unexpected.line)
 }
 fun bin_node(op: Token, left: AstExpr, right: AstExpr): AstExpr {
     ast_binary(binary_operator(op), left, right, op.line)

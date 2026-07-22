@@ -5,15 +5,6 @@
 fun align_up(value: i64, alignment: i64): i64 {
     ((value + alignment - 1) / alignment) * alignment
 }
-fun type_is_array(name: str): bool {
-    if len(name) < 2 {
-        ret false
-    }
-    name[len(name) - 2] == 91 && name[len(name) - 1] == 93
-}
-fun array_element_type(name: str): str {
-    name[0:len(name) - 2]
-}
 fun digit_value(c: u8): i64 {
     if c >= '0' && c <= '9' {
         ret i64(c - '0')

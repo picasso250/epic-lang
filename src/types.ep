@@ -1,0 +1,205 @@
+#
+# Shared structural type model.
+#
+type TypeRefKind = I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Bool | Str | Ptr | Void | Never | Named | Array
+type TypeRef {
+    kind: TypeRefKind
+    name: str
+    element: TypeRef
+}
+fun type_none(): TypeRef {
+    let holder = new TypeRef
+    holder.element
+}
+fun type_ref(kind: TypeRefKind): TypeRef {
+    let typ = new TypeRef
+    typ.kind = kind
+    typ
+}
+fun type_i8(): TypeRef {
+    type_ref(TypeRefKind.I8)
+}
+fun type_u8(): TypeRef {
+    type_ref(TypeRefKind.U8)
+}
+fun type_i16(): TypeRef {
+    type_ref(TypeRefKind.I16)
+}
+fun type_u16(): TypeRef {
+    type_ref(TypeRefKind.U16)
+}
+fun type_i32(): TypeRef {
+    type_ref(TypeRefKind.I32)
+}
+fun type_u32(): TypeRef {
+    type_ref(TypeRefKind.U32)
+}
+fun type_i64(): TypeRef {
+    type_ref(TypeRefKind.I64)
+}
+fun type_u64(): TypeRef {
+    type_ref(TypeRefKind.U64)
+}
+fun type_bool(): TypeRef {
+    type_ref(TypeRefKind.Bool)
+}
+fun type_str(): TypeRef {
+    type_ref(TypeRefKind.Str)
+}
+fun type_ptr(): TypeRef {
+    type_ref(TypeRefKind.Ptr)
+}
+fun type_void(): TypeRef {
+    type_ref(TypeRefKind.Void)
+}
+fun type_never(): TypeRef {
+    type_ref(TypeRefKind.Never)
+}
+fun type_named(name: str): TypeRef {
+    let typ = type_ref(TypeRefKind.Named)
+    typ.name = name
+    typ
+}
+fun type_array(element: TypeRef): TypeRef {
+    let typ = type_ref(TypeRefKind.Array)
+    typ.element = element
+    typ
+}
+fun type_from_source_name(name: str): TypeRef {
+    if name == "i8" {
+        ret type_i8()
+    }
+    if name == "u8" {
+        ret type_u8()
+    }
+    if name == "i16" {
+        ret type_i16()
+    }
+    if name == "u16" {
+        ret type_u16()
+    }
+    if name == "i32" {
+        ret type_i32()
+    }
+    if name == "u32" {
+        ret type_u32()
+    }
+    if name == "i64" {
+        ret type_i64()
+    }
+    if name == "u64" {
+        ret type_u64()
+    }
+    if name == "bool" {
+        ret type_bool()
+    }
+    if name == "str" {
+        ret type_str()
+    }
+    if name == "ptr" {
+        ret type_ptr()
+    }
+    if name == "void" {
+        ret type_void()
+    }
+    type_named(name)
+}
+fun type_equal(left: TypeRef, right: TypeRef): bool {
+    if left.kind != right.kind {
+        ret false
+    }
+    if left.kind == TypeRefKind.Named {
+        ret left.name == right.name
+    }
+    if left.kind == TypeRefKind.Array {
+        ret type_equal(left.element, right.element)
+    }
+    true
+}
+fun type_text(typ: TypeRef): str {
+    match typ.kind {
+        TypeRefKind.I8 {
+            ret "i8"
+        }
+        TypeRefKind.U8 {
+            ret "u8"
+        }
+        TypeRefKind.I16 {
+            ret "i16"
+        }
+        TypeRefKind.U16 {
+            ret "u16"
+        }
+        TypeRefKind.I32 {
+            ret "i32"
+        }
+        TypeRefKind.U32 {
+            ret "u32"
+        }
+        TypeRefKind.I64 {
+            ret "i64"
+        }
+        TypeRefKind.U64 {
+            ret "u64"
+        }
+        TypeRefKind.Bool {
+            ret "bool"
+        }
+        TypeRefKind.Str {
+            ret "str"
+        }
+        TypeRefKind.Ptr {
+            ret "ptr"
+        }
+        TypeRefKind.Void {
+            ret "void"
+        }
+        TypeRefKind.Never {
+            ret "never"
+        }
+        TypeRefKind.Named {
+            ret typ.name
+        }
+        TypeRefKind.Array {
+            ret type_text(typ.element) + "[]"
+        }
+    }
+    ""
+}
+fun type_is_integer(typ: TypeRef): bool {
+    typ.kind == TypeRefKind.I8 || typ.kind == TypeRefKind.U8 || typ.kind == TypeRefKind.I16 || typ.kind == TypeRefKind.U16 || typ.kind == TypeRefKind.I32 || typ.kind == TypeRefKind.U32 || typ.kind == TypeRefKind.I64 || typ.kind == TypeRefKind.U64
+}
+fun type_is_signed(typ: TypeRef): bool {
+    typ.kind == TypeRefKind.I8 || typ.kind == TypeRefKind.I16 || typ.kind == TypeRefKind.I32 || typ.kind == TypeRefKind.I64
+}
+fun type_integer_bits(typ: TypeRef): i64 {
+    if typ.kind == TypeRefKind.I8 || typ.kind == TypeRefKind.U8 {
+        ret 8
+    }
+    if typ.kind == TypeRefKind.I16 || typ.kind == TypeRefKind.U16 {
+        ret 16
+    }
+    if typ.kind == TypeRefKind.I32 || typ.kind == TypeRefKind.U32 {
+        ret 32
+    }
+    if typ.kind == TypeRefKind.I64 || typ.kind == TypeRefKind.U64 {
+        ret 64
+    }
+    0
+}
+fun type_width(typ: TypeRef): i64 {
+    if typ.kind == TypeRefKind.Bool {
+        ret 8
+    }
+    let bits = type_integer_bits(typ)
+    if bits != 0 {
+        ret bits
+    }
+    64
+}
+fun type_storage_size(typ: TypeRef): i64 {
+    type_width(typ) / 8
+}
+fun type_is_primitive(typ: TypeRef): bool {
+    type_is_integer(typ) || typ.kind == TypeRefKind.Bool || typ.kind == TypeRefKind.Str || typ.kind == TypeRefKind.Ptr || typ.kind == TypeRefKind.Void
+}
