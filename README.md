@@ -8,7 +8,7 @@ Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v4 -> Epic v4 fixed p
 
 ## 规范历史（Canonical history）
 
-> 修正历史时，应将设计回溯到它合理归属的最早版本，而非技术上能够实现的最早版本。
+> 修正历史时，应将设计回迁到它在逻辑上本该属于的最早版本，而非在技术上勉强能实现的最早版本。
 
 ## 构建（Build）
 
