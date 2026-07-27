@@ -766,34 +766,34 @@ fun sema_resolve_literal(state: SemaState, expr: AstExpr, expected: TypeRef, neg
         if expr.source_type.kind == TypeRefKind.Bool && negative {
             sema_error(state.source_path, expr.line, "unary - does not accept bool")
         }
+        expr.resolved_type = expr.source_type
         expr.resolved_value = parse_integer(expr.value)
-        ret expr.source_type
+        ret expr.resolved_type
     }
     let digit_end = sema_literal_digit_end(expr.value)
     let suffix = ""
-    let result = type_none()
     if digit_end < len(expr.value) {
         suffix = expr.value[digit_end:len(expr.value)]
-        result = type_from_source_name(suffix)
-        if !type_is_integer(result) {
+        expr.resolved_type = type_from_source_name(suffix)
+        if !type_is_integer(expr.resolved_type) {
             sema_error(state.source_path, expr.line, "invalid integer literal suffix '" + suffix + "'")
         }
     }
-    if is_null(result) {
+    if is_null(expr.resolved_type) {
         if !is_null(expected) && type_is_integer(expected) {
-            result = expected
+            expr.resolved_type = expected
         } else {
-            result = type_i64()
+            expr.resolved_type = type_i64()
         }
     }
-    if negative && !type_is_signed(result) {
-        sema_error(state.source_path, expr.line, "unary - requires a signed integer, got " + type_text(result))
+    if negative && !type_is_signed(expr.resolved_type) {
+        sema_error(state.source_path, expr.line, "unary - requires a signed integer, got " + type_text(expr.resolved_type))
     }
-    if !sema_literal_fits(expr.value, digit_end, result, negative) {
-        sema_error(state.source_path, expr.line, "integer literal is out of range for " + type_text(result))
+    if !sema_literal_fits(expr.value, digit_end, expr.resolved_type, negative) {
+        sema_error(state.source_path, expr.line, "integer literal is out of range for " + type_text(expr.resolved_type))
     }
     expr.resolved_value = sema_parse_literal_bits(expr.value, digit_end)
-    result
+    expr.resolved_type
 }
 fun sema_assignable(expected: TypeRef, actual: TypeRef): bool {
     if actual.kind == TypeRefKind.Never {
@@ -812,7 +812,7 @@ fun sema_join_types(state: SemaState, left: TypeRef, right: TypeRef, line: i64):
         ret left
     }
     sema_error(state.source_path, line, "cannot join types " + type_text(left) + " and " + type_text(right))
-    type_none()
+    left
 }
 fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): void {
     if expr.resolved_type.kind != TypeRefKind.I64 && expr.resolved_type.kind != TypeRefKind.Never {
@@ -830,9 +830,6 @@ fun sema_require_integer(state: SemaState, expr: AstExpr, context: str): void {
     }
 }
 fun sema_field_type(state: SemaState, base_type: TypeRef, field_name: str): TypeRef {
-    if base_type.kind != TypeRefKind.Named {
-        ret type_none()
-    }
     let field = sema_find_field(state, base_type, field_name)
     field.typ
 }
@@ -859,91 +856,91 @@ fun sema_matching_integers(left: TypeRef, right: TypeRef): bool {
     type_equal(left, right) && type_is_integer(left)
 }
 fun sema_check_binary(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRef {
-    let left = type_none()
-    let right = type_none()
-    let result_expected = type_none()
+    let result_expected = expr.resolved_type
     if !is_null(expected) && type_is_integer(expected) {
         result_expected = expected
     }
     if expr.op == OperatorKind.ShiftLeft || expr.op == OperatorKind.ShiftRight {
-        left = sema_check_expr_expected(state, expr.left, result_expected)
-        right = sema_check_expr_expected(state, expr.right, type_none())
+        sema_check_expr_expected(state, expr.left, result_expected)
+        sema_check_expr(state, expr.right)
     } else if sema_needs_integer_context(expr.left) && !sema_needs_integer_context(expr.right) {
-        right = sema_check_expr_expected(state, expr.right, type_none())
-        left = sema_check_expr_expected(state, expr.left, right)
+        sema_check_expr(state, expr.right)
+        sema_check_expr_expected(state, expr.left, expr.right.resolved_type)
     } else {
-        left = sema_check_expr_expected(state, expr.left, result_expected)
-        let right_expected = left
-        if !type_is_integer(left) {
-            right_expected = type_none()
+        sema_check_expr_expected(state, expr.left, result_expected)
+        if type_is_integer(expr.left.resolved_type) {
+            sema_check_expr_expected(state, expr.right, expr.left.resolved_type)
+        } else {
+            sema_check_expr(state, expr.right)
         }
-        right = sema_check_expr_expected(state, expr.right, right_expected)
     }
+    let left = expr.left.resolved_type
+    let right = expr.right.resolved_type
     if left.kind == TypeRefKind.Never || right.kind == TypeRefKind.Never {
-        ret type_never()
+        expr.resolved_type = type_never()
+        ret expr.resolved_type
     }
-    let result = type_none()
     match expr.op {
         OperatorKind.Add {
             if left.kind == TypeRefKind.Str && right.kind == TypeRefKind.Str {
-                result = type_str()
+                expr.resolved_type = type_str()
             } else if left.kind == TypeRefKind.Ptr && type_is_integer(right) {
-                result = type_ptr()
+                expr.resolved_type = type_ptr()
             } else if type_is_integer(left) && right.kind == TypeRefKind.Ptr {
-                result = type_ptr()
+                expr.resolved_type = type_ptr()
             } else if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.Subtract {
             if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.Multiply {
             if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.Divide {
             if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.Remainder {
             if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.BitAnd {
             if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.BitOr {
             if sema_matching_integers(left, right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.ShiftLeft {
             if type_is_integer(left) && type_is_integer(right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.ShiftRight {
             if type_is_integer(left) && type_is_integer(right) {
-                result = left
+                expr.resolved_type = left
             }
         }
         OperatorKind.Equal {
             if sema_matching_integers(left, right) {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else if left.kind == TypeRefKind.Str && right.kind == TypeRefKind.Str {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else if left.kind == TypeRefKind.Bool && right.kind == TypeRefKind.Bool {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else if left.kind == TypeRefKind.Ptr && right.kind == TypeRefKind.Ptr {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else {
                 let decl = new SemaTypeDecl
                 decl.name = ""
@@ -951,19 +948,19 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: TypeRef): TypeR
                     decl = sema_find_type(state, left.name)
                 }
                 if type_equal(left, right) && decl.name != "" && decl.kind == SemaTypeDeclKind.Enum {
-                    result = type_bool()
+                    expr.resolved_type = type_bool()
                 }
             }
         }
         OperatorKind.NotEqual {
             if sema_matching_integers(left, right) {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else if left.kind == TypeRefKind.Str && right.kind == TypeRefKind.Str {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else if left.kind == TypeRefKind.Bool && right.kind == TypeRefKind.Bool {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else if left.kind == TypeRefKind.Ptr && right.kind == TypeRefKind.Ptr {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             } else {
                 let not_equal_decl = new SemaTypeDecl
                 not_equal_decl.name = ""
@@ -971,44 +968,44 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: TypeRef): TypeR
                     not_equal_decl = sema_find_type(state, left.name)
                 }
                 if type_equal(left, right) && not_equal_decl.name != "" && not_equal_decl.kind == SemaTypeDeclKind.Enum {
-                    result = type_bool()
+                    expr.resolved_type = type_bool()
                 }
             }
         }
         OperatorKind.Less {
             if sema_matching_integers(left, right) {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             }
         }
         OperatorKind.LessEqual {
             if sema_matching_integers(left, right) {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             }
         }
         OperatorKind.Greater {
             if sema_matching_integers(left, right) {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             }
         }
         OperatorKind.GreaterEqual {
             if sema_matching_integers(left, right) {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             }
         }
         OperatorKind.LogicalAnd {
             if left.kind == TypeRefKind.Bool && right.kind == TypeRefKind.Bool {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             }
         }
         OperatorKind.LogicalOr {
             if left.kind == TypeRefKind.Bool && right.kind == TypeRefKind.Bool {
-                result = type_bool()
+                expr.resolved_type = type_bool()
             }
         } else {
             sema_error(state.source_path, expr.line, "unsupported binary operator " + operator_text(expr.op))
         }
     }
-    if is_null(result) {
+    if is_null(expr.resolved_type) {
         match expr.op {
             OperatorKind.Equal {
                 sema_error(state.source_path, expr.line, "operator " + operator_text(expr.op) + " requires matching integers, two bool values, two strings, or two values of the same enum type")
@@ -1020,36 +1017,36 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: TypeRef): TypeR
             }
         }
     }
-    result
+    expr.resolved_type
 }
 fun sema_check_unary(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRef {
-    let operand = type_none()
     if expr.op == OperatorKind.Negate && expr.left.kind == AstExprKind.Literal {
-        operand = sema_resolve_literal(state, expr.left, expected, true)
-        expr.left.resolved_type = operand
+        sema_resolve_literal(state, expr.left, expected, true)
     } else {
-        operand = sema_check_expr_expected(state, expr.left, expected)
+        sema_check_expr_expected(state, expr.left, expected)
     }
+    let operand = expr.left.resolved_type
     if operand.kind == TypeRefKind.Never {
-        ret type_never()
+        expr.resolved_type = type_never()
+        ret expr.resolved_type
     }
     match expr.op {
         OperatorKind.Negate {
             if !type_is_signed(operand) {
                 sema_error(state.source_path, expr.line, "unary operator - requires a signed integer operand, got " + type_text(operand))
             }
-            ret operand
+            expr.resolved_type = operand
         }
         OperatorKind.LogicalNot {
             if operand.kind != TypeRefKind.Bool {
                 sema_error(state.source_path, expr.line, "unary operator ! requires bool, got " + type_text(operand))
             }
-            ret type_bool()
+            expr.resolved_type = type_bool()
         } else {
             sema_error(state.source_path, expr.line, "binary operator used as unary operator")
         }
     }
-    type_none()
+    expr.resolved_type
 }
 fun sema_is_special_builtin_name(name: str): bool {
     name == "len" || name == "is_null" || name == "push" || name == "pop" || name == "extend" || name == "embed"
@@ -1138,7 +1135,7 @@ fun sema_check_special_call(state: SemaState, expr: AstExpr): TypeRef {
         ret type_void()
     }
     sema_error(state.source_path, expr.line, "unknown function '" + expr.name + "'")
-    type_none()
+    expr.resolved_type
 }
 fun sema_check_ptr_call(state: SemaState, expr: AstExpr): TypeRef {
         if len(expr.args) != 1 {
@@ -1346,7 +1343,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: TypeRef)
     }
     match expr.kind {
         AstExprKind.Literal {
-            expr.resolved_type = sema_resolve_literal(state, expr, expected, false)
+            sema_resolve_literal(state, expr, expected, false)
         }
         AstExprKind.String {
             expr.resolved_type = type_str()
@@ -1380,10 +1377,10 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: TypeRef)
             }
         }
         AstExprKind.Binary {
-            expr.resolved_type = sema_check_binary(state, expr, expected)
+            sema_check_binary(state, expr, expected)
         }
         AstExprKind.Unary {
-            expr.resolved_type = sema_check_unary(state, expr, expected)
+            sema_check_unary(state, expr, expected)
         }
         AstExprKind.Call {
             expr.resolved_type = sema_check_call(state, expr)
@@ -1484,7 +1481,7 @@ fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: TypeRef)
     expr.resolved_type
 }
 fun sema_check_expr(state: SemaState, expr: AstExpr): TypeRef {
-    sema_check_expr_expected(state, expr, type_none())
+    sema_check_expr_expected(state, expr, expr.resolved_type)
 }
 fun sema_check_match(state: SemaState, expr: AstExpr, expected: TypeRef): TypeRef {
     let subject_type = sema_check_expr(state, expr.subject)
@@ -1597,7 +1594,7 @@ fun sema_assign_target_type(state: SemaState, target: AstAssignTarget, line: i64
                 ret base_type.element
             }
             sema_error(state.source_path, line, "type " + type_text(base_type) + " is not subscriptable")
-            ret type_none()
+            ret base_type
         }
     }
 }
@@ -1623,11 +1620,12 @@ fun sema_check_assign_op(state: SemaState, stmt: AstStmt): void {
     if !type_is_integer(target_type) {
         sema_error(state.source_path, stmt.line, "compound assignment requires an integer target, got " + type_text(target_type))
     }
-    let right_expected = target_type
     if stmt.op == OperatorKind.ShiftLeft || stmt.op == OperatorKind.ShiftRight {
-        right_expected = type_none()
+        sema_check_expr(state, stmt.value_expr)
+    } else {
+        sema_check_expr_expected(state, stmt.value_expr, target_type)
     }
-    let actual = sema_check_expr_expected(state, stmt.value_expr, right_expected)
+    let actual = stmt.value_expr.resolved_type
     if stmt.op == OperatorKind.ShiftLeft || stmt.op == OperatorKind.ShiftRight {
         if !type_is_integer(actual) {
             sema_error(state.source_path, stmt.line, "shift assignment requires an integer right operand, got " + type_text(actual))
@@ -1778,7 +1776,7 @@ fun sema_check_block_expected(state: SemaState, block: AstBlock, expected: TypeR
     block.resolved_type
 }
 fun sema_check_block(state: SemaState, block: AstBlock): TypeRef {
-    sema_check_block_expected(state, block, type_none())
+    sema_check_block_expected(state, block, block.resolved_type)
 }
 fun sema_check_bodies(state: SemaState, ast: AstProgram): void {
     let i = 0

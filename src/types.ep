@@ -9,10 +9,6 @@ type TypeRef {
     params: TypeRef[]
     result: TypeRef
 }
-fun type_none(): TypeRef {
-    let holder = new TypeRef
-    holder.element
-}
 fun type_ref(kind: TypeRefKind): TypeRef {
     let typ = new TypeRef
     typ.kind = kind
