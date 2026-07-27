@@ -64,12 +64,26 @@ _read_file_path_ok:
     sub rsp, 40
     call CloseHandle
     add rsp, 40
+    ; Return the read buffer directly instead of copying it into another array.
+    xor edx, edx
     cmp qword [rbp-48], 0
-    je _read_file_empty
-    ; Copy exactly the bytes read into an independent mutable array.
-    mov rcx, [rbp-32]
+    je _read_file_build_array
     mov edx, [rbp-40]
-    call _embed_bytes
+_read_file_build_array:
+    mov [rbp-56], rdx      ; logical length; zero after a failed read
+    mov rcx, [_heap]
+    mov edx, 8
+    mov r8d, 24
+    sub rsp, 40
+    call HeapAlloc
+    add rsp, 40
+    mov rcx, rax
+    mov rdx, [rbp-32]
+    mov [rcx], rdx
+    mov rdx, [rbp-56]
+    mov [rcx+8], rdx
+    mov [rcx+16], rdx
+    mov rax, rcx
     jmp _read_file_done
 _read_file_empty:
     lea rcx, [_read_file_empty_data]
