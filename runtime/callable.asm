@@ -1,17 +1,9 @@
 ; Non-returning target for an indirect call through a null callable value.
 ; Entered by jump with the generated function stack already 16-byte aligned.
 __ep_null_callable:
-    sub rsp, 48
-    mov ecx, -11
-    call GetStdHandle
-    mov rcx, rax
-    lea rdx, [__ep_null_callable_message]
-    mov r8, 42
-    lea r9, [_written]
-    mov qword [rsp+32], 0
-    call WriteFile
-    mov ecx, 1
-    call ExitProcess
+    lea rcx, [__ep_null_callable_message]
+    mov edx, 42
+    jmp __ep_runtime_fail
 
 section .data
 __ep_null_callable_message:

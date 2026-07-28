@@ -160,6 +160,7 @@ fun emit_runtime_helpers(e: EmitterState): void {
     emit_runtime(e, embed("../runtime/argv.asm"))
     emit_runtime(e, embed("../runtime/read_file.asm"))
     emit_runtime(e, embed("../runtime/write_file.asm"))
+    emit_runtime(e, embed("../runtime/error.asm"))
     emit_runtime(e, embed("../runtime/bounds.asm"))
     emit_runtime(e, embed("../runtime/pop.asm"))
     emit_runtime(e, embed("../runtime/panic.asm"))
