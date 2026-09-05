@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = Path(__file__).resolve().parent / "cases"
-COMPILER = Path(os.environ.get("EPIC_TEST_COMPILER", ROOT / "build" / "fixed-point" / "generation-1.exe"))
+COMPILER = Path(os.environ.get("EPIC_TEST_COMPILER", ROOT / "build" / "epic-v2.exe"))
 
 
 def expected_error(path: Path) -> str:

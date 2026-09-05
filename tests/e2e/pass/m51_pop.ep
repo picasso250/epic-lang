@@ -18,14 +18,14 @@ fun main(): void {
     let probe = new PopProbe
     probe.values = values
     let last = pop(probe_values(probe))
-    if last != 9 || probe.calls != 1 || len(values) != 1 || values.data[1] != 0 {
+    if last != 9 || probe.calls != 1 || len(values) != 1 {
         os.ExitProcess(1)
     }
 
     let bytes = new u8[1]
     bytes[0] = 255
     let byte = pop(bytes)
-    if byte != 255 || len(bytes) != 0 || bytes.data[0] != 0 {
+    if byte != 255 || len(bytes) != 0 {
         os.ExitProcess(2)
     }
 

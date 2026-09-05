@@ -3,9 +3,9 @@
 fun main(): void {
     let buf = new u8[]
     extend(buf, bytes("hi"))
-    print(str_new(buf.data, buf.len))
+    print(str(buf))
     let xs = bytes("ab")
     extend(xs, xs)
-    print(str_new(xs.data, xs.len))
+    print(str(xs))
     os.ExitProcess(0)
 }

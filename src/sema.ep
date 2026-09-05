@@ -564,12 +564,6 @@ fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
         ret ""
     }
     if sema_is_array(base_type) == 1 {
-        if field_name == "data" {
-            ret "ptr:" + sema_array_element(base_type)
-        }
-        if field_name == "len" || field_name == "cap" {
-            ret "i64"
-        }
         ret ""
     }
     let field = sema_find_field(state, base_type, field_name)

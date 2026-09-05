@@ -8,14 +8,14 @@ live in [`language.md`](language.md).
 The bootstrap chain is:
 
 ```text
-Python v0 stage-0 -> Epic v1 -> Epic v2 seed -> Epic v2 fixed point
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3
 ```
 
 `build_epic.py` resolves the exact commit of the local `v1` branch. A cached
 `build/epic-v1-<hash>.exe` is reused when available; otherwise the script
 creates a detached v1 worktree and invokes its `build_epic.py`. That v1
-compiler builds the current v2 sources. `bootstrap_fixed_point.py` then checks
-that generations 1 and 2 are byte-identical.
+compiler builds the current v2 sources. The resulting v2 compiler is the seed
+for v3; v2 is not required to compile its own v1-era sources.
 
 ## Compiler pipeline
 
@@ -40,7 +40,7 @@ src/asm.ep
 src/pe.ep
 ```
 
-The self-hosted generations do not invoke NASM or an external linker. NASM is
+The v2 compiler does not invoke NASM or an external linker. NASM is
 only part of the trusted Python stage-0 route used to create the first seed.
 
 ## Syntax model
@@ -99,15 +99,14 @@ the resulting stable symbol index immediately; the final resolution pass only
 checks that every indexed symbol was defined instead of repeating linear
 name searches.
 
-On the v2 fixed-point self-compile benchmark, this changes the median of three
+On the historical v2 full-compiler benchmark, this changes the median of three
 runs from 4.050 seconds to 1.677 seconds, a 2.42x speedup. The remaining gap to
 v3's structured assembler is the generation and reparsing of the in-memory
 assembly text.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
-sections, imports, and relocations. Determinism is part of the bootstrap
-contract: identical compiler sources must produce byte-identical fixed-point
-executables.
+sections, imports, and relocations. Identical compiler inputs produce
+byte-identical executables.
 
 ## Acceptance
 
@@ -115,15 +114,13 @@ Run the maintained checks in this order:
 
 ```powershell
 python tests/run.py
-python tests/examples/run.py
-python bootstrap_fixed_point.py
 ```
 
-The self-contained suite first copies only `epic.exe` into an isolated
-directory and verifies that it can compile a program using an embedded byte
-resource. The public examples are compiled and executed individually. End-to-end test
-sources remain independent, but their runner generates one temporary bundle,
-compiles it once, and starts that executable separately for each case. This
-preserves process isolation without producing one tiny PE per regression. The
-GC suite separately exercises retained stack and heap references under bounded
-memory pressure.
+The test runner first builds the v2 compiler with v1. The self-contained suite
+then copies only `epic.exe` into an isolated directory and verifies that it can
+compile a program using an embedded byte resource. The public examples are
+compiled and executed individually. End-to-end test sources remain independent,
+but their runner generates one temporary bundle, compiles it once, and starts
+that executable separately for each case. This preserves process isolation
+without producing one tiny PE per regression. The GC suite separately exercises
+retained stack and heap references under bounded memory pressure.

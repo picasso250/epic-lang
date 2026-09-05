@@ -24,8 +24,8 @@ fun main(): void {
     let item = new CompoundItem
     item.value = 8
     let items = new CompoundItem[1]
-    items.data[0] = item
-    items.data[0].value += 1
+    items[0] = item
+    items[0].value += 1
     if counter.calls != 2 || values[0] != 6 || item.value != 9 {
         os.ExitProcess(2)
     }

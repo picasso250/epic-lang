@@ -13,7 +13,7 @@
 - The Epic v2 compiler is self-hosted and begins with the v1 language surface.
 - v2 does not preserve forward compatibility.
 
-**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v2 fixed point.
+**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3.
 
 ## Changes introduced in Epic v2
 
@@ -28,8 +28,8 @@ are therefore explicit dogfood targets for the next generation:
   `<<=`, and `>>=`;
 - unary integer negation `-` and logical negation `!`;
 - half-open integer range loops whose bounds are evaluated once;
-- `len(value)` for strings and arrays, `pop(array)` for stack-style removal,
-  plus checked direct string and array subscripting with `value[index]`;
+- opaque dynamic arrays accessed through `len`, checked subscripting, `push`,
+  `pop`, and `extend`;
 - checked semantic analysis for declarations, lexical local scope,
   use-before-declaration, expression and assignment types, call signatures, and
   required return paths.
@@ -120,21 +120,19 @@ Use `new u8[n]` for mutable byte buffers.
 | `new T[n]` | dynamic array of length `n` and capacity at least `n`, with zero-initialized elements |
 | `len(a)` | current element count |
 | `a[i]` | checked element access; invalid indices terminate the program |
-| `a.data[i]` | unchecked low-level element access |
-| `a.len` | compatibility access to the internal length field |
-| `a.cap` | compatibility access to the internal capacity field |
 
 `new T[]` starts empty. `new T[n]` evaluates `n` once, requires a
 non-negative value, and creates `n` zero-initialized elements with `len(a) == n`.
 Direct `a[i]` rejects negative indices and indices greater than or equal to
 `len(a)`. `push` appends after the initialized elements; `push` and `extend` are
-documented under built-in functions.
+documented under built-in functions. Arrays expose no source-level fields; their
+data pointer, length, and capacity are private runtime state.
 
 ### Built-in global
 
 | Name | Type | Meaning |
 | --- | --- | --- |
-| `argv` | `str[]` | command-line arguments, including `argv.data[0]` as the executable name |
+| `argv` | `str[]` | command-line arguments, including `argv[0]` as the executable name |
 
 `argv` is initialized before `main`. v1 implements the Windows command-line
 rules needed for bootstrapping: whitespace separates arguments and double
@@ -379,14 +377,14 @@ to declare them.
 | `len(value: str | T[]): i64` | returns a string byte length or dynamic-array element count; the argument is evaluated once |
 | `str_slice(s: str, start: i64, end: i64): str` | copies the half-open byte range `[start, end)`; invalid bounds terminate the program |
 | `read_file(path: str): u8[]` | reads a whole file into a fresh mutable array, or returns an empty array on failure |
-| `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `data.len`, or `-1` on failure |
+| `write_file(path: str, data: u8[]): i64` | writes every array byte and returns `len(data)`, or `-1` on failure |
 | `push(a: T[], x: T): void` | appends to a dynamic array |
 | `pop(a: T[]): T` | removes and returns the last element; empty arrays print `Epic runtime error: pop from empty array` and terminate |
 | `extend(dst: u8[], src: u8[]): void` | appends all source bytes to the destination; self-extension is supported |
 | `embed("path"): u8[]` | embeds raw file bytes at compile time and returns an independent mutable byte array |
 
 File contents are always bytes. Convert explicitly with
-`str_new(data.data, data.len)` when text is required, and with `bytes(text)`
+`str(data)` when text is required, and with `bytes(text)`
 when writing a string. File paths remain `str`; an interior NUL makes the
 operation fail. `write_file` preserves interior NUL bytes in its data and an
 empty array successfully creates or truncates a file.
@@ -395,10 +393,9 @@ empty array successfully creates or truncates a file.
 container interfaces. `pop` evaluates its array expression once, preserves
 capacity, and clears the removed slot so stale references do not keep objects
 alive through the conservative collector.
-Direct `.data`, `.len`, and `.cap` access remains available for compatibility
-and deliberate low-level code, but exposes the current runtime layout and may be
-deprecated in a future generation. Pointer subscripting and `.data[index]` are
-unchecked.
+The low-level `str.data` and `str.len` interfaces remain available because the
+v3 compiler sources still use them for substring construction. Dynamic arrays
+expose no fields. Pointer subscripting and `str.data[index]` are unchecked.
 
 `embed` accepts exactly one string literal. Relative paths are resolved against
 the `.ep` file containing the expression; absolute paths are used unchanged.

@@ -48,11 +48,11 @@ does not enumerate roots from other or externally created threads.
 
 ## Verification
 
-`bootstrap_fixed_point.py` makes generation 1 compile generation 2, exercising
-the collector in the compiler workload, and requires byte-identical output.
-The `tests/gc` suite creates a retained stack/heap object graph amid more than
-60 MiB of temporary allocations, separately exercises all four slab classes,
-and checks retention plus a bounded peak working set.
+The end-to-end suites exercise the collector while the v2 compiler processes
+whole-program bundles. The `tests/gc` suite creates a retained stack/heap
+object graph amid more than 60 MiB of temporary allocations, separately
+exercises all four slab classes, and checks retention plus a bounded peak
+working set.
 
 ## Generation history
 

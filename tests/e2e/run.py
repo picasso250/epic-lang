@@ -43,11 +43,10 @@ def write_bundle(cases: list[Path]) -> None:
 
     dispatcher = [
         "fun main(): void {",
-        "    if argv.len < 2 {",
+        "    if len(argv) < 2 {",
         "        os.ExitProcess(126)",
         "    }",
-        "    let case_name = argv.data[argv.len - 1]",
-        "    argv.len = argv.len - 1",
+        "    let case_name = pop(argv)",
     ]
     for source in cases:
         dispatcher.extend(

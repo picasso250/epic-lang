@@ -1,0 +1,13 @@
+# EXIT: 6
+type LayoutNames {
+    data: i64
+    len: i64
+    cap: i64
+}
+fun main(): void {
+    let value = new LayoutNames
+    value.data = 1
+    value.len = 2
+    value.cap = 3
+    os.ExitProcess(value.data + value.len + value.cap)
+}

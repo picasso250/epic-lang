@@ -29,7 +29,7 @@ fun main(): void {
     let bad_path_bytes = bytes("x")
     push(bad_path_bytes, 0)
     push(bad_path_bytes, 'y')
-    let bad_path = str_new(bad_path_bytes.data, bad_path_bytes.len)
+    let bad_path = str(bad_path_bytes)
     if write_file(bad_path, data) + 1 != 0 {
         os.ExitProcess(6)
     }

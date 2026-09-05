@@ -8,6 +8,6 @@ fun main(): void {
     push(tokens, new DebugToken)
     push(tokens, new DebugToken)
     push(tokens, new DebugToken)
-    tokens.data[2].kind = 42
+    tokens[2].kind = 42
     os.ExitProcess(0)
 }
