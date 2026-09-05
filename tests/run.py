@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the self-hosted compiler, then run every v3 test suite."""
+"""Build the v2-produced v3 compiler, then run every v3 test suite."""
 
 import os
 import subprocess
@@ -8,17 +8,17 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPILER = ROOT / "build" / "fixed-point" / "generation-1.exe"
+COMPILER = ROOT / "build" / "epic-v3.exe"
 SUITES = ("self_contained", "examples", "e2e", "sema", "assembler", "gc")
 
 
 def main() -> int:
-    bootstrap = subprocess.run(
-        [sys.executable, str(ROOT / "bootstrap_fixed_point.py")],
+    build = subprocess.run(
+        [sys.executable, str(ROOT / "build_epic.py")],
         cwd=ROOT,
     )
-    if bootstrap.returncode != 0:
-        return bootstrap.returncode
+    if build.returncode != 0:
+        return build.returncode
 
     env = os.environ.copy()
     env["EPIC_TEST_COMPILER"] = str(COMPILER)

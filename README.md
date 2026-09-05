@@ -25,7 +25,7 @@ deterministic PE writer, and conservative garbage collector.
 The bootstrap chain is:
 
 ```text
-Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v3 fixed point
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3
 ```
 
 ## Build
@@ -49,21 +49,15 @@ working directory.
 - [Compiler implementation](docs/implementation.md)
 - [Garbage collector](docs/gc.md)
 
-Verify the self-hosted fixed point:
-
-```powershell
-python bootstrap_fixed_point.py
-```
-
-The v2-built v3 seed compiles generation 1, then generation 1 compiles
-generation 2. The check succeeds only when generations 1 and 2 are
-byte-identical.
-
 ## Test
 
 ```powershell
 python tests/run.py
 ```
+
+The test runner builds v3 with v2 and tests that seed compiler directly. It
+does not self-compile v3 first, because correctness must not depend on an
+extra fixed-point generation.
 
 `examples/` contains the small learning sequence. Broader regression coverage
 lives under `tests/e2e/pass/`.

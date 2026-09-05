@@ -8,14 +8,14 @@ live in [`language.md`](language.md).
 The bootstrap chain is:
 
 ```text
-Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 seed -> Epic v3 fixed point
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3
 ```
 
 `build_epic.py` resolves the exact commit of the local `v2` branch. A cached
 `build/epic-v2-<hash>.exe` is reused when available; otherwise the script
 creates a detached v2 worktree and invokes its `build_epic.py`. That v2
-compiler builds the current v3 sources. `bootstrap_fixed_point.py` then checks
-that generations 1 and 2 are byte-identical.
+compiler builds the current v3 sources. That v2-produced compiler is the v3
+artifact: v3 correctness must not depend on compiling itself once more.
 
 ## Compiler pipeline
 
@@ -174,8 +174,7 @@ that can be parsed and encoded again.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
 sections, imports, and relocations. Determinism is part of the bootstrap
-contract: identical compiler sources must produce byte-identical fixed-point
-executables.
+contract: identical compiler inputs must produce byte-identical executables.
 
 ## Acceptance
 
@@ -183,11 +182,10 @@ Run the maintained checks in this order:
 
 ```powershell
 python tests/run.py
-python tests/examples/run.py
-python bootstrap_fixed_point.py
 ```
 
-The self-contained suite first copies only `epic.exe` into an isolated
+The runner first builds v3 with v2 and tests that seed compiler directly. The
+self-contained suite copies only `epic.exe` into an isolated
 directory and verifies that it can compile a program using an embedded byte
 resource. The public examples are compiled and executed individually. End-to-end test
 sources remain independent, but their runner generates one temporary bundle,

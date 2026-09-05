@@ -13,7 +13,7 @@
 - The Epic v3 compiler is self-hosted and begins with the v2 language surface.
 - v3 does not preserve forward compatibility.
 
-**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v3 fixed point.
+**Bootstrap route**: Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3.
 
 ## Changes introduced in Epic v2
 
@@ -87,8 +87,8 @@ previous generation's language work; expression-form `match` is the separate v3
 extension described above.
 
 Compiler-driver and backend changes such as verbose phase timings, `a.exe` as
-the default executable name, structured assembly IR, and fixed-point build
-layout changes are implementation changes rather than language features.
+the default executable name, and structured assembly IR are implementation
+changes rather than language features.
 
 ## Program model
 
