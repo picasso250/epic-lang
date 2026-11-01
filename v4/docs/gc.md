@@ -48,6 +48,16 @@ does not enumerate roots from other or externally created threads. A Windows
 callback may allocate only when it synchronously reenters on that owner thread,
 whose active stack remains within the original `_gc_stack_high` boundary.
 
+## FFI pointer lifetime: accepted design decision
+
+See [GC roots and FFI pointer lifetime](decisions/2026-11-01-gc-ffi-pointer-lifetime.md)
+(accepted 2026-11-01). An opaque `ptr` is non-owning and does not itself
+extend a managed object's lifetime; a raw interior address is deliberately
+not a GC root. Synchronous native borrowing relies on an ordinary live owner
+and stable backing storage. Long-lived native retention remains the caller's
+explicit FFI responsibility. There is currently no user-global/root-handle or
+pinning API, and the GC does not scan arbitrary user static storage.
+
 ## Verification
 
 `bootstrap_fixed_point.py` makes generation 1 compile generation 2, exercising

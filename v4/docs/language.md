@@ -629,6 +629,16 @@ transfers ownership, nor extends the managed owner's lifetime.
 NUL-terminated C string. For a counted mutable byte buffer, use `bytes(text)`,
 then pass `ptr(buffer)` together with `len(buffer)`.
 
+**Lifetime decision:** `ptr` is a non-owning FFI value, not a managed GC
+reference. If passing `ptr(array)` or `ptr(product)` to native code, keep the
+managed owner reachable for the entire native use, without replacing the
+borrowed backing storage. A synchronous call can use an active local owner;
+foreign retention after the call requires a correspondingly longer-lived owner.
+Neither an interior address nor a Windows-held pointer keeps an object alive
+on its own. See the [accepted GC/FFI lifetime decision](decisions/2026-11-01-gc-ffi-pointer-lifetime.md)
+for the rationale, limitations, and absence of user-defined GC globals or pin
+handles in v4.
+
 Pointer addition with an integer is byte-oriented. Pointers support `==`, `!=`,
 and `is_null`, but have no dereference operation, field access, subscript,
 pointee type, or automatic bounds check. External code retaining a borrowed
