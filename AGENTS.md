@@ -1,6 +1,24 @@
-- 新 feature / bug fix / refactor 完成之后，git 提交
-- 马斯克五步工作法。（第一步：质疑需求；第二步：删掉所有可能的部件；第三步：简化与优化；第四步：加速周转；第五步：自动化）
-- v0 是非自举的 Python stage-0，只负责编译使用 v0 子集编写的 Epic v1。
-- fixed point 只要求在 v0 -> v1 建立；此后第 N 代编译器只需正确编译第 N+1 代编译器源码，不要求编译自身，也不得为本代自编译保留旧语言兼容层。
-- 新语言特性由第 N 代实现，第 N+1 代编译器源码才 dogfood，尽量避免为当代 dogfood 向 seed 倒灌特性。
-- 测试原则：重视e2e，轻视白盒测试，让测试服务于意图，而不绑定具体实现。不好的测试，可以删。
+# Epic Lang development contract
+
+- `main` is the canonical **directory-based** source tree. `v4/` is the current
+  active compiler generation. `v0/`–`v3/` are historical compiler generations,
+  not active alternative development branches.
+- Question the requirements, remove unnecessary parts, simplify, accelerate
+  iteration, and only then automate.
+- New features, bug fixes, and refactors should be tested and committed. Do not
+  overwrite or delete user-created/untracked files or archived Git history.
+- Python `v0/` is the non-self-hosting stage-0 seed and compiles only `v1/`.
+- Initial fixed point is established at v0 → v1. Later generation vN must
+  correctly compile the vN+1 compiler source. **Do not require vN to compile
+  itself or preserve outdated language behavior just to achieve this.**
+- New language features are implemented by vN and dogfooded in the source
+  of vN+1. Avoid pushing future features backwards into the earlier seed.
+- For canonical-history corrections, change the logically earliest relevant
+  generation and propagate the change to successor generations in one coherent
+  cross-directory diff.
+- Prefer end-to-end tests expressing intended behavior over white-box tests
+  that encode incidental implementation details. Remove misleading tests.
+- Before calling work complete, run `python test.py` or at least
+  `python test.py --from-version 4` if the change is strictly v4-only.
+- Root `build.py` is the only cross-generation build logic; there must be no
+  compiler dependency on Git branches, worktrees or prebuilt binary seeds.

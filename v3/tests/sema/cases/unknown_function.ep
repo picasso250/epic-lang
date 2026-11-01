@@ -1,0 +1,4 @@
+# ERROR: unknown function 'missing'
+fun main(): void {
+    missing()
+}

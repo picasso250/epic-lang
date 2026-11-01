@@ -1,0 +1,4 @@
+# ERROR: range end requires i64, got str
+fun main(): void {
+    for i: 0:"end" {}
+}

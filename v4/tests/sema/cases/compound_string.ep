@@ -1,0 +1,5 @@
+# ERROR: compound assignment requires an integer target, got str
+fun main(): void {
+    let text = "a"
+    text += "b"
+}

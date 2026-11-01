@@ -1,0 +1,4 @@
+# COMPILE_ERROR: argument 2 of 'write_file' expects u8[], got str
+fun main(): void {
+    write_file("out", "text")
+}

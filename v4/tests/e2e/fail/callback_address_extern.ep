@@ -1,0 +1,7 @@
+# COMPILE_ERROR: ptr cannot take the address of extern 'Sleep'
+
+extern "kernel32.dll" fun Sleep(milliseconds: u32): void
+
+fun main(): void {
+    let callback = ptr(Sleep)
+}

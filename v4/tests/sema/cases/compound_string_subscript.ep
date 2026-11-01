@@ -1,0 +1,5 @@
+# ERROR: str does not support compound assignment
+fun main(): void {
+    let text = "abc"
+    text[0] += 1
+}

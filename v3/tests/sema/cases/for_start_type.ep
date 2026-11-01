@@ -1,0 +1,5 @@
+# ERROR: range start requires i64, got RangeStartKind
+type RangeStartKind = First | Second
+fun main(): void {
+    for i: RangeStartKind.First:1 {}
+}

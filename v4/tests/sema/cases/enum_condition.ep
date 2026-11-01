@@ -1,0 +1,5 @@
+# ERROR: if condition requires bool, got ConditionEnum
+type ConditionEnum = False | True
+fun main(): void {
+    if ConditionEnum.True {}
+}

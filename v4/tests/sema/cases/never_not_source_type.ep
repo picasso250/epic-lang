@@ -1,0 +1,7 @@
+# ERROR: unknown type 'never'
+fun stop(): never {
+    exit(1)
+}
+fun main(): void {
+    ret
+}

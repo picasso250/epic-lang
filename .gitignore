@@ -1,21 +1,13 @@
-# Build artifacts
-*.obj
-*.exe
+# Generated binaries, temporary build outputs and Python caches
 build/
-
-# Python
-__pycache__/
+**/build/
+*.exe
+*.obj
 *.pyc
-
-# Node
-node_modules/
-
-# Zed generated grammars
-editors/zed/grammars/
-
-# Binary tools (see README for setup)
-tools/
-
-# Temporary files produced by examples
+__pycache__/
+# Trusted external binary tools are deliberately not tracked
+**/tools/
+# Test scratch files
 test_out.txt
 test_write_file.txt
+a.asm

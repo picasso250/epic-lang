@@ -1,0 +1,13 @@
+# EXIT: 0
+# STDOUT: B42
+fun main(): void {
+    let text = "ABC"
+    if text[1] != 66 {
+        os.ExitProcess(1)
+    }
+    print(str_new(text.data + 1, 1))
+    let values = new i64[1]
+    values[0] = 42
+    print(itoa(values[0]))
+    print("\n")
+}

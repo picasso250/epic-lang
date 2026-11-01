@@ -1,0 +1,4 @@
+# COMPILE_ERROR: function 'is_null' expects 1 argument(s), got 0
+fun main(): void {
+    let result = is_null()
+}

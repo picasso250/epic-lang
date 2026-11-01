@@ -1,0 +1,5 @@
+# ERROR: compound assignment requires i64 right operand, got str
+fun main(): void {
+    let value = 1
+    value += "wrong"
+}

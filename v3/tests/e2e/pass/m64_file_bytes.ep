@@ -1,0 +1,34 @@
+# EXIT: 0
+# CLEAN: test_file_bytes.bin
+fun main(): void {
+    let data = new u8[]
+    push(data, 'A')
+    push(data, 0)
+    push(data, 'B')
+    if write_file("test_file_bytes.bin", data) != 3 {
+        os.ExitProcess(1)
+    }
+    let loaded = read_file("test_file_bytes.bin")
+    if len(loaded) != 3 || loaded[0] != 'A' || loaded[1] != 0 || loaded[2] != 'B' {
+        os.ExitProcess(2)
+    }
+
+    let empty = new u8[]
+    if write_file("test_file_bytes.bin", empty) != 0 {
+        os.ExitProcess(3)
+    }
+    if len(read_file("test_file_bytes.bin")) != 0 {
+        os.ExitProcess(4)
+    }
+    if len(read_file("missing-file-for-m64")) != 0 {
+        os.ExitProcess(5)
+    }
+
+    let bad_path_bytes = bytes("x")
+    push(bad_path_bytes, 0)
+    push(bad_path_bytes, 'y')
+    if write_file(str(bad_path_bytes), data) != -1 {
+        os.ExitProcess(6)
+    }
+    os.ExitProcess(0)
+}

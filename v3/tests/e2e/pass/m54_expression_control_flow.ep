@@ -1,0 +1,66 @@
+# EXIT: 0
+# STDOUT: 85:2
+type ExprChoice = Left | Right
+fun expr_tail_value(): i64 {
+    40 + 2
+}
+fun expr_if_value(flag: i64): i64 {
+    if flag {
+        10
+    } else {
+        exit(90)
+    }
+}
+fun expr_guarded(flag: i64): i64 {
+    if flag {
+        ret 7
+    }
+    8
+}
+fun expr_match_value(choice: ExprChoice): i64 {
+    match choice {
+        ExprChoice.Left {
+            4
+        }
+        ExprChoice.Right {
+            exit(91)
+        }
+    }
+}
+fun expr_explicit_if(flag: i64): i64 {
+    ret if flag {
+        1
+    } else {
+        2
+    }
+}
+fun expr_else_if(value: i64): i64 {
+    if value == 1 {
+        10
+    } else if value == 2 {
+        20
+    } else {
+        30
+    }
+}
+fun expr_void_tail(): void {
+    99
+}
+fun main(): void {
+    expr_void_tail()
+    let a = expr_tail_value()
+    let b = expr_if_value(1)
+    let c = expr_guarded(0)
+    let d = expr_match_value(ExprChoice.Left)
+    let e = expr_explicit_if(1)
+    let f = expr_else_if(2)
+    let nested = itoa(if 1 {
+        2
+    } else {
+        3
+    })
+    print(itoa(a + b + c + d + e + f))
+    print(":")
+    print(nested)
+    0
+}

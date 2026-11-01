@@ -1,0 +1,9 @@
+# COMPILE_ERROR: cannot take address of function 'bad_callback': parameter 1 has unsupported callback ABI type str
+
+fun bad_callback(text: str): i32 {
+    i32(len(text))
+}
+
+fun main(): void {
+    let callback = ptr(bad_callback)
+}

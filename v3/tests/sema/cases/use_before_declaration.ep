@@ -1,0 +1,5 @@
+# ERROR: undefined variable 'value'
+fun main(): void {
+    print(itoa(value))
+    let value = 1
+}

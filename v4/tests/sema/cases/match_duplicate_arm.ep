@@ -1,0 +1,9 @@
+# ERROR: duplicate match arm DuplicateArmEnum.First
+type DuplicateArmEnum = First | Second
+fun main(): void {
+    match DuplicateArmEnum.First {
+        DuplicateArmEnum.First {}
+        DuplicateArmEnum.First {}
+        else {}
+    }
+}

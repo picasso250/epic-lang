@@ -1,0 +1,4 @@
+# COMPILE_ERROR: is_null expects a reference, got i64
+fun main(): void {
+    let result = is_null(0)
+}

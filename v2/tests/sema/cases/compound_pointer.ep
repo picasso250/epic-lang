@@ -1,0 +1,6 @@
+# ERROR: compound assignment requires i64 or u8 target, got ptr:u8
+fun main(): void {
+    let text = "abc"
+    let pointer = text.data
+    pointer += 1
+}

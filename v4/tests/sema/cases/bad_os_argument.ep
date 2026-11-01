@@ -1,0 +1,4 @@
+# ERROR: argument 1 of 'os.Sleep' expects i64, got str
+fun main(): void {
+    os.Sleep("wrong")
+}

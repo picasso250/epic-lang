@@ -1,0 +1,16 @@
+# Test: dynamic product arrays store object references
+type VectorPoint {
+    x: i64
+    y: i64
+}
+fun main(): void {
+    let points = new VectorPoint[4]
+    let p = new VectorPoint
+    p.x = 42
+    p.y = 99
+    push(points, p)
+    let p2 = points.data[0]
+    let result = p2.x + p2.y
+    os.ExitProcess(result)
+}
+# EXIT: 141

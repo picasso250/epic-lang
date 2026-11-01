@@ -1,0 +1,115 @@
+# EXIT: 0
+type M68ClosureHolder {
+    callback: fun(i64): i64
+}
+
+fun m68_add_one(value: i64): i64 {
+    value + 1
+}
+
+fun m68_choose(use_plain: bool, offset: i64): fun(i64): i64 {
+    if use_plain {
+        m68_add_one
+    } else {
+        fun(value: i64): i64 {
+            value + offset
+        }
+    }
+}
+
+fun m68_apply_six(callback: fun(i64, i64, i64, i64, i64, i64): i64): i64 {
+    callback(1, 2, 3, 4, 5, 6)
+}
+
+fun main(): void {
+    let outer = 10
+    let counter = fun(delta: i64): i64 {
+        outer += delta
+        outer
+    }
+    outer = 100
+    if counter(1) != 11 || counter(2) != 13 {
+        exit(1)
+    }
+
+    let alias = counter
+    if alias(3) != 16 || counter(0) != 16 {
+        exit(2)
+    }
+
+    let values = new i64[]
+    push(values, 7)
+    let read_first = fun(): i64 {
+        values[0]
+    }
+    values[0] = 9
+    if read_first() != 9 {
+        exit(3)
+    }
+
+    let handlers = new (fun(): i64)[]
+    for i: 0:3 {
+        push(handlers, fun(): i64 {
+            i
+        })
+    }
+    if handlers[0]() != 0 || handlers[1]() != 1 || handlers[2]() != 2 {
+        exit(4)
+    }
+
+    let holder = new M68ClosureHolder
+    if !is_null(holder.callback) {
+        exit(5)
+    }
+    holder.callback = m68_choose(false, 5)
+    if holder.callback(7) != 12 || m68_choose(true, 99)(4) != 5 {
+        exit(6)
+    }
+
+    let nested = fun(base: i64): fun(i64): i64 {
+        fun(value: i64): i64 {
+            value + base
+        }
+    }
+    if nested(20)(22) != 42 {
+        exit(7)
+    }
+
+    if true {
+        let len = fun(value: i64): i64 {
+            value + 40
+        }
+        if len(2) != 42 {
+            exit(8)
+        }
+        if true {
+            let len = fun(value: i64): i64 {
+                value
+            }
+            if len(3) != 3 {
+                exit(10)
+            }
+        }
+    }
+    if len(handlers) != 3 {
+        exit(11)
+    }
+
+    let grandparent = 30
+    let make_grandchild = fun(): fun(): i64 {
+        fun(): i64 {
+            grandparent
+        }
+    }
+    grandparent = 0
+    if make_grandchild()() != 30 {
+        exit(12)
+    }
+
+    let sum_six = fun(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64): i64 {
+        a + b + c + d + e + f
+    }
+    if m68_apply_six(sum_six) != 21 {
+        exit(9)
+    }
+}

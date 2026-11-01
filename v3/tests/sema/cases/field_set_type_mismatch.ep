@@ -1,0 +1,8 @@
+# ERROR: cannot assign str to field of type i64
+type Box {
+    value: i64
+}
+fun main(): void {
+    let box = new Box
+    box.value = "wrong"
+}

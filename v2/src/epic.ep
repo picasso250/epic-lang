@@ -1,0 +1,123 @@
+#
+# Epic v0 self-hosted compiler driver.
+#
+type DriverOptions {
+    emit_asm: i64
+    output_path: str
+    inputs: str[]
+}
+fun die_driver(msg: str): i64 {
+    print("epic: ")
+    print(msg)
+    print("\n")
+    os.ExitProcess(1)
+    ret 0
+}
+fun parse_file(path: str): AstProgram {
+    let source_bytes = read_file(path)
+    let src = str_new(source_bytes.data, source_bytes.len)
+    let tokens = lex(src)
+    let p = make_parser_at(tokens, path)
+    ret parse_program(p)
+}
+fun has_main(ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.funcs.len {
+        if ast.funcs.data[i].name == "main" {
+            ret 1
+        }
+        i = i + 1
+    }
+    ret 0
+}
+fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
+    let i = 0
+    for i < ast.structs.len {
+        let s = ast.structs.data[i]
+        push(out.structs, s)
+        i = i + 1
+    }
+    i = 0
+    for i < ast.enums.len {
+        push(out.enums, ast.enums.data[i])
+        i = i + 1
+    }
+    i = 0
+    for i < ast.funcs.len {
+        let f = ast.funcs.data[i]
+        if f.name == "main" && is_main_file == 0 {
+            i = i + 1
+        } else {
+            push(out.funcs, f)
+            i = i + 1
+        }
+    }
+    ret 0
+}
+fun merge_inputs(inputs: str[]): AstProgram {
+    let out = ast_program()
+    let main_ast = parse_file(inputs.data[0])
+    if has_main(main_ast) == 0 {
+        die_driver("main file has no main function")
+    }
+    merge_one(out, main_ast, 1)
+    let i = 1
+    for i < inputs.len {
+        let ast = parse_file(inputs.data[i])
+        merge_one(out, ast, 0)
+        i = i + 1
+    }
+    ret out
+}
+fun parse_driver_options(): DriverOptions {
+    let options = new DriverOptions
+    options.output_path = ""
+    options.inputs = new str[]
+    let i = 1
+    for i < argv.len {
+        let arg = argv.data[i]
+        if arg == "-S" {
+            options.emit_asm = 1
+        } else if arg == "-o" {
+            i = i + 1
+            if i >= argv.len {
+                die_driver("-o requires an output path")
+            }
+            options.output_path = argv.data[i]
+        } else {
+            if arg.len > 0 && arg.data[0] == 45 {
+                die_driver("unknown option '" + arg + "'")
+            }
+            push(options.inputs, arg)
+        }
+        i = i + 1
+    }
+    if options.inputs.len == 0 {
+        die_driver("usage: epic [-S] [-o path] <main.ep> [other.ep...]")
+    }
+    ret options
+}
+fun main(): void {
+    let options = parse_driver_options()
+    let ast = merge_inputs(options.inputs)
+    sema_check(ast)
+    let output_path = options.output_path
+    if output_path == "" {
+        if options.emit_asm == 1 {
+            output_path = "a.asm"
+        } else {
+            output_path = "a.exe"
+        }
+    }
+    let e = make_emitter()
+    emit_program(e, ast)
+    if options.emit_asm == 1 {
+        write_file(output_path, e.out_buf)
+    } else {
+        let asm_text = str_new(e.out_buf.data, e.out_buf.len)
+        let image = assemble_text(asm_text)
+        pe_write_exe(output_path, image)
+    }
+    print(output_path)
+    print("\n")
+}

@@ -1,0 +1,6 @@
+# COMPILE_ERROR: type ptr is not subscriptable
+fun main(): void {
+    let text = "abc"
+    let pointer = text.data
+    print(itoa(pointer[0]))
+}

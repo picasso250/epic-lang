@@ -1,0 +1,4 @@
+# COMPILE_ERROR: incompatible operand types u16 and u32
+fun main(): void {
+    let value = 1u16 + 1u32
+}

@@ -1,0 +1,5 @@
+# ERROR: new requires a product type
+type NewEnum = First | Second
+fun main(): void {
+    let value = new NewEnum
+}

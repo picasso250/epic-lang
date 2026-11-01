@@ -1,0 +1,6 @@
+# ERROR: cannot bind a void expression
+fun main(): void {
+    let value = if 1 {
+        1
+    }
+}

@@ -1,0 +1,7 @@
+# COMPILE_ERROR: callable expects 1 argument(s), got 0
+fun main(): void {
+    let callback = fun(value: i64): i64 {
+        value
+    }
+    print(itoa(callback()))
+}

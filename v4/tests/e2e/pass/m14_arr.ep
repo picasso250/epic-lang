@@ -1,0 +1,11 @@
+# EXIT: 0
+# STDOUT: 99
+fun main(): void {
+    let xs = new i64[3]
+    xs[0] = 99
+    xs[1] = 42
+    xs[2] = 7
+    print(itoa(xs[0]))
+    print("\n")
+    os.ExitProcess(0)
+}

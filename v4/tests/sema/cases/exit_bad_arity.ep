@@ -1,0 +1,4 @@
+# ERROR: function 'exit' expects 1 argument(s), got 0
+fun main(): void {
+    exit()
+}

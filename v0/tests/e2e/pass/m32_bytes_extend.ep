@@ -1,0 +1,11 @@
+# EXIT: 0
+# STDOUT: hiabab
+fun main(): void {
+    let buf = new u8[1]
+    extend(buf, bytes("hi"))
+    print(str_new(buf.data, buf.len))
+    let xs = bytes("ab")
+    extend(xs, xs)
+    print(str_new(xs.data, xs.len))
+    os.ExitProcess(0)
+}

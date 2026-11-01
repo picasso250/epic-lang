@@ -1,0 +1,4 @@
+# ERROR: unary operator ! requires i64 operand, got str
+fun main(): void {
+    let value = !"text"
+}

@@ -1,0 +1,4 @@
+# ERROR: assignment to undefined variable 'missing'
+fun main(): void {
+    missing += 1
+}

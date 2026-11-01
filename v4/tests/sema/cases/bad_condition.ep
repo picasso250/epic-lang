@@ -1,0 +1,6 @@
+# ERROR: if condition requires bool, got str
+fun main(): void {
+    if "yes" {
+        ret
+    }
+}

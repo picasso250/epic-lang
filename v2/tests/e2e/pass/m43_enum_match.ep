@@ -1,0 +1,71 @@
+# EXIT: 0
+type Flavor = Vanilla | Chocolate | Mint
+type OtherFlavor = Vanilla | Done
+type KeywordKind = EOF | ID | FUN | MATCH | FOR
+type FlavorBox {
+    value: Flavor
+}
+fun flavor_code(value: Flavor): i64 {
+    match value {
+        Flavor.Vanilla {
+            ret 1
+        }
+        Flavor.Chocolate {
+            ret 2
+        }
+        Flavor.Mint {
+            ret 3
+        }
+    }
+}
+fun flavor_group(value: Flavor): i64 {
+    match value {
+        Flavor.Vanilla {
+            ret 10
+        }
+        else {
+            ret 20
+        }
+    }
+}
+fun flavor_identity(value: Flavor): Flavor {
+    ret value
+}
+fun keyword_code(value: KeywordKind): i64 {
+    match value {
+        KeywordKind.EOF {
+            ret 0
+        }
+        KeywordKind.ID {
+            ret 1
+        }
+        KeywordKind.FUN {
+            ret 2
+        }
+        KeywordKind.MATCH {
+            ret 3
+        }
+        KeywordKind.FOR {
+            ret 4
+        }
+    }
+}
+fun main(): void {
+    let flavor = Flavor.Chocolate
+    let other = OtherFlavor.Vanilla
+    let box = new FlavorBox
+    box.value = flavor
+    let values = new Flavor[]
+    push(values, Flavor.Mint)
+    push(values, Flavor.Vanilla)
+    values[0] = Flavor.Mint
+    if flavor_code(flavor_identity(box.value)) != 2 || flavor_group(values[0]) != 20 || flavor_group(values[1]) != 10 {
+        os.ExitProcess(1)
+    }
+    if flavor == Flavor.Mint || flavor != Flavor.Chocolate || other != OtherFlavor.Vanilla {
+        os.ExitProcess(2)
+    }
+    if keyword_code(KeywordKind.FUN) != 2 || keyword_code(KeywordKind.MATCH) != 3 || keyword_code(KeywordKind.FOR) != 4 {
+        os.ExitProcess(3)
+    }
+}

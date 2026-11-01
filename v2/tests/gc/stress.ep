@@ -1,0 +1,38 @@
+type GcNode {
+    value: i64
+    next: GcNode
+}
+
+fun main(): void {
+    let kept = new GcNode[]
+    let head = new GcNode
+    head.value = 255
+
+    let i = 254
+    for i >= 0 {
+        let node = new GcNode
+        node.value = i
+        node.next = head
+        head = node
+        i = i - 1
+    }
+    push(kept, head)
+
+    i = 0
+    for i < 60000 {
+        let waste = new u8[1024]
+        waste[0] = i
+        i = i + 1
+    }
+
+    let cursor = kept[0]
+    i = 0
+    for i < 256 {
+        if cursor.value != i {
+            os.ExitProcess(1)
+        }
+        cursor = cursor.next
+        i = i + 1
+    }
+    os.ExitProcess(0)
+}

@@ -1,0 +1,1051 @@
+#
+# Epic v2 semantic analysis.
+#
+type SemaTypeDecl {
+    name: str
+    source_path: str
+    line: i64
+    kind: str
+}
+type SemaSignature {
+    name: str
+    return_type: str
+    param_types: str[]
+    source_path: str
+    line: i64
+    builtin: i64
+}
+type SemaLocal {
+    name: str
+    type_name: str
+    line: i64
+    depth: i64
+    active: i64
+    read_only: i64
+}
+type SemaState {
+    ast: AstProgram
+    types: SemaTypeDecl[]
+    funcs: SemaSignature[]
+    locals: SemaLocal[]
+    source_path: str
+    return_type: str
+    scope_depth: i64
+}
+fun sema_error(path: str, line: i64, message: str): i64 {
+    print(path)
+    print(":")
+    print(itoa(line))
+    print(": semantic error: ")
+    print(message)
+    print("\n")
+    os.ExitProcess(1)
+    ret 0
+}
+fun sema_duplicate(path: str, line: i64, what: str, first: str): i64 {
+    print(path)
+    print(":")
+    print(itoa(line))
+    print(": semantic error: duplicate ")
+    print(what)
+    print("; first declared at ")
+    print(first)
+    print("\n")
+    os.ExitProcess(1)
+    ret 0
+}
+fun sema_state(): SemaState {
+    let state = new SemaState
+    state.types = new SemaTypeDecl[]
+    state.funcs = new SemaSignature[]
+    ret state
+}
+fun sema_find_type(state: SemaState, name: str): SemaTypeDecl {
+    let i = 0
+    for i < state.types.len {
+        if state.types.data[i].name == name {
+            ret state.types.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new SemaTypeDecl
+    missing.name = ""
+    ret missing
+}
+fun sema_find_func(state: SemaState, name: str): SemaSignature {
+    let i = 0
+    for i < state.funcs.len {
+        if state.funcs.data[i].name == name {
+            ret state.funcs.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new SemaSignature
+    missing.name = ""
+    ret missing
+}
+fun sema_is_array(type_name: str): i64 {
+    if type_name.len < 2 {
+        ret 0
+    }
+    if type_name.data[type_name.len - 2] == 91 && type_name.data[type_name.len - 1] == 93 {
+        ret 1
+    }
+    ret 0
+}
+fun sema_array_element(type_name: str): str {
+    ret str_new(type_name.data, type_name.len - 2)
+}
+fun sema_type_exists(state: SemaState, type_name: str): i64 {
+    if type_name == "i64" || type_name == "u8" || type_name == "str" || type_name == "void" {
+        ret 1
+    }
+    if sema_find_type(state, type_name).name != "" {
+        ret 1
+    }
+    ret 0
+}
+fun sema_validate_value_type(state: SemaState, path: str, line: i64, type_name: str): i64 {
+    if type_name == "void" {
+        sema_error(path, line, "void is only valid as a function return type")
+        ret 0
+    }
+    if sema_is_array(type_name) == 1 {
+        let element = sema_array_element(type_name)
+        if element == "void" {
+            sema_error(path, line, "array element type cannot be void")
+        }
+        if sema_is_array(element) == 1 {
+            sema_error(path, line, "nested arrays are not supported in v2")
+        }
+        if sema_type_exists(state, element) == 0 {
+            sema_error(path, line, "unknown array element type '" + element + "'")
+        }
+        ret 0
+    }
+    if sema_type_exists(state, type_name) == 0 {
+        sema_error(path, line, "unknown type '" + type_name + "'")
+    }
+    ret 0
+}
+fun sema_signature(name: str, return_type: str): SemaSignature {
+    let sig = new SemaSignature
+    sig.name = name
+    sig.return_type = return_type
+    sig.param_types = new str[]
+    sig.source_path = "<builtin>"
+    sig.builtin = 1
+    ret sig
+}
+fun sema_add_builtin(state: SemaState, sig: SemaSignature): i64 {
+    push(state.funcs, sig)
+    ret 0
+}
+fun sema_add_builtins(state: SemaState): i64 {
+    let sig = sema_signature("print", "void")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("itoa", "str")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("bytes", "u8[]")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("str", "str")
+    push(sig.param_types, "u8[]")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("cstr", "ptr")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("len", "i64")
+    push(sig.param_types, "lenable")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("str_new", "str")
+    push(sig.param_types, "ptr")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("str_slice", "str")
+    push(sig.param_types, "str")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("read_file", "u8[]")
+    push(sig.param_types, "str")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("write_file", "i64")
+    push(sig.param_types, "str")
+    push(sig.param_types, "u8[]")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("push", "void")
+    push(sig.param_types, "array")
+    push(sig.param_types, "element")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("pop", "element")
+    push(sig.param_types, "array")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("extend", "void")
+    push(sig.param_types, "u8[]")
+    push(sig.param_types, "u8[]")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("embed", "u8[]")
+    sema_add_builtin(state, sig)
+    ret 0
+}
+fun sema_add_os_signatures(state: SemaState): i64 {
+    let sig = sema_signature("os.Sleep", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetTickCount64", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetLastError", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.SetLastError", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetStdHandle", "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.CloseHandle", "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.lstrlenA", "i64")
+    push(sig.param_types, "cstr_source")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.lstrcmpA", "i64")
+    push(sig.param_types, "cstr_source")
+    push(sig.param_types, "cstr_source")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.MessageBoxA", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "cstr_or_null")
+    push(sig.param_types, "cstr_or_null")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.Beep", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetCurrentProcess", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetCurrentProcessId", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetCurrentThreadId", "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.ExitProcess", "void")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.GetFileAttributesA", "i64")
+    push(sig.param_types, "cstr_source")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.CreateDirectoryA", "i64")
+    push(sig.param_types, "cstr_source")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.CreateFileA", "i64")
+    push(sig.param_types, "cstr_source")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.ReadFile", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "buffer_ptr")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "ptr_or_null")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    sig = sema_signature("os.WriteFile", "i64")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "buffer_ptr")
+    push(sig.param_types, "i64")
+    push(sig.param_types, "ptr_or_null")
+    push(sig.param_types, "i64")
+    sema_add_builtin(state, sig)
+    ret 0
+}
+fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.structs.len {
+        let node = ast.structs.data[i]
+        if node.name == "os" || node.name == "ptr" {
+            sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
+        }
+        let first = sema_find_type(state, node.name)
+        if first.name != "" {
+            sema_duplicate(node.source_path, node.line, "type '" + node.name + "'", first.source_path + ":" + itoa(first.line))
+        }
+        let decl = new SemaTypeDecl
+        decl.name = node.name
+        decl.source_path = node.source_path
+        decl.line = node.line
+        decl.kind = "product"
+        push(state.types, decl)
+        i = i + 1
+    }
+    i = 0
+    for i < ast.enums.len {
+        let enum_node = ast.enums.data[i]
+        if enum_node.name == "os" || enum_node.name == "ptr" {
+            sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
+        }
+        let enum_first = sema_find_type(state, enum_node.name)
+        if enum_first.name != "" {
+            sema_duplicate(enum_node.source_path, enum_node.line, "type '" + enum_node.name + "'", enum_first.source_path + ":" + itoa(enum_first.line))
+        }
+        let enum_decl = new SemaTypeDecl
+        enum_decl.name = enum_node.name
+        enum_decl.source_path = enum_node.source_path
+        enum_decl.line = enum_node.line
+        enum_decl.kind = "enum"
+        push(state.types, enum_decl)
+        i = i + 1
+    }
+    ret 0
+}
+fun sema_validate_enums(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.enums.len {
+        let node = ast.enums.data[i]
+        let j = 0
+        for j < node.members.len {
+            let member = node.members.data[j]
+            let k = 0
+            for k < j {
+                let first = node.members.data[k]
+                if first.name == member.name {
+                    sema_duplicate(node.source_path, member.line, "enum member '" + member.name + "'", node.source_path + ":" + itoa(first.line))
+                }
+                k = k + 1
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    ret 0
+}
+fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.structs.len {
+        let node = ast.structs.data[i]
+        let j = 0
+        for j < node.fields.len {
+            let field = node.fields.data[j]
+            let k = 0
+            for k < j {
+                let first = node.fields.data[k]
+                if first.name == field.name {
+                    sema_duplicate(node.source_path, field.line, "field '" + field.name + "'", node.source_path + ":" + itoa(first.line))
+                }
+                k = k + 1
+            }
+            sema_validate_value_type(state, node.source_path, field.line, field.type_name)
+            j = j + 1
+        }
+        i = i + 1
+    }
+    ret 0
+}
+fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.funcs.len {
+        let node = ast.funcs.data[i]
+        if node.name == "os" {
+            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
+        }
+        let first = sema_find_func(state, node.name)
+        if first.name != "" {
+            if first.builtin == 1 {
+                sema_error(node.source_path, node.line, "cannot redefine builtin function '" + node.name + "'")
+            }
+            sema_duplicate(node.source_path, node.line, "function '" + node.name + "'", first.source_path + ":" + itoa(first.line))
+        }
+        if node.type_name != "void" {
+            sema_validate_value_type(state, node.source_path, node.line, node.type_name)
+        }
+        let sig = sema_signature(node.name, node.type_name)
+        sig.source_path = node.source_path
+        sig.line = node.line
+        sig.builtin = 0
+        let j = 0
+        for j < node.params.len {
+            let param = node.params.data[j]
+            let k = 0
+            for k < j {
+                let previous = node.params.data[k]
+                if previous.name == param.name {
+                    sema_duplicate(node.source_path, param.line, "parameter '" + param.name + "'", node.source_path + ":" + itoa(previous.line))
+                }
+                k = k + 1
+            }
+            if param.name == "os" || param.name == "argv" {
+                sema_error(node.source_path, param.line, "reserved parameter name '" + param.name + "'")
+            }
+            sema_validate_value_type(state, node.source_path, param.line, param.type_name)
+            push(sig.param_types, param.type_name)
+            j = j + 1
+        }
+        push(state.funcs, sig)
+        i = i + 1
+    }
+    ret 0
+}
+fun sema_validate_main(state: SemaState): i64 {
+    let main_sig = sema_find_func(state, "main")
+    if main_sig.name == "" || main_sig.builtin == 1 {
+        sema_error("<input>", 1, "missing main function")
+    }
+    if main_sig.return_type != "void" || main_sig.param_types.len != 0 {
+        sema_error(main_sig.source_path, main_sig.line, "main must have signature fun main(): void")
+    }
+    ret 0
+}
+fun sema_find_struct(state: SemaState, name: str): AstStructDef {
+    let i = 0
+    for i < state.ast.structs.len {
+        if state.ast.structs.data[i].name == name {
+            ret state.ast.structs.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new AstStructDef
+    missing.name = ""
+    missing.fields = new AstStructField[]
+    ret missing
+}
+fun sema_find_enum(state: SemaState, name: str): AstEnumDef {
+    let i = 0
+    for i < state.ast.enums.len {
+        if state.ast.enums.data[i].name == name {
+            ret state.ast.enums.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new AstEnumDef
+    missing.name = ""
+    missing.members = new AstEnumMember[]
+    ret missing
+}
+fun sema_enum_member_index(node: AstEnumDef, name: str): i64 {
+    let i = 0
+    for i < node.members.len {
+        if node.members.data[i].name == name {
+            ret i
+        }
+        i = i + 1
+    }
+    ret 0 - 1
+}
+fun sema_find_field(state: SemaState, type_name: str, field_name: str): AstStructField {
+    let node = sema_find_struct(state, type_name)
+    let i = 0
+    for i < node.fields.len {
+        if node.fields.data[i].name == field_name {
+            ret node.fields.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new AstStructField
+    missing.name = ""
+    missing.type_name = ""
+    ret missing
+}
+fun sema_find_local(state: SemaState, name: str): SemaLocal {
+    let i = 0
+    for i < state.locals.len {
+        let local = state.locals.data[i]
+        if local.name == name && local.active == 1 {
+            ret local
+        }
+        i = i + 1
+    }
+    let missing = new SemaLocal
+    missing.name = ""
+    missing.type_name = ""
+    ret missing
+}
+fun sema_name_was_used(state: SemaState, name: str): SemaLocal {
+    let i = 0
+    for i < state.locals.len {
+        if state.locals.data[i].name == name {
+            ret state.locals.data[i]
+        }
+        i = i + 1
+    }
+    let missing = new SemaLocal
+    missing.name = ""
+    ret missing
+}
+fun sema_add_local(state: SemaState, name: str, type_name: str, line: i64): i64 {
+    if name == "argv" || name == "os" {
+        sema_error(state.source_path, line, "reserved local name '" + name + "'")
+    }
+    let first = sema_name_was_used(state, name)
+    if first.name != "" {
+        sema_duplicate(state.source_path, line, "local '" + name + "'", state.source_path + ":" + itoa(first.line))
+    }
+    let local = new SemaLocal
+    local.name = name
+    local.type_name = type_name
+    local.line = line
+    local.depth = state.scope_depth
+    local.active = 1
+    push(state.locals, local)
+    ret 0
+}
+fun sema_leave_scope(state: SemaState): i64 {
+    let i = 0
+    for i < state.locals.len {
+        if state.locals.data[i].depth == state.scope_depth {
+            state.locals.data[i].active = 0
+        }
+        i = i + 1
+    }
+    state.scope_depth = state.scope_depth - 1
+    ret 0
+}
+fun sema_is_pointer(type_name: str): i64 {
+    if type_name.len > 4 {
+        if type_name.data[0] == 112 && type_name.data[1] == 116 && type_name.data[2] == 114 && type_name.data[3] == 58 {
+            ret 1
+        }
+    }
+    ret 0
+}
+fun sema_pointer_element(type_name: str): str {
+    ret str_new(type_name.data + 4, type_name.len - 4)
+}
+fun sema_promote(type_name: str): str {
+    if type_name == "u8" {
+        ret "i64"
+    }
+    ret type_name
+}
+fun sema_assignable(expected: str, actual: str): i64 {
+    if expected == actual {
+        ret 1
+    }
+    if expected == "u8" && actual == "i64" {
+        ret 1
+    }
+    if expected == "ptr" && sema_is_pointer(actual) == 1 {
+        ret 1
+    }
+    if expected == "cstr_source" && (actual == "str" || actual == "ptr") {
+        ret 1
+    }
+    if expected == "cstr_or_null" && (actual == "str" || actual == "ptr" || actual == "i64") {
+        ret 1
+    }
+    if expected == "buffer_ptr" && (actual == "str" || sema_is_pointer(actual) == 1) {
+        ret 1
+    }
+    if expected == "ptr_or_null" && (actual == "i64" || sema_is_pointer(actual) == 1) {
+        ret 1
+    }
+    ret 0
+}
+fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): i64 {
+    if expr.resolved_type != "i64" {
+        sema_error(state.source_path, expr.line, context + " requires i64, got " + expr.resolved_type)
+    }
+    ret 0
+}
+fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
+    if base_type == "str" {
+        if field_name == "data" {
+            ret "ptr:u8"
+        }
+        if field_name == "len" {
+            ret "i64"
+        }
+        ret ""
+    }
+    if sema_is_array(base_type) == 1 {
+        ret ""
+    }
+    let field = sema_find_field(state, base_type, field_name)
+    ret field.type_name
+}
+fun sema_check_binary(state: SemaState, expr: AstExpr): str {
+    let left = sema_check_expr(state, expr.left)
+    let right = sema_check_expr(state, expr.right)
+    if expr.op == "+" && left == "str" && right == "str" {
+        ret "str"
+    }
+    if expr.op == "+" && sema_is_pointer(left) == 1 && right == "i64" {
+        ret left
+    }
+    if expr.op == "+" && left == "i64" && sema_is_pointer(right) == 1 {
+        ret right
+    }
+    if expr.op == "==" || expr.op == "!=" {
+        if left == "i64" && right == "i64" {
+            ret "i64"
+        }
+        if left == "str" && right == "str" {
+            ret "i64"
+        }
+        let decl = sema_find_type(state, left)
+        if left == right && decl.name != "" && decl.kind == "enum" {
+            ret "i64"
+        }
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires two integers, two strings, or two values of the same enum type")
+    }
+    if expr.op == "+" || expr.op == "-" || expr.op == "*" || expr.op == "/" || expr.op == "%" || expr.op == "&" || expr.op == "|" || expr.op == "<<" || expr.op == ">>" {
+        if left == "i64" && right == "i64" {
+            ret "i64"
+        }
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
+    }
+    if expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" || expr.op == "&&" || expr.op == "||" {
+        if left == "i64" && right == "i64" {
+            ret "i64"
+        }
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
+    }
+    sema_error(state.source_path, expr.line, "unsupported binary operator " + expr.op)
+    ret ""
+}
+fun sema_check_unary(state: SemaState, expr: AstExpr): str {
+    let operand = sema_check_expr(state, expr.left)
+    if operand != "i64" {
+        sema_error(state.source_path, expr.line, "unary operator " + expr.op + " requires i64 operand, got " + operand)
+    }
+    if expr.op != "-" && expr.op != "!" {
+        sema_error(state.source_path, expr.line, "unsupported unary operator " + expr.op)
+    }
+    ret "i64"
+}
+fun sema_check_call(state: SemaState, expr: AstExpr): str {
+    let full_name = expr.name
+    if expr.type_name != "" {
+        full_name = expr.type_name + "." + expr.name
+    }
+    let sig = sema_find_func(state, full_name)
+    if sig.name == "" {
+        sema_error(state.source_path, expr.line, "unknown function '" + full_name + "'")
+    }
+    if expr.args.len != sig.param_types.len {
+        sema_error(state.source_path, expr.line, "function '" + full_name + "' expects " + itoa(sig.param_types.len) + " argument(s), got " + itoa(expr.args.len))
+    }
+    let i = 0
+    for i < expr.args.len {
+        let actual = sema_check_expr(state, expr.args.data[i])
+        let expected = sig.param_types.data[i]
+        if full_name == "push" && i == 0 {
+            if sema_is_array(actual) == 0 {
+                sema_error(state.source_path, expr.args.data[i].line, "push first argument must be an array")
+            }
+        } else if full_name == "push" && i == 1 {
+            let array_type = expr.args.data[0].resolved_type
+            let element = sema_array_element(array_type)
+            if sema_assignable(element, actual) == 0 {
+                sema_error(state.source_path, expr.args.data[i].line, "push value type " + actual + " is not assignable to " + element)
+            }
+        } else if full_name == "len" && i == 0 {
+            if actual != "str" && sema_is_array(actual) == 0 {
+                sema_error(state.source_path, expr.args.data[i].line, "len expects str or array, got " + actual)
+            }
+        } else if full_name == "pop" && i == 0 {
+            if sema_is_array(actual) == 0 {
+                sema_error(state.source_path, expr.args.data[i].line, "pop expects an array, got " + actual)
+            }
+        } else if sema_assignable(expected, actual) == 0 {
+            sema_error(state.source_path, expr.args.data[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
+        }
+        i = i + 1
+    }
+    if full_name == "pop" {
+        ret sema_promote(sema_array_element(expr.args.data[0].resolved_type))
+    }
+    ret sema_promote(sig.return_type)
+}
+fun sema_check_expr(state: SemaState, expr: AstExpr): str {
+    let result = ""
+    if expr.kind == "Literal" {
+        result = "i64"
+    } else if expr.kind == "EnumMember" {
+        result = expr.type_name
+    } else if expr.kind == "String" {
+        result = "str"
+    } else if expr.kind == "Embed" {
+        result = "u8[]"
+    } else if expr.kind == "Var" {
+        if expr.name == "argv" {
+            result = "str[]"
+        } else {
+            let local = sema_find_local(state, expr.name)
+            if local.name == "" {
+                sema_error(state.source_path, expr.line, "undefined variable '" + expr.name + "'")
+            }
+            result = sema_promote(local.type_name)
+        }
+    } else if expr.kind == "Binary" {
+        result = sema_check_binary(state, expr)
+    } else if expr.kind == "Unary" {
+        result = sema_check_unary(state, expr)
+    } else if expr.kind == "Call" {
+        result = sema_check_call(state, expr)
+    } else if expr.kind == "New" {
+        let decl = sema_find_type(state, expr.name)
+        if decl.name == "" || decl.kind != "product" {
+            sema_error(state.source_path, expr.line, "new requires a product type, got '" + expr.name + "'")
+        }
+        result = expr.name
+    } else if expr.kind == "NewArray" {
+        sema_validate_value_type(state, state.source_path, expr.line, expr.type_name)
+        if expr.count.kind != "" {
+            sema_check_expr(state, expr.count)
+            sema_require_i64(state, expr.count, "array length")
+        }
+        result = expr.type_name + "[]"
+    } else if expr.kind == "FieldAccess" {
+        let enum_node = new AstEnumDef
+        enum_node.name = ""
+        if expr.object.kind == "Var" {
+            enum_node = sema_find_enum(state, expr.object.name)
+        }
+        if enum_node.name != "" {
+            let value = sema_enum_member_index(enum_node, expr.name)
+            if value < 0 {
+                sema_error(state.source_path, expr.line, "enum " + enum_node.name + " has no member '" + expr.name + "'")
+            }
+            expr.kind = "EnumMember"
+            expr.type_name = enum_node.name
+            expr.value = itoa(value)
+            result = enum_node.name
+        } else {
+            let object_type = sema_check_expr(state, expr.object)
+            let field_type = sema_field_type(state, object_type, expr.name)
+            if field_type == "" {
+                sema_error(state.source_path, expr.line, "type " + object_type + " has no field '" + expr.name + "'")
+            }
+            result = sema_promote(field_type)
+        }
+    } else if expr.kind == "Subscript" {
+        let base_type = sema_check_expr(state, expr.base)
+        sema_check_expr(state, expr.index)
+        sema_require_i64(state, expr.index, "subscript")
+        if base_type == "str" {
+            result = "i64"
+        } else if sema_is_array(base_type) == 1 {
+            result = sema_promote(sema_array_element(base_type))
+        } else if sema_is_pointer(base_type) == 1 {
+            result = sema_promote(sema_pointer_element(base_type))
+        } else {
+            sema_error(state.source_path, expr.line, "type " + base_type + " is not subscriptable")
+        }
+    } else {
+        sema_error(state.source_path, expr.line, "unsupported expression kind '" + expr.kind + "'")
+    }
+    expr.resolved_type = result
+    ret result
+}
+fun sema_check_match(state: SemaState, stmt: AstStmt): i64 {
+    let subject_type = sema_check_expr(state, stmt.expr)
+    let enum_node = sema_find_enum(state, subject_type)
+    if enum_node.name == "" {
+        sema_error(state.source_path, stmt.line, "match subject must have an enum type, got " + subject_type)
+    }
+    let seen = new i64[enum_node.members.len]
+    let explicit_count = 0
+    let has_else = 0
+    let i = 0
+    for i < stmt.match_arms.len {
+        let arm = stmt.match_arms.data[i]
+        if arm.is_else == 1 {
+            if has_else == 1 {
+                sema_error(state.source_path, arm.line, "match has more than one else arm")
+            }
+            if i + 1 != stmt.match_arms.len {
+                sema_error(state.source_path, arm.line, "else must be the final match arm")
+            }
+            has_else = 1
+        } else {
+            if arm.type_name != subject_type {
+                sema_error(state.source_path, arm.line, "match arm belongs to enum " + arm.type_name + ", expected " + subject_type)
+            }
+            let value = sema_enum_member_index(enum_node, arm.member_name)
+            if value < 0 {
+                sema_error(state.source_path, arm.line, "enum " + subject_type + " has no member '" + arm.member_name + "'")
+            }
+            if seen.data[value] == 1 {
+                sema_error(state.source_path, arm.line, "duplicate match arm " + subject_type + "." + arm.member_name)
+            }
+            seen.data[value] = 1
+            arm.value = value
+            explicit_count = explicit_count + 1
+        }
+        sema_check_block(state, arm.body)
+        i = i + 1
+    }
+    if has_else == 0 && explicit_count != enum_node.members.len {
+        sema_error(state.source_path, stmt.line, "non-exhaustive match on enum " + subject_type)
+    }
+    if has_else == 1 && explicit_count == enum_node.members.len {
+        sema_error(state.source_path, stmt.line, "unreachable else arm in exhaustive match")
+    }
+    ret 0
+}
+fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
+    if stmt.name == "argv" {
+        sema_error(state.source_path, stmt.line, "argv is read-only")
+    }
+    let local = sema_find_local(state, stmt.name)
+    if local.name == "" {
+        sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
+    }
+    if local.read_only == 1 {
+        sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if sema_assignable(local.type_name, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
+    }
+    ret 0
+}
+fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
+    let object_type = sema_check_expr(state, stmt.object)
+    if object_type == "str" {
+        sema_error(state.source_path, stmt.line, "str is read-only")
+    }
+    let field_type = sema_field_type(state, object_type, stmt.name)
+    if field_type == "" {
+        sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if sema_assignable(field_type, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + field_type)
+    }
+    ret 0
+}
+fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
+    let base_type = sema_check_expr(state, stmt.base)
+    sema_check_expr(state, stmt.index)
+    sema_require_i64(state, stmt.index, "subscript")
+    let element = ""
+    if base_type == "str" {
+        sema_error(state.source_path, stmt.line, "str is read-only")
+    } else if sema_is_array(base_type) == 1 {
+        element = sema_array_element(base_type)
+    } else if sema_is_pointer(base_type) == 1 {
+        element = sema_pointer_element(base_type)
+    } else {
+        sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if sema_assignable(element, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + element)
+    }
+    ret 0
+}
+fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
+    if stmt.target_kind == "Var" {
+        if stmt.name == "argv" {
+            sema_error(state.source_path, stmt.line, "argv is read-only")
+        }
+        let local = sema_find_local(state, stmt.name)
+        if local.name == "" {
+            sema_error(state.source_path, stmt.line, "assignment to undefined variable '" + stmt.name + "'")
+        }
+        if local.read_only == 1 {
+            sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
+        }
+        ret local.type_name
+    }
+    if stmt.target_kind == "Field" {
+        let object_type = sema_check_expr(state, stmt.object)
+        if object_type == "str" {
+            sema_error(state.source_path, stmt.line, "str does not support compound assignment")
+        }
+        let field_type = sema_field_type(state, object_type, stmt.name)
+        if field_type == "" {
+            sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
+        }
+        ret field_type
+    }
+    if stmt.target_kind == "Subscript" {
+        let base_type = sema_check_expr(state, stmt.base)
+        sema_check_expr(state, stmt.index)
+        sema_require_i64(state, stmt.index, "subscript")
+        if base_type == "str" {
+            sema_error(state.source_path, stmt.line, "str does not support compound assignment")
+        }
+        if sema_is_array(base_type) == 1 {
+            ret sema_array_element(base_type)
+        }
+        if sema_is_pointer(base_type) == 1 {
+            ret sema_pointer_element(base_type)
+        }
+        sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
+    }
+    sema_error(state.source_path, stmt.line, "internal: unknown compound assignment target")
+    ret ""
+}
+fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
+    let target_type = sema_compound_target_type(state, stmt)
+    if target_type != "i64" && target_type != "u8" {
+        sema_error(state.source_path, stmt.line, "compound assignment requires i64 or u8 target, got " + target_type)
+    }
+    let actual = sema_check_expr(state, stmt.value_expr)
+    if actual != "i64" {
+        sema_error(state.source_path, stmt.line, "compound assignment requires i64 right operand, got " + actual)
+    }
+    if stmt.op != "+" && stmt.op != "-" && stmt.op != "*" && stmt.op != "/" && stmt.op != "%" && stmt.op != "&" && stmt.op != "|" && stmt.op != "<<" && stmt.op != ">>" {
+        sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + stmt.op)
+    }
+    ret 0
+}
+fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
+    if state.return_type == "void" {
+        if stmt.expr.kind != "" {
+            sema_error(state.source_path, stmt.line, "void function cannot return a value")
+        }
+        ret 0
+    }
+    if stmt.expr.kind == "" {
+        sema_error(state.source_path, stmt.line, "non-void function must return a value")
+    }
+    let actual = sema_check_expr(state, stmt.expr)
+    if sema_assignable(state.return_type, actual) == 0 {
+        sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
+    }
+    ret 0
+}
+fun sema_check_for_range(state: SemaState, stmt: AstStmt): i64 {
+    sema_check_expr(state, stmt.range_start)
+    sema_require_i64(state, stmt.range_start, "range start")
+    sema_check_expr(state, stmt.range_end)
+    sema_require_i64(state, stmt.range_end, "range end")
+    state.scope_depth = state.scope_depth + 1
+    sema_add_local(state, stmt.name, "i64", stmt.line)
+    state.locals.data[state.locals.len - 1].read_only = 1
+    sema_check_block(state, stmt.body)
+    sema_leave_scope(state)
+    ret 0
+}
+fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
+    if stmt.kind == "Return" {
+        sema_check_return(state, stmt)
+    } else if stmt.kind == "ExprStmt" {
+        sema_check_expr(state, stmt.expr)
+    } else if stmt.kind == "Let" {
+        if stmt.value_expr.kind == "" {
+            sema_error(state.source_path, stmt.line, "let requires an initializer")
+        }
+        let type_name = sema_check_expr(state, stmt.value_expr)
+        if type_name == "void" {
+            sema_error(state.source_path, stmt.line, "cannot bind a void expression")
+        }
+        sema_add_local(state, stmt.name, type_name, stmt.line)
+    } else if stmt.kind == "Assign" {
+        sema_check_assignment(state, stmt)
+    } else if stmt.kind == "FieldSet" {
+        sema_check_field_set(state, stmt)
+    } else if stmt.kind == "SubscriptAssign" {
+        sema_check_subscript_set(state, stmt)
+    } else if stmt.kind == "AssignOp" {
+        sema_check_assign_op(state, stmt)
+    } else if stmt.kind == "If" {
+        sema_check_expr(state, stmt.expr)
+        sema_require_i64(state, stmt.expr, "if condition")
+        sema_check_block(state, stmt.then_block)
+        sema_check_block(state, stmt.else_block)
+    } else if stmt.kind == "While" {
+        sema_check_expr(state, stmt.expr)
+        sema_require_i64(state, stmt.expr, "while condition")
+        sema_check_block(state, stmt.body)
+    } else if stmt.kind == "ForRange" {
+        sema_check_for_range(state, stmt)
+    } else if stmt.kind == "Match" {
+        sema_check_match(state, stmt)
+    }
+    ret 0
+}
+fun sema_stmt_returns(stmt: AstStmt): i64 {
+    if stmt.kind == "Return" {
+        ret 1
+    }
+    if stmt.kind == "If" && stmt.else_block.present == 1 {
+        if sema_block_returns(stmt.then_block) == 1 && sema_block_returns(stmt.else_block) == 1 {
+            ret 1
+        }
+    }
+    if stmt.kind == "Match" {
+        let i = 0
+        for i < stmt.match_arms.len {
+            if sema_block_returns(stmt.match_arms.data[i].body) == 0 {
+                ret 0
+            }
+            i = i + 1
+        }
+        if stmt.match_arms.len > 0 {
+            ret 1
+        }
+    }
+    ret 0
+}
+fun sema_block_returns(block: AstBlock): i64 {
+    if block.present == 0 {
+        ret 0
+    }
+    let i = 0
+    for i < block.stmts.len {
+        if sema_stmt_returns(block.stmts.data[i]) == 1 {
+            ret 1
+        }
+        i = i + 1
+    }
+    ret 0
+}
+fun sema_check_block(state: SemaState, block: AstBlock): i64 {
+    if block.present == 0 {
+        ret 0
+    }
+    state.scope_depth = state.scope_depth + 1
+    let i = 0
+    for i < block.stmts.len {
+        sema_check_stmt_exprs(state, block.stmts.data[i])
+        i = i + 1
+    }
+    sema_leave_scope(state)
+    ret 0
+}
+fun sema_check_bodies(state: SemaState, ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.funcs.len {
+        let node = ast.funcs.data[i]
+        state.source_path = node.source_path
+        state.return_type = node.type_name
+        state.scope_depth = 0
+        state.locals = new SemaLocal[]
+        let j = 0
+        for j < node.params.len {
+            let param = node.params.data[j]
+            sema_add_local(state, param.name, param.type_name, param.line)
+            j = j + 1
+        }
+        sema_check_block(state, node.body)
+        if node.type_name != "void" && sema_block_returns(node.body) == 0 {
+            sema_error(node.source_path, node.line, "function '" + node.name + "' may not return a value on every path")
+        }
+        i = i + 1
+    }
+    ret 0
+}
+fun sema_check(ast: AstProgram): i64 {
+    let state = sema_state()
+    state.ast = ast
+    sema_add_builtins(state)
+    sema_add_os_signatures(state)
+    sema_collect_type_names(state, ast)
+    sema_validate_enums(state, ast)
+    sema_validate_structs(state, ast)
+    sema_collect_functions(state, ast)
+    sema_validate_main(state)
+    sema_check_bodies(state, ast)
+    ret 0
+}

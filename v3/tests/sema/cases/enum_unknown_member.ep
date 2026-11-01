@@ -1,0 +1,5 @@
+# ERROR: enum KnownEnum has no member 'Missing'
+type KnownEnum = First | Second
+fun main(): void {
+    let value = KnownEnum.Missing
+}

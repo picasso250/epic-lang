@@ -1,0 +1,7 @@
+# COMPILE_ERROR: array element type cannot be void
+type Bad {
+    values: void[][]
+}
+
+fun main(): void {
+}

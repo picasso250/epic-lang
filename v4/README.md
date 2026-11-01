@@ -1,0 +1,82 @@
+# Epic v4
+
+Epic v4 starts from the sealed v3 compiler. Its initial seed intentionally has
+the same language semantics and compiler sources as the v3 fixed point; v4 is
+the dogfood generation for v3's expression control flow, fixed-width integers,
+opaque arrays, string and array slicing, explicit C-string conversion, and a
+single pointer model. New v4 language work begins from this fixed point. The
+compiler now dogfoods string slicing, v4 closes the transitional `str.data`,
+`str.len`, and `str_new` interfaces retained by v3, source programs can declare
+Windows x64 DLL imports with `extern "dll" fun ...`, and `ptr(top_level_fun)`
+exposes owner-thread callback entries without generating trampolines. v4 also
+adds structural function types, first-class top-level function values, and
+escaping value-capturing closures with GC-managed environments.
+
+It retains the self-contained structured AMD64 assembler, stable symbol indexes,
+deterministic PE writer, and conservative garbage collector.
+
+The bootstrap chain is:
+
+```text
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v4 -> Epic v4 fixed point
+```
+
+## Canonical history
+
+> When correcting history, backport a design to the earliest version where it
+> reasonably belongs, not the earliest version where it could technically be
+> implemented.
+
+## Build
+
+```powershell
+python build_epic.py
+```
+
+`build_epic.py` delegates to the root `../build.py`. That builds the previous
+generations in their neighboring directories, then uses the resulting v3
+compiler to compile the active `v4/` source. No Git branches, detached
+worktrees, or cached historical seed binaries are involved.
+
+The default output is `build/epic-v4.exe`. Pass `-o PATH` to copy only the
+final v4 executable elsewhere; relative paths are resolved from the calling
+working directory.
+
+Compiled Epic programs default to the Windows console subsystem. Pass
+`--windows-gui` when producing a native GUI executable without an attached
+console window:
+
+```powershell
+build\epic-v4.exe --windows-gui -o app.exe main.ep
+```
+
+The option affects PE output only and cannot be combined with `-S`.
+
+## Documentation
+
+- [Language reference](docs/language.md), including built-in data structures and functions
+- [Compiler implementation](docs/implementation.md)
+- [Garbage collector](docs/gc.md)
+
+Verify the self-hosted fixed point:
+
+```powershell
+python bootstrap_fixed_point.py
+```
+
+The v3-built v4 seed compiles generation 1, then generation 1 compiles
+generation 2. The check succeeds only when generations 1 and 2 are
+byte-identical.
+
+## Test
+
+```powershell
+python tests/run.py
+```
+
+`examples/` contains the small learning sequence. An example marked
+`# COMPILE_ONLY` must compile successfully but is not started by the test runner.
+`# COMPILE_ARGS: ...` supplies additional compiler arguments for that example;
+`examples/06_win32_gui.ep` uses both annotations for its GUI subsystem and
+blocking Win32 message loop. Broader regression coverage lives under
+`tests/e2e/pass/`.

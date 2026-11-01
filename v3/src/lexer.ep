@@ -1,0 +1,444 @@
+#
+# Epic lexer.
+#
+type TokenKind = EOF | ID | FUN | RETURN | IF | ELSE | WHILE | FOR | BREAK | CONTINUE | TYPE | NEW | LET | MATCH | TRUE | FALSE | NEWLINE | STRING | CHAR | NUMBER | ASSIGN_OP | EQEQ | ASSIGN | NEQ | BANG | SHL | LTE | LT | SHR | GTE | GT | AND | AMPERSAND | OR | BIT_OR | MINUS | PLUS | STAR | SLASH | PERCENT | DOT | LBRACKET | RBRACKET | LPAREN | RPAREN | LBRACE | RBRACE | COMMA | COLON
+type Token {
+    kind: TokenKind
+    text: str
+    line: i64
+}
+fun push_token(tokens: Token[], kind: TokenKind, text: str, line: i64): i64 {
+    let t = new Token
+    t.kind = kind
+    t.text = text
+    t.line = line
+    push(tokens, t)
+    ret 0
+}
+fun is_alpha(c: i64): i64 {
+    if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 {
+        ret 1
+    }
+    ret 0
+}
+fun is_alnum(c: i64): i64 {
+    if is_alpha(c) == 1 || (c >= 48 && c <= 57) {
+        ret 1
+    }
+    ret 0
+}
+fun is_digit(c: i64): i64 {
+    if c >= 48 && c <= 57 {
+        ret 1
+    }
+    ret 0
+}
+fun is_hex_digit(c: i64): i64 {
+    ret digit_value(c) >= 0
+}
+fun identifier_kind(text: str): TokenKind {
+    if text == "fun" {
+        ret TokenKind.FUN
+    }
+    if text == "ret" {
+        ret TokenKind.RETURN
+    }
+    if text == "if" {
+        ret TokenKind.IF
+    }
+    if text == "else" {
+        ret TokenKind.ELSE
+    }
+    if text == "while" {
+        ret TokenKind.WHILE
+    }
+    if text == "for" {
+        ret TokenKind.FOR
+    }
+    if text == "break" {
+        ret TokenKind.BREAK
+    }
+    if text == "continue" {
+        ret TokenKind.CONTINUE
+    }
+    if text == "type" {
+        ret TokenKind.TYPE
+    }
+    if text == "new" {
+        ret TokenKind.NEW
+    }
+    if text == "let" {
+        ret TokenKind.LET
+    }
+    if text == "match" {
+        ret TokenKind.MATCH
+    }
+    if text == "true" {
+        ret TokenKind.TRUE
+    }
+    if text == "false" {
+        ret TokenKind.FALSE
+    }
+    ret TokenKind.ID
+}
+fun lex(src: str): Token[] {
+    let tokens = new Token[]
+    let n = len(src)
+    let pos = 0
+    let line = 1
+    for pos < n {
+        let ch = src[pos]
+        if ch == 32 || ch == 9 || ch == 13 {
+            pos += 1
+            continue
+        }
+        if ch == 10 {
+            push_token(tokens, TokenKind.NEWLINE, "\n", line)
+            pos += 1
+            line += 1
+            continue
+        }
+        if ch == 35 {
+            pos += 1
+            for pos < n && src[pos] != 10 {
+                pos += 1
+            }
+            continue
+        }
+        if ch == 34 {
+            let string_line = line
+            pos += 1
+            let buf = new u8[]
+            let scanning = 1
+            for scanning == 1 && pos < n {
+                if src[pos] == 34 {
+                    scanning = 0
+                } else {
+                    let c = src[pos]
+                    if c == 10 || c == 13 {
+                        print("unterminated string\n")
+                        os.ExitProcess(1)
+                    }
+                    if c == 92 {
+                        pos += 1
+                        if pos >= n {
+                            print("bad escape\n")
+                            os.ExitProcess(1)
+                        }
+                        let e = src[pos]
+                        if e == 110 {
+                            c = 10
+                        } else if e == 114 {
+                            c = 13
+                        } else if e == 116 {
+                            c = 9
+                        } else if e == 92 {
+                            c = 92
+                        } else if e == 34 {
+                            c = 34
+                        } else if e == 39 {
+                            c = 39
+                        } else if e == 48 {
+                            c = 0
+                        } else {
+                            print("bad escape\n")
+                            os.ExitProcess(1)
+                        }
+                    }
+                    push(buf, c)
+                    pos += 1
+                }
+            }
+            if scanning == 1 {
+                print("unterminated string\n")
+                os.ExitProcess(1)
+            }
+            let text = str(buf)
+            pos += 1
+            push_token(tokens, TokenKind.STRING, text, string_line)
+            continue
+        }
+        if ch == 39 {
+            let char_line = line
+            pos += 1
+            if pos >= n {
+                print("bad char\n")
+                os.ExitProcess(1)
+            }
+            let ch_val = src[pos]
+            if ch_val == 92 {
+                pos += 1
+                if pos >= n {
+                    print("bad char\n")
+                    os.ExitProcess(1)
+                }
+                let char_escape = src[pos]
+                if char_escape == 110 {
+                    ch_val = 10
+                } else if char_escape == 114 {
+                    ch_val = 13
+                } else if char_escape == 116 {
+                    ch_val = 9
+                } else if char_escape == 92 {
+                    ch_val = 92
+                } else if char_escape == 34 {
+                    ch_val = 34
+                } else if char_escape == 39 {
+                    ch_val = 39
+                } else if char_escape == 48 {
+                    ch_val = 0
+                } else {
+                    print("bad escape\n")
+                    os.ExitProcess(1)
+                }
+            }
+            pos += 1
+            if pos >= n || src[pos] != 39 {
+                print("bad char\n")
+                os.ExitProcess(1)
+            }
+            pos += 1
+            push_token(tokens, TokenKind.CHAR, itoa(ch_val), char_line)
+            continue
+        }
+        if is_digit(ch) == 1 {
+            let number_line = line
+            let number_start = pos
+            let hex = 0
+            if ch == 48 && pos + 1 < n && (src[pos + 1] == 120 || src[pos + 1] == 88) {
+                hex = 1
+                pos += 2
+                let digit_start = pos
+                for pos < n && is_hex_digit(src[pos]) == 1 {
+                    pos += 1
+                }
+                if pos == digit_start {
+                    print("hexadecimal literal requires at least one digit\n")
+                    os.ExitProcess(1)
+                }
+            } else {
+                for pos < n && is_digit(src[pos]) == 1 {
+                    pos += 1
+                }
+            }
+            for pos < n && is_alnum(src[pos]) == 1 {
+                pos += 1
+            }
+            let number_text = str_new(src.data + number_start, pos - number_start)
+            push_token(tokens, TokenKind.NUMBER, number_text, number_line)
+            continue
+        }
+        if is_alpha(ch) == 1 {
+            let identifier_line = line
+            let identifier_start = pos
+            for pos < n && is_alnum(src[pos]) == 1 {
+                pos += 1
+            }
+            let identifier_text = str_new(src.data + identifier_start, pos - identifier_start)
+            push_token(tokens, identifier_kind(identifier_text), identifier_text, identifier_line)
+            continue
+        }
+        if ch == 60 && pos + 2 < n && src[pos + 1] == 60 && src[pos + 2] == 61 {
+            push_token(tokens, TokenKind.ASSIGN_OP, "<<=", line)
+            pos += 3
+            continue
+        }
+        if ch == 62 && pos + 2 < n && src[pos + 1] == 62 && src[pos + 2] == 61 {
+            push_token(tokens, TokenKind.ASSIGN_OP, ">>=", line)
+            pos += 3
+            continue
+        }
+        if ch == 61 {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.EQEQ, "==", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.ASSIGN, "=", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 33 {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.NEQ, "!=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.BANG, "!", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 60 {
+            if pos + 1 < n && src[pos + 1] == 60 {
+                push_token(tokens, TokenKind.SHL, "<<", line)
+                pos += 2
+            } else if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.LTE, "<=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.LT, "<", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 62 {
+            if pos + 1 < n && src[pos + 1] == 62 {
+                push_token(tokens, TokenKind.SHR, ">>", line)
+                pos += 2
+            } else if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.GTE, ">=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.GT, ">", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 38 {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "&=", line)
+                pos += 2
+            } else if pos + 1 < n && src[pos + 1] == 38 {
+                push_token(tokens, TokenKind.AND, "&&", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.AMPERSAND, "&", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 124 {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "|=", line)
+                pos += 2
+            } else if pos + 1 < n && src[pos + 1] == 124 {
+                push_token(tokens, TokenKind.OR, "||", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.BIT_OR, "|", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 45 {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "-=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.MINUS, "-", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 43  {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "+=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.PLUS, "+", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 42  {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "*=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.STAR, "*", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 47  {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "/=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.SLASH, "/", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 37  {
+            if pos + 1 < n && src[pos + 1] == 61 {
+                push_token(tokens, TokenKind.ASSIGN_OP, "%=", line)
+                pos += 2
+            } else {
+                push_token(tokens, TokenKind.PERCENT, "%", line)
+                pos += 1
+            }
+            continue
+        }
+        if ch == 46  {
+            push_token(tokens, TokenKind.DOT,    ".", line)
+            pos += 1
+            continue
+        }
+        if ch == 91  {
+            push_token(tokens, TokenKind.LBRACKET, "[", line)
+            pos += 1
+            continue
+        }
+        if ch == 93  {
+            push_token(tokens, TokenKind.RBRACKET, "]", line)
+            pos += 1
+            continue
+        }
+        if ch == 40  {
+            push_token(tokens, TokenKind.LPAREN, "(", line)
+            pos += 1
+            continue
+        }
+        if ch == 41  {
+            push_token(tokens, TokenKind.RPAREN, ")", line)
+            pos += 1
+            continue
+        }
+        if ch == 123 {
+            push_token(tokens, TokenKind.LBRACE, "{", line)
+            pos += 1
+            continue
+        }
+        if ch == 125 {
+            push_token(tokens, TokenKind.RBRACE, "}", line)
+            pos += 1
+            continue
+        }
+        if ch == 59 {
+            print("unexpected semicolon\n")
+            os.ExitProcess(1)
+        }
+        if ch == 44  {
+            push_token(tokens, TokenKind.COMMA, ",", line)
+            pos += 1
+            continue
+        }
+        if ch == 58  {
+            push_token(tokens, TokenKind.COLON, ":", line)
+            pos += 1
+            continue
+        }
+        pos += 1
+    }
+    ret tokens
+}
+fun dump_tokens(tokens: Token[]): i64 {
+    for i: 0:len(tokens) {
+        let t = tokens[i]
+        print(t.text)
+        print(" ")
+        print(itoa(t.line))
+        print("\n")
+    }
+    ret 0
+}
+fun main(): void {
+    if len(argv) < 2 {
+        print("usage: lexer <file>\n")
+        os.ExitProcess(1)
+    }
+    let src = str(read_file(argv[1]))
+    let tokens = lex(src)
+    dump_tokens(tokens)
+}

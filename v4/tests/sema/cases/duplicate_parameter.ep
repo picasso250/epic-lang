@@ -1,0 +1,7 @@
+# ERROR: duplicate parameter 'x'
+fun work(x: i64, x: i64): void {
+    ret
+}
+fun main(): void {
+    ret
+}

@@ -1,0 +1,8 @@
+# EXIT: 0
+# STDOUT: 5
+fun main(): void {
+    let s = "hello"
+    print(itoa(len(s)))
+    print("\n")
+    os.ExitProcess(0)
+}

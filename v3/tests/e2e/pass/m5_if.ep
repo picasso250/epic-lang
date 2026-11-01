@@ -1,0 +1,21 @@
+# EXIT: 0
+# STDOUT: 1
+# STDOUT: 2
+fun main(): void {
+    let x = 10
+    if x > 5 {
+        print(itoa(1))
+        print("\n")
+    }
+    if x == 1 {
+        print(itoa(999))
+        print("\n")
+    } else if x == 10 {
+        print(itoa(2))
+        print("\n")
+    } else {
+        print(itoa(999))
+        print("\n")
+    }
+    os.ExitProcess(0)
+}

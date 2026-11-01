@@ -1,0 +1,5 @@
+# COMPILE_ERROR: extern 'BadExternBool' has unsupported ABI return type bool
+extern "demo.dll" fun BadExternBool(): bool
+
+fun main(): void {
+}

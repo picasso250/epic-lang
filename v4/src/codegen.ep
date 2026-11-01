@@ -1,0 +1,2284 @@
+#
+# Epic code generator.
+#
+type Local {
+    name: str
+    typ: TypeRef
+    slot: i64
+    symbol_id: i64
+}
+type FuncInfo {
+    name: str
+    ret_type: TypeRef
+    params: AstParam[]
+    symbol_index: i64
+    descriptor_symbol_index: i64
+}
+type StringLit {
+    text: str
+    symbol_index: i64
+}
+type FieldInfo {
+    name: str
+    typ: TypeRef
+    offset: i64
+}
+type StructInfo {
+    name: str
+    size: i64
+    fields: FieldInfo[]
+}
+type EmitterState {
+    program: AsmProgram
+    current_fn: str
+    current_ret_type: TypeRef
+    current_ep_id: i64
+    local_bytes: i64
+    alloc_size: i64
+    alloc_size_item: i64
+    temp_base: i64
+    temp_count: i64
+    temp_peak: i64
+    locals: Local[]
+    funcs: FuncInfo[]
+    strings: StringLit[]
+    structs: StructInfo[]
+    enums: AstEnumDef[]
+    loop_starts: i64[]
+    loop_ends: i64[]
+    closures: AstExpr[]
+    current_captures: AstCapture[]
+    context_slot: i64
+}
+fun die(msg: str): void {
+    panic("codegen: " + msg)
+}
+fun named_symbol(e: EmitterState, name: str): i64 {
+    asm_symbol_intern(e.program, name)
+}
+fun emit_label(e: EmitterState, name: str): void {
+    asm_label(e.program, named_symbol(e, name))
+}
+fun emit_label_index(e: EmitterState, symbol_index: i64): void {
+    asm_label(e.program, symbol_index)
+}
+fun emit_lea_ref(e: EmitterState, dst: AsmOperand, symbol_index: i64): void {
+    asm_lea(e.program, dst, asm_mem_symbol(0, symbol_index, 0))
+}
+fun emit_call_inst(e: EmitterState, target: str): void {
+    asm_call(e.program, asm_symbol(named_symbol(e, target)))
+}
+fun emit_extern(e: EmitterState, name: str): void {
+    asm_extern_item(e.program, named_symbol(e, name))
+}
+fun sys_member_symbol(ns: str, name: str): str {
+    if ns != "os" {
+        ret ""
+    }
+    if name == "Sleep" {
+        ret "Sleep"
+    }
+    if name == "GetTickCount64" {
+        ret "GetTickCount64"
+    }
+    if name == "GetLastError" {
+        ret "GetLastError"
+    }
+    if name == "SetLastError" {
+        ret "SetLastError"
+    }
+    if name == "GetStdHandle" {
+        ret "GetStdHandle"
+    }
+    if name == "CloseHandle" {
+        ret "CloseHandle"
+    }
+    if name == "lstrlenA" {
+        ret "lstrlenA"
+    }
+    if name == "lstrcmpA" {
+        ret "lstrcmpA"
+    }
+    if name == "MessageBoxA" {
+        ret "MessageBoxA"
+    }
+    if name == "Beep" {
+        ret "Beep"
+    }
+    if name == "GetCurrentProcess" {
+        ret "GetCurrentProcess"
+    }
+    if name == "GetCurrentProcessId" {
+        ret "GetCurrentProcessId"
+    }
+    if name == "GetCurrentThreadId" {
+        ret "GetCurrentThreadId"
+    }
+    if name == "ExitProcess" {
+        ret "ExitProcess"
+    }
+    if name == "GetFileAttributesA" {
+        ret "GetFileAttributesA"
+    }
+    if name == "CreateDirectoryA" {
+        ret "CreateDirectoryA"
+    }
+    if name == "CreateFileA" {
+        ret "CreateFileA"
+    }
+    if name == "ReadFile" {
+        ret "ReadFile"
+    }
+    if name == "WriteFile" {
+        ret "WriteFile"
+    }
+    ""
+}
+fun emit_stack_store(e: EmitterState, slot: i64, src: AsmOperand): void {
+    asm_mov(e.program, asm_mem_base(0, asm_rbp(), slot), src)
+}
+fun emit_stack_load(e: EmitterState, dst: AsmOperand, slot: i64): void {
+    asm_mov(e.program, dst, asm_mem_base(0, asm_rbp(), slot))
+}
+fun fresh_label(e: EmitterState): i64 {
+    asm_symbol_new(e.program, "")
+}
+fun emit_runtime(e: EmitterState, source: u8[]): void {
+    asm_parse_text_into(e.program, source)
+}
+fun emit_runtime_helpers(e: EmitterState): void {
+    emit_runtime(e, embed("../runtime/gc.asm"))
+    emit_runtime(e, embed("../runtime/str_alloc.asm"))
+    emit_runtime(e, embed("../runtime/bytes.asm"))
+    emit_runtime(e, embed("../runtime/str_cat.asm"))
+    emit_runtime(e, embed("../runtime/str_equal.asm"))
+    emit_runtime(e, embed("../runtime/str_slice.asm"))
+    emit_runtime(e, embed("../runtime/cstr.asm"))
+    emit_runtime(e, embed("../runtime/embed.asm"))
+    emit_runtime(e, embed("../runtime/extend.asm"))
+    emit_runtime(e, embed("../runtime/itoa.asm"))
+    emit_runtime(e, embed("../runtime/argv.asm"))
+    emit_runtime(e, embed("../runtime/read_file.asm"))
+    emit_runtime(e, embed("../runtime/write_file.asm"))
+    emit_runtime(e, embed("../runtime/error.asm"))
+    emit_runtime(e, embed("../runtime/bounds.asm"))
+    emit_runtime(e, embed("../runtime/pop.asm"))
+    emit_runtime(e, embed("../runtime/panic.asm"))
+    emit_runtime(e, embed("../runtime/callable.asm"))
+}
+fun make_emitter(): EmitterState {
+    let e = new EmitterState
+    e.program = asm_program_new()
+    e.current_fn = ""
+    e.current_ret_type = type_void()
+    e.current_ep_id = 0
+    e.local_bytes = 0
+    e.alloc_size = 0
+    e.alloc_size_item = 0
+    e.temp_base = 0
+    e.temp_count = 0
+    e.temp_peak = 0
+    e.locals = new Local[]
+    e.funcs = new FuncInfo[]
+    e.strings = new StringLit[]
+    e.structs = new StructInfo[]
+    e.enums = new AstEnumDef[]
+    e.loop_starts = new i64[]
+    e.loop_ends = new i64[]
+    e.closures = new AstExpr[]
+    e.current_captures = new AstCapture[]
+    e.context_slot = 0
+    e
+}
+fun get_string_id(e: EmitterState, text: str): i64 {
+    for i: 0:len(e.strings) {
+        if e.strings[i].text == text {
+            ret e.strings[i].symbol_index
+        }
+    }
+    let s = new StringLit
+    s.text = text
+    s.symbol_index = asm_symbol_new(e.program, "")
+    push(e.strings, s)
+    s.symbol_index
+}
+fun collect_expr_strings(e: EmitterState, node: AstExpr): void {
+    match node.kind {
+        AstExprKind.Literal {
+        }
+        AstExprKind.String {
+            let ignored_string_id = get_string_id(e, node.value)
+        }
+        AstExprKind.Embed {
+            let ignored_embed_id = get_string_id(e, node.value)
+        }
+        AstExprKind.Var {
+        }
+        AstExprKind.Binary {
+            collect_expr_strings(e, node.left)
+            collect_expr_strings(e, node.right)
+        }
+        AstExprKind.Unary {
+            collect_expr_strings(e, node.left)
+        }
+        AstExprKind.Call {
+            collect_expr_strings(e, node.callee)
+            for arg_i: 0:len(node.args) {
+                collect_expr_strings(e, node.args[arg_i])
+            }
+        }
+        AstExprKind.Closure {
+            push(e.closures, node)
+            collect_block_strings(e, node.closure_body)
+        }
+        AstExprKind.NewProduct {
+        }
+        AstExprKind.NewArray {
+            match node.count.kind {
+                AstExprOptionKind.None {
+                }
+                AstExprOptionKind.Some {
+                    collect_expr_strings(e, node.count.value)
+                }
+            }
+        }
+        AstExprKind.FieldAccess {
+            collect_expr_strings(e, node.object)
+        }
+        AstExprKind.Subscript {
+            collect_expr_strings(e, node.base)
+            collect_expr_strings(e, node.index)
+        }
+        AstExprKind.Slice {
+            collect_expr_strings(e, node.base)
+            collect_expr_strings(e, node.slice_start)
+            collect_expr_strings(e, node.slice_end)
+        }
+        AstExprKind.If {
+            collect_expr_strings(e, node.condition)
+            collect_block_strings(e, node.then_block)
+            collect_block_strings(e, node.else_block)
+        }
+        AstExprKind.Match {
+            collect_expr_strings(e, node.subject)
+            for arm_i: 0:len(node.match_arms) {
+                collect_block_strings(e, node.match_arms[arm_i].body)
+            }
+        }
+    }
+}
+fun collect_assign_target_strings(e: EmitterState, target: AstAssignTarget): void {
+    match target.kind {
+        AssignTargetKind.Var {
+        }
+        AssignTargetKind.Field {
+            collect_expr_strings(e, target.object)
+        }
+        AssignTargetKind.Subscript {
+            collect_expr_strings(e, target.base)
+            collect_expr_strings(e, target.index)
+        }
+    }
+}
+fun collect_stmt_strings(e: EmitterState, node: AstStmt): void {
+    match node.kind {
+        AstStmtKind.Return {
+            match node.return_value.kind {
+                AstExprOptionKind.None {
+                }
+                AstExprOptionKind.Some {
+                    collect_expr_strings(e, node.return_value.value)
+                }
+            }
+        }
+        AstStmtKind.Expr {
+            collect_expr_strings(e, node.expr)
+        }
+        AstStmtKind.Let {
+            collect_expr_strings(e, node.value_expr)
+        }
+        AstStmtKind.Assign {
+            collect_assign_target_strings(e, node.target)
+            collect_expr_strings(e, node.value_expr)
+        }
+        AstStmtKind.AssignOp {
+            collect_assign_target_strings(e, node.target)
+            collect_expr_strings(e, node.value_expr)
+        }
+        AstStmtKind.ForCondition {
+            collect_expr_strings(e, node.expr)
+            collect_block_strings(e, node.body)
+        }
+        AstStmtKind.ForRange {
+            collect_expr_strings(e, node.range_start)
+            collect_expr_strings(e, node.range_end)
+            collect_block_strings(e, node.body)
+        }
+        AstStmtKind.Break {
+        }
+        AstStmtKind.Continue {
+        }
+    }
+}
+fun collect_block_strings(e: EmitterState, block: AstBlock): void {
+    if !block.present {
+        ret
+    }
+    for i: 0:len(block.stmts) {
+        collect_stmt_strings(e, block.stmts[i])
+    }
+    match block.tail.kind {
+        AstExprOptionKind.None {
+        }
+        AstExprOptionKind.Some {
+            collect_expr_strings(e, block.tail.value)
+        }
+    }
+}
+fun collect_program_strings(e: EmitterState, program: AstProgram): void {
+    e.closures = new AstExpr[]
+    for i: 0:len(program.funcs) {
+        collect_block_strings(e, program.funcs[i].body)
+    }
+}
+fun string_bytes(s: str): u8[] {
+    let values = new u8[]
+    for i: 0:len(s) {
+        push(values, s[i])
+    }
+    push(values, 0)
+    values
+}
+fun add_func_infos(e: EmitterState, ast: AstProgram): void {
+    for i: 0:len(ast.funcs) {
+        let fn = ast.funcs[i]
+        let f = new FuncInfo
+        f.name = fn.name
+        f.ret_type = fn.return_type
+        f.params = fn.params
+        f.symbol_index = named_symbol(e, fn.name)
+        f.descriptor_symbol_index = named_symbol(e, "__ep_callable_" + fn.name)
+        push(e.funcs, f)
+    }
+    for extern_i: 0:len(ast.externs) {
+        let ext = ast.externs[extern_i]
+        let info = new FuncInfo
+        info.name = ext.name
+        info.ret_type = ext.return_type
+        info.params = ext.params
+        info.symbol_index = asm_symbol_new(e.program, "")
+        info.descriptor_symbol_index = -1
+        asm_extern_import_item(e.program, info.symbol_index, ext.library, ext.name)
+        push(e.funcs, info)
+    }
+}
+fun add_field(info: StructInfo, name: str, typ: TypeRef, offset: i64): void {
+    let f = new FieldInfo
+    f.name = name
+    f.typ = typ
+    f.offset = offset
+    push(info.fields, f)
+}
+fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
+    let s = new StructInfo
+    s.name = name
+    s.size = size
+    s.fields = new FieldInfo[]
+    push(e.structs, s)
+    s
+}
+fun find_struct_info(e: EmitterState, name: str): StructInfo {
+    for i: 0:len(e.structs) {
+        if e.structs[i].name == name {
+            ret e.structs[i]
+        }
+    }
+    die("unknown struct layout")
+    new StructInfo
+}
+fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldInfo {
+    let s = find_struct_info(e, struct_name)
+    for i: 0:len(s.fields) {
+        if s.fields[i].name == field_name {
+            ret s.fields[i]
+        }
+    }
+    die("unknown field " + struct_name + "." + field_name)
+    new FieldInfo
+}
+fun compute_struct_layouts(e: EmitterState, ast: AstProgram): void {
+    e.structs = new StructInfo[]
+    let s = new StructInfo
+    for struct_i: 0:len(ast.structs) {
+        let node = ast.structs[struct_i]
+        let struct_size = 0
+        let struct_align = 1
+        s = add_struct_info(e, node.name, 0)
+        for j: 0:len(node.fields) {
+            let field_type = node.fields[j].typ
+            let field_size = type_storage_size(field_type)
+            if field_size > struct_align {
+                struct_align = field_size
+            }
+            struct_size = align_up(struct_size, field_size)
+            add_field(s, node.fields[j].name, field_type, struct_size)
+            struct_size += field_size
+        }
+        s.size = align_up(struct_size, struct_align)
+    }
+}
+fun reset_locals(e: EmitterState): void {
+    e.locals = new Local[]
+    e.local_bytes = 0
+    e.temp_count = 0
+    e.temp_peak = 0
+}
+fun add_local(e: EmitterState, name: str, typ: TypeRef, symbol_id: i64): void {
+    for i: 0:len(e.locals) {
+        if e.locals[i].symbol_id == symbol_id {
+            ret
+        }
+    }
+    e.local_bytes += 8
+    let l = new Local
+    l.name = name
+    l.typ = typ
+    l.symbol_id = symbol_id
+    l.slot = -e.local_bytes
+    push(e.locals, l)
+}
+fun find_local_slot(e: EmitterState, symbol_id: i64): i64 {
+    for i: 0:len(e.locals) {
+        if e.locals[i].symbol_id == symbol_id {
+            ret e.locals[i].slot
+        }
+    }
+    die("undefined local")
+    0
+}
+fun find_local_type(e: EmitterState, symbol_id: i64): TypeRef {
+    for i: 0:len(e.locals) {
+        if e.locals[i].symbol_id == symbol_id {
+            ret e.locals[i].typ
+        }
+    }
+    die("internal: checked local has no type")
+    type_i64()
+}
+fun has_local(e: EmitterState, symbol_id: i64): bool {
+    for i: 0:len(e.locals) {
+        if e.locals[i].symbol_id == symbol_id {
+            ret true
+        }
+    }
+    false
+}
+fun find_capture_index(e: EmitterState, symbol_id: i64): i64 {
+    for i: 0:len(e.current_captures) {
+        if e.current_captures[i].symbol_id == symbol_id {
+            ret i
+        }
+    }
+    die("internal: checked capture has no layout entry")
+    0
+}
+fun find_capture_type(e: EmitterState, symbol_id: i64): TypeRef {
+    e.current_captures[find_capture_index(e, symbol_id)].typ
+}
+fun capture_offset(e: EmitterState, symbol_id: i64): i64 {
+    8 + find_capture_index(e, symbol_id) * 8
+}
+fun closure_symbol(e: EmitterState, closure_id: i64): i64 {
+    named_symbol(e, "__ep_closure_" + itoa(closure_id))
+}
+fun emit_load_resolved_value(e: EmitterState, kind: AstValueKind, symbol_id: i64, typ: TypeRef): void {
+    if kind == AstValueKind.Local {
+        emit_stack_load_value(e, 0, find_local_slot(e, symbol_id), typ)
+        ret
+    }
+    if kind == AstValueKind.Capture {
+        emit_stack_load(e, asm_rax(), e.context_slot)
+        asm_mov(e.program, type_register(0, typ), asm_operand_width(asm_mem_base(0, asm_rax(), capture_offset(e, symbol_id)), type_width(typ)))
+        ret
+    }
+    die("internal: value is not a local or capture")
+}
+fun emit_resolved_value_address(e: EmitterState, kind: AstValueKind, symbol_id: i64): TypeRef {
+    if kind == AstValueKind.Local {
+        asm_lea(e.program, asm_rax(), asm_mem_base(0, asm_rbp(), find_local_slot(e, symbol_id)))
+        ret find_local_type(e, symbol_id)
+    }
+    if kind == AstValueKind.Capture {
+        emit_stack_load(e, asm_rax(), e.context_slot)
+        asm_add(e.program, asm_rax(), asm_imm(capture_offset(e, symbol_id)))
+        ret find_capture_type(e, symbol_id)
+    }
+    die("internal: assignment target is not a local or capture")
+    type_i64()
+}
+fun expr_type(e: EmitterState, expr: AstExpr): TypeRef {
+    if is_null(expr.resolved_type) {
+        die("internal: expression has no checked type")
+    }
+    expr.resolved_type
+}
+fun type_register(reg: i64, typ: TypeRef): AsmOperand {
+    asm_register(reg, type_width(typ))
+}
+fun emit_widen_register(e: EmitterState, reg: i64, source: TypeRef, target: TypeRef): void {
+    let source_width = type_width(source)
+    let target_width = type_width(target)
+    if source_width >= target_width {
+        ret
+    }
+    let source_reg = asm_register(reg, source_width)
+    if type_is_signed(source) {
+        if source_width == 32 && target_width == 64 {
+            asm_movsxd(e.program, asm_register(reg, 64), asm_register(reg, 32))
+        } else {
+            asm_movsx(e.program, asm_register(reg, target_width), source_reg)
+        }
+    } else {
+        if source_width == 32 {
+            asm_mov(e.program, asm_register(reg, 32), asm_register(reg, 32))
+        } else {
+            asm_movzx(e.program, asm_register(reg, 32), source_reg)
+        }
+    }
+}
+fun find_func_info(e: EmitterState, name: str): FuncInfo {
+    for i: 0:len(e.funcs) {
+        if e.funcs[i].name == name {
+            ret e.funcs[i]
+        }
+    }
+    die("internal: checked function has no codegen signature")
+    new FuncInfo
+}
+fun emit_widen_rax(e: EmitterState, source: TypeRef, target: TypeRef): void {
+    emit_widen_register(e, 0, source, target)
+}
+fun emit_coerce_rax(e: EmitterState, source: TypeRef, target: TypeRef): void {
+    if (type_is_integer(source) || source.kind == TypeRefKind.Bool) && type_is_integer(target) {
+        emit_widen_rax(e, source, target)
+    }
+}
+fun emit_test_rax(e: EmitterState, typ: TypeRef): void {
+    let reg = type_register(0, typ)
+    asm_test(e.program, reg, reg)
+}
+fun emit_expr_as(e: EmitterState, expr: AstExpr, target: TypeRef): void {
+    let source = expr_type(e, expr)
+    emit_expr(e, expr)
+    emit_coerce_rax(e, source, target)
+}
+fun emit_stack_store_value(e: EmitterState, slot: i64, reg: i64, typ: TypeRef): void {
+    asm_mov(e.program, asm_operand_width(asm_mem_base(0, asm_rbp(), slot), type_width(typ)), type_register(reg, typ))
+}
+fun emit_stack_load_value(e: EmitterState, reg: i64, slot: i64, typ: TypeRef): void {
+    asm_mov(e.program, type_register(reg, typ), asm_operand_width(asm_mem_base(0, asm_rbp(), slot), type_width(typ)))
+}
+fun pre_scan_expr(e: EmitterState, expr: AstExpr): void {
+    match expr.kind {
+        AstExprKind.Literal {
+        }
+        AstExprKind.String {
+        }
+        AstExprKind.Embed {
+        }
+        AstExprKind.Var {
+        }
+        AstExprKind.Binary {
+            pre_scan_expr(e, expr.left)
+            pre_scan_expr(e, expr.right)
+        }
+        AstExprKind.Unary {
+            pre_scan_expr(e, expr.left)
+        }
+        AstExprKind.Call {
+            pre_scan_expr(e, expr.callee)
+            for arg_i: 0:len(expr.args) {
+                pre_scan_expr(e, expr.args[arg_i])
+            }
+        }
+        AstExprKind.Closure {
+        }
+        AstExprKind.NewProduct {
+        }
+        AstExprKind.NewArray {
+            match expr.count.kind {
+                AstExprOptionKind.None {
+                }
+                AstExprOptionKind.Some {
+                    pre_scan_expr(e, expr.count.value)
+                }
+            }
+        }
+        AstExprKind.FieldAccess {
+            pre_scan_expr(e, expr.object)
+        }
+        AstExprKind.Subscript {
+            pre_scan_expr(e, expr.base)
+            pre_scan_expr(e, expr.index)
+        }
+        AstExprKind.Slice {
+            pre_scan_expr(e, expr.base)
+            pre_scan_expr(e, expr.slice_start)
+            pre_scan_expr(e, expr.slice_end)
+        }
+        AstExprKind.If {
+            pre_scan_expr(e, expr.condition)
+            pre_scan_block(e, expr.then_block)
+            pre_scan_block(e, expr.else_block)
+        }
+        AstExprKind.Match {
+            pre_scan_expr(e, expr.subject)
+            for arm_i: 0:len(expr.match_arms) {
+                pre_scan_block(e, expr.match_arms[arm_i].body)
+            }
+        }
+    }
+}
+fun pre_scan_stmt(e: EmitterState, stmt: AstStmt): void {
+    match stmt.kind {
+        AstStmtKind.Return {
+            match stmt.return_value.kind {
+                AstExprOptionKind.None {
+                }
+                AstExprOptionKind.Some {
+                    pre_scan_expr(e, stmt.return_value.value)
+                }
+            }
+        }
+        AstStmtKind.Expr {
+            pre_scan_expr(e, stmt.expr)
+        }
+        AstStmtKind.Let {
+            pre_scan_expr(e, stmt.value_expr)
+            add_local(e, stmt.name, expr_type(e, stmt.value_expr), stmt.symbol_id)
+        }
+        AstStmtKind.Assign {
+            pre_scan_expr(e, stmt.value_expr)
+        }
+        AstStmtKind.AssignOp {
+            pre_scan_expr(e, stmt.value_expr)
+        }
+        AstStmtKind.ForCondition {
+            pre_scan_expr(e, stmt.expr)
+            pre_scan_block(e, stmt.body)
+        }
+        AstStmtKind.ForRange {
+            pre_scan_expr(e, stmt.range_start)
+            pre_scan_expr(e, stmt.range_end)
+            add_local(e, stmt.name, type_i64(), stmt.symbol_id)
+            e.local_bytes += 8
+            stmt.range_end_slot = -e.local_bytes
+            pre_scan_block(e, stmt.body)
+        }
+        AstStmtKind.Break {
+        }
+        AstStmtKind.Continue {
+        }
+    }
+}
+fun pre_scan_block(e: EmitterState, block: AstBlock): void {
+    if !block.present {
+        ret
+    }
+    for i: 0:len(block.stmts) {
+        pre_scan_stmt(e, block.stmts[i])
+    }
+    match block.tail.kind {
+        AstExprOptionKind.None {
+        }
+        AstExprOptionKind.Some {
+            pre_scan_expr(e, block.tail.value)
+        }
+    }
+}
+fun temp_reset(e: EmitterState): void {
+    e.temp_count = 0
+}
+fun temp_save_rax(e: EmitterState): i64 {
+    let nr = e.temp_count
+    e.temp_count += 1
+    if e.temp_count > e.temp_peak {
+        e.temp_peak = e.temp_count
+    }
+    let slot = -(e.temp_base + (nr + 1) * 8)
+    emit_stack_store(e, slot, asm_rax())
+    slot
+}
+fun emit_prologue(e: EmitterState): void {
+    asm_push(e.program, asm_rbp())
+    asm_mov(e.program, asm_rbp(), asm_rsp())
+    e.alloc_size_item = len(e.program.items)
+    asm_sub(e.program, asm_rsp(), asm_imm(0))
+}
+fun emit_epilogue(e: EmitterState): void {
+    asm_mov(e.program, asm_rsp(), asm_rbp())
+    asm_pop(e.program, asm_rbp())
+    asm_ret(e.program)
+}
+fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
+    let slots = new i64[]
+    let i = 0
+    for i < len(args) {
+        emit_expr(e, args[i])
+        push(slots, temp_save_rax(e))
+        i += 1
+    }
+    slots
+}
+fun load_spilled_args(e: EmitterState, slots: i64[]): void {
+    if len(slots) > 0 {
+        emit_stack_load(e, asm_rcx(), slots[0])
+    }
+    if len(slots) > 1 {
+        emit_stack_load(e, asm_rdx(), slots[1])
+    }
+    if len(slots) > 2 {
+        emit_stack_load(e, asm_r8(), slots[2])
+    }
+    if len(slots) > 3 {
+        emit_stack_load(e, asm_r9(), slots[3])
+    }
+}
+fun emit_call_slots(e: EmitterState, target_symbol_index: i64, slots: i64[]): void {
+    load_spilled_args(e, slots)
+    let stack_args = len(slots) - 4
+    if stack_args < 0 {
+        stack_args = 0
+    }
+    let frame = 32 + align_up(stack_args * 8, 16)
+    asm_sub(e.program, asm_rsp(), asm_imm(frame))
+    let i = 4
+    for i < len(slots) {
+        emit_stack_load(e, asm_rax(), slots[i])
+        asm_mov(e.program, asm_mem_base(64, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
+        i += 1
+    }
+    asm_call(e.program, asm_symbol(target_symbol_index))
+    asm_add(e.program, asm_rsp(), asm_imm(frame))
+}
+fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
+    let slots = new i64[]
+    let i = 0
+    for i < len(args) {
+        emit_expr_as(e, args[i], info.params[i].typ)
+        push(slots, temp_save_rax(e))
+        i += 1
+    }
+    slots
+}
+fun spill_callable_args(e: EmitterState, args: AstExpr[], callable: TypeRef): i64[] {
+    let slots = new i64[]
+    for i: 0:len(args) {
+        emit_expr_as(e, args[i], callable.params[i])
+        push(slots, temp_save_rax(e))
+    }
+    slots
+}
+fun emit_indirect_call_slots(e: EmitterState, callable_slot: i64, slots: i64[]): void {
+    load_spilled_args(e, slots)
+    emit_stack_load(e, asm_r10(), callable_slot)
+    asm_test(e.program, asm_r10(), asm_r10())
+    asm_jz(e.program, asm_symbol(named_symbol(e, "__ep_null_callable")))
+    asm_mov(e.program, asm_r11(), asm_mem_base(0, asm_r10(), 0))
+    let stack_args = len(slots) - 4
+    if stack_args < 0 {
+        stack_args = 0
+    }
+    let frame = 32 + align_up(stack_args * 8, 16)
+    asm_sub(e.program, asm_rsp(), asm_imm(frame))
+    for i: 4:len(slots) {
+        emit_stack_load(e, asm_rax(), slots[i])
+        asm_mov(e.program, asm_mem_base(64, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
+    }
+    asm_call(e.program, asm_r11())
+    asm_add(e.program, asm_rsp(), asm_imm(frame))
+}
+fun emit_call_expr(e: EmitterState, expr: AstExpr): void {
+    let name = expr.name
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && type_source_name_is_integer(name) {
+        let conversion_type = type_from_source_name(name)
+        emit_expr(e, expr.args[0])
+        emit_coerce_rax(e, expr_type(e, expr.args[0]), conversion_type)
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "ptr" {
+        let ptr_arg = expr.args[0]
+        if ptr_arg.kind == AstExprKind.Var && ptr_arg.resolved_kind == AstValueKind.Function {
+            emit_lea_ref(e, asm_rax(), named_symbol(e, ptr_arg.name))
+            ret
+        }
+        let source_type = expr_type(e, ptr_arg)
+        emit_expr(e, ptr_arg)
+        if source_type.kind == TypeRefKind.Array {
+            let empty_array = fresh_label(e)
+            let array_done = fresh_label(e)
+            asm_cmp(e.program, asm_mem_base(64, asm_rax(), 8), asm_imm(0))
+            asm_je(e.program, asm_symbol(empty_array))
+            asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 0))
+            asm_jmp(e.program, asm_symbol(array_done))
+            emit_label_index(e, empty_array)
+            asm_xor(e.program, asm_eax(), asm_eax())
+            emit_label_index(e, array_done)
+        }
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "is_null" {
+        emit_expr(e, expr.args[0])
+        asm_test(e.program, asm_rax(), asm_rax())
+        asm_sete(e.program, asm_al())
+        ret
+    }
+    let sys_symbol = sys_member_symbol(expr.namespace, expr.name)
+    if sys_symbol != "" {
+        let slots = new i64[]
+        let i = 0
+        for i < len(expr.args) {
+            let arg = expr.args[i]
+            let arg_type = expr_type(e, arg)
+            emit_expr(e, arg)
+            if arg_type.kind == TypeRefKind.U8 || arg_type.kind == TypeRefKind.Bool {
+                emit_widen_rax(e, arg_type, type_i64())
+            }
+            let slot = temp_save_rax(e)
+            push(slots, slot)
+            i += 1
+        }
+        emit_call_slots(e, named_symbol(e, sys_symbol), slots)
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "exit" {
+        emit_expr_as(e, expr.args[0], type_i64())
+        asm_mov(e.program, asm_ecx(), asm_eax())
+        emit_call_inst(e, "ExitProcess")
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && expr.namespace == "" && name == "panic" {
+        emit_expr(e, expr.args[0])
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_call_inst(e, "__ep_panic")
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "print" {
+        emit_expr(e, expr.args[0])
+        let tmp = temp_save_rax(e)
+        asm_mov(e.program, asm_ecx(), asm_imm(-11))
+        emit_call_inst(e, "GetStdHandle")
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_stack_load(e, asm_rax(), tmp)
+        asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
+        asm_add(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
+        asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 16))
+        asm_lea(e.program, asm_r9(), asm_mem_symbol(0, named_symbol(e, "_written"), 0))
+        asm_sub(e.program, asm_rsp(), asm_imm(16))
+        asm_mov(e.program, asm_mem_base(64, asm_rsp(), 32), asm_imm(0))
+        emit_call_inst(e, "WriteFile")
+        asm_add(e.program, asm_rsp(), asm_imm(16))
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "itoa" {
+        emit_expr_as(e, expr.args[0], type_i64())
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_call_inst(e, "_itoa")
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "bytes" {
+        emit_expr(e, expr.args[0])
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_call_inst(e, "_bytes")
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "str" {
+        emit_expr(e, expr.args[0])
+        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 0))
+        asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
+        emit_call_inst(e, "_str_alloc")
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "cstr" {
+        emit_expr(e, expr.args[0])
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_call_inst(e, "_cstr")
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "len" {
+        emit_expr(e, expr.args[0])
+        if expr_type(e, expr.args[0]).kind == TypeRefKind.Str {
+            asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 16))
+        } else {
+            asm_mov(e.program, asm_rax(), asm_mem_base(0, asm_rax(), 8))
+        }
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "read_file" {
+        emit_expr(e, expr.args[0])
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        asm_sub(e.program, asm_rsp(), asm_imm(8))
+        emit_call_inst(e, "_read_file")
+        asm_add(e.program, asm_rsp(), asm_imm(8))
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "write_file" {
+        let write_slots = spill_args(e, expr.args)
+        emit_stack_load(e, asm_rcx(), write_slots[0])
+        emit_stack_load(e, asm_rax(), write_slots[1])
+        asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
+        asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 8))
+        asm_sub(e.program, asm_rsp(), asm_imm(8))
+        emit_call_inst(e, "_write_file")
+        asm_add(e.program, asm_rsp(), asm_imm(8))
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "pop" {
+        let pop_arr_type = expr_type(e, expr.args[0])
+        let pop_type = pop_arr_type.element
+        let pop_size = type_storage_size(pop_type)
+        let pop_width = type_width(pop_type)
+        emit_expr(e, expr.args[0])
+        let pop_arr_slot = temp_save_rax(e)
+        emit_stack_load(e, asm_rax(), pop_arr_slot)
+        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
+        asm_test(e.program, asm_rcx(), asm_rcx())
+        asm_jz(e.program, asm_symbol(named_symbol(e, "__ep_pop_fail")))
+        asm_dec(e.program, asm_rcx())
+        asm_mov(e.program, asm_mem_base(0, asm_rax(), 8), asm_rcx())
+        asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 0))
+        asm_mov(e.program, asm_register(0, pop_width), asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), pop_size, 0), pop_width))
+        asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rdx(), asm_rcx(), pop_size, 0), pop_width), asm_imm(0))
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "push" {
+        let arr_type = expr_type(e, expr.args[0])
+        let elem_type = arr_type.element
+        let el_size = type_storage_size(elem_type)
+        let el_width = type_width(elem_type)
+        emit_expr(e, expr.args[0])
+        let arr_slot = temp_save_rax(e)
+        emit_expr(e, expr.args[1])
+        let val_slot = temp_save_rax(e)
+        let new_data_slot = temp_save_rax(e)
+        let grow = fresh_label(e)
+        let store = fresh_label(e)
+        let copy_loop = fresh_label(e)
+        let copy_done = fresh_label(e)
+        let cap_nonzero = fresh_label(e)
+        emit_stack_load(e, asm_rax(), arr_slot)
+        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 8))
+        asm_cmp(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 16))
+        asm_jge(e.program, asm_symbol(grow))
+        asm_jmp(e.program, asm_symbol(store))
+        emit_label_index(e, grow)
+        asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 16))
+        asm_test(e.program, asm_rdx(), asm_rdx())
+        asm_jnz(e.program, asm_symbol(cap_nonzero))
+        asm_mov(e.program, asm_rdx(), asm_imm(2))
+        emit_label_index(e, cap_nonzero)
+        asm_add(e.program, asm_rdx(), asm_rdx())
+        asm_mov(e.program, asm_mem_base(0, asm_rax(), 16), asm_rdx())
+        asm_mov(e.program, asm_r8(), asm_rdx())
+        if el_size != 1 {
+            asm_imul(e.program, asm_r8(), asm_imm(el_size))
+        }
+        asm_mov(e.program, asm_rcx(), asm_r8())
+        asm_sub(e.program, asm_rsp(), asm_imm(40))
+        emit_call_inst(e, "__ep_alloc")
+        asm_add(e.program, asm_rsp(), asm_imm(40))
+        emit_stack_store(e, new_data_slot, asm_rax())
+        emit_stack_load(e, asm_rax(), arr_slot)
+        asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rax(), 0))
+        asm_mov(e.program, asm_r9(), asm_mem_base(0, asm_rax(), 8))
+        asm_xor(e.program, asm_r10(), asm_r10())
+        emit_label_index(e, copy_loop)
+        asm_cmp(e.program, asm_r10(), asm_r9())
+        asm_jge(e.program, asm_symbol(copy_done))
+        asm_mov(e.program, asm_register(11, el_width), asm_operand_width(asm_mem_indexed(asm_r8(), asm_r10(), el_size, 0), el_width))
+        emit_stack_load(e, asm_rax(), new_data_slot)
+        asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rax(), asm_r10(), el_size, 0), el_width), asm_register(11, el_width))
+        asm_inc(e.program, asm_r10())
+        asm_jmp(e.program, asm_symbol(copy_loop))
+        emit_label_index(e, copy_done)
+        emit_stack_load(e, asm_rax(), arr_slot)
+        emit_stack_load(e, asm_rcx(), new_data_slot)
+        asm_mov(e.program, asm_mem_base(0, asm_rax(), 0), asm_rcx())
+        emit_label_index(e, store)
+        emit_stack_load(e, asm_rax(), arr_slot)
+        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rax(), 0))
+        asm_mov(e.program, asm_rdx(), asm_mem_base(0, asm_rax(), 8))
+        emit_stack_load(e, asm_r8(), val_slot)
+        asm_mov(e.program, asm_operand_width(asm_mem_indexed(asm_rcx(), asm_rdx(), el_size, 0), el_width), asm_register(8, el_width))
+        asm_inc(e.program, asm_mem_base(64, asm_rax(), 8))
+        asm_xor(e.program, asm_eax(), asm_eax())
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Builtin && name == "extend" {
+        let extend_type = expr_type(e, expr.args[0])
+        let elem_size = type_storage_size(extend_type.element)
+        let extend_slots = spill_args(e, expr.args)
+        emit_stack_load(e, asm_rcx(), extend_slots[0])
+        emit_stack_load(e, asm_rdx(), extend_slots[1])
+        asm_mov(e.program, asm_r8(), asm_imm(elem_size))
+        emit_call_inst(e, "_extend")
+        asm_xor(e.program, asm_eax(), asm_eax())
+        ret
+    }
+    if expr.callee.resolved_kind == AstValueKind.Function || expr.callee.resolved_kind == AstValueKind.Extern {
+        let call_info = find_func_info(e, name)
+        let call_slots = spill_typed_args(e, expr.args, call_info)
+        emit_call_slots(e, call_info.symbol_index, call_slots)
+        ret
+    }
+    emit_expr(e, expr.callee)
+    let callable_slot = temp_save_rax(e)
+    let indirect_slots = spill_callable_args(e, expr.args, expr_type(e, expr.callee))
+    emit_indirect_call_slots(e, callable_slot, indirect_slots)
+}
+fun emit_integer_value_op(e: EmitterState, op: OperatorKind, right_slot: i64, typ: TypeRef): void {
+    emit_stack_load(e, asm_rcx(), right_slot)
+    let width = type_width(typ)
+    let left_reg = asm_register(0, width)
+    let right_reg = asm_register(1, width)
+    match op {
+        OperatorKind.Add {
+            asm_add(e.program, left_reg, right_reg)
+        }
+        OperatorKind.Subtract {
+            asm_sub(e.program, left_reg, right_reg)
+        }
+        OperatorKind.Multiply {
+            if width == 8 {
+                asm_imul(e.program, asm_eax(), asm_ecx())
+            } else {
+                asm_imul(e.program, left_reg, right_reg)
+            }
+        }
+        OperatorKind.Divide {
+            if type_is_signed(typ) {
+                emit_widen_register(e, 0, typ, type_i64())
+                emit_widen_register(e, 1, typ, type_i64())
+                if width == 64 {
+                    let divide_normal = fresh_label(e)
+                    let divide_done = fresh_label(e)
+                    asm_mov(e.program, asm_rdx(), asm_imm(-9223372036854775807 - 1))
+                    asm_cmp(e.program, asm_rax(), asm_rdx())
+                    asm_jne(e.program, asm_symbol(divide_normal))
+                    asm_cmp(e.program, asm_rcx(), asm_imm(-1))
+                    asm_jne(e.program, asm_symbol(divide_normal))
+                    asm_jmp(e.program, asm_symbol(divide_done))
+                    emit_label_index(e, divide_normal)
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                    emit_label_index(e, divide_done)
+                } else {
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                }
+            } else {
+                emit_widen_register(e, 0, typ, type_u64())
+                emit_widen_register(e, 1, typ, type_u64())
+                asm_xor(e.program, asm_edx(), asm_edx())
+                asm_div(e.program, asm_rcx())
+            }
+        }
+        OperatorKind.Remainder {
+            if type_is_signed(typ) {
+                emit_widen_register(e, 0, typ, type_i64())
+                emit_widen_register(e, 1, typ, type_i64())
+                if width == 64 {
+                    let remainder_normal = fresh_label(e)
+                    let remainder_done = fresh_label(e)
+                    asm_mov(e.program, asm_rdx(), asm_imm(-9223372036854775807 - 1))
+                    asm_cmp(e.program, asm_rax(), asm_rdx())
+                    asm_jne(e.program, asm_symbol(remainder_normal))
+                    asm_cmp(e.program, asm_rcx(), asm_imm(-1))
+                    asm_jne(e.program, asm_symbol(remainder_normal))
+                    asm_xor(e.program, asm_edx(), asm_edx())
+                    asm_jmp(e.program, asm_symbol(remainder_done))
+                    emit_label_index(e, remainder_normal)
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                    emit_label_index(e, remainder_done)
+                } else {
+                    asm_cqo(e.program)
+                    asm_idiv(e.program, asm_rcx())
+                }
+            } else {
+                emit_widen_register(e, 0, typ, type_u64())
+                emit_widen_register(e, 1, typ, type_u64())
+                asm_xor(e.program, asm_edx(), asm_edx())
+                asm_div(e.program, asm_rcx())
+            }
+            asm_mov(e.program, asm_rax(), asm_rdx())
+        }
+        OperatorKind.BitAnd {
+            asm_and(e.program, left_reg, right_reg)
+        }
+        OperatorKind.BitOr {
+            asm_or(e.program, left_reg, right_reg)
+        }
+        OperatorKind.ShiftLeft {
+            asm_shl(e.program, left_reg, asm_cl())
+        }
+        OperatorKind.ShiftRight {
+            if type_is_signed(typ) {
+                asm_sar(e.program, left_reg, asm_cl())
+            } else {
+                asm_shr(e.program, left_reg, asm_cl())
+            }
+        } else {
+            die("internal: operator is not an integer value operator")
+            ret
+        }
+    }
+}
+fun emit_binary(e: EmitterState, expr: AstExpr): void {
+    if expr.op == OperatorKind.LogicalAnd || expr.op == OperatorKind.LogicalOr {
+        let end_id = fresh_label(e)
+        let true_id = fresh_label(e)
+        emit_cond_jump(e, expr, true, true_id)
+        asm_xor(e.program, asm_eax(), asm_eax())
+        asm_jmp(e.program, asm_symbol(end_id))
+        emit_label_index(e, true_id)
+        asm_mov(e.program, asm_eax(), asm_imm(1))
+        emit_label_index(e, end_id)
+        ret
+    }
+    let left_type = expr_type(e, expr.left)
+    let right_type = expr_type(e, expr.right)
+    let operand_type = left_type
+    emit_expr(e, expr.right)
+    if type_width(right_type) < type_width(operand_type) {
+        emit_widen_rax(e, right_type, operand_type)
+    }
+    let tmp = temp_save_rax(e)
+    emit_expr(e, expr.left)
+    if type_width(left_type) < type_width(operand_type) {
+        emit_widen_rax(e, left_type, operand_type)
+    }
+    if expr.op == OperatorKind.Add && left_type.kind == TypeRefKind.Str && right_type.kind == TypeRefKind.Str {
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_stack_load(e, asm_rdx(), tmp)
+        asm_sub(e.program, asm_rsp(), asm_imm(32))
+        emit_call_inst(e, "_str_cat")
+        asm_add(e.program, asm_rsp(), asm_imm(32))
+        ret
+    }
+    if (expr.op == OperatorKind.Equal || expr.op == OperatorKind.NotEqual) && left_type.kind == TypeRefKind.Str && right_type.kind == TypeRefKind.Str {
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_stack_load(e, asm_rax(), tmp)
+        asm_mov(e.program, asm_rdx(), asm_rax())
+        asm_sub(e.program, asm_rsp(), asm_imm(32))
+        emit_call_inst(e, "_str_equal")
+        asm_add(e.program, asm_rsp(), asm_imm(32))
+        if expr.op == OperatorKind.Equal {
+            # _str_equal already returns 0 or 1.
+        } else {
+            asm_xor(e.program, asm_al(), asm_imm(1))
+        }
+        ret
+    }
+    match expr.op {
+        OperatorKind.Add {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.Subtract {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.Multiply {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.Divide {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.Remainder {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.BitAnd {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.BitOr {
+            emit_integer_value_op(e, expr.op, tmp, operand_type)
+            ret
+        }
+        OperatorKind.ShiftLeft {
+            emit_integer_value_op(e, expr.op, tmp, left_type)
+            ret
+        }
+        OperatorKind.ShiftRight {
+            emit_integer_value_op(e, expr.op, tmp, left_type)
+            ret
+        }
+        OperatorKind.Equal {
+            emit_stack_load(e, asm_rcx(), tmp)
+            let equal_width = type_width(operand_type)
+            asm_cmp(e.program, asm_register(0, equal_width), asm_register(1, equal_width))
+            asm_sete(e.program, asm_al())
+        }
+        OperatorKind.NotEqual {
+            emit_stack_load(e, asm_rcx(), tmp)
+            let not_equal_width = type_width(operand_type)
+            asm_cmp(e.program, asm_register(0, not_equal_width), asm_register(1, not_equal_width))
+            asm_setne(e.program, asm_al())
+        }
+        OperatorKind.Less {
+            emit_stack_load(e, asm_rcx(), tmp)
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) {
+                asm_setl(e.program, asm_al())
+            } else {
+                asm_setb(e.program, asm_al())
+            }
+        }
+        OperatorKind.LessEqual {
+            emit_stack_load(e, asm_rcx(), tmp)
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) {
+                asm_setle(e.program, asm_al())
+            } else {
+                asm_setbe(e.program, asm_al())
+            }
+        }
+        OperatorKind.Greater {
+            emit_stack_load(e, asm_rcx(), tmp)
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) {
+                asm_setg(e.program, asm_al())
+            } else {
+                asm_seta(e.program, asm_al())
+            }
+        }
+        OperatorKind.GreaterEqual {
+            emit_stack_load(e, asm_rcx(), tmp)
+            asm_cmp(e.program, type_register(0, operand_type), type_register(1, operand_type))
+            if type_is_signed(operand_type) {
+                asm_setge(e.program, asm_al())
+            } else {
+                asm_setae(e.program, asm_al())
+            }
+        } else {
+            die("internal: operator reached eager binary lowering")
+            ret
+        }
+    }
+}
+fun emit_unary(e: EmitterState, expr: AstExpr): void {
+    emit_expr(e, expr.left)
+    let operand_type = expr_type(e, expr.left)
+    match expr.op {
+        OperatorKind.Negate {
+            asm_neg(e.program, type_register(0, operand_type))
+        }
+        OperatorKind.LogicalNot {
+            emit_test_rax(e, operand_type)
+            asm_sete(e.program, asm_al())
+        } else {
+            die("internal: binary operator used by unary expression")
+            ret
+        }
+    }
+}
+fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
+    let left_type = expr_type(e, expr.left)
+    let right_type = expr_type(e, expr.right)
+    let operand_type = left_type
+    emit_expr(e, expr.right)
+    if type_width(right_type) < type_width(operand_type) {
+        emit_widen_rax(e, right_type, operand_type)
+    }
+    let tmp = temp_save_rax(e)
+    emit_expr(e, expr.left)
+    if type_width(left_type) < type_width(operand_type) {
+        emit_widen_rax(e, left_type, operand_type)
+    }
+    if (expr.op == OperatorKind.Equal || expr.op == OperatorKind.NotEqual) && left_type.kind == TypeRefKind.Str && right_type.kind == TypeRefKind.Str {
+        asm_mov(e.program, asm_rcx(), asm_rax())
+        emit_stack_load(e, asm_rax(), tmp)
+        asm_mov(e.program, asm_rdx(), asm_rax())
+        asm_sub(e.program, asm_rsp(), asm_imm(32))
+        emit_call_inst(e, "_str_equal")
+        asm_add(e.program, asm_rsp(), asm_imm(32))
+        asm_cmp(e.program, asm_eax(), asm_imm(1))
+    } else {
+        emit_stack_load(e, asm_rcx(), tmp)
+        let comparison_width = type_width(operand_type)
+        asm_cmp(e.program, asm_register(0, comparison_width), asm_register(1, comparison_width))
+    }
+    let target = asm_symbol(label)
+    match expr.op {
+        OperatorKind.Equal {
+            if jump_if_true {
+                asm_jz(e.program, target)
+            } else {
+                asm_jnz(e.program, target)
+            }
+        }
+        OperatorKind.NotEqual {
+            if jump_if_true {
+                asm_jnz(e.program, target)
+            } else {
+                asm_jz(e.program, target)
+            }
+        }
+        OperatorKind.Less {
+            if type_is_signed(operand_type) {
+                if jump_if_true {
+                    asm_jl(e.program, target)
+                } else {
+                    asm_jge(e.program, target)
+                }
+            } else {
+                if jump_if_true {
+                    asm_jb(e.program, target)
+                } else {
+                    asm_jae(e.program, target)
+                }
+            }
+        }
+        OperatorKind.LessEqual {
+            if type_is_signed(operand_type) {
+                if jump_if_true {
+                    asm_jle(e.program, target)
+                } else {
+                    asm_jg(e.program, target)
+                }
+            } else {
+                if jump_if_true {
+                    asm_jbe(e.program, target)
+                } else {
+                    asm_ja(e.program, target)
+                }
+            }
+        }
+        OperatorKind.Greater {
+            if type_is_signed(operand_type) {
+                if jump_if_true {
+                    asm_jg(e.program, target)
+                } else {
+                    asm_jle(e.program, target)
+                }
+            } else {
+                if jump_if_true {
+                    asm_ja(e.program, target)
+                } else {
+                    asm_jbe(e.program, target)
+                }
+            }
+        }
+        OperatorKind.GreaterEqual {
+            if type_is_signed(operand_type) {
+                if jump_if_true {
+                    asm_jge(e.program, target)
+                } else {
+                    asm_jl(e.program, target)
+                }
+            } else {
+                if jump_if_true {
+                    asm_jae(e.program, target)
+                } else {
+                    asm_jb(e.program, target)
+                }
+            }
+        } else {
+            die("internal: non-comparison used by comparison jump")
+            ret
+        }
+    }
+}
+fun emit_value_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
+    emit_expr(e, expr)
+    emit_test_rax(e, expr_type(e, expr))
+    if jump_if_true {
+        asm_jnz(e.program, asm_symbol(label))
+    } else {
+        asm_jz(e.program, asm_symbol(label))
+    }
+}
+fun emit_binary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
+    match expr.op {
+        OperatorKind.Add {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Subtract {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Multiply {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Divide {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Remainder {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.BitAnd {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.BitOr {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.ShiftLeft {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.ShiftRight {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Equal {
+            emit_comparison_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.NotEqual {
+            emit_comparison_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Less {
+            emit_comparison_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.LessEqual {
+            emit_comparison_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.Greater {
+            emit_comparison_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.GreaterEqual {
+            emit_comparison_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.LogicalAnd {
+            if !jump_if_true {
+                emit_cond_jump(e, expr.left, false, label)
+                emit_cond_jump(e, expr.right, false, label)
+            } else {
+                let and_skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, false, and_skip)
+                emit_cond_jump(e, expr.right, true, label)
+                emit_label_index(e, and_skip)
+            }
+            ret
+        }
+        OperatorKind.LogicalOr {
+            if jump_if_true {
+                emit_cond_jump(e, expr.left, true, label)
+                emit_cond_jump(e, expr.right, true, label)
+            } else {
+                let or_skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, true, or_skip)
+                emit_cond_jump(e, expr.right, false, label)
+                emit_label_index(e, or_skip)
+            }
+            ret
+        } else {
+            die("internal: unary operator used by binary expression")
+            ret
+        }
+    }
+}
+fun emit_unary_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
+    match expr.op {
+        OperatorKind.Negate {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        OperatorKind.LogicalNot {
+            if jump_if_true {
+                emit_cond_jump(e, expr.left, false, label)
+                ret
+            }
+            emit_cond_jump(e, expr.left, true, label)
+            ret
+        } else {
+            die("internal: binary operator used by unary expression")
+            ret
+        }
+    }
+}
+fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: bool, label: i64): void {
+    match expr.kind {
+        AstExprKind.Literal {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.String {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Embed {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Var {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Binary {
+            emit_binary_cond_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Unary {
+            emit_unary_cond_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Call {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Closure {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.NewProduct {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.NewArray {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.FieldAccess {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Subscript {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Slice {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.If {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+        AstExprKind.Match {
+            emit_value_jump(e, expr, jump_if_true, label)
+            ret
+        }
+    }
+}
+fun emit_new(e: EmitterState, expr: AstExpr): void {
+    let info = find_struct_info(e, expr.source_type.name)
+    asm_mov(e.program, asm_ecx(), asm_imm(info.size))
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+}
+fun emit_closure(e: EmitterState, expr: AstExpr): void {
+    asm_mov(e.program, asm_ecx(), asm_imm((len(expr.captures) + 1) * 8))
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+    let object_slot = temp_save_rax(e)
+    emit_stack_load(e, asm_rcx(), object_slot)
+    emit_lea_ref(e, asm_rdx(), closure_symbol(e, expr.closure_id))
+    asm_mov(e.program, asm_mem_base(0, asm_rcx(), 0), asm_rdx())
+    for capture_i: 0:len(expr.captures) {
+        let capture = expr.captures[capture_i]
+        let source_kind = AstValueKind.Capture
+        if has_local(e, capture.symbol_id) {
+            source_kind = AstValueKind.Local
+        }
+        emit_load_resolved_value(e, source_kind, capture.symbol_id, capture.typ)
+        emit_stack_load(e, asm_rcx(), object_slot)
+        asm_mov(e.program, asm_operand_width(asm_mem_base(0, asm_rcx(), 8 + capture_i * 8), type_width(capture.typ)), type_register(0, capture.typ))
+    }
+    emit_stack_load(e, asm_rax(), object_slot)
+}
+fun emit_new_array(e: EmitterState, expr: AstExpr): void {
+    let el_size = type_storage_size(expr.source_type)
+    let header_slot = 0
+    asm_mov(e.program, asm_ecx(), asm_imm(24))
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+    header_slot = temp_save_rax(e)
+    match expr.count.kind {
+        AstExprOptionKind.None {
+            emit_stack_load(e, asm_rcx(), header_slot)
+            asm_mov(e.program, asm_mem_base(64, asm_rcx(), 8), asm_imm(0))
+            asm_mov(e.program, asm_rax(), asm_imm(4))
+        }
+        AstExprOptionKind.Some {
+            emit_expr(e, expr.count.value)
+            let count_ok = fresh_label(e)
+            asm_test(e.program, asm_rax(), asm_rax())
+            asm_jge(e.program, asm_symbol(count_ok))
+            asm_mov(e.program, asm_ecx(), asm_imm(1))
+            emit_call_inst(e, "ExitProcess")
+            emit_label_index(e, count_ok)
+            emit_stack_load(e, asm_rcx(), header_slot)
+            asm_mov(e.program, asm_mem_base(0, asm_rcx(), 8), asm_rax())
+        }
+    }
+    asm_cmp(e.program, asm_rax(), asm_imm(1))
+    let cap_ok = fresh_label(e)
+    asm_jge(e.program, asm_symbol(cap_ok))
+    asm_mov(e.program, asm_rax(), asm_imm(1))
+    emit_label_index(e, cap_ok)
+    emit_stack_load(e, asm_rcx(), header_slot)
+    asm_mov(e.program, asm_mem_base(0, asm_rcx(), 16), asm_rax())
+    asm_mov(e.program, asm_r8(), asm_rax())
+    if el_size != 1 {
+        asm_imul(e.program, asm_r8(), asm_imm(el_size))
+    }
+    asm_mov(e.program, asm_rcx(), asm_r8())
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+    emit_stack_load(e, asm_rcx(), header_slot)
+    asm_mov(e.program, asm_mem_base(0, asm_rcx(), 0), asm_rax())
+    asm_mov(e.program, asm_rax(), asm_rcx())
+}
+fun field_layout_name(t: TypeRef): str {
+    if t.kind == TypeRefKind.Named {
+        ret t.name
+    }
+    ""
+}
+fun emit_field_address(e: EmitterState, object: AstExpr, name: str): TypeRef {
+    let object_type = expr_type(e, object)
+    let field = find_field_info(e, field_layout_name(object_type), name)
+    emit_expr(e, object)
+    if field.offset != 0 {
+        asm_add(e.program, asm_rax(), asm_imm(field.offset))
+    }
+    field.typ
+}
+fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): TypeRef {
+    let base_type = expr_type(e, base)
+    let elem_type = type_i64()
+    if base_type.kind == TypeRefKind.Str {
+        elem_type = type_u8()
+    } else if base_type.kind == TypeRefKind.Array {
+        elem_type = base_type.element
+    } else {
+        die("internal: checked subscript has invalid base")
+    }
+    emit_expr(e, base)
+    let base_slot = temp_save_rax(e)
+    emit_expr_as(e, index, type_i64())
+    emit_stack_load(e, asm_rcx(), base_slot)
+    if base_type.kind == TypeRefKind.Str || base_type.kind == TypeRefKind.Array {
+        asm_test(e.program, asm_rax(), asm_rax())
+        asm_jl(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
+        let len_offset = 8
+        if base_type.kind == TypeRefKind.Str {
+            len_offset = 16
+        }
+        asm_cmp(e.program, asm_rax(), asm_mem_base(0, asm_rcx(), len_offset))
+        asm_jae(e.program, asm_symbol(named_symbol(e, "__ep_bounds_fail")))
+        if base_type.kind == TypeRefKind.Str {
+            asm_add(e.program, asm_rax(), asm_mem_base(0, asm_rcx(), 8))
+        }
+        asm_mov(e.program, asm_rcx(), asm_mem_base(0, asm_rcx(), 0))
+    }
+    asm_lea(e.program, asm_rax(), asm_mem_indexed(asm_rcx(), asm_rax(), type_storage_size(elem_type), 0))
+    elem_type
+}
+fun emit_load_address(e: EmitterState, value_type: TypeRef): void {
+    let width = type_width(value_type)
+    asm_mov(e.program, type_register(0, value_type), asm_mem_base(width, asm_rax(), 0))
+}
+fun emit_store_address(e: EmitterState, value_type: TypeRef, address_slot: i64): void {
+    emit_stack_load(e, asm_rcx(), address_slot)
+    asm_mov(e.program, asm_mem_base(type_width(value_type), asm_rcx(), 0), type_register(0, value_type))
+}
+fun is_enum_member_access(e: EmitterState, expr: AstExpr): bool {
+    if expr.object.kind != AstExprKind.Var {
+        ret false
+    }
+    for i: 0:len(e.enums) {
+        if e.enums[i].name == expr.object.name {
+            ret true
+        }
+    }
+    false
+}
+fun emit_field_access(e: EmitterState, expr: AstExpr): void {
+    if is_enum_member_access(e, expr) {
+        asm_mov(e.program, asm_rax(), asm_imm(parse_integer(expr.value)))
+        ret
+    }
+    let field_type = emit_field_address(e, expr.object, expr.name)
+    emit_load_address(e, field_type)
+}
+fun emit_subscript(e: EmitterState, expr: AstExpr): void {
+    let elem_type = emit_subscript_address(e, expr.base, expr.index)
+    emit_load_address(e, elem_type)
+    emit_coerce_rax(e, elem_type, expr_type(e, expr))
+}
+fun emit_slice(e: EmitterState, expr: AstExpr): void {
+    let base_type = expr_type(e, expr.base)
+    emit_expr(e, expr.base)
+    let base_slot = temp_save_rax(e)
+    emit_expr_as(e, expr.slice_start, type_i64())
+    let start_slot = temp_save_rax(e)
+    emit_expr_as(e, expr.slice_end, type_i64())
+    let end_slot = temp_save_rax(e)
+
+    emit_stack_load(e, asm_rax(), start_slot)
+    asm_test(e.program, asm_rax(), asm_rax())
+    asm_jl(e.program, asm_symbol(named_symbol(e, "__ep_slice_bounds_fail")))
+    emit_stack_load(e, asm_rcx(), end_slot)
+    asm_cmp(e.program, asm_rcx(), asm_rax())
+    asm_jl(e.program, asm_symbol(named_symbol(e, "__ep_slice_bounds_fail")))
+    emit_stack_load(e, asm_rdx(), base_slot)
+    let len_offset = 8
+    if base_type.kind == TypeRefKind.Str {
+        len_offset = 16
+    }
+    asm_cmp(e.program, asm_rcx(), asm_mem_base(0, asm_rdx(), len_offset))
+    asm_jg(e.program, asm_symbol(named_symbol(e, "__ep_slice_bounds_fail")))
+
+    if base_type.kind == TypeRefKind.Str {
+        emit_stack_load(e, asm_rcx(), base_slot)
+        emit_stack_load(e, asm_rdx(), start_slot)
+        emit_stack_load(e, asm_r8(), end_slot)
+        asm_sub(e.program, asm_rsp(), asm_imm(32))
+        emit_call_inst(e, "_str_slice")
+        asm_add(e.program, asm_rsp(), asm_imm(32))
+        ret
+    }
+
+    let elem_type = base_type.element
+    let elem_size = type_storage_size(elem_type)
+    asm_mov(e.program, asm_ecx(), asm_imm(24))
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+    let header_slot = temp_save_rax(e)
+    emit_stack_load(e, asm_r8(), end_slot)
+    emit_stack_load(e, asm_r9(), start_slot)
+    asm_sub(e.program, asm_r8(), asm_r9())
+    asm_mov(e.program, asm_mem_base(0, asm_rax(), 8), asm_r8())
+    asm_mov(e.program, asm_mem_base(0, asm_rax(), 16), asm_r8())
+    if elem_size != 1 {
+        asm_imul(e.program, asm_r8(), asm_imm(elem_size))
+    }
+    let nonempty = fresh_label(e)
+    asm_test(e.program, asm_r8(), asm_r8())
+    asm_jnz(e.program, asm_symbol(nonempty))
+    asm_mov(e.program, asm_r8(), asm_imm(1))
+    emit_label_index(e, nonempty)
+    asm_mov(e.program, asm_rcx(), asm_r8())
+    asm_sub(e.program, asm_rsp(), asm_imm(40))
+    emit_call_inst(e, "__ep_alloc")
+    asm_add(e.program, asm_rsp(), asm_imm(40))
+    let data_slot = temp_save_rax(e)
+    emit_stack_load(e, asm_rcx(), header_slot)
+    asm_mov(e.program, asm_mem_base(0, asm_rcx(), 0), asm_rax())
+
+    emit_stack_load(e, asm_rdx(), base_slot)
+    asm_mov(e.program, asm_r8(), asm_mem_base(0, asm_rdx(), 0))
+    emit_stack_load(e, asm_r10(), start_slot)
+    if elem_size != 1 {
+        asm_imul(e.program, asm_r10(), asm_imm(elem_size))
+    }
+    asm_add(e.program, asm_r8(), asm_r10())
+    emit_stack_load(e, asm_r9(), data_slot)
+    emit_stack_load(e, asm_r10(), end_slot)
+    emit_stack_load(e, asm_rdx(), start_slot)
+    asm_sub(e.program, asm_r10(), asm_rdx())
+    let copy_loop = fresh_label(e)
+    let copy_done = fresh_label(e)
+    emit_label_index(e, copy_loop)
+    asm_test(e.program, asm_r10(), asm_r10())
+    asm_jz(e.program, asm_symbol(copy_done))
+    asm_mov(e.program, type_register(11, elem_type), asm_operand_width(asm_mem_base(0, asm_r8(), 0), type_width(elem_type)))
+    asm_mov(e.program, asm_operand_width(asm_mem_base(0, asm_r9(), 0), type_width(elem_type)), type_register(11, elem_type))
+    asm_add(e.program, asm_r8(), asm_imm(elem_size))
+    asm_add(e.program, asm_r9(), asm_imm(elem_size))
+    asm_dec(e.program, asm_r10())
+    asm_jmp(e.program, asm_symbol(copy_loop))
+    emit_label_index(e, copy_done)
+    emit_stack_load(e, asm_rax(), header_slot)
+}
+fun emit_expr(e: EmitterState, expr: AstExpr): void {
+    match expr.kind {
+        AstExprKind.Literal {
+            asm_mov(e.program, type_register(0, expr_type(e, expr)), asm_imm(expr.resolved_value))
+            ret
+        }
+        AstExprKind.String {
+            let string_id = get_string_id(e, expr.value)
+            emit_lea_ref(e, asm_rcx(), string_id)
+            asm_mov(e.program, asm_rdx(), asm_imm(len(expr.value)))
+            emit_call_inst(e, "_str_alloc")
+            ret
+        }
+        AstExprKind.Embed {
+            let embed_id = get_string_id(e, expr.value)
+            emit_lea_ref(e, asm_rcx(), embed_id)
+            asm_mov(e.program, asm_rdx(), asm_imm(len(expr.value)))
+            emit_call_inst(e, "_embed_bytes")
+            ret
+        }
+        AstExprKind.Var {
+            if expr.resolved_kind == AstValueKind.Argv {
+                asm_mov(e.program, asm_rax(), asm_mem_symbol(0, named_symbol(e, "_argv"), 0))
+            } else if expr.resolved_kind == AstValueKind.Function {
+                emit_lea_ref(e, asm_rax(), find_func_info(e, expr.name).descriptor_symbol_index)
+            } else if expr.resolved_kind == AstValueKind.Local || expr.resolved_kind == AstValueKind.Capture {
+                emit_load_resolved_value(e, expr.resolved_kind, expr.resolved_value, expr_type(e, expr))
+            } else {
+                die("internal: unresolved value expression")
+            }
+            ret
+        }
+        AstExprKind.Binary {
+            emit_binary(e, expr)
+            ret
+        }
+        AstExprKind.Unary {
+            emit_unary(e, expr)
+            ret
+        }
+        AstExprKind.Call {
+            emit_call_expr(e, expr)
+            ret
+        }
+        AstExprKind.Closure {
+            emit_closure(e, expr)
+            ret
+        }
+        AstExprKind.NewProduct {
+            emit_new(e, expr)
+            ret
+        }
+        AstExprKind.NewArray {
+            emit_new_array(e, expr)
+            ret
+        }
+        AstExprKind.FieldAccess {
+            emit_field_access(e, expr)
+            ret
+        }
+        AstExprKind.Subscript {
+            emit_subscript(e, expr)
+            ret
+        }
+        AstExprKind.Slice {
+            emit_slice(e, expr)
+            ret
+        }
+        AstExprKind.If {
+            emit_if(e, expr)
+            ret
+        }
+        AstExprKind.Match {
+            emit_match(e, expr)
+            ret
+        }
+    }
+}
+fun emit_return(e: EmitterState, stmt: AstStmt): void {
+    if e.current_fn == "main" {
+        match stmt.return_value.kind {
+            AstExprOptionKind.None {
+                asm_mov(e.program, asm_ecx(), asm_imm(0))
+            }
+            AstExprOptionKind.Some {
+                emit_expr(e, stmt.return_value.value)
+                emit_coerce_rax(e, expr_type(e, stmt.return_value.value), type_i64())
+                asm_mov(e.program, asm_ecx(), asm_eax())
+            }
+        }
+        emit_call_inst(e, "ExitProcess")
+    } else {
+        match stmt.return_value.kind {
+            AstExprOptionKind.None {
+            }
+            AstExprOptionKind.Some {
+                emit_expr(e, stmt.return_value.value)
+                emit_coerce_rax(e, expr_type(e, stmt.return_value.value), e.current_ret_type)
+            }
+        }
+        asm_jmp(e.program, asm_symbol(e.current_ep_id))
+    }
+}
+fun emit_let(e: EmitterState, stmt: AstStmt): void {
+    emit_expr(e, stmt.value_expr)
+    let local_type = find_local_type(e, stmt.symbol_id)
+    emit_stack_store_value(e, find_local_slot(e, stmt.symbol_id), 0, local_type)
+}
+fun emit_assign_target_address(e: EmitterState, target: AstAssignTarget): TypeRef {
+    match target.kind {
+        AssignTargetKind.Var {
+            ret emit_resolved_value_address(e, target.resolved_kind, target.resolved_value)
+        }
+        AssignTargetKind.Field {
+            ret emit_field_address(e, target.object, target.name)
+        }
+        AssignTargetKind.Subscript {
+            ret emit_subscript_address(e, target.base, target.index)
+        }
+    }
+}
+fun emit_assign(e: EmitterState, stmt: AstStmt): void {
+    let target_type = emit_assign_target_address(e, stmt.target)
+    let address_slot = temp_save_rax(e)
+    emit_expr(e, stmt.value_expr)
+    emit_coerce_rax(e, expr_type(e, stmt.value_expr), target_type)
+    emit_store_address(e, target_type, address_slot)
+}
+fun emit_assign_op(e: EmitterState, stmt: AstStmt): void {
+    let target_type = emit_assign_target_address(e, stmt.target)
+    let address_slot = temp_save_rax(e)
+    emit_load_address(e, target_type)
+    let old_value_slot = temp_save_rax(e)
+    emit_expr(e, stmt.value_expr)
+    let right_slot = temp_save_rax(e)
+    emit_stack_load(e, asm_rax(), old_value_slot)
+    emit_integer_value_op(e, stmt.op, right_slot, target_type)
+    emit_store_address(e, target_type, address_slot)
+}
+fun emit_block_as(e: EmitterState, block: AstBlock, target: TypeRef): void {
+    emit_block(e, block)
+    emit_coerce_rax(e, block.resolved_type, target)
+}
+fun emit_if(e: EmitterState, expr: AstExpr): void {
+    let else_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    if !expr.else_block.present {
+        emit_cond_jump(e, expr.condition, false, end_id)
+        emit_block_as(e, expr.then_block, expr_type(e, expr))
+    } else {
+        emit_cond_jump(e, expr.condition, false, else_id)
+        emit_block_as(e, expr.then_block, expr_type(e, expr))
+        asm_jmp(e.program, asm_symbol(end_id))
+        emit_label_index(e, else_id)
+        emit_block_as(e, expr.else_block, expr_type(e, expr))
+    }
+    emit_label_index(e, end_id)
+}
+fun emit_for_condition(e: EmitterState, stmt: AstStmt): void {
+    let start_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    push(e.loop_starts, start_id)
+    push(e.loop_ends, end_id)
+    emit_label_index(e, start_id)
+    emit_cond_jump(e, stmt.expr, false, end_id)
+    emit_block(e, stmt.body)
+    pop(e.loop_starts)
+    pop(e.loop_ends)
+    asm_jmp(e.program, asm_symbol(start_id))
+    emit_label_index(e, end_id)
+}
+fun emit_for_range(e: EmitterState, stmt: AstStmt): void {
+    emit_expr(e, stmt.range_start)
+    emit_stack_store(e, find_local_slot(e, stmt.symbol_id), asm_rax())
+    emit_expr(e, stmt.range_end)
+    emit_stack_store(e, stmt.range_end_slot, asm_rax())
+    let check_id = fresh_label(e)
+    let step_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    push(e.loop_starts, step_id)
+    push(e.loop_ends, end_id)
+    emit_label_index(e, check_id)
+    emit_stack_load(e, asm_rax(), find_local_slot(e, stmt.symbol_id))
+    emit_stack_load(e, asm_rcx(), stmt.range_end_slot)
+    asm_cmp(e.program, asm_rax(), asm_rcx())
+    asm_jge(e.program, asm_symbol(end_id))
+    emit_block(e, stmt.body)
+    pop(e.loop_starts)
+    pop(e.loop_ends)
+    emit_label_index(e, step_id)
+    asm_inc(e.program, asm_mem_base(64, asm_rbp(), find_local_slot(e, stmt.symbol_id)))
+    asm_jmp(e.program, asm_symbol(check_id))
+    emit_label_index(e, end_id)
+}
+fun emit_match(e: EmitterState, expr: AstExpr): void {
+    emit_expr(e, expr.subject)
+    let subject_slot = temp_save_rax(e)
+    let end_id = fresh_label(e)
+    for i: 0:len(expr.match_arms) {
+        let arm = expr.match_arms[i]
+        if arm.is_else {
+            emit_block_as(e, arm.body, expr_type(e, expr))
+            asm_jmp(e.program, asm_symbol(end_id))
+        } else {
+            let next_id = fresh_label(e)
+            emit_stack_load(e, asm_rax(), subject_slot)
+            asm_mov(e.program, asm_rcx(), asm_imm(arm.value))
+            asm_cmp(e.program, asm_rax(), asm_rcx())
+            asm_jne(e.program, asm_symbol(next_id))
+            emit_block_as(e, arm.body, expr_type(e, expr))
+            asm_jmp(e.program, asm_symbol(end_id))
+            emit_label_index(e, next_id)
+        }
+    }
+    emit_label_index(e, end_id)
+}
+fun emit_break(e: EmitterState, stmt: AstStmt): void {
+    if len(e.loop_ends) == 0 {
+        die("break outside loop")
+    }
+    asm_jmp(e.program, asm_symbol(e.loop_ends[len(e.loop_ends) - 1]))
+}
+fun emit_continue(e: EmitterState, stmt: AstStmt): void {
+    if len(e.loop_starts) == 0 {
+        die("continue outside loop")
+    }
+    asm_jmp(e.program, asm_symbol(e.loop_starts[len(e.loop_starts) - 1]))
+}
+fun emit_stmt(e: EmitterState, stmt: AstStmt): void {
+    temp_reset(e)
+    match stmt.kind {
+        AstStmtKind.Return {
+            emit_return(e, stmt)
+            ret
+        }
+        AstStmtKind.Expr {
+            emit_expr(e, stmt.expr)
+            ret
+        }
+        AstStmtKind.Let {
+            emit_let(e, stmt)
+            ret
+        }
+        AstStmtKind.Assign {
+            emit_assign(e, stmt)
+            ret
+        }
+        AstStmtKind.AssignOp {
+            emit_assign_op(e, stmt)
+            ret
+        }
+        AstStmtKind.ForCondition {
+            emit_for_condition(e, stmt)
+            ret
+        }
+        AstStmtKind.ForRange {
+            emit_for_range(e, stmt)
+            ret
+        }
+        AstStmtKind.Break {
+            emit_break(e, stmt)
+            ret
+        }
+        AstStmtKind.Continue {
+            emit_continue(e, stmt)
+            ret
+        }
+    }
+}
+fun emit_block(e: EmitterState, block: AstBlock): void {
+    if !block.present {
+        ret
+    }
+    let i = 0
+    for i < len(block.stmts) {
+        emit_stmt(e, block.stmts[i])
+        i += 1
+    }
+    match block.tail.kind {
+        AstExprOptionKind.None {
+        }
+        AstExprOptionKind.Some {
+            temp_reset(e)
+            emit_expr(e, block.tail.value)
+        }
+    }
+}
+fun emit_fn_def(e: EmitterState, fn: AstFunDef): void {
+    reset_locals(e)
+    e.current_captures = new AstCapture[]
+    e.context_slot = 0
+    e.current_fn = fn.name
+    e.current_ret_type = fn.return_type
+    e.current_ep_id = fresh_label(e)
+    let i = 0
+    for i < len(fn.params) {
+        add_local(e, fn.params[i].name, fn.params[i].typ, fn.params[i].symbol_id)
+        i += 1
+    }
+    pre_scan_block(e, fn.body)
+    e.temp_base = e.local_bytes
+    if fn.name == "main" {
+        emit_label(e, "_start")
+    } else {
+        emit_label(e, fn.name)
+    }
+    if fn.name == "main" {
+        asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_gc_stack_high"), 0), asm_rsp())
+    }
+    emit_prologue(e)
+    if fn.name == "main" {
+        emit_call_inst(e, "GetProcessHeap")
+        asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_heap"), 0), asm_rax())
+        emit_call_inst(e, "__ep_gc_small_init")
+        emit_call_inst(e, "_argv_init")
+        asm_mov(e.program, asm_mem_symbol(0, named_symbol(e, "_argv"), 0), asm_rax())
+    }
+    if len(fn.params) > 0 {
+        let param0_type = find_local_type(e, fn.params[0].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[0].symbol_id), 1, param0_type)
+    }
+    if len(fn.params) > 1 {
+        let param1_type = find_local_type(e, fn.params[1].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[1].symbol_id), 2, param1_type)
+    }
+    if len(fn.params) > 2 {
+        let param2_type = find_local_type(e, fn.params[2].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[2].symbol_id), 8, param2_type)
+    }
+    if len(fn.params) > 3 {
+        let param3_type = find_local_type(e, fn.params[3].symbol_id)
+        emit_stack_store_value(e, find_local_slot(e, fn.params[3].symbol_id), 9, param3_type)
+    }
+    i = 4
+    for i < len(fn.params) {
+        let stack_param_type = find_local_type(e, fn.params[i].symbol_id)
+        asm_mov(e.program, type_register(0, stack_param_type), asm_operand_width(asm_mem_base(0, asm_rbp(), 48 + (i - 4) * 8), type_width(stack_param_type)))
+        emit_stack_store_value(e, find_local_slot(e, fn.params[i].symbol_id), 0, stack_param_type)
+        i += 1
+    }
+    emit_block(e, fn.body)
+    if fn.name != "main" {
+        emit_coerce_rax(e, fn.body.resolved_type, e.current_ret_type)
+    }
+    if fn.name == "main" {
+        asm_mov(e.program, asm_ecx(), asm_imm(0))
+        emit_call_inst(e, "ExitProcess")
+    } else {
+        emit_label_index(e, e.current_ep_id)
+        emit_epilogue(e)
+    }
+    e.alloc_size = align_up(e.local_bytes + e.temp_peak * 8 + 32, 16)
+    if e.alloc_size >= 4096 {
+        die("stack frame exceeds v2 limit")
+    }
+    e.program.items[e.alloc_size_item].b.imm = e.alloc_size
+}
+fun emit_closure_def(e: EmitterState, closure: AstExpr): void {
+    reset_locals(e)
+    e.current_fn = "__ep_closure_" + itoa(closure.closure_id)
+    e.current_ret_type = closure.closure_return_type
+    e.current_ep_id = fresh_label(e)
+    e.current_captures = closure.captures
+    e.local_bytes = 8
+    e.context_slot = -8
+    for i: 0:len(closure.closure_params) {
+        let param = closure.closure_params[i]
+        add_local(e, param.name, param.typ, param.symbol_id)
+    }
+    pre_scan_block(e, closure.closure_body)
+    e.temp_base = e.local_bytes
+    emit_label_index(e, closure_symbol(e, closure.closure_id))
+    emit_prologue(e)
+    emit_stack_store(e, e.context_slot, asm_r10())
+    if len(closure.closure_params) > 0 {
+        let param0 = closure.closure_params[0]
+        emit_stack_store_value(e, find_local_slot(e, param0.symbol_id), 1, param0.typ)
+    }
+    if len(closure.closure_params) > 1 {
+        let param1 = closure.closure_params[1]
+        emit_stack_store_value(e, find_local_slot(e, param1.symbol_id), 2, param1.typ)
+    }
+    if len(closure.closure_params) > 2 {
+        let param2 = closure.closure_params[2]
+        emit_stack_store_value(e, find_local_slot(e, param2.symbol_id), 8, param2.typ)
+    }
+    if len(closure.closure_params) > 3 {
+        let param3 = closure.closure_params[3]
+        emit_stack_store_value(e, find_local_slot(e, param3.symbol_id), 9, param3.typ)
+    }
+    for stack_i: 4:len(closure.closure_params) {
+        let stack_param = closure.closure_params[stack_i]
+        asm_mov(e.program, type_register(0, stack_param.typ), asm_operand_width(asm_mem_base(0, asm_rbp(), 48 + (stack_i - 4) * 8), type_width(stack_param.typ)))
+        emit_stack_store_value(e, find_local_slot(e, stack_param.symbol_id), 0, stack_param.typ)
+    }
+    emit_block(e, closure.closure_body)
+    emit_coerce_rax(e, closure.closure_body.resolved_type, closure.closure_return_type)
+    emit_label_index(e, e.current_ep_id)
+    emit_epilogue(e)
+    e.alloc_size = align_up(e.local_bytes + e.temp_peak * 8 + 32, 16)
+    if e.alloc_size >= 4096 {
+        die("stack frame exceeds v2 limit")
+    }
+    e.program.items[e.alloc_size_item].b.imm = e.alloc_size
+}
+fun emit_program(e: EmitterState, ast: AstProgram): void {
+    e.enums = ast.enums
+    compute_struct_layouts(e, ast)
+    add_func_infos(e, ast)
+    collect_program_strings(e, ast)
+    e.program.entry_symbol_index = named_symbol(e, "_start")
+    emit_extern(e, "ExitProcess")
+    emit_extern(e, "GetStdHandle")
+    emit_extern(e, "WriteFile")
+    emit_extern(e, "CreateFileA")
+    emit_extern(e, "ReadFile")
+    emit_extern(e, "SetFilePointer")
+    emit_extern(e, "CloseHandle")
+    emit_extern(e, "GetFileSize")
+    emit_extern(e, "lstrcmpA")
+    emit_extern(e, "lstrlenA")
+    emit_extern(e, "GetCommandLineA")
+    emit_extern(e, "HeapAlloc")
+    emit_extern(e, "HeapFree")
+    emit_extern(e, "GetProcessHeap")
+    emit_extern(e, "VirtualAlloc")
+    emit_extern(e, "Beep")
+    emit_extern(e, "GetCurrentProcess")
+    emit_extern(e, "GetCurrentProcessId")
+    emit_extern(e, "GetCurrentThreadId")
+    emit_extern(e, "GetFileAttributesA")
+    emit_extern(e, "CreateDirectoryA")
+    emit_extern(e, "GetLastError")
+    emit_extern(e, "GetTickCount64")
+    emit_extern(e, "MessageBoxA")
+    emit_extern(e, "SetLastError")
+    emit_extern(e, "Sleep")
+    asm_section_data(e.program)
+    emit_label(e, "_written")
+    asm_dd(e.program, 0)
+    emit_label(e, "_heap")
+    asm_dq(e.program, 0)
+    emit_label(e, "_argv")
+    asm_dq(e.program, 0)
+    for descriptor_i: 0:len(ast.funcs) {
+        let descriptor_fn = ast.funcs[descriptor_i]
+        if descriptor_fn.name != "main" {
+            let descriptor_info = find_func_info(e, descriptor_fn.name)
+            emit_label_index(e, descriptor_info.descriptor_symbol_index)
+            asm_dq_symbol(e.program, descriptor_info.symbol_index)
+        }
+    }
+    let i = 0
+    for i < len(e.strings) {
+        emit_label_index(e, e.strings[i].symbol_index)
+        asm_bytes(e.program, string_bytes(e.strings[i].text))
+        i += 1
+    }
+    asm_section_text(e.program)
+    i = 0
+    for i < len(ast.funcs) {
+        emit_fn_def(e, ast.funcs[i])
+        i += 1
+    }
+    for closure_i: 0:len(e.closures) {
+        emit_closure_def(e, e.closures[closure_i])
+    }
+    emit_runtime_helpers(e)
+}

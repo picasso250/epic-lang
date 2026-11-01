@@ -1,0 +1,4 @@
+# ERROR: unary operator ! requires bool, got str
+fun main(): void {
+    let value = !"text"
+}

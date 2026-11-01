@@ -1,0 +1,24 @@
+type GcClosureBox {
+    value: i64
+}
+
+fun make_gc_closure(): fun(): i64 {
+    let box = new GcClosureBox
+    box.value = 77
+    fun(): i64 {
+        box.value
+    }
+}
+
+fun main(): void {
+    let callback = make_gc_closure()
+    let i = 0
+    for i < 60000 {
+        let waste = new u8[1024]
+        waste[0] = u8(i)
+        i += 1
+    }
+    if callback() != 77 {
+        exit(1)
+    }
+}

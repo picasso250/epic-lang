@@ -1,0 +1,5 @@
+extern "kernel32.dll" fun EpicV4DefinitelyMissingExport7f3a9c(): i32
+
+fun main(): void {
+    EpicV4DefinitelyMissingExport7f3a9c()
+}

@@ -1,0 +1,8 @@
+# ERROR: non-exhaustive match on enum MissingArmEnum
+type MissingArmEnum = First | Second | Third
+fun main(): void {
+    match MissingArmEnum.First {
+        MissingArmEnum.First {}
+        MissingArmEnum.Second {}
+    }
+}

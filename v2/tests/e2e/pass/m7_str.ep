@@ -1,0 +1,10 @@
+# EXIT: 0
+# STDOUT: Hello, Epic!
+# STDOUT: 42
+fun main(): void {
+    print("Hello, Epic!")
+    print("\n")
+    print(itoa(42))
+    print("\n")
+    os.ExitProcess(0)
+}

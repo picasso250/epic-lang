@@ -1,0 +1,4 @@
+# COMPILE_ERROR: is_null expects a reference, got never
+fun main(): void {
+    let result = is_null(exit(1))
+}

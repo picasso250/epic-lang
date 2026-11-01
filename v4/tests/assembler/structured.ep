@@ -1,0 +1,123 @@
+fun equal_bytes(a: u8[], b: u8[]): i64 {
+    if len(a) != len(b) {
+        ret 0
+    }
+    for i: 0:len(a) {
+        if a[i] != b[i] {
+            ret 0
+        }
+    }
+    ret 1
+}
+
+fun main(): void {
+    let program = asm_program_new()
+    let start_symbol = asm_symbol_new(program, "_start")
+    let value_symbol = asm_symbol_new(program, "value")
+    let payload_symbol = asm_symbol_new(program, "payload")
+    let done_symbol = asm_symbol_new(program, "done")
+    let anonymous_symbol = asm_symbol_new(program, "")
+    let collision_symbol = asm_symbol_new(program, "__ep_anon_" + itoa(anonymous_symbol))
+    let imported_symbol = asm_symbol_new(program, "MessageBoxA")
+    program.entry_symbol_index = start_symbol
+    asm_extern_library_item(program, imported_symbol, "user32.dll")
+    asm_section_data(program)
+    asm_label(program, value_symbol)
+    asm_dq(program, 0)
+    let payload = new u8[]
+    push(payload, 1)
+    push(payload, 2)
+    push(payload, 3)
+    asm_label(program, payload_symbol)
+    asm_bytes(program, payload)
+    asm_section_text(program)
+    asm_label(program, start_symbol)
+    asm_mov(program, asm_rax(), asm_imm(7))
+    asm_mov(program, asm_mem_symbol(64, value_symbol, 0), asm_imm(0))
+    asm_mov(program, asm_rax(), asm_mem_base(0, asm_rbp(), -8))
+    asm_mov(program, asm_ax(), asm_mem_base(16, asm_rbp(), -10))
+    asm_movsx(program, asm_rax(), asm_al())
+    asm_movsx(program, asm_eax(), asm_ax())
+    asm_movsxd(program, asm_rax(), asm_eax())
+    asm_mov(program, asm_mem_base(0, asm_rbp(), -16), asm_imm(0))
+    asm_lea(program, asm_rax(), asm_mem_base(0, asm_rbp(), -24))
+    asm_add(program, asm_mem_base(0, asm_rbp(), -32), asm_imm(1))
+    asm_cmp(program, asm_rax(), asm_mem_base(0, asm_rbp(), -40))
+    asm_inc(program, asm_mem_base(0, asm_rbp(), -48))
+    asm_call(program, asm_symbol(imported_symbol))
+    asm_jmp(program, asm_symbol(done_symbol))
+    asm_label(program, done_symbol)
+    asm_jmp(program, asm_symbol(anonymous_symbol))
+    asm_label(program, collision_symbol)
+    asm_ret(program)
+    asm_label(program, anonymous_symbol)
+    asm_ret(program)
+
+    let rendered = asm_render(program)
+    let newline_count = 0
+    for i: 0:len(rendered) {
+        if rendered[i] == 10 {
+            newline_count += 1
+        }
+    }
+    if newline_count != len(program.items) + 2 {
+        os.ExitProcess(1)
+    }
+
+    let direct = asm_encode(program)
+    let rendered_after_encode = asm_render(program)
+    if equal_bytes(rendered, rendered_after_encode) == 0 {
+        os.ExitProcess(2)
+    }
+    let direct_again = asm_encode(program)
+    if equal_bytes(direct.text, direct_again.text) == 0 || equal_bytes(direct.data, direct_again.data) == 0 {
+        os.ExitProcess(3)
+    }
+    let parsed = asm_parse(str(rendered))
+    let roundtrip = asm_encode(parsed)
+    if equal_bytes(direct.text, roundtrip.text) == 0 {
+        os.ExitProcess(4)
+    }
+    if equal_bytes(direct.data, roundtrip.data) == 0 {
+        os.ExitProcess(5)
+    }
+    if direct.entry_offset != roundtrip.entry_offset {
+        os.ExitProcess(6)
+    }
+    if len(direct.relocs) != len(roundtrip.relocs) {
+        os.ExitProcess(7)
+    }
+    for reloc_i: 0:len(direct.relocs) {
+        let a = direct.relocs[reloc_i]
+        let b = roundtrip.relocs[reloc_i]
+        let a_name = asm_symbol_name(program, a.symbol_index)
+        let b_name = asm_symbol_name(parsed, b.symbol_index)
+        if a.kind != b.kind || a_name != b_name || a.addend != b.addend {
+            os.ExitProcess(8)
+        }
+    }
+    let parsed_import_index = asm_named_symbol_find(parsed, "MessageBoxA")
+    if parsed_import_index < 0 || parsed.symbols[parsed_import_index].library != "user32.dll" || parsed.symbols[parsed_import_index].import_name != "MessageBoxA" {
+        os.ExitProcess(13)
+    }
+
+    let presentation = asm_parse("; ignored\n\nsection .text\nentry: ; ignored\n    ret\n")
+    if len(presentation.items) != 3 {
+        os.ExitProcess(9)
+    }
+
+    let appended = asm_program_new()
+    asm_section_text(appended)
+    let item_count = len(appended.items)
+    asm_parse_text_into(appended, bytes("helper:\n    ret\n"))
+    if len(appended.items) != item_count + 2 {
+        os.ExitProcess(10)
+    }
+    if appended.items[item_count].kind != AsmItemKind.Label {
+        os.ExitProcess(11)
+    }
+    if appended.items[item_count + 1].kind != AsmItemKind.Instruction {
+        os.ExitProcess(12)
+    }
+    os.ExitProcess(0)
+}

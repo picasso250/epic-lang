@@ -1,0 +1,7 @@
+# EXIT: 1
+# STDOUT: Epic runtime error: pop from empty array
+fun main(): void {
+    let values = new i64[]
+    let value = pop(values)
+    print(itoa(value))
+}

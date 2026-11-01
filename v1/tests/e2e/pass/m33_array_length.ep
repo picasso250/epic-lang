@@ -1,0 +1,9 @@
+# EXIT: 0
+# STDOUT: 3:0
+fun main(): void {
+    let values = new i64[3]
+    print(itoa(values.len))
+    print(":")
+    print(itoa(values.data[1]))
+    print("\n")
+}

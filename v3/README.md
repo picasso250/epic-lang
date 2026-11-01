@@ -1,0 +1,62 @@
+# Epic v3
+
+Epic v3 starts from the sealed v2 compiler and dogfoods the language surface
+implemented there: unary operators, compound assignment, integer range loops,
+nominal unit enums, and exhaustive matching. It adds block tail values, implicit
+function tail returns, expression-form `if` and `match`, and an internal `never`
+type for no-return control flow, including allocation-free `panic(message)`.
+v3 also implements distinct `bool` plus signed and unsigned 8-, 16-, 32-, and
+64-bit integers, typed integer literals, explicit `T(value)` conversions, and
+compact integer storage. The v3 compiler source remains on the previous
+surface; v4 is the dogfood generation for these additions.
+It also provides `is_null(reference)` for explicit zero-address tests without
+inserting implicit dereference checks. Dynamic arrays are opaque and use
+`len`, checked subscripting, `push`, `pop`, and `extend`; `str(byte_array)`
+copies a mutable byte array into an immutable string. Strings are byte views:
+`s[start:end]` creates a zero-copy view, while array slicing copies the
+selected elements into an independent array. Raw C/Win32 string arguments use
+an explicit allocating `cstr(s)` conversion; Epic strings no longer promise a
+trailing NUL byte. During the v3-to-v4 transition, `str.data`, `str.len`, and
+`str_new(ptr, len)` remain available low-level interfaces; v4 will dogfood
+slicing before closing them.
+It retains the self-contained AMD64 assembler,
+deterministic PE writer, and conservative garbage collector.
+
+The bootstrap chain is:
+
+```text
+Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3
+```
+
+## Build
+
+```powershell
+python build_epic.py
+```
+
+`build_epic.py` delegates to the root `../build.py`. It rebuilds the prior
+generations from the neighboring directories and uses the resulting v2 compiler
+to compile this directory's v3 sources. No Git branch references are involved.
+
+The default output is `build/epic-v3.exe`. Pass `-o PATH` to copy only the
+final v3 executable elsewhere; relative paths are resolved from the calling
+working directory.
+
+## Documentation
+
+- [Language reference](docs/language.md), including built-in data structures and functions
+- [Compiler implementation](docs/implementation.md)
+- [Garbage collector](docs/gc.md)
+
+## Test
+
+```powershell
+python tests/run.py
+```
+
+The test runner builds v3 with v2 and tests that seed compiler directly. It
+does not self-compile v3 first, because correctness must not depend on an
+extra fixed-point generation.
+
+`examples/` contains the small learning sequence. Broader regression coverage
+lives under `tests/e2e/pass/`.

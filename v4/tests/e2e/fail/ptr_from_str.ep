@@ -1,0 +1,4 @@
+# COMPILE_ERROR: ptr conversion requires i64, u64, array, or product, got str
+fun main(): void {
+    let value = ptr("Epic")
+}

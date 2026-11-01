@@ -1,0 +1,9 @@
+# COMPILE_ERROR: cannot take address of function 'bad_callback': unsupported callback ABI return type bool
+
+fun bad_callback(value: u32): bool {
+    value != u32(0)
+}
+
+fun main(): void {
+    let callback = ptr(bad_callback)
+}

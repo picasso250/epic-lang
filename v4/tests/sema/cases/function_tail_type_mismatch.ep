@@ -1,0 +1,7 @@
+# ERROR: function result type str is not assignable to i64
+fun bad_tail(): i64 {
+    "wrong"
+}
+fun main(): void {
+    ret
+}

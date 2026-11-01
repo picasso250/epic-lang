@@ -1,0 +1,9 @@
+# EXIT: 0
+# STDOUT: epic/lang
+fun main(): void {
+    let s = "xxepic/langyy"
+    let mid = s[2:11]
+    let empty = s[0:0]
+    print(mid + empty)
+    os.ExitProcess(0)
+}

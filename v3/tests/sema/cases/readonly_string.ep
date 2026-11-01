@@ -1,0 +1,5 @@
+# ERROR: str is read-only
+fun main(): void {
+    let text = "hello"
+    text[0] = 72
+}

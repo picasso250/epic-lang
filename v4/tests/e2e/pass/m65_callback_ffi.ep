@@ -1,0 +1,33 @@
+# EXIT: 0
+
+extern "kernel32.dll" fun EnumSystemLocalesEx(callback: ptr, flags: u32, context: i64, reserved: ptr): i32
+
+fun m65_address_target(value: u32): i32 {
+    i32(value)
+}
+
+fun m65_locale_callback(locale: ptr, flags: u32, context: i64): i32 {
+    if locale != ptr(0) && context == i64(123) {
+        let allocated = bytes("ok")
+        if len(allocated) == 2 {
+            os.ExitProcess(0)
+        }
+    }
+    i32(0)
+}
+
+fun main(): void {
+    let first = ptr(m65_address_target)
+    let second = ptr(m65_address_target)
+    if first == ptr(0) || first != second {
+        os.ExitProcess(2)
+    }
+
+    let m65_address_target = u64(7)
+    if ptr(m65_address_target) != ptr(u64(7)) {
+        os.ExitProcess(3)
+    }
+
+    EnumSystemLocalesEx(ptr(m65_locale_callback), u32(0), i64(123), ptr(0))
+    os.ExitProcess(1)
+}

@@ -1,0 +1,4 @@
+# COMPILE_ERROR: hexadecimal literal requires at least one digit
+fun main(): void {
+    let value = 0x
+}

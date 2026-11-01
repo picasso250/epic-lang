@@ -1,0 +1,11 @@
+# EXIT: 42
+type PointerNode {
+    kind: i64
+    value: i64
+}
+fun main(): void {
+    let n = new PointerNode
+    n.kind = 42
+    n.value = 10
+    os.ExitProcess(n.kind)
+}

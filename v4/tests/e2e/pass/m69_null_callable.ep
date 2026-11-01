@@ -1,0 +1,17 @@
+# EXIT: 1
+# STDOUT: argument evaluated
+# STDOUT: Epic runtime error: call of null callable
+type M69NullCallableHolder {
+    callback: fun(i64): void
+}
+
+fun m69_side_effect(): i64 {
+    print("argument evaluated\n")
+    1
+}
+
+fun main(): void {
+    let holder = new M69NullCallableHolder
+    let callback = holder.callback
+    callback(m69_side_effect())
+}

@@ -1,0 +1,5 @@
+# ERROR: cannot assign str to i64
+fun main(): void {
+    let value = 1
+    value = "wrong"
+}

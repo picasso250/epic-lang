@@ -1,0 +1,1789 @@
+#
+# Epic v0 codegen — self-hosting bootstrap slice
+#
+type Local {
+    name: str
+    typ: TypeInfo
+    slot: i64
+}
+type FuncInfo {
+    name: str
+    ret_type: TypeInfo
+    params: AstParam[]
+}
+type StringLit {
+    text: str
+    id: i64
+}
+type TypeInfo {
+    kind: str
+    name: str
+}
+type FieldInfo {
+    name: str
+    typ: TypeInfo
+    offset: i64
+}
+type StructInfo {
+    name: str
+    size: i64
+    fields: FieldInfo[]
+}
+type EmitterState {
+    out_path: str
+    out_buf: u8[]
+    label_counter: i64
+    string_counter: i64
+    current_fn: str
+    current_ret_type: TypeInfo
+    current_ep_id: i64
+    local_bytes: i64
+    alloc_size: i64
+    alloc_size_patch: i64
+    temp_base: i64
+    temp_count: i64
+    temp_peak: i64
+    locals: Local[]
+    funcs: FuncInfo[]
+    strings: StringLit[]
+    structs: StructInfo[]
+    loop_starts: i64[]
+    loop_ends: i64[]
+}
+fun die(msg: str): i64 {
+    print("Codegen error: ")
+    print(msg)
+    print("\n")
+    os.ExitProcess(1)
+    ret 0
+}
+fun out_s(e: EmitterState, s: str): i64 {
+    let bs = bytes(s)
+    extend(e.out_buf, bs)
+    ret 0
+}
+fun out_i(e: EmitterState, n: i64): i64 {
+    let text = itoa(n)
+    let bs = bytes(text)
+    extend(e.out_buf, bs)
+    ret 0
+}
+fun out_nl(e: EmitterState): i64 {
+    let s = "\n"
+    let bs = bytes(s)
+    extend(e.out_buf, bs)
+    ret 0
+}
+fun out_line(e: EmitterState, s: str): i64 {
+    out_s(e, s)
+    out_nl(e)
+    ret 0
+}
+fun emit_inst(e: EmitterState, op: str): i64 {
+    out_s(e, "    ")
+    out_line(e, op)
+    ret 0
+}
+fun emit_label(e: EmitterState, name: str): i64 {
+    out_s(e, name)
+    out_line(e, ":")
+    ret 0
+}
+fun emit_label_id(e: EmitterState, prefix: str, id: i64): i64 {
+    out_s(e, prefix)
+    out_i(e, id)
+    out_line(e, ":")
+    ret 0
+}
+fun emit_ref_id(e: EmitterState, prefix: str, id: i64): i64 {
+    out_s(e, "[")
+    out_s(e, prefix)
+    out_i(e, id)
+    out_s(e, "]")
+    ret 0
+}
+fun emit_mov(e: EmitterState, dst: str, src: str): i64 {
+    out_s(e, "    mov ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    out_line(e, src)
+    ret 0
+}
+fun emit_mov_i(e: EmitterState, dst: str, n: i64): i64 {
+    out_s(e, "    mov ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    out_i(e, n)
+    out_nl(e)
+    ret 0
+}
+fun emit_lea_ref_id(e: EmitterState, dst: str, prefix: str, id: i64): i64 {
+    out_s(e, "    lea ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    emit_ref_id(e, prefix, id)
+    out_nl(e)
+    ret 0
+}
+fun emit_call_inst(e: EmitterState, target: str): i64 {
+    out_s(e, "    call ")
+    out_line(e, target)
+    ret 0
+}
+fun sys_call_symbol(name: str): str {
+    if name == "os.Sleep" {
+        ret "Sleep"
+    }
+    if name == "os.GetTickCount64" {
+        ret "GetTickCount64"
+    }
+    if name == "os.GetLastError" {
+        ret "GetLastError"
+    }
+    if name == "os.SetLastError" {
+        ret "SetLastError"
+    }
+    if name == "os.GetStdHandle" {
+        ret "GetStdHandle"
+    }
+    if name == "os.CloseHandle" {
+        ret "CloseHandle"
+    }
+    if name == "os.lstrlenA" {
+        ret "lstrlenA"
+    }
+    if name == "os.lstrcmpA" {
+        ret "lstrcmpA"
+    }
+    if name == "os.MessageBoxA" {
+        ret "MessageBoxA"
+    }
+    if name == "os.Beep" {
+        ret "Beep"
+    }
+    if name == "os.GetCurrentProcess" {
+        ret "GetCurrentProcess"
+    }
+    if name == "os.GetCurrentProcessId" {
+        ret "GetCurrentProcessId"
+    }
+    if name == "os.GetCurrentThreadId" {
+        ret "GetCurrentThreadId"
+    }
+    if name == "os.ExitProcess" {
+        ret "ExitProcess"
+    }
+    if name == "os.GetFileAttributesA" {
+        ret "GetFileAttributesA"
+    }
+    if name == "os.CreateDirectoryA" {
+        ret "CreateDirectoryA"
+    }
+    if name == "os.CreateFileA" {
+        ret "CreateFileA"
+    }
+    if name == "os.ReadFile" {
+        ret "ReadFile"
+    }
+    if name == "os.WriteFile" {
+        ret "WriteFile"
+    }
+    ret ""
+}
+fun sys_member_symbol(ns: str, name: str): str {
+    if ns != "os" {
+        ret ""
+    }
+    if name == "Sleep" {
+        ret "Sleep"
+    }
+    if name == "GetTickCount64" {
+        ret "GetTickCount64"
+    }
+    if name == "GetLastError" {
+        ret "GetLastError"
+    }
+    if name == "SetLastError" {
+        ret "SetLastError"
+    }
+    if name == "GetStdHandle" {
+        ret "GetStdHandle"
+    }
+    if name == "CloseHandle" {
+        ret "CloseHandle"
+    }
+    if name == "lstrlenA" {
+        ret "lstrlenA"
+    }
+    if name == "lstrcmpA" {
+        ret "lstrcmpA"
+    }
+    if name == "MessageBoxA" {
+        ret "MessageBoxA"
+    }
+    if name == "Beep" {
+        ret "Beep"
+    }
+    if name == "GetCurrentProcess" {
+        ret "GetCurrentProcess"
+    }
+    if name == "GetCurrentProcessId" {
+        ret "GetCurrentProcessId"
+    }
+    if name == "GetCurrentThreadId" {
+        ret "GetCurrentThreadId"
+    }
+    if name == "ExitProcess" {
+        ret "ExitProcess"
+    }
+    if name == "GetFileAttributesA" {
+        ret "GetFileAttributesA"
+    }
+    if name == "CreateDirectoryA" {
+        ret "CreateDirectoryA"
+    }
+    if name == "CreateFileA" {
+        ret "CreateFileA"
+    }
+    if name == "ReadFile" {
+        ret "ReadFile"
+    }
+    if name == "WriteFile" {
+        ret "WriteFile"
+    }
+    ret ""
+}
+fun is_sys_call(name: str): i64 {
+    if sys_call_symbol(name) == "" {
+        ret 0
+    }
+    ret 1
+}
+fun emit_jmp(e: EmitterState, label: str): i64 {
+    out_s(e, "    jmp ")
+    out_line(e, label)
+    ret 0
+}
+fun emit_jmp_id(e: EmitterState, op: str, prefix: str, id: i64): i64 {
+    out_s(e, "    ")
+    out_s(e, op)
+    out_s(e, " ")
+    out_s(e, prefix)
+    out_i(e, id)
+    out_nl(e)
+    ret 0
+}
+fun emit_slot_ref(e: EmitterState, slot: i64): i64 {
+    out_s(e, "[rbp")
+    if slot >= 0 {
+        out_s(e, "+")
+    }
+    out_i(e, slot)
+    out_s(e, "]")
+    ret 0
+}
+fun emit_stack_store(e: EmitterState, slot: i64, src: str): i64 {
+    out_s(e, "    mov ")
+    emit_slot_ref(e, slot)
+    out_s(e, ", ")
+    out_line(e, src)
+    ret 0
+}
+fun emit_stack_load(e: EmitterState, dst: str, slot: i64): i64 {
+    out_s(e, "    mov ")
+    out_s(e, dst)
+    out_s(e, ", ")
+    emit_slot_ref(e, slot)
+    out_nl(e)
+    ret 0
+}
+fun fresh_label(e: EmitterState): i64 {
+    e.label_counter = e.label_counter + 1
+    ret e.label_counter
+}
+fun align16(n: i64): i64 {
+    ret ((n + 15) / 16) * 16
+}
+fun emit_runtime(e: EmitterState, source: u8[]): i64 {
+    extend(e.out_buf, source)
+    out_nl(e)
+    ret 0
+}
+fun emit_runtime_helpers(e: EmitterState): i64 {
+    emit_runtime(e, embed("../runtime/str_alloc.asm"))
+    emit_runtime(e, embed("../runtime/bytes.asm"))
+    emit_runtime(e, embed("../runtime/str_cat.asm"))
+    emit_runtime(e, embed("../runtime/str_slice.asm"))
+    emit_runtime(e, embed("../runtime/embed.asm"))
+    emit_runtime(e, embed("../runtime/extend_u8.asm"))
+    emit_runtime(e, embed("../runtime/itoa.asm"))
+    emit_runtime(e, embed("../runtime/argv.asm"))
+    emit_runtime(e, embed("../runtime/read_file.asm"))
+    emit_runtime(e, embed("../runtime/write_file.asm"))
+    ret 0
+}
+fun make_emitter(out_path: str): EmitterState {
+    let e = new EmitterState
+    e.out_path = out_path
+    e.out_buf = new u8[]
+    e.label_counter = 0
+    e.string_counter = 0
+    e.current_fn = ""
+    e.current_ret_type = type_void()
+    e.current_ep_id = 0
+    e.local_bytes = 0
+    e.alloc_size = 0
+    e.alloc_size_patch = 0
+    e.temp_base = 0
+    e.temp_count = 0
+    e.temp_peak = 0
+    e.locals = new Local[]
+    e.funcs = new FuncInfo[]
+    e.strings = new StringLit[]
+    e.structs = new StructInfo[]
+    e.loop_starts = new i64[]
+    e.loop_ends = new i64[]
+    ret e
+}
+fun type_info(kind: str, name: str): TypeInfo {
+    let t = new TypeInfo
+    t.kind = kind
+    t.name = name
+    ret t
+}
+fun type_i64(): TypeInfo {
+    ret type_info("i64", "")
+}
+fun type_u8(): TypeInfo {
+    ret type_info("u8", "")
+}
+fun type_void(): TypeInfo {
+    ret type_info("void", "")
+}
+fun type_str(): TypeInfo {
+    ret type_info("str", "")
+}
+fun type_struct(name: str): TypeInfo {
+    ret type_info("struct", name)
+}
+fun type_array(elem: str): TypeInfo {
+    ret type_info("array", elem)
+}
+fun type_is_u8(t: TypeInfo): i64 {
+    if t.kind == "u8" {
+        ret 1
+    }
+    ret 0
+}
+fun type_is_value_u8(t: TypeInfo): i64 {
+    ret type_is_u8(t)
+}
+fun type_is_complex(t: TypeInfo): i64 {
+    if t.kind == "str" {
+        ret 1
+    }
+    if t.kind == "struct" {
+        ret 1
+    }
+    if t.kind == "array" {
+        ret 1
+    }
+    ret 0
+}
+fun is_array_type_name(name: str): i64 {
+    if name.len >= 2 {
+        if name.data[name.len - 2] == 91 && name.data[name.len - 1] == 93 {
+            ret 1
+        }
+    }
+    ret 0
+}
+fun array_elem_name(name: str): str {
+    if is_array_type_name(name) == 1 {
+        ret str_new(name.data, name.len - 2)
+    }
+    ret name
+}
+fun user_type(name: str): TypeInfo {
+    if name == "i64" {
+        ret type_i64()
+    }
+    if name == "u8" {
+        ret type_u8()
+    }
+    if name == "void" {
+        ret type_void()
+    }
+    if name == "str" {
+        ret type_str()
+    }
+    if is_array_type_name(name) == 1 {
+        ret type_array(array_elem_name(name))
+    }
+    ret type_struct(name)
+}
+fun codegen_error(message: str): i64 {
+    print("codegen: ")
+    print(message)
+    print("\n")
+    os.ExitProcess(1)
+    ret 0
+}
+fun get_string_id(e: EmitterState, text: str): i64 {
+    let i = 0
+    for i < e.strings.len {
+        if e.strings.data[i].text == text {
+            ret e.strings.data[i].id
+        }
+        i = i + 1
+    }
+    e.string_counter = e.string_counter + 1
+    let s = new StringLit
+    s.text = text
+    s.id = e.string_counter
+    push(e.strings, s)
+    ret s.id
+}
+fun collect_expr_strings(e: EmitterState, node: AstExpr): i64 {
+    if node.kind == "" {
+        ret 0
+    }
+    if node.kind == "String" || node.kind == "Embed" {
+        get_string_id(e, node.value)
+    } else if node.kind == "Binary" {
+        collect_expr_strings(e, node.left)
+        collect_expr_strings(e, node.right)
+    } else if node.kind == "Call" {
+        let i = 0
+        for i < node.args.len {
+            collect_expr_strings(e, node.args.data[i])
+            i = i + 1
+        }
+    } else if node.kind == "FieldAccess" {
+        collect_expr_strings(e, node.object)
+    } else if node.kind == "Subscript" {
+        collect_expr_strings(e, node.base)
+        collect_expr_strings(e, node.index)
+    } else if node.kind == "NewArray" {
+        collect_expr_strings(e, node.count)
+    }
+    ret 0
+}
+fun collect_stmt_strings(e: EmitterState, node: AstStmt): i64 {
+    if node.kind == "Return" || node.kind == "ExprStmt" {
+        collect_expr_strings(e, node.expr)
+    } else if node.kind == "Let" || node.kind == "Assign" {
+        collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "FieldSet" {
+        collect_expr_strings(e, node.object)
+        collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "SubscriptAssign" {
+        collect_expr_strings(e, node.base)
+        collect_expr_strings(e, node.index)
+        collect_expr_strings(e, node.value_expr)
+    } else if node.kind == "If" {
+        collect_expr_strings(e, node.expr)
+        collect_block_strings(e, node.then_block)
+        collect_block_strings(e, node.else_block)
+    } else if node.kind == "While" {
+        collect_expr_strings(e, node.expr)
+        collect_block_strings(e, node.body)
+    }
+    ret 0
+}
+fun collect_block_strings(e: EmitterState, block: AstBlock): i64 {
+    if block.present == 0 {
+        ret 0
+    }
+    let i = 0
+    for i < block.stmts.len {
+        collect_stmt_strings(e, block.stmts.data[i])
+        i = i + 1
+    }
+    ret 0
+}
+fun collect_program_strings(e: EmitterState, program: AstProgram): i64 {
+    let i = 0
+    for i < program.funcs.len {
+        collect_block_strings(e, program.funcs.data[i].body)
+        i = i + 1
+    }
+    ret 0
+}
+fun emit_string_bytes(e: EmitterState, s: str): i64 {
+    let i = 0
+    for i < s.len {
+        if i != 0 {
+            out_s(e, ", ")
+        }
+        out_i(e, s.data[i])
+        i = i + 1
+    }
+    if s.len != 0 {
+        out_s(e, ", ")
+    }
+    out_line(e, "0")
+    ret 0
+}
+fun add_func_infos(e: EmitterState, ast: AstProgram): i64 {
+    let i = 0
+    for i < ast.funcs.len {
+        let fn = ast.funcs.data[i]
+        let f = new FuncInfo
+        f.name = fn.name
+        f.ret_type = user_type(fn.type_name)
+        f.params = fn.params
+        push(e.funcs, f)
+        i = i + 1
+    }
+    ret 0
+}
+fun add_field(info: StructInfo, name: str, typ: TypeInfo, offset: i64): i64 {
+    let f = new FieldInfo
+    f.name = name
+    f.typ = typ
+    f.offset = offset
+    push(info.fields, f)
+    ret 0
+}
+fun add_struct_info(e: EmitterState, name: str, size: i64): StructInfo {
+    let s = new StructInfo
+    s.name = name
+    s.size = size
+    s.fields = new FieldInfo[]
+    push(e.structs, s)
+    ret s
+}
+fun find_struct_info(e: EmitterState, name: str): StructInfo {
+    let i = 0
+    for i < e.structs.len {
+        if e.structs.data[i].name == name {
+            ret e.structs.data[i]
+        }
+        i = i + 1
+    }
+    die("unknown struct layout")
+    ret new StructInfo
+}
+fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldInfo {
+    let s = find_struct_info(e, struct_name)
+    let i = 0
+    for i < s.fields.len {
+        if s.fields.data[i].name == field_name {
+            ret s.fields.data[i]
+        }
+        i = i + 1
+    }
+    print("Codegen error: unknown field ")
+    print(struct_name)
+    print(".")
+    print(field_name)
+    print("\n")
+    os.ExitProcess(1)
+    ret new FieldInfo
+}
+fun ensure_array_layout(e: EmitterState, elem: str): i64 {
+    let arr_name = elem
+    # StructInfo.name for arrays is the element name with kind array resolved by callers.
+    # Builtin array layouts are materialized under a synthetic name: [] + elem is
+    # not constructible without string concatenation, so callers use array_layout_name.
+    ret 0
+}
+fun array_layout_name(elem: str): str {
+    ret "_arr_" + elem
+}
+fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
+    e.structs = new StructInfo[]
+    let s = add_struct_info(e, "str", 16)
+    add_field(s, "data", type_info("ptr", "u8"), 0)
+    add_field(s, "len", type_i64(), 8)
+    let a = add_struct_info(e, "_arr_u8", 24)
+    add_field(a, "data", type_info("ptr", "u8"), 0)
+    add_field(a, "len", type_i64(), 8)
+    add_field(a, "cap", type_i64(), 16)
+    a = add_struct_info(e, "_arr_i64", 24)
+    add_field(a, "data", type_info("ptr", "i64"), 0)
+    add_field(a, "len", type_i64(), 8)
+    add_field(a, "cap", type_i64(), 16)
+    a = add_struct_info(e, "_arr_str", 24)
+    add_field(a, "data", type_info("ptr", "str"), 0)
+    add_field(a, "len", type_i64(), 8)
+    add_field(a, "cap", type_i64(), 16)
+    let i = 0
+    for i < ast.structs.len {
+        let node = ast.structs.data[i]
+        s = add_struct_info(e, node.name, node.fields.len * 8)
+        let j = 0
+        for j < node.fields.len {
+            add_field(s, node.fields.data[j].name, user_type(node.fields.data[j].type_name), j * 8)
+            j = j + 1
+        }
+        a = add_struct_info(e, array_layout_name(node.name), 24)
+        add_field(a, "data", type_info("ptr", node.name), 0)
+        add_field(a, "len", type_i64(), 8)
+        add_field(a, "cap", type_i64(), 16)
+        i = i + 1
+    }
+    ret 0
+}
+fun find_func_ret(e: EmitterState, name: str): TypeInfo {
+    let i = 0
+    for i < e.funcs.len {
+        if e.funcs.data[i].name == name {
+            ret e.funcs.data[i].ret_type
+        }
+        i = i + 1
+    }
+    ret type_i64()
+}
+fun reset_locals(e: EmitterState): i64 {
+    e.locals = new Local[]
+    e.local_bytes = 0
+    e.temp_count = 0
+    e.temp_peak = 0
+    ret 0
+}
+fun add_local(e: EmitterState, name: str, typ: TypeInfo): i64 {
+    let i = 0
+    for i < e.locals.len {
+        if e.locals.data[i].name == name {
+            ret e.locals.data[i].slot
+        }
+        i = i + 1
+    }
+    e.local_bytes = e.local_bytes + 8
+    let l = new Local
+    l.name = name
+    l.typ = typ
+    l.slot = 0 - e.local_bytes
+    push(e.locals, l)
+    ret l.slot
+}
+fun find_local_slot(e: EmitterState, name: str): i64 {
+    if name == "argv" {
+        ret 0
+    }
+    let i = 0
+    for i < e.locals.len {
+        if e.locals.data[i].name == name {
+            ret e.locals.data[i].slot
+        }
+        i = i + 1
+    }
+    die("undefined local")
+    ret 0
+}
+fun find_local_type(e: EmitterState, name: str): TypeInfo {
+    if name == "argv" {
+        ret type_array("str")
+    }
+    let i = 0
+    for i < e.locals.len {
+        if e.locals.data[i].name == name {
+            ret e.locals.data[i].typ
+        }
+        i = i + 1
+    }
+    ret type_i64()
+}
+fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
+    if expr.kind == "String" {
+        ret type_str()
+    }
+    if expr.kind == "Embed" {
+        ret type_array("u8")
+    }
+    if expr.kind == "Literal" {
+        ret type_i64()
+    }
+    if expr.kind == "Binary" {
+        if expr.op == "+" {
+            let lt = expr_type(e, expr.left)
+            let rt = expr_type(e, expr.right)
+            if lt.kind == "str" && rt.kind == "str" {
+                ret type_str()
+            }
+        }
+        ret type_i64()
+    }
+    if expr.kind == "Var" {
+        ret find_local_type(e, expr.name)
+    }
+    if expr.kind == "Call" {
+        if is_sys_call(expr.name) == 1 {
+            ret type_i64()
+        }
+        if sys_member_symbol(expr.type_name, expr.name) != "" {
+            ret type_i64()
+        }
+        if expr.name == "itoa" {
+            ret type_str()
+        }
+        if expr.name == "bytes" {
+            ret type_array("u8")
+        }
+        if expr.name == "str_new" {
+            ret type_str()
+        }
+        if expr.name == "str_slice" {
+            ret type_str()
+        }
+        if expr.name == "read_file" {
+            ret type_array("u8")
+        }
+        if expr.name == "write_file" {
+            ret type_i64()
+        }
+        if expr.name == "extend" {
+            ret type_void()
+        }
+        ret find_func_ret(e, expr.name)
+    }
+    if expr.kind == "New" {
+        ret type_struct(expr.name)
+    }
+    if expr.kind == "NewArray" {
+        ret type_array(expr.type_name)
+    }
+    if expr.kind == "FieldAccess" {
+        let base_type = expr_type(e, expr.object)
+        let layout = ""
+        if base_type.kind == "str" {
+            layout = "str"
+        } else if base_type.kind == "array" {
+            layout = array_layout_name(base_type.name)
+        } else {
+            layout = base_type.name
+        }
+        let f = find_field_info(e, layout, expr.name)
+        ret f.typ
+    }
+    if expr.kind == "Subscript" {
+        let bt = expr_type(e, expr.base)
+        if bt.kind == "array" {
+            ret user_type(bt.name)
+        }
+        if bt.kind == "ptr" {
+            ret user_type(bt.name)
+        }
+    }
+    ret type_i64()
+}
+fun infer_let_type(e: EmitterState, value: AstExpr): TypeInfo {
+    if value.kind == "" {
+        ret type_i64()
+    }
+    ret expr_type(e, value)
+}
+fun pre_scan_block(e: EmitterState, block: AstBlock): i64 {
+    if block.present == 0 {
+        ret 0
+    }
+    let i = 0
+    for i < block.stmts.len {
+        let stmt = block.stmts.data[i]
+        if stmt.kind == "Let" {
+            add_local(e, stmt.name, infer_let_type(e, stmt.value_expr))
+        } else if stmt.kind == "If" {
+            pre_scan_block(e, stmt.then_block)
+            pre_scan_block(e, stmt.else_block)
+        } else if stmt.kind == "While" {
+            pre_scan_block(e, stmt.body)
+        }
+        i = i + 1
+    }
+    ret 0
+}
+fun temp_reset(e: EmitterState): i64 {
+    e.temp_count = 0
+    ret 0
+}
+fun temp_save_rax(e: EmitterState): i64 {
+    let nr = e.temp_count
+    e.temp_count = e.temp_count + 1
+    if e.temp_count > e.temp_peak {
+        e.temp_peak = e.temp_count
+    }
+    let slot = 0 - (e.temp_base + (nr + 1) * 8)
+    emit_stack_store(e, slot, "rax")
+    ret slot
+}
+fun patch_hex_u32(e: EmitterState, offset: i64, value: i64): i64 {
+    let i = 7
+    for i >= 0 {
+        let digit = value & 15
+        if digit < 10 {
+            e.out_buf.data[offset + i] = 48 + digit
+        } else {
+            e.out_buf.data[offset + i] = 87 + digit
+        }
+        value = value >> 4
+        i = i - 1
+    }
+    ret 0
+}
+fun emit_prologue(e: EmitterState): i64 {
+    emit_inst(e, "push rbp")
+    emit_mov(e, "rbp", "rsp")
+    out_s(e, "    sub rsp, 0x")
+    e.alloc_size_patch = e.out_buf.len
+    out_line(e, "00000000")
+    ret 0
+}
+fun emit_epilogue(e: EmitterState): i64 {
+    emit_mov(e, "rsp", "rbp")
+    emit_inst(e, "pop rbp")
+    emit_inst(e, "ret")
+    ret 0
+}
+fun spill_args(e: EmitterState, args: AstExpr[]): i64[] {
+    let slots = new i64[]
+    let i = 0
+    for i < args.len {
+        emit_expr(e, args.data[i])
+        push(slots, temp_save_rax(e))
+        i = i + 1
+    }
+    ret slots
+}
+fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
+    if slots.len > 0 {
+        emit_stack_load(e, "rcx", slots.data[0])
+    }
+    if slots.len > 1 {
+        emit_stack_load(e, "rdx", slots.data[1])
+    }
+    if slots.len > 2 {
+        emit_stack_load(e, "r8", slots.data[2])
+    }
+    if slots.len > 3 {
+        emit_stack_load(e, "r9", slots.data[3])
+    }
+    ret 0
+}
+fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
+    let name = expr.name
+    let sys_symbol = sys_call_symbol(name)
+    if sys_symbol == "" {
+        sys_symbol = sys_member_symbol(expr.type_name, expr.name)
+    }
+    if sys_symbol != "" {
+        let slots = new i64[]
+        let i = 0
+        for i < expr.args.len {
+            let arg = expr.args.data[i]
+            let arg_type = expr_type(e, arg)
+            emit_expr(e, arg)
+            if arg_type.kind == "str" {
+                emit_mov(e, "rax", "[rax]")
+            }
+            let slot = temp_save_rax(e)
+            push(slots, slot)
+            i = i + 1
+        }
+        load_spilled_args(e, slots)
+        let stack_args = slots.len - 4
+        if stack_args < 0 {
+            stack_args = 0
+        }
+        let extra_frame = align16(stack_args * 8)
+        let frame = 32 + extra_frame
+        out_s(e, "    sub rsp, ")
+        out_i(e, frame)
+        out_nl(e)
+        i = 4
+        for i < slots.len {
+            emit_stack_load(e, "rax", slots.data[i])
+            out_s(e, "    mov [rsp+")
+            out_i(e, 32 + (i - 4) * 8)
+            out_line(e, "], rax")
+            i = i + 1
+        }
+        emit_call_inst(e, sys_symbol)
+        out_s(e, "    add rsp, ")
+        out_i(e, frame)
+        out_nl(e)
+        ret 0
+    }
+    if name == "print" {
+        emit_expr(e, expr.args.data[0])
+        let tmp = temp_save_rax(e)
+        emit_mov(e, "ecx", "-11")
+        emit_call_inst(e, "GetStdHandle")
+        emit_mov(e, "rcx", "rax")
+        emit_stack_load(e, "rax", tmp)
+        emit_mov(e, "rdx", "[rax]")
+        emit_mov(e, "r8", "[rax+8]")
+        out_line(e, "    lea r9, [_written]")
+        emit_inst(e, "sub rsp, 16")
+        emit_mov(e, "qword [rsp+32]", "0")
+        emit_call_inst(e, "WriteFile")
+        emit_inst(e, "add rsp, 16")
+        ret 0
+    }
+    if name == "itoa" {
+        emit_expr(e, expr.args.data[0])
+        emit_mov(e, "rcx", "rax")
+        emit_call_inst(e, "_itoa")
+        ret 0
+    }
+    if name == "str_new" {
+        let slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", slots.data[0])
+        emit_stack_load(e, "rdx", slots.data[1])
+        emit_call_inst(e, "_str_alloc")
+        ret 0
+    }
+    if name == "bytes" {
+        emit_expr(e, expr.args.data[0])
+        emit_mov(e, "rcx", "rax")
+        emit_call_inst(e, "_bytes")
+        ret 0
+    }
+    if name == "str_slice" {
+        let slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", slots.data[0])
+        emit_stack_load(e, "rdx", slots.data[1])
+        emit_stack_load(e, "r8", slots.data[2])
+        emit_inst(e, "sub rsp, 32")
+        emit_call_inst(e, "_str_slice")
+        emit_inst(e, "add rsp, 32")
+        ret 0
+    }
+    if name == "read_file" {
+        if expr.args.len != 1 {
+            codegen_error("read_file expects (str)")
+        }
+        let path_type = expr_type(e, expr.args.data[0])
+        if path_type.kind != "str" {
+            codegen_error("read_file expects (str)")
+        }
+        emit_expr(e, expr.args.data[0])
+        emit_mov(e, "rcx", "rax")
+        emit_inst(e, "sub rsp, 8")
+        emit_call_inst(e, "_read_file")
+        emit_inst(e, "add rsp, 8")
+        ret 0
+    }
+    if name == "write_file" {
+        if expr.args.len != 2 {
+            codegen_error("write_file expects (str, u8[])")
+        }
+        let path_type = expr_type(e, expr.args.data[0])
+        let data_type = expr_type(e, expr.args.data[1])
+        if path_type.kind != "str" || data_type.kind != "array" || data_type.name != "u8" {
+            codegen_error("write_file expects (str, u8[])")
+        }
+        let slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", slots.data[0])
+        emit_stack_load(e, "rax", slots.data[1])
+        emit_mov(e, "rdx", "[rax]")
+        emit_mov(e, "r8", "[rax+8]")
+        emit_inst(e, "sub rsp, 8")
+        emit_call_inst(e, "_write_file")
+        emit_inst(e, "add rsp, 8")
+        ret 0
+    }
+    if name == "push" {
+        let arr_type = expr_type(e, expr.args.data[0])
+        let elem = arr_type.name
+        let el_size = 8
+        if elem == "u8" {
+            el_size = 1
+        }
+        emit_expr(e, expr.args.data[0])
+        let arr_slot = temp_save_rax(e)
+        emit_expr(e, expr.args.data[1])
+        let val_slot = temp_save_rax(e)
+        let new_data_slot = temp_save_rax(e)
+        let grow = fresh_label(e)
+        let store = fresh_label(e)
+        let copy_loop = fresh_label(e)
+        let copy_done = fresh_label(e)
+        let cap_nonzero = fresh_label(e)
+        emit_stack_load(e, "rax", arr_slot)
+        emit_inst(e, "mov rcx, [rax+8]")
+        emit_inst(e, "cmp rcx, [rax+16]")
+        emit_jmp_id(e, "jge", "L", grow)
+        emit_jmp_id(e, "jmp", "L", store)
+        emit_label_id(e, "L", grow)
+        emit_inst(e, "mov rdx, [rax+16]")
+        emit_inst(e, "test rdx, rdx")
+        emit_jmp_id(e, "jnz", "L", cap_nonzero)
+        emit_inst(e, "mov rdx, 2")
+        emit_label_id(e, "L", cap_nonzero)
+        emit_inst(e, "add rdx, rdx")
+        emit_inst(e, "mov [rax+16], rdx")
+        emit_inst(e, "mov r8, rdx")
+        if el_size != 1 {
+            out_s(e, "    imul r8, ")
+            out_i(e, el_size)
+            out_nl(e)
+        }
+        emit_mov(e, "rcx", "[_heap]")
+        emit_mov(e, "edx", "8")
+        emit_inst(e, "sub rsp, 40")
+        emit_call_inst(e, "HeapAlloc")
+        emit_inst(e, "add rsp, 40")
+        emit_stack_store(e, new_data_slot, "rax")
+        emit_stack_load(e, "rax", arr_slot)
+        emit_inst(e, "mov r8, [rax]")
+        emit_inst(e, "mov r9, [rax+8]")
+        emit_inst(e, "xor r10, r10")
+        emit_label_id(e, "L", copy_loop)
+        emit_inst(e, "cmp r10, r9")
+        emit_jmp_id(e, "jge", "L", copy_done)
+        if el_size == 1 {
+            emit_inst(e, "mov r11b, [r8+r10]")
+            emit_stack_load(e, "rax", new_data_slot)
+            emit_inst(e, "mov [rax+r10], r11b")
+        } else {
+            emit_inst(e, "mov r11, [r8+r10*8]")
+            emit_stack_load(e, "rax", new_data_slot)
+            emit_inst(e, "mov [rax+r10*8], r11")
+        }
+        emit_inst(e, "inc r10")
+        emit_jmp_id(e, "jmp", "L", copy_loop)
+        emit_label_id(e, "L", copy_done)
+        emit_stack_load(e, "rax", arr_slot)
+        emit_stack_load(e, "rcx", new_data_slot)
+        emit_inst(e, "mov [rax], rcx")
+        emit_label_id(e, "L", store)
+        emit_stack_load(e, "rax", arr_slot)
+        emit_mov(e, "rcx", "[rax]")
+        emit_mov(e, "rdx", "[rax+8]")
+        emit_stack_load(e, "r8", val_slot)
+        if el_size == 1 {
+            emit_inst(e, "mov [rcx+rdx], r8b")
+        } else {
+            emit_inst(e, "mov [rcx+rdx*8], r8")
+        }
+        emit_inst(e, "inc qword [rax+8]")
+        emit_inst(e, "xor eax, eax")
+        ret 0
+    }
+    if name == "extend" {
+        let slots = spill_args(e, expr.args)
+        emit_stack_load(e, "rcx", slots.data[0])
+        emit_stack_load(e, "rdx", slots.data[1])
+        emit_call_inst(e, "_extend_u8")
+        emit_inst(e, "xor eax, eax")
+        ret 0
+    }
+    let slots = spill_args(e, expr.args)
+    load_spilled_args(e, slots)
+    emit_inst(e, "sub rsp, 32")
+    emit_call_inst(e, name)
+    emit_inst(e, "add rsp, 32")
+    ret 0
+}
+fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
+    if expr.op == "&&" || expr.op == "||" {
+        let end_id = fresh_label(e)
+        let true_id = fresh_label(e)
+        emit_cond_jump(e, expr, 1, true_id)
+        emit_inst(e, "xor eax, eax")
+        emit_jmp_id(e, "jmp", "L", end_id)
+        emit_label_id(e, "L", true_id)
+        emit_mov(e, "eax", "1")
+        emit_label_id(e, "L", end_id)
+        ret 0
+    }
+    let left_type = expr_type(e, expr.left)
+    let right_type = expr_type(e, expr.right)
+    emit_expr(e, expr.right)
+    let tmp = temp_save_rax(e)
+    emit_expr(e, expr.left)
+    if expr.op == "+" && left_type.kind == "str" && right_type.kind == "str" {
+        emit_mov(e, "rcx", "rax")
+        emit_stack_load(e, "rdx", tmp)
+        emit_inst(e, "sub rsp, 32")
+        emit_call_inst(e, "_str_cat")
+        emit_inst(e, "add rsp, 32")
+        ret 0
+    }
+    if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
+        emit_mov(e, "rcx", "[rax]")
+        emit_stack_load(e, "rax", tmp)
+        emit_mov(e, "rdx", "[rax]")
+        emit_inst(e, "sub rsp, 32")
+        emit_call_inst(e, "lstrcmpA")
+        emit_inst(e, "add rsp, 32")
+        emit_inst(e, "cmp eax, 0")
+        if expr.op == "==" {
+            emit_inst(e, "sete al")
+        } else {
+            emit_inst(e, "setne al")
+        }
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    emit_stack_load(e, "rcx", tmp)
+    if expr.op == "+" {
+        emit_inst(e, "add rax, rcx")
+        ret 0
+    }
+    if expr.op == "-" {
+        emit_inst(e, "sub rax, rcx")
+        ret 0
+    }
+    if expr.op == "*" {
+        emit_inst(e, "imul rax, rcx")
+        ret 0
+    }
+    if expr.op == "&" {
+        emit_inst(e, "and rax, rcx")
+        ret 0
+    }
+    if expr.op == "|" {
+        emit_inst(e, "or rax, rcx")
+        ret 0
+    }
+    if expr.op == "<<" || expr.op == ">>" {
+        let count_ok = fresh_label(e)
+        let count_bad = fresh_label(e)
+        emit_inst(e, "cmp rcx, 0")
+        emit_jmp_id(e, "jl", "L", count_bad)
+        emit_inst(e, "cmp rcx, 64")
+        emit_jmp_id(e, "jl", "L", count_ok)
+        emit_label_id(e, "L", count_bad)
+        emit_mov(e, "ecx", "1")
+        emit_call_inst(e, "ExitProcess")
+        emit_label_id(e, "L", count_ok)
+        if expr.op == "<<" {
+            emit_inst(e, "shl rax, cl")
+        } else {
+            emit_inst(e, "sar rax, cl")
+        }
+        ret 0
+    }
+    if expr.op == "/" {
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        ret 0
+    }
+    if expr.op == "%" {
+        emit_inst(e, "cqo")
+        emit_inst(e, "idiv rcx")
+        emit_mov(e, "rax", "rdx")
+        ret 0
+    }
+    if expr.op == "==" {
+        emit_inst(e, "cmp rax, rcx")
+        emit_inst(e, "sete al")
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    if expr.op == "!=" {
+        emit_inst(e, "cmp rax, rcx")
+        emit_inst(e, "setne al")
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    if expr.op == "<" {
+        emit_inst(e, "cmp rax, rcx")
+        emit_inst(e, "setl al")
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    if expr.op == ">" {
+        emit_inst(e, "cmp rax, rcx")
+        emit_inst(e, "setg al")
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    if expr.op == "<=" {
+        emit_inst(e, "cmp rax, rcx")
+        emit_inst(e, "setle al")
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    if expr.op == ">=" {
+        emit_inst(e, "cmp rax, rcx")
+        emit_inst(e, "setge al")
+        emit_inst(e, "movzx eax, al")
+        ret 0
+    }
+    die("unknown binary op")
+    ret 0
+}
+fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
+    let left_type = expr_type(e, expr.left)
+    let right_type = expr_type(e, expr.right)
+    emit_expr(e, expr.right)
+    let tmp = temp_save_rax(e)
+    emit_expr(e, expr.left)
+    if (expr.op == "==" || expr.op == "!=") && left_type.kind == "str" && right_type.kind == "str" {
+        emit_mov(e, "rcx", "[rax]")
+        emit_stack_load(e, "rax", tmp)
+        emit_mov(e, "rdx", "[rax]")
+        emit_inst(e, "sub rsp, 32")
+        emit_call_inst(e, "lstrcmpA")
+        emit_inst(e, "add rsp, 32")
+        emit_inst(e, "cmp eax, 0")
+    } else {
+        emit_stack_load(e, "rcx", tmp)
+        emit_inst(e, "cmp rax, rcx")
+    }
+    let op = ""
+    if expr.op == "==" {
+        if jump_if_true == 1 {
+            op = "jz"
+        } else {
+            op = "jnz"
+        }
+    }
+    else if expr.op == "!=" {
+        if jump_if_true == 1 {
+            op = "jnz"
+        } else {
+            op = "jz"
+        }
+    }
+    else if expr.op == "<" {
+        if jump_if_true == 1 {
+            op = "jl"
+        } else {
+            op = "jge"
+        }
+    }
+    else if expr.op == ">" {
+        if jump_if_true == 1 {
+            op = "jg"
+        } else {
+            op = "jle"
+        }
+    }
+    else if expr.op == "<=" {
+        if jump_if_true == 1 {
+            op = "jle"
+        } else {
+            op = "jg"
+        }
+    }
+    else {
+        if jump_if_true == 1 {
+            op = "jge"
+        } else {
+            op = "jl"
+        }
+    }
+    emit_jmp_id(e, op, "L", label)
+    ret 0
+}
+fun emit_cond_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, label: i64): i64 {
+    if expr.kind == "Binary" {
+        if expr.op == "==" || expr.op == "!=" || expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" {
+            ret emit_comparison_jump(e, expr, jump_if_true, label)
+        }
+        if expr.op == "&&" {
+            if jump_if_true == 0 {
+                emit_cond_jump(e, expr.left, 0, label)
+                emit_cond_jump(e, expr.right, 0, label)
+            } else {
+                let skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, 0, skip)
+                emit_cond_jump(e, expr.right, 1, label)
+                emit_label_id(e, "L", skip)
+            }
+            ret 0
+        }
+        if expr.op == "||" {
+            if jump_if_true == 1 {
+                emit_cond_jump(e, expr.left, 1, label)
+                emit_cond_jump(e, expr.right, 1, label)
+            } else {
+                let skip = fresh_label(e)
+                emit_cond_jump(e, expr.left, 1, skip)
+                emit_cond_jump(e, expr.right, 0, label)
+                emit_label_id(e, "L", skip)
+            }
+            ret 0
+        }
+    }
+    emit_expr(e, expr)
+    emit_inst(e, "test rax, rax")
+    if jump_if_true == 1 {
+        emit_jmp_id(e, "jnz", "L", label)
+    } else {
+        emit_jmp_id(e, "jz", "L", label)
+    }
+    ret 0
+}
+fun emit_new(e: EmitterState, expr: AstExpr): i64 {
+    let info = find_struct_info(e, expr.name)
+    emit_mov(e, "rcx", "[_heap]")
+    emit_mov(e, "edx", "8")
+    emit_mov_i(e, "r8d", info.size)
+    emit_inst(e, "sub rsp, 40")
+    emit_call_inst(e, "HeapAlloc")
+    emit_inst(e, "add rsp, 40")
+    ret 0
+}
+fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
+    let elem = expr.type_name
+    let el_size = 8
+    if elem == "u8" {
+        el_size = 1
+    }
+    let header_slot = 0
+    emit_mov(e, "rcx", "[_heap]")
+    emit_mov(e, "edx", "8")
+    emit_mov(e, "r8d", "24")
+    emit_inst(e, "sub rsp, 40")
+    emit_call_inst(e, "HeapAlloc")
+    emit_inst(e, "add rsp, 40")
+    header_slot = temp_save_rax(e)
+    if expr.count.kind == "" {
+        emit_stack_load(e, "rcx", header_slot)
+        emit_mov(e, "qword [rcx+8]", "0")
+        emit_mov(e, "rax", "4")
+    } else {
+        emit_expr(e, expr.count)
+        let count_ok = fresh_label(e)
+        emit_inst(e, "test rax, rax")
+        emit_jmp_id(e, "jge", "L", count_ok)
+        emit_mov(e, "ecx", "1")
+        emit_call_inst(e, "ExitProcess")
+        emit_label_id(e, "L", count_ok)
+        emit_stack_load(e, "rcx", header_slot)
+        emit_mov(e, "[rcx+8]", "rax")
+    }
+    emit_inst(e, "cmp rax, 1")
+    let cap_ok = fresh_label(e)
+    emit_jmp_id(e, "jge", "L", cap_ok)
+    emit_mov(e, "rax", "1")
+    emit_label_id(e, "L", cap_ok)
+    emit_stack_load(e, "rcx", header_slot)
+    emit_mov(e, "[rcx+16]", "rax")
+    emit_mov(e, "r8", "rax")
+    if el_size != 1 {
+        out_s(e, "    imul r8, ")
+        out_i(e, el_size)
+        out_nl(e)
+    }
+    emit_mov(e, "rcx", "[_heap]")
+    emit_mov(e, "edx", "8")
+    emit_inst(e, "sub rsp, 40")
+    emit_call_inst(e, "HeapAlloc")
+    emit_inst(e, "add rsp, 40")
+    emit_stack_load(e, "rcx", header_slot)
+    emit_mov(e, "[rcx]", "rax")
+    emit_mov(e, "rax", "rcx")
+    ret 0
+}
+fun field_layout_name(t: TypeInfo): str {
+    if t.kind == "str" {
+        ret "str"
+    }
+    if t.kind == "array" {
+        ret array_layout_name(t.name)
+    }
+    if t.kind == "struct" {
+        ret t.name
+    }
+    if t.kind == "ptr" {
+        ret t.name
+    }
+    ret ""
+}
+fun emit_field_access(e: EmitterState, expr: AstExpr): i64 {
+    let obj_type = expr_type(e, expr.object)
+    emit_expr(e, expr.object)
+    let field = find_field_info(e, field_layout_name(obj_type), expr.name)
+    if type_is_u8(field.typ) == 1 {
+        out_s(e, "    movzx rax, byte [rax+")
+        out_i(e, field.offset)
+        out_line(e, "]")
+    } else {
+        out_s(e, "    mov rax, [rax+")
+        out_i(e, field.offset)
+        out_line(e, "]")
+    }
+    ret 0
+}
+fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
+    let elem_type = expr_type(e, expr)
+    emit_expr(e, expr.base)
+    let base_slot = temp_save_rax(e)
+    emit_expr(e, expr.index)
+    emit_stack_load(e, "rcx", base_slot)
+    if type_is_u8(elem_type) == 1 {
+        emit_inst(e, "movzx rax, byte [rcx+rax]")
+    } else {
+        emit_inst(e, "mov rax, [rcx+rax*8]")
+    }
+    ret 0
+}
+fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
+    if expr.kind == "Literal" {
+        emit_mov(e, "rax", expr.value)
+        ret 0
+    }
+    if expr.kind == "String" {
+        let id = get_string_id(e, expr.value)
+        emit_lea_ref_id(e, "rcx", "_str_", id)
+        emit_mov_i(e, "rdx", expr.value.len)
+        emit_call_inst(e, "_str_alloc")
+        ret 0
+    }
+    if expr.kind == "Embed" {
+        let id = get_string_id(e, expr.value)
+        emit_lea_ref_id(e, "rcx", "_str_", id)
+        emit_mov_i(e, "rdx", expr.value.len)
+        emit_call_inst(e, "_embed_bytes")
+        ret 0
+    }
+    if expr.kind == "Var" {
+        if expr.name == "argv" {
+            emit_mov(e, "rax", "[_argv]")
+            ret 0
+        }
+        if type_is_u8(find_local_type(e, expr.name)) == 1 {
+            out_s(e, "    movzx rax, byte ")
+            emit_slot_ref(e, find_local_slot(e, expr.name))
+            out_nl(e)
+        } else {
+            emit_stack_load(e, "rax", find_local_slot(e, expr.name))
+        }
+        ret 0
+    }
+    if expr.kind == "Call" {
+        emit_call_expr(e, expr)
+        ret 0
+    }
+    if expr.kind == "Binary" {
+        emit_binary(e, expr)
+        ret 0
+    }
+    if expr.kind == "New" {
+        emit_new(e, expr)
+        ret 0
+    }
+    if expr.kind == "NewArray" {
+        emit_new_array(e, expr)
+        ret 0
+    }
+    if expr.kind == "FieldAccess" {
+        emit_field_access(e, expr)
+        ret 0
+    }
+    if expr.kind == "Subscript" {
+        emit_subscript(e, expr)
+        ret 0
+    }
+    die("unsupported expr")
+    ret 0
+}
+fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
+    if e.current_fn == "main" {
+        if stmt.expr.kind == "" {
+            emit_mov(e, "ecx", "0")
+        } else {
+            emit_expr(e, stmt.expr)
+            emit_mov(e, "ecx", "eax")
+        }
+        emit_call_inst(e, "ExitProcess")
+    } else {
+        if stmt.expr.kind != "" {
+            emit_expr(e, stmt.expr)
+            if type_is_u8(e.current_ret_type) == 1 {
+                emit_inst(e, "movzx eax, al")
+            }
+        }
+        emit_jmp_id(e, "jmp", "L", e.current_ep_id)
+    }
+    ret 0
+}
+fun emit_let(e: EmitterState, stmt: AstStmt): i64 {
+    if stmt.value_expr.kind == "" {
+        ret 0
+    }
+    emit_expr(e, stmt.value_expr)
+    if type_is_u8(find_local_type(e, stmt.name)) == 1 {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "al")
+    } else {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
+    }
+    ret 0
+}
+fun emit_assign(e: EmitterState, stmt: AstStmt): i64 {
+    emit_expr(e, stmt.value_expr)
+    if type_is_u8(find_local_type(e, stmt.name)) == 1 {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "al")
+    } else {
+        emit_stack_store(e, find_local_slot(e, stmt.name), "rax")
+    }
+    ret 0
+}
+fun emit_subscript_assign(e: EmitterState, stmt: AstStmt): i64 {
+    let synth = ast_expr("Subscript")
+    synth.base = stmt.base
+    synth.index = stmt.index
+    let elem_type = expr_type(e, synth)
+    emit_expr(e, stmt.value_expr)
+    let val_slot = temp_save_rax(e)
+    emit_expr(e, stmt.base)
+    let base_slot = temp_save_rax(e)
+    emit_expr(e, stmt.index)
+    emit_stack_load(e, "rcx", base_slot)
+    if type_is_u8(elem_type) == 1 {
+        emit_inst(e, "lea rcx, [rcx+rax]")
+    } else {
+        emit_inst(e, "lea rcx, [rcx+rax*8]")
+    }
+    emit_stack_load(e, "rax", val_slot)
+    if type_is_u8(elem_type) == 1 {
+        emit_inst(e, "mov [rcx], al")
+    } else {
+        emit_inst(e, "mov [rcx], rax")
+    }
+    ret 0
+}
+fun emit_field_set(e: EmitterState, stmt: AstStmt): i64 {
+    let obj_type = expr_type(e, stmt.object)
+    let field = find_field_info(e, field_layout_name(obj_type), stmt.name)
+    emit_expr(e, stmt.value_expr)
+    let val_slot = temp_save_rax(e)
+    emit_expr(e, stmt.object)
+    emit_stack_load(e, "rcx", val_slot)
+    if type_is_u8(field.typ) == 1 {
+        out_s(e, "    mov [rax+")
+        out_i(e, field.offset)
+        out_line(e, "], cl")
+    } else {
+        out_s(e, "    mov [rax+")
+        out_i(e, field.offset)
+        out_line(e, "], rcx")
+    }
+    ret 0
+}
+fun emit_if(e: EmitterState, stmt: AstStmt): i64 {
+    let else_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    if stmt.else_block.present == 0 {
+        emit_cond_jump(e, stmt.expr, 0, end_id)
+        emit_block(e, stmt.then_block)
+    } else {
+        emit_cond_jump(e, stmt.expr, 0, else_id)
+        emit_block(e, stmt.then_block)
+        emit_jmp_id(e, "jmp", "L", end_id)
+        emit_label_id(e, "L", else_id)
+        emit_block(e, stmt.else_block)
+    }
+    emit_label_id(e, "L", end_id)
+    ret 0
+}
+fun emit_while(e: EmitterState, stmt: AstStmt): i64 {
+    let start_id = fresh_label(e)
+    let end_id = fresh_label(e)
+    push(e.loop_starts, start_id)
+    push(e.loop_ends, end_id)
+    emit_label_id(e, "L", start_id)
+    emit_cond_jump(e, stmt.expr, 0, end_id)
+    emit_block(e, stmt.body)
+    e.loop_starts.len = e.loop_starts.len - 1
+    e.loop_ends.len = e.loop_ends.len - 1
+    emit_jmp_id(e, "jmp", "L", start_id)
+    emit_label_id(e, "L", end_id)
+    ret 0
+}
+fun emit_break(e: EmitterState, stmt: AstStmt): i64 {
+    if e.loop_ends.len == 0 {
+        die("break outside loop")
+    }
+    emit_jmp_id(e, "jmp", "L", e.loop_ends.data[e.loop_ends.len - 1])
+    ret 0
+}
+fun emit_continue(e: EmitterState, stmt: AstStmt): i64 {
+    if e.loop_starts.len == 0 {
+        die("continue outside loop")
+    }
+    emit_jmp_id(e, "jmp", "L", e.loop_starts.data[e.loop_starts.len - 1])
+    ret 0
+}
+fun emit_stmt(e: EmitterState, stmt: AstStmt): i64 {
+    temp_reset(e)
+    if stmt.kind == "Return" {
+        ret emit_return(e, stmt)
+    }
+    if stmt.kind == "ExprStmt" {
+        ret emit_expr(e, stmt.expr)
+    }
+    if stmt.kind == "Let" {
+        ret emit_let(e, stmt)
+    }
+    if stmt.kind == "Assign" {
+        ret emit_assign(e, stmt)
+    }
+    if stmt.kind == "SubscriptAssign" {
+        ret emit_subscript_assign(e, stmt)
+    }
+    if stmt.kind == "FieldSet" {
+        ret emit_field_set(e, stmt)
+    }
+    if stmt.kind == "If" {
+        ret emit_if(e, stmt)
+    }
+    if stmt.kind == "While" {
+        ret emit_while(e, stmt)
+    }
+    if stmt.kind == "Break" {
+        ret emit_break(e, stmt)
+    }
+    if stmt.kind == "Continue" {
+        ret emit_continue(e, stmt)
+    }
+    die("unsupported stmt")
+    ret 0
+}
+fun emit_block(e: EmitterState, block: AstBlock): i64 {
+    if block.present == 0 {
+        ret 0
+    }
+    let i = 0
+    for i < block.stmts.len {
+        emit_stmt(e, block.stmts.data[i])
+        i = i + 1
+    }
+    ret 0
+}
+fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
+    reset_locals(e)
+    e.current_fn = fn.name
+    e.current_ret_type = user_type(fn.type_name)
+    e.current_ep_id = fresh_label(e)
+    let i = 0
+    for i < fn.params.len {
+        add_local(e, fn.params.data[i].name, user_type(fn.params.data[i].type_name))
+        i = i + 1
+    }
+    pre_scan_block(e, fn.body)
+    e.temp_base = e.local_bytes
+    if fn.name == "main" {
+        emit_label(e, "_start")
+    } else {
+        emit_label(e, fn.name)
+    }
+    emit_prologue(e)
+    if fn.name == "main" {
+        emit_call_inst(e, "GetProcessHeap")
+        emit_mov(e, "[_heap]", "rax")
+        emit_call_inst(e, "_argv_init")
+        emit_mov(e, "[_argv]", "rax")
+    }
+    if fn.params.len > 0 {
+        if type_is_u8(find_local_type(e, fn.params.data[0].name)) == 1 {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "cl")
+        }
+        else {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[0].name), "rcx")
+        }
+    }
+    if fn.params.len > 1 {
+        if type_is_u8(find_local_type(e, fn.params.data[1].name)) == 1 {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "dl")
+        }
+        else {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[1].name), "rdx")
+        }
+    }
+    if fn.params.len > 2 {
+        if type_is_u8(find_local_type(e, fn.params.data[2].name)) == 1 {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8b")
+        }
+        else {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[2].name), "r8")
+        }
+    }
+    if fn.params.len > 3 {
+        if type_is_u8(find_local_type(e, fn.params.data[3].name)) == 1 {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9b")
+        }
+        else {
+            emit_stack_store(e, find_local_slot(e, fn.params.data[3].name), "r9")
+        }
+    }
+    emit_block(e, fn.body)
+    if fn.name == "main" {
+        emit_mov(e, "ecx", "0")
+        emit_call_inst(e, "ExitProcess")
+    } else {
+        emit_label_id(e, "L", e.current_ep_id)
+        emit_epilogue(e)
+    }
+    e.alloc_size = align16(e.local_bytes + e.temp_peak * 8 + 32)
+    patch_hex_u32(e, e.alloc_size_patch, e.alloc_size)
+    out_nl(e)
+    ret 0
+}
+fun emit_program(e: EmitterState, ast: AstProgram): i64 {
+    compute_struct_layouts(e, ast)
+    add_func_infos(e, ast)
+    collect_program_strings(e, ast)
+    out_line(e, "global _start")
+    out_line(e, "extern ExitProcess")
+    out_line(e, "extern GetStdHandle")
+    out_line(e, "extern WriteFile")
+    out_line(e, "extern CreateFileA")
+    out_line(e, "extern ReadFile")
+    out_line(e, "extern SetFilePointer")
+    out_line(e, "extern CloseHandle")
+    out_line(e, "extern GetFileSize")
+    out_line(e, "extern lstrcmpA")
+    out_line(e, "extern lstrlenA")
+    out_line(e, "extern GetCommandLineA")
+    out_line(e, "extern HeapAlloc")
+    out_line(e, "extern GetProcessHeap")
+    out_line(e, "extern Beep")
+    out_line(e, "extern GetCurrentProcess")
+    out_line(e, "extern GetCurrentProcessId")
+    out_line(e, "extern GetCurrentThreadId")
+    out_line(e, "extern GetFileAttributesA")
+    out_line(e, "extern CreateDirectoryA")
+    out_line(e, "extern GetLastError")
+    out_line(e, "extern GetTickCount64")
+    out_line(e, "extern MessageBoxA")
+    out_line(e, "extern SetLastError")
+    out_line(e, "extern Sleep")
+    out_line(e, "default rel")
+    out_nl(e)
+    out_line(e, "section .data")
+    out_line(e, "_written:")
+    out_line(e, "    dd 0")
+    out_line(e, "_heap:")
+    out_line(e, "    dq 0")
+    out_line(e, "_argv:")
+    out_line(e, "    dq 0")
+    let i = 0
+    for i < e.strings.len {
+        emit_label_id(e, "_str_", e.strings.data[i].id)
+        out_s(e, "    db ")
+        emit_string_bytes(e, e.strings.data[i].text)
+        i = i + 1
+    }
+    out_nl(e)
+    out_line(e, "section .text")
+    out_nl(e)
+    i = 0
+    for i < ast.funcs.len {
+        emit_fn_def(e, ast.funcs.data[i])
+        i = i + 1
+    }
+    emit_runtime_helpers(e)
+    write_file(e.out_path, e.out_buf)
+    ret 0
+}
+fun main(): void {
+    if argv.len < 3 {
+        print("usage: codegen <input.ep> <output.asm>\n")
+        os.ExitProcess(1)
+    }
+    let source_bytes = read_file(argv.data[1])
+    let src = str_new(source_bytes.data, source_bytes.len)
+    let tokens = lex(src)
+    let p = make_parser(tokens)
+    let ast = parse_program(p)
+    let e = make_emitter(argv.data[2])
+    emit_program(e, ast)
+}

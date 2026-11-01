@@ -1,0 +1,27 @@
+# EXIT: 0
+type Grid {
+    rows: i64[][]
+}
+
+fun main(): void {
+    let grid = new Grid
+    grid.rows = new i64[][2]
+    if len(grid.rows) != 2 || !is_null(grid.rows[0]) || !is_null(grid.rows[1]) {
+        exit(1)
+    }
+
+    grid.rows[0] = new i64[2]
+    grid.rows[1] = new i64[]
+    grid.rows[0][0] = 10
+    grid.rows[0][1] = 20
+    push(grid.rows[1], 30)
+    if grid.rows[0][0] != 10 || grid.rows[0][1] != 20 || grid.rows[1][0] != 30 {
+        exit(2)
+    }
+
+    let byte_rows = new u8[][]
+    push(byte_rows, bytes("ok"))
+    if str(byte_rows[0]) != "ok" {
+        exit(3)
+    }
+}

@@ -1,0 +1,5 @@
+# ERROR: type str has no field 'cap'
+fun main(): void {
+    let text = "x"
+    let value = text.cap
+}

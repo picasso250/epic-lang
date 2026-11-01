@@ -1,0 +1,72 @@
+# EXIT: 0
+
+type ExternSystemTime {
+    year: u16
+    month: u16
+    day_of_week: u16
+    day: u16
+    hour: u16
+    minute: u16
+    second: u16
+    milliseconds: u16
+}
+
+extern "kernel32.dll" fun GetSystemTime(value: ptr): void
+extern "kernel32.dll" fun GetSystemDefaultUILanguage(): u16
+extern "kernel32.dll" fun GetTickCount64(): u64
+extern "kernel32.dll" fun GetTickCount64(): u64
+extern "kernel32.dll" fun CreateFileA(name: ptr, access: u32, share: u32, security: ptr, creation: u32, flags: u32, template_file: ptr): ptr
+extern "kernel32.dll" fun CloseHandle(handle: ptr): i32
+extern "user32.dll" fun GetDesktopWindow(): ptr
+
+fun extern_sum6(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64): i64 {
+    a + b + c + d + e + f
+}
+
+fun main(): void {
+    if extern_sum6(1, 2, 3, 4, 5, 6) != 21 {
+        exit(1)
+    }
+
+    let unsigned_bits = u64(1234)
+    let unsigned_pointer = ptr(unsigned_bits)
+    if u64(unsigned_pointer) != unsigned_bits || i64(unsigned_pointer) != 1234 {
+        exit(2)
+    }
+    let signed_pointer = ptr(i64(-1))
+    if u64(signed_pointer) != u64(0) - u64(1) {
+        exit(3)
+    }
+
+    let empty = new u16[]
+    if ptr(empty) != ptr(0) {
+        exit(4)
+    }
+    let values = new u16[2]
+    if ptr(values) == ptr(0) {
+        exit(5)
+    }
+
+    let now = new ExternSystemTime
+    GetSystemTime(ptr(now))
+    if now.year < u16(2020) {
+        exit(6)
+    }
+    if GetSystemDefaultUILanguage() == u16(0) {
+        exit(7)
+    }
+    if GetTickCount64() == u64(0) {
+        exit(8)
+    }
+    if GetDesktopWindow() == ptr(0) {
+        exit(9)
+    }
+
+    let handle = CreateFileA(cstr("build\\extern_ffi.tmp"), u32(1073741824), u32(0), ptr(0), u32(2), u32(128), ptr(0))
+    if handle == ptr(u64(0) - u64(1)) {
+        exit(10)
+    }
+    if CloseHandle(handle) == i32(0) {
+        exit(11)
+    }
+}

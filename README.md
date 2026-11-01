@@ -1,43 +1,66 @@
-# Epic
+# Epic Lang
 
-引导链如下：
+**The compiler generations are directories, not Git branches.** The active
+front line is [`v4/`](v4/). The `main` branch is the single canonical tree.
 
 ```text
-Python v0 stage-0 -> Epic v1 -> Epic v2 -> Epic v3 -> Epic v4 -> Epic v4 fixed point
+Epic Lang/
+  v0/    Python stage-0, non-self-hosted, compiles v1 only
+  v1/    first self-hosted compiler, fixed-point foundation
+  v2/    semantic analysis, GC, enums, containers
+  v3/    typed integers, bool, expression control flow; v4 compiler seed
+  v4/    current language/compiler development, FFI, closures, Windows GUI
+  build.py     build the complete generation chain, without Git branches
+  test.py      test every generation using each generation's test suites
+  AGENTS.md    cross-generation development contract
+  MIGRATION.md exact legacy branch snapshots and migration rationale
 ```
 
-## 规范历史（Canonical history）
+## Build
 
-> 修正历史时，应将设计回迁到它在逻辑上本该属于的最早版本，而非在技术上勉强能实现的最早版本。
-
-## 构建（Build）
+On Windows x64, install Python 3 and provide a trusted NASM executable at
+`v0/tools/nasm.exe` (ignored by Git) or set `EPIC_NASM` to its path. NASM is
+needed only for the **trusted Python v0 → Epic v1** bootstrap step. Later
+compilers contain their own assembler and PE writer.
 
 ```powershell
-python build_epic.py
+python build.py             # v0 -> v1 -> v2 -> v3 -> v4
+python build.py --to 3      # stop at compiler v3
+python test.py              # v0 acceptance + v1..v4 test suites
+python test.py --from-version 4   # test only today's front line
 ```
 
-该脚本将封存的本地 `v3` 分支解析为一个精确的 commit。当 `build/epic-v3-<hash>.exe` 已存在时直接复用；否则创建一个 detached v3 worktree，并调用该世代的 `build_epic.py`。生成的 v3 编译器随后编译当前的 v4 working tree。
+Each generation is independent at the source level: `vN/build_epic.py` is a
+thin interface to the root orchestration. Run a generation's test suite from
+its own folder; its build script compiles all prerequisite generations first.
+No Git branch names, temporary Git worktrees, or prebuilt compiler images are
+required. Builds intentionally always regenerate seeds to avoid stale binary
+cache problems.
 
-默认输出为 `build/epic-v4.exe`。传入 `-o PATH` 可仅将最终的 v4 可执行文件复制到其他位置；相对路径从调用方的工作目录（calling working directory）解析。
-
-## 文档（Documentation）
-
-- [语言参考](docs/language.md)，包括内置数据结构与函数
-- [编译器实现](docs/implementation.md)
-- [垃圾收集器](docs/gc.md)
-
-验证自托管 fixed point：
+The compiled current toolchain lives at `v4/build/epic-v4.exe`. For a
+byte-identical self-hosted fixed point, run:
 
 ```powershell
+cd v4
 python bootstrap_fixed_point.py
 ```
 
-v3 构建的 v4 seed 编译第 1 代，然后第 1 代编译第 2 代。只有当第 1 代与第 2 代字节完全相同时检查才通过。
+Only v1's initial fixed point is an architectural requirement for the
+intergenerational bootstrap. Later generations are required to compile their
+successors, **not** necessarily themselves. v4 currently supports a fixed-point
+check as an additional self-hosting verification.
 
-## 测试（Test）
+## Canonical history
 
-```powershell
-python tests/run.py
-```
+**When correcting language history, implement the intended design in the
+earliest generation where it logically belongs, then propagate changes forward.**
+Do not retrofit future features into Python v0 or retain compatibility layers
+merely so vN can recompile its own source. Every generation has its own docs,
+tests, and runtime. The fixed-point contract is documented in `AGENTS.md`.
 
-`examples/` 包含小型学习序列。更广泛的回归测试位于 `tests/e2e/pass/` 下。
+## Existing development history
+
+Before this layout, v0..v4 were separate Git branches. Their original heads and
+commit ancestry are preserved by annotated `archive/pre-directories-2026-11-01-*`
+tags. See [`MIGRATION.md`](MIGRATION.md) for exact SHAs and recover instructions.
+Do not use legacy branches as a basis for new language work.

@@ -1,0 +1,19 @@
+# EXIT: 0
+# STDOUT: 1
+# STDOUT: 3
+# STDOUT: 4
+fun main(): void {
+    let i = 0
+    for i < 10 {
+        i = i + 1
+        if i == 2 {
+            continue
+        }
+        if i == 5 {
+            break
+        }
+        print(itoa(i))
+        print("\n")
+    }
+    os.ExitProcess(0)
+}

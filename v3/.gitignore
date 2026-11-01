@@ -1,0 +1,21 @@
+# Build artifacts
+*.obj
+*.exe
+build/
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Zed generated grammars
+editors/zed/grammars/
+
+# Binary tools (see README for setup)
+tools/
+
+# Temporary files produced by examples
+test_out.txt
+test_write_file.txt

@@ -1,0 +1,4 @@
+# COMPILE_ERROR: integer conversion 'i64' requires an integer, got bool
+fun main(): void {
+    let value = i64(true)
+}

@@ -1,0 +1,17 @@
+# EXIT: 0
+fun main(): void {
+    let empty = new u8[]
+    if len(str(empty)) != 0 {
+        os.ExitProcess(1)
+    }
+    let data = new u8[3]
+    data[0] = 'a'
+    data[1] = 0
+    data[2] = 'b'
+    let text = str(data)
+    data[0] = 'z'
+    if len(text) != 3 || text[0] != 'a' || text[1] != 0 || text[2] != 'b' {
+        os.ExitProcess(2)
+    }
+    os.ExitProcess(0)
+}

@@ -1,0 +1,4 @@
+# ERROR: undefined value 'missing'
+fun main(): void {
+    missing()
+}

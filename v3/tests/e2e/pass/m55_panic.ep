@@ -1,0 +1,17 @@
+# EXIT: 1
+# STDOUT: evaluated once
+# STDERR: Epic panic: unexpected state
+fun panic_message(): str {
+    print("evaluated once\n")
+    ret "unexpected state"
+}
+fun panic_value(flag: i64): i64 {
+    if flag {
+        ret 7
+    } else {
+        panic(panic_message())
+    }
+}
+fun main(): void {
+    os.ExitProcess(panic_value(0))
+}

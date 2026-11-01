@@ -1,0 +1,22 @@
+# EXIT: 0
+# STDOUT: 3
+# STDOUT: 1
+# STDOUT: 70
+# STDOUT: 9
+# STDOUT: -5
+# STDOUT: 5
+fun main(): void {
+    print(itoa(10 / 3))
+    print("\n")
+    print(itoa(10 % 3))
+    print("\n")
+    print(itoa(10 + 20 * 3))
+    print("\n")
+    print(itoa((1 + 2) * 3))
+    print("\n")
+    print(itoa(0 - 5))
+    print("\n")
+    print(itoa(10 - 3 - 2))
+    print("\n")
+    os.ExitProcess(0)
+}
