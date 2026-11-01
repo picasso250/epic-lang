@@ -1,0 +1,5 @@
+# ERROR: extern parameter requires an integer or ptr ABI lane, got str
+extern "kernel32.dll" fun GetTickCount64(value: str): u64
+fun main(): void {
+    print("hello")
+}

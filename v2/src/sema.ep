@@ -14,6 +14,7 @@ type SemaSignature {
     source_path: str
     line: i64
     builtin: i64
+    external: i64
 }
 type SemaLocal {
     name: str
@@ -273,6 +274,20 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
     }
     ret 0
 }
+# Probe: model native-width scalar ABI declarations before the full v3 type
+# system. Ordinary Epic calculations remain i64 in v2.
+fun sema_is_native_integer(name: str): i64 {
+    if name == "i8" || name == "u8" || name == "i16" || name == "u16" || name == "i32" || name == "u32" || name == "i64" || name == "u64" {
+        ret 1
+    }
+    ret 0
+}
+fun sema_is_native_abi_type(name: str): i64 {
+    if name == "ptr" || sema_is_native_integer(name) == 1 {
+        ret 1
+    }
+    ret 0
+}
 fun sema_collect_externs(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     for i < ast.externs.len {
@@ -281,18 +296,19 @@ fun sema_collect_externs(state: SemaState, ast: AstProgram): i64 {
         if first.name != "" {
             sema_error(decl.source_path, decl.line, "duplicate extern function '" + decl.name + "'")
         }
-        if decl.type_name != "void" {
-            sema_validate_value_type(state, decl.source_path, decl.line, decl.type_name)
+        if decl.type_name != "void" && sema_is_native_abi_type(decl.type_name) == 0 {
+            sema_error(decl.source_path, decl.line, "extern return type requires an integer, ptr, or void ABI lane, got " + decl.type_name)
         }
         let sig = sema_signature(decl.name, decl.type_name)
         sig.source_path = decl.source_path
         sig.line = decl.line
         sig.builtin = 0
+        sig.external = 1
         let j = 0
         for j < decl.params.len {
             let param = decl.params.data[j]
-            if param.type_name != "ptr" {
-                sema_validate_value_type(state, decl.source_path, param.line, param.type_name)
+            if sema_is_native_abi_type(param.type_name) == 0 {
+                sema_error(decl.source_path, param.line, "extern parameter requires an integer or ptr ABI lane, got " + param.type_name)
             }
             push(sig.param_types, param.type_name)
             j = j + 1
@@ -570,6 +586,15 @@ fun sema_check_unary(state: SemaState, expr: AstExpr): str {
     }
     ret "i64"
 }
+fun sema_foreign_arg_assignable(external: i64, expected: str, actual: str): i64 {
+    if sema_assignable(expected, actual) == 1 {
+        ret 1
+    }
+    if external == 1 && sema_is_native_integer(expected) == 1 && actual == "i64" {
+        ret 1
+    }
+    ret 0
+}
 fun sema_check_call(state: SemaState, expr: AstExpr): str {
     let full_name = expr.name
     if expr.type_name != "" {
@@ -604,13 +629,17 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             if sema_is_array(actual) == 0 {
                 sema_error(state.source_path, expr.args.data[i].line, "pop expects an array, got " + actual)
             }
-        } else if sema_assignable(expected, actual) == 0 {
+        } else if sema_foreign_arg_assignable(sig.external, expected, actual) == 0 {
             sema_error(state.source_path, expr.args.data[i].line, "argument " + itoa(i + 1) + " of '" + full_name + "' expects " + expected + ", got " + actual)
         }
         i = i + 1
     }
     if full_name == "pop" {
         ret sema_promote(sema_array_element(expr.args.data[0].resolved_type))
+    }
+    if sig.external == 1 && sema_is_native_integer(sig.return_type) == 1 {
+        # The probe decodes the ABI return lane into v2's i64 working type.
+        ret "i64"
     }
     ret sema_promote(sig.return_type)
 }

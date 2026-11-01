@@ -1,7 +1,8 @@
-# Bootstrap Win32 imports; platform ABI types are intentionally minimal here.
-extern "kernel32.dll" fun GetTickCount64(): i64
-extern "kernel32.dll" fun CreateFileA(path: ptr, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
-extern "kernel32.dll" fun CloseHandle(handle: i64): i64
+# v2 understands native-width extern lanes, but its ordinary expressions
+# still use i64. Handle return/argument bridging remains a separate question.
+extern "kernel32.dll" fun GetTickCount64(): u64
+extern "kernel32.dll" fun CreateFileA(path: ptr, access: u32, share: u32, security: i64, creation: u32, flags: u32, template: i64): i64
+extern "kernel32.dll" fun CloseHandle(handle: i64): i32
 
 #
 # Epic self-hosted compiler driver.

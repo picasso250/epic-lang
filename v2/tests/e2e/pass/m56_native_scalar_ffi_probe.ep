@@ -1,0 +1,21 @@
+# EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+extern "kernel32.dll" fun GetSystemDefaultUILanguage(): u16
+extern "kernel32.dll" fun GetCurrentThreadId(): u32
+extern "kernel32.dll" fun MulDiv(number: i32, numerator: i32, denominator: i32): i32
+extern "kernel32.dll" fun GetStdHandle(kind: i32): ptr
+extern "kernel32.dll" fun GetFileType(handle: ptr): u32
+fun main(): void {
+    if GetSystemDefaultUILanguage() == 0 {
+        ExitProcess(1)
+    }
+    if GetCurrentThreadId() == 0 {
+        ExitProcess(2)
+    }
+    if MulDiv(0 - 9, 1, 2) != -5 {
+        ExitProcess(3)
+    }
+    if GetFileType(GetStdHandle(0 - 11)) == 0 {
+        ExitProcess(4)
+    }
+}

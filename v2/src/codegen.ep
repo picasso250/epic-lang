@@ -710,6 +710,32 @@ fun find_extern_index(e: EmitterState, name: str): i64 {
     }
     ret 0 - 1
 }
+# Probe: normalize the defined low bits of a native scalar result into a
+# canonical i64 value, without adding general narrow integer arithmetic yet.
+fun emit_abi_result_as_i64(e: EmitterState, typ: str): i64 {
+    if typ == "u8" {
+        emit_inst(e, "and rax, 255")
+    } else if typ == "u16" {
+        emit_inst(e, "and rax, 65535")
+    } else if typ == "u32" {
+        emit_inst(e, "mov eax, eax")
+    } else {
+        let shift = 0
+        if typ == "i8" {
+            shift = 56
+        } else if typ == "i16" {
+            shift = 48
+        } else if typ == "i32" {
+            shift = 32
+        }
+        if shift > 0 {
+            emit_inst(e, "mov cl, " + itoa(shift))
+            emit_inst(e, "shl rax, cl")
+            emit_inst(e, "sar rax, cl")
+        }
+    }
+    ret 0
+}
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
     let external = 0 - 1
@@ -748,6 +774,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         out_s(e, "    add rsp, ")
         out_i(e, frame)
         out_nl(e)
+        emit_abi_result_as_i64(e, e.externs.data[external].type_name)
         ret 0
     }
     if name == "print" {

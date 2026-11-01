@@ -1,0 +1,5 @@
+# ERROR: extern return type requires an integer, ptr, or void ABI lane, got str
+extern "kernel32.dll" fun GetTickCount64(): str
+fun main(): void {
+    print("hello")
+}
