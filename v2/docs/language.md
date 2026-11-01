@@ -1,5 +1,8 @@
 # Epic v2 language reference
 
+> Experimental branch note: this branch prototypes fixed-width v2 scalars.
+> [Design and limitations](../../docs/experiments/v2-full-scalars.md).
+
 ## Core direction
 
 - Epic is a small C-like systems language targeting Windows x64 in v0.

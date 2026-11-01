@@ -1,4 +1,4 @@
-# ERROR: operator - requires integer operands
+# ERROR: operator - requires matching integer types
 fun main(): void {
     let value = "a" - "b"
 }

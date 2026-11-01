@@ -1,0 +1,5 @@
+# ERROR: cannot redefine integer conversion 'u64'
+fun u64(value: i64): i64 {
+    ret value
+}
+fun main(): void {}

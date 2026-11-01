@@ -6,16 +6,16 @@ extern "kernel32.dll" fun MulDiv(number: i32, numerator: i32, denominator: i32):
 extern "kernel32.dll" fun GetStdHandle(kind: i32): ptr
 extern "kernel32.dll" fun GetFileType(handle: ptr): u32
 fun main(): void {
-    if GetSystemDefaultUILanguage() == 0 {
+    if GetSystemDefaultUILanguage() == u16(0) {
         ExitProcess(1)
     }
-    if GetCurrentThreadId() == 0 {
+    if GetCurrentThreadId() == u32(0) {
         ExitProcess(2)
     }
-    if MulDiv(0 - 9, 1, 2) != -5 {
+    if MulDiv(i32(0 - 9), i32(1), i32(2)) != i32(0 - 5) {
         ExitProcess(3)
     }
-    if GetFileType(GetStdHandle(0 - 11)) == 0 {
+    if GetFileType(GetStdHandle(i32(0 - 11))) == u32(0) {
         ExitProcess(4)
     }
 }

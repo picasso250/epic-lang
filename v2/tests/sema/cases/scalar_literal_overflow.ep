@@ -1,0 +1,4 @@
+# ERROR: integer literal is out of u8 range
+fun main(): void {
+    let value = 300u8
+}

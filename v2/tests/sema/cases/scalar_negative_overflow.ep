@@ -1,0 +1,4 @@
+# ERROR: integer literal is out of i8 range
+fun main(): void {
+    let value = -129i8
+}

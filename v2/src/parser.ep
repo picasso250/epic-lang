@@ -844,12 +844,28 @@ fun parse_primary(p: Parser): AstExpr {
     if peek_kind(p, "NUMBER") == 1 {
         let number = advance(p)
         let literal = ast_expr("Literal", number.line)
-        literal.value = number.text
+        let text = number.text
+        let i = 0
+        let hex = 0
+        if text.len >= 2 && text.data[0] == 48 && (text.data[1] == 120 || text.data[1] == 88) {
+            i = 2
+            hex = 1
+        }
+        for i < text.len {
+            let ch = text.data[i]
+            if (hex == 1 && is_hex_digit(ch) == 0) || (hex == 0 && is_digit(ch) == 0) {
+                break
+            }
+            i = i + 1
+        }
+        literal.value = str_new(text.data, i)
+        literal.type_name = str_new(text.data + i, text.len - i)
         ret literal
     }
     if peek_kind(p, "CHAR") == 1 {
         let character = advance(p)
         let char_literal = ast_expr("Literal", character.line)
+        char_literal.type_name = ""
         char_literal.value = character.text
         ret char_literal
     }
@@ -861,6 +877,14 @@ fun parse_primary(p: Parser): AstExpr {
     }
     if peek_kind(p, "ID") == 1 {
         let identifier = advance(p)
+        if identifier.text == "true" || identifier.text == "false" {
+            let literal = ast_expr("BoolLiteral", identifier.line)
+            literal.value = "0"
+            if identifier.text == "true" {
+                literal.value = "1"
+            }
+            ret literal
+        }
         let node = ast_expr("Var", identifier.line)
         node.name = identifier.text
         if check(p, "LPAREN") == 1 {

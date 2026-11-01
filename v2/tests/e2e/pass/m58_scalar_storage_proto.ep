@@ -1,0 +1,60 @@
+# EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+type ScalarBox {
+    byte: u8
+    half: u16
+    wide: u32
+    signed_byte: i8
+    signed_half: i16
+    signed_wide: i32
+    long: u64
+}
+fun main(): void {
+    let box = new ScalarBox
+    box.byte = u8(200)
+    box.half = u16(65000)
+    box.wide = u32(4000000000)
+    box.signed_byte = i8(0 - 42)
+    box.signed_half = i16(0 - 12345)
+    box.signed_wide = i32(0 - 12345678)
+    box.long = u64(i64(0 - 1))
+    if box.byte != 200 || box.half != u16(65000) || box.wide != u32(4000000000) {
+        ExitProcess(1)
+    }
+    if box.signed_byte != i8(0 - 42) || box.signed_half != i16(0 - 12345) || box.signed_wide != i32(0 - 12345678) {
+        ExitProcess(2)
+    }
+    if box.long != u64(i64(0 - 1)) {
+        ExitProcess(3)
+    }
+    let halves = new u16[2]
+    halves[0] = u16(65535)
+    halves[1] = u16(12345)
+    push(halves, u16(777))
+    if len(halves) != 3 || halves[0] != u16(65535) || halves[1] != u16(12345) || halves[2] != u16(777) {
+        ExitProcess(4)
+    }
+    if pop(halves) != u16(777) || len(halves) != 2 {
+        ExitProcess(5)
+    }
+    let quarter = new i32[]
+    for i: 0:24 {
+        push(quarter, i32(0 - i))
+    }
+    if len(quarter) != 24 || quarter[19] != i32(0 - 19) || pop(quarter) != i32(0 - 23) {
+        ExitProcess(6)
+    }
+    let truth = new bool[2]
+    truth[0] = true
+    truth[1] = false
+    if truth[0] != true || truth[1] != false {
+        ExitProcess(8)
+    }
+    let two = new u16[]
+    for j: 0:40 {
+        push(two, u16(j))
+    }
+    if len(two) != 40 || two[38] != u16(38) {
+        ExitProcess(7)
+    }
+}

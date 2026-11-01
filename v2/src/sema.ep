@@ -98,7 +98,7 @@ fun sema_array_element(type_name: str): str {
     ret str_new(type_name.data, type_name.len - 2)
 }
 fun sema_type_exists(state: SemaState, type_name: str): i64 {
-    if type_name == "i64" || type_name == "u8" || type_name == "str" || type_name == "void" {
+    if sema_is_native_integer(type_name) == 1 || type_name == "bool" || type_name == "str" || type_name == "void" {
         ret 1
     }
     if sema_find_type(state, type_name).name != "" {
@@ -196,7 +196,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     for i < ast.structs.len {
         let node = ast.structs.data[i]
-        if node.name == "ptr" {
+        if sema_is_reserved_type(node.name) == 1 {
             sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
         }
         let first = sema_find_type(state, node.name)
@@ -214,7 +214,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     i = 0
     for i < ast.enums.len {
         let enum_node = ast.enums.data[i]
-        if enum_node.name == "ptr" {
+        if sema_is_reserved_type(enum_node.name) == 1 {
             sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
         }
         let enum_first = sema_find_type(state, enum_node.name)
@@ -274,10 +274,15 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
     }
     ret 0
 }
-# Probe: model native-width scalar ABI declarations before the full v3 type
-# system. Ordinary Epic calculations remain i64 in v2.
+# Native-width integer types available in ordinary Epic expressions and FFI.
 fun sema_is_native_integer(name: str): i64 {
     if name == "i8" || name == "u8" || name == "i16" || name == "u16" || name == "i32" || name == "u32" || name == "i64" || name == "u64" {
+        ret 1
+    }
+    ret 0
+}
+fun sema_is_reserved_type(name: str): i64 {
+    if name == "ptr" || name == "bool" || name == "str" || name == "void" || sema_is_native_integer(name) == 1 {
         ret 1
     }
     ret 0
@@ -322,6 +327,9 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     for i < ast.funcs.len {
         let node = ast.funcs.data[i]
+        if sema_is_native_integer(node.name) == 1 {
+            sema_error(node.source_path, node.line, "cannot redefine integer conversion '" + node.name + "'")
+        }
         let first = sema_find_func(state, node.name)
         if first.name != "" {
             if first.builtin == 1 {
@@ -494,6 +502,9 @@ fun sema_assignable(expected: str, actual: str): i64 {
     if expected == actual {
         ret 1
     }
+    # Historical u8 bridge: v3 compiler source and earlier GC tests still
+    # explicitly narrow i64 into byte storage. Remove only with a coherent
+    # successor-source migration, not by silently breaking the bootstrap.
     if expected == "u8" && actual == "i64" {
         ret 1
     }
@@ -520,6 +531,12 @@ fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): i64 {
     }
     ret 0
 }
+fun sema_require_condition(state: SemaState, expr: AstExpr, context: str): i64 {
+    if expr.resolved_type != "i64" && expr.resolved_type != "bool" {
+        sema_error(state.source_path, expr.line, context + " requires bool, got " + expr.resolved_type)
+    }
+    ret 0
+}
 fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     if base_type == "str" {
         if field_name == "data" {
@@ -536,9 +553,165 @@ fun sema_field_type(state: SemaState, base_type: str, field_name: str): str {
     let field = sema_find_field(state, base_type, field_name)
     ret field.type_name
 }
+# Literal suffixes are exact, unlike explicit T(value) narrowing casts.
+fun sema_literal_bound(type_name: str, negative: i64, hex: i64): str {
+    if hex == 1 {
+        if type_name == "i8" {
+            if negative == 1 {
+                ret "80"
+            }
+            ret "7f"
+        }
+        if type_name == "u8" {
+            ret "ff"
+        }
+        if type_name == "i16" {
+            if negative == 1 {
+                ret "8000"
+            }
+            ret "7fff"
+        }
+        if type_name == "u16" {
+            ret "ffff"
+        }
+        if type_name == "i32" {
+            if negative == 1 {
+                ret "80000000"
+            }
+            ret "7fffffff"
+        }
+        if type_name == "u32" {
+            ret "ffffffff"
+        }
+        if type_name == "i64" {
+            if negative == 1 {
+                ret "8000000000000000"
+            }
+            ret "7fffffffffffffff"
+        }
+        if type_name == "u64" {
+            ret "ffffffffffffffff"
+        }
+        ret ""
+    }
+    if type_name == "i8" {
+        if negative == 1 {
+            ret "128"
+        }
+        ret "127"
+    }
+    if type_name == "u8" {
+        ret "255"
+    }
+    if type_name == "i16" {
+        if negative == 1 {
+            ret "32768"
+        }
+        ret "32767"
+    }
+    if type_name == "u16" {
+        ret "65535"
+    }
+    if type_name == "i32" {
+        if negative == 1 {
+            ret "2147483648"
+        }
+        ret "2147483647"
+    }
+    if type_name == "u32" {
+        ret "4294967295"
+    }
+    if type_name == "i64" {
+        if negative == 1 {
+            ret "9223372036854775808"
+        }
+        ret "9223372036854775807"
+    }
+    if type_name == "u64" {
+        ret "18446744073709551615"
+    }
+    ret ""
+}
+fun sema_literal_digit(ch: i64): i64 {
+    if ch >= 48 && ch <= 57 {
+        ret ch - 48
+    }
+    if ch >= 65 && ch <= 70 {
+        ret ch - 55
+    }
+    if ch >= 97 && ch <= 102 {
+        ret ch - 87
+    }
+    ret 0 - 1
+}
+fun sema_check_literal_range(state: SemaState, expr: AstExpr, negative: i64): i64 {
+    let type_name = expr.type_name
+    if sema_is_native_integer(type_name) == 0 {
+        sema_error(state.source_path, expr.line, "unsupported integer literal suffix " + type_name)
+    }
+    if negative == 1 && type_name != "i8" && type_name != "i16" && type_name != "i32" && type_name != "i64" {
+        sema_error(state.source_path, expr.line, "negative integer literal requires signed type")
+    }
+    let value = expr.value
+    let hex = 0
+    let start = 0
+    if value.len >= 2 && value.data[0] == 48 && (value.data[1] == 120 || value.data[1] == 88) {
+        hex = 1
+        start = 2
+    }
+    for start + 1 < value.len && value.data[start] == 48 {
+        start = start + 1
+    }
+    let bound = sema_literal_bound(type_name, negative, hex)
+    let digits = value.len - start
+    if digits > bound.len {
+        sema_error(state.source_path, expr.line, "integer literal is out of " + type_name + " range")
+    }
+    if digits == bound.len {
+        let i = 0
+        for i < digits {
+            let a = sema_literal_digit(value.data[start + i])
+            let b = sema_literal_digit(bound.data[i])
+            if a > b {
+                sema_error(state.source_path, expr.line, "integer literal is out of " + type_name + " range")
+            }
+            if a < b {
+                ret 0
+            }
+            i = i + 1
+        }
+    }
+    ret 0
+}
+# A bare literal adopts an integer type from its immediate context, while
+# a suffixed literal or an expression with an established type stays exact.
+fun sema_check_expr_expected(state: SemaState, expr: AstExpr, expected: str): str {
+    if sema_is_native_integer(expected) == 1 {
+        if expr.kind == "Literal" && expr.type_name == "" {
+            expr.type_name = expected
+        }
+        if expr.kind == "Unary" && expr.op == "-" && expr.left.kind == "Literal" && expr.left.type_name == "" {
+            expr.left.type_name = expected
+        }
+    }
+    ret sema_check_expr(state, expr)
+}
 fun sema_check_binary(state: SemaState, expr: AstExpr): str {
-    let left = sema_check_expr(state, expr.left)
-    let right = sema_check_expr(state, expr.right)
+    let left = ""
+    let right = ""
+    let left_untyped = expr.left.kind == "Literal" && expr.left.type_name == ""
+    let right_untyped = expr.right.kind == "Literal" && expr.right.type_name == ""
+    if left_untyped && right_untyped == 0 {
+        right = sema_check_expr(state, expr.right)
+        left = sema_check_expr_expected(state, expr.left, right)
+    } else {
+        left = sema_check_expr(state, expr.left)
+        if right_untyped {
+            right = sema_check_expr_expected(state, expr.right, left)
+        } else {
+            right = sema_check_expr(state, expr.right)
+        }
+    }
     if expr.op == "+" && left == "str" && right == "str" {
         ret "str"
     }
@@ -549,8 +722,11 @@ fun sema_check_binary(state: SemaState, expr: AstExpr): str {
         ret right
     }
     if expr.op == "==" || expr.op == "!=" {
-        if left == "i64" && right == "i64" {
-            ret "i64"
+        if left == right && (sema_is_native_integer(left) == 1 || left == "bool") {
+            if left == "i64" {
+                ret "i64"
+            }
+            ret "bool"
         }
         if left == "str" && right == "str" {
             ret "i64"
@@ -559,46 +735,85 @@ fun sema_check_binary(state: SemaState, expr: AstExpr): str {
         if left == right && decl.name != "" && decl.kind == "enum" {
             ret "i64"
         }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires two integers, two strings, or two values of the same enum type")
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires matching integer, bool, str, or enum types")
     }
     if expr.op == "+" || expr.op == "-" || expr.op == "*" || expr.op == "/" || expr.op == "%" || expr.op == "&" || expr.op == "|" || expr.op == "<<" || expr.op == ">>" {
-        if left == "i64" && right == "i64" {
-            ret "i64"
+        if sema_is_native_integer(left) == 1 && sema_is_native_integer(right) == 1 {
+            if left == right || ((expr.op == "<<" || expr.op == ">>") && right == "i64") {
+                ret left
+            }
         }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires matching integer types")
     }
-    if expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" || expr.op == "&&" || expr.op == "||" {
-        if left == "i64" && right == "i64" {
-            ret "i64"
+    if expr.op == "<" || expr.op == ">" || expr.op == "<=" || expr.op == ">=" {
+        if sema_is_native_integer(left) == 1 && left == right {
+            if left == "i64" {
+                ret "i64"
+            }
+            ret "bool"
         }
-        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires integer operands")
+        sema_error(state.source_path, expr.line, "operator " + expr.op + " requires matching integer types")
+    }
+    if expr.op == "&&" || expr.op == "||" {
+        if (left == "i64" || left == "bool") && (right == "i64" || right == "bool") {
+            if left == "i64" && right == "i64" {
+                ret "i64"
+            }
+            ret "bool"
+        }
+        sema_error(state.source_path, expr.line, "logical operator requires bool or legacy i64 operands")
     }
     sema_error(state.source_path, expr.line, "unsupported binary operator " + expr.op)
     ret ""
 }
 fun sema_check_unary(state: SemaState, expr: AstExpr): str {
+    if expr.op == "-" && expr.left.kind == "Literal" && expr.left.type_name != "" {
+        sema_check_literal_range(state, expr.left, 1)
+        expr.left.resolved_type = expr.left.type_name
+        ret expr.left.type_name
+    }
     let operand = sema_check_expr(state, expr.left)
-    if operand != "i64" {
-        sema_error(state.source_path, expr.line, "unary operator " + expr.op + " requires i64 operand, got " + operand)
+    if expr.op == "-" {
+        if operand != "i8" && operand != "i16" && operand != "i32" && operand != "i64" {
+            sema_error(state.source_path, expr.line, "unary - requires a signed integer, got " + operand)
+        }
+        ret operand
     }
-    if expr.op != "-" && expr.op != "!" {
-        sema_error(state.source_path, expr.line, "unsupported unary operator " + expr.op)
+    if expr.op == "!" {
+        if operand == "bool" {
+            ret "bool"
+        }
+        if operand == "i64" {
+            ret "i64"
+        }
     }
-    ret "i64"
+    sema_error(state.source_path, expr.line, "unsupported unary operator " + expr.op + " for " + operand)
+    ret ""
 }
 fun sema_foreign_arg_assignable(external: i64, expected: str, actual: str): i64 {
-    if sema_assignable(expected, actual) == 1 {
-        ret 1
+    # Native scalar lanes must match exactly; no implicit i64 narrowing.
+    if external == 1 && sema_is_native_integer(expected) == 1 {
+        if expected == actual {
+            ret 1
+        }
+        ret 0
     }
-    if external == 1 && sema_is_native_integer(expected) == 1 && actual == "i64" {
-        ret 1
-    }
-    ret 0
+    ret sema_assignable(expected, actual)
 }
 fun sema_check_call(state: SemaState, expr: AstExpr): str {
     let full_name = expr.name
     if expr.type_name != "" {
         full_name = expr.type_name + "." + expr.name
+    }
+    if expr.type_name == "" && sema_is_native_integer(expr.name) == 1 {
+        if expr.args.len != 1 {
+            sema_error(state.source_path, expr.line, "integer conversion requires one argument")
+        }
+        let source_type = sema_check_expr(state, expr.args.data[0])
+        if sema_is_native_integer(source_type) == 0 {
+            sema_error(state.source_path, expr.line, "integer conversion requires an integer, got " + source_type)
+        }
+        ret expr.name
     }
     let sig = sema_find_func(state, full_name)
     if sig.name == "" {
@@ -609,8 +824,11 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
     }
     let i = 0
     for i < expr.args.len {
-        let actual = sema_check_expr(state, expr.args.data[i])
         let expected = sig.param_types.data[i]
+        if full_name == "push" && i == 1 {
+            expected = sema_array_element(expr.args.data[0].resolved_type)
+        }
+        let actual = sema_check_expr_expected(state, expr.args.data[i], expected)
         if full_name == "push" && i == 0 {
             if sema_is_array(actual) == 0 {
                 sema_error(state.source_path, expr.args.data[i].line, "push first argument must be an array")
@@ -637,9 +855,9 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
     if full_name == "pop" {
         ret sema_promote(sema_array_element(expr.args.data[0].resolved_type))
     }
-    if sig.external == 1 && sema_is_native_integer(sig.return_type) == 1 {
-        # The probe decodes the ABI return lane into v2's i64 working type.
-        ret "i64"
+    if sig.external == 1 {
+        # Results retain their declared type, not an artificial i64 bridge.
+        ret sig.return_type
     }
     ret sema_promote(sig.return_type)
 }
@@ -647,6 +865,12 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     let result = ""
     if expr.kind == "Literal" {
         result = "i64"
+        if expr.type_name != "" {
+            sema_check_literal_range(state, expr, 0)
+            result = expr.type_name
+        }
+    } else if expr.kind == "BoolLiteral" {
+        result = "bool"
     } else if expr.kind == "EnumMember" {
         result = expr.type_name
     } else if expr.kind == "String" {
@@ -661,7 +885,7 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
             if local.name == "" {
                 sema_error(state.source_path, expr.line, "undefined variable '" + expr.name + "'")
             }
-            result = sema_promote(local.type_name)
+            result = local.type_name
         }
     } else if expr.kind == "Binary" {
         result = sema_check_binary(state, expr)
@@ -781,7 +1005,7 @@ fun sema_check_assignment(state: SemaState, stmt: AstStmt): i64 {
     if local.read_only == 1 {
         sema_error(state.source_path, stmt.line, "range iterator '" + stmt.name + "' is read-only")
     }
-    let actual = sema_check_expr(state, stmt.value_expr)
+    let actual = sema_check_expr_expected(state, stmt.value_expr, local.type_name)
     if sema_assignable(local.type_name, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to " + local.type_name)
     }
@@ -796,7 +1020,7 @@ fun sema_check_field_set(state: SemaState, stmt: AstStmt): i64 {
     if field_type == "" {
         sema_error(state.source_path, stmt.line, "type " + object_type + " has no field '" + stmt.name + "'")
     }
-    let actual = sema_check_expr(state, stmt.value_expr)
+    let actual = sema_check_expr_expected(state, stmt.value_expr, field_type)
     if sema_assignable(field_type, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to field of type " + field_type)
     }
@@ -816,7 +1040,7 @@ fun sema_check_subscript_set(state: SemaState, stmt: AstStmt): i64 {
     } else {
         sema_error(state.source_path, stmt.line, "type " + base_type + " is not subscriptable")
     }
-    let actual = sema_check_expr(state, stmt.value_expr)
+    let actual = sema_check_expr_expected(state, stmt.value_expr, element)
     if sema_assignable(element, actual) == 0 {
         sema_error(state.source_path, stmt.line, "cannot assign " + actual + " to element of type " + element)
     }
@@ -867,12 +1091,16 @@ fun sema_compound_target_type(state: SemaState, stmt: AstStmt): str {
 }
 fun sema_check_assign_op(state: SemaState, stmt: AstStmt): i64 {
     let target_type = sema_compound_target_type(state, stmt)
-    if target_type != "i64" && target_type != "u8" {
-        sema_error(state.source_path, stmt.line, "compound assignment requires i64 or u8 target, got " + target_type)
+    if sema_is_native_integer(target_type) == 0 {
+        sema_error(state.source_path, stmt.line, "compound assignment requires an integer target, got " + target_type)
     }
-    let actual = sema_check_expr(state, stmt.value_expr)
-    if actual != "i64" {
-        sema_error(state.source_path, stmt.line, "compound assignment requires i64 right operand, got " + actual)
+    let actual = sema_check_expr_expected(state, stmt.value_expr, target_type)
+    let shift_operand = (stmt.op == "<<" || stmt.op == ">>") && sema_is_native_integer(actual) == 1
+    if actual != target_type && shift_operand == 0 {
+        if target_type == "i64" {
+            sema_error(state.source_path, stmt.line, "compound assignment requires i64 right operand, got " + actual)
+        }
+        sema_error(state.source_path, stmt.line, "compound assignment requires matching integer types, got " + actual)
     }
     if stmt.op != "+" && stmt.op != "-" && stmt.op != "*" && stmt.op != "/" && stmt.op != "%" && stmt.op != "&" && stmt.op != "|" && stmt.op != "<<" && stmt.op != ">>" {
         sema_error(state.source_path, stmt.line, "unsupported compound assignment operator " + stmt.op)
@@ -889,7 +1117,7 @@ fun sema_check_return(state: SemaState, stmt: AstStmt): i64 {
     if stmt.expr.kind == "" {
         sema_error(state.source_path, stmt.line, "non-void function must return a value")
     }
-    let actual = sema_check_expr(state, stmt.expr)
+    let actual = sema_check_expr_expected(state, stmt.expr, state.return_type)
     if sema_assignable(state.return_type, actual) == 0 {
         sema_error(state.source_path, stmt.line, "return type " + actual + " is not assignable to " + state.return_type)
     }
@@ -931,12 +1159,12 @@ fun sema_check_stmt_exprs(state: SemaState, stmt: AstStmt): i64 {
         sema_check_assign_op(state, stmt)
     } else if stmt.kind == "If" {
         sema_check_expr(state, stmt.expr)
-        sema_require_i64(state, stmt.expr, "if condition")
+        sema_require_condition(state, stmt.expr, "if condition")
         sema_check_block(state, stmt.then_block)
         sema_check_block(state, stmt.else_block)
     } else if stmt.kind == "While" {
         sema_check_expr(state, stmt.expr)
-        sema_require_i64(state, stmt.expr, "while condition")
+        sema_require_condition(state, stmt.expr, "while condition")
         sema_check_block(state, stmt.body)
     } else if stmt.kind == "ForRange" {
         sema_check_for_range(state, stmt)

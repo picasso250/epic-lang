@@ -1,0 +1,30 @@
+# EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+extern "kernel32.dll" fun GetCurrentThreadId(): u32
+fun add_u32(left: u32, right: u32): u32 {
+    ret left + right
+}
+fun return_u16(): u16 {
+    ret 65535
+}
+fun main(): void {
+    let a = u32(40)
+    if add_u32(a, 2) != 42 {
+        ExitProcess(1)
+    }
+    let result = GetCurrentThreadId()
+    if result == 0 {
+        ExitProcess(2)
+    }
+    let arr = new u16[2]
+    arr[0] = 65535
+    arr[1] = return_u16()
+    if arr[0] != 65535 || arr[1] != 65535 {
+        ExitProcess(3)
+    }
+    let b = u8(255)
+    b += 1
+    if b != 0 {
+        ExitProcess(4)
+    }
+}

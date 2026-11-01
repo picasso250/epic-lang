@@ -1,0 +1,47 @@
+# EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+fun main(): void {
+    let a = u8(255)
+    let b = a + u8(1)
+    if b != u8(0) {
+        ExitProcess(1)
+    }
+    let c = i8(127) + i8(1)
+    if c != i8(0 - 128) {
+        ExitProcess(2)
+    }
+    let d = u16(65535) + u16(2)
+    if d != u16(1) {
+        ExitProcess(3)
+    }
+    let e = u32(4294967295) + u32(1)
+    if e != u32(0) {
+        ExitProcess(4)
+    }
+    let f = u32(4294967295) / u32(65536)
+    if f != u32(65535) {
+        ExitProcess(5)
+    }
+    if u32(4294967295) <= u32(1) {
+        ExitProcess(6)
+    }
+    let g = i32(0 - 123456)
+    if g / i32(3) != i32(0 - 41152) {
+        ExitProcess(7)
+    }
+    if g > i32(0) {
+        ExitProcess(8)
+    }
+    let flag = true
+    if !flag {
+        ExitProcess(9)
+    }
+    let literal = 42u32
+    if literal != u32(42) {
+        ExitProcess(10)
+    }
+    let high = u64(i64(0 - 1))
+    if high < u64(1) {
+        ExitProcess(11)
+    }
+}

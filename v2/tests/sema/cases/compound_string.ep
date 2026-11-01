@@ -1,4 +1,4 @@
-# ERROR: compound assignment requires i64 or u8 target, got str
+# ERROR: compound assignment requires an integer target, got str
 fun main(): void {
     let text = "a"
     text += "b"

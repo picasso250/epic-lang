@@ -122,14 +122,14 @@ fun main(): void {
     let phase_start = 0
     let now = 0
     if options.verbose == 1 {
-        total_start = GetTickCount64()
+        total_start = i64(GetTickCount64())
         phase_start = total_start
     }
 
     let ast = merge_inputs(options.inputs)
     let parse_ms = 0
     if options.verbose == 1 {
-        now = GetTickCount64()
+        now = i64(GetTickCount64())
         parse_ms = now - phase_start
         phase_start = now
     }
@@ -137,7 +137,7 @@ fun main(): void {
     sema_check(ast)
     let sema_ms = 0
     if options.verbose == 1 {
-        now = GetTickCount64()
+        now = i64(GetTickCount64())
         sema_ms = now - phase_start
         phase_start = now
     }
@@ -155,7 +155,7 @@ fun main(): void {
     emit_program(e, ast)
     let codegen_ms = 0
     if options.verbose == 1 {
-        now = GetTickCount64()
+        now = i64(GetTickCount64())
         codegen_ms = now - phase_start
         phase_start = now
     }
@@ -167,19 +167,19 @@ fun main(): void {
     } else {
         let image = asm_encode(e.program)
         if options.verbose == 1 {
-            now = GetTickCount64()
+            now = i64(GetTickCount64())
             encode_ms = now - phase_start
             phase_start = now
         }
         write_output(output_path, pe_build_exe(image, ast.externs))
         if options.verbose == 1 {
-            write_ms = GetTickCount64() - phase_start
+            write_ms = i64(GetTickCount64()) - phase_start
         }
     }
 
     let total_ms = 0
     if options.verbose == 1 {
-        total_ms = GetTickCount64() - total_start
+        total_ms = i64(GetTickCount64()) - total_start
     }
     print_timing(options.verbose, "parse+merge", parse_ms)
     print_timing(options.verbose, "sema", sema_ms)

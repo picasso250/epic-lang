@@ -1,4 +1,4 @@
-# ERROR: compound assignment requires i64 or u8 target, got i64[]
+# ERROR: compound assignment requires an integer target, got i64[]
 fun main(): void {
     let values = new i64[]
     values += 1

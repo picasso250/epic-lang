@@ -1,0 +1,6 @@
+# ERROR: argument 1 of 'Sleep' expects u32, got i64
+extern "kernel32.dll" fun Sleep(milliseconds: u32): void
+fun main(): void {
+    let milliseconds = i64(1)
+    Sleep(milliseconds)
+}

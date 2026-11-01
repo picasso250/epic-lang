@@ -253,6 +253,24 @@ fun type_is_u8(t: TypeInfo): i64 {
     }
     ret 0
 }
+fun scalar_storage_size(name: str): i64 {
+    if name == "i8" || name == "u8" || name == "bool" {
+        ret 1
+    }
+    if name == "i16" || name == "u16" {
+        ret 2
+    }
+    if name == "i32" || name == "u32" {
+        ret 4
+    }
+    ret 8
+}
+fun type_storage_size(typ: TypeInfo): i64 {
+    ret scalar_storage_size(typ.kind)
+}
+fun align_size(value: i64, alignment: i64): i64 {
+    ret ((value + alignment - 1) / alignment) * alignment
+}
 fun type_is_value_u8(t: TypeInfo): i64 {
     ret type_is_u8(t)
 }
@@ -288,6 +306,9 @@ fun user_type(name: str): TypeInfo {
     }
     if name == "u8" {
         ret type_u8()
+    }
+    if sema_is_native_integer(name) == 1 || name == "bool" {
+        ret type_info(name, "")
     }
     if name == "void" {
         ret type_void()
@@ -520,12 +541,22 @@ fun compute_struct_layouts(e: EmitterState, ast: AstProgram): i64 {
     let i = 0
     for i < ast.structs.len {
         let node = ast.structs.data[i]
-        s = add_struct_info(e, node.name, node.fields.len * 8)
+        s = add_struct_info(e, node.name, 0)
         let j = 0
+        let offset = 0
+        let maximum_align = 1
         for j < node.fields.len {
-            add_field(s, node.fields.data[j].name, emitter_type(e, node.fields.data[j].type_name), j * 8)
+            let field_type = emitter_type(e, node.fields.data[j].type_name)
+            let width = type_storage_size(field_type)
+            if width > maximum_align {
+                maximum_align = width
+            }
+            offset = align_size(offset, width)
+            add_field(s, node.fields.data[j].name, field_type, offset)
+            offset = offset + width
             j = j + 1
         }
+        s.size = align_size(offset, maximum_align)
         a = add_struct_info(e, array_layout_name(node.name), 24)
         add_field(a, "data", type_info("ptr", node.name), 0)
         add_field(a, "len", type_i64(), 8)
@@ -710,10 +741,10 @@ fun find_extern_index(e: EmitterState, name: str): i64 {
     }
     ret 0 - 1
 }
-# Probe: normalize the defined low bits of a native scalar result into a
-# canonical i64 value, without adding general narrow integer arithmetic yet.
-fun emit_abi_result_as_i64(e: EmitterState, typ: str): i64 {
-    if typ == "u8" {
+# Represent scalar values canonically in RAX across Epic expression edges.
+# Narrow signed values are sign-extended; unsigned values are zero-extended.
+fun emit_scalar_normalize(e: EmitterState, typ: str): i64 {
+    if typ == "u8" || typ == "bool" {
         emit_inst(e, "and rax, 255")
     } else if typ == "u16" {
         emit_inst(e, "and rax, 65535")
@@ -733,6 +764,12 @@ fun emit_abi_result_as_i64(e: EmitterState, typ: str): i64 {
             emit_inst(e, "shl rax, cl")
             emit_inst(e, "sar rax, cl")
         }
+    }
+    ret 0
+}
+fun emit_is_unsigned_scalar(typ: str): i64 {
+    if typ == "u8" || typ == "u16" || typ == "u32" || typ == "u64" {
+        ret 1
     }
     ret 0
 }
@@ -774,7 +811,12 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         out_s(e, "    add rsp, ")
         out_i(e, frame)
         out_nl(e)
-        emit_abi_result_as_i64(e, e.externs.data[external].type_name)
+        emit_scalar_normalize(e, e.externs.data[external].type_name)
+        ret 0
+    }
+    if expr.type_name == "" && sema_is_native_integer(name) == 1 {
+        emit_expr(e, expr.args.data[0])
+        emit_scalar_normalize(e, name)
         ret 0
     }
     if name == "print" {
@@ -871,22 +913,27 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_inst(e, "dec rcx")
         emit_mov(e, "[rax+8]", "rcx")
         emit_mov(e, "rdx", "[rax]")
-        if pop_elem == "u8" {
+        let el_size = scalar_storage_size(pop_elem)
+        if el_size == 1 {
             emit_inst(e, "movzx eax, byte [rdx+rcx]")
             emit_inst(e, "mov byte [rdx+rcx], 0")
+        } else if el_size == 2 {
+            emit_inst(e, "movzx eax, word [rdx+rcx*2]")
+            emit_inst(e, "mov word [rdx+rcx*2], 0")
+        } else if el_size == 4 {
+            emit_inst(e, "mov eax, [rdx+rcx*4]")
+            emit_inst(e, "mov dword [rdx+rcx*4], 0")
         } else {
             emit_inst(e, "mov rax, [rdx+rcx*8]")
             emit_inst(e, "mov qword [rdx+rcx*8], 0")
         }
+        emit_scalar_normalize(e, pop_elem)
         ret 0
     }
     if name == "push" {
         let arr_type = expr_type(e, expr.args.data[0])
         let elem = arr_type.name
-        let el_size = 8
-        if elem == "u8" {
-            el_size = 1
-        }
+        let el_size = scalar_storage_size(elem)
         emit_expr(e, expr.args.data[0])
         let arr_slot = temp_save_rax(e)
         emit_expr(e, expr.args.data[1])
@@ -932,6 +979,14 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             emit_inst(e, "mov r11b, [r8+r10]")
             emit_stack_load(e, "rax", new_data_slot)
             emit_inst(e, "mov [rax+r10], r11b")
+        } else if el_size == 2 {
+            emit_inst(e, "mov r11w, word [r8+r10*2]")
+            emit_stack_load(e, "rax", new_data_slot)
+            emit_inst(e, "mov word [rax+r10*2], r11w")
+        } else if el_size == 4 {
+            emit_inst(e, "mov r11d, [r8+r10*4]")
+            emit_stack_load(e, "rax", new_data_slot)
+            emit_inst(e, "mov [rax+r10*4], r11d")
         } else {
             emit_inst(e, "mov r11, [r8+r10*8]")
             emit_stack_load(e, "rax", new_data_slot)
@@ -950,6 +1005,10 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_stack_load(e, "r8", val_slot)
         if el_size == 1 {
             emit_inst(e, "mov [rcx+rdx], r8b")
+        } else if el_size == 2 {
+            emit_inst(e, "mov word [rcx+rdx*2], r8w")
+        } else if el_size == 4 {
+            emit_inst(e, "mov [rcx+rdx*4], r8d")
         } else {
             emit_inst(e, "mov [rcx+rdx*8], r8")
         }
@@ -984,7 +1043,7 @@ fun is_integer_value_op(op: str): i64 {
     }
     ret 0
 }
-fun emit_integer_value_op(e: EmitterState, op: str, right_slot: i64): i64 {
+fun emit_integer_value_op(e: EmitterState, op: str, right_slot: i64, operand_type: str): i64 {
     emit_stack_load(e, "rcx", right_slot)
     if op == "+" {
         emit_inst(e, "add rax, rcx")
@@ -1020,18 +1079,32 @@ fun emit_integer_value_op(e: EmitterState, op: str, right_slot: i64): i64 {
         if op == "<<" {
             emit_inst(e, "shl rax, cl")
         } else {
-            emit_inst(e, "sar rax, cl")
+            if emit_is_unsigned_scalar(operand_type) == 1 {
+                emit_inst(e, "shr rax, cl")
+            } else {
+                emit_inst(e, "sar rax, cl")
+            }
         }
         ret 0
     }
     if op == "/" {
-        emit_inst(e, "cqo")
-        emit_inst(e, "idiv rcx")
+        if emit_is_unsigned_scalar(operand_type) == 1 {
+            emit_inst(e, "xor edx, edx")
+            emit_inst(e, "div rcx")
+        } else {
+            emit_inst(e, "cqo")
+            emit_inst(e, "idiv rcx")
+        }
         ret 0
     }
     if op == "%" {
-        emit_inst(e, "cqo")
-        emit_inst(e, "idiv rcx")
+        if emit_is_unsigned_scalar(operand_type) == 1 {
+            emit_inst(e, "xor edx, edx")
+            emit_inst(e, "div rcx")
+        } else {
+            emit_inst(e, "cqo")
+            emit_inst(e, "idiv rcx")
+        }
         emit_mov(e, "rax", "rdx")
         ret 0
     }
@@ -1080,7 +1153,11 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
         ret 0
     }
     if is_integer_value_op(expr.op) == 1 {
-        ret emit_integer_value_op(e, expr.op, tmp)
+        emit_integer_value_op(e, expr.op, tmp, left_type.kind)
+        if expr.resolved_type != "ptr" {
+            emit_scalar_normalize(e, expr.resolved_type)
+        }
+        ret 0
     }
     emit_stack_load(e, "rcx", tmp)
     if expr.op == "==" {
@@ -1097,25 +1174,41 @@ fun emit_binary(e: EmitterState, expr: AstExpr): i64 {
     }
     if expr.op == "<" {
         emit_inst(e, "cmp rax, rcx")
-        emit_inst(e, "setl al")
+        if emit_is_unsigned_scalar(left_type.kind) == 1 {
+            emit_inst(e, "setb al")
+        } else {
+            emit_inst(e, "setl al")
+        }
         emit_inst(e, "movzx eax, al")
         ret 0
     }
     if expr.op == ">" {
         emit_inst(e, "cmp rax, rcx")
-        emit_inst(e, "setg al")
+        if emit_is_unsigned_scalar(left_type.kind) == 1 {
+            emit_inst(e, "seta al")
+        } else {
+            emit_inst(e, "setg al")
+        }
         emit_inst(e, "movzx eax, al")
         ret 0
     }
     if expr.op == "<=" {
         emit_inst(e, "cmp rax, rcx")
-        emit_inst(e, "setle al")
+        if emit_is_unsigned_scalar(left_type.kind) == 1 {
+            emit_inst(e, "setbe al")
+        } else {
+            emit_inst(e, "setle al")
+        }
         emit_inst(e, "movzx eax, al")
         ret 0
     }
     if expr.op == ">=" {
         emit_inst(e, "cmp rax, rcx")
-        emit_inst(e, "setge al")
+        if emit_is_unsigned_scalar(left_type.kind) == 1 {
+            emit_inst(e, "setae al")
+        } else {
+            emit_inst(e, "setge al")
+        }
         emit_inst(e, "movzx eax, al")
         ret 0
     }
@@ -1126,6 +1219,7 @@ fun emit_unary(e: EmitterState, expr: AstExpr): i64 {
     emit_expr(e, expr.left)
     if expr.op == "-" {
         emit_inst(e, "neg rax")
+        emit_scalar_normalize(e, expr.resolved_type)
         ret 0
     }
     if expr.op == "!" {
@@ -1198,6 +1292,20 @@ fun emit_comparison_jump(e: EmitterState, expr: AstExpr, jump_if_true: i64, labe
             op = "jl"
         }
     }
+    if emit_is_unsigned_scalar(left_type.kind) == 1 {
+        if op == "jl" {
+            op = "jb"
+        }
+        else if op == "jge" {
+            op = "jae"
+        }
+        else if op == "jg" {
+            op = "ja"
+        }
+        else if op == "jle" {
+            op = "jbe"
+        }
+    }
     emit_jmp_id(e, op, "L", label)
     ret 0
 }
@@ -1256,10 +1364,7 @@ fun emit_new(e: EmitterState, expr: AstExpr): i64 {
 }
 fun emit_new_array(e: EmitterState, expr: AstExpr): i64 {
     let elem = expr.type_name
-    let el_size = 8
-    if elem == "u8" {
-        el_size = 1
-    }
+    let el_size = scalar_storage_size(elem)
     let header_slot = 0
     emit_mov(e, "ecx", "24")
     emit_inst(e, "sub rsp, 40")
@@ -1350,25 +1455,37 @@ fun emit_subscript_address(e: EmitterState, base: AstExpr, index: AstExpr): Type
         emit_inst(e, "jge __ep_bounds_fail")
         emit_mov(e, "rcx", "[rcx]")
     }
-    if type_is_u8(elem_type) == 1 {
+    let element_size = type_storage_size(elem_type)
+    if element_size == 1 {
         emit_inst(e, "lea rax, [rcx+rax]")
     } else {
-        emit_inst(e, "lea rax, [rcx+rax*8]")
+        emit_inst(e, "lea rax, [rcx+rax*" + itoa(element_size) + "]")
     }
     ret elem_type
 }
 fun emit_load_address(e: EmitterState, value_type: TypeInfo): i64 {
-    if type_is_u8(value_type) == 1 {
+    let width = type_storage_size(value_type)
+    if width == 1 {
         emit_inst(e, "movzx rax, byte [rax]")
+    } else if width == 2 {
+        emit_inst(e, "movzx rax, word [rax]")
+    } else if width == 4 {
+        emit_inst(e, "mov eax, dword [rax]")
     } else {
         emit_inst(e, "mov rax, [rax]")
     }
+    emit_scalar_normalize(e, value_type.kind)
     ret 0
 }
 fun emit_store_address(e: EmitterState, value_type: TypeInfo, address_slot: i64): i64 {
     emit_stack_load(e, "rcx", address_slot)
-    if type_is_u8(value_type) == 1 {
+    let width = type_storage_size(value_type)
+    if width == 1 {
         emit_inst(e, "mov [rcx], al")
+    } else if width == 2 {
+        emit_inst(e, "mov word [rcx], ax")
+    } else if width == 4 {
+        emit_inst(e, "mov [rcx], eax")
     } else {
         emit_inst(e, "mov [rcx], rax")
     }
@@ -1391,8 +1508,9 @@ fun emit_subscript(e: EmitterState, expr: AstExpr): i64 {
     ret 0
 }
 fun emit_expr(e: EmitterState, expr: AstExpr): i64 {
-    if expr.kind == "Literal" {
+    if expr.kind == "Literal" || expr.kind == "BoolLiteral" {
         emit_mov(e, "rax", expr.value)
+        emit_scalar_normalize(e, expr.resolved_type)
         ret 0
     }
     if expr.kind == "EnumMember" {
@@ -1470,9 +1588,7 @@ fun emit_return(e: EmitterState, stmt: AstStmt): i64 {
     } else {
         if stmt.expr.kind != "" {
             emit_expr(e, stmt.expr)
-            if type_is_u8(e.current_ret_type) == 1 {
-                emit_inst(e, "movzx eax, al")
-            }
+            emit_scalar_normalize(e, e.current_ret_type.kind)
         }
         emit_jmp_id(e, "jmp", "L", e.current_ep_id)
     }
@@ -1534,7 +1650,8 @@ fun emit_assign_op(e: EmitterState, stmt: AstStmt): i64 {
     emit_expr(e, stmt.value_expr)
     let right_slot = temp_save_rax(e)
     emit_stack_load(e, "rax", old_value_slot)
-    emit_integer_value_op(e, stmt.op, right_slot)
+    emit_integer_value_op(e, stmt.op, right_slot, target_type.kind)
+    emit_scalar_normalize(e, target_type.kind)
     emit_store_address(e, target_type, address_slot)
     ret 0
 }

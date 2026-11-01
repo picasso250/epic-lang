@@ -1,0 +1,4 @@
+# ERROR: operator + requires matching integer types
+fun main(): void {
+    let value = true + 1
+}

@@ -1,0 +1,3 @@
+# ERROR: reserved type name 'bool'
+type bool = False | True
+fun main(): void {}

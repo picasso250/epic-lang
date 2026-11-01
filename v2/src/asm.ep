@@ -153,40 +153,40 @@ fun asm_number(s: str): i64 {
     ret value * sign
 }
 fun asm_reg(name: str): i64 {
-    if name == "rax" || name == "eax" || name == "al" {
+    if name == "rax" || name == "eax" || name == "al" || name == "ax" {
         ret 0
     }
-    if name == "rcx" || name == "ecx" || name == "cl" {
+    if name == "rcx" || name == "ecx" || name == "cl" || name == "cx" {
         ret 1
     }
-    if name == "rdx" || name == "edx" || name == "dl" {
+    if name == "rdx" || name == "edx" || name == "dl" || name == "dx" {
         ret 2
     }
-    if name == "rbx" || name == "ebx" || name == "bl" {
+    if name == "rbx" || name == "ebx" || name == "bl" || name == "bx" {
         ret 3
     }
-    if name == "rsp" || name == "esp" {
+    if name == "rsp" || name == "esp" || name == "sp" {
         ret 4
     }
-    if name == "rbp" || name == "ebp" {
+    if name == "rbp" || name == "ebp" || name == "bp" {
         ret 5
     }
-    if name == "rsi" || name == "esi" {
+    if name == "rsi" || name == "esi" || name == "si" {
         ret 6
     }
-    if name == "rdi" || name == "edi" {
+    if name == "rdi" || name == "edi" || name == "di" {
         ret 7
     }
-    if name == "r8" || name == "r8d" || name == "r8b" {
+    if name == "r8" || name == "r8d" || name == "r8b" || name == "r8w" {
         ret 8
     }
-    if name == "r9" || name == "r9d" || name == "r9b" {
+    if name == "r9" || name == "r9d" || name == "r9b" || name == "r9w" {
         ret 9
     }
-    if name == "r10" || name == "r10d" || name == "r10b" {
+    if name == "r10" || name == "r10d" || name == "r10b" || name == "r10w" {
         ret 10
     }
-    if name == "r11" || name == "r11d" || name == "r11b" {
+    if name == "r11" || name == "r11d" || name == "r11b" || name == "r11w" {
         ret 11
     }
     ret 0 - 1
@@ -194,6 +194,9 @@ fun asm_reg(name: str): i64 {
 fun asm_reg_width(name: str): i64 {
     if name == "al" || name == "bl" || name == "cl" || name == "dl" || name == "r8b" || name == "r9b" || name == "r10b" || name == "r11b" {
         ret 8
+    }
+    if name == "ax" || name == "bx" || name == "cx" || name == "dx" || name == "sp" || name == "bp" || name == "si" || name == "di" || name == "r8w" || name == "r9w" || name == "r10w" || name == "r11w" {
+        ret 16
     }
     if name == "eax" || name == "ebx" || name == "ecx" || name == "edx" || name == "esp" || name == "ebp" || name == "esi" || name == "edi" || name == "r8d" || name == "r9d" || name == "r10d" || name == "r11d" {
         ret 32
@@ -286,6 +289,9 @@ fun asm_parse_operand(image: ExeImage, raw: str): AsmOperand {
     if asm_starts(text, "byte ") == 1 {
         width = 8
         text = asm_trim(asm_slice(text, 5, text.len))
+    } else if asm_starts(text, "word ") == 1 {
+        width = 16
+        text = asm_trim(asm_slice(text, 5, text.len))
     } else if asm_starts(text, "dword ") == 1 {
         width = 32
         text = asm_trim(asm_slice(text, 6, text.len))
@@ -340,6 +346,11 @@ fun asm_byte(image: ExeImage, value: i64): i64 {
     else {
         asm_die("bytes outside a section")
     }
+    ret 0
+}
+fun asm_u16(image: ExeImage, value: i64): i64 {
+    asm_byte(image, value)
+    asm_byte(image, value >> 8)
     ret 0
 }
 fun asm_u32(image: ExeImage, value: i64): i64 {
@@ -534,6 +545,9 @@ fun asm_emit_opcode_rm(image: ExeImage, opcode: i64, reg: i64, rm: AsmOperand): 
         base = rm.base
         index = rm.index
     }
+    if rm.width == 16 {
+        asm_byte(image, 102)
+    }
     asm_rex(image, asm_rex_bits(rm.width, reg, index, base), asm_force_rex8(rm))
     asm_byte(image, opcode)
     asm_emit_rm(image, reg, rm)
@@ -552,10 +566,16 @@ fun asm_effective_width(a: AsmOperand, b: AsmOperand): i64 {
 fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     let width = asm_effective_width(dst, src)
     if dst.kind == 1 && src.kind == 2 {
+        if width == 16 {
+            asm_byte(image, 102)
+        }
         asm_rex(image, asm_rex_bits(width, 0, 0 - 1, dst.reg), asm_force_rex8(dst))
         if width == 8 {
             asm_byte(image, 176 + (dst.reg & 7))
             asm_byte(image, src.imm)
+        } else if width == 16 {
+            asm_byte(image, 184 + (dst.reg & 7))
+            asm_u16(image, src.imm)
         } else if width == 32 {
             asm_byte(image, 184 + (dst.reg & 7))
             asm_u32(image, src.imm)
@@ -581,6 +601,9 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
         }
         let base = dst.base
         let index = dst.index
+        if width == 16 {
+            asm_byte(image, 102)
+        }
         asm_rex(image, asm_rex_bits(width, src.reg, index, base), asm_force_rex8(src))
         asm_byte(image, store_opcode)
         asm_emit_rm(image, src.reg, dst)
@@ -598,14 +621,17 @@ fun asm_emit_mov(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
             let reloc = image.relocs.data[reloc_count]
             if width == 8 {
                 reloc.addend = reloc.addend - 1
+            } else if width == 16 {
+                reloc.addend = reloc.addend - 2
             } else {
                 reloc.addend = reloc.addend - 4
             }
         }
         if width == 8 {
             asm_byte(image, src.imm)
-        }
-        else {
+        } else if width == 16 {
+            asm_u16(image, src.imm)
+        } else {
             asm_u32(image, src.imm)
         }
         ret 0
@@ -633,7 +659,11 @@ fun asm_emit_movzx(image: ExeImage, dst: AsmOperand, src: AsmOperand): i64 {
     }
     asm_rex(image, asm_rex_bits(dst.width, dst.reg, index, base), asm_force_rex8(src))
     asm_byte(image, 15)
-    asm_byte(image, 182)
+    if src.width == 16 {
+        asm_byte(image, 183)
+    } else {
+        asm_byte(image, 182)
+    }
     asm_emit_rm(image, dst.reg, src)
     ret 0
 }
@@ -797,6 +827,18 @@ fun asm_jump_code(name: str): i64 {
     if name == "jne" || name == "jnz" {
         ret 133
     }
+    if name == "jb" {
+        ret 130
+    }
+    if name == "jae" {
+        ret 131
+    }
+    if name == "jbe" {
+        ret 134
+    }
+    if name == "ja" {
+        ret 135
+    }
     if name == "jl" {
         ret 140
     }
@@ -839,6 +881,18 @@ fun asm_setcc_code(name: str): i64 {
     }
     if name == "setne" {
         ret 149
+    }
+    if name == "setb" {
+        ret 146
+    }
+    if name == "setae" {
+        ret 147
+    }
+    if name == "setbe" {
+        ret 150
+    }
+    if name == "seta" {
+        ret 151
     }
     if name == "setl" {
         ret 156

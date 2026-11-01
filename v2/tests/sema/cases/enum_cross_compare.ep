@@ -1,4 +1,4 @@
-# ERROR: requires two integers, two strings, or two values of the same enum type
+# ERROR: requires matching integer, bool, str, or enum types
 type LeftEnum = Same | Other
 type RightEnum = Same | Other
 fun main(): void {

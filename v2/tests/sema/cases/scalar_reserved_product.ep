@@ -1,0 +1,5 @@
+# ERROR: reserved type name 'u32'
+type u32 {
+    value: i64
+}
+fun main(): void {}
