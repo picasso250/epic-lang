@@ -36,3 +36,30 @@ git log archive/pre-directories-2026-11-01-v3 --oneline
 This repository is **one** source history with five logical compiler generations.
 A change to shared language semantics should update the appropriate generation
 folders together; do not recreate five long-lived Git branches.
+
+## Verification and branch retirement
+
+- Migration commit: `812d537beaa34d9ce6d3e39c2eb21180c6edc952`
+  (plus this documentation follow-up).
+- Verified original Git blob identities for each generation's `src/`,
+  `runtime/`, `tests/`, and `examples/` files against the archived snapshots.
+- Executed `python test.py` in the new layout: **all five generations passed**.
+  In particular, v4's full six-suite test runner (including fixed point,
+  132 end-to-end cases, 67 semantic diagnostics, assembler and GC) passed.
+- Executed `python test.py --from-version 4` again on the existing repository's
+  real `main` working tree: **passed**.
+- **After deleting the local v0–v4 branches**, executed `python build.py --to 4`
+  again: **passed**. This confirms that normal builds no longer depend on
+  branch references or Git worktrees.
+- The new v4 executable's SHA-256 does **not** match the executable built in
+  the older v4 worktree. Each location independently passes its two-generation
+  byte-identical fixed-point check and full functional suite; cross-directory
+  binary identity has not been established, and the difference's cause has not
+  yet been isolated. Do not overstate binary reproducibility across locations.
+- The original `v0`–`v4` local and `origin` branches were deleted **only after**
+  annotated archive tags were pushed to GitHub. Other experimental branches
+  were left unchanged. The five older local worktrees under `build/worktrees/`
+  were **detached at their original commit** and retained as local safety copies;
+  do not make new changes there. The scratch integration worktree was removed.
+- The preexisting untracked `.continue-on-phone/` was preserved. Untracked
+  ignored build/cache artifacts in the original repository were not deleted.
