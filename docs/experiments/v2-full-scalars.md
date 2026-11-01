@@ -180,3 +180,42 @@ Experimental v2 additionally passes **80 E2E** cases, **72 semantic rejection**
 cases, its isolated-compiler tests, and GC stress/small tests. The negative
 cases specifically reject implicit typed `u8`/`i64` conversions. No changes
 are merged into canonical `main` as part of this experiment.
+
+## Follow-up: remove v3 scalar-compatibility bridges (2026-11-01)
+
+**Completed on the experiment branch; not merged into `main`.** The v3
+compiler no longer accepts implicit `i64 -> u8`, `u8 -> i64`, or
+`bool -> i64` scalar assignment/call/return conversions. It no longer accepts
+mixed `u8`/`i64` arithmetic, mixed `bool`/`i64` equality, cross-type joins,
+`i64`/`u8` conditions, non-`bool` `!`, or mixed-type boolean operators.
+Unsigned/signed integer operations still require matching operand types,
+except for the already-defined integer shift-count rule. Unsuffixed literals
+continue to receive types from their immediate contexts; explicit conversions
+remain available.
+
+This removes `sema_legacy_i64_pair` entirely, simplifies v3's integer
+comparison and code generation, and replaces old conditional expressions in
+v3's positive tests with explicit comparisons or actual `bool` values. It also
+updates the few v3 GC, isolated-compiler, and assembler fixtures that exercised
+implicit byte conversion. The assembler integration tests recompile portions
+of the v3 compiler with v3 itself, so `v3/src/utils.ep` and two `asm.ep` sites
+now use source expressions valid under *both* the v2 bootstrap and strict v3.
+
+**`ptr` is intentionally unchanged.** In particular, v3 still permits the
+historical integer-to-`ptr` argument conversion; this is a separate FFI and
+null-pointer design question, not an unexamined part of the scalar cleanup.
+A direct `GetFileType(0)` Win32 call compiled and ran successfully after the
+change. No `ptr` design decision is made here.
+
+Verification: `python test.py` produced **`ALL 5 GENERATIONS PASS`** for
+v0–v4, including v3's **105 passing E2E** cases, **81 semantic diagnostics**
+(including 12 new strict-scalar rejection cases), assembler integration,
+GC stress/views, and the isolated compiler tests. The v1 and v4 bootstrap
+fixed-point comparisons remained byte-identical. After this cleanup, v3's
+compiler-source LOC (`src/*.ep`) is approximately **8,897**, down from
+**8,946** on the preceding experimental revision (49 fewer lines). v2 stays
+at 6,586; v4 stays at 9,313. These are compiler-only physical source lines.
+
+The next separate design discussion is `ptr` (null representation, integer
+conversions, precise Win64 ABI signatures, and pointer-lifetime rules). Nothing
+in this scalar cleanup presupposes that decision.

@@ -73,12 +73,14 @@ not use. The user-visible language changes introduced in v3 are:
   and
 - one index type: checked subscripts and both slice bounds require `i64`.
 
-The v3 compiler implementation itself stays within the v2-era integer surface.
-The v4 compiler is the dogfood target for the new bool and integer types. During
-that migration, v3 retains the old `u8`/`i64` assignment and expression bridge,
-and accepts legacy `i64` or `u8` conditions. New code should use matching
-integer operands, explicit conversions, and `bool` conditions; the bridge is
-not a forward-compatibility promise.
+In the canonical history, fixed-width scalar types first arrived in v3;
+this experimental branch already implements them in v2. The v3 compiler source
+still uses the subset that v2 can compile, while the v4 compiler is the main
+dogfood target for `bool` and the expanded integer types. **The v3 language
+itself now requires matching integer types, explicit conversions, and `bool`
+conditions.** The earlier `u8`/`i64` and `bool`/`i64` compatibility bridges
+have been removed. The separate `ptr` conversion rules remain unchanged for a
+later design review.
 
 The v3 compiler source also dogfoods the v2 foundations: unit enums and
 exhaustive matching, compound assignment, unary operators, integer range loops,
@@ -289,9 +291,8 @@ let value = if ready {
 ```
 
 Branch types must join even when the complete `if` appears in statement position.
-Conditions require `bool`. The v3 migration bridge also accepts legacy `i64`
-or `u8` conditions, where zero is false and nonzero is true; new code should
-not rely on that bridge.
+Conditions require `bool`; integer values are not implicitly treated as
+conditions. Compare an integer with zero explicitly when testing its truth.
 
 ## Else-if chains
 
@@ -437,8 +438,8 @@ statement and does not produce a value.
 
 Unary `-` accepts signed integers and operates at their width. A directly
 negated literal may use the signed minimum, such as `-128i8`. Logical `!`
-accepts `bool`; the v3 migration bridge also accepts `i64` and `u8`. It returns
-`bool`. Unary operators bind more tightly than `*`, `/`, and `%` and may be
+accepts only `bool` and returns `bool`. Unary operators bind more tightly
+than `*`, `/`, and `%` and may be
 chained. Epic has no unary `+` or bitwise `~` in v3.
 
 Supported escapes in string and character literals:
@@ -475,7 +476,7 @@ String lengths and indices count bytes, not Unicode characters.
 `str + str` remains the non-integer addition case. `==` and `!=` additionally
 accept two bool values, two strings, or two values of the same enum type;
 products and arrays have no implicit reference equality. `if` and condition-form
-`for` conditions require `bool`, subject to the documented v3 migration bridge.
+`for` conditions require `bool` without implicit integer conversions.
 
 ## Windows external functions
 

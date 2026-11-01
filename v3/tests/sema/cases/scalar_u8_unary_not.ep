@@ -1,0 +1,4 @@
+# ERROR: unary operator ! requires bool, got u8
+fun main(): void {
+    let result = !u8(1)
+}

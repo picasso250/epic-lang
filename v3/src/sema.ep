@@ -690,12 +690,6 @@ fun sema_assignable(expected: str, actual: str): i64 {
     if expected == actual {
         ret 1
     }
-    if expected == "u8" && actual == "i64" {
-        ret 1
-    }
-    if expected == "i64" && (actual == "u8" || actual == "bool") {
-        ret 1
-    }
     if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual) == 1) {
         ret 1
     }
@@ -711,9 +705,6 @@ fun sema_join_types(state: SemaState, left: str, right: str, line: i64): str {
     if right == "never" {
         ret left
     }
-    if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") || (left == "i64" && right == "bool") || (left == "bool" && right == "i64") {
-        ret "i64"
-    }
     sema_error(state.source_path, line, "cannot join types " + left + " and " + right)
     ret ""
 }
@@ -724,7 +715,7 @@ fun sema_require_i64(state: SemaState, expr: AstExpr, context: str): i64 {
     ret 0
 }
 fun sema_require_condition(state: SemaState, expr: AstExpr, context: str): i64 {
-    if expr.resolved_type != "bool" && expr.resolved_type != "i64" && expr.resolved_type != "u8" && expr.resolved_type != "never" {
+    if expr.resolved_type != "bool" && expr.resolved_type != "never" {
         sema_error(state.source_path, expr.line, context + " requires bool, got " + expr.resolved_type)
     }
     ret 0
@@ -770,17 +761,11 @@ fun sema_needs_integer_context(expr: AstExpr): i64 {
     }
     ret 0
 }
-fun sema_legacy_i64_pair(left: str, right: str): i64 {
-    if (left == "i64" && right == "u8") || (left == "u8" && right == "i64") {
-        ret 1
-    }
-    ret 0
-}
 fun sema_matching_integers(left: str, right: str): i64 {
     if left == right && sema_is_integer(left) == 1 {
         ret 1
     }
-    ret sema_legacy_i64_pair(left, right)
+    ret 0
 }
 fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
     let left = ""
@@ -817,57 +802,36 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
                 result = "ptr"
             } else if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Subtract {
             if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Multiply {
             if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Divide {
             if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.Remainder {
             if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.BitAnd {
             if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.BitOr {
             if sema_matching_integers(left, right) == 1 {
                 result = left
-                if sema_legacy_i64_pair(left, right) == 1 {
-                    result = "i64"
-                }
             }
         }
         OperatorKind.ShiftLeft {
@@ -887,8 +851,6 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
                 result = "bool"
             } else if left == "bool" && right == "bool" {
                 result = "bool"
-            } else if (left == "bool" && right == "i64") || (left == "i64" && right == "bool") {
-                result = "bool"
             } else {
                 let decl = sema_find_type(state, left)
                 if left == right && decl.name != "" && decl.kind == "enum" {
@@ -902,8 +864,6 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
             } else if left == "str" && right == "str" {
                 result = "bool"
             } else if left == "bool" && right == "bool" {
-                result = "bool"
-            } else if (left == "bool" && right == "i64") || (left == "i64" && right == "bool") {
                 result = "bool"
             } else {
                 let not_equal_decl = sema_find_type(state, left)
@@ -933,12 +893,12 @@ fun sema_check_binary(state: SemaState, expr: AstExpr, expected: str): str {
             }
         }
         OperatorKind.LogicalAnd {
-            if (left == "bool" || left == "i64" || left == "u8") && (right == "bool" || right == "i64" || right == "u8") {
+            if left == "bool" && right == "bool" {
                 result = "bool"
             }
         }
         OperatorKind.LogicalOr {
-            if (left == "bool" || left == "i64" || left == "u8") && (right == "bool" || right == "i64" || right == "u8") {
+            if left == "bool" && right == "bool" {
                 result = "bool"
             }
         } else {
@@ -977,7 +937,7 @@ fun sema_check_unary(state: SemaState, expr: AstExpr, expected: str): str {
             ret operand
         }
         OperatorKind.LogicalNot {
-            if operand != "bool" && operand != "i64" && operand != "u8" {
+            if operand != "bool" {
                 sema_error(state.source_path, expr.line, "unary operator ! requires bool, got " + operand)
             }
             ret "bool"

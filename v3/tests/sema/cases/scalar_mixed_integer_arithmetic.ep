@@ -1,0 +1,6 @@
+# ERROR: operator + has incompatible operand types u8 and i64
+fun main(): void {
+    let byte = u8(5)
+    let wide = i64(2)
+    let result = byte + wide
+}

@@ -1,0 +1,8 @@
+# ERROR: cannot join types u8 and i64
+fun main(): void {
+    let result = if true {
+        u8(1)
+    } else {
+        i64(2)
+    }
+}

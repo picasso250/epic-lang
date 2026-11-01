@@ -4,7 +4,7 @@ fun stop_now(): i64 {
     exit(42)
 }
 fun choose_exit(flag: i64): i64 {
-    if flag {
+    if flag != 0 {
         ret 7
     } else {
         exit(42)

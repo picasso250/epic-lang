@@ -1,0 +1,6 @@
+# ERROR: cannot assign i64 to element of type u8
+fun main(): void {
+    let values = new u8[1]
+    let wide = i64(300)
+    values[0] = wide
+}

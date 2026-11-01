@@ -5,14 +5,14 @@ fun expr_tail_value(): i64 {
     40 + 2
 }
 fun expr_if_value(flag: i64): i64 {
-    if flag {
+    if flag != 0 {
         10
     } else {
         exit(90)
     }
 }
 fun expr_guarded(flag: i64): i64 {
-    if flag {
+    if flag != 0 {
         ret 7
     }
     8
@@ -28,7 +28,7 @@ fun expr_match_value(choice: ExprChoice): i64 {
     }
 }
 fun expr_explicit_if(flag: i64): i64 {
-    ret if flag {
+    ret if flag != 0 {
         1
     } else {
         2
@@ -54,7 +54,7 @@ fun main(): void {
     let d = expr_match_value(ExprChoice.Left)
     let e = expr_explicit_if(1)
     let f = expr_else_if(2)
-    let nested = itoa(if 1 {
+    let nested = itoa(if true {
         2
     } else {
         3

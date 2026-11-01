@@ -7,7 +7,7 @@ fun panic_message(): str {
     ret "unexpected state"
 }
 fun panic_value(flag: i64): i64 {
-    if flag {
+    if flag != 0 {
         ret 7
     } else {
         panic(panic_message())

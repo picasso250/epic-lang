@@ -1,6 +1,6 @@
 # ERROR: function 'choose' may not return a value on every path
 fun choose(value: i64): i64 {
-    if value {
+    if value != 0 {
         ret 1
     }
 }

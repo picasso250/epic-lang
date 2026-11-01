@@ -1,7 +1,7 @@
 # EXIT: 0
 # STDOUT: 7
 fun choose(flag: i64): i64 {
-    if flag {
+    if flag != 0 {
         ret 7
     } else {
         ret 9

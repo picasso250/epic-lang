@@ -1,0 +1,5 @@
+# ERROR: argument 1 of 'itoa' expects i64, got u8
+fun main(): void {
+    let byte = u8(42)
+    print(itoa(byte))
+}

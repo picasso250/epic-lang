@@ -1,0 +1,4 @@
+# ERROR: operator && has incompatible operand types bool and i64
+fun main(): void {
+    let result = true && i64(1)
+}

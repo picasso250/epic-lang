@@ -106,7 +106,7 @@ fun asm_starts(s: str, prefix: str): i64 {
 }
 fun asm_find(s: str, ch: i64): i64 {
     for i: 0:len(s) {
-        if s[i] == ch {
+        if i64(s[i]) == ch {
             ret i
         }
     }
@@ -141,7 +141,7 @@ fun asm_is_number(s: str): i64 {
         if hex == 0 && (s[i] < 48 || s[i] > 57) {
             ret 0
         }
-        if hex == 1 && digit_value(s[i]) < 0 {
+        if hex == 1 && digit_value(i64(s[i])) < 0 {
             ret 0
         }
         i += 1

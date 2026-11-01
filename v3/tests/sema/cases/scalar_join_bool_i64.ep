@@ -1,0 +1,8 @@
+# ERROR: cannot join types bool and i64
+fun main(): void {
+    let result = if true {
+        true
+    } else {
+        i64(2)
+    }
+}
