@@ -53,14 +53,13 @@ def ensure_nasm() -> Path:
     if target.is_file():
         return target
     supplied = os.environ.get('EPIC_NASM')
-    if supplied:
-        candidate = Path(supplied).expanduser().resolve()
-    else:
-        # Keep supporting the pre-migration ignored binary without committing it.
-        candidate = ROOT / 'tools' / 'nasm.exe'
-    if not candidate.is_file():
-        raise RuntimeError('Missing trusted NASM: supply v0/tools/nasm.exe or EPIC_NASM. '
+    if not supplied:
+        raise RuntimeError('Missing trusted NASM: place nasm.exe at v0/tools/nasm.exe '
+                           'or set EPIC_NASM to an existing executable. '
                            'The binary is not stored in Git.')
+    candidate = Path(supplied).expanduser().resolve()
+    if not candidate.is_file():
+        raise RuntimeError(f'EPIC_NASM points to a missing executable: {candidate}')
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(candidate, target)
     return target

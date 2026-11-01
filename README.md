@@ -35,7 +35,9 @@ thin interface to the root orchestration. Run a generation's test suite from
 its own folder; its build script compiles all prerequisite generations first.
 No Git branch names, temporary Git worktrees, or prebuilt compiler images are
 required. Builds intentionally always regenerate seeds to avoid stale binary
-cache problems.
+cache problems. The root `.gitattributes` forces LF for Epic `.ep` and embedded
+assembly `.asm` files, so compilation does not depend on Windows Git's
+working-tree newline conversion.
 
 The compiled current toolchain lives at `v4/build/epic-v4.exe`. For a
 byte-identical self-hosted fixed point, run:

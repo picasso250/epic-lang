@@ -1,0 +1,5 @@
+# Epic compiler source must have consistent bytes on every OS.
+# The vN compilers read their sources and embedded assembly as raw bytes;
+# core.autocrlf=true can otherwise change binary output across worktrees.
+*.ep text eol=lf
+*.asm text eol=lf

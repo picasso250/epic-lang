@@ -51,11 +51,29 @@ folders together; do not recreate five long-lived Git branches.
 - **After deleting the local v0–v4 branches**, executed `python build.py --to 4`
   again: **passed**. This confirms that normal builds no longer depend on
   branch references or Git worktrees.
-- The new v4 executable's SHA-256 does **not** match the executable built in
-  the older v4 worktree. Each location independently passes its two-generation
-  byte-identical fixed-point check and full functional suite; cross-directory
-  binary identity has not been established, and the difference's cause has not
-  yet been isolated. Do not overstate binary reproducibility across locations.
+- An initial cross-directory v4 binary mismatch was **subsequently traced
+  to Windows working-tree line endings**, not changes in the Git-tracked
+  compiler source. The original detached v4 worktree had mixed CRLF/LF in
+  `src/codegen.ep`, `src/sema.ep`, and `src/types.ep`; the newly checked-out
+  directory had uniformly CRLF copies of these files. Respectively, 5, 343,
+  and 8 line endings differed; converting them to LF made the actual source
+  content identical. The old/new Git blobs had already been identical.
+- Root `.gitattributes` now enforces LF for all tracked `*.ep` and `*.asm`
+  files, regardless of the user's Windows `core.autocrlf` setting. The
+  compiler binaries built from identical LF source/runtime bytes in two
+  distinct directories now match exactly (SHA-256:
+  `3ef36629964597e23125199072a19c129bfa0601d900792c91a02afdb62b4c53`).
+  This proves reproducibility for the tested toolchain and paths, not a
+  universal theorem about all environments.
+- The full five-generation test suite was run again after LF normalization:
+  **all five generations passed**, including the v4 fixed point. The root
+  `build.py` no longer falls back to the obsolete root `tools/nasm.exe`;
+  trusted NASM is supplied through `v0/tools/nasm.exe` or `EPIC_NASM`.
+- Obsolete root `tests/` (only 19 Python cache files) and empty root `runtime/`
+  were **moved, not deleted**, to ignored `build/legacy-root-20261101/`.
+  The ignored root `build/` (~822 MB at inspection, including archived local
+  worktrees and experiments) and `tools/` (external executables) were left
+  untouched rather than treating them as disposable caches.
 - The original `v0`–`v4` local and `origin` branches were deleted **only after**
   annotated archive tags were pushed to GitHub. Other experimental branches
   were left unchanged. The five older local worktrees under `build/worktrees/`
