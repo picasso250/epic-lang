@@ -1,7 +1,4 @@
-# Experimental stage-0 FFI: use the same extern surface instead of os.*.
-extern "kernel32.dll" fun ExitProcess(code: i64): void
-extern "kernel32.dll" fun CreateFileA(path: i64, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
-extern "kernel32.dll" fun CloseHandle(handle: i64): i64
+# Early external declarations replace compiler-special Windows bindings.
 
 #
 # Epic v0 self-hosted compiler driver.

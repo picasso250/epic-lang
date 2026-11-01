@@ -1,4 +1,5 @@
 # EXIT: 65
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type Data {
     flag: u8
     value: i64
@@ -8,7 +9,7 @@ fun main(): void {
     d.flag = 1
     d.value = 65
     if d.flag != 0 {
-        os.ExitProcess(d.value)
+        ExitProcess(d.value)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

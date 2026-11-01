@@ -18,13 +18,6 @@ class Emitter:
                          "itoa",
                          "str_new", "bytes", "read_file", "write_file",
                          "str_slice", "push", "extend"}
-        self.winapi = {
-            "Sleep", "GetTickCount64", "GetLastError", "SetLastError",
-            "GetStdHandle", "CloseHandle", "lstrlenA", "lstrcmpA",
-            "MessageBoxA", "Beep", "GetCurrentProcess",
-            "GetCurrentProcessId", "GetCurrentThreadId", "ExitProcess",
-            "GetFileAttributesA", "CreateDirectoryA", "CreateFileA", "ReadFile", "WriteFile",
-        }
         self.local_offset = {}  # var name → stack offset relative to rbp
         self.local_count = 0
         self.local_types = {}
@@ -103,8 +96,6 @@ class Emitter:
         self.emit_extern("GetCommandLineA")
         self.emit_extern("HeapAlloc")
         self.emit_extern("GetProcessHeap")
-        for name in sorted(self.winapi):
-            self.emit_extern(name)
         self.externs = {}
         for decl in ast.externs:
             if decl.name in self.externs:
@@ -312,26 +303,11 @@ class Emitter:
         self.emit_call_inst(target)
         self.emit("    add rsp, 32")
 
-    def _syscall_symbol(self, name, namespace=""):
-        if namespace == "os":
-            symbol = name
-        elif name.startswith("os."):
-            symbol = name[3:]
-        else:
-            return None
-        if symbol not in self.winapi:
-            full_name = f"{namespace}.{name}" if namespace else name
-            raise RuntimeError(f"Unsupported os call: {full_name}")
-        return symbol
-
-    def _emit_syscall(self, symbol, args, legacy_str_conversion=True):
+    def _emit_extern_call(self, symbol, args):
         param_regs = ["rcx", "rdx", "r8", "r9"]
         slots = []
         for arg in args:
-            arg_type = self._expr_type(arg)
             self.emit_expr(arg)
-            if legacy_str_conversion and arg_type == "&str":
-                self.emit_mov("rax", "[rax]")
             slot = self._alloc_temp()
             self.emit_stack_store(slot, "rax")
             slots.append(slot)
@@ -654,15 +630,11 @@ class Emitter:
         name = expr.name
         args = expr.args
 
-        if symbol := self._syscall_symbol(name, expr.namespace):
-            self._emit_syscall(symbol, args)
-            return
-
         if not expr.namespace and name in self.externs:
             decl = self.externs[name]
             if len(args) != len(decl.params):
                 raise RuntimeError(f"Extern {name} requires {len(decl.params)} arguments")
-            self._emit_syscall(name, args, legacy_str_conversion=False)
+            self._emit_extern_call(name, args)
             return
 
         if name in self.builtins:
@@ -1199,8 +1171,6 @@ class Emitter:
             return self.local_types.get(expr.name, "i64")
         if isinstance(expr, CallNode):
             name = expr.name
-            if self._syscall_symbol(name, expr.namespace):
-                return "i64"
             # Builtins with known return types
             if name in ("itoa", "str_new", "str_slice"):
                 return "&str"

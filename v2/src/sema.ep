@@ -191,86 +191,11 @@ fun sema_add_builtins(state: SemaState): i64 {
     sema_add_builtin(state, sig)
     ret 0
 }
-fun sema_add_os_signatures(state: SemaState): i64 {
-    let sig = sema_signature("os.Sleep", "void")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetTickCount64", "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetLastError", "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.SetLastError", "void")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetStdHandle", "i64")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.CloseHandle", "i64")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.lstrlenA", "i64")
-    push(sig.param_types, "cstr_source")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.lstrcmpA", "i64")
-    push(sig.param_types, "cstr_source")
-    push(sig.param_types, "cstr_source")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.MessageBoxA", "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "cstr_or_null")
-    push(sig.param_types, "cstr_or_null")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.Beep", "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetCurrentProcess", "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetCurrentProcessId", "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetCurrentThreadId", "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.ExitProcess", "void")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetFileAttributesA", "i64")
-    push(sig.param_types, "cstr_source")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.CreateDirectoryA", "i64")
-    push(sig.param_types, "cstr_source")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.CreateFileA", "i64")
-    push(sig.param_types, "cstr_source")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.ReadFile", "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "buffer_ptr")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "ptr_or_null")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.WriteFile", "i64")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "buffer_ptr")
-    push(sig.param_types, "i64")
-    push(sig.param_types, "ptr_or_null")
-    push(sig.param_types, "i64")
-    sema_add_builtin(state, sig)
-    ret 0
-}
 fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     for i < ast.structs.len {
         let node = ast.structs.data[i]
-        if node.name == "os" || node.name == "ptr" {
+        if node.name == "ptr" {
             sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
         }
         let first = sema_find_type(state, node.name)
@@ -288,7 +213,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): i64 {
     i = 0
     for i < ast.enums.len {
         let enum_node = ast.enums.data[i]
-        if enum_node.name == "os" || enum_node.name == "ptr" {
+        if enum_node.name == "ptr" {
             sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
         }
         let enum_first = sema_find_type(state, enum_node.name)
@@ -381,9 +306,6 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
     let i = 0
     for i < ast.funcs.len {
         let node = ast.funcs.data[i]
-        if node.name == "os" {
-            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
-        }
         let first = sema_find_func(state, node.name)
         if first.name != "" {
             if first.builtin == 1 {
@@ -409,7 +331,7 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
                 }
                 k = k + 1
             }
-            if param.name == "os" || param.name == "argv" {
+            if param.name == "argv" {
                 sema_error(node.source_path, param.line, "reserved parameter name '" + param.name + "'")
             }
             sema_validate_value_type(state, node.source_path, param.line, param.type_name)
@@ -508,7 +430,7 @@ fun sema_name_was_used(state: SemaState, name: str): SemaLocal {
     ret missing
 }
 fun sema_add_local(state: SemaState, name: str, type_name: str, line: i64): i64 {
-    if name == "argv" || name == "os" {
+    if name == "argv" {
         sema_error(state.source_path, line, "reserved local name '" + name + "'")
     }
     let first = sema_name_was_used(state, name)
@@ -1069,7 +991,6 @@ fun sema_check(ast: AstProgram): i64 {
     let state = sema_state()
     state.ast = ast
     sema_add_builtins(state)
-    sema_add_os_signatures(state)
     sema_collect_type_names(state, ast)
     sema_validate_enums(state, ast)
     sema_validate_structs(state, ast)

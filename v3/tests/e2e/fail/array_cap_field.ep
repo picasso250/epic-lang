@@ -1,5 +1,6 @@
 # COMPILE_ERROR: type u8[] has no field 'cap'
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let values = new u8[]
-    os.ExitProcess(values.cap)
+    ExitProcess(values.cap)
 }

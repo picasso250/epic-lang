@@ -1,29 +1,30 @@
 # EXIT: 0
 # CLEAN: test_file_bytes.bin
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let data = new u8[]
     push(data, 'A')
     push(data, 0)
     push(data, 'B')
     if write_file("test_file_bytes.bin", data) != 3 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     let loaded = read_file("test_file_bytes.bin")
     if len(loaded) != 3 || loaded[0] != 'A' || loaded[1] != 0 || loaded[2] != 'B' {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
 
     let empty = new u8[]
     if write_file("test_file_bytes.bin", empty) != 0 {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
     let loaded_empty = read_file("test_file_bytes.bin")
     if len(loaded_empty) != 0 {
-        os.ExitProcess(4)
+        ExitProcess(4)
     }
     let missing = read_file("missing-file-for-m54")
     if len(missing) != 0 {
-        os.ExitProcess(5)
+        ExitProcess(5)
     }
 
     let bad_path_bytes = bytes("x")
@@ -31,7 +32,7 @@ fun main(): void {
     push(bad_path_bytes, 'y')
     let bad_path = str(bad_path_bytes)
     if write_file(bad_path, data) + 1 != 0 {
-        os.ExitProcess(6)
+        ExitProcess(6)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

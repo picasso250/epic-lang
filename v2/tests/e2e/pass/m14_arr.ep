@@ -1,5 +1,6 @@
 # EXIT: 0
 # STDOUT: 99
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let xs = new i64[3]
     xs[0] = 99
@@ -7,5 +8,5 @@ fun main(): void {
     xs[2] = 7
     print(itoa(xs[0]))
     print("\n")
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

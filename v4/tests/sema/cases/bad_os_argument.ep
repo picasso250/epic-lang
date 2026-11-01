@@ -1,4 +1,5 @@
-# ERROR: argument 1 of 'os.Sleep' expects i64, got str
+# ERROR: argument 1 of 'Sleep' expects i64, got str
+extern "kernel32.dll" fun Sleep(ms: i64): void
 fun main(): void {
-    os.Sleep("wrong")
+    Sleep("wrong")
 }

@@ -1,5 +1,6 @@
 # COMPILE_ERROR: argument 1 of 'str' expects u8[], got i64
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let value = str(42)
-    os.ExitProcess(len(value))
+    ExitProcess(len(value))
 }

@@ -1,5 +1,6 @@
 # EXIT: 35
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let src = read_file("tests/e2e/pass/m1_exit.ep")
-    os.ExitProcess(i64(src[0]))
+    ExitProcess(i64(src[0]))
 }

@@ -150,8 +150,9 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
             capture_output=True, text=True,
         )
     else:
-        if ast.externs:
-            raise RuntimeError("experimental v0 extern is supported only with the Python linker")
+        # The optional SDK-linker path resolves the kernel32/user32 imports
+        # via their import libraries. The Python PE writer additionally supports
+        # arbitrary DLL names without requiring SDK import libraries.
         result = subprocess.run(
             [LLD_LINK, "/subsystem:console", "/timestamp:0", f"/entry:_start",
              f"/out:{exe_path}", obj_path,

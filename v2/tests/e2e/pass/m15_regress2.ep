@@ -1,4 +1,5 @@
 # EXIT: 57
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun divv(a: i64, b: i64): i64 {
     ret a / b
 }
@@ -6,5 +7,5 @@ fun pair(a: i64, b: i64): i64 {
     ret a * 10 + b
 }
 fun main(): void {
-    os.ExitProcess(pair(divv(10, 2), 7))
+    ExitProcess(pair(divv(10, 2), 7))
 }

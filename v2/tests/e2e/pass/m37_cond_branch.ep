@@ -1,21 +1,22 @@
 # EXIT: 0
 # STDOUT: 1
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun fail(): i64 {
-    os.ExitProcess(9)
+    ExitProcess(9)
     ret 0
 }
 fun main(): void {
     if 1 == 1 || fail() == 1 {
         if 1 != 1 && fail() == 0 {
-            os.ExitProcess(8)
+            ExitProcess(8)
         }
     } else {
-        os.ExitProcess(7)
+        ExitProcess(7)
     }
     let value = 2 < 3 && 4 >= 4
     if value {
         print("1")
-        os.ExitProcess(0)
+        ExitProcess(0)
     }
-    os.ExitProcess(6)
+    ExitProcess(6)
 }

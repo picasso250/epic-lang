@@ -179,85 +179,11 @@ fun sema_add_builtins(state: SemaState): void {
     push(sig.param_types, type_array(type_u8()))
     sema_add_builtin(state, sig)
 }
-fun sema_add_os_signatures(state: SemaState): void {
-    let sig = sema_signature("os.Sleep", type_void())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetTickCount64", type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetLastError", type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.SetLastError", type_void())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetStdHandle", type_i64())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.CloseHandle", type_i64())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.lstrlenA", type_i64())
-    push(sig.param_types, type_ptr())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.lstrcmpA", type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_ptr())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.MessageBoxA", type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.Beep", type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetCurrentProcess", type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetCurrentProcessId", type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetCurrentThreadId", type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.ExitProcess", type_void())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.GetFileAttributesA", type_i64())
-    push(sig.param_types, type_ptr())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.CreateDirectoryA", type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.CreateFileA", type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.ReadFile", type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-    sig = sema_signature("os.WriteFile", type_i64())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    push(sig.param_types, type_ptr())
-    push(sig.param_types, type_i64())
-    sema_add_builtin(state, sig)
-}
 fun sema_collect_type_names(state: SemaState, ast: AstProgram): void {
     let i = 0
     for i < len(ast.structs) {
         let node = ast.structs[i]
-        if node.name == "os" || node.name == "never" || type_is_primitive(type_from_source_name(node.name)) {
+        if node.name == "never" || type_is_primitive(type_from_source_name(node.name)) {
             sema_error(node.source_path, node.line, "reserved type name '" + node.name + "'")
         }
         let first = sema_find_type(state, node.name)
@@ -275,7 +201,7 @@ fun sema_collect_type_names(state: SemaState, ast: AstProgram): void {
     i = 0
     for i < len(ast.enums) {
         let enum_node = ast.enums[i]
-        if enum_node.name == "os" || enum_node.name == "never" || type_is_primitive(type_from_source_name(enum_node.name)) {
+        if enum_node.name == "never" || type_is_primitive(type_from_source_name(enum_node.name)) {
             sema_error(enum_node.source_path, enum_node.line, "reserved type name '" + enum_node.name + "'")
         }
         let enum_first = sema_find_type(state, enum_node.name)
@@ -371,9 +297,6 @@ fun sema_collect_externs(state: SemaState, ast: AstProgram): void {
     for i: 0:len(ast.externs) {
         let node = ast.externs[i]
         sema_validate_extern_library(node)
-        if node.name == "os" {
-            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
-        }
         if node.return_type.kind != TypeRefKind.Void {
             sema_validate_value_type(state, node.source_path, node.line, node.return_type)
             if !sema_is_extern_abi_type(node.return_type) {
@@ -419,9 +342,6 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
     let i = 0
     for i < len(ast.funcs) {
         let node = ast.funcs[i]
-        if node.name == "os" {
-            sema_error(node.source_path, node.line, "'os' is a reserved namespace")
-        }
         let first = sema_find_func(state, node.name)
         if first.name != "" && !first.builtin {
             sema_duplicate(node.source_path, node.line, "function '" + node.name + "'", first.source_path + ":" + itoa(first.line))
@@ -443,9 +363,6 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): void {
                     sema_duplicate(node.source_path, param.line, "parameter '" + param.name + "'", node.source_path + ":" + itoa(previous.line))
                 }
                 k += 1
-            }
-            if param.name == "os" {
-                sema_error(node.source_path, param.line, "reserved parameter name '" + param.name + "'")
             }
             sema_validate_value_type(state, node.source_path, param.line, param.typ)
             push(sig.param_types, param.typ)
@@ -544,9 +461,6 @@ fun sema_find_local_in_current_scope(state: SemaState, name: str): SemaLocal {
     missing
 }
 fun sema_add_local(state: SemaState, name: str, typ: TypeRef, line: i64): void {
-    if name == "os" {
-        sema_error(state.source_path, line, "reserved local name '" + name + "'")
-    }
     let first = sema_find_local_in_current_scope(state, name)
     if first.name != "" {
         sema_duplicate(state.source_path, line, "local '" + name + "'", state.source_path + ":" + itoa(first.line))
@@ -1142,9 +1056,6 @@ fun sema_check_ptr_call(state: SemaState, expr: AstExpr): TypeRef {
             sema_error(state.source_path, expr.line, "ptr conversion expects 1 argument, got " + itoa(len(expr.args)))
         }
         let ptr_arg = expr.args[0]
-        if ptr_arg.kind == AstExprKind.FieldAccess && ptr_arg.object.kind == AstExprKind.Var && ptr_arg.object.name == "os" {
-            sema_error(state.source_path, ptr_arg.line, "ptr cannot take the address of os binding '" + ptr_arg.name + "'")
-        }
         if ptr_arg.kind == AstExprKind.Var {
             let ptr_local = sema_find_local(state, ptr_arg.name)
             if ptr_local.name == "" && ptr_arg.name != "argv" {
@@ -1215,22 +1126,7 @@ fun sema_check_callable_args(state: SemaState, expr: AstExpr, callable: TypeRef,
     }
     callable.result
 }
-fun sema_is_os_call(expr: AstExpr): bool {
-    expr.callee.kind == AstExprKind.FieldAccess && expr.callee.object.kind == AstExprKind.Var && expr.callee.object.name == "os"
-}
 fun sema_check_call(state: SemaState, expr: AstExpr): TypeRef {
-    if sema_is_os_call(expr) {
-        expr.namespace = "os"
-        expr.name = expr.callee.name
-        let os_name = "os." + expr.name
-        let os_sig = sema_find_func(state, os_name)
-        if os_sig.name == "" {
-            sema_error(state.source_path, expr.line, "unknown os binding '" + expr.name + "'")
-        }
-        expr.callee.resolved_kind = AstValueKind.Builtin
-        expr.callee.resolved_type = sema_signature_type(os_sig)
-        ret sema_check_callable_args(state, expr, expr.callee.resolved_type, "'" + os_name + "'")
-    }
     if expr.callee.kind == AstExprKind.Var {
         let direct_name = expr.callee.name
         let direct_local = sema_find_local(state, direct_name)
@@ -1811,7 +1707,6 @@ fun sema_check(ast: AstProgram): void {
     let state = sema_state()
     state.ast = ast
     sema_add_builtins(state)
-    sema_add_os_signatures(state)
     sema_collect_type_names(state, ast)
     sema_validate_enums(state, ast)
     sema_validate_structs(state, ast)

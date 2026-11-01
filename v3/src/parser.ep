@@ -178,11 +178,6 @@ fun ast_call(name: str, args: AstExpr[], line: i64): AstExpr {
     node.line = line
     ret node
 }
-fun ast_os_call(name: str, args: AstExpr[], line: i64): AstExpr {
-    let node = ast_call(name, args, line)
-    node.type_name = "os"
-    ret node
-}
 fun ast_binary(op: OperatorKind, left: AstExpr, right: AstExpr, line: i64): AstExpr {
     let node = new AstExpr
     node.kind = AstExprKind.Binary
@@ -1114,12 +1109,7 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
         if check(p, TokenKind.DOT) == 1 {
             let field = expect_enum_member(p)
             if check(p, TokenKind.LPAREN) == 1 {
-                if current.kind != AstExprKind.Var || current.name != "os" {
-                    parse_error(field.line, "method calls are only supported for os.* in v0")
-                }
-                let args = parse_args(p)
-                expect(p, TokenKind.RPAREN)
-                current = ast_os_call(field.text, args, field.line)
+                parse_error(field.line, "method calls are not supported")
             } else {
                 current = ast_field_access(current, field.text, field.line)
             }

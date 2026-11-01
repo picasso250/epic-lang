@@ -36,26 +36,35 @@ bootstrap, even before v3 introduced precise-width integer types.
   raw `ptr` is valid in external declarations but is not accidentally made a
   general source-language value type.
 
-## Limits / unfinished
+## Outcome: single language-level FFI
 
-- This **does not remove** the historical `os.*` language mechanism yet.
-  Untouched old sources/tests still use it. This branch is a feasibility proof,
-  not a completed canonical-history migration.
-- Early `extern` has `i64` arguments and `i64`/`void` returns only. It treats
-  a raw address as a 64-bit integer; when crossing to C strings, use
-  `name.data` explicitly (old `str` has a terminating NUL). Passing `name`
-  would pass an Epic string object instead.
-- Floating-point argument ABI, structs, and exact 32-bit signedness are not
-  modeled. Existing `os.*` compiler/runtime import names are still predefined.
-- The Python v0 `lld-link` fallback rejects new extern declarations; the
-  experimental multi-DLL implementation is in the Python linker.
-- The early assembler's symbol namespace cannot yet distinguish two imports
-  with the same exported name from different DLLs. General-purpose FFI would
-  require a distinct internal import symbol or an alias scheme.
+- The `os.*` language-special call path is gone from v0, v1, v2, v3 and v4.
+  All direct operating-system calls now use source-declared `extern` functions.
+  Runtime assembly still imports necessary OS functions internally; these are
+  backend implementation dependencies, not a second source-language API.
+- Test fixtures that previously relied on implicit OS bindings now declare
+  externs; bundled suites hoist identical declarations to one prelude.
+- Negative tests reject old `os.*` syntax. The v4 semantic check additionally
+  rejects taking a pointer to an imported external function.
+
+## Remaining scope and limitations
+
+- The bootstrap FFI is intentionally restricted: v0 and v1 use `i64` native
+  lanes; v2 and v3 add a pointer formal type but do not expose full C ABI
+  widths to native calls. v4 offers precise-width integers and opaque `ptr`.
+  No generation models floating-point or aggregate ABI lanes.
+- Python v0's optional `lld-link` path uses the Windows SDK import libraries,
+  currently kernel32 and user32. The default Python PE writer supports imports
+  from arbitrary named DLLs without SDK `.lib` files.
+- Early assemblers import by function name, so two DLLs exposing the same
+  function name need import alias support for complete general-purpose FFI.
+  The v4 extern path uses a single source-level declaration mechanism, but its
+  runtime assembly still relies on the internal system-import map.
+- The old canonical-history `main` is unchanged. The experiment is isolated,
+  and should not be merged without review of this API-breaking historical
+  correction.
 
 ## Next decision
 
-A full migration would eliminate `os.*` in the v0-v4 user-facing surface,
-propagate implementation and source changes through successor generations, and
-retire duplicate binding lists where they are no longer required. No changes
-have been merged into `main`.
+Review the cross-generation diff and ABI boundaries, then decide whether to
+adopt this new canonical history. All old Git tags remain preserved.

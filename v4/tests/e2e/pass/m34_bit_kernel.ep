@@ -4,6 +4,7 @@
 # STDOUT: -1
 # STDOUT: 195
 # STDOUT: 1
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun line(value: i64): void {
     print(itoa(value))
     print("\n")
@@ -14,5 +15,5 @@ fun main(): void {
     line((0 - 2) >> 1)
     line((0xF0 & 0xCC) | 0x03)
     line(1 | 2 & 4)
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

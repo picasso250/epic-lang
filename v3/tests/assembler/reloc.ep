@@ -1,13 +1,13 @@
 fun main(): void {
     let image = assemble_text("section .data\nvalue:\n    dq 0\nsection .text\n    mov qword [value], 0\n    mov byte [value], 0\n")
     if len(image.relocs) != 2 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     if image.relocs[0].addend != 0 - 4 {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
     if image.relocs[1].addend != 0 - 1 {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

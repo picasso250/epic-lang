@@ -1,4 +1,5 @@
 # Test self-referencing product
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type SelfRefNode {
     val: i64
     next: SelfRefNode
@@ -10,6 +11,6 @@ fun main(): void {
     b.val = 20
     a.next = b
     # a.next.val should be 20
-    os.ExitProcess(a.next.val)
+    ExitProcess(a.next.val)
 }
 # EXIT: 20

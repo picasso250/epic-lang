@@ -188,29 +188,37 @@ before participating in `<<`, `>>`, `&`, or `|`.
 
 String lengths and indices count bytes, not Unicode characters.
 
-## System calls
+## Windows external functions
 
-`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
+`extern "library.dll" fun name(arg: i64): i64` declares a Windows DLL import.
+The initial bootstrap ABI allows `i64` arguments and `i64`/`void` returns,
+including more than four native arguments. Native pointers travel in integer
+registers and use explicit raw addresses, e.g. `file_name.data`; an Epic `str`
+object is never silently converted to a C pointer.
 
-In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
+```epic
+extern "kernel32.dll" fun Sleep(ms: i64): void
+fun main(): void {
+    Sleep(1)
+}
+```
 
-`os.CreateDirectoryA(path, 0)` creates a directory and returns nonzero on
-success. It returns zero on failure, including when the directory already
-exists.
-
-General method calls are not supported in v0.
+The previous special `os.*` syntax is not supported. Ordinary method calls
+are not supported either; all native functions use declarations.
 
 ## Program exit
 
 The program entry function must be exactly:
 
 ```epic
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 fun main(): void {
-    os.ExitProcess(0)
+    ExitProcess(0)
 }
 ```
 
-Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
+Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `ExitProcess(code)`.
 
 `main` returning `i64` is not part of the v0 design.
 

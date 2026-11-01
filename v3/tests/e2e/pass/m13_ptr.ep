@@ -1,4 +1,5 @@
 # EXIT: 42
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type PointerNode {
     kind: i64
     value: i64
@@ -7,5 +8,5 @@ fun main(): void {
     let n = new PointerNode
     n.kind = 42
     n.value = 10
-    os.ExitProcess(n.kind)
+    ExitProcess(n.kind)
 }

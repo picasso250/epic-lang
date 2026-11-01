@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type DebugToken {
     kind: i64
     value: i64
@@ -9,5 +10,5 @@ fun main(): void {
     push(tokens, new DebugToken)
     push(tokens, new DebugToken)
     tokens.data[2].kind = 42
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

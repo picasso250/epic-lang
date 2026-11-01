@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type IntegerWidthsPacked {
     a: u8
     b: u16
@@ -23,57 +24,57 @@ fun main(): void {
     let byte = 255u8
     byte += 1u8
     if byte != 0u8 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     if u8(300) != 44u8 {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
     if i64(-128i8) != -128 {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
     if u64(0xffu8) != 255u64 {
-        os.ExitProcess(4)
+        ExitProcess(4)
     }
     if i8(255u16) != -1i8 {
-        os.ExitProcess(5)
+        ExitProcess(5)
     }
     if i64(-345678i32) != -345678i64 {
-        os.ExitProcess(21)
+        ExitProcess(21)
     }
     if u64(0xffffffffu32) != 4294967295u64 {
-        os.ExitProcess(22)
+        ExitProcess(22)
     }
 
     if add_u16(65000u16, 535u16) != 65535u16 {
-        os.ExitProcess(6)
+        ExitProcess(6)
     }
     if !is_positive_i32(7i32) {
-        os.ExitProcess(7)
+        ExitProcess(7)
     }
     if 0xffffffffu32 <= 1u32 {
-        os.ExitProcess(8)
+        ExitProcess(8)
     }
     if 0xffffffffffffffffu64 <= 1u64 {
-        os.ExitProcess(9)
+        ExitProcess(9)
     }
     if (-7i16 / 3i16) != -2i16 {
-        os.ExitProcess(10)
+        ExitProcess(10)
     }
     if (-7i16 % 3i16) != -1i16 {
-        os.ExitProcess(11)
+        ExitProcess(11)
     }
     if (7u16 / 3u16) != 2u16 {
-        os.ExitProcess(12)
+        ExitProcess(12)
     }
     if (-2i8 >> 1u8) != -1i8 {
-        os.ExitProcess(13)
+        ExitProcess(13)
     }
     if (1u8 << 32u8) != 1u8 {
-        os.ExitProcess(14)
+        ExitProcess(14)
     }
     let min_i64 = -9223372036854775808i64
     if min_i64 / -1i64 != min_i64 || min_i64 % -1i64 != 0i64 {
-        os.ExitProcess(20)
+        ExitProcess(20)
     }
 
     let packed = new IntegerWidthsPacked
@@ -87,13 +88,13 @@ fun main(): void {
     packed.h = -456789i64
     packed.flag = true
     if packed.a != 11u8 || packed.b != 2222u16 || packed.c != 333333u32 {
-        os.ExitProcess(15)
+        ExitProcess(15)
     }
     if packed.d != 4444444444u64 || packed.e != -12i8 || packed.f != -2345i16 {
-        os.ExitProcess(16)
+        ExitProcess(16)
     }
     if packed.g != -345678i32 || packed.h != -456789i64 || !packed.flag {
-        os.ExitProcess(17)
+        ExitProcess(17)
     }
 
     let words = new u16[2]
@@ -101,14 +102,14 @@ fun main(): void {
     words[1] = 0xabcdu16
     push(words, 0xffffu16)
     if words[0] != 0x1234u16 || words[1] != 0xabcdu16 || pop(words) != 0xffffu16 {
-        os.ExitProcess(18)
+        ExitProcess(18)
     }
 
     let flags = new bool[2]
     flags[0] = true
     flags[1] = false
     if !flags[0] || flags[1] {
-        os.ExitProcess(19)
+        ExitProcess(19)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

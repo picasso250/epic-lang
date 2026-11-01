@@ -1,3 +1,4 @@
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun equal_bytes(a: u8[], b: u8[]): i64 {
     if len(a) != len(b) {
         ret 0
@@ -61,31 +62,31 @@ fun main(): void {
         }
     }
     if newline_count != len(program.items) + 2 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
 
     let direct = asm_encode(program)
     let rendered_after_encode = asm_render(program)
     if equal_bytes(rendered, rendered_after_encode) == 0 {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
     let direct_again = asm_encode(program)
     if equal_bytes(direct.text, direct_again.text) == 0 || equal_bytes(direct.data, direct_again.data) == 0 {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
     let parsed = asm_parse(str(rendered))
     let roundtrip = asm_encode(parsed)
     if equal_bytes(direct.text, roundtrip.text) == 0 {
-        os.ExitProcess(4)
+        ExitProcess(4)
     }
     if equal_bytes(direct.data, roundtrip.data) == 0 {
-        os.ExitProcess(5)
+        ExitProcess(5)
     }
     if direct.entry_offset != roundtrip.entry_offset {
-        os.ExitProcess(6)
+        ExitProcess(6)
     }
     if len(direct.relocs) != len(roundtrip.relocs) {
-        os.ExitProcess(7)
+        ExitProcess(7)
     }
     for reloc_i: 0:len(direct.relocs) {
         let a = direct.relocs[reloc_i]
@@ -93,17 +94,17 @@ fun main(): void {
         let a_name = asm_symbol_name(program, a.symbol_index)
         let b_name = asm_symbol_name(parsed, b.symbol_index)
         if a.kind != b.kind || a_name != b_name || a.addend != b.addend {
-            os.ExitProcess(8)
+            ExitProcess(8)
         }
     }
     let parsed_import_index = asm_named_symbol_find(parsed, "MessageBoxA")
     if parsed_import_index < 0 || parsed.symbols[parsed_import_index].library != "user32.dll" || parsed.symbols[parsed_import_index].import_name != "MessageBoxA" {
-        os.ExitProcess(13)
+        ExitProcess(13)
     }
 
     let presentation = asm_parse("; ignored\n\nsection .text\nentry: ; ignored\n    ret\n")
     if len(presentation.items) != 3 {
-        os.ExitProcess(9)
+        ExitProcess(9)
     }
 
     let appended = asm_program_new()
@@ -111,13 +112,13 @@ fun main(): void {
     let item_count = len(appended.items)
     asm_parse_text_into(appended, bytes("helper:\n    ret\n"))
     if len(appended.items) != item_count + 2 {
-        os.ExitProcess(10)
+        ExitProcess(10)
     }
     if appended.items[item_count].kind != AsmItemKind.Label {
-        os.ExitProcess(11)
+        ExitProcess(11)
     }
     if appended.items[item_count + 1].kind != AsmItemKind.Instruction {
-        os.ExitProcess(12)
+        ExitProcess(12)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

@@ -1,3 +1,4 @@
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type GcNode {
     value: i64
     next: GcNode
@@ -29,10 +30,10 @@ fun main(): void {
     i = 0
     for i < 256 {
         if cursor.value != i {
-            os.ExitProcess(1)
+            ExitProcess(1)
         }
         cursor = cursor.next
         i = i + 1
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

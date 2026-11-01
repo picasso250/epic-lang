@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type CompoundBox {
     wide: i64
     byte: u8
@@ -30,6 +31,6 @@ fun main(): void {
     bytes[0] = 250
     bytes[0] += 10
     if value != 2 || box.wide != 42 || box.byte != 4 || values[0] != 7 || bytes[0] != 4 || compound_u8(250) != 4 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
 }

@@ -131,69 +131,6 @@ fun emit_call_inst(e: EmitterState, target: str): i64 {
     out_line(e, target)
     ret 0
 }
-fun sys_member_symbol(ns: str, name: str): str {
-    if ns != "os" {
-        ret ""
-    }
-    if name == "Sleep" {
-        ret "Sleep"
-    }
-    if name == "GetTickCount64" {
-        ret "GetTickCount64"
-    }
-    if name == "GetLastError" {
-        ret "GetLastError"
-    }
-    if name == "SetLastError" {
-        ret "SetLastError"
-    }
-    if name == "GetStdHandle" {
-        ret "GetStdHandle"
-    }
-    if name == "CloseHandle" {
-        ret "CloseHandle"
-    }
-    if name == "lstrlenA" {
-        ret "lstrlenA"
-    }
-    if name == "lstrcmpA" {
-        ret "lstrcmpA"
-    }
-    if name == "MessageBoxA" {
-        ret "MessageBoxA"
-    }
-    if name == "Beep" {
-        ret "Beep"
-    }
-    if name == "GetCurrentProcess" {
-        ret "GetCurrentProcess"
-    }
-    if name == "GetCurrentProcessId" {
-        ret "GetCurrentProcessId"
-    }
-    if name == "GetCurrentThreadId" {
-        ret "GetCurrentThreadId"
-    }
-    if name == "ExitProcess" {
-        ret "ExitProcess"
-    }
-    if name == "GetFileAttributesA" {
-        ret "GetFileAttributesA"
-    }
-    if name == "CreateDirectoryA" {
-        ret "CreateDirectoryA"
-    }
-    if name == "CreateFileA" {
-        ret "CreateFileA"
-    }
-    if name == "ReadFile" {
-        ret "ReadFile"
-    }
-    if name == "WriteFile" {
-        ret "WriteFile"
-    }
-    ret ""
-}
 fun emit_jmp(e: EmitterState, label: str): i64 {
     out_s(e, "    jmp ")
     out_line(e, label)
@@ -775,24 +712,16 @@ fun find_extern_index(e: EmitterState, name: str): i64 {
 }
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
-    let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
     let external = 0 - 1
     if expr.type_name == "" {
         external = find_extern_index(e, name)
     }
     if external >= 0 {
-        sys_symbol = name
-    }
-    if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
         for i < expr.args.len {
             let arg = expr.args.data[i]
-            let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
-            if arg_type.kind == "str" && external < 0 {
-                emit_mov(e, "rax", "[rax]")
-            }
             let slot = temp_save_rax(e)
             push(slots, slot)
             i = i + 1
@@ -815,7 +744,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             out_line(e, "], rax")
             i = i + 1
         }
-        emit_call_inst(e, sys_symbol)
+        emit_call_inst(e, name)
         out_s(e, "    add rsp, ")
         out_i(e, frame)
         out_nl(e)

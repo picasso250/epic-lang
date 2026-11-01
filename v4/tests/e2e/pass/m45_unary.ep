@@ -1,31 +1,32 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let five = 5
     if -five != -5 || --five != 5 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     if -2 * 3 != -6 || -(2 + 3) != -5 {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
     if !false != true || !true != false || !!true != true {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
     if !(1 == 2) != true || !("left" == "right") != true {
-        os.ExitProcess(4)
+        ExitProcess(4)
     }
     if !false {
         let reached = true
         if !reached {
-            os.ExitProcess(5)
+            ExitProcess(5)
         }
     } else {
-        os.ExitProcess(6)
+        ExitProcess(6)
     }
     if !true {
-        os.ExitProcess(7)
+        ExitProcess(7)
     }
     let minimum = -9223372036854775807 - 1
     if minimum >= 0 {
-        os.ExitProcess(8)
+        ExitProcess(8)
     }
 }

@@ -1,7 +1,8 @@
 # EXIT: 0
 # STDOUT: 3,1
+extern "kernel32.dll" fun lstrlenA(text: ptr): i64
 fun main(): void {
-    print(itoa(os.lstrlenA(cstr("abc"))))
+    print(itoa(lstrlenA(cstr("abc"))))
     print(",")
-    print(itoa(os.lstrlenA(cstr("a\0b"))))
+    print(itoa(lstrlenA(cstr("a\0b"))))
 }

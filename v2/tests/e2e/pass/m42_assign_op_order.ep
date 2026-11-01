@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type CompoundCounter {
     calls: i64
 }
@@ -11,7 +12,7 @@ fun compound_index(counter: CompoundCounter): i64 {
 }
 fun compound_rhs(counter: CompoundCounter): i64 {
     if counter.calls != 1 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     counter.calls = counter.calls + 1
     ret 5
@@ -27,6 +28,6 @@ fun main(): void {
     items[0] = item
     items[0].value += 1
     if counter.calls != 2 || values[0] != 6 || item.value != 9 {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
 }

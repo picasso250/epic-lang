@@ -1,12 +1,13 @@
 # EXIT: 0
 # STDOUT: hello
 # CLEAN: test_write_file.txt
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let n = write_file("test_write_file.txt", bytes("hello"))
     if n != 5 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     let s = read_file("test_write_file.txt")
     print(str_new(s.data, s.len))
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

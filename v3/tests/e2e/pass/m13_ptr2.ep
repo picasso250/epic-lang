@@ -1,5 +1,6 @@
 # EXIT: 0
 # STDOUT: 200
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type FunctionPoint {
     x: i64
     y: i64
@@ -13,5 +14,5 @@ fun main(): void {
     p.y = 100
     print(itoa(sum(p)))
     print("\n")
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

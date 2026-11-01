@@ -15,6 +15,7 @@ EPICC = ROOT / "epic.py"
 BUNDLE_SOURCE = ROOT / "build" / "tests" / "v0_bundle.ep"
 MAIN_PATTERN = re.compile(r"^fun main(?=\s*\()", re.MULTILINE)
 DECL_PATTERN = re.compile(r"^(?:fun|type)\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
+EXTERN_PATTERN = re.compile(r'^extern "[^"\n]+" fun [A-Za-z_][A-Za-z0-9_]*\([^\n]*\): [A-Za-z_][A-Za-z0-9_]*(?:\[\])?$', re.MULTILINE)
 EMBED_PATTERN = re.compile(r'\bembed\("([^"]*)"\)')
 EXEC_TIMEOUT = 2
 
@@ -76,9 +77,19 @@ def case_symbol(source: Path) -> str:
 
 def write_bundle(all_cases: list[tuple[str, Path]]) -> None:
     declarations = {}
+    imports = {}
     parts = []
     for suite, source in all_cases:
         text = rewrite_embeds(source.read_text(encoding="utf-8"), source)
+        def take_extern(match):
+            declaration = match.group(0)
+            name = declaration.split(" fun ", 1)[1].split("(", 1)[0]
+            prior = imports.get(name)
+            if prior is not None and prior != declaration:
+                raise RuntimeError(f"conflicting extern declarations of {name}")
+            imports[name] = declaration
+            return ""
+        text = EXTERN_PATTERN.sub(take_extern, text)
         for name in DECL_PATTERN.findall(text):
             if name == "main":
                 continue
@@ -94,7 +105,7 @@ def write_bundle(all_cases: list[tuple[str, Path]]) -> None:
     dispatcher = [
         "fun main(): void {",
         "    if argv.len < 2 {",
-        "        os.ExitProcess(126)",
+        "        ExitProcess(126)",
         "    }",
         "    let case_name = argv.data[argv.len - 1]",
     ]
@@ -103,15 +114,15 @@ def write_bundle(all_cases: list[tuple[str, Path]]) -> None:
             (
                 f'    if case_name == "{source.stem}" {{',
                 f"        {case_symbol(source)}()",
-                "        os.ExitProcess(0)",
+                "        ExitProcess(0)",
                 "    }",
             )
         )
-    dispatcher.extend(("    os.ExitProcess(127)", "}"))
+    dispatcher.extend(("    ExitProcess(127)", "}"))
     parts.append("\n".join(dispatcher) + "\n")
 
     BUNDLE_SOURCE.parent.mkdir(parents=True, exist_ok=True)
-    BUNDLE_SOURCE.write_text("\n".join(parts), encoding="utf-8")
+    BUNDLE_SOURCE.write_text("\n".join(imports.values()) + "\n" + "\n".join(parts), encoding="utf-8")
 
 
 def compile_bundle(all_cases: list[tuple[str, Path]], linker: str) -> Path:

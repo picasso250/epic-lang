@@ -1,5 +1,6 @@
 # EXIT: 0
 # STDOUT: 3:0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type ArrayCountProbe {
     calls: i64
 }
@@ -11,7 +12,7 @@ fun main(): void {
     let probe = new ArrayCountProbe
     let values = new i64[array_count(probe)]
     if probe.calls != 1 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     print(itoa(len(values)))
     print(":")

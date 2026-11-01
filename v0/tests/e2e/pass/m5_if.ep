@@ -1,6 +1,7 @@
 # EXIT: 0
 # STDOUT: 1
 # STDOUT: 2
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let x = 10
     if x > 5 {
@@ -17,5 +18,5 @@ fun main(): void {
         print(itoa(999))
         print("\n")
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

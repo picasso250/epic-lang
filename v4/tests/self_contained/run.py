@@ -16,14 +16,15 @@ sys.path.insert(0, str(TESTS))
 import ep_runner
 
 
-PROGRAM = """fun main(): void {
+PROGRAM = """extern "kernel32.dll" fun ExitProcess(code: i64): void
+fun main(): void {
     let first = embed("asset.bin")
     let second = embed("asset.bin")
     first[0] = 42
     if second[0] == 42 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
-    os.ExitProcess(i64(first[0]))
+    ExitProcess(i64(first[0]))
 }
 """
 

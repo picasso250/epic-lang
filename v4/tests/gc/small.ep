@@ -1,3 +1,4 @@
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type GcSlot8 {
     a: i64
 }
@@ -41,7 +42,7 @@ fun main(): void {
     }
 
     if keep8.a != 8 || keep16.b != 16 || keep24.c != 24 || keep32.d != 32 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

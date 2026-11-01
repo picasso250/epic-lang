@@ -182,30 +182,45 @@ before participating in `<<`, `>>`, `&`, or `|`.
 
 String lengths and indices count bytes, not Unicode characters.
 
-## System calls
+## Windows external functions
 
-`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
+`extern "library.dll" fun FunctionName(arg: i64): i64` declares a function
+implemented by a Windows DLL, and is the single user-facing mechanism for
+calling native functions. The Python stage-0 linker builds the corresponding
+import table from those declarations.
 
-In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
+For bootstrap v0, native arguments use `i64` (including raw addresses) and
+returns use `i64` or `void`. The compiler supports the Windows x64 integer
+calling convention, including more than four extern arguments; it does not
+implement a complete C ABI or precise `u32`/floating-point calling contracts.
 
-`os.CreateDirectoryA(path, 0)` exposes the Win32 directory creation primitive
-used by the bootstrap compiler. It returns nonzero when it creates the
-directory and zero when creation fails, including when the directory already
-exists.
+An Epic `str` is an object reference, **not** automatically a `char *`. With
+v0's NUL-terminated representation, `path.data` supplies the address that a
+Windows API expecting a C string needs.
 
-General method calls are not supported in v0.
+```epic
+extern "kernel32.dll" fun Sleep(ms: i64): void
+
+fun main(): void {
+    Sleep(1)
+}
+```
+
+No `os.*` special syntax is supported. General method calls are not supported.
 
 ## Program exit
 
 The program entry function must be exactly:
 
 ```epic
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 fun main(): void {
-    os.ExitProcess(0)
+    ExitProcess(0)
 }
 ```
 
-Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
+Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through a user-declared `ExitProcess(code)` extern.
 
 `main` returning `i64` is not part of the v0 design.
 

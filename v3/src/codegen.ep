@@ -79,69 +79,6 @@ fun emit_extern(e: EmitterState, name: str): void {
     asm_extern_item(e.program, named_symbol(e, name))
     ret
 }
-fun sys_member_symbol(ns: str, name: str): str {
-    if ns != "os" {
-        ret ""
-    }
-    if name == "Sleep" {
-        ret "Sleep"
-    }
-    if name == "GetTickCount64" {
-        ret "GetTickCount64"
-    }
-    if name == "GetLastError" {
-        ret "GetLastError"
-    }
-    if name == "SetLastError" {
-        ret "SetLastError"
-    }
-    if name == "GetStdHandle" {
-        ret "GetStdHandle"
-    }
-    if name == "CloseHandle" {
-        ret "CloseHandle"
-    }
-    if name == "lstrlenA" {
-        ret "lstrlenA"
-    }
-    if name == "lstrcmpA" {
-        ret "lstrcmpA"
-    }
-    if name == "MessageBoxA" {
-        ret "MessageBoxA"
-    }
-    if name == "Beep" {
-        ret "Beep"
-    }
-    if name == "GetCurrentProcess" {
-        ret "GetCurrentProcess"
-    }
-    if name == "GetCurrentProcessId" {
-        ret "GetCurrentProcessId"
-    }
-    if name == "GetCurrentThreadId" {
-        ret "GetCurrentThreadId"
-    }
-    if name == "ExitProcess" {
-        ret "ExitProcess"
-    }
-    if name == "GetFileAttributesA" {
-        ret "GetFileAttributesA"
-    }
-    if name == "CreateDirectoryA" {
-        ret "CreateDirectoryA"
-    }
-    if name == "CreateFileA" {
-        ret "CreateFileA"
-    }
-    if name == "ReadFile" {
-        ret "ReadFile"
-    }
-    if name == "WriteFile" {
-        ret "WriteFile"
-    }
-    ret ""
-}
 fun emit_stack_store(e: EmitterState, slot: i64, src: AsmOperand): void {
     asm_mov(e.program, asm_mem_base(0, asm_rbp(), slot), src)
     ret
@@ -898,15 +835,11 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         asm_sete(e.program, asm_al())
         ret 0
     }
-    let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
     let external = -1
     if expr.type_name == "" {
         external = find_extern_index(e, name)
     }
     if external >= 0 {
-        sys_symbol = name
-    }
-    if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
         for i < len(expr.args) {
@@ -934,7 +867,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             asm_mov(e.program, asm_mem_base(0, asm_rsp(), 32 + (i - 4) * 8), asm_rax())
             i += 1
         }
-        emit_call_inst(e, sys_symbol)
+        emit_call_inst(e, name)
         asm_add(e.program, asm_rsp(), asm_imm(frame))
         ret 0
     }

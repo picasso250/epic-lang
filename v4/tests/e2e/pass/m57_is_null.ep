@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type NullProbeNode {
     next: NullProbeNode
 }
@@ -13,21 +14,21 @@ fun main(): void {
     let holder = new NullProbeHolder
     let shadow_check = 7
     if shadow_check != 7 {
-        os.ExitProcess(5)
+        ExitProcess(5)
     }
     if !is_null(holder.text) || !is_null(holder.values) || !is_null(holder.node) {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
 
     holder.text = ""
     holder.values = new u8[]
     holder.node = new NullProbeNode
     if is_null(holder.text) || is_null(holder.values) || is_null(holder.node) {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
 
     if is_null(new NullProbeNode) {
-        os.ExitProcess(4)
+        ExitProcess(4)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

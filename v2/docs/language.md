@@ -330,34 +330,37 @@ strings, or two values of the same enum type; products and arrays have no
 implicit reference equality.
 `if` and condition-form `for` conditions require `i64`.
 
-## System calls
+## Windows external functions
 
-`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
+Declare Windows API imports explicitly using `extern "dll" fun ...`.
+Unlike regular functions, native imports may have more than four arguments.
+The early v2 FFI supports integer-width `i64` and raw `ptr` argument slots,
+with `i64` or `void` returns; it is not a full native C ABI for floating-point
+and aggregate arguments. Use `cstr(value)` to pass Epic strings to functions
+expecting a C-style NUL-terminated buffer.
 
-In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
+```epic
+extern "kernel32.dll" fun Sleep(ms: i64): void
+fun main(): void {
+    Sleep(1)
+}
+```
 
-`os.CreateDirectoryA(path, 0)` creates a directory and returns nonzero on
-success. It returns zero on failure, including when the directory already
-exists.
-
-`cstr(s)` creates a fresh NUL-terminated byte region for explicit C-string
-interop. Its result has the internal `ptr` type; `ptr` cannot be written in
-source declarations. v2 continues accepting `str` directly at legacy Win32
-string parameters so the v1-written compiler source remains bootstrapable.
-
-General method calls are not supported in v0.
+The old compiler-special `os.*` namespace was removed.
 
 ## Program exit
 
 The program entry function must be exactly:
 
 ```epic
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 fun main(): void {
-    os.ExitProcess(0)
+    ExitProcess(0)
 }
 ```
 
-Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `os.ExitProcess(code)`.
+Falling off the end of `main` exits with status `0`. Non-zero process status is explicit through `ExitProcess(code)`.
 
 `main` returning `i64` is not part of the v0 design.
 

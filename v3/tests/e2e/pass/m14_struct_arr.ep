@@ -1,4 +1,5 @@
 # EXIT: 150
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type StructArrayToken {
     kind: i64
     value: i64
@@ -8,5 +9,5 @@ fun main(): void {
     push(tokens, new StructArrayToken)
     tokens[0].kind = 100
     tokens[0].value = 50
-    os.ExitProcess(tokens[0].kind + tokens[0].value)
+    ExitProcess(tokens[0].kind + tokens[0].value)
 }

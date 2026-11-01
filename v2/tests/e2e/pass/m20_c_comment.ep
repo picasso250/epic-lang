@@ -1,5 +1,6 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     # comment
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

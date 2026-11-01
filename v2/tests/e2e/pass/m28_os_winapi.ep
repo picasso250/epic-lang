@@ -1,18 +1,28 @@
 # EXIT: 0
 # CLEAN: test_os_create.tmp
+extern "kernel32.dll" fun CloseHandle(handle: i64): i64
+extern "kernel32.dll" fun CreateDirectoryA(path: ptr, security: i64): i64
+extern "kernel32.dll" fun CreateFileA(path: ptr, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+extern "kernel32.dll" fun GetFileAttributesA(path: ptr): i64
+extern "kernel32.dll" fun GetLastError(): i64
+extern "kernel32.dll" fun GetTickCount64(): i64
+extern "kernel32.dll" fun Sleep(ms: i64): void
+extern "kernel32.dll" fun lstrcmpA(one: ptr, two: ptr): i64
+extern "kernel32.dll" fun lstrlenA(text: ptr): i64
 fun main(): void {
-    os.Sleep(1)
-    let t = os.GetTickCount64()
-    let n = os.lstrlenA(cstr("abc"))
-    let prefix = os.lstrlenA(cstr("a\0b"))
-    let c = os.lstrcmpA("same", "same")
-    let made = os.CreateDirectoryA("build", 0)
-    let mkdir_error = os.GetLastError()
-    let attrs = os.GetFileAttributesA("build")
-    let h = os.CreateFileA("test_os_create.tmp", 1073741824, 0, 0, 2, 128, 0)
+    Sleep(1)
+    let t = GetTickCount64()
+    let n = lstrlenA(cstr("abc"))
+    let prefix = lstrlenA(cstr("a\0b"))
+    let c = lstrcmpA(cstr("same"), cstr("same"))
+    let made = CreateDirectoryA(cstr("build"), 0)
+    let mkdir_error = GetLastError()
+    let attrs = GetFileAttributesA(cstr("build"))
+    let h = CreateFileA(cstr("test_os_create.tmp"), 1073741824, 0, 0, 2, 128, 0)
     if t >= 0 && n == 3 && prefix == 1 && c == 0 && (made != 0 || mkdir_error == 183) && (attrs & 16) != 0 && h + 1 != 0 {
-        os.CloseHandle(h)
-        os.ExitProcess(0)
+        CloseHandle(h)
+        ExitProcess(0)
     }
-    os.ExitProcess(1)
+    ExitProcess(1)
 }

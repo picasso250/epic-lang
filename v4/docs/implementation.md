@@ -137,8 +137,8 @@ use concrete builders such as `asm_mov`, `asm_call`, and `asm_ret`; registers,
 immediates, symbols, and memory addresses are typed operands rather than text.
 Calls follow the Windows x64 ABI. The first four integer, pointer, or reference
 arguments use `RCX`, `RDX`, `R8`, and `R9`; later arguments occupy 8-byte caller
-stack slots after the 32-byte shadow space. One lowering path serves ordinary
-Epic functions, source externs, and the transitional `os.*` bindings. Callees
+stack slots after the 32-byte shadow space. Call lowering supports ordinary
+Epic functions and source-declared externs, without an `os.*` special namespace. Callees
 copy both register and stack parameters into their statically assigned local
 slots.
 

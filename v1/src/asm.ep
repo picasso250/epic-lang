@@ -1,3 +1,5 @@
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 #
 # Epic's private NASM-subset assembler. It accepts only code emitted by
 # codegen.ep and runtime/*.asm.

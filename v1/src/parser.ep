@@ -1,3 +1,6 @@
+extern "kernel32.dll" fun CreateFileA(path: i64, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
+extern "kernel32.dll" fun CloseHandle(handle: i64): i64
+
 #
 # Epic v0 parser — self-hosting bootstrap
 #
@@ -603,16 +606,7 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
         if check(p, "DOT") == 1 {
             let field = expect(p, "ID")
             if check(p, "LPAREN") == 1 {
-                let n = ast_expr("Call")
-                if current.kind == "Var" && current.name == "os" {
-                    n.name = field.text
-                    n.type_name = "os"
-                } else {
-                    parse_error(field.line, "method calls are only supported for os.* in v0")
-                }
-                n.args = parse_args(p)
-                expect(p, "RPAREN")
-                current = n
+                parse_error(field.line, "method calls are not supported in v1")
             } else {
                 let n = ast_expr("FieldAccess")
                 n.object = current

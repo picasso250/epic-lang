@@ -1,6 +1,7 @@
 # COMPILE_ERROR: if condition requires bool, got u16
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     if 1u16 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
 }

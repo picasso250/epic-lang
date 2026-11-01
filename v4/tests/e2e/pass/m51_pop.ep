@@ -1,5 +1,6 @@
 # EXIT: 0
 # STDOUT: 9:255:42
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type PopNode {
     value: i64
 }
@@ -19,14 +20,14 @@ fun main(): void {
     probe.values = values
     let last = pop(probe_values(probe))
     if last != 9 || probe.calls != 1 || len(values) != 1 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
 
     let bytes = new u8[1]
     bytes[0] = 255
     let byte = pop(bytes)
     if byte != 255 || len(bytes) != 0 {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
 
     let node = new PopNode
@@ -35,7 +36,7 @@ fun main(): void {
     nodes[0] = node
     let popped = pop(nodes)
     if popped.value != 42 || len(nodes) != 0 {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
 
     print(itoa(last))

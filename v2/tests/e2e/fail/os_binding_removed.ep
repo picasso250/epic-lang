@@ -1,0 +1,4 @@
+# COMPILE_ERROR: method calls are not supported
+fun main(): void {
+    os.Sleep(1)
+}

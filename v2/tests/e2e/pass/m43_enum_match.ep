@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type Flavor = Vanilla | Chocolate | Mint
 type OtherFlavor = Vanilla | Done
 type KeywordKind = EOF | ID | FUN | MATCH | FOR
@@ -60,12 +61,12 @@ fun main(): void {
     push(values, Flavor.Vanilla)
     values[0] = Flavor.Mint
     if flavor_code(flavor_identity(box.value)) != 2 || flavor_group(values[0]) != 20 || flavor_group(values[1]) != 10 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     if flavor == Flavor.Mint || flavor != Flavor.Chocolate || other != OtherFlavor.Vanilla {
-        os.ExitProcess(2)
+        ExitProcess(2)
     }
     if keyword_code(KeywordKind.FUN) != 2 || keyword_code(KeywordKind.MATCH) != 3 || keyword_code(KeywordKind.FOR) != 4 {
-        os.ExitProcess(3)
+        ExitProcess(3)
     }
 }

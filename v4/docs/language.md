@@ -233,8 +233,8 @@ visible only after their initializer. Consequently, a closure initializer
 cannot refer to the binding being declared; v4 has no local recursive-closure
 syntax. Parameters, locals, captured locals, top-level functions, and builtins
 share one value namespace. Lexical values shadow module declarations, and
-module declarations shadow the builtin prelude. Types and `os.*` use separate
-namespaces.
+module declarations shadow the builtin prelude. Types live in a separate
+namespace.
 
 Callable values support `is_null`, but not `==` or `!=`. A normally created
 closure or top-level function value is non-null; zero-initialized callable
@@ -640,7 +640,7 @@ grows, is a caller contract violation.
 `ptr(function_name)` returns the real `.text` entry address of an ordinary
 top-level Epic function. The function must use only extern-ABI-safe parameter
 and return types; this restriction is checked only when its address is taken.
-`main`, extern declarations, builtins, `os.*` bindings, and unknown names cannot
+`main`, extern declarations, builtins, and unknown names cannot
 be addressed. A lexical local with the same name wins; it can use the ordinary
 `ptr(i64/u64/array/product)` conversions only when its own type qualifies.
 
@@ -692,37 +692,38 @@ in an ordinary integer lane, advanced code may declare the matching `u8`, `u16`,
 `u32`, or `u64` and pack or unpack the bits manually. Other aggregate returns,
 including hidden return-buffer conventions, are unsupported.
 
-## System calls
+## Windows operating-system calls
 
-`os.*` names are reserved for selected legacy system/runtime calls exposed by the compiler.
+Windows functions are invoked through explicit `extern` DLL declarations,
+using the same native-call mechanism as all other FFI functions. For example:
 
-In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
+```epic
+extern "kernel32.dll" fun CreateDirectoryA(path: ptr, security: ptr): i32
+fun main(): void {
+    let created = CreateDirectoryA(cstr("test"), ptr(0))
+}
+```
 
-`os.CreateDirectoryA(cstr(path), 0)` creates a directory and returns nonzero on
-success. It returns zero on failure, including when the directory already
-exists.
-
-Raw bindings whose Windows signature takes a C string require `cstr`; Epic
-`str` is never converted implicitly at this boundary.
-
-Callable product fields may be invoked with `value.field(args)`. General method
-lookup remains unsupported; this syntax calls the field value rather than
-resolving a method declaration.
+The compiler no longer provides special `os.*` names. Raw DLL calls requiring
+C strings need explicit `cstr(...)`; the native type declaration describes
+the argument and return widths.
 
 ## Program exit
 
 The program entry function must be exactly:
 
 ```epic
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 fun main(): void {
-    os.ExitProcess(0)
+    ExitProcess(0)
 }
 ```
 
 Falling off the end of `main` exits with status `0`. The built-in `exit(code)`
 terminates the process with an `i64` status and has the internal result type
-`never`. `os.ExitProcess(code)` remains available as the direct Windows binding,
-but only `exit(code)` carries language-level no-return semantics.
+`never`. A user-declared external `ExitProcess(code)` call returns `void` in
+the type system; only `exit(code)` carries language-level no-return semantics.
 
 `panic(message)` writes `Epic panic: `, the message bytes, and a newline to
 standard error without allocating, then terminates with status `1`. It also has
@@ -779,7 +780,7 @@ contains an earlier zero byte. This low-level interpretation is the caller's
 responsibility. High-level `read_file(path)` and `write_file(path, data)` keep
 accepting `str` paths, reject interior NUL, and perform the conversion
 internally; raw string-taking
-`os.*` bindings require explicit `cstr(...)`.
+raw DLL imports require explicit `cstr(...)`.
 
 File contents are always bytes. Convert explicitly with `str(data)` when text
 is required, and with `bytes(text)` when writing a string. `write_file`

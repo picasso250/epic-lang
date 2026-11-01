@@ -1,5 +1,6 @@
-# COMPILE_ERROR: ptr cannot take the address of os binding 'ExitProcess'
+# COMPILE_ERROR: ptr cannot take the address of extern 'ExitProcess'
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 
 fun main(): void {
-    let callback = ptr(os.ExitProcess)
+    let callback = ptr(ExitProcess)
 }

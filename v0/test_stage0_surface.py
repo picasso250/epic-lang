@@ -48,6 +48,7 @@ def main():
     assert early.externs[0].ret_type == "i64"
     expect_rejected('extern "kernel32.dll" fun Sleep(ms: str): void\n')
     expect_rejected('extern "" fun Sleep(ms: i64): void\n')
+    expect_rejected("fun main(): void {\nos.Sleep(1)\n}\n")
     expect_rejected("fun main(): void {\nreturn\n}\n")
     expect_rejected("fun main(): void {\nwhile 1 {\n}\n}\n")
 

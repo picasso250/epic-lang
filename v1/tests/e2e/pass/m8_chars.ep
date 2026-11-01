@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let a = 65
     let b = 10
@@ -6,7 +7,7 @@ fun main(): void {
     let d = 'p'
     let e = 'i'
     if a != 65 || b != 10 || c != 69 || d != 112 || e != 105 || 'c' != 99 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

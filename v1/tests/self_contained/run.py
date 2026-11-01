@@ -16,14 +16,15 @@ sys.path.insert(0, str(TESTS))
 import ep_runner
 
 
-PROGRAM = """fun main(): void {
+PROGRAM = """extern "kernel32.dll" fun ExitProcess(code: i64): void
+fun main(): void {
     let first = embed("asset.bin")
     let second = embed("asset.bin")
     first.data[0] = 42
     if second.data[0] == 42 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
-    os.ExitProcess(first.data[0])
+    ExitProcess(first.data[0])
 }
 """
 
@@ -73,6 +74,13 @@ def main() -> int:
         result = compile_program(compiler, isolated, "-o")
         if result.returncode == 0:
             print("  FAIL  missing -o path was accepted")
+            return 1
+
+        (source_dir / "deprecated_os.ep").write_text(
+            "fun main(): void {\n    os.Sleep(1)\n}\n", encoding="utf-8")
+        result = compile_program(compiler, isolated, "src/deprecated_os.ep")
+        if result.returncode == 0 or "method calls are not supported" not in result.stdout:
+            print(f"  FAIL  legacy os.* call was accepted or rejected incorrectly: {result.stdout}")
             return 1
 
     print("  PASS  isolated compiler, a.exe default, -o, and mutable embedded bytes")

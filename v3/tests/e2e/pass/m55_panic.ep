@@ -1,6 +1,7 @@
 # EXIT: 1
 # STDOUT: evaluated once
 # STDERR: Epic panic: unexpected state
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun panic_message(): str {
     print("evaluated once\n")
     ret "unexpected state"
@@ -13,5 +14,5 @@ fun panic_value(flag: i64): i64 {
     }
 }
 fun main(): void {
-    os.ExitProcess(panic_value(0))
+    ExitProcess(panic_value(0))
 }

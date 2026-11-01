@@ -477,34 +477,37 @@ accept two bool values, two strings, or two values of the same enum type;
 products and arrays have no implicit reference equality. `if` and condition-form
 `for` conditions require `bool`, subject to the documented v3 migration bridge.
 
-## System calls
+## Windows external functions
 
-`os.*` names are reserved for selected system/runtime calls exposed by the compiler.
+Declare native functions using `extern "dll" fun name(args...): result`.
+The v3 FFI passes raw `ptr` parameters and integer values through the
+Windows x64 ABI; aggregate and floating-point ABI classes are not supported.
+Use `cstr(value)` when passing strings to Windows APIs, not an Epic `str` object.
 
-In v0, `os` is not a module, package, object, or namespace value. Calls such as `os.ExitProcess(0)` are recognized specially by the compiler.
+```epic
+extern "kernel32.dll" fun Sleep(milliseconds: i64): void
+fun main(): void {
+    Sleep(1)
+}
+```
 
-`os.CreateDirectoryA(cstr(path), 0)` creates a directory and returns nonzero on
-success. It returns zero on failure, including when the directory already
-exists.
-
-Raw bindings whose Windows signature takes a C string require `cstr`; Epic
-`str` is never converted implicitly at this boundary.
-
-General method calls are not supported in v0.
+There is no special `os.*` namespace. Windows APIs must be declared explicitly.
 
 ## Program exit
 
 The program entry function must be exactly:
 
 ```epic
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 fun main(): void {
-    os.ExitProcess(0)
+    ExitProcess(0)
 }
 ```
 
 Falling off the end of `main` exits with status `0`. The built-in `exit(code)`
 terminates the process with an `i64` status and has the internal result type
-`never`. `os.ExitProcess(code)` remains available as the direct Windows binding,
+`never`. `ExitProcess(code)` remains available as the direct Windows binding,
 but only `exit(code)` carries language-level no-return semantics.
 
 `panic(message)` writes `Epic panic: `, the message bytes, and a newline to
@@ -559,7 +562,7 @@ contains an earlier zero byte. This low-level interpretation is the caller's
 responsibility. High-level `read_file(path)` and `write_file(path, data)` keep
 accepting `str` paths, reject interior NUL, and perform the conversion
 internally; raw string-taking
-`os.*` bindings require explicit `cstr(...)`.
+native DLL calls require explicit `cstr(...)`.
 
 File contents are always bytes. Convert explicitly with `str(data)` when text
 is required, and with `bytes(text)` when writing a string. `write_file`

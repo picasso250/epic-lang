@@ -1,0 +1,4 @@
+# COMPILE_ERROR: undefined value 'os'
+fun main(): void {
+    os.Sleep(1)
+}

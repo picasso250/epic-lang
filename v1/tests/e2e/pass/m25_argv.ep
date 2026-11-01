@@ -1,11 +1,12 @@
 # ARGV: hello
 # EXIT: 0
 # STDOUT: hello
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     if argv.len < 2 {
         print("missing")
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     print(argv.data[1])
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

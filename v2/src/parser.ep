@@ -766,16 +766,7 @@ fun parse_postfix(p: Parser, node: AstExpr): AstExpr {
         if check(p, "DOT") == 1 {
             let field = expect_enum_member(p)
             if check(p, "LPAREN") == 1 {
-                let n = ast_expr("Call", field.line)
-                if current.kind == "Var" && current.name == "os" {
-                    n.name = field.text
-                    n.type_name = "os"
-                } else {
-                    parse_error(field.line, "method calls are only supported for os.* in v0")
-                }
-                n.args = parse_args(p)
-                expect(p, "RPAREN")
-                current = n
+                parse_error(field.line, "method calls are not supported")
             } else {
                 let field_access = ast_expr("FieldAccess", field.line)
                 field_access.object = current

@@ -1,6 +1,7 @@
 # EXIT: 66
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let s = "ABC"
     let bytes = s.data
-    os.ExitProcess(bytes[1])
+    ExitProcess(bytes[1])
 }

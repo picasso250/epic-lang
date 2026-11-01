@@ -1,4 +1,5 @@
 # EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun to_upper(c: u8): i64 {
     if c >= 'a' && c <= 'z' {
         ret c - 32
@@ -12,7 +13,7 @@ fun main(): void {
     let buf = new u8[]
     push(buf, 255)
     if to_upper('h') != 'H' || to_upper('i') != 'I' || to_upper('z') != 90 || narrow_return() != 44 || buf[0] != 255 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

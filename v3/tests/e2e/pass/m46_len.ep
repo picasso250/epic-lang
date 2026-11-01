@@ -1,5 +1,6 @@
 # EXIT: 0
 # STDOUT: 3:2
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 type LenProbe {
     calls: i64
 }
@@ -14,7 +15,7 @@ fun main(): void {
     push(values, 9)
     let probe = new LenProbe
     if len(make_values(probe)) != 2 || probe.calls != 1 {
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     print(itoa(len(text)))
     print(":")

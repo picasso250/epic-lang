@@ -1,9 +1,10 @@
 # EXIT: 0
 # STDOUT: epic/lang
+extern "kernel32.dll" fun ExitProcess(code: i64): void
 fun main(): void {
     let s = "xxepic/langyy"
     let mid = str_slice(s, 2, 11)
     let empty = str_slice(s, 0, 0)
     print(mid + empty)
-    os.ExitProcess(0)
+    ExitProcess(0)
 }

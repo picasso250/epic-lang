@@ -131,135 +131,6 @@ fun emit_call_inst(e: EmitterState, target: str): i64 {
     out_line(e, target)
     ret 0
 }
-fun sys_call_symbol(name: str): str {
-    if name == "os.Sleep" {
-        ret "Sleep"
-    }
-    if name == "os.GetTickCount64" {
-        ret "GetTickCount64"
-    }
-    if name == "os.GetLastError" {
-        ret "GetLastError"
-    }
-    if name == "os.SetLastError" {
-        ret "SetLastError"
-    }
-    if name == "os.GetStdHandle" {
-        ret "GetStdHandle"
-    }
-    if name == "os.CloseHandle" {
-        ret "CloseHandle"
-    }
-    if name == "os.lstrlenA" {
-        ret "lstrlenA"
-    }
-    if name == "os.lstrcmpA" {
-        ret "lstrcmpA"
-    }
-    if name == "os.MessageBoxA" {
-        ret "MessageBoxA"
-    }
-    if name == "os.Beep" {
-        ret "Beep"
-    }
-    if name == "os.GetCurrentProcess" {
-        ret "GetCurrentProcess"
-    }
-    if name == "os.GetCurrentProcessId" {
-        ret "GetCurrentProcessId"
-    }
-    if name == "os.GetCurrentThreadId" {
-        ret "GetCurrentThreadId"
-    }
-    if name == "os.ExitProcess" {
-        ret "ExitProcess"
-    }
-    if name == "os.GetFileAttributesA" {
-        ret "GetFileAttributesA"
-    }
-    if name == "os.CreateDirectoryA" {
-        ret "CreateDirectoryA"
-    }
-    if name == "os.CreateFileA" {
-        ret "CreateFileA"
-    }
-    if name == "os.ReadFile" {
-        ret "ReadFile"
-    }
-    if name == "os.WriteFile" {
-        ret "WriteFile"
-    }
-    ret ""
-}
-fun sys_member_symbol(ns: str, name: str): str {
-    if ns != "os" {
-        ret ""
-    }
-    if name == "Sleep" {
-        ret "Sleep"
-    }
-    if name == "GetTickCount64" {
-        ret "GetTickCount64"
-    }
-    if name == "GetLastError" {
-        ret "GetLastError"
-    }
-    if name == "SetLastError" {
-        ret "SetLastError"
-    }
-    if name == "GetStdHandle" {
-        ret "GetStdHandle"
-    }
-    if name == "CloseHandle" {
-        ret "CloseHandle"
-    }
-    if name == "lstrlenA" {
-        ret "lstrlenA"
-    }
-    if name == "lstrcmpA" {
-        ret "lstrcmpA"
-    }
-    if name == "MessageBoxA" {
-        ret "MessageBoxA"
-    }
-    if name == "Beep" {
-        ret "Beep"
-    }
-    if name == "GetCurrentProcess" {
-        ret "GetCurrentProcess"
-    }
-    if name == "GetCurrentProcessId" {
-        ret "GetCurrentProcessId"
-    }
-    if name == "GetCurrentThreadId" {
-        ret "GetCurrentThreadId"
-    }
-    if name == "ExitProcess" {
-        ret "ExitProcess"
-    }
-    if name == "GetFileAttributesA" {
-        ret "GetFileAttributesA"
-    }
-    if name == "CreateDirectoryA" {
-        ret "CreateDirectoryA"
-    }
-    if name == "CreateFileA" {
-        ret "CreateFileA"
-    }
-    if name == "ReadFile" {
-        ret "ReadFile"
-    }
-    if name == "WriteFile" {
-        ret "WriteFile"
-    }
-    ret ""
-}
-fun is_sys_call(name: str): i64 {
-    if sys_call_symbol(name) == "" {
-        ret 0
-    }
-    ret 1
-}
 fun emit_jmp(e: EmitterState, label: str): i64 {
     out_s(e, "    jmp ")
     out_line(e, label)
@@ -712,12 +583,6 @@ fun expr_type(e: EmitterState, expr: AstExpr): TypeInfo {
         ret find_local_type(e, expr.name)
     }
     if expr.kind == "Call" {
-        if is_sys_call(expr.name) == 1 {
-            ret type_i64()
-        }
-        if sys_member_symbol(expr.type_name, expr.name) != "" {
-            ret type_i64()
-        }
         if expr.name == "itoa" {
             ret type_str()
         }
@@ -879,10 +744,6 @@ fun find_extern_index(e: EmitterState, name: str): i64 {
 }
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
-    let sys_symbol = sys_call_symbol(name)
-    if sys_symbol == "" {
-        sys_symbol = sys_member_symbol(expr.type_name, expr.name)
-    }
     let external = 0 - 1
     if expr.type_name == "" {
         external = find_extern_index(e, name)
@@ -891,18 +752,11 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         if expr.args.len != e.externs.data[external].params.len {
             codegen_error("extern call has wrong argument count")
         }
-        sys_symbol = name
-    }
-    if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
         for i < expr.args.len {
             let arg = expr.args.data[i]
-            let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
-            if arg_type.kind == "str" && external < 0 {
-                emit_mov(e, "rax", "[rax]")
-            }
             let slot = temp_save_rax(e)
             push(slots, slot)
             i = i + 1
@@ -925,7 +779,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             out_line(e, "], rax")
             i = i + 1
         }
-        emit_call_inst(e, sys_symbol)
+        emit_call_inst(e, name)
         out_s(e, "    add rsp, ")
         out_i(e, frame)
         out_nl(e)

@@ -124,8 +124,8 @@ User product fields use fixed 8-byte slots in v0.
 - Ordinary statements use newlines as explicit statement terminators.
 - `let` annotations are rejected.
 - Functions may have at most 4 parameters.
-- Calls may have at most 4 arguments.
-- `os.*` calls are recognized specially.
+- Ordinary Epic calls may have at most 4 arguments; extern calls support stack arguments.
+- Native DLL functions use explicit `extern` declarations; `os.*` is not recognized.
 - General method calls are rejected.
 - Assignment targets support variables, field chains, and subscripts.
 - `else if` is lowered by the parser to a nested `IfNode` in the `else` block.
