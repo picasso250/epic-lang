@@ -112,6 +112,18 @@ def main() -> int:
             print("  FAIL  default a.asm is not Epic assembly")
             return 1
 
+        # Runtime imports must carry their DLL explicitly in canonical -S output.
+        # User externs use their own anonymous symbols and never supply this map.
+        asm_source = assembly.read_text(encoding="utf-8")
+        for name in ("GetStdHandle", "ExitProcess", "GetFileSize", "HeapAlloc"):
+            declaration = f"extern_dll {'KERNEL32.dll'.encode().hex()} {name.encode().hex()} {name}"
+            if declaration not in asm_source.splitlines():
+                print(f"  FAIL  runtime import lacks explicit DLL: {name}")
+                return 1
+        if "MessageBoxA" in asm_source or "SetFilePointer" in asm_source:
+            print("  FAIL  unused legacy runtime externs are still emitted")
+            return 1
+
         emitted = isolated / "emitted.asm"
         result = subprocess.run(
             [str(compiler), "src/main.ep", "-S", "-o", str(emitted)],

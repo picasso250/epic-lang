@@ -242,7 +242,7 @@ receive an index immediately and definitions later complete the same symbol.
 Names remain on symbol-table entries for imports, diagnostics, and canonical
 `-S` rendering; parser output after the text boundary is index-based. External
 symbols may additionally carry their exact source DLL and export names. Source
-externs use anonymous internal symbols, so they cannot collide with transitional
+externs use anonymous internal symbols, so they cannot collide with named
 runtime imports that happen to use the same export spelling. Canonical assembly
 renders the DLL and export bytes in an `extern_dll` directive as hexadecimal,
 so `-S` render/parse/encode preserves both names without quoting ambiguity.
@@ -253,6 +253,13 @@ validates referenced symbols in one linear pass instead of recovering indexes
 with relocation-by-symbol string searches. Comments, blank lines, and original
 runtime formatting are discarded; the renderer produces canonical `-S` text
 that can be parsed and encoded again.
+
+Internal runtime Win32 imports use explicit `KERNEL32.dll` declarations in
+`src/codegen.ep`, just as user `extern` declarations carry their requested DLL.
+Only symbols needed by the runtime are declared; the PE writer does **not**
+infer a DLL from a legacy global list of Win32 function names. An external
+relocation with no declared DLL is an error. This is a v4 backend cleanup;
+older bootstrap generations retain their historical import handling.
 
 `src/pe.ep` writes a deterministic Windows PE executable, including headers,
 sections, imports, and relocations. Referenced source externs are grouped by DLL

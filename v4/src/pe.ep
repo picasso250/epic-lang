@@ -97,15 +97,6 @@ fun pe_import_find(items: PeImport[], symbol_index: i64): i64 {
     }
     -1
 }
-fun pe_dll_for(name: str): str {
-    if name == "MessageBoxA" {
-        "USER32.dll"
-    } else if name == "ExitProcess" || name == "GetStdHandle" || name == "WriteFile" || name == "CreateDirectoryA" || name == "CreateFileA" || name == "ReadFile" || name == "SetFilePointer" || name == "CloseHandle" || name == "GetFileSize" || name == "lstrcmpA" || name == "lstrlenA" || name == "GetCommandLineA" || name == "HeapAlloc" || name == "HeapFree" || name == "GetProcessHeap" || name == "VirtualAlloc" || name == "Beep" || name == "GetCurrentProcess" || name == "GetCurrentProcessId" || name == "GetCurrentThreadId" || name == "GetFileAttributesA" || name == "GetLastError" || name == "GetTickCount64" || name == "SetLastError" || name == "Sleep" {
-        "KERNEL32.dll"
-    } else {
-        ""
-    }
-}
 fun pe_collect_imports(image: ExeImage): PeImport[] {
     # Relocation order is deterministic; preserve it instead of normalizing
     # small programs into the same sorted IAT byte pattern.
@@ -124,10 +115,7 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
             }
             let dll = sym.library
             if len(dll) == 0 {
-                dll = pe_dll_for(import_name)
-            }
-            if len(dll) == 0 {
-                pe_die("unknown external symbol: " + import_name)
+                pe_die("external symbol has no DLL: " + import_name)
             }
             let item = new PeImport
             item.name = import_name
