@@ -36,13 +36,11 @@ merely create a prettier historical feature timeline?
 
 ## Known compatibility debt and intentionally limited scope
 
-- **Legacy `u8` bridge remains.** Existing v2 GC tests and large parts of the
-  v3 compiler source write `i64` values into `u8` arrays or fields. The v2
-  semantic checker still accepts `i64 -> u8` at ordinary assignment boundaries,
-  while explicit `extern` integer lanes remain exact. `u8` reads through
-  certain container/field paths and `pop` retain the historical promotion to
-  `i64`. A strict full scalar language must eventually retire these exceptions
-  through a separate migration of successor compiler sources and tests.
+- **Resolved in the strict-`u8` follow-up below:** v2 previously allowed
+  `i64 -> u8` narrowing and `u8 -> i64` read promotions. These have now been
+  removed from v2's semantics; successor v3 source and v2 tests use explicit
+  `u8(...)` / `i64(...)` casts. This does **not** rewrite the independent v3
+  compiler's own legacy language semantics, which require separate analysis.
 - **Legacy `i64` condition bridge remains.** Existing programs still use
   integer conditions and obtain `i64`-typed comparison results in older paths,
   rather than universally requiring `bool` as modern v3/v4 code does.
@@ -92,7 +90,7 @@ Separate *history* from the *live bootstrap chain*:
    reduces bootstrap cost, maintained source, and cognitive load without losing
    a reproducible fixed point or trustworthy historical tests.
 
-## Outcome and next decision
+## Outcome and next decision (original experiment conclusion)
 
 This is a **positive feasibility result** for moving scalar types to v2 and
 an explicit measurement of the maintenance cost. It does not yet establish a
@@ -103,8 +101,9 @@ with a before/after maintained-LOC and full-bootstrap comparison.
 
 ## Follow-up review: actual compiler adoption and LOC (2026-11-01)
 
-**Decision: defer removal of the legacy `u8` implicit-conversion bridge and
-avoid a broad v3 source rewrite for now.** This is not acceptance of the bridge
+**Historical decision (superseded by the strict-`u8` cleanup below): defer
+removal of the legacy `u8` implicit-conversion bridge and avoid a broad v3
+source rewrite for now.** This is not acceptance of the bridge
 as permanent language semantics; it is a prioritization decision. No compiler
 semantics or test code were changed in this follow-up.
 
@@ -145,3 +144,39 @@ architectural experiment demonstrates that code can actually be removed from
 the maintained compiler chain, with all five generations and fixed-point tests
 still passing. No version deletion or forced v3 rewrite is implied by this
 record.
+
+## Follow-up implementation: strict v2 `u8` conversions (2026-11-01)
+
+**Decision: implement the narrow migration now.** The 14 audited v3 source
+sites are small and localized enough to remove the transitional rules, rather
+than keep them as permanent exceptions. This supersedes the prior deferral.
+
+- Removed `sema_promote` and the `i64 -> u8` branch of `sema_assignable` from
+  the **experimental v2 compiler**. A `u8` array read, pointer read, product
+  field, function return, or `pop(u8[])` now has type `u8` rather than silently
+  becoming `i64`. Implicit `i64` assignment into `u8` is rejected.
+- Updated the 14 source sites across `v3/src/asm.ep`, `codegen.ep`,
+  `lexer.ep`, and `pe.ep` to request explicit `u8(...)` truncation or
+  `i64(...)` widening. The v3 source still builds with the v2 compiler.
+- Updated impacted v2 E2E, GC stress and isolated-compiler fixture cases.
+  Unsuffixed integer literals remain contextually typed; e.g. `push(bytes, 42)`
+  is not an implicit conversion from an already-typed `i64` expression.
+- Added semantic rejection tests covering `u8 -> i64` argument/return and
+  `i64 -> u8` subscript-assignment/`push` conversions.
+- The previous `i64` condition-compatibility behavior **remains** as a
+  separate issue. This cleanup changes v2's byte conversions only, and does
+  not backport strict byte rules into the distinct **v3 language implementation**.
+  In particular, v3's own `sema.ep` still contains historical `u8`/`i64`
+  compatibility, which is not needed to compile v3 from strict v2.
+
+Compiler source LOC after this cleanup: approximately **6,586** for v2
+(main: 6,065), **8,946** for v3, and **9,313** for v4. This is a small
+semantic simplification, **not** evidence that front-loading types reduced
+cumulative maintained LOC or the number of bootstrap generations.
+
+Verification: `python test.py` returns **ALL 5 GENERATIONS PASS** (v0,
+v1, v2, v3, v4); byte-identical bootstrap fixed points are preserved.
+Experimental v2 additionally passes **80 E2E** cases, **72 semantic rejection**
+cases, its isolated-compiler tests, and GC stress/small tests. The negative
+cases specifically reject implicit typed `u8`/`i64` conversions. No changes
+are merged into canonical `main` as part of this experiment.

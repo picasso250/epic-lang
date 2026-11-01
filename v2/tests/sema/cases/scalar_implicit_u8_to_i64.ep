@@ -1,0 +1,8 @@
+# ERROR: argument 1 of 'take_i64' expects i64, got u8
+fun take_i64(value: i64): void {
+    ret
+}
+fun main(): void {
+    let byte = u8(200)
+    take_i64(byte)
+}

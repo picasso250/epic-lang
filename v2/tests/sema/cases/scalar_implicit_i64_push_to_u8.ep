@@ -1,0 +1,6 @@
+# ERROR: push value type i64 is not assignable to u8
+fun main(): void {
+    let data = new u8[]
+    let wide = i64(300)
+    push(data, wide)
+}

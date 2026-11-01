@@ -116,7 +116,7 @@ fun asm_remove_spaces(s: str): str {
     let out = new u8[]
     for i: 0:len(s) {
         if s[i] != 32 && s[i] != 9 {
-            push(out, s[i])
+            push(out, u8(s[i]))
         }
     }
     ret str(out)
@@ -750,9 +750,9 @@ fun asm_offset(image: ExeImage): i64 {
 }
 fun asm_byte(image: ExeImage, value: i64): void {
     if image.section == 1 {
-        push(image.text, value)
+        push(image.text, u8(value))
     } else if image.section == 2 {
-        push(image.data, value)
+        push(image.data, u8(value))
     } else {
         asm_die("bytes outside a section")
     }
@@ -1947,7 +1947,7 @@ fun asm_program_parse_db(program: AsmProgram, args: str): i64 {
         if asm_is_number(value_text) == 0 {
             asm_die("db values must be integers")
         }
-        push(values, parse_integer(value_text))
+        push(values, u8(parse_integer(value_text)))
         value_start = value_end + 1
     }
     ret asm_bytes(program, values)
@@ -2136,7 +2136,7 @@ fun asm_encode(program: AsmProgram): ExeImage {
             }
             AsmItemKind.Bytes {
                 for byte_i: 0:len(item.bytes) {
-                    asm_byte(image, item.bytes[byte_i])
+                    asm_byte(image, i64(item.bytes[byte_i]))
                 }
             }
             AsmItemKind.DataInteger {
@@ -2663,7 +2663,7 @@ fun asm_render(program: AsmProgram): u8[] {
                     if byte_i != 0 {
                         asm_render_s(out, ", ")
                     }
-                    asm_render_i(out, item.bytes[byte_i])
+                    asm_render_i(out, i64(item.bytes[byte_i]))
                 }
                 asm_render_s(out, "\n")
             }

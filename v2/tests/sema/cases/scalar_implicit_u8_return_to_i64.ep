@@ -1,0 +1,8 @@
+# ERROR: return type u8 is not assignable to i64
+fun byte_value(): u8 {
+    ret u8(200)
+}
+fun wide_value(): i64 {
+    ret byte_value()
+}
+fun main(): void {}

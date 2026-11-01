@@ -24,7 +24,7 @@ fun main(): void {
     if second[0] == 42 {
         ExitProcess(1)
     }
-    ExitProcess(first[0])
+    ExitProcess(i64(first[0]))
 }
 """
 

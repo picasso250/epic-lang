@@ -148,7 +148,7 @@ fun lex(src: str): Token[] {
                             ExitProcess(1)
                         }
                     }
-                    push(buf, c)
+                    push(buf, u8(c))
                     pos += 1
                 }
             }

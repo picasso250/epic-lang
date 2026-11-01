@@ -30,7 +30,7 @@ fun pe_die(msg: str): void {
     ret
 }
 fun pe_byte(out: u8[], value: i64): void {
-    push(out, value)
+    push(out, u8(value))
     ret
 }
 fun pe_u16(out: u8[], value: i64): void {
@@ -49,10 +49,10 @@ fun pe_u64(out: u8[], value: i64): void {
     ret
 }
 fun pe_patch_u32(out: u8[], off: i64, value: i64): void {
-    out[off] = value
-    out[off + 1] = value >> 8
-    out[off + 2] = value >> 16
-    out[off + 3] = value >> 24
+    out[off] = u8(value)
+    out[off + 1] = u8(value >> 8)
+    out[off + 2] = u8(value >> 16)
+    out[off + 3] = u8(value >> 24)
     ret
 }
 fun pe_patch_u64(out: u8[], off: i64, value: i64): void {
@@ -74,7 +74,7 @@ fun pe_pad(out: u8[], alignment: i64, value: i64): i64 {
 }
 fun pe_append(out: u8[], src: u8[]): i64 {
     for i: 0:len(src) {
-        pe_byte(out, src[i])
+        pe_byte(out, i64(src[i]))
     }
     ret 0
 }

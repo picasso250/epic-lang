@@ -401,7 +401,7 @@ fun collect_program_strings(e: EmitterState, program: AstProgram): void {
 fun string_bytes(s: str): u8[] {
     let values = new u8[]
     for i: 0:len(s) {
-        push(values, s[i])
+        push(values, u8(s[i]))
     }
     push(values, 0)
     ret values

@@ -492,20 +492,8 @@ fun sema_is_pointer(type_name: str): i64 {
 fun sema_pointer_element(type_name: str): str {
     ret str_new(type_name.data + 4, type_name.len - 4)
 }
-fun sema_promote(type_name: str): str {
-    if type_name == "u8" {
-        ret "i64"
-    }
-    ret type_name
-}
 fun sema_assignable(expected: str, actual: str): i64 {
     if expected == actual {
-        ret 1
-    }
-    # Historical u8 bridge: v3 compiler source and earlier GC tests still
-    # explicitly narrow i64 into byte storage. Remove only with a coherent
-    # successor-source migration, not by silently breaking the bootstrap.
-    if expected == "u8" && actual == "i64" {
         ret 1
     }
     if expected == "ptr" && sema_is_pointer(actual) == 1 {
@@ -853,13 +841,13 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
         i = i + 1
     }
     if full_name == "pop" {
-        ret sema_promote(sema_array_element(expr.args.data[0].resolved_type))
+        ret sema_array_element(expr.args.data[0].resolved_type)
     }
     if sig.external == 1 {
         # Results retain their declared type, not an artificial i64 bridge.
         ret sig.return_type
     }
-    ret sema_promote(sig.return_type)
+    ret sig.return_type
 }
 fun sema_check_expr(state: SemaState, expr: AstExpr): str {
     let result = ""
@@ -927,7 +915,7 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
             if field_type == "" {
                 sema_error(state.source_path, expr.line, "type " + object_type + " has no field '" + expr.name + "'")
             }
-            result = sema_promote(field_type)
+            result = field_type
         }
     } else if expr.kind == "Subscript" {
         let base_type = sema_check_expr(state, expr.base)
@@ -936,9 +924,9 @@ fun sema_check_expr(state: SemaState, expr: AstExpr): str {
         if base_type == "str" {
             result = "i64"
         } else if sema_is_array(base_type) == 1 {
-            result = sema_promote(sema_array_element(base_type))
+            result = sema_array_element(base_type)
         } else if sema_is_pointer(base_type) == 1 {
-            result = sema_promote(sema_pointer_element(base_type))
+            result = sema_pointer_element(base_type)
         } else {
             sema_error(state.source_path, expr.line, "type " + base_type + " is not subscriptable")
         }
