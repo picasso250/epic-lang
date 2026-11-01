@@ -100,3 +100,48 @@ net simplification: the remaining `u8`/condition bridges and duplicated later
 implementations still exist. The branch must remain experimental until we
 have a specific plan for eliminating or archiving those redundant generations,
 with a before/after maintained-LOC and full-bootstrap comparison.
+
+## Follow-up review: actual compiler adoption and LOC (2026-11-01)
+
+**Decision: defer removal of the legacy `u8` implicit-conversion bridge and
+avoid a broad v3 source rewrite for now.** This is not acceptance of the bridge
+as permanent language semantics; it is a prioritization decision. No compiler
+semantics or test code were changed in this follow-up.
+
+A read-only audit of `src/*.ep` identifiers on canonical `main` (counting type
+names in code, excluding quoted strings and comments) found:
+
+| Compiler source | `i64` | `u8` | New scalar names `i8/i16/u16/i32/u32/u64/bool` |
+| --- | ---: | ---: | ---: |
+| v2 | 380 | 30 | 0 |
+| v3 | 427 | 41 | **0** |
+| v4 | 287 | 89 | **68** (`bool` 59, `u32` 8, `i32` 1) |
+
+These are **lexical token counts, not type-checked usage counts**, and include
+the occurrences of the basic `i64`/`u8` type names in the compiler's
+implementation. The important finding is that v3's **own compiler source**
+does not actually dogfood the new scalar types; it *implements their support*
+for the next generation. Moving that support into v2 therefore does not
+magically remove v3's semantic analyzer, code generator, or assembler support
+for the same types. The v3 compiler must still be able to compile v4 source.
+
+The experimentally instrumented v2 compiler identified **14 conversion events
+at 14 source locations** when compiling v3: 11 `i64 -> u8` narrowings and
+three `u8 -> i64` read promotions (concentrated in `asm.ep`, `pe.ep`,
+`codegen.ep`, `lexer.ep`). The v2 E2E bundle produced 25 promotion events
+across 13 source lines in 12 cases, and its GC stress test had one narrowing.
+These are finite migration sites, but cleaning them only changes source and
+removes legacy bridges; it does not itself yield large source reductions.
+
+Current experiment compiler LOC are about v2 **6,598** (main: 6,065), v3
+**8,946** (main: 8,945), and v4 **9,313** (unchanged). This is about **+534
+lines** across v2-v4, not a demonstrated reduction. The primary benefit so far
+is a more coherent *earlier language contract*, not a smaller live bootstrap.
+
+**Revisit when** one of the following is true: (a) strict `u8` rules are needed
+for real user-facing correctness, (b) v3 source is being edited for another
+substantial reason and the 14 sites can be migrated naturally, or (c) an
+architectural experiment demonstrates that code can actually be removed from
+the maintained compiler chain, with all five generations and fixed-point tests
+still passing. No version deletion or forced v3 rewrite is implied by this
+record.
