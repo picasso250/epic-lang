@@ -11,3 +11,5 @@ __pycache__/
 test_out.txt
 test_write_file.txt
 a.asm
+# Local voice transcription dictionary
+.continue-on-phone/
