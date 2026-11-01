@@ -297,6 +297,9 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
 fun sema_collect_externs(state: SemaState, ast: AstProgram): i64 {
     for i: 0:len(ast.externs) {
         let decl = ast.externs[i]
+        if decl.name == "ptr" {
+            sema_error(decl.source_path, decl.line, "cannot redefine builtin function 'ptr'")
+        }
         let first = sema_find_func(state, decl.name)
         if first.name != "" {
             sema_error(decl.source_path, decl.line, "duplicate extern function '" + decl.name + "'")
@@ -325,6 +328,9 @@ fun sema_collect_functions(state: SemaState, ast: AstProgram): i64 {
         let node = ast.funcs[i]
         if sema_is_primitive_type(node.name) == 1 {
             sema_error(node.source_path, node.line, "cannot redefine primitive conversion '" + node.name + "'")
+        }
+        if node.name == "ptr" {
+            sema_error(node.source_path, node.line, "cannot redefine builtin function 'ptr'")
         }
         let first = sema_find_func(state, node.name)
         if first.name != "" {
@@ -690,9 +696,6 @@ fun sema_assignable(expected: str, actual: str): i64 {
     if expected == actual {
         ret 1
     }
-    if expected == "ptr" && (actual == "ptr" || sema_is_integer(actual) == 1) {
-        ret 1
-    }
     ret 0
 }
 fun sema_join_types(state: SemaState, left: str, right: str, line: i64): str {
@@ -964,6 +967,21 @@ fun sema_check_call(state: SemaState, expr: AstExpr): str {
             sema_error(state.source_path, expr.line, "integer conversion '" + expr.name + "' requires an integer, got " + source_type)
         }
         ret expr.name
+    }
+    # v3 only converts 64-bit integer addresses explicitly. Managed arrays,
+    # products and callbacks are deliberately outside this minimal backport.
+    if expr.type_name == "" && expr.name == "ptr" {
+        if len(expr.args) != 1 {
+            sema_error(state.source_path, expr.line, "ptr conversion expects 1 argument, got " + itoa(len(expr.args)))
+        }
+        let ptr_source_type = sema_check_expr_expected(state, expr.args[0], "")
+        if ptr_source_type == "never" {
+            ret "never"
+        }
+        if ptr_source_type != "i64" && ptr_source_type != "u64" {
+            sema_error(state.source_path, expr.line, "ptr conversion requires i64 or u64, got " + ptr_source_type)
+        }
+        ret "ptr"
     }
     let sig = sema_find_func(state, full_name)
     if sig.name == "" {

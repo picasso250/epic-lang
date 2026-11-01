@@ -1,0 +1,4 @@
+# ERROR: ptr conversion expects 1 argument, got 0
+fun main(): void {
+    let handle = ptr()
+}

@@ -1,0 +1,5 @@
+# ERROR: cannot redefine builtin function 'ptr'
+fun ptr(value: i64): i64 {
+    ret value
+}
+fun main(): void {}

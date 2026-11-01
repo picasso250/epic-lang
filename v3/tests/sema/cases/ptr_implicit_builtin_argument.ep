@@ -1,0 +1,4 @@
+# ERROR: argument 1 of 'str_new' expects ptr, got i64
+fun main(): void {
+    let result = str_new(i64(0), 0)
+}

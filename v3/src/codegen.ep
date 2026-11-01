@@ -829,6 +829,11 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_coerce_rax(e, expr_type(e, expr.args[0]), type_integer(name))
         ret 0
     }
+    if expr.type_name == "" && name == "ptr" {
+        # Explicit i64/u64 address conversion preserves all 64 bits.
+        emit_expr(e, expr.args[0])
+        ret 0
+    }
     if expr.type_name == "" && name == "is_null" {
         emit_expr(e, expr.args[0])
         asm_test(e.program, asm_rax(), asm_rax())

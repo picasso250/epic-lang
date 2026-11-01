@@ -1,0 +1,6 @@
+# ERROR: argument 1 of 'GetFileType' expects ptr, got i64
+extern "kernel32.dll" fun GetFileType(handle: ptr): u32
+fun main(): void {
+    let handle = i64(1)
+    GetFileType(handle)
+}

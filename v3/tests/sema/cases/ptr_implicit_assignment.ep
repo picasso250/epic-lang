@@ -1,0 +1,5 @@
+# ERROR: cannot assign i64 to ptr
+fun main(): void {
+    let handle = ptr(0)
+    handle = i64(1)
+}

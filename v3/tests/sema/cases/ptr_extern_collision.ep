@@ -1,0 +1,3 @@
+# ERROR: cannot redefine builtin function 'ptr'
+extern "kernel32.dll" fun ptr(value: i64): i64
+fun main(): void {}

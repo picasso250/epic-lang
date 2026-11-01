@@ -219,3 +219,39 @@ at 6,586; v4 stays at 9,313. These are compiler-only physical source lines.
 The next separate design discussion is `ptr` (null representation, integer
 conversions, precise Win64 ABI signatures, and pointer-lifetime rules). Nothing
 in this scalar cleanup presupposes that decision.
+
+## Follow-up: explicit integer-to-`ptr` conversion in v3 (2026-11-01)
+
+**Implemented in the experiment branch, not canonical `main`.** v3 now accepts
+`ptr(i64_value)` and `ptr(u64_value)` including `ptr(0)` as an explicit null
+address, preserving the underlying 64 bits. Calls with the wrong arity or
+other operand types are rejected. The conversion is implemented directly in
+semantic analysis and emitted as a plain 64-bit value; it does not require
+new runtime support or rewriting the assembler.
+
+- Removed the implicit integer-to-`ptr` rule from v3's `sema_assignable`.
+  `ptr` parameters (including native FFI) and assignment targets therefore
+  require an already-typed `ptr`; direct `GetFileType(0)` is rejected while
+  `GetFileType(ptr(0))` is accepted.
+- Reserved `ptr` as the conversion builtin name against user-function and
+  extern-function redeclarations.
+- **Kept `ptr + integer` exactly as before.** This is pointer arithmetic,
+  not an implicit cast, and has its own future design discussion.
+- **Kept v3 narrower than v4**: `ptr(array)`, `ptr(product)`, callback addresses,
+  managed-object lifetime rules, and arbitrary smaller-width conversions are
+  deliberately not backported. V3 source restrictions on declaring a `ptr`
+  type remain unchanged; local inference and `extern` `ptr` parameters work.
+- Added a runtime/FFI smoke test and 11 semantic rejection tests for implicit
+  casts, arity, incorrect operand types, and conversion-name collisions.
+
+The prior section's statement that `ptr` was unchanged describes the preceding
+scalar-only commit. It is superseded **only for integer-to-`ptr` conversion**
+by this follow-up; no other pointer behavior is redesigned here.
+
+Verification for the explicit-`ptr` follow-up: `python test.py` passed all
+five generations with both bootstrap fixed points byte-identical; v3 passed
+**106 E2E cases** and **92 semantic diagnostics**. The new E2E case checks
+zero and nonzero integer-address conversion, an explicit Win32 `ptr` argument,
+and unchanged 64-bit `ptr + integer` arithmetic (including wrap to null).
+Compiler-source LOC after this follow-up: v2 **6,586**, v3 **8,920**, v4
+**9,313**. No changes were made to the v4 compiler implementation.

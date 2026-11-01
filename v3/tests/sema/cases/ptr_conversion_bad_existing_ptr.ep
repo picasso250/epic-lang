@@ -1,0 +1,4 @@
+# ERROR: ptr conversion requires i64 or u64, got ptr
+fun main(): void {
+    let handle = ptr(ptr(0))
+}

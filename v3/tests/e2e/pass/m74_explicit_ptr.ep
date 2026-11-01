@@ -1,0 +1,21 @@
+# EXIT: 0
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+extern "kernel32.dll" fun GetFileType(handle: ptr): u32
+fun main(): void {
+    let null_pointer = ptr(0)
+    if !is_null(null_pointer) || !is_null(ptr(u64(0))) {
+        ExitProcess(1)
+    }
+    let address = ptr(i64(7))
+    if is_null(address) || is_null(ptr(u64(i64(-1)))) {
+        ExitProcess(2)
+    }
+    # Pointer arithmetic is deliberately unchanged in this experiment.
+    if is_null(address + 1) || !is_null(ptr(i64(-1)) + 1) {
+        ExitProcess(3)
+    }
+    # A raw Win32 ptr argument requires an explicitly typed pointer.
+    if GetFileType(ptr(0)) != u32(0) {
+        ExitProcess(4)
+    }
+}

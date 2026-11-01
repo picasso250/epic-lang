@@ -79,8 +79,10 @@ still uses the subset that v2 can compile, while the v4 compiler is the main
 dogfood target for `bool` and the expanded integer types. **The v3 language
 itself now requires matching integer types, explicit conversions, and `bool`
 conditions.** The earlier `u8`/`i64` and `bool`/`i64` compatibility bridges
-have been removed. The separate `ptr` conversion rules remain unchanged for a
-later design review.
+have been removed. Low-level `ptr` values now require explicit `ptr(i64)`
+or `ptr(u64)` construction from integers. Existing `ptr + integer` byte-address
+arithmetic remains unchanged; managed-object address conversion is not part of
+this v3 backport.
 
 The v3 compiler source also dogfoods the v2 foundations: unit enums and
 exhaustive matching, compound assignment, unary operators, integer range loops,
@@ -484,6 +486,9 @@ Declare native functions using `extern "dll" fun name(args...): result`.
 The v3 FFI passes raw `ptr` parameters and integer values through the
 Windows x64 ABI; aggregate and floating-point ABI classes are not supported.
 Use `cstr(value)` when passing strings to Windows APIs, not an Epic `str` object.
+An integer cannot be passed implicitly to a `ptr` parameter: write `ptr(0)`
+for a null pointer or `ptr(address)` when the address is already `i64` or `u64`.
+This does not imply that an arbitrary integer is a valid dereferenceable address.
 
 ```epic
 extern "kernel32.dll" fun Sleep(milliseconds: i64): void
@@ -545,9 +550,15 @@ to declare them.
 `never` appears here to describe the built-in precisely, but it is not accepted
 in user-written parameter, field, local, or function return type declarations.
 The same applies to the internal `ptr` type: a local may infer it from
-`cstr(s)` or `s.data`, but source declarations cannot name it. `ptr` is a
-transparent byte address: integer addition is byte-oriented, and it cannot be
-subscripted because it carries no pointee type or stride.
+`cstr(s)`, `s.data`, or an explicit `ptr(i64 | u64)` conversion, but source
+declarations cannot name it. `ptr(0)` represents a null pointer. A `ptr(...)`
+conversion accepts exactly one `i64` or `u64` argument, preserving its 64-bit
+pattern. Neither smaller integer widths nor arrays or products are accepted as
+inputs by v3's minimal conversion; the later v4 pointer facilities are broader.
+`ptr` is a transparent byte address: existing `ptr + integer` addition is
+byte-oriented, and a `ptr` cannot be subscripted because it has no pointee type
+or stride. Integer-to-`ptr` assignment and function argument conversion are not
+implicit, including when the integer is zero.
 
 `len(value)`, `pop(array)`, checked `value[index]`, and slicing are the container interfaces.
 `pop` evaluates its array expression once, preserves capacity, and clears the
