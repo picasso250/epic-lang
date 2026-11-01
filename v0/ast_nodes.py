@@ -16,6 +16,7 @@ class ASTNode:
 class ProgramNode(ASTNode):
     funcs: list      # list[FunDefNode]
     structs: list    # list[StructDefNode]
+    externs: list = field(default_factory=list)  # list[ExternDefNode]
 
 
 @dataclass
@@ -34,6 +35,14 @@ class StructDefNode(ASTNode):
 class Param(ASTNode):
     name: str
     type: str
+
+
+@dataclass
+class ExternDefNode(ASTNode):
+    library: str
+    name: str
+    params: list
+    ret_type: str
 
 
 @dataclass

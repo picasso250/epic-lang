@@ -38,7 +38,7 @@ def sym_name(sym, strtab):
     return sym['name_raw'].rstrip(b'\x00').decode()
 
 
-def link(obj_path, exe_path):
+def link(obj_path, exe_path, import_map=None):
     data = open(obj_path, 'rb').read()
 
     # ── COFF header ──
@@ -111,7 +111,7 @@ def link(obj_path, exe_path):
     text_sec['virtual_sz'] = len(text_sec['data'])
 
     idata_rva = align(text_rva + text_sec['virtual_sz'], SECTION_ALIGN)
-    idata, iat_map = build_idata(imports, idata_rva)
+    idata, iat_map, descriptor_size, iat_offset, iat_size = build_idata(imports, idata_rva, import_map or {})
     data_rva = align(idata_rva + len(idata), SECTION_ALIGN) if idata else idata_rva
 
     # Patch thunk RIP-relative IAT references now that .rdata has its final RVA.
@@ -151,39 +151,66 @@ def link(obj_path, exe_path):
             struct.pack_into('<i', text_sec['data'], rva, disp)
 
     # ── Write PE ──
-    return write_pe(exe_path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entry_rva)
+    return write_pe(exe_path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entry_rva, descriptor_size, iat_offset, iat_size)
 
 
-def build_idata(imports, idata_rva):
-    if not imports: return b'', {}
-    ILT_OFF = 40
-    TABLE_SIZE = len(imports) * 8 + 8
-    IAT_OFF = ILT_OFF + TABLE_SIZE
-    HINT_OFF = IAT_OFF + TABLE_SIZE
+def build_idata(imports, idata_rva, import_map):
+    if not imports:
+        return b'', {}, 0, 0, 0
+    # The stage-0 runtime's own imports are implicit; user externs supply
+    # their DLL in the manifest. Group by DLL for a valid PE import directory.
+    dlls = {}
+    for name in imports:
+        dll = import_map.get(name, 'USER32.dll' if name == 'MessageBoxA' else 'KERNEL32.dll')
+        if not dll or '\x00' in dll:
+            raise ValueError('invalid import DLL name')
+        dlls.setdefault(dll, []).append(name)
+
+    descriptor_size = (len(dlls) + 1) * 20
+    offset = descriptor_size
+    ilt_offsets = {}
+    for dll, names in dlls.items():
+        ilt_offsets[dll] = offset
+        offset += (len(names) + 1) * 8
+    iat_offset = offset
+    iat_offsets = {}
+    for dll, names in dlls.items():
+        iat_offsets[dll] = offset
+        offset += (len(names) + 1) * 8
+    iat_size = offset - iat_offset
+
+    hint_offsets = {}
+    hints = bytearray()
+    for name in imports:
+        hint_offsets[name] = offset + len(hints)
+        hints += struct.pack('<H', KERNEL32_HINTS.get(name, 0)) + name.encode('ascii') + b'\x00'
+        if len(hints) % 2:
+            hints += b'\x00'
+    offset += len(hints)
+    dll_offsets = {}
+    dll_blob = bytearray()
+    for dll in dlls:
+        dll_offsets[dll] = offset + len(dll_blob)
+        dll_blob += dll.encode('ascii') + b'\x00'
+    blob = bytearray(offset + len(dll_blob))
+    blob[offset:] = dll_blob
+    hint_start = iat_offset + iat_size
+    blob[hint_start:hint_start + len(hints)] = hints
 
     iat_map = {}
-    hint_blob = bytearray()
-    for func in imports:
-        hint_blob += struct.pack('<H', KERNEL32_HINTS.get(func, 0)) + func.encode() + b'\x00'
-        if len(hint_blob) % 2: hint_blob += b'\x00'
-
-    DLL_OFF = HINT_OFF + len(hint_blob)
-    ilt = bytearray()
-    for idx, func in enumerate(imports):
-        hoff = sum(2 + len(f.encode()) + 1 + (1 if (2 + len(f.encode()) + 1) % 2 else 0)
-                   for f in imports[:idx])
-        ilt += struct.pack('<Q', idata_rva + HINT_OFF + hoff)
-        iat_map[func] = IAT_OFF + idx * 8
-    ilt += struct.pack('<Q', 0)
-    iat = bytearray(ilt)
-
-    idt = struct.pack('<IIIII', idata_rva + ILT_OFF, 0, 0,
-                      idata_rva + DLL_OFF, idata_rva + IAT_OFF)
-    idt += bytes(20)
-    return bytes(idt + ilt + iat + hint_blob) + b'KERNEL32.dll\x00', iat_map
+    for index, (dll, names) in enumerate(dlls.items()):
+        struct.pack_into('<IIIII', blob, index * 20,
+                         idata_rva + ilt_offsets[dll], 0, 0,
+                         idata_rva + dll_offsets[dll], idata_rva + iat_offsets[dll])
+        for j, name in enumerate(names):
+            hint_rva = idata_rva + hint_offsets[name]
+            struct.pack_into('<Q', blob, ilt_offsets[dll] + j * 8, hint_rva)
+            struct.pack_into('<Q', blob, iat_offsets[dll] + j * 8, hint_rva)
+            iat_map[name] = iat_offsets[dll] + j * 8
+    return bytes(blob), iat_map, descriptor_size, iat_offset, iat_size
 
 
-def write_pe(path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entry_rva):
+def write_pe(path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entry_rva, descriptor_size, iat_offset, iat_size):
     TEXT_RVA = 0x1000
     all_sec = [
         ('.text', TEXT_RVA, bytes(text_sec['data']), 0x60000020, text_sec.get('virtual_sz', len(text_sec['data']))),
@@ -224,12 +251,12 @@ def write_pe(path, text_sec, data_sec, data_rva, idata, idata_rva, imports, entr
     # Data directories
     buf += struct.pack('<II', 0, 0)
     if idata:
-        buf += struct.pack('<II', idata_rva, 40)
+        buf += struct.pack('<II', idata_rva, descriptor_size)
     else:
         buf += struct.pack('<II', 0, 0)
     buf += bytes(10 * 8)
     if idata:
-        buf += struct.pack('<II', idata_rva + 40 + (len(imports) + 1) * 8, (len(imports) + 1) * 8)
+        buf += struct.pack('<II', idata_rva + iat_offset, iat_size)
     else:
         buf += struct.pack('<II', 0, 0)
     buf += bytes(3 * 8)
@@ -267,5 +294,11 @@ if __name__ == '__main__':
         sys.exit(1)
     obj = sys.argv[1]
     out = sys.argv[sys.argv.index('-o') + 1] if '-o' in sys.argv else os.path.splitext(obj)[0] + '.exe'
-    sz = link(obj, out)
+    import json
+    import_map = {}
+    if '--import-map' in sys.argv:
+        manifest = sys.argv[sys.argv.index('--import-map') + 1]
+        with open(manifest, encoding='utf-8') as handle:
+            import_map = json.load(handle)
+    sz = link(obj, out, import_map)
     print(f"  OK: {out} ({sz} bytes)")

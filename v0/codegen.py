@@ -39,11 +39,18 @@ class Emitter:
         self.local_bytes = 0    # track variable allocation in pre-scan
         self.structs = {}       # name → {fields: [{name, type, offset}], size}
         self.funcs = {}         # name → {ret_type, params}
+        self.externs = {}       # name → {library, ret_type, params}
+        self.emitted_externs = set()
         self.globals = {"argv": {"type": "&_arr_str", "label": "_argv"}}
         self.loop_stack = []
 
     def emit(self, s):
         self.out.write(s + "\n")
+
+    def emit_extern(self, name):
+        if name not in self.emitted_externs:
+            self.emit(f"extern {name}")
+            self.emitted_externs.add(name)
 
     def emit_label(self, name):
         self.emit(f"{name}:")
@@ -83,26 +90,30 @@ class Emitter:
 
     def emit_program(self, ast):
         self.emit("global _start")
-        self.emit("extern ExitProcess")
-        self.emit("extern GetStdHandle")
-        self.emit("extern WriteFile")
-        self.emit("extern CreateFileA")
-        self.emit("extern ReadFile")
-        self.emit("extern SetFilePointer")
-        self.emit("extern CloseHandle")
-        self.emit("extern GetFileSize")
-        self.emit("extern lstrcmpA")
-        self.emit("extern lstrlenA")
-        self.emit("extern GetCommandLineA")
-        self.emit("extern HeapAlloc")
-        self.emit("extern GetProcessHeap")
+        self.emit_extern("ExitProcess")
+        self.emit_extern("GetStdHandle")
+        self.emit_extern("WriteFile")
+        self.emit_extern("CreateFileA")
+        self.emit_extern("ReadFile")
+        self.emit_extern("SetFilePointer")
+        self.emit_extern("CloseHandle")
+        self.emit_extern("GetFileSize")
+        self.emit_extern("lstrcmpA")
+        self.emit_extern("lstrlenA")
+        self.emit_extern("GetCommandLineA")
+        self.emit_extern("HeapAlloc")
+        self.emit_extern("GetProcessHeap")
         for name in sorted(self.winapi):
-            if name not in {
-                "ExitProcess", "GetStdHandle", "CloseHandle",
-                "lstrcmpA", "lstrlenA", "CreateFileA", "ReadFile",
-                "WriteFile",
-            }:
-                self.emit(f"extern {name}")
+            self.emit_extern(name)
+        self.externs = {}
+        for decl in ast.externs:
+            if decl.name in self.externs:
+                previous = self.externs[decl.name]
+                if (decl.library, decl.ret_type, [p.type for p in decl.params]) != (previous.library, previous.ret_type, [p.type for p in previous.params]):
+                    raise RuntimeError(f"Conflicting extern declaration: {decl.name}")
+            else:
+                self.externs[decl.name] = decl
+                self.emit_extern(decl.name)
         self.emit("default rel")
         self.emit("")
 
@@ -112,6 +123,9 @@ class Emitter:
             fn.name: {"ret_type": self._internal_type(fn.ret_type), "params": fn.params}
             for fn in ast.funcs
         }
+        for name in self.externs:
+            if name in self.funcs or name in self.builtins:
+                raise RuntimeError(f"Extern conflicts with program function or builtin: {name}")
 
         # Collect strings from AST
         self.strings = {}
@@ -310,13 +324,13 @@ class Emitter:
             raise RuntimeError(f"Unsupported os call: {full_name}")
         return symbol
 
-    def _emit_syscall(self, symbol, args):
+    def _emit_syscall(self, symbol, args, legacy_str_conversion=True):
         param_regs = ["rcx", "rdx", "r8", "r9"]
         slots = []
         for arg in args:
             arg_type = self._expr_type(arg)
             self.emit_expr(arg)
-            if arg_type == "&str":
+            if legacy_str_conversion and arg_type == "&str":
                 self.emit_mov("rax", "[rax]")
             slot = self._alloc_temp()
             self.emit_stack_store(slot, "rax")
@@ -642,6 +656,13 @@ class Emitter:
 
         if symbol := self._syscall_symbol(name, expr.namespace):
             self._emit_syscall(symbol, args)
+            return
+
+        if not expr.namespace and name in self.externs:
+            decl = self.externs[name]
+            if len(args) != len(decl.params):
+                raise RuntimeError(f"Extern {name} requires {len(decl.params)} arguments")
+            self._emit_syscall(name, args, legacy_str_conversion=False)
             return
 
         if name in self.builtins:
@@ -1193,6 +1214,8 @@ class Emitter:
             # User-defined function
             if name in self.funcs:
                 return self.funcs[name]["ret_type"]
+            if name in self.externs:
+                return self.externs[name].ret_type
             return "i64"
         if isinstance(expr, FieldAccessNode):
             obj_type = self._expr_type(expr.object)

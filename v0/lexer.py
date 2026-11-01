@@ -7,6 +7,7 @@ import re
 
 TOKEN_SPEC = [
     ("FUN",       r'\bfun\b'),
+    ("EXTERN",    r'\bextern\b'),
     ("RET",       r'\bret\b'),
     ("RETURN",    r'\breturn\b'),
     ("IF",        r'\bif\b'),

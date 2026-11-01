@@ -26,7 +26,7 @@ fun pe_die(msg: str): i64 {
     print("pe: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret 0
 }
 fun pe_align(value: i64, alignment: i64): i64 {
@@ -133,7 +133,17 @@ fun pe_dll_for(name: str): str {
     }
     ret ""
 }
-fun pe_collect_imports(image: ExeImage): PeImport[] {
+fun pe_declared_dll(externs: AstExternDef[], name: str): str {
+    let i = 0
+    for i < externs.len {
+        if externs.data[i].name == name {
+            ret externs.data[i].library
+        }
+        i = i + 1
+    }
+    ret ""
+}
+fun pe_collect_imports(image: ExeImage, externs: AstExternDef[]): PeImport[] {
     # Relocation order is deterministic; preserve it instead of normalizing
     # small programs into the same sorted IAT byte pattern.
     let out = new PeImport[]
@@ -145,7 +155,10 @@ fun pe_collect_imports(image: ExeImage): PeImport[] {
         }
         let sym = image.symbols.data[r.symbol_index]
         if sym.external == 1 && pe_import_find(out, sym.name) < 0 {
-            let dll = pe_dll_for(sym.name)
+            let dll = pe_declared_dll(externs, sym.name)
+            if dll.len == 0 {
+                dll = pe_dll_for(sym.name)
+            }
             if dll.len == 0 {
                 pe_die("unknown external symbol: " + sym.name)
             }
@@ -441,8 +454,8 @@ fun pe_build_headers(image: ExeImage, rdata: u8[], dlls: PeDll[], data_rva: i64)
     }
     ret out
 }
-fun pe_build_exe(image: ExeImage): u8[] {
-    let imports = pe_collect_imports(image)
+fun pe_build_exe(image: ExeImage, externs: AstExternDef[]): u8[] {
+    let imports = pe_collect_imports(image, externs)
     let dlls = pe_make_dlls(imports)
     pe_add_thunks(image, imports)
     let rdata_rva = pe_align(4096 + image.text.len, 4096)
@@ -459,8 +472,8 @@ fun pe_build_exe(image: ExeImage): u8[] {
     pe_pad(out, 512, 0)
     ret out
 }
-fun pe_write_exe(path: str, image: ExeImage): i64 {
-    let out = pe_build_exe(image)
+fun pe_write_exe(path: str, image: ExeImage, externs: AstExternDef[]): i64 {
+    let out = pe_build_exe(image, externs)
     write_file(path, out)
     ret out.len
 }

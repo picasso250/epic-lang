@@ -72,17 +72,20 @@ class Parser:
     def parse_program(self):
         funcs = []
         structs = []
+        externs = []
         self.skip_newlines()
-        while self.peek()[0] in ("FUN", "TYPE"):
+        while self.peek()[0] in ("FUN", "TYPE", "EXTERN"):
             if self.peek_kind("FUN"):
                 funcs.append(self.parse_fn_def())
+            elif self.peek_kind("EXTERN"):
+                externs.append(self.parse_extern_def())
             else:
                 structs.append(self.parse_struct_def())
             self.skip_newlines()
         if self.peek()[0] != "EOF":
             t = self.peek()
             raise ParseError(f"Unexpected token {t[0]}('{t[1]}')", t[2])
-        return ProgramNode(funcs=funcs, structs=structs)
+        return ProgramNode(funcs=funcs, structs=structs, externs=externs)
 
     # ── fun definition ─────────────────────────────────────────────────
 
@@ -118,7 +121,24 @@ class Parser:
             line=name[2],
         )
 
-    def parse_params(self):
+    def parse_extern_def(self):
+        self.expect("EXTERN")
+        library = self.expect("STRING")[1]
+        self.expect("FUN")
+        name = self.expect("ID")[1]
+        self.expect("LPAREN")
+        params = self.parse_params(max_params=64)
+        self.expect("RPAREN")
+        self.expect("COLON")
+        ret_type = self.parse_type()
+        self.expect_stmt_end()
+        if not library or "\x00" in library:
+            raise ParseError("extern requires a nonempty DLL name without NUL")
+        if ret_type not in ("i64", "void") or any(param.type != "i64" for param in params):
+            raise ParseError("v0 extern ABI supports only i64 parameters and i64/void results")
+        return ExternDefNode(library=library, name=name, params=params, ret_type=ret_type)
+
+    def parse_params(self, max_params=4):
         params = []
         if not self.peek_kind("ID"):
             return params
@@ -127,7 +147,7 @@ class Parser:
             self.expect("COLON")
             ptype = self.parse_type()
             params.append(Param(name=pname[1], type=ptype))
-            if len(params) > 4:
+            if len(params) > max_params:
                 raise ParseError("functions may have at most 4 parameters in v0", pname[2])
             if not self.check("COMMA"):
                 break
@@ -411,8 +431,6 @@ class Parser:
                 else:
                     args = self.parse_args()
                     self.expect("RPAREN")
-                    if len(args) > 4:
-                        raise ParseError("function calls may have at most 4 arguments in v0", t[2])
                     node = CallNode(name=name, args=args)
             else:
                 node = VarNode(name=name)

@@ -77,6 +77,7 @@ def _emit_runtime_helpers(emitter):
 def _merge_programs(input_paths, main_path):
     funcs = []
     structs = []
+    externs = []
     seen_funcs = {}
     seen_structs = {}
     found_main = False
@@ -86,6 +87,7 @@ def _merge_programs(input_paths, main_path):
         ast = _parse_file(input_path)
         is_main_file = os.path.abspath(input_path) == main_abs
 
+        externs.extend(ast.externs)
         for struct in ast.structs:
             if struct.name in seen_structs:
                 raise RuntimeError(
@@ -109,7 +111,7 @@ def _merge_programs(input_paths, main_path):
     if not found_main:
         raise RuntimeError(f"Main file has no main function: {main_path}")
 
-    return ProgramNode(funcs=funcs, structs=structs)
+    return ProgramNode(funcs=funcs, structs=structs, externs=externs)
 
 
 def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
@@ -139,11 +141,17 @@ def compile_files(input_paths, main_path=None, linker="py", out_dir=BUILD_DIR):
 
     stage_start = time.perf_counter()
     if linker == "py":
+        import json
+        manifest_path = os.path.splitext(obj_path)[0] + ".imports.json"
+        with open(manifest_path, "w", encoding="utf-8") as manifest:
+            json.dump({decl.name: decl.library for decl in ast.externs}, manifest)
         result = subprocess.run(
-            [sys.executable, LINK_PY, obj_path, "-o", exe_path],
+            [sys.executable, LINK_PY, obj_path, "-o", exe_path, "--import-map", manifest_path],
             capture_output=True, text=True,
         )
     else:
+        if ast.externs:
+            raise RuntimeError("experimental v0 extern is supported only with the Python linker")
         result = subprocess.run(
             [LLD_LINK, "/subsystem:console", "/timestamp:0", f"/entry:_start",
              f"/out:{exe_path}", obj_path,

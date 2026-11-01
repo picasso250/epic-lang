@@ -43,6 +43,11 @@ def main():
     expect_rejected("type Expr = Lit | Add\nfun main(): void {\n}\n")
 
     parse("fun choose(x: i64): i64 {\nfor x {\nret x\n}\nret 0\n}\n")
+    early = parse('extern "kernel32.dll" fun GetCurrentProcessId(): i64\nfun main(): void {\n}\n')
+    assert early.externs[0].library == "kernel32.dll"
+    assert early.externs[0].ret_type == "i64"
+    expect_rejected('extern "kernel32.dll" fun Sleep(ms: str): void\n')
+    expect_rejected('extern "" fun Sleep(ms: i64): void\n')
     expect_rejected("fun main(): void {\nreturn\n}\n")
     expect_rejected("fun main(): void {\nwhile 1 {\n}\n}\n")
 
