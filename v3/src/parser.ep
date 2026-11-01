@@ -108,7 +108,16 @@ type AstFunDef {
     source_path: str
     line: i64
 }
+type AstExternDef {
+    library: str
+    name: str
+    type_name: str
+    params: AstParam[]
+    source_path: str
+    line: i64
+}
 type AstProgram {
+    externs: AstExternDef[]
     funcs: AstFunDef[]
     structs: AstStructDef[]
     enums: AstEnumDef[]
@@ -361,6 +370,7 @@ fun ast_program(): AstProgram {
     program.funcs = new AstFunDef[]
     program.structs = new AstStructDef[]
     program.enums = new AstEnumDef[]
+    program.externs = new AstExternDef[]
     ret program
 }
 fun make_parser_at(tokens: Token[], source_path: str): Parser {
@@ -402,7 +412,7 @@ fun parse_error(line: i64, msg: str): void {
     print(": ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret
 }
 fun expect(p: Parser, kind: TokenKind): Token {
@@ -413,7 +423,7 @@ fun expect(p: Parser, kind: TokenKind): Token {
         print(": Unexpected token '")
         print(t.text)
         print("'\n")
-        os.ExitProcess(1)
+        ExitProcess(1)
     }
     ret t
 }
@@ -458,7 +468,7 @@ fun parse_type(p: Parser): str {
     }
     ret typ
 }
-fun parse_params(p: Parser): AstParam[] {
+fun parse_params(p: Parser, max_params: i64): AstParam[] {
     let params = new AstParam[]
     if !peek_kind(p, TokenKind.ID) {
         ret params
@@ -473,7 +483,7 @@ fun parse_params(p: Parser): AstParam[] {
         param.name = pname.text
         param.type_name = ptype
         push(params, param)
-        if len(params) > 4 {
+        if len(params) > max_params {
             parse_error(pname.line, "functions may have at most 4 parameters in v0")
         }
         if check(p, TokenKind.COMMA) == 0 {
@@ -541,7 +551,7 @@ fun parse_fn_def(p: Parser): AstFunDef {
     expect(p, TokenKind.FUN)
     let name = expect(p, TokenKind.ID)
     expect(p, TokenKind.LPAREN)
-    let params = parse_params(p)
+    let params = parse_params(p, 4)
     expect(p, TokenKind.RPAREN)
     expect(p, TokenKind.COLON)
     let ret_type = parse_type(p)
@@ -555,12 +565,37 @@ fun parse_fn_def(p: Parser): AstFunDef {
     node.body = body
     ret node
 }
+fun parse_extern_def(p: Parser): AstExternDef {
+    let keyword = expect(p, TokenKind.EXTERN)
+    let library = expect(p, TokenKind.STRING)
+    expect(p, TokenKind.FUN)
+    let name = expect(p, TokenKind.ID)
+    expect(p, TokenKind.LPAREN)
+    let params = parse_params(p, 64)
+    expect(p, TokenKind.RPAREN)
+    expect(p, TokenKind.COLON)
+    let result = parse_type(p)
+    expect_stmt_end(p)
+    if len(library.text) == 0 {
+        parse_error(keyword.line, "empty extern DLL name")
+    }
+    let decl = new AstExternDef
+    decl.library = library.text
+    decl.name = name.text
+    decl.type_name = result
+    decl.params = params
+    decl.line = keyword.line
+    decl.source_path = p.source_path
+    ret decl
+}
 fun parse_program(p: Parser): AstProgram {
     let node = ast_program()
     skip_newlines(p)
-    for peek_kind(p, TokenKind.FUN) == 1 || peek_kind(p, TokenKind.TYPE) == 1 {
+    for peek_kind(p, TokenKind.FUN) == 1 || peek_kind(p, TokenKind.TYPE) == 1 || peek_kind(p, TokenKind.EXTERN) == 1 {
         if peek_kind(p, TokenKind.FUN) == 1 {
             push(node.funcs, parse_fn_def(p))
+        } else if peek_kind(p, TokenKind.EXTERN) == 1 {
+            push(node.externs, parse_extern_def(p))
         } else {
             if p.tokens[p.pos + 2].kind == TokenKind.ASSIGN {
                 push(node.enums, parse_enum_def(p))
@@ -1134,11 +1169,11 @@ fun embed_resolve_path(source_path: str, path: str): str {
 }
 fun read_embed(source_path: str, path: str, line: i64): str {
     let resolved = embed_resolve_path(source_path, path)
-    let handle = os.CreateFileA(cstr(resolved), 2147483648, 1, 0, 3, 128, 0)
+    let handle = CreateFileA(cstr(resolved), 2147483648, 1, 0, 3, 128, 0)
     if handle == 4294967295 {
         parse_error(line, "embed file not found: " + path)
     }
-    os.CloseHandle(handle)
+    CloseHandle(handle)
     ret str(read_file(resolved))
 }
 fun parse_primary(p: Parser): AstExpr {
@@ -1191,9 +1226,6 @@ fun parse_primary(p: Parser): AstExpr {
             }
             let args = parse_args(p)
             expect(p, TokenKind.RPAREN)
-            if len(args) > 4 {
-                parse_error(identifier.line, "function calls may have at most 4 arguments in v0")
-            }
             ret parse_postfix(p, ast_call(identifier.text, args, identifier.line))
         }
         ret parse_postfix(p, ast_var(identifier.text, identifier.line))

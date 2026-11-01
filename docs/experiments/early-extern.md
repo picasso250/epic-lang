@@ -22,6 +22,20 @@ bootstrap, even before v3 introduced precise-width integer types.
   path and reaches a two-generation byte-identical fixed point.
 - Existing regression suites from v0 through v4 still pass.
 
+## Extended cross-generation demonstration
+
+- The v2 compiler parses, type-checks and encodes `extern` declarations, using
+  them as the source for import DLL resolution. Its own source now uses early
+  external declarations rather than the previous `os.*` calls.
+- v3 has the same declaration path and can compile and execute a native call
+  with seven parameters across `kernel32.dll` and `user32.dll`.
+- v4 compiler source likewise uses external declarations, and the full chain
+  from Python v0 through v4 builds successfully. The v4 bootstrap binary is
+  byte-identical across its two independent self-compilation runs.
+- v2 and v3 regression suites were rerun after correcting pointer type scope:
+  raw `ptr` is valid in external declarations but is not accidentally made a
+  general source-language value type.
+
 ## Limits / unfinished
 
 - This **does not remove** the historical `os.*` language mechanism yet.

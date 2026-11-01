@@ -1,3 +1,8 @@
+# Bootstrap Win32 imports; platform ABI types are intentionally minimal here.
+extern "kernel32.dll" fun GetTickCount64(): i64
+extern "kernel32.dll" fun CreateFileA(path: ptr, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
+extern "kernel32.dll" fun CloseHandle(handle: i64): i64
+
 #
 # Epic self-hosted compiler driver.
 #
@@ -11,7 +16,7 @@ fun die_driver(msg: str): void {
     print("epic: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret
 }
 fun write_output(path: str, data: u8[]): void {
@@ -45,7 +50,10 @@ fun has_main(ast: AstProgram): i64 {
     }
     ret 0
 }
-fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64): i64 {
+fun merge_one(out: AstProgram, ast: AstProgram, is_main_file: i64) : i64 {
+    for extern_i: 0:len(ast.externs) {
+        push(out.externs, ast.externs[extern_i])
+    }
     for struct_i: 0:len(ast.structs) {
         let s = ast.structs[struct_i]
         push(out.structs, s)
@@ -113,14 +121,14 @@ fun main(): void {
     let phase_start = 0
     let now = 0
     if options.verbose == 1 {
-        total_start = os.GetTickCount64()
+        total_start = GetTickCount64()
         phase_start = total_start
     }
 
     let ast = merge_inputs(options.inputs)
     let parse_ms = 0
     if options.verbose == 1 {
-        now = os.GetTickCount64()
+        now = GetTickCount64()
         parse_ms = now - phase_start
         phase_start = now
     }
@@ -128,7 +136,7 @@ fun main(): void {
     sema_check(ast)
     let sema_ms = 0
     if options.verbose == 1 {
-        now = os.GetTickCount64()
+        now = GetTickCount64()
         sema_ms = now - phase_start
         phase_start = now
     }
@@ -146,7 +154,7 @@ fun main(): void {
     emit_program(e, ast)
     let codegen_ms = 0
     if options.verbose == 1 {
-        now = os.GetTickCount64()
+        now = GetTickCount64()
         codegen_ms = now - phase_start
         phase_start = now
     }
@@ -158,19 +166,19 @@ fun main(): void {
     } else {
         let image = asm_encode(e.program)
         if options.verbose == 1 {
-            now = os.GetTickCount64()
+            now = GetTickCount64()
             encode_ms = now - phase_start
             phase_start = now
         }
-        write_output(output_path, pe_build_exe(image))
+        write_output(output_path, pe_build_exe(image, ast.externs))
         if options.verbose == 1 {
-            write_ms = os.GetTickCount64() - phase_start
+            write_ms = GetTickCount64() - phase_start
         }
     }
 
     let total_ms = 0
     if options.verbose == 1 {
-        total_ms = os.GetTickCount64() - total_start
+        total_ms = GetTickCount64() - total_start
     }
     print_timing(options.verbose, "parse+merge", parse_ms)
     print_timing(options.verbose, "sema", sema_ms)

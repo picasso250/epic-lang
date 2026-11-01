@@ -42,6 +42,7 @@ type EmitterState {
     temp_peak: i64
     locals: Local[]
     funcs: FuncInfo[]
+    externs: AstExternDef[]
     strings: StringLit[]
     structs: StructInfo[]
     enums: AstEnumDef[]
@@ -52,7 +53,7 @@ fun die(msg: str): void {
     print("Codegen error: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret
 }
 fun named_symbol(e: EmitterState, name: str): i64 {
@@ -189,6 +190,7 @@ fun make_emitter(): EmitterState {
     e.temp_peak = 0
     e.locals = new Local[]
     e.funcs = new FuncInfo[]
+    e.externs = new AstExternDef[]
     e.strings = new StringLit[]
     e.structs = new StructInfo[]
     e.enums = new AstEnumDef[]
@@ -515,7 +517,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
     print(".")
     print(field_name)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret new FieldInfo
 }
 fun ensure_array_layout(e: EmitterState, elem: str): i64 {
@@ -875,6 +877,14 @@ fun spill_typed_args(e: EmitterState, args: AstExpr[], info: FuncInfo): i64[] {
     }
     ret slots
 }
+fun find_extern_index(e: EmitterState, name: str): i64 {
+    for i: 0:len(e.externs) {
+        if e.externs[i].name == name {
+            ret i
+        }
+    }
+    ret -1
+}
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
     if expr.type_name == "" && sema_is_integer(name) == 1 {
@@ -889,6 +899,13 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         ret 0
     }
     let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
+    let external = -1
+    if expr.type_name == "" {
+        external = find_extern_index(e, name)
+    }
+    if external >= 0 {
+        sys_symbol = name
+    }
     if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
@@ -2246,6 +2263,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     ret 0
 }
 fun emit_program(e: EmitterState, ast: AstProgram): i64 {
+    e.externs = ast.externs
     e.enums = ast.enums
     compute_struct_layouts(e, ast)
     add_func_infos(e, ast)
@@ -2277,6 +2295,9 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     emit_extern(e, "MessageBoxA")
     emit_extern(e, "SetLastError")
     emit_extern(e, "Sleep")
+    for extern_i: 0:len(ast.externs) {
+        emit_extern(e, ast.externs[extern_i].name)
+    }
     asm_section_data(e.program)
     emit_label(e, "_written")
     asm_dd(e.program, 0)

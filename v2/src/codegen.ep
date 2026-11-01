@@ -44,6 +44,7 @@ type EmitterState {
     temp_peak: i64
     locals: Local[]
     funcs: FuncInfo[]
+    externs: AstExternDef[]
     strings: StringLit[]
     structs: StructInfo[]
     enums: AstEnumDef[]
@@ -54,7 +55,7 @@ fun die(msg: str): i64 {
     print("Codegen error: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret 0
 }
 fun out_s(e: EmitterState, s: str): i64 {
@@ -277,6 +278,7 @@ fun make_emitter(): EmitterState {
     e.temp_peak = 0
     e.locals = new Local[]
     e.funcs = new FuncInfo[]
+    e.externs = new AstExternDef[]
     e.strings = new StringLit[]
     e.structs = new StructInfo[]
     e.enums = new AstEnumDef[]
@@ -548,7 +550,7 @@ fun find_field_info(e: EmitterState, struct_name: str, field_name: str): FieldIn
     print(".")
     print(field_name)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret new FieldInfo
 }
 fun ensure_array_layout(e: EmitterState, elem: str): i64 {
@@ -761,9 +763,26 @@ fun load_spilled_args(e: EmitterState, slots: i64[]): i64 {
     }
     ret 0
 }
+fun find_extern_index(e: EmitterState, name: str): i64 {
+    let i = 0
+    for i < e.externs.len {
+        if e.externs.data[i].name == name {
+            ret i
+        }
+        i = i + 1
+    }
+    ret 0 - 1
+}
 fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
     let name = expr.name
     let sys_symbol = sys_member_symbol(expr.type_name, expr.name)
+    let external = 0 - 1
+    if expr.type_name == "" {
+        external = find_extern_index(e, name)
+    }
+    if external >= 0 {
+        sys_symbol = name
+    }
     if sys_symbol != "" {
         let slots = new i64[]
         let i = 0
@@ -771,7 +790,7 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
             let arg = expr.args.data[i]
             let arg_type = expr_type(e, arg)
             emit_expr(e, arg)
-            if arg_type.kind == "str" {
+            if arg_type.kind == "str" && external < 0 {
                 emit_mov(e, "rax", "[rax]")
             }
             let slot = temp_save_rax(e)
@@ -989,6 +1008,9 @@ fun emit_call_expr(e: EmitterState, expr: AstExpr): i64 {
         emit_call_inst(e, "_extend_u8")
         emit_inst(e, "xor eax, eax")
         ret 0
+    }
+    if expr.args.len > 4 {
+        die("ordinary calls accept no more than 4 arguments")
     }
     let call_slots = spill_args(e, expr.args)
     load_spilled_args(e, call_slots)
@@ -1787,6 +1809,7 @@ fun emit_fn_def(e: EmitterState, fn: AstFunDef): i64 {
     ret 0
 }
 fun emit_program(e: EmitterState, ast: AstProgram): i64 {
+    e.externs = ast.externs
     e.enums = ast.enums
     compute_struct_layouts(e, ast)
     add_func_infos(e, ast)
@@ -1818,6 +1841,11 @@ fun emit_program(e: EmitterState, ast: AstProgram): i64 {
     out_line(e, "extern MessageBoxA")
     out_line(e, "extern SetLastError")
     out_line(e, "extern Sleep")
+    let extern_i = 0
+    for extern_i < ast.externs.len {
+        out_line(e, "extern " + ast.externs.data[extern_i].name)
+        extern_i = extern_i + 1
+    }
     out_line(e, "default rel")
     out_nl(e)
     out_line(e, "section .data")

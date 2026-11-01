@@ -1,3 +1,5 @@
+extern "kernel32.dll" fun ExitProcess(code: i64): void
+
 #
 # Epic's structured private NASM-subset assembler. Codegen builds AsmProgram
 # directly; runtime/*.asm enters through the parser below.
@@ -74,7 +76,7 @@ fun asm_die(msg: str): void {
     print("assembler: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret
 }
 fun asm_slice(s: str, start: i64, end: i64): str {

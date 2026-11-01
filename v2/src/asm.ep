@@ -43,7 +43,7 @@ fun asm_die(msg: str): i64 {
     print("assembler: ")
     print(msg)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret 0
 }
 fun asm_slice(s: str, start: i64, end: i64): str {

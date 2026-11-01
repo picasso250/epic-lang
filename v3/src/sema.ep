@@ -39,7 +39,7 @@ fun sema_error(path: str, line: i64, message: str): void {
     print(": semantic error: ")
     print(message)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret
 }
 fun sema_duplicate(path: str, line: i64, what: str, first: str): void {
@@ -51,7 +51,7 @@ fun sema_duplicate(path: str, line: i64, what: str, first: str): void {
     print("; first declared at ")
     print(first)
     print("\n")
-    os.ExitProcess(1)
+    ExitProcess(1)
     ret
 }
 fun sema_state(): SemaState {
@@ -366,6 +366,31 @@ fun sema_validate_structs(state: SemaState, ast: AstProgram): i64 {
             j += 1
         }
         i += 1
+    }
+    ret 0
+}
+fun sema_collect_externs(state: SemaState, ast: AstProgram): i64 {
+    for i: 0:len(ast.externs) {
+        let decl = ast.externs[i]
+        let first = sema_find_func(state, decl.name)
+        if first.name != "" {
+            sema_error(decl.source_path, decl.line, "duplicate extern function '" + decl.name + "'")
+        }
+        if decl.type_name != "void" {
+            sema_validate_value_type(state, decl.source_path, decl.line, decl.type_name)
+        }
+        let sig = sema_signature(decl.name, decl.type_name)
+        sig.source_path = decl.source_path
+        sig.line = decl.line
+        sig.builtin = 0
+        for j: 0:len(decl.params) {
+            let param = decl.params[j]
+            if param.type_name != "ptr" {
+                sema_validate_value_type(state, decl.source_path, param.line, param.type_name)
+            }
+            push(sig.param_types, param.type_name)
+        }
+        push(state.funcs, sig)
     }
     ret 0
 }
@@ -1582,6 +1607,7 @@ fun sema_check(ast: AstProgram): i64 {
     sema_collect_type_names(state, ast)
     sema_validate_enums(state, ast)
     sema_validate_structs(state, ast)
+    sema_collect_externs(state, ast)
     sema_collect_functions(state, ast)
     sema_validate_main(state)
     sema_check_bodies(state, ast)

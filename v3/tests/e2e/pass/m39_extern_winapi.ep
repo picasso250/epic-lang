@@ -1,0 +1,13 @@
+# EXIT: 0
+# STDOUT: extern-ok
+# Stage-0 i64-only FFI: explicit raw pointer from the old NUL-terminated str.
+extern "kernel32.dll" fun GetCurrentProcessId(): i64
+extern "kernel32.dll" fun CreateFileA(path: ptr, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
+extern "user32.dll" fun GetDesktopWindow(): i64
+fun main(): void {
+    let path = "not-a-real-epic-file-a8f6b3f4.txt"
+    let handle = CreateFileA(cstr(path), 2147483648, 1, 0, 3, 128, 0)
+    if handle + 1 == 0 && GetCurrentProcessId() > 0 && GetDesktopWindow() != 0 {
+        print("extern-ok\n")
+    }
+}
