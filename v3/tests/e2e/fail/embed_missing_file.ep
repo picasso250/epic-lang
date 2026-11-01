@@ -1,0 +1,4 @@
+# COMPILE_ERROR: embed file not found: epic-missing-embed-20261101-never-create.bin
+fun main(): void {
+    let content = embed("epic-missing-embed-20261101-never-create.bin")
+}

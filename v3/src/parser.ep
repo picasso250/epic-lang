@@ -1160,7 +1160,7 @@ fun embed_resolve_path(source_path: str, path: str): str {
 fun read_embed(source_path: str, path: str, line: i64): str {
     let resolved = embed_resolve_path(source_path, path)
     let handle = CreateFileA(cstr(resolved), 2147483648, 1, 0, 3, 128, 0)
-    if handle == 4294967295 {
+    if handle == 0 - 1 {
         parse_error(line, "embed file not found: " + path)
     }
     CloseHandle(handle)

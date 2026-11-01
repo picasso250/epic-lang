@@ -71,6 +71,33 @@ def main() -> int:
             print(f"  FAIL  embedded byte program returned {process.returncode}, expected 42")
             return 1
 
+        # An existing empty asset is valid; it must not be confused with a missing one.
+        (source_dir / "empty.bin").write_bytes(b"")
+        (source_dir / "empty_embed.ep").write_text(
+            """fun main(): void {
+    let content = embed("empty.bin")
+    if len(content) != 0 {
+        exit(1)
+    }
+}
+""",
+            encoding="utf-8",
+        )
+        empty_executable = isolated / "empty_embed.exe"
+        result = subprocess.run(
+            [str(compiler), "-o", str(empty_executable), "src/empty_embed.ep"],
+            cwd=isolated,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0 or not empty_executable.is_file():
+            print(f"  FAIL  valid empty embed was rejected: {result.stdout} {result.stderr}")
+            return 1
+        if subprocess.run([str(empty_executable)], cwd=isolated, timeout=5).returncode != 0:
+            print("  FAIL  valid empty embed did not evaluate to zero-length bytes")
+            return 1
+
         result = subprocess.run(
             [str(compiler), "src/main.ep", "-S"],
             cwd=isolated,

@@ -83,6 +83,19 @@ def main() -> int:
             print(f"  FAIL  legacy os.* call was accepted or rejected incorrectly: {result.stdout}")
             return 1
 
+        # A missing embed must be an error, not silently become an empty byte array.
+        (source_dir / "missing_embed.ep").write_text(
+            """fun main(): void {
+    let content = embed("epic-missing-embed-20261101-never-create.bin")
+}
+""",
+            encoding="utf-8",
+        )
+        result = compile_program(compiler, isolated, "src/missing_embed.ep")
+        if result.returncode == 0 or "embed file not found: epic-missing-embed-20261101-never-create.bin" not in result.stdout:
+            print(f"  FAIL  missing embed was not rejected: {result.stdout} {result.stderr}")
+            return 1
+
     print("  PASS  isolated compiler, a.exe default, -o, and mutable embedded bytes")
     return 0
 

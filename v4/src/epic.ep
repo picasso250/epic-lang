@@ -1,7 +1,10 @@
 # Explicit Win32 imports shared by the compiler source.
+# The v3 bootstrap compiler cannot expose ptr as an extern return or a typed
+# local, so HANDLE returns and nullable pointer lanes remain i64 here.
+# v4 user programs can declare the fully typed ptr/u32/i32 Win32 signature.
 extern "kernel32.dll" fun GetTickCount64(): i64
-extern "kernel32.dll" fun CreateFileA(path: ptr, access: i64, share: i64, security: i64, creation: i64, flags: i64, template: i64): i64
-extern "kernel32.dll" fun CloseHandle(handle: i64): i64
+extern "kernel32.dll" fun CreateFileA(path: ptr, access: u32, share: u32, security: i64, creation: u32, flags: u32, template: i64): i64
+extern "kernel32.dll" fun CloseHandle(handle: i64): i32
 
 #
 # Epic self-hosted compiler driver.
